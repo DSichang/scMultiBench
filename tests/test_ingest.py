@@ -1,7 +1,7 @@
 import numpy as np
 import h5py
 import pytest
-from multibench.run import ingest
+from multibench.engine import ingest
 
 
 def test_canonical_passthrough(tmp_path):

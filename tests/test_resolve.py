@@ -1,6 +1,6 @@
 import pytest
 
-from multibench.run import resolve
+from multibench.engine import resolve
 
 
 def _make_data(tmp_path):

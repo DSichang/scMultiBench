@@ -8,7 +8,7 @@ from . import plot as plot_ns
 
 
 def _cmd_list(args) -> int:
-    from .run import registry
+    from .engine import registry
     for m in registry.list_methods(category=args.category, task=args.task):
         print(m)
     return 0
@@ -66,7 +66,7 @@ def _cmd_evaluate(args) -> int:
 
 
 def _cmd_env(args) -> int:
-    from .run import envs
+    from .engine import envs
     cmd = args.env_cmd
     if cmd == "status":
         for r in envs.status():

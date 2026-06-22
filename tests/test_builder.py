@@ -1,4 +1,4 @@
-from multibench.run import registry, builder
+from multibench.engine import registry, builder
 
 
 def test_scalex_command():

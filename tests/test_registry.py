@@ -1,4 +1,4 @@
-from multibench.run import registry
+from multibench.engine import registry
 
 
 def test_all_methods_declared():

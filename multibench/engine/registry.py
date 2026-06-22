@@ -27,7 +27,7 @@ def _parse_method(d: dict) -> MethodSpec:
     return MethodSpec(
         id=d["id"], language=d.get("language", "python"),
         categories=d.get("categories", []), tasks=d.get("tasks", []),
-        env=d.get("env", ""), atac=d.get("atac"), needs_labels=d.get("needs_labels", False),
+        atac=d.get("atac"), needs_labels=d.get("needs_labels", False),
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
         variants=[_parse_variant(v) for v in d.get("variants", [])],
         env_spec=d.get("env_spec", {}) or {},

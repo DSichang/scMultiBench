@@ -1,4 +1,4 @@
-from multibench.run import schema
+from multibench.engine import schema
 
 
 def test_argspec_positional_vs_flag():
@@ -21,7 +21,7 @@ def test_variant_matches_category_and_modalities():
 
 def test_methodspec_select_variant():
     spec = schema.MethodSpec(
-        id="M", language="python", categories=["mosaic"], tasks=["clustering"], env="m",
+        id="M", language="python", categories=["mosaic"], tasks=["clustering"],
         variants=[
             schema.Variant(when={"category": "mosaic", "modalities": ["rna", "adt"]},
                            entrypoint="adt.py", language="python", args=[],

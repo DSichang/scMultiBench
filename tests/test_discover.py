@@ -28,7 +28,7 @@ def test_top_level_find_methods():
 # --- modalities= filter ---
 
 def test_modality_types_mapping():
-    from multibench.run import registry
+    from multibench.engine import registry
     from multibench.discover import _modality_types
     assert _modality_types(registry.get("SCALEX")) == {"rna", "atac"}
     assert _modality_types(registry.get("Cobolt")) == {"rna", "atac"}
@@ -50,7 +50,7 @@ def test_find_methods_modalities_rna_atac():
 
 
 def test_find_methods_modalities_and_combined_with_category():
-    from multibench.run import registry
+    from multibench.engine import registry
     from multibench.discover import _modality_types
     ids = discover.find_methods(category="diagonal", modalities=["rna", "atac"])
     assert "SCALEX" in ids

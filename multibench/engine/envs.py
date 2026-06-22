@@ -33,7 +33,13 @@ def recipe(method: str) -> dict:
 
 
 def default_env_name(method: str) -> str:
-    """Default conda env name for a method: ``scmb_<method>``."""
+    """The method's OWN (singleton) env name, ``scmb_<method>``.
+
+    This is only the env name used when a method is NOT a member of any shared
+    group (see :func:`group_for`). It is NOT necessarily the env ``run()``
+    executes in: that is always :func:`group_for`, which returns the shared
+    group env for grouped methods and falls back to this name otherwise.
+    """
     return f"scmb_{method.lower()}"
 
 
@@ -200,7 +206,7 @@ def status(conda: str | None = None) -> list[dict]:
         grp = group_for(s.id)
         out.append({
             "method": s.id, "env": env, "group": grp,
-            "exists": env in have or grp in have or s.env in have,
+            "exists": env in have or grp in have,
             "difficulty": r.get("difficulty", "unknown"),
             "verified_working": bool(r.get("verified_working", False)),
             "has_recipe": bool(r),

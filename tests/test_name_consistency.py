@@ -1,5 +1,5 @@
 from multibench.data import catalog
-from multibench.run import registry
+from multibench.engine import registry
 
 
 def test_every_catalog_method_canonical_id_in_registry(files_dir):

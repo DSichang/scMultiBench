@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .. import config
-from . import builder, io, ingest, registry
+from . import builder, io, ingest, registry, envs
 
 
 @dataclass
@@ -77,7 +77,13 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         # initialized conda) so the default works even when bare `conda` is not
         # on the spawned subprocess's PATH; fall back to `conda`.
         conda = os.environ.get("CONDA_EXE", "conda")
-        cmd_template = f"{conda} run -n {spec.env} {{cmd}}"
+        # Resolve the env via the same group system that provisioning builds
+        # (mtb.env.plan/create/create_group), so "the env you provision is the
+        # env you run". group_for() returns a method's shared group env, or its
+        # own scmb_<method> env if it is not grouped. (The legacy per-method
+        # methods.yaml `env:` field is no longer consulted here.)
+        env_name = envs.group_for(method)
+        cmd_template = f"{conda} run -n {env_name} {{cmd}}"
     cmd = wrap_command(cmd, cmd_template)
 
     proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True)

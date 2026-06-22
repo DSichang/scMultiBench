@@ -2,8 +2,8 @@ from pathlib import Path
 
 import numpy as np
 import h5py
-from multibench.run import io as rio
-from multibench.run.schema import OutputSpec
+from multibench.engine import io as rio
+from multibench.engine.schema import OutputSpec
 
 
 def test_load_embedding_output(tmp_path):
@@ -34,7 +34,7 @@ def test_load_labels_output(tmp_path):
 
 
 def test_wrap_cmd_template():
-    from multibench.run import runner
+    from multibench.engine import runner
     wrapped = runner.wrap_command(["python", "x.py", "--a", "1"],
                                   cmd_template="conda run -n scalex {cmd}")
     assert wrapped[:4] == ["conda", "run", "-n", "scalex"]
@@ -43,7 +43,7 @@ def test_wrap_cmd_template():
 
 def test_run_invokes_subprocess_and_loads_output(tmp_path, monkeypatch):
     import multibench as mtb
-    from multibench.run import runner
+    from multibench.engine import runner
     import numpy as np, h5py
 
     calls = {}
@@ -69,7 +69,7 @@ def test_run_invokes_subprocess_and_loads_output(tmp_path, monkeypatch):
 
 def test_run_surfaces_stdout_and_stderr_on_failure(tmp_path, monkeypatch):
     import multibench as mtb
-    from multibench.run import runner
+    from multibench.engine import runner
     import pytest
 
     def fake_run(cmd, cwd, capture_output, text):

@@ -3,7 +3,6 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [clustering, batch]
-    env: scmb_torch_v2
     atac: gene_activity
     status: verified
     variants:
@@ -20,7 +19,6 @@ methods:
     language: python
     categories: [mosaic, vertical, cross]
     tasks: [clustering, batch]
-    env: multigrate
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
@@ -59,7 +57,6 @@ methods:
     language: R
     categories: [diagonal]
     tasks: [clustering, batch]
-    env: seurat_v5
     atac: peak
     status: verified
     variants:
@@ -78,7 +75,6 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [clustering, batch, classification]
-    env: scbridge
     atac: gene_activity
     needs_labels: true
     status: verified
@@ -102,7 +98,6 @@ methods:
     language: python
     categories: [vertical, mosaic, cross]
     tasks: [clustering]
-    env: totalvi
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -117,7 +112,6 @@ methods:
     language: python
     categories: [mosaic]
     tasks: [clustering]
-    env: multivi
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna, atac, rna_pair, atac_pair]}
@@ -134,7 +128,6 @@ methods:
     language: python
     categories: [mosaic]
     tasks: [clustering]
-    env: cobolt
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
@@ -152,7 +145,6 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
-    env: scmvp
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
@@ -163,13 +155,12 @@ methods:
           - {role: atac, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: scMM, language: python, categories: [vertical], tasks: [clustering], env: scmm, status: declared}
-  - {id: scMDC, language: python, categories: [vertical], tasks: [clustering], env: scmdc, status: declared}
+  - {id: scMM, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - {id: scMDC, language: python, categories: [vertical], tasks: [clustering], status: declared}
   - id: scMoMaT
     language: python
     categories: [vertical, mosaic, cross]
     tasks: [clustering]
-    env: scmomat
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -195,12 +186,11 @@ methods:
         extra_outputs:
           - {kind: graph, file: knn_dists.h5, dataset: data}
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
-  - {id: moETM, language: python, categories: [vertical], tasks: [clustering], env: moetm, status: declared}
+  - {id: moETM, language: python, categories: [vertical], tasks: [clustering], status: declared}
   - id: MIRA
     language: python
     categories: [vertical]
     tasks: [clustering]
-    env: mira
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
@@ -213,13 +203,12 @@ methods:
         output: {kind: graph, file: distancess.h5, dataset: data}
         extra_outputs:
           - {kind: graph, file: connectivities.h5, dataset: data}
-  - {id: Concerto, language: python, categories: [vertical], tasks: [clustering], env: concerto, status: declared}
-  - {id: Matilda, language: python, categories: [vertical], tasks: [clustering], env: matilda, status: declared}
+  - {id: Concerto, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - {id: Matilda, language: python, categories: [vertical], tasks: [clustering], status: declared}
   - id: VIMCCA
     language: python
     categories: [vertical]
     tasks: [clustering]
-    env: vimcca
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -242,7 +231,6 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [clustering]
-    env: vipcca
     atac: gene_activity
     status: verified
     variants:
@@ -258,7 +246,6 @@ methods:
     language: python
     categories: [mosaic]
     tasks: [clustering]
-    env: smile
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna_ref, atac_ref, rna_query, atac_query]}
@@ -275,7 +262,6 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [clustering]
-    env: portal
     atac: gene_activity
     status: verified
     variants:
@@ -291,7 +277,6 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [clustering]
-    env: uniport
     atac: gene_activity
     status: verified
     variants:
@@ -308,7 +293,6 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [clustering]
-    env: scican
     atac: gene_activity
     status: verified
     variants:
@@ -320,13 +304,12 @@ methods:
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: scJoint, language: python, categories: [diagonal], tasks: [classification], env: scjoint, status: declared}
-  - {id: GLUE, language: python, categories: [diagonal], tasks: [clustering], env: glue, status: declared}
+  - {id: scJoint, language: python, categories: [diagonal], tasks: [classification], status: declared}
+  - {id: GLUE, language: python, categories: [diagonal], tasks: [clustering], status: declared}
   - id: MultiMAP
     language: python
     categories: [diagonal]
     tasks: [clustering]
-    env: multimap
     atac: peak
     status: verified
     variants:
@@ -339,13 +322,12 @@ methods:
           - {role: atac_gas, flag: "--path3"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: SCALEX_cross, language: python, categories: [cross], tasks: [clustering], env: scalex, status: declared}
-  - {id: sciPENN, language: python, categories: [mosaic], tasks: [imputation], env: scipenn, status: declared}
+  - {id: SCALEX_cross, language: python, categories: [cross], tasks: [clustering], status: declared}
+  - {id: sciPENN, language: python, categories: [mosaic], tasks: [imputation], status: declared}
   - id: scMSI
     language: python
     categories: [vertical]
     tasks: [clustering]
-    env: scmsi
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -356,18 +338,17 @@ methods:
           - {role: adt, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: UnitedNet, language: python, categories: [cross], tasks: [clustering], env: unitednet, status: declared}
-  - {id: SPIRAL, language: python, categories: [cross], tasks: [registration], env: spiral, status: declared}
-  - {id: GPSA, language: python, categories: [cross], tasks: [registration], env: gpsa, status: declared}
-  - {id: PASTE, language: python, categories: [cross], tasks: [registration], env: paste, status: declared}
-  - {id: PASTE2, language: python, categories: [cross], tasks: [registration], env: paste2, status: declared}
-  - {id: iPOLNG, language: python, categories: [vertical], tasks: [clustering], env: ipolng, status: declared}
-  - {id: StabMap, language: R, categories: [mosaic], tasks: [clustering], env: stabmap, status: declared}
+  - {id: UnitedNet, language: python, categories: [cross], tasks: [clustering], status: declared}
+  - {id: SPIRAL, language: python, categories: [cross], tasks: [registration], status: declared}
+  - {id: GPSA, language: python, categories: [cross], tasks: [registration], status: declared}
+  - {id: PASTE, language: python, categories: [cross], tasks: [registration], status: declared}
+  - {id: PASTE2, language: python, categories: [cross], tasks: [registration], status: declared}
+  - {id: iPOLNG, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - {id: StabMap, language: R, categories: [mosaic], tasks: [clustering], status: declared}
   - id: UINMF
     language: R
     categories: [vertical, cross]
     tasks: [clustering]
-    env: uinmf
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -392,7 +373,6 @@ methods:
     language: R
     categories: [diagonal]
     tasks: [clustering]
-    env: inmf
     atac: gene_activity
     status: verified
     variants:
@@ -408,7 +388,6 @@ methods:
     language: R
     categories: [diagonal]
     tasks: [clustering]
-    env: online_inmf
     atac: gene_activity
     status: verified
     variants:
@@ -424,7 +403,6 @@ methods:
     language: R
     categories: [diagonal]
     tasks: [clustering]
-    env: conos
     atac: gene_activity
     status: verified
     variants:
@@ -436,13 +414,12 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: MOFA2, language: R, categories: [vertical], tasks: [clustering], env: mofa2, status: declared}
-  - {id: Seurat_v3, language: R, categories: [vertical], tasks: [clustering], env: seurat_v3, status: declared}
+  - {id: MOFA2, language: R, categories: [vertical], tasks: [clustering], status: declared}
+  - {id: Seurat_v3, language: R, categories: [vertical], tasks: [clustering], status: declared}
   - id: Seurat_WNN
     language: R
     categories: [vertical]
     tasks: [clustering]
-    env: seurat_wnn
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}

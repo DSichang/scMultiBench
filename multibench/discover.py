@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .run import registry
-from .run.runner import _AUX_ROLES
+from .engine import registry, envs
+from .engine.runner import _AUX_ROLES
 
 
 def _base_modality(role: str) -> str:
@@ -61,7 +61,9 @@ def method_info(method: str, files_dir: Path | str | None = None) -> dict:
     s = registry.get(method)
     info = {
         "id": s.id, "language": s.language, "categories": s.categories,
-        "tasks": s.tasks, "env": s.env, "atac": s.atac,
+        # `env` is the conda env run() actually executes in: the shared group
+        # env, or the method's own scmb_<method> env (see engine.envs.group_for).
+        "tasks": s.tasks, "env": envs.group_for(s.id), "atac": s.atac,
         "needs_labels": s.needs_labels, "status": s.status,
         "setup_hint": s.setup_hint,
         "variants": [v.entrypoint for v in s.variants],

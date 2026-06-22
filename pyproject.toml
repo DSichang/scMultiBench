@@ -17,10 +17,10 @@ eval = ["scib>=1.1"]
 multibench = "multibench.cli:main"
 
 [tool.setuptools]
-packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.run"]
+packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.engine"]
 
 [tool.setuptools.package-data]
-multibench = ["run/methods.yaml", "run/env_specs.yaml"]
+multibench = ["engine/methods.yaml", "engine/env_specs.yaml", "engine/env_groups.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

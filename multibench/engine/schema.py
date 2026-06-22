@@ -45,7 +45,6 @@ class MethodSpec:
     language: str
     categories: list[str]
     tasks: list[str]
-    env: str
     atac: str | None = None
     needs_labels: bool = False
     setup_hint: str = ""
