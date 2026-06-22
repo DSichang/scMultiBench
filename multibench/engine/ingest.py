@@ -34,6 +34,14 @@ def _to_anndata(src):
         df = pd.read_csv(p, sep=sep, index_col=None)
         return ad.AnnData(df.to_numpy(dtype=float))
     if suf == ".loom":
+        try:
+            import loompy  # noqa: F401  (anndata.read_loom needs it)
+        except ModuleNotFoundError as exc:
+            raise ImportError(
+                "reading .loom requires the optional 'loompy' package "
+                "(pip install 'multibench[loom]' or pip install loompy); "
+                "alternatively convert the input to .h5ad/.csv first."
+            ) from exc
         return ad.read_loom(p)
     raise ValueError(f"unsupported input format: {p.name}")
 

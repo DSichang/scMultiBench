@@ -38,7 +38,13 @@ def find_methods(category: str | None = None, task: str | None = None,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
                  modalities: list[str] | set[str] | None = None) -> list[str]:
-    """Return method ids matching all supplied filters."""
+    """Return method ids matching all supplied filters.
+
+    ``atac`` is an exact match on the method's declared ATAC representation;
+    valid values are ``"peak"`` or ``"gene_activity"`` (not a boolean flag).
+    ``modalities`` keeps methods that consume ALL of the requested base modality
+    types (e.g. ``["rna", "atac"]``).
+    """
     want = set(modalities) if modalities is not None else None
     out = []
     for s in registry.load():

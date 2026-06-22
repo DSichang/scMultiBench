@@ -12,6 +12,7 @@ dependencies = ["pandas>=2.0", "numpy>=1.24", "matplotlib>=3.7", "h5py>=3.8", "a
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
 eval = ["scib>=1.1"]
+loom = ["loompy>=3.0"]
 
 [project.scripts]
 multibench = "multibench.cli:main"

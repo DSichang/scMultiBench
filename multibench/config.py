@@ -57,7 +57,6 @@ class Config:
     result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result")
     files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
     repo_path: Path = field(default_factory=lambda: _ROOT / "scMultiBench_ref")
-    qc_path: Path = field(default_factory=lambda: _ROOT / "qc")
     data_path: Path = field(default_factory=lambda: _ROOT / "data")
 
 

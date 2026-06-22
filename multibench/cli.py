@@ -130,7 +130,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     pf = sub.add_parser("find")
     pf.add_argument("--category"); pf.add_argument("--task")
-    pf.add_argument("--needs-labels", action="store_true"); pf.add_argument("--atac")
+    pf.add_argument("--needs-labels", action="store_true")
+    pf.add_argument("--atac", choices=["peak", "gene_activity"],
+                    help="filter by ATAC representation the method consumes")
     pf.set_defaults(func=_cmd_find)
 
     pp = sub.add_parser("plot")
@@ -148,7 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     pr.set_defaults(func=_cmd_run)
 
     pe = sub.add_parser("evaluate")
-    pe.add_argument("--output", required=True); pe.add_argument("--category", required=True)
+    pe.add_argument("--output", required=True)
+    pe.add_argument("--category", help="reserved; not used by v1 metrics")
     pe.add_argument("--task", default="clustering")
     pe.add_argument("--labels"); pe.add_argument("--cluster"); pe.add_argument("--out")
     pe.set_defaults(func=_cmd_evaluate)

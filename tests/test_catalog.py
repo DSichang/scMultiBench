@@ -1,9 +1,12 @@
 from multibench.data import catalog
+from multibench.engine import registry
 
 
-def test_methods_table_has_40_rows(files_dir):
+def test_methods_table_matches_registry(files_dir):
     df = catalog.methods(files_dir)
-    assert len(df) == 40
+    # catalog and registry are 1:1 (every registry method has a catalog row)
+    assert len(df) == len(registry.load())
+    assert set(df["canonical_id"]) == {s.id for s in registry.load()}
     # normalized column names (no embedded newlines/spaces)
     assert "method" in df.columns
     assert "language" in df.columns
@@ -11,10 +14,10 @@ def test_methods_table_has_40_rows(files_dir):
     assert "tasks" in df.columns       # list-valued
 
 
-def test_methods_default_files_dir_returns_40_rows():
+def test_methods_default_files_dir_matches_registry():
     # called with NO argument -> config.DEFAULT.files_path
     df = catalog.methods()
-    assert len(df) == 40
+    assert len(df) == len(registry.load())
 
 
 def test_categories_are_split_into_lists(files_dir):

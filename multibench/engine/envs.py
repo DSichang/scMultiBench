@@ -183,13 +183,27 @@ def plan(category: str | None = None, methods: list[str] | None = None) -> list[
 
 # --- env existence / status -----------------------------------------------
 def installed_envs(conda: str | None = None) -> list[str]:
+    """Names (basenames) of existing conda envs.
+
+    Uses ``conda env list --json`` and returns the basename of each env prefix,
+    so path-only/prefix entries (e.g. basilisk caches) become clean names rather
+    than leaking raw filesystem paths.
+    """
+    import json
+    import os
     conda = conda or _conda_bin("conda")
     try:
-        out = subprocess.run([conda, "env", "list"], capture_output=True, text=True, check=True).stdout
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        out = subprocess.run([conda, "env", "list", "--json"],
+                             capture_output=True, text=True, check=True).stdout
+        prefixes = json.loads(out).get("envs", [])
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError, TypeError):
         return []
-    return [ln.split()[0] for ln in out.splitlines()
-            if ln.strip() and not ln.startswith("#")]
+    names: list[str] = []
+    for p in prefixes:
+        name = os.path.basename(str(p).rstrip("/"))
+        if name and name not in names:
+            names.append(name)
+    return names
 
 
 def env_exists(env_name: str, conda: str | None = None) -> bool:

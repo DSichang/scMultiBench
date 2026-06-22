@@ -39,3 +39,4 @@ Conos,R,No,Gene Activity,embedding,No,diagonal,clustering
 MOFA+,R,No,-,embedding,No,vertical,clustering
 Seurat_v3,R,No,-,embedding,No,vertical,clustering
 Seurat(WNN),R,No,-,graph,No,vertical,clustering
+Matilda,python,Yes,-,embedding,No,vertical,clustering
