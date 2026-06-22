@@ -1,0 +1,875 @@
+# Per-method environment recipes (generated). Loaded by scmbench.run.registry.
+# Regenerate from the env-recipe workflow output via tools: scripts/gen_env_specs.py
+SCALEX:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scalex
+  - scanpy
+  - h5py
+  - anndata
+  - numpy<2
+  pip_git: []
+  package_source: 'PyPI (package name: scalex; official repo jsxlei/SCALEX). torch is pulled in automatically as a scalex dependency.'
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMP: verified ran on GPU with `pip install scalex scanpy h5py ''numpy<2''` — this matches the script imports exactly (h5py, numpy, scanpy, scalex, anndata). Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/SCALEX/main_SCALEX.py. CLI: python main_SCALEX.py --path1 <rna.h5> --path2 <atac_gas.h5> --save_path <outdir>. Designed for diagonal integration: input is RNA (.h5) and ATAC-as-gene-activity-score (.h5); both read via h5py key ''matrix/data'' (transposed). Output is a joint embedding written to <save_path>/embedding.h5 under dataset ''data'' (from adata.obsm[''latent'']). Side effects: writes intermediate RNA-ATAC.h5ad and a ./pbmc_RNA_ATAC/ output dir in cwd, and calls SCALEX with gpu=0 (needs a CUDA GPU as the empirical run used). numpy<2 pin recommended for the 2023-era scalex/scanpy stack. anndata is a transitive dep of scanpy/scalex but listed for safety.'
+Multigrate:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scvi-tools<0.20
+  - multigrate==0.0.2
+  - muon
+  - numpy<2
+  - scanpy
+  - anndata
+  - pandas
+  - h5py
+  - scipy
+  pip_git: []
+  package_source: 'PyPI: `pip install multigrate==0.0.2` (latest release Nov 2022; imported as `multigrate as mtg`)'
+  difficulty: old-scvi
+  verified_working: true
+  caveats: 'Empirical ground truth: ran successfully with `pip install ''scvi-tools<0.20'' muon multigrate ''numpy<2''`. The multigrate 0.0.2 code path uses `scvi._compat`, which was REMOVED in scvi-tools 0.20 — so scvi-tools MUST be pinned <0.20 (e.g. 0.19.x). numpy<2 is required because main_Multigrate_mosaic_rna_adt.py uses np.mat (removed in numpy 2). Python must be >=3.9 and <3.11 per multigrate metadata; 3.9 chosen for the era. Method dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Multigrate/ (no space in name). Three entrypoints: main_Multigrate_paired_integration.py (vertical/cross integration for rna+adt, rna+adt+atac, multi rna+adt), main_Multigrate_mosaic_rna_adt.py (mosaic [RNA, RNA+ADT, ADT]), main_Multigrate_mosaic_rna_atac.py. Input is .h5 files with HDF5 layout matrix/data, matrix/barcodes, matrix/features (data transposed to cells x features). Output: embedding.h5 (dataset ''data'') + time.csv written to --save_path. Core API used: mtg.data.organize_multiome_anndatas, mtg.model.MultiVAE. muon used for ADT CLR normalization (muon.prot.pp.clr). torch comes transitively via scvi-tools; no explicit pin needed but let scvi-tools<0.20 resolve a compatible torch.'
+Seurat_v5:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base>=4.2
+  - r-seurat>=5.0
+  - r-signac
+  - r-dplyr
+  - r-ggplot2
+  - r-glue
+  - bioconductor-hdf5array
+  - bioconductor-rhdf5
+  - r-seuratdisk
+  - r-biocmanager
+  - r-hdf5r
+  pip_packages: []
+  pip_git: []
+  package_source: CRAN (Seurat v5, Signac) + Bioconductor (HDF5Array, rhdf5); see https://satijalab.org/seurat/ and https://stuartlab.org/signac/. Bridge integration uses PrepareBridgeReference/FindBridgeTransferAnchors introduced in Seurat v5.
+  difficulty: R
+  verified_working: true
+  caveats: 'Single entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Seurat_v5/main_Seurat_v5.Rmd (it is an R script, run with Rscript despite the .Rmd extension). Takes 5 POSITIONAL args: Rscript main_Seurat_v5.Rmd <rna1.h5> <rna2.h5> <atac_peak2.h5> <atac_peak3.h5> <save_path/>. In the documented run command rna1==rna2 and atac2==atac3 (same files passed twice). Diagonal integration of [RNA, ATAC] data where ATAC must be PEAK matrices (not gene activity); requires a multiome BRIDGE dataset (the obj.multi built from rna2+atac2). Output: joint embedding (UMAP cell.embeddings) written as embedding.h5 (via HDF5Array writeHDF5Array, name=''data'') plus time.csv. CRITICAL package needs: Seurat MUST be v5 (bridge functions PrepareBridgeReference/FindBridgeTransferAnchors/MapQuery are v5-only) and Signac (CreateChromatinAssay, RunTFIDF). HDF5 I/O uses Bioconductor rhdf5 (h5read, h5createFile, h5ls) and HDF5Array (writeHDF5Array). Input h5 layout: group ''matrix'' with datasets ''data'' (cells x features, transposed in script), ''features'', ''barcodes''. ATAC peak feature names must be formatted ''chr:start-end'' (sep=c('':'',''-'')). SCTransform is used so the sctransform package (Seurat dep) and glmGamPoi (optional, speeds SCT) may be wanted. EMP ground truth lists SeuratDisk; the actual script does not call SeuratDisk functions but it is harmless/expected in the Seurat env — included for parity. No requirements.txt/yaml/setup in the method dir; only the single Rmd. numpy<2 not applicable (pure R).'
+scBridge:
+  python_version: '3.10'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch==1.13.0
+  - scanpy==1.9.1
+  - scikit-learn==1.1.3
+  - scipy==1.9.3
+  - seaborn==0.12.0
+  - harmonypy==0.0.6
+  - matplotlib==3.5.3
+  - pandas==1.4.4
+  - anndata
+  - h5py
+  pip_git: []
+  package_source: 'local code in repo dir (/Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scBridge/ — main_scBridge.py + data_utils.py + model_utils.py + eval_utils.py); no installable package, scBridge is run as a script from its source dir (official source: github.com/XLearning-SCU/scBridge)'
+  difficulty: verified
+  verified_working: true
+  caveats: 'Diagonal-integration method (RNA + ATAC gene-activity-score). EMP: ran with torch + scanpy and local helper files (data_utils/model_utils/eval_utils.py) which must sit alongside main_scBridge.py and be on the import path (run from inside the scBridge dir). INPUT LAYOUT: requires --data_path pointing to a DIRECTORY (e.g. .../D27/) containing rna.h5 / atac_gas.h5 plus rna_cty.csv / atac_cty.csv label files, NOT single file paths; file names passed via --source_data/--target_data/--source_cty/--target_cty. ATAC must already be converted to gene activity score. Output: writes embedding.h5 (joint embedding, source+target concatenated) and Prediction.csv (predicted target labels) to --save_path. GPU REQUIRED: code is hardcoded with .cuda() (ce_weight.cuda(), Net(...).cuda()) and torch.cuda.manual_seed_all — will fail on CPU-only machines. Uses scanpy.external (sce) harmony, so harmonypy is needed. Note --umap_plot uses action=''store_false'' so it defaults to True (plotting on) unless the flag is passed. numpy<2 pinned (official env uses numpy 1.23.3); official environment.yml pins python 3.10.6, torch 1.13.0+cuda11.8, scanpy 1.9.1.'
+totalVI:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scvi-tools
+  - muon
+  - scanpy
+  - anndata
+  - h5py
+  - numpy<2
+  - pandas
+  - scipy
+  - torch
+  - seaborn
+  - scrublet
+  pip_git: []
+  package_source: PyPI (scvi-tools provides scvi.model.TOTALVI). totalVI is a model inside the scvi-tools package, not a standalone package. The scMultiBench wrapper scripts are local code in the repo dir.
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMP CONFIRMED RAN: pip install scvi-tools muon scanpy anndata h5py ''numpy<2''. totalVI is invoked via scvi.model.TOTALVI from the scvi-tools package; there is no separate "totalVI" PyPI package. Two entrypoints in /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/totalVI/: (1) main_totalVI.py for vertical/cross integration - inputs are RNA (.h5) and ADT (.h5) files passed via --path1 (one or more rna.h5) and --path2 (one or more adt.h5), output is a joint embedding written to <save_path>/embedding.h5 (dataset ''data'') plus a time.csv. Reads h5 via f[''matrix/data''] transposed. (2) main_totalVI_imputation.py for ADT imputation - takes --dataset_dir containing rna*.h5/adt*.h5/cty*.csv files, --holdout_batch, --transform_batch; additionally imports torch, seaborn, scrublet (scrublet is imported but not actually used in the logic; still must be installed or the import fails). Output imputation.h5. ''numpy<2'' is required because scvi-tools/scanpy of this era break with numpy>=2. muon is in the verified EMP install set (scanpy/anndata ecosystem dep) though not directly imported by these two scripts. torch installs as a dep of scvi-tools but is listed explicitly since the imputation script imports it directly. Dir name ''totalVI'' (no space).'
+MultiVI:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scvi-tools==0.20.3
+  - muon
+  - mudata
+  - scanpy
+  - anndata
+  - h5py
+  - numpy<2
+  - pandas
+  - scipy
+  - torch
+  - matplotlib
+  pip_git: []
+  package_source: 'PyPI: scvi-tools (provides scvi.model.MULTIVI). Method has no own package; the scMultiBench entrypoint is local code in the repo dir (main_MultiVI.py + util.py).'
+  difficulty: old-scvi
+  verified_working: false
+  caveats: 'Dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/MultiVI/ (main_MultiVI.py + local util.py — util.py MUST be importable from the same dir). EMPIRICAL: env (scvi-tools+muon+numpy<2) trains 500 epochs successfully but then FAILS at model.get_latent_representation() / save step — a scvi-version API mismatch — so it does NOT produce final embedding.h5 output. numpy<2 is REQUIRED: util.py uses np.mat / np.matrix (lines 28, 48-49, 56) which are removed in numpy>=2. The script uses OLD scvi API names: scvi.data.organize_multiome_anndatas, scvi.model.MULTIVI, and model.get_accessibility_estimates() (renamed to get_normalized_accessibility in scvi 1.x). This pins scvi-tools to the 0.20.x line (0.20.3 recommended) to match these calls; scvi 1.x will break on get_accessibility_estimates and likely the latent/save step. Input layout: mosaic integration expecting [RNA single (--path1), ATAC single (--path2), paired RNA+ATAC multiome (--pair_path1/--pair_path2)], each an .h5 with matrix/data, matrix/barcodes, matrix/features. Outputs (when working): embedding.h5 (joint embedding), imputed_rna.h5, imputed_atac.h5 in --save_path. Run: python main_MultiVI.py --path1 rna1.h5 --path2 atac3.h5 --pair_path1 rna2.h5 --pair_path2 atac2.h5 --save_path <out>. To get past the known failure, may need to align scvi-tools version with the API used at get_latent_representation()/save; if 0.20.3 still fails there, try nearby 0.19.x/0.20.x patch releases. GPU optional (train accelerator line is commented out; defaults to CPU/auto).'
+Cobolt:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - scipy
+  - torch
+  - h5py
+  - pandas
+  - scikit-learn
+  - umap-learn
+  - python-igraph
+  - leidenalg
+  - xgboost
+  - seaborn
+  pip_git:
+  - git+https://github.com/epurdom/cobolt.git#egg=cobolt
+  package_source: 'GitHub: git+https://github.com/epurdom/cobolt.git (NOT the PyPI package named ''cobolt'', which is an unrelated cobalt.tools API wrapper). Official README install: pip install git+https://github.com/epurdom/cobolt.git#egg=cobolt'
+  difficulty: verified
+  verified_working: true
+  caveats: 'Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Cobolt/main_Cobolt.py (the only file in the Cobolt dir; no requirements.txt/setup.py/yaml present locally). Imports: h5py, scipy, torch, numpy, pandas, and cobolt (from cobolt.model import Cobolt; from cobolt.utils import SingleData, MultiomicDataset). IMPORTANT package-source pitfall: `pip install cobolt` from PyPI installs the WRONG package (an async wrapper for cobalt.tools, requires Python>=3.12); the scMultiBench method is epurdom/cobolt and MUST be installed from GitHub. Empirical ground truth: pip install cobolt torch h5py ran successfully (cobolt resolved/installed alongside torch+h5py and produced output) — but use the git+ URL to guarantee the correct epurdom package. Mosaic-integration task: input is 4 .h5 files (path1=RNA single, path2=RNA of multiome, path3=ATAC of multiome, path4=ATAC single) in 10x-style HDF5 layout with groups matrix/data, matrix/barcodes, matrix/features (data is transposed then made csr). Output: writes embedding.h5 (dataset ''data'', transposed latent) and barcode.h5 into --save_path; joint embedding / dimension reduction. Run command (from script): python main_Cobolt.py --path1 rna1.h5 --path2 rna2.h5 --path3 atac2.h5 --path4 atac3.h5 --save_path <dir>. Trains 100 epochs, n_latent=10, default batch_size=128, lr=0.005. epurdom/cobolt setup.py pins no versions (python_requires>=3.7; README says >=3.8); pinned numpy<2 for 2023-era torch/scipy/numba(umap-learn) compatibility. Python 3.9 recommended for the method''s era and to satisfy torch/numba wheels.'
+scMVP:
+  python_version: '3.7'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch
+  - scanpy
+  - anndata>=0.7
+  - h5py
+  - pandas
+  - scikit-learn==0.22.2
+  - numba>=0.48
+  - scipy
+  - loompy
+  - tqdm
+  - matplotlib
+  - hyperopt==0.1.2
+  - xlrd==1.2.0
+  pip_git:
+  - git+https://github.com/bm2-lab/scMVP.git
+  package_source: Vendored locally in repo at /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scMVP/scMVP/ (has setup.py; package name "scMVP", version 0.0.1). Upstream is GitHub bm2-lab/scMVP (NOT on PyPI). Best to `pip install -e` the local dir so the bundled scMVP package is importable; the git+URL is the upstream fallback.
+  difficulty: verified
+  verified_working: true
+  caveats: 'Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scMVP/main_scMVP.py. Run: python main_scMVP.py --path1 rna.h5 --path2 atac.h5 --save_path OUT/ (vertical integration; output = joint embedding written to OUT/embedding.h5 plus time.csv). The scMVP package is bundled in-repo at scMVP/scMVP/scMVP/ and is imported as `from scMVP.inference import ...`; install it via the local setup.py (pip install -e the scMVP/scMVP dir) OR run with that dir on PYTHONPATH. EMP confirms `pip install scMVP torch scanpy` works; scMVP itself is GitHub-only (bm2-lab/scMVP), no PyPI package. MUST pin numpy<2: main_scMVP.py line 47 uses np.mat and dataset/dataset.py line 876 uses np.bool (both removed in numpy 2.x). setup.py pins scikit-learn==0.22.2 and Python 3.7. Script hardcodes use_cuda=True (GPU); set to False for CPU. Input h5 layout expected: matrix/data, matrix/barcodes, matrix/features. Script writes intermediate .mtx/.txt files next to the input rna/atac h5 files (needs write access to data dir). Dir name has no spaces (folder is exactly ''scMVP'').'
+scMM:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch
+  - torchvision
+  - torchnet
+  - pyro-ppl
+  - pandas
+  - scipy
+  - scikit-learn
+  - umap-learn
+  - h5py
+  - matplotlib
+  - seaborn
+  pip_git: []
+  package_source: local code in repo dir (tools_scripts/scMM/); scMM has no PyPI/pip package. Upstream is GitHub kodaim1115/scMM, but the scMultiBench copy is self-contained (main_scMM.py + local models/, datasets.py, objectives.py, utils.py, vis.py). Run via `python main_scMM.py` from inside the scMM dir.
+  difficulty: easy
+  verified_working: false
+  caveats: 'No empirical run available; recipe derived from imports + official repo (kodaim1115/scMM, PyTorch + Pyro). MUST pin numpy<2: main_scMM.py uses np.mat (removed in numpy 2.0) at lines 122-124,146-148. Key non-obvious deps: torchnet (provides torchnet.dataset.TensorDataset/ResampleDataset) and pyro-ppl (uses pyro.distributions.zero_inflated.ZeroInflatedNegativeBinomial in the VAE objectives). torchvision is imported but only for datasets/transforms/save_image. Local helper modules (models/, datasets.py RNA_Dataset/ATAC_Dataset, objectives.py, utils.py Timer/EarlyStopping) must be on PYTHONPATH, so run the script with cwd = the scMM dir. Input layout: each --path1/--path2 is one or more .h5 files with HDF5 groups matrix/data, matrix/barcodes, matrix/features (genes-by-cells count matrix). Two models: --model rna_protein (RNA+ADT/CITE-seq) and --model rna_atac (RNA+ATAC). The script writes intermediate scMM_data/ .mtx + barcode/gene/protein txt files next to each input, then trains a MoE-VAE and writes the joint embedding to <save_path>/embedding.h5 (dataset ''data''). Multiple matched pairs supported for cross/diagonal integration (first pair = train, additional pairs = test, concatenated into final embedding). matplotlib/seaborn/umap only needed if vis.py is invoked; the main embedding pipeline does not import vis. Run example: python main_scMM.py --path1 rna.h5 --path2 adt.h5 --save_path out/ --model rna_protein. GPU optional (falls back to CPU). torch/torchvision versions are flexible; any reasonably recent CPU build works since the code uses only standard nn/optim/distributions APIs.'
+scMDC:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch
+  - scanpy
+  - h5py
+  - scikit-learn
+  - scipy
+  - pandas
+  - munkres
+  pip_git: []
+  package_source: local code in repo dir (/Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scMDC). scMDC is not a pip package; the model code (main_scMDC.py, scMDC_batch.py, layers.py, utils.py, preprocess.py) ships in-repo, copied from the official repo https://github.com/xianglin226/scMDC. Run via `python main_scMDC.py ...`.
+  difficulty: easy
+  verified_working: false
+  caveats: 'No requirements.txt/setup.py/yaml in the method dir; recipe derived from imports + official GitHub README (xianglin226/scMDC). Pure-PyTorch method (no TensorFlow, no scvi-tools) so any reasonably recent torch works. MUST pin numpy<2: main_scMDC.py line 79 uses np.mat (removed in numpy 2.0). The ''munkres'' package is required by utils.py (from munkres import Munkres). All five .py files (main_scMDC.py, scMDC_batch.py, layers.py, utils.py, preprocess.py) must sit together in the same dir since they import each other locally (from utils import *, from scMDC_batch import ..., from preprocess import ..., from layers import ...). Input is .h5 files read with h5py expecting an HDF5 group ''matrix/data'' (e.g. rna.h5 as --path1, adt.h5/atac.h5 as --path2). CLI args: --path1/--path2 (one per batch; multiple paths allowed for multi-sample cross-integration), --save_path (embedding output), --nbatch, --n_clusters. Run commands documented inline in main_scMDC.py for RNA+ADT, RNA+ATAC, and multi-sample variants. Outputs latent embedding for clustering. No empirical run log available, so verified_working=false; a clean pip install of these deps should run on CPU or GPU.'
+scMoMaT:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scmomat
+  - torch
+  - h5py
+  - numpy<2
+  - scipy
+  - pandas
+  - scikit-learn
+  - umap-learn
+  - leidenalg
+  - matplotlib
+  pip_git: []
+  package_source: 'PyPI: scmomat (official repo github.com/PeterZZQ/scMoMaT; also installable via git+https://github.com/PeterZZQ/scMoMaT.git)'
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMPIRICALLY VERIFIED: `pip install scmomat torch h5py` ran successfully and produced graph output (knn_indices.h5). Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scMoMaT/main_scMoMaT.py (plus local helper /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scMoMaT/util.py which MUST be co-located, imported as `from util import ...`). Third-party imports: scmomat, torch, h5py, scipy, numpy, pandas (scmomat pulls in scikit-learn/umap-learn/leidenalg/matplotlib transitively). Input layout: per-modality .h5 count files passed via --path1 (RNA), --path2 (ADT), --path3 (ATAC), each read from group ''matrix/data'' and transposed (cells x features); supports vertical/cross/mosaic integration where ''None'' string entries denote missing modality per batch. Output: a joint k-NN graph written as knn_indices.h5 + knn_dists.h5 + umap_embedding.h5 in --save_path (this method produces a GRAPH/embedding output, not a corrected matrix). Runs CPU or CUDA automatically. numpy<2 pinned for compatibility with the torch/scipy 2023-era stack; official min reqs are numpy>=1.19.5, torch>=1.11, python>=3.8.10. main_scMoMaT_fs.py is the feature-score variant (requires --cty_path cell-type labels); the marker-score / retrain block in main_scMoMaT.py is commented out by default.'
+moETM:
+  python_version: '3.9'
+  conda_channels:
+  - conda-forge
+  conda_packages: []
+  pip_packages:
+  - numpy==1.21.4
+  - scipy==1.7.1
+  - pandas==1.3.4
+  - scanpy==1.9.1
+  - anndata==0.8.0
+  - matplotlib==3.4.3
+  - scikit-learn==1.3.0
+  - psutil==5.9.1
+  - scib==1.0.5
+  - h5py
+  - joblib
+  - torch==1.11.0
+  - leidenalg
+  - louvain
+  pip_git: []
+  package_source: local code in repo dir (scMultiBench_ref/tools_scripts/moETM); moETM is NOT a pip package — it is run as scripts cloned from https://github.com/manqizhou/moETM. The model code lives in the local moETM/ subpackage (moETM/build_model.py, moETM/train.py) plus utils.py, dataloader.py, eval_utils.py in the method dir.
+  difficulty: old-scvi
+  verified_working: false
+  caveats: 'Method dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/moETM (no space in name). Run scripts directly with cwd = method dir (relative imports `from moETM.build_model import ...`, `from eval_utils import evaluate`, `from dataloader import ...`, `from utils import calc_weight`). Entrypoints: main_moETM_rna_adt.py (RNA+ADT vertical integration), main_moETM_rna_atac.py, plus *_imputation.py variants. Example run: `python main_moETM_rna_adt.py --path1 rna.h5 --path2 adt.h5 --save_path <out>`. Input layout: per-modality .h5 files with HDF5 groups matrix/data (features x cells, transposed in code), matrix/barcodes, matrix/features. Output: writes <save_path>/embedding.h5 (dataset ''data'' = topic mixture ''delta'', cells x num_topic=100) and time.csv.
+
+
+    GPU REQUIRED: build_model.py and dataloader hardcode `.cuda()` and training moves minibatches `.to(''cuda'')` with no CPU fallback — will fail on a CPU-only machine.
+
+
+    Version pins matter (era: 2023, Python 3.9.5 / torch 1.11.0+cu102 per official README & requirements.txt): MUST pin numpy<2 (utils.py uses np.Inf, removed in numpy 2.0) — official pin numpy==1.21.4. MUST pin scipy==1.7.1 (eval_utils.py imports `from scipy.sparse.csr import spmatrix`, which was removed in scipy>=1.8). scib==1.0.5 is imported at the top of eval_utils.py (so it is needed for the module to import even though the entrypoint comments out the evaluate() call). Their requirements.txt lists `sklearn==1.3.0` (the deprecated meta-pkg name) — install scikit-learn==1.3.0 instead. Added leidenalg/louvain because eval_utils uses sc.tl.louvain/leiden (only on the evaluate path, which is commented out in main entrypoint, but kept for safety). h5py and joblib are imported by the scripts but absent from the official requirements.txt — add them.
+
+
+    torch==1.11.0 from PyPI is a CPU/CUDA-bundled build; for a specific CUDA (cu102/cu113) use the PyTorch wheel index. If exact old pins conflict on the target platform, a workable looser combo is numpy<2 + scipy<1.8 + scanpy==1.9.* + anndata==0.8.* + a CUDA-enabled torch."'
+MIRA:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - mira-multiome
+  - scanpy
+  - anndata
+  - h5py
+  - scipy
+  - numpy<2
+  - leidenalg
+  pip_git: []
+  package_source: 'PyPI: mira-multiome (the import name is `mira`; note the bare PyPI package `mira` is an unrelated project, so DO NOT install that one). PyTorch + Pyro are pulled in automatically as dependencies of mira-multiome.'
+  difficulty: blocked-script
+  verified_working: false
+  caveats: 'BLOCKED: The main entrypoint /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/MIRA/main_MIRA.py does `from logger import *` (line 9) but logger.py is MISSING from the MIRA dir (the dir contains ONLY main_MIRA.py). The script will ImportError at startup unless a logger.py is supplied/copied in. Empirically `pip install mira-multiome scanpy` installs cleanly, so the environment itself is fine — the blocker is the missing local helper file, not the deps. INSTALL: pip install mira-multiome scanpy (the rest are transitive but listed for safety). DEPS: mira-multiome auto-installs torch + pyro-ppl; no manual torch pin needed for CPU. numpy<2 pinned defensively (2023-era code; also avoids ABI issues with the older torch/numba that mira pulls in). RUN CMD (from the script comment): python main_MIRA.py --rna ../../data/.../rna.h5 --atac ../../data/.../atac.h5 --save_path ../../result/.../MIRA/  -- it is vertical RNA+ATAC integration. INPUT: HDF5 files read via h5py at ''matrix/data'', transposed to cells x features. OUTPUT: a JOINT GRAPH (not an embedding) -- writes distancess.h5 and connectivities.h5 (neighbor graph from mira.utils.make_joint_representation) to save_path. --acc default is ''gpu''; pass --acc cpu (or mps on this Mac) to run without a GPU; on CPU the script uses the ''light'' atac encoder. Trains topic models via mira.topics.gradient_tune which is slow. Dir name is plain ''MIRA'' (no spaces).'
+Concerto:
+  python_version: '3.8'
+  conda_channels:
+  - conda-forge
+  conda_packages: []
+  pip_packages:
+  - tensorflow==2.4.1
+  - numpy==1.19.5
+  - scanpy==1.7.1
+  - pandas==1.1.5
+  - scipy==1.5.4
+  - scikit-learn==0.24.2
+  - h5py==2.10.0
+  - umap-learn==0.5.1
+  - loompy==3.0.6
+  - openTSNE==0.4.4
+  - Pillow==8.4.0
+  - anndata
+  - protobuf<3.20
+  pip_git: []
+  package_source: 'local code in repo dir: the method''s own code (concerto_function5_3.py and the bundled bgi/ package) lives at /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Concerto/. There is no pip/conda package for Concerto itself; it is vendored from the official melobio/Concerto-reproducibility GitHub repo (the bgi package). Run main_Concerto.py from inside that directory so `import bgi` and `from concerto_function5_3 import *` resolve.'
+  difficulty: old-tensorflow
+  verified_working: false
+  caveats: 'Requires the pinned OLD TensorFlow 2.4.1 (uses tf.keras 2.4-era API, tf.io.TFRecordWriter pipeline, tf.train.Example feature protos). The official env (melobio/Concerto-reproducibility requirements.txt) is Python 3.6.2 + TF 2.4.1 + numpy 1.19.5 + scanpy 1.7.1 + pandas 1.1.5 + scipy 1.5.4 + sklearn 0.24.2 + h5py 2.10.0 + umap-learn 0.5.1 + loompy 3.0.6 + openTSNE 0.4.4. Python 3.8 chosen as the most installable target that still has official TF 2.4.1 cp38 wheels (Linux/macOS x86_64); avoid Python>=3.9 (no TF 2.4.1 wheel). numpy MUST be pinned to 1.19.5 (TF 2.4.1 hard-requires numpy~=1.19.2 and the code uses np.array on bytes; numpy<2 is mandatory). Add protobuf<3.20 to avoid the descriptor incompatibility error that breaks TF 2.4.1. NO requirements.txt/setup.py/yaml exists in the local Concerto dir, so deps are derived from imports (tensorflow, numpy, scanpy, pandas, h5py, scipy, random) plus the official repo requirements. Local helper files are mandatory: concerto_function5_3.py and the entire bgi/ subpackage (bgi/models/DeepSingleCell.py, bgi/losses/contrastive_loss.py, bgi/utils/data_utils.py, bgi/metrics/clustering_metrics.py, etc.) must be importable. Run command (from main_Concerto.py comments): vertical integration: python main_Concerto.py --path1 rna.h5 --path2 adt.h5 --save_path OUT/ ; cross integration: python main_Concerto.py --path1 rna1.h5 rna2.h5 --path2 adt1.h5 adt2.h5 --save_path OUT/. Input data layout: HDF5 .h5 files with datasets at matrix/data (cells x genes, transposed in code), matrix/barcodes, matrix/features. Output: embedding.h5 (dataset ''data'' = joint embedding / dimension reduction) plus time.csv in save_path. NOTE the script writes intermediate adata_RNA.h5ad, adata_Protein.h5ad, tfrecord/ and weight/ into the CURRENT working directory (''./''), so run it in a writable cwd. GPU optional (training is small, CPU works but slow). Not empirically verified to have produced output in this environment.'
+Matilda:
+  python_version: '3.7'
+  conda_channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  conda_packages:
+  - python=3.7
+  - pytorch=1.9.1
+  - torchvision=0.10.1
+  - cudatoolkit=11.1
+  pip_packages:
+  - numpy==1.19.5
+  - scipy==1.7.1
+  - pandas==1.3.4
+  - h5py==3.1.0
+  - scanpy==1.8.2
+  - captum==0.4.1
+  - tqdm==4.62.3
+  - pillow==8.4.0
+  pip_git: []
+  package_source: 'local code in repo dir (/Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Matilda); Matilda is not a pip/conda package, it is run as scripts. Upstream: https://github.com/PYangLab/Matilda'
+  difficulty: old-scvi
+  verified_working: false
+  caveats: 'No requirements.txt/setup.py/yaml inside the local dir; recipe derived from imports + official environment_matilda.yaml from github.com/PYangLab/Matilda. Official env: python=3.7.10, pytorch=1.9.1 (cuda11.1), torchvision=0.10.1, numpy 1.19.5, scipy 1.7.1, pandas 1.3.4, h5py 3.1.0, scanpy 1.8.2, tqdm 4.62.3, pillow 8.4.0. captum is imported by main_matilda_train.py and main_matilda_task.py (`from captum.attr import *`) but is MISSING from the official yaml — added captum==0.4.1 (compatible with torch 1.9.1). The ''old-scvi'' difficulty tag is the closest available marker for ''needs a pinned old framework'' (here: torch 1.9.1 + py3.7); no actual scvi-tools dependency. GPU: README says Matilda needs >=1 GPU and default --device is ''cuda''; pass --device cpu to run CPU-only (cudatoolkit then unneeded). On Apple Silicon/macOS the cuda11.1 pytorch build is unavailable — install CPU pytorch 1.9.1 instead and use --device cpu. numpy<2 is satisfied by the pinned numpy 1.19.5. RUN ORDER: must train first (main_matilda_train.py writes ../trained_model/<mode>/model_best.pth.tar and classify_dim.csv) then run main_matilda_task.py with --dim_reduce True for embedding output (writes embedding<index>.h5 to --save_path). Modes auto-detected: CITEseq (rna+adt), SHAREseq (rna+atac), TEAseq (rna+adt+atac). INPUT LAYOUT: rna/adt/atac as .h5 files with dataset ''matrix/data'' (and ''matrix/features'' read in task script via h5py); cell-type labels as .csv (header skipped via skiprows=1). Local helper files required and present: util.py, util_fs.py, learn/{model,model_rna,train,predict}.py. Scripts use relative paths (../trained_model, ../output) so run from inside the Matilda dir. Train script (main_matilda_train.py) only does augmentation+train; the integration EMBEDDING output for benchmarking comes from main_matilda_task.py --dim_reduce True.'
+VIMCCA:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scbean
+  - tensorflow==2.8.0
+  - tensorflow-probability==0.16.0
+  - astunparse
+  - keras==2.8.0
+  - protobuf<3.20
+  - numpy<2
+  - scanpy
+  - anndata
+  - h5py
+  - scipy
+  - pandas
+  - python-igraph
+  - louvain
+  pip_git: []
+  package_source: 'PyPI: scbean (provides scbean.model.vimcca); VIMCCA itself is the vimcca module inside the scbean package'
+  difficulty: old-tensorflow
+  verified_working: true
+  caveats: 'VIMCCA is NOT its own package - it is accessed via `from scbean.model import vimcca`, so install the PyPI package `scbean`. EMPIRICAL GROUND TRUTH (honored): scbean needs an OLD TensorFlow (~2.8) plus astunparse; newer TF breaks because `tensorflow.python.training.tracking.graph_view` was removed. NOTE the discrepancy: scbean''s own setup.py (github main) pins tensorflow==2.4.0 / tensorflow-probability==0.12.1 / keras==2.3.1, but those are too old to build on modern systems and the real runs succeeded with TF 2.8 - so pin tensorflow==2.8.0 (with matching keras==2.8.0 and tensorflow-probability==0.16.0, which is the TFP release compatible with TF 2.8). Add astunparse explicitly (TF 2.8 import path needs it). protobuf<3.20 is required to avoid the ''Descriptors cannot be created directly'' error with TF 2.8. numpy<2 required for the old TF/scanpy stack. Two entrypoint scripts in the dir: main_VIMCCA_RNA_ADT.py (vertical RNA+ADT integration, hidden_layers=[128,64,32,8], epochs=50) and main_VIMCCA_RNA_ATAC.py (RNA+ATAC, hidden_layers=[128,64,16,8], epochs=50, weight=5). Input: each modality is a separate .h5 file read at dataset ''matrix/data'' and transposed (cells x features); passed via --path1 (RNA), --path2 (ADT/ATAC), --save_path. Output: joint embedding written to <save_path>/embedding.h5 under dataset ''data''. Dir path has NO spaces. Method dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/VIMCCA/'
+VIPCCA:
+  python_version: '3.8'
+  conda_channels:
+  - conda-forge
+  conda_packages:
+  - python=3.8
+  pip_packages:
+  - vipcca
+  - tensorflow==2.8.0
+  - keras==2.8.0
+  - protobuf<3.20
+  - numpy<2
+  - scanpy
+  - anndata
+  - scipy
+  - pandas
+  - h5py
+  - python-igraph
+  - louvain
+  pip_git: []
+  package_source: 'PyPI: vipcca (pip install vipcca); upstream repo github.com/jhu99/vipcca, current PyPI version 0.2.7'
+  difficulty: old-tensorflow
+  verified_working: true
+  caveats: 'Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/VIPCCA/main_VIPCCA.py (only file in dir; no requirements.txt/setup.py locally). Imports: vipcca.tools.utils, vipcca.model.vipcca, scanpy, anndata, h5py, numpy, scipy. KEY VERSION CONFLICT: vipcca''s own setup.py pins tensorflow==2.4.0, but TF 2.4 is essentially uninstallable on modern macOS/Python-3.8+ wheels; EMPIRICAL ground truth confirms an OLD TensorFlow ~2.8 is what actually ran. With TF 2.8 you MUST install matching keras==2.8.0 (vipcca imports keras; standalone keras must match the TF minor or imports break) and protobuf<3.20 (TF 2.8 breaks on newer protobuf). numpy<2 is REQUIRED: data_loader uses np.mat (removed in numpy 2.x). On Apple Silicon, tensorflow 2.8.0 x86 wheels may not exist; may need tensorflow-macos==2.8.0 + tensorflow-metal, or run under x86 conda/Rosetta. Run command (from comment in script): python main_VIPCCA.py --path1 <rna.h5> --path2 <atac_gas.h5> --save_path <out_dir/>. Input layout: HDF5 files with dataset ''matrix/data'' (features x cells; script transposes to cells x features). For diagonal integration ATAC must be pre-converted to gene activity score (atac_gas.h5). Output: <save_path>/embedding.h5 with dataset ''data'' = joint embedding adata.obsm[''X_vipcca'']. Script writes intermediate files to ./atac_result/ (res_path) in cwd. epochs hardcoded to 20.'
+SMILE:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch
+  - scanpy
+  - anndata
+  - pandas
+  - scikit-learn
+  - h5py
+  - umap-learn
+  pip_git: []
+  package_source: local code in repo dir (the SMILE package is vendored at scMultiBench_ref/tools_scripts/SMILE/SMILE/; main_SMILE.py imports `from SMILE.SMILE import ...`). Upstream origin is GitHub https://github.com/rpmccordlab/SMILE — not on PyPI. No install of the SMILE package needed; run from the method dir so the local `SMILE/` package is importable.
+  difficulty: easy
+  verified_working: false
+  caveats: 'No empirical run data; recipe derived from imports + bundled source. Method dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/SMILE/. Entrypoint: main_SMILE.py; bundled package in SMILE/SMILE/SMILE.py + contrastive_loss_pytorch.py. MUST run with cwd = the SMILE method dir (or add it to PYTHONPATH) so `from SMILE.SMILE import SMILE` resolves to the local package. numpy<2 is REQUIRED: data_loader uses np.mat (line 40), removed in numpy 2.0; also np.percentile usage is fine. CUDA CAVEAT: ContrastiveLoss.__init__ (SMILE.py lines 20-22 and contrastive_loss_pytorch.py lines 8-10) calls .cuda() unconditionally on registered buffers. main_SMILE.py''s ReferenceSMILE_trainer creates f_con = ContrastiveLoss(...) in its pretrain loop, so on a CPU-only machine this will raise (CUDA not available); a GPU is effectively required, OR the .cuda() calls must be patched to device-aware. Run command (from comment in main_SMILE.py): python main_SMILE.py --query_path1 rna1.h5 --query_path2 atac3.h5 --ref_path1 rna2.h5 --ref_path2 atac2.h5 --save_path <out>/SMILE/. Input: .h5 files with HDF5 datasets matrix/data (genes/features x cells, transposed in loader) and matrix/features. Task: mosaic integration of [RNA, RNA+ATAC, ATAC]; ATAC is TF-IDF + top-10%-idf + StandardScaler preprocessed. Output: <save_path>/embedding.h5 with dataset ''data'' = joint embedding (dim reduction). torch version unpinned (any modern 1.x/2.x works for the simple Linear/BatchNorm/Softmax/F.normalize/F.cosine_similarity ops used); pin a CUDA-enabled torch build matching the GPU.'
+Portal:
+  python_version: '3.9'
+  conda_channels:
+  - conda-forge
+  conda_packages:
+  - r-base
+  pip_packages:
+  - torch
+  - rpy2
+  - anndata2ri
+  - scikit-misc
+  - tables
+  - scanpy
+  - scikit-learn
+  - umap-learn
+  - numpy<2
+  - h5py
+  - anndata
+  - pandas
+  - scipy
+  pip_git: []
+  package_source: local code in repo dir (the 'portal' package is bundled at scMultiBench_ref/tools_scripts/Portal/portal/; upstream equivalent is PyPI 'portal-sc' / GitHub YangLabHKUST/Portal, but the local copy is used and imported as `import portal`)
+  difficulty: verified
+  verified_working: true
+  caveats: 'Dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Portal/. Entrypoint main_Portal.py runs diagonal integration (RNA + ATAC-gene-activity-score), output is a joint embedding written to <save_path>/embedding.h5 (dataset ''data'', transposed latent). Run from inside the Portal dir so `import portal` resolves the LOCAL package (portal/model.py, networks.py, utils.py) — do NOT pip-install portal-sc, it would shadow the bundled code. Run command (from script comment): python main_Portal.py --path1 ../../data/dataset_final/D27/rna.h5 --path2 ../../data/dataset_final/D27/atac_gas.h5 --save_path ../../result/embedding/diagonal_integration/D27/Portal/. Input: HDF5 files with matrix/data, matrix/barcodes, matrix/features (data is features x cells, transposed in script). numpy<2 required (scanpy/HVG era 2023). scikit-misc (skmisc) is REQUIRED because preprocess uses sc.pp.highly_variable_genes(flavor=''seurat_v3''). rpy2 + anndata2ri are imported by portal/utils.py at module load, so a working R install (r-base) is needed even though the core diagonal path doesn''t call R. EMP confirms env builds and runs into the algorithm. main_Portal_classification.py is an alternate entrypoint (label transfer) using the same deps minus rpy2/R-only utils. torch is CPU-fine; no specific torch pin needed.'
+uniPort:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - uniport
+  - scanpy
+  - numpy<2
+  - h5py
+  - anndata
+  - torch
+  - scipy
+  - pandas
+  pip_git: []
+  package_source: 'PyPI: `uniport` (import name `uniport`, project uniPort by Cao et al.; https://github.com/caokai1073/uniPort). Torch is pulled in as a dependency of uniport but is also imported directly by the scripts.'
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMP confirmed: `pip install uniport scanpy ''numpy<2'' h5py anndata` works and trains (training takes time). numpy<2 is REQUIRED because both scripts use np.mat in data_loader (line 33 of main_uniPort.py, line 43 of main_uniPort_classification.py), which was removed in numpy 2.x. Method dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/uniPort/ (two entrypoints: main_uniPort.py for diagonal integration -> joint embedding; main_uniPort_classification.py for label transfer/classification). Input layout: --path1 RNA .h5, --path2 ATAC gene-activity-score .h5 (HDF5 with dataset ''matrix/data'', stored gene-by-cell so the script transposes); classification variant also needs --cty_path1/--cty_path2 celltype CSVs. Output: embedding.h5 (dataset ''data'') in save_path for the embedding script; predict.csv/query.csv for classification. torch installs CPU-or-CUDA per platform; no version pin needed. No requirements.txt/setup.py/yaml present in the dir.'
+sciCAN:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - torch
+  - scanpy
+  - scikit-learn
+  - umap-learn
+  - leidenalg
+  - easydl
+  - numpy<2
+  - h5py
+  - anndata
+  pip_git: []
+  package_source: local code in repo dir (/Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/sciCAN/). sciCAN itself is not a pip package; the upstream repo is github.com/rpmccordlab/sciCAN and ships these same .py modules. Run via main_sciCAN.py. The only external pip dep unique to sciCAN is 'easydl' (PyPI) for easydl.aToBSheduler.
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMP ground truth: VERIFIED RAN with `pip install torch scanpy scikit-learn umap-learn leidenalg easydl ''numpy<2'' h5py anndata`. Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/sciCAN/main_sciCAN.py. It imports LOCAL modules in the same dir (network.py, training.py, and transitively Center_loss_pytorch.py + contrastive_loss_pytorch.py) -- must run with cwd set to the sciCAN dir (training.py does sys.path.append(''./'')). External third-party imports: h5py, torch, anndata, scanpy, sklearn.preprocessing.StandardScaler, numpy, and easydl (aToBSheduler from network.py). ''numpy<2'' is pinned because main_sciCAN.py uses np.array(...) via h5py and numpy>=2 can break older scanpy/anndata stacks (honor pin per EMP). Run command (from script comment): python main_sciCAN.py --path1 rna.h5 --path2 atac_gas.h5 --save_path <outdir>. Input layout: two .h5 files each with dataset ''matrix/data'' (loaded and transposed); path1=RNA, path2=ATAC converted to gene activity score (gas). This is diagonal integration; output is a joint embedding written to <save_path>/embedding.h5 (dataset ''data''). NOTE: training.py and network.py call .cuda() / torch.cuda unconditionally, so a CUDA GPU is effectively required for an unmodified run (FeatureExtractor.to(''cpu'') is only applied at inference in main); EMP confirms it produced output, so the verified run was on a GPU machine. umap-learn and leidenalg are pulled in by scanpy''s full feature set / EMP install but are not directly imported by the entrypoint.'
+scJoint:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch
+  - h5py
+  - pandas
+  - scipy
+  - scikit-learn
+  pip_git: []
+  package_source: local code in repo dir (/Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/scJoint/) - the scMultiBench-adapted fork of https://github.com/SydneyBioX/scJoint; not on PyPI. Run from inside the dir so `import config`, `import process_db`, and `util/` resolve.
+  difficulty: easy
+  verified_working: false
+  caveats: 'No requirements.txt/setup.py/yaml in the method dir; recipe derived from imports + official SydneyBioX README (deps: h5py, torch, scipy, numpy; developed/tested on PyTorch 1.0.0-1.4.0, any modern torch works since only basic nn/optim/autograd are used). Entrypoint: main_scJoint.py. Third-party imports across main + util/: torch, h5py, numpy, pandas, scipy (scipy.sparse, scipy.linalg.norm, scipy.special.softmax), sklearn (KNeighborsClassifier). MUST run from within the scJoint dir because of local imports (config.py, process_db.py, util/*). util/libutility.so is a precompiled x86-64 ELF shared object loaded via ctypes (util/knn.py) -- this will NOT load on Apple Silicon/arm64 macOS or non-x86 platforms; needs a Linux x86-64 (or x86_64 emulation) environment. use_cuda defaults to True (device hardcoded to cuda:0); pass --use_cuda False to run on CPU. Inline run command (line 51): python main_scJoint.py --path1 <rna.h5> --path2 <atac_gas.h5> --cty_path1 <rna_cty.csv> --save_path <out>. Input layout: RNA .h5 (matrix/data) + ATAC gene-activity-score .h5 + RNA cell-type csv (ATAC label optional); ATAC must be pre-converted to gene activity scores. process_db converts .h5->.npz and .csv->.txt at runtime; intermediate embeddings written to ./output/ (relative to cwd). Output: joint embedding saved to <save_path>/embedding.h5 plus time.csv. numpy<2 pinned defensively for compatibility with the older torch era and the compiled extension. Stage3 training is commented out; only Stage1 + KNN run.'
+GLUE:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scglue
+  - numpy<2
+  - scanpy
+  - anndata
+  - h5py
+  - networkx
+  - scikit-misc
+  - seaborn
+  - matplotlib
+  - pandas
+  - scipy
+  pip_git: []
+  package_source: 'PyPI: scglue (the scGLUE package from gao-lab/GLUE). `pip install scglue` pulls torch automatically. Latest is 0.4.1; code is compatible with scglue 0.3.x / 0.4.x.'
+  difficulty: easy
+  verified_working: false
+  caveats: 'No empirical run; recipe derived from imports + official install (pip install scglue or conda -c conda-forge -c bioconda scglue). The method package is `scglue` (import scglue), from gao-lab/GLUE. Pin numpy<2 because the scripts use np.mat and np.matrix (removed in numpy 2.x); these also appear in load_rna/load_atac. scikit-misc is REQUIRED because preprocess_rna calls sc.pp.highly_variable_genes(..., flavor=''seurat_v3''). The scripts print os.environ[''CONDA_DEFAULT_ENV''] at import time, so they MUST be run inside an activated conda env or they crash with KeyError before doing anything. EXTERNAL FILE NEEDED: scglue.data.get_gene_annotation requires a GTF annotation file in the working dir — GLUE_human.py expects gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz and GLUE_mouse.py expects gencode.vM25...gtf.gz (download links in the dir''s README.md / Dropbox). Input is .h5 files with HDF5 layout matrix/data, matrix/features, matrix/barcodes (RNA raw counts via --path1, ATAC peak raw counts via --path2). Output is embedding.h5 (dataset ''data'' = concatenated RNA+ATAC joint embedding) written to --save_path. Run command (from script comment): python GLUE_human.py --path1 rna.h5 --path2 atac_peak.h5 --save_path <out_dir>. GPU optional (CPU torch works). Dir name is plain ''GLUE'' (no spaces).'
+MultiMAP:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - scanpy
+  - anndata
+  - h5py
+  - scipy
+  pip_git:
+  - git+https://github.com/Teichlab/MultiMAP.git
+  package_source: MultiMAP installed from GitHub (git+https://github.com/Teichlab/MultiMAP.git). The official Teich Lab repo; not reliably on PyPI. Other deps (scanpy/anndata/h5py/scipy/numpy) from PyPI.
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMP confirmed it ran: pip install ''numpy<2'' scanpy h5py anndata + MultiMAP from git (github.com/Teichlab/MultiMAP). numpy<2 is REQUIRED: the script uses np.mat / np.matrix (line 26-38) which were removed in numpy 2.0, and MultiMAP internals use np.infty. Single entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/MultiMAP/main_MultiMAP.py (no requirements.txt/setup.py/yaml in the dir). It performs diagonal integration for RNA + ATAC: requires 3 inputs as .h5 files with dataset at ''matrix/data'' (cells x features stored transposed) -- path1=rna gene expr, path2=atac peak matrix, path3=atac gene activity score (GAS). Internally: MultiMAP.TFIDF_LSI on peaks -> copies X_lsi to GAS adata; scale+PCA on RNA; MultiMAP.Integration([rna, atac_genes], [''X_pca'',''X_lsi''], strengths=[0,1]). Output: joint embedding written to <save_path>/embedding.h5 (dataset ''data'' = adata.obsm[''X_multimap'']) plus time.csv. Run command (from script comment): python main_MultiMAP.py --path1 rna.h5 --path2 atac_peak.h5 --path3 atac_gas.h5 --save_path <out_dir>/. scanpy pulls in numba/llvmlite/umap-learn; pinning numpy<2 avoids ABI conflicts there too.'
+SCALEX_cross:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - scalex==1.0.2
+  - numpy<2
+  - scanpy
+  - anndata
+  - h5py
+  - leidenalg
+  - torch
+  - scikit-learn
+  - scipy
+  - pandas
+  - matplotlib
+  - seaborn
+  - tqdm
+  - umap-learn
+  pip_git: []
+  package_source: 'PyPI: scalex (https://pypi.org/project/scalex/), official repo jsxlei/SCALEX. Pin scalex==1.0.2 (Oct 2022) for the era-appropriate classic API used by the script (`from scalex import SCALEX`); the latest 1.0.4 forces torch>=2.2.2 / numpy>=1.26.4.'
+  difficulty: easy
+  verified_working: false
+  caveats: 'Method dir is /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/SCALEX/ (folder name is ''SCALEX'', not ''SCALEX_cross''); the single script main_SCALEX.py implements the cross/diagonal-integration variant. Third-party imports: h5py, numpy, scanpy, scalex (from scalex import SCALEX), anndata. No requirements.txt/setup.py/yaml inside the method dir.\n\nInline run command (from script comment):\npython main_SCALEX.py --path1 \"../../data/dataset_final/D27/rna.h5\" --path2 \"../../data/dataset_final/D27/atac_gas.h5\" --save_path \"../../result/embedding/diagonal integration/D27/SCALEX/\"\n\nInput layout: two .h5 files, each with dataset ''matrix/data'' (loaded as np.array(f[''matrix/data'']).transpose()). path1 = RNA, path2 = ATAC converted to gene activity score (gas). Output: embedding.h5 (dataset ''data'') = SCALEX joint embedding (adata.obsm[''latent'']).\n\nNotes: (1) Script writes intermediate files into its CWD (''RNA-ATAC.h5ad'' and a ''./pbmc_RNA_ATAC/'' output dir), so run from a writable working directory. (2) Hardcodes gpu=0 in the SCALEX() call; SCALEX runs on CPU if no GPU is present but the gpu=0 arg is passed regardless — should still fall back to CPU. (3) scalex 1.0.2 deps have only loose lower bounds (numpy>=1.17.2, torch>=1.0.0, scanpy>=1.4.5) with no upper caps, so an unconstrained install can pull numpy 2.x / too-new scanpy; the explicit numpy<2 pin guards against that. (4) Script itself uses no removed numpy APIs, but numpy<2 is pinned for compatibility with the 2022-era scalex/scanpy stack. Not empirically verified to run; recipe derived from imports + official PyPI/GitHub install.'
+sciPENN:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - sciPENN
+  - numpy<2
+  - torch
+  - scanpy
+  - anndata
+  - pandas
+  - scipy
+  - h5py
+  - tqdm
+  - numba
+  pip_git: []
+  package_source: PyPI package 'sciPENN' (https://pypi.org/project/sciPENN/, latest v0.9.6 by jlakkis; GitHub https://github.com/jlakkis/sciPENN). Provides sciPENN.sciPENN_API and sciPENN.Preprocessing, exactly the modules the scripts import.
+  difficulty: easy
+  verified_working: false
+  caveats: 'No empirical run log available; recipe derived from imports + official PyPI/GitHub install docs. Method dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/sciPENN/ with entrypoints main_sciPENN.py (vertical/cross integration -> joint embedding), main_sciPENN_imputation.py (mosaic imputation: predict missing ADT from CITE-seq reference + RNA query), and run_scipenn_classification.sh (cell-type label transfer; NOTE this shell script references main_sciPENN_classification.py which is NOT present in the dir -- classification entrypoint is missing/blocked). Inputs are .h5 files with HDF5 layout ''matrix/data'', ''matrix/barcodes'', ''matrix/features'' (data is features x cells, transposed in-script); imputation expects a data_path dir with subfolders ''reference/'' (rna{id}.h5, adt{id}.h5, cty{id}.csv) and ''gt/'' (adt{id}.h5). Official requirements: python>=3.7, torch>=1.6.1, scanpy>=1.7.1, pandas>=1.1.5, numpy>=1.20.1, scipy>=1.6.1, tqdm>=4.59.0, anndata>=0.7.5, numba<=0.50.0. The numba<=0.50.0 pin in setup.py is overly strict and essentially uninstallable with modern scanpy/numpy -- do NOT honor it; install a recent numba and pin numpy<2 (scripts rely on np.array/scanpy APIs and old-numpy expectations, and numpy 2.x breaks scanpy/anndata of this era). If pip''s dependency resolver chokes on sciPENN''s pinned numba, install sciPENN with --no-deps and then install the deps listed here manually. Output for integration: embedding.h5 (dataset ''data'') + time.csv; for imputation: imputed_result.h5 (prediction/groundtruth_raw/groundtruth_norm) + time.csv. Scripts run on CPU or GPU via torch (no explicit device pin). The dir name has no spaces.'
+scMSI:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch==1.13.1
+  - anndata<0.10
+  - scanpy<1.10
+  - pandas<2
+  - scipy<1.13
+  - scikit-learn
+  - h5py
+  - rich
+  - tqdm
+  pip_git: []
+  package_source: 'local code in repo dir (the scMSI/ subpackage is vendored alongside main_scMSI.py; not on PyPI). Official upstream: https://github.com/ChengmingZhang-CAS/scMSI-master'
+  difficulty: verified
+  verified_working: true
+  caveats: 'EMP confirms torch + scanpy + local code ran and produced output. The method package is NOT installed from PyPI/scvi-tools: scMSI ships its own vendored subpackage (tools_scripts/scMSI/scMSI/) that is a self-contained reimplementation "inspired by scvi-tools" — every `scvi`/`from scvi` reference in the code is commented out or only in docstrings, so scvi-tools is NOT required. Run from inside the tools_scripts/scMSI/ dir so `from scMSI.* import ...` resolves. HARD VERSION PIN: scMSI/utils.py line 23 does `from anndata._core.sparse_dataset import SparseDataset`, a private anndata API removed in anndata >=0.10 (renamed/relocated); must use anndata<0.10 (e.g. 0.9.x). This forces scanpy<1.10 and pandas<2 for compatibility. Pin numpy<2 (2023-era torch 1.13 / scanpy 1.9 stack is incompatible with numpy 2). Official repo tested on Python 3.8.15 + torch 1.13.0; its README uses `conda create -n scMSI python=3.9` and `pip install -r used_package.txt`. Entry point: main_scMSI.py for vertical (RNA+ADT) integration. Run command (from comments): python main_scMSI.py --path1 <rna.h5> --path2 <adt.h5> --save_path <out_dir>. Input: two .h5 files each with HDF5 group ''matrix'' containing datasets data, barcodes, features (cells = columns, transposed in code). Output: <save_path>/embedding.h5 (dataset ''data'' = concatenated RNA+protein latent, 20 dims transposed to features x cells) plus time.csv. Note in code: ''may change the batch_size if there is nan error'' (default batch_size=128, max_epochs=400, n_latent=10).'
+UnitedNet:
+  python_version: '3.8'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - torch==1.11.0
+  - scanpy
+  - anndata
+  - scipy
+  - scikit-learn
+  - pandas
+  - h5py
+  - matplotlib
+  - tqdm
+  - tabulate
+  pip_git: []
+  package_source: local code in repo dir (the UnitedNet model lives in the vendored `src/` package; official repo https://github.com/LiuLab-Bioelectronics-Harvard/UnitedNet ships no pip package, no setup.py, and no requirements.txt/environment.yml — it is used by copying the src/ directory). The scMultiBench entrypoint imports it as `from src.interface import UnitedNet`.
+  difficulty: easy
+  verified_working: false
+  caveats: 'Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/UnitedNet/main_UnitedNet.py (also main_UnitedNet_imputation.py). MUST run with cwd = the UnitedNet dir so the relative `from src...` imports and `from src.configs import *` resolve; the vendored `src/` package is required (no pip install of the method exists). Official spec from the LiuLab README: Python 3.7 + pytorch 1.11; local .pyc artifacts are cpython-37 AND cpython-38, so 3.8 also works and is easier to source torch 1.11 wheels for. No empirical run log available — verified_working is false (recipe derived from imports + official README). numpy<2 pinned because the torch-1.11/scanpy-of-this-era stack predates the numpy 2.0 ABI break; do not let numpy float to 2.x. SUPERVISED method: requires --train_cty_path cell-type label CSVs (read with skiprows=1, label in first column) in addition to RNA/ATAC .h5 files. Designed for vertical RNA+ATAC integration (and multi-dataset cross integration). Input .h5 layout: matrix is read from HDF5 dataset ''matrix/data'' and transposed (cells x features after transpose). Output: joint embedding written to <save_path>/embedding<index>.h5 (dataset ''data''), predicted labels to predict<index>.csv, and time.csv. Code hardcodes device=''cuda:0'' (line 32) — for CPU-only machines this line must be edited to ''cpu''. NOTE: src/plots.py imports `mne_connectivity` and `pylab` but is NOT on the runtime import chain of the entrypoint (main -> src.interface -> scripts/data/modules/loss/constants), so mne-connectivity is NOT needed to run integration; only add it if you exercise plotting utilities.'
+SPIRAL:
+  python_version: '3.9'
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - r-mclust
+  - r-vegan
+  pip_packages:
+  - numpy==1.26.4
+  - pandas==2.2.0
+  - scipy==1.12.0
+  - scikit-learn==1.4.1.post1
+  - scanpy==1.9.8
+  - anndata==0.10.5.post1
+  - umap-learn==0.5.5
+  - networkx==3.2.1
+  - matplotlib==3.8.3
+  - POT==0.8.0
+  - rpy2==3.5.15
+  - torch==2.2.0
+  - numba==0.59.0
+  - h5py==3.10.0
+  - tqdm==4.66.2
+  - seaborn==0.13.2
+  - statsmodels==0.14.1
+  - leidenalg
+  - louvain
+  pip_git: []
+  package_source: 'local code in repo dir: the `spiral` package (v1.0) lives in /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/SPIRAL/ (install with `pip install -e .` from that dir, or run main_SPIRAL.py from within it so `spiral`, `pytorch_revgrad`, and `Process` are importable). Upstream is GitHub guott15/SPIRAL. Do NOT `pip install spiral` from PyPI — that is an unrelated package.'
+  difficulty: old-scvi
+  verified_working: false
+  caveats: 'No empirical run available; recipe derived from imports + the repo''s official spiral_environment.yaml (Python 3.9, torch 2.2.0, numpy 1.26.4, scanpy 1.9.8, POT==0.8.0, rpy2 3.5.15) which is authoritative. (1) The `spiral` package and `pytorch_revgrad` are LOCAL code in the method dir; main_SPIRAL.py also does `from Process.Spatial_Net import Cal_Spatial_Net`, so it must be run with the SPIRAL repo dir as cwd/on PYTHONPATH. (2) HARD R DEPENDENCY via rpy2: spiral/utils.py mclust_R uses R library `mclust`; spiral/CoordAlignment.py uses R library `vegan` (procrustes). Install r-base + r-mclust + r-vegan via conda. (3) The script HARDCODES the R binary path `R_dirs=\"/opt/miniforge3/bin/R\"` in coord_align() (line 295) — edit this to point at your conda env''s R, or it will fail at the alignment step. (4) GPU REQUIRED as written: `.cuda()` calls (e.g. all_feature ... .cuda(), embed_new.cuda()) are unconditional, no CPU fallback — needs a CUDA GPU + the matching torch CUDA build, or code edits to remove .cuda(). (5) numpy pinned <2 (1.26.4) per env. (6) POT must be exactly 0.8.0 — CoordAlignment uses ot.gromov.init_matrix/gwloss/cg internal APIs that changed in later POT. (7) `mclust` line in requirements.txt is a no-op pip name; the real mclust is the R package. (8) Input: a data_dir containing per-slice .h5ad files (gene expression in .X + spatial coords in .obsm[''spatial'']); output is aligned/registered spatial coordinates. leidenalg/louvain added defensively for scanpy neighbors/clustering. (9) Dir name has no spaces (plain ''SPIRAL'').'
+GPSA:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy<2
+  - gpsa
+  - torch
+  - scipy
+  - scikit-learn
+  - anndata
+  - pandas
+  - scanpy
+  - seaborn
+  - networkx
+  - matplotlib
+  - POT
+  pip_git: []
+  package_source: 'PyPI: pip install gpsa (official package from https://github.com/andrewcharlesjones/spatial-alignment, import name `gpsa`, provides VariationalGPSA and rbf_kernel)'
+  difficulty: easy
+  verified_working: false
+  caveats: 'Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/GPSA/main_GPSA.py (single file, no requirements.txt/setup.py/yaml in the dir). Run command (from inline comment): python main_GPSA.py --data_dir ''../unified_data/DLPFC/donor1/'' --save_dir ''./aligned_slices/''. Task: cross-integration / spatial registration. Input: data_dir must contain spatial .h5ad files (glob ''*.h5ad''); each AnnData needs .X (gene expression), .obsm[''spatial''] (coords), and .obs[''Ground_Truth'']. Output is aligned/registered spatial coordinates. NOTE the --save_dir arg is used as a FILE path via np.savetxt (it writes runtime, not aligned slices) and os.path.dirname(save_dir) is created — minor quirk in the script. The aligned slices (original_slices with updated .obsm[''spatial'']) are returned in-memory but not explicitly written to disk by the script. The script also writes ./out/W_st.csv only when n_latent_gps is not None (here it is None, so skipped). Imports `ot` (POT) and `networkx` which are NOT in the official gpsa requirements.txt — added explicitly. The official gpsa requirements.txt pins very old versions (numpy==1.19.2, torch==1.8.0, tensorflow==2.5.0, scanpy==1.9.1), but the actual main_GPSA.py only uses torch + standard single-cell stack and does not import tensorflow; tensorflow is therefore omitted. Pin numpy<2 for compatibility with the 2021-era anndata/scanpy/torch stack the package targets. Trains VariationalGPSA for 5000 epochs (Adam, lr=1e-2); GPU used if available else CPU — CPU run will be slow. Not empirically verified to produce output.'
+PASTE:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - paste-bio
+  - POT==0.9.0
+  - torch
+  - scanpy
+  - anndata
+  - scikit-learn
+  - scipy
+  - pandas
+  - numpy<2
+  pip_git: []
+  package_source: 'PyPI: paste-bio (imported as `paste`, aliased `pst`); from raphael-group/paste'
+  difficulty: easy
+  verified_working: false
+  caveats: 'Dir: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/PASTE/ with two entrypoints: main_PASTE_pairwise.py and main_PASTE_center.py. Both take --data_dir (dir of *.h5ad spatial slices, each with .X expression + .obsm spatial coords) and --save_dir (writes aligned_slice_{i}.h5ad with spatially registered coords). Method package is paste-bio on PyPI, imported as `paste`. Key dependency: POT (import name `ot`) pinned to 0.9.0 per the repo requirements.txt; the scripts explicitly use ot.backend.TorchBackend() with use_gpu=True, so PyTorch is required (and a GPU is preferred — set use_gpu=False in code if running CPU-only). Official requirements.txt also lists anndata>=0.7.6, scanpy>=1.7.2, scikit-learn>=0.24.0, IPython, numpy, scipy. Pin numpy<2 for compatibility with this 2023-era scanpy/anndata/POT stack. No requirements.txt/setup.py inside the method dir itself — only the two run scripts; deps derived from imports + official raphael-group/paste install. No empirical run log available, so not verified.'
+PASTE2:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - paste2==1.0.1
+  - numpy<2
+  - scipy
+  - scanpy
+  - anndata
+  - pandas
+  - networkx
+  - POT>=0.9.1
+  - statsmodels
+  - scikit-learn
+  - leidenalg
+  - igraph
+  pip_git: []
+  package_source: 'PyPI: paste2 (https://pypi.org/project/paste2/), repo github.com/raphael-group/paste2; import name is `paste2` exposing submodules PASTE2 and projection'
+  difficulty: easy
+  verified_working: false
+  caveats: 'Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/PASTE2/main_PASTE2.py (only file in dir; no requirements.txt/setup.py/yaml present). Script imports `import ot` (POT) and `from paste2 import PASTE2, projection` — the PyPI paste2 package (v1.0.1, 2023) provides both submodules and the functions used: PASTE2.partial_pairwise_align(s=0.7, dissimilarity=''pca'') and projection.partial_stack_slices_pairwise. CLI: `python main_PASTE2.py --data_dir <dir>/ --save_dir <dir>` (note: data_dir is globbed for ''*.h5ad'' so it MUST end with a trailing slash). Input layout: a directory of .h5ad spatial slices, each with gene expression (.X) and spatial coords (.obsm[''spatial'']); script normalizes, log1p, selects 2000 HVGs, partially aligns consecutive pairs, projects, and writes aligned_slice_{i}.h5ad to save_dir. Output is spatial registration (aligned coordinates), not a graph. No removed numpy APIs are used, but numpy<2 is pinned for compatibility with the 2023-era paste2/POT/scanpy/anndata stack. leidenalg/igraph/scikit-learn added because scanpy.pp.highly_variable_genes/normalize pipeline may pull them; harmless if redundant. Method package itself is cleanly pip-installable; not empirically verified in this environment.'
+iPOLNG:
+  python_version: '3.9'
+  conda_channels: []
+  conda_packages: []
+  pip_packages:
+  - numpy==1.21.0
+  - torch==1.11.0
+  - pyro-ppl==1.8.1
+  - statsmodels==0.12.2
+  - importlib_resources==5.8.0
+  - tqdm==4.62.3
+  - iPoLNG
+  - h5py
+  - anndata
+  - scanpy
+  pip_git: []
+  package_source: 'PyPI: pip install iPoLNG (official repo https://github.com/cuhklinlab/iPoLNG, imported as ''from iPoLNG import iPoLNG''). Built on Pyro (pyro-ppl).'
+  difficulty: easy
+  verified_working: false
+  caveats: 'GPU REQUIRED: main_iPOLNG.py line 41 hardcodes data1.type("torch.cuda.FloatTensor") / data2.type("torch.cuda.FloatTensor"), so it will fail on a CPU-only machine even though line 12 has a CPU fallback for the default tensor type. The official requirements.txt pins torch==1.11.0+cu113 (CUDA 11.3); install matching torch+CUDA build from the PyTorch index (e.g. pip install torch==1.11.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113). numpy==1.21.0 is pinned by the package (satisfies numpy<2). Python 3.7+ supported; 3.9 chosen for the torch 1.11 era. Method = vertical integration: input is two .h5 files (RNA --path1, ATAC --path2) with matrix stored at ''matrix/data'' (transposed to cells x features); RNA uses 5000 HVGs, ATAC uses 20000 HVGs via scanpy normalize_total/log1p/highly_variable_genes. Output: joint embedding written to <save_path>/embedding.h5 (dataset ''data'') plus time.csv; result also has per-modality embeddings Ls_est[''W1''/''W2''] but only the joint L_est is saved. Model run: num_topics=20, integrated_epochs=3000, warmup_epochs=3000, seed=42. No requirements.txt/setup.py/yaml present in the tools_scripts dir itself; dependency versions taken from the official GitHub requirements.txt. Extra imports needed beyond iPoLNG: h5py, torch, anndata, scanpy, numpy. No empirical run log available (not verified).'
+StabMap:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - bioconductor-stabmap
+  - bioconductor-singlecellexperiment
+  - bioconductor-scran
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  - r-seurat
+  - r-devtools
+  - r-biocmanager
+  pip_packages: []
+  pip_git: []
+  package_source: 'Bioconductor: StabMap (BiocManager::install("StabMap")). Source/dev: github.com/MarioniLab/StabMap (devtools::install_github("MarioniLab/StabMap")). conda: bioconductor-stabmap from bioconda channel.'
+  difficulty: R
+  verified_working: false
+  caveats: 'Pure-R method (no Python). Entrypoints are R Markdown scripts: main_StabMap.Rmd (cross-integration -> joint embedding) and main_StabMap_imputation.Rmd (imputation). Both source local helpers util.R / util_imputation.R, so those files MUST be present in the working dir alongside the .Rmd (run from the StabMap dir). Required libraries from the scripts: StabMap, rhdf5, SingleCellExperiment, scran, Seurat, HDF5Array (all Bioconductor except Seurat/CRAN). Core calls: stabMap(...), imputeEmbedding(...) (both in StabMap). Run command (commented in main_StabMap.Rmd): build file_paths list with rna_path/adt_path/atac_path as lists of .h5 paths, set save_path and reference (e.g. \"data3\"), then run_StabMap(file_paths, save_path, reference). For imputation also pass query. Input layout: each .h5 must contain an HDF5 group ''matrix'' with datasets ''data'' (cells x features, transposed in code), ''features'', and ''barcodes''. Output: writes embedding.h5 / imputation.h5 via writeHDF5Array (HDF5Array) under dataset name ''data''. util.R uses system(''rm ...'') to overwrite existing h5 (Unix shell assumed). RNA/ATAC preprocessing uses scran logNormCounts + modelGeneVar HVG selection; ADT uses Seurat NormalizeData CLR. StabMap needs R >= 4.x (Bioconductor release; current Bioc lists R 4.5). Not empirically run, so not verified.'
+UINMF:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - r-rliger
+  - r-seurat
+  - r-devtools
+  - r-rcpp
+  - r-matrix
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  - bioconductor-scran
+  - bioconductor-singlecellexperiment
+  - bioconductor-summarizedexperiment
+  - bioconductor-delayedarray
+  - hdf5
+  pip_packages: []
+  pip_git: []
+  package_source: CRAN package 'rliger' (the LIGER R package, repo welch-lab/liger / welch-lab/rliger on GitHub). The integration code lives in scMultiBench_ref/tools_scripts/UINMF/*.Rmd which call rliger's runUINMF.
+  difficulty: R
+  verified_working: true
+  caveats: 'Pure-R method; no Python needed. EMPIRICAL GROUND TRUTH confirms it ran with r-base + rliger + rhdf5 + HDF5Array. CRITICAL VERSION NOTE: the actual scripts (main_UINMF_cross.Rmd, main_UINMF_vertical.Rmd) use the MODERN rliger 2.x API: createLiger(list(...)), normalize/selectGenes/scaleNotCenter via magrittr pipe, varUnsharedFeatures(lig,...)<- , scaleUnsharedData(lig,...)<- , runUINMF(lig, k=30, nIteration=30), quantileNorm(lig), and result via lig@H.norm. So install rliger >= 2.0.1 (current CRAN), NOT the old v1.0.1. The inline comment ''# for vertical integration ... devtools::install_github(\"welch-lab/liger\", ref = \"v1.0.1\")'' is a stale/alternate note; the committed code requires the new API, so r-rliger from conda-forge (CRAN, 2.x) works. If conda lacks r-rliger, install in R: install.packages(''rliger''). Required libraries loaded by both scripts: rhdf5, scran, Seurat, rliger, HDF5Array (plus implicit magrittr pipe — provided by rliger/Seurat deps, otherwise add r-magrittr). Entry points are .Rmd files run directly with Rscript (they are plain R, not knitted): cross = `Rscript main_UINMF_cross.Rmd rna1.h5 rna2.h5 adt1.h5 adt2.h5 <out_dir>/`; vertical = `Rscript main_UINMF_vertical.Rmd rna.h5 adt.h5 <out_dir>/`. Save path arg MUST end with a trailing slash. INPUT LAYOUT: each .h5 must contain group ''matrix'' with datasets data (cells x features, gets transposed), features, barcodes (h5_to_matrix reads h5read(path,''matrix'')). OUTPUT: <out_dir>/embedding.h5 (dataset name ''data'', the joint H.norm embedding) + time.csv. No numpy concerns (R method). util.R holds extra helpers for multi-omic input assembly but the two main scripts are self-contained.'
+iNMF:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - r-rliger
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  pip_packages: []
+  pip_git: []
+  package_source: 'CRAN package ''rliger'' (r-rliger on conda-forge/bioconda). Must be rliger >= 2.0 because the script uses the v2 API: createLiger(), runIntegration(), quantile_norm(), selectGenes(datasets.use=), scaleNotCenter(), and the @H.norm slot. Bioconductor rhdf5 + HDF5Array provide HDF5 I/O.'
+  difficulty: R
+  verified_working: true
+  caveats: 'Pure-R method, no Python. Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/iNMF/main_iNMF.Rmd (run with Rscript despite the .Rmd extension). Imports: rliger, rhdf5, HDF5Array. Run command from inline comment: Rscript main_iNMF.Rmd ''.../rna.h5'' ''.../atac_gas.h5'' ''.../result/.../iNMF/''. Designed for diagonal integration of [RNA, ATAC] where ATAC is pre-converted to gene activity score; produces a joint embedding (H.norm, k=20). Input .h5 files must contain a ''matrix'' group with ''data'', ''features'', ''barcodes'' (CellRanger-style layout). Args are: one or more input h5 paths followed by the output dir as the LAST arg. Outputs barcode.csv and embedding.h5 (written via writeHDF5Array) into the save_path. NOTE: only the first dataset''s genes are used for selectGenes (datasets.use=1), so feature/rowname alignment across inputs is required (script stops if rownames differ on write). EMP confirms r-base + rliger + bioconductor rhdf5 + HDF5Array is the working stack, but warns the bioconda/conda solve is SLOW — allow extra time or use mamba. rliger must be >= 2.0 (the v2 createLiger/runIntegration API); older 1.x rliger (optimizeALS/Createliger) is incompatible.'
+online_iNMF:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base>=4.2
+  - r-rliger>=2.0.0
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  - r-rcpp
+  - r-rcppeigen
+  - r-hdf5r
+  pip_packages: []
+  pip_git: []
+  package_source: rliger from CRAN (install.packages("rliger")) or conda-forge as r-rliger; rhdf5 + HDF5Array from Bioconductor (bioconda channel). No code shipped in repo dir beyond the single Rmd entrypoint.
+  difficulty: R
+  verified_working: true
+  caveats: 'Pure-R method, no Python/numpy needed. Entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/online iNMF/main_online_iNMF.Rmd (despite .Rmd extension it is a plain R script run via Rscript). CRITICAL: the directory name ''online iNMF'' contains a SPACE -- `conda run` and many shell invocations mangle the path; quote the full path or copy/symlink the script to a space-free location before running. Requires rliger >= 2.0 because the script uses the new 2.x API: createLiger(named_list), normalize/selectGenes/scaleNotCenter, runIntegration(pbmcs, k=20, method=''online''), quantileNorm, and the @H.norm slot (older rliger 1.x used online_iNMF()/optimizeALS() and an @H.norm that differs; the commented-out online_iNMF() line is the 1.x fallback). Run command (from the script''s inline comment): Rscript main_online_iNMF.Rmd ''<rna.h5>'' ''<atac_gas.h5>'' ''<output_dir>/''. Designed for diagonal integration of [RNA, ATAC] where ATAC must be pre-converted to gene activity score (gas) matrix; takes N input h5 paths (matrix group with features/barcodes/data) + final arg = save dir. Output: barcode.csv and embedding.h5 (joint embedding from H.norm). Needs bioconductor rhdf5 + HDF5Array for HDF5 I/O (h5read/h5createFile/writeHDF5Array/h5ls). selectGenes uses var.thresh=0.2.'
+Conos:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - r-conos
+  - r-pagoda2
+  - r-ggplot2
+  - r-glue
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  pip_packages: []
+  pip_git: []
+  package_source: 'CRAN: conos (also available as conda r-conos via conda-forge). pagoda2 from Bioconductor/conda r-pagoda2. rhdf5 + HDF5Array from Bioconductor. Upstream GitHub: kharchenkolab/conos and kharchenkolab/pagoda2.'
+  difficulty: R
+  verified_working: true
+  caveats: 'Pure-R method (.Rmd files run via Rscript, not knitted). Two entrypoints in /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Conos/: main_Conos.Rmd (diagonal integration -> graph/embedding) and main_Conos_classification.Rmd (label transfer/classification). EMP confirms r-base + r-conos + rhdf5 worked. Library deps from the scripts: conos, pagoda2, parallel (base R), ggplot2, rhdf5, HDF5Array; classification script additionally needs glue. parallel ships with base R so no separate install. Diagonal integration: ATAC must be pre-converted to gene activity score (atac_gas.h5); input is RNA counts + ATAC GAS counts. Run command (integration): Rscript main_Conos.Rmd ''../../data/dataset_final/D27/rna.h5'' ''../../data/dataset_final/D27/atac_gas.h5'' ''../../result/embedding/diagonal integration/D27/Conos/'' -- note output path contains a SPACE (''diagonal integration''), quote it. Run command (classification): Rscript main_Conos_classification.Rmd rna.h5 atac_gas.h5 rna_cty.csv atac_cty.csv <save_path/>. Input h5 layout: group ''matrix'' with datasets features, barcodes, data (cells x features, transposed in script). save_path must end with trailing slash; created if missing. Integration output: embedding.h5 (largeVis embedding) + result.h5 (saveConosForScanPy). Classification output: per-batch r{n}/query.csv and predict.csv. Pipeline: pagoda2 basicP2proc -> Conos$new -> buildGraph(space=''PCA'') -> findCommunities -> embedGraph -> largeVis embedding. n.cores=1 hardcoded. pagoda2/conos need a C++ toolchain and igraph; conda r-conos/r-pagoda2 pull these in cleanly which is why conda (not install.packages from source) is preferred. No numpy involved (pure R).'
+MOFA2:
+  python_version: '3.9'
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - bioconductor-mofa2
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  - r-reshape2
+  - r-ggplot2
+  - r-reticulate
+  pip_packages:
+  - mofapy2
+  - numpy<2
+  - scipy
+  - pandas
+  - h5py
+  - scikit-learn
+  pip_git: []
+  package_source: R package MOFA2 from Bioconductor (bioconductor-mofa2). Core training engine is the Python package mofapy2 (PyPI), called via reticulate. Script sets use_basilisk=FALSE, so mofapy2 must be installed in the same conda env's Python that reticulate detects.
+  difficulty: R
+  verified_working: false
+  caveats: 'Entrypoints: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/MOFA2/main_MOFA2.Rmd (joint embedding) and main_MOFA2_fs.Rmd (feature-selection variant); both source util.R in the same dir, so run with cwd set to that dir (script uses source(\"util.R\") with a relative path). R imports: MOFA2, rhdf5, HDF5Array, reshape2, ggplot2 (util.R also loads ggplot2). CRITICAL: run_mofa is called with use_basilisk=FALSE, so MOFA2 will NOT auto-provision its own Python via basilisk; the Python package mofapy2 must be pip-installed into the conda env''s Python and reticulate must point to it (set reticulate::use_python(...) if not auto-detected). train_opts$gpu_mode=TRUE is hardcoded in the script -- mofapy2 GPU mode needs cupy+CUDA; on a CPU-only machine this will error unless gpu_mode is set to FALSE or cupy is installed (likely failure point, hence not verified). Input layout: one .h5 per modality per batch, each with HDF5 group ''matrix'' containing data/features/barcodes (read via h5read(path,''matrix'')); CLI arg order is all modality files then batch_num, num_modalities, save_path, e.g. Rscript main_MOFA2.Rmd rna1.h5 rna2.h5 rna3.h5 adt1.h5 adt2.h5 adt3.h5 3 2 ./MOFA2/. Output: joint embedding written to <save_path>embedding.h5 (group ''data'') plus time.csv. Pin numpy<2 for mofapy2 (2023-era). No requirements.txt/setup.py/yaml present in the method dir.'
+Seurat_v3:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base=4.2
+  - r-seurat=4.3
+  - r-signac
+  - r-ggplot2
+  - r-cowplot
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  - r-hdf5r
+  pip_packages: []
+  pip_git: []
+  package_source: 'All packages are standard R libraries (CRAN + Bioconductor); no method-specific package. The method IS the single local script main_Seurat_v3.Rmd. Install via conda/bioconda: r-seurat + r-signac (CRAN), bioconductor-rhdf5 + bioconductor-hdf5array. No pip needed.'
+  difficulty: R
+  verified_working: false
+  caveats: 'Pure-R method, run with: Rscript main_Seurat_v3.Rmd <rna.h5> <atac_peak.h5> <atac_gas.h5> <rna_cty.csv> <atac_cty.csv> <save_path/> (the inline comment in the script omits the 5th arg atac_cty_path, but the code reads 6 args: rna_path, atac_path, gene_activity_path, rna_cty_path, atac_cty_path, save_path). Despite the name ''Seurat_v3'', this implements the Seurat v3-style label-transfer/anchor diagonal integration workflow (FindTransferAnchors reduction=''cca'', TransferData) and REQUIRES Signac (CreateChromatinAssay, RunTFIDF, FindTopFeatures, RunSVD) — so it needs Seurat >= 3.2 with Signac; Seurat 4.3 + matching Signac is the reliable combo (Seurat v5 may need future.globals/assay-class tweaks). Input layout: each .h5 must contain group ''matrix'' with datasets features, barcodes, data (read by custom h5_to_matrix). Inputs are [RNA, ATAC] diagonal integration; both ATAC peak matrix and ATAC gene-activity-score matrix are required. Output: joint embedding (PCA co-embedding) written to embedding.h5, plus predict.csv (predicted labels) and query.csv (true labels). The single source file uses an .Rmd extension but is plain R run via Rscript. No empirical run available, so not verified. r-hdf5r included as a safety net for HDF5 I/O though core I/O uses rhdf5/HDF5Array.'
+Seurat_WNN:
+  python_version: ''
+  conda_channels:
+  - conda-forge
+  - bioconda
+  conda_packages:
+  - r-base
+  - r-seurat
+  - r-signac
+  - r-dplyr
+  - bioconductor-rhdf5
+  - bioconductor-hdf5array
+  pip_packages: []
+  pip_git: []
+  package_source: CRAN (Seurat v4, Signac, dplyr) + Bioconductor (rhdf5, HDF5Array). No method-specific package; the method is the local R scripts main_Seurat_v4.Rmd + util.R in the repo dir.
+  difficulty: R
+  verified_working: true
+  caveats: 'Pure-R method. EMP confirms it ran with r-base + Seurat and produced graph output (dist.h5 / idx.h5). Dir is /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/Seurat_v4/ (NOT a dir literally named Seurat_WNN). Two local files are required and util.R must be in CWD (entrypoint does source(''util.R'')): main_Seurat_v4.Rmd (entrypoint, run via Rscript despite the .Rmd extension) and util.R. IMPORTANT: Seurat must be v4 (not v5) because the WNN API (FindMultiModalNeighbors, the weighted.nn neighbor slot with @nn.dist/@nn.idx) and the v4 assay model are what the script relies on; r-seurat from conda-forge may resolve to v5, so pin to a 4.x build if a clean run fails. Signac (r-signac) is imported in util.R and is needed for the RNA+ATAC path (RunTFIDF/RunSVD/lsi); not needed for RNA+ADT-only runs. Run command (RNA+ADT): Rscript main_Seurat_v4.Rmd ''<rna.h5>'' ''<adt.h5>'' NULL ''<save_path>/''. Run command (RNA+ATAC): Rscript main_Seurat_v4.Rmd ''<rna.h5>'' NULL ''<atac.h5>'' ''<save_path>/''. Input h5 files use HDF5 layout group ''matrix'' with datasets data, features, barcodes (read via h5read). Output: dist.h5, idx.h5 (weighted NN graph, written via writeHDF5Array under dataset name ''data''), graph.rds, time.csv. NOTE BUG in main_Seurat_v4.Rmd: the run_Seurat_RNA_ADT function is DEFINED (line 32) AFTER it is CALLED (line 27); however util.R (sourced at line 8) defines run_Seurat_RNA_ADT, run_Seurat_RNA_ATAC, run_Seurat_ADT_ATAC, run_Seurat_RNA_ADT_ATAC, so the sourced definitions are what actually execute — util.R is mandatory and the in-Rmd redefinition is dead/irrelevant. (run_Seurat_ADT_ATAC and run_Seurat_RNA_ADT_ATAC are referenced in main but only RNA+ADT and RNA+ATAC are actually defined in util.R; only those two modality pairs are supported in practice.) No Python, no numpy concerns.'

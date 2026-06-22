@@ -1,0 +1,41 @@
+Methods,Programming Language,Deep Learning,Peak/Gene Activity,Output,CellType Information Required,Integration Categories,Task Categories
+SCALEX,python,Yes,Gene Activity,embedding,No,diagonal,clustering;batch
+Multigrate,python,Yes,-,embedding,No,mosaic;vertical;cross,clustering;batch
+Seurat_v5,R,No,Peak,embedding,No,diagonal,clustering;batch
+scBridge,python,Yes,Gene Activity,embedding,Yes,diagonal,clustering;batch;classification
+totalVI,python,Yes,-,embedding,No,vertical;mosaic;cross,clustering
+MultiVI,python,Yes,-,embedding,No,mosaic,clustering
+Cobolt,python,Yes,-,embedding,No,mosaic,clustering
+scMVP,python,Yes,-,embedding,No,vertical,clustering
+scMM,python,Yes,-,embedding,No,vertical,clustering
+scMDC,python,Yes,-,embedding,No,vertical,clustering
+scMoMaT,python,No,-,graph,No,vertical;mosaic;cross,clustering
+moETM,python,Yes,-,embedding,No,vertical,clustering
+MIRA,python,Yes,-,graph,No,vertical,clustering
+Concerto,python,Yes,-,embedding,No,vertical,clustering
+VIMCCA,python,Yes,-,embedding,No,vertical,clustering
+VIPCCA,python,Yes,Gene Activity,embedding,No,diagonal,clustering
+SMILE,python,Yes,-,embedding,No,mosaic,clustering
+Portal,python,Yes,Gene Activity,embedding,No,diagonal,clustering
+uniPort,python,Yes,Gene Activity,embedding,No,diagonal,clustering
+sciCAN,python,Yes,Gene Activity,embedding,No,diagonal,clustering
+scJoint,python,Yes,-,embedding,No,diagonal,classification
+GLUE,python,Yes,-,embedding,No,diagonal,clustering
+MultiMAP,python,Yes,Peak,embedding,No,diagonal,clustering
+SCALEX_cross,python,Yes,-,embedding,No,cross,clustering
+sciPENN,python,Yes,-,embedding,No,mosaic,imputation
+scMSI,python,Yes,-,embedding,No,vertical,clustering
+UnitedNet,python,Yes,-,embedding,No,cross,clustering
+SPIRAL,python,No,-,embedding,No,cross,registration
+GPSA,python,Yes,-,embedding,No,cross,registration
+PASTE,python,No,-,embedding,No,cross,registration
+PASTE2,python,No,-,embedding,No,cross,registration
+iPOLNG,python,Yes,-,embedding,No,vertical,clustering
+StabMap,R,No,-,embedding,No,mosaic,clustering
+UINMF,R,No,-,embedding,No,vertical;cross,clustering
+iNMF,R,No,Gene Activity,embedding,No,diagonal,clustering
+online_iNMF,R,No,Gene Activity,embedding,No,diagonal,clustering
+Conos,R,No,Gene Activity,embedding,No,diagonal,clustering
+MOFA+,R,No,-,embedding,No,vertical,clustering
+Seurat_v3,R,No,-,embedding,No,vertical,clustering
+Seurat(WNN),R,No,-,graph,No,vertical,clustering

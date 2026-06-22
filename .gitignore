@@ -1,0 +1,13 @@
+# bytecode / build / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# run outputs
+/runs/
+
+# external data symlinks (machine-specific, not part of the package source)
+/data
+/scMultiBench_ref
+/multibench/result

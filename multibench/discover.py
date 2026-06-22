@@ -1,0 +1,77 @@
+"""Discovery: filter methods by need; enrich method_info with catalog metadata."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from .run import registry
+from .run.runner import _AUX_ROLES
+
+
+def _base_modality(role: str) -> str:
+    """Map an arg role to its base modality type (rna/adt/atac/...)."""
+    # compound roles with an explicit modality prefix
+    for prefix in ("rna", "adt", "atac"):
+        if role.startswith(prefix + "_"):
+            return prefix
+    # strip a single trailing digit (rna1 -> rna, atac2 -> atac)
+    if role and role[-1].isdigit():
+        return role[:-1]
+    return role
+
+
+def _modality_types(spec) -> set[str]:
+    """Union of base modality types consumed across all of a method's variants.
+
+    Auxiliary roles (data_dir, source/target data & cty, out_dir) are excluded.
+    Methods with no variants (declared stubs) yield an empty set.
+    """
+    types: set[str] = set()
+    for v in spec.variants:
+        for a in v.args:
+            if a.role in _AUX_ROLES:
+                continue
+            types.add(_base_modality(a.role))
+    return types
+
+
+def find_methods(category: str | None = None, task: str | None = None,
+                 needs_labels: bool | None = None,
+                 atac: str | None = None,
+                 modalities: list[str] | set[str] | None = None) -> list[str]:
+    """Return method ids matching all supplied filters."""
+    want = set(modalities) if modalities is not None else None
+    out = []
+    for s in registry.load():
+        if category and category not in s.categories:
+            continue
+        if task and task not in s.tasks:
+            continue
+        if needs_labels is not None and s.needs_labels != needs_labels:
+            continue
+        if atac and s.atac != atac:
+            continue
+        if want is not None and not want <= _modality_types(s):
+            continue
+        out.append(s.id)
+    return out
+
+
+def method_info(method: str, files_dir: Path | str | None = None) -> dict:
+    """Return a flat dict combining registry spec + (optional) catalog row."""
+    s = registry.get(method)
+    info = {
+        "id": s.id, "language": s.language, "categories": s.categories,
+        "tasks": s.tasks, "env": s.env, "atac": s.atac,
+        "needs_labels": s.needs_labels, "status": s.status,
+        "setup_hint": s.setup_hint,
+        "variants": [v.entrypoint for v in s.variants],
+    }
+    if files_dir is not None:
+        from .data import catalog
+        cat = catalog.methods(files_dir)
+        match = cat[cat["canonical_id"] == s.id]
+        if len(match):
+            row = match.iloc[0]
+            info["deep_learning"] = row["deep_learning"]
+            info["output"] = row["output"]
+    return info

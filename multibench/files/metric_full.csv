@@ -1,0 +1,11 @@
+metric,description
+ARI,Adjusted Rand Index between Louvain/Leiden clusters and cell-type labels (bio-conservation).
+NMI,Normalized Mutual Information between clusters and cell-type labels (bio-conservation).
+ASW,Average Silhouette Width on cell-type labels; higher = better-separated cell types.
+iASW,Isolated-label Average Silhouette Width for rare/isolated cell types.
+iF1,Isolated-label F1: clustering F1 for the most isolated label(s).
+cLISI,Cell-type Local Inverse Simpson's Index; bio-conservation (label purity in neighborhoods).
+ASW_batch,Batch Average Silhouette Width; higher = batches well mixed (batch correction).
+GC,Graph Connectivity: are cells of the same type connected after integration (batch correction).
+iLISI,Integration LISI; higher = better batch mixing (batch correction).
+kBET,k-nearest-neighbour Batch Effect Test; acceptance rate of batch-label mixing.

@@ -1,0 +1,469 @@
+methods:
+  - id: SCALEX
+    language: python
+    categories: [diagonal]
+    tasks: [clustering, batch]
+    env: scmb_torch_v2
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/SCALEX/main_SCALEX.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
+  - id: Multigrate
+    language: python
+    categories: [mosaic, vertical, cross]
+    tasks: [clustering, batch]
+    env: multigrate
+    status: verified
+    variants:
+      - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_adt.py
+        language: python
+        args:
+          - {role: rna1, flag: "--path1"}
+          - {role: rna2, flag: "--path2"}
+          - {role: adt2, flag: "--path3"}
+          - {role: adt3, flag: "--path4"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, lr: 0.0001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_atac.py
+        language: python
+        args:
+          - {role: rna1, flag: "--path1"}
+          - {role: rna2, flag: "--path2"}
+          - {role: atac2, flag: "--path3"}
+          - {role: atac3, flag: "--path4"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: adt, flag: "--path2", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
+  - id: Seurat_v5
+    language: R
+    categories: [diagonal]
+    tasks: [clustering, batch]
+    env: seurat_v5
+    atac: peak
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_peak]}
+        entrypoint: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: rna}
+          - {role: atac_peak}
+          - {role: atac_peak}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
+  - id: scBridge
+    language: python
+    categories: [diagonal]
+    tasks: [clustering, batch, classification]
+    env: scbridge
+    atac: gene_activity
+    needs_labels: true
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/scBridge/main_scBridge.py
+        language: python
+        args:
+          - {role: data_dir, flag: "--data_path", eq: true}
+          - {role: source_data, flag: "--source_data", eq: true}
+          - {role: target_data, flag: "--target_data", eq: true}
+          - {role: source_cty, flag: "--source_cty"}
+          - {role: target_cty, flag: "--target_cty"}
+          - {role: out_dir, flag: "--save_path", eq: true}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+        extra_outputs:
+          - {kind: labels, file: Prediction.csv}
+
+  # ---- declared stubs (discoverable; not yet wired) ----
+  - id: totalVI
+    language: python
+    categories: [vertical, mosaic, cross]
+    tasks: [clustering]
+    env: totalvi
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/totalVI/main_totalVI.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: adt, flag: "--path2", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: MultiVI
+    language: python
+    categories: [mosaic]
+    tasks: [clustering]
+    env: multivi
+    status: verified
+    variants:
+      - when: {category: mosaic, modalities: [rna, atac, rna_pair, atac_pair]}
+        entrypoint: tools_scripts/MultiVI/main_MultiVI.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac, flag: "--path2"}
+          - {role: rna_pair, flag: "--pair_path1"}
+          - {role: atac_pair, flag: "--pair_path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: Cobolt
+    language: python
+    categories: [mosaic]
+    tasks: [clustering]
+    env: cobolt
+    status: verified
+    variants:
+      - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
+        entrypoint: tools_scripts/Cobolt/main_Cobolt.py
+        language: python
+        args:
+          - {role: rna1, flag: "--path1"}
+          - {role: rna2, flag: "--path2"}
+          - {role: atac2, flag: "--path3"}
+          - {role: atac3, flag: "--path4"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {batch_size: 128, lr: 0.005}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: scMVP
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    env: scmvp
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/scMVP/main_scMVP.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - {id: scMM, language: python, categories: [vertical], tasks: [clustering], env: scmm, status: declared}
+  - {id: scMDC, language: python, categories: [vertical], tasks: [clustering], env: scmdc, status: declared}
+  - id: scMoMaT
+    language: python
+    categories: [vertical, mosaic, cross]
+    tasks: [clustering]
+    env: scmomat
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: adt, flag: "--path2", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, adt, atac]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: adt, flag: "--path2", repeat: true}
+          - {role: atac, flag: "--path3", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+  - {id: moETM, language: python, categories: [vertical], tasks: [clustering], env: moetm, status: declared}
+  - id: MIRA
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    env: mira
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/MIRA/main_MIRA.py
+        language: python
+        args:
+          - {role: rna, flag: "--rna", repeat: true}
+          - {role: atac, flag: "--atac", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: distancess.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: connectivities.h5, dataset: data}
+  - {id: Concerto, language: python, categories: [vertical], tasks: [clustering], env: concerto, status: declared}
+  - {id: Matilda, language: python, categories: [vertical], tasks: [clustering], env: matilda, status: declared}
+  - id: VIMCCA
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    env: vimcca
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/VIMCCA/main_VIMCCA_RNA_ADT.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/VIMCCA/main_VIMCCA_RNA_ATAC.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: VIPCCA
+    language: python
+    categories: [diagonal]
+    tasks: [clustering]
+    env: vipcca
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/VIPCCA/main_VIPCCA.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: SMILE
+    language: python
+    categories: [mosaic]
+    tasks: [clustering]
+    env: smile
+    status: verified
+    variants:
+      - when: {category: mosaic, modalities: [rna_ref, atac_ref, rna_query, atac_query]}
+        entrypoint: tools_scripts/SMILE/main_SMILE.py
+        language: python
+        args:
+          - {role: rna_ref, flag: "--ref_path1"}
+          - {role: atac_ref, flag: "--ref_path2"}
+          - {role: rna_query, flag: "--query_path1"}
+          - {role: atac_query, flag: "--query_path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: Portal
+    language: python
+    categories: [diagonal]
+    tasks: [clustering]
+    env: portal
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/Portal/main_Portal.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: uniPort
+    language: python
+    categories: [diagonal]
+    tasks: [clustering]
+    env: uniport
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/uniPort/main_uniPort.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {seed: 1}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: sciCAN
+    language: python
+    categories: [diagonal]
+    tasks: [clustering]
+    env: scican
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/sciCAN/main_sciCAN.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - {id: scJoint, language: python, categories: [diagonal], tasks: [classification], env: scjoint, status: declared}
+  - {id: GLUE, language: python, categories: [diagonal], tasks: [clustering], env: glue, status: declared}
+  - id: MultiMAP
+    language: python
+    categories: [diagonal]
+    tasks: [clustering]
+    env: multimap
+    atac: peak
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_peak, atac_gas]}
+        entrypoint: tools_scripts/MultiMAP/main_MultiMAP.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_peak, flag: "--path2"}
+          - {role: atac_gas, flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - {id: SCALEX_cross, language: python, categories: [cross], tasks: [clustering], env: scalex, status: declared}
+  - {id: sciPENN, language: python, categories: [mosaic], tasks: [imputation], env: scipenn, status: declared}
+  - id: scMSI
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    env: scmsi
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/scMSI/main_scMSI.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - {id: UnitedNet, language: python, categories: [cross], tasks: [clustering], env: unitednet, status: declared}
+  - {id: SPIRAL, language: python, categories: [cross], tasks: [registration], env: spiral, status: declared}
+  - {id: GPSA, language: python, categories: [cross], tasks: [registration], env: gpsa, status: declared}
+  - {id: PASTE, language: python, categories: [cross], tasks: [registration], env: paste, status: declared}
+  - {id: PASTE2, language: python, categories: [cross], tasks: [registration], env: paste2, status: declared}
+  - {id: iPOLNG, language: python, categories: [vertical], tasks: [clustering], env: ipolng, status: declared}
+  - {id: StabMap, language: R, categories: [mosaic], tasks: [clustering], env: stabmap, status: declared}
+  - id: UINMF
+    language: R
+    categories: [vertical, cross]
+    tasks: [clustering]
+    env: uinmf
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_vertical.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: adt}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, adt1, adt2]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross.Rmd
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: adt1}
+          - {role: adt2}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: iNMF
+    language: R
+    categories: [diagonal]
+    tasks: [clustering]
+    env: inmf
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/iNMF/main_iNMF.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: atac_gas}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: online_iNMF
+    language: R
+    categories: [diagonal]
+    tasks: [clustering]
+    env: online_inmf
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/online iNMF/main_online_iNMF.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: atac_gas}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: Conos
+    language: R
+    categories: [diagonal]
+    tasks: [clustering]
+    env: conos
+    atac: gene_activity
+    status: verified
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/Conos/main_Conos.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: atac_gas}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - {id: MOFA2, language: R, categories: [vertical], tasks: [clustering], env: mofa2, status: declared}
+  - {id: Seurat_v3, language: R, categories: [vertical], tasks: [clustering], env: seurat_v3, status: declared}
+  - id: Seurat_WNN
+    language: R
+    categories: [vertical]
+    tasks: [clustering]
+    env: seurat_wnn
+    status: verified
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: adt}
+          - {role: atac, const: "NULL"}
+          - {role: out_dir}
+        output: {kind: graph, file: dist.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: idx.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: adt, const: "NULL"}
+          - {role: atac}
+          - {role: out_dir}
+        output: {kind: graph, file: dist.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: idx.h5, dataset: data}
