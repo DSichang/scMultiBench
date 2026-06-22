@@ -10,6 +10,8 @@ from pathlib import Path
 import h5py
 import numpy as np
 
+__all__ = ["to_canonical", "read_canonical"]
+
 
 def _is_canonical_h5(path: Path) -> bool:
     try:

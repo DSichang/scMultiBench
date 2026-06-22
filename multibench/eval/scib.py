@@ -72,7 +72,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering") -> pd.Data
         _safe("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
         _safe("ASW", lambda: me.silhouette(adata, label_key="celltype", embed="X_emb"))
         _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
-        _safe("iFI", lambda: me.isolated_labels_f1(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
+        _safe("iF1", lambda: me.isolated_labels_f1(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))

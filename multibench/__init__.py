@@ -4,8 +4,8 @@ from . import config
 from . import plot
 from . import eval
 from .data import catalog
-from .data.results import load_results
-from .eval.pipeline import evaluate
+from .data.results import load_results, available_datasets
+from .eval.pipeline import evaluate, to_long
 from .engine.runner import run
 from .engine.registry import list_methods, list_tasks
 from .engine.resolve import inputs_for, labels_for
@@ -15,6 +15,6 @@ from .discover import find_methods, method_info
 
 __version__ = "0.1.0"
 
-__all__ = ["config", "plot", "eval", "catalog", "load_results", "evaluate",
-           "run", "list_methods", "list_tasks", "inputs_for", "labels_for",
-           "io", "env", "method_info", "find_methods", "__version__"]
+__all__ = ["config", "plot", "eval", "catalog", "load_results", "available_datasets",
+           "evaluate", "to_long", "run", "list_methods", "list_tasks", "inputs_for",
+           "labels_for", "io", "env", "method_info", "find_methods", "__version__"]

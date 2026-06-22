@@ -23,6 +23,13 @@ import yaml
 
 from . import registry
 
+__all__ = [
+    "recipe", "default_env_name", "group_for", "groups", "plan",
+    "create_commands", "environment_yml", "group_create_commands",
+    "group_environment_yml", "installed_envs", "env_exists", "status",
+    "create", "create_group",
+]
+
 _GROUPS_YAML = Path(__file__).resolve().parent / "env_groups.yaml"
 
 

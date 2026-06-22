@@ -19,7 +19,13 @@ def test_category_folder_rejects_unknown():
 
 def test_metric_set_dir():
     assert config.metric_set_dir("scib") == "scib_metric"
-    assert config.metric_set_dir("classification") == "classification_metrics"
+
+
+def test_metric_set_dir_rejects_unwired():
+    # only "scib" is wired in v1; other metric sets are not advertised
+    import pytest
+    with pytest.raises(ValueError):
+        config.metric_set_dir("classification")
 
 
 def test_defaults_point_at_local_data(tmp_path, monkeypatch):

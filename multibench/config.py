@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+__all__ = ["Config", "DEFAULT", "category_folder", "metric_set_dir"]
+
 # token -> on-disk space-named folder
 _CATEGORY_FOLDERS = {
     "vertical": "vertical integration",
@@ -17,14 +19,11 @@ _CATEGORY_FOLDERS = {
     "cross": "cross integration",
 }
 
-# metric-set token -> top-level result dir
+# metric-set token -> top-level result dir. Only "scib" is wired in v1
+# (load_results raises NotImplementedError otherwise); other metric sets are not
+# yet exposed here rather than advertising tokens with no working loader.
 _METRIC_SET_DIRS = {
     "scib": "scib_metric",
-    "classification": "classification_metrics",
-    "fs_cor": "fs_cor",
-    "fs_intersection": "fs_intersection",
-    "registration": "registration_clean",
-    "time_memory": "time_memory",
 }
 
 _ROOT = Path(__file__).resolve().parent.parent  # <ROOT>

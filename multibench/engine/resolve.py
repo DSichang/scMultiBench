@@ -33,13 +33,16 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 def inputs_for(dataset: str, method: str, category: str,
                modalities: list[str] | set[str] | None = None,
-               data_path: Path | str | None = None) -> dict:
+               data_path: Path | str | None = None,
+               check: bool = False) -> dict:
     """Return ``{modality_role: path}`` for a method's variant on a dataset.
 
     The dataset tree is **flat** (``<data_path>/<dataset>/<file>``). Each role is
     resolved to the actual file present in that dir (the role token, or a known
     alias such as ``atac_peak``->``peak.h5`` / ``atac_gas``->``atac.h5``),
-    falling back to ``<role>.h5`` when no candidate exists. Use
+    falling back to ``<role>.h5`` when no candidate exists. Pass ``check=True`` to
+    raise ``FileNotFoundError`` if any resolved path is missing (instead of
+    returning a best-effort path that only fails later inside ``run``). Use
     :func:`labels_for` to get the matching cell-type label CSVs.
 
     Variant selection:
@@ -71,7 +74,16 @@ def inputs_for(dataset: str, method: str, category: str,
         variant = candidates[0]
 
     roles = [a.role for a in variant.args if a.role != "out_dir"]
-    return {role: str(_resolve_role(ds_dir, role)) for role in roles}
+    out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
+    if check:
+        missing = {r: p for r, p in out.items() if not Path(p).exists()}
+        if missing:
+            raise FileNotFoundError(
+                f"{method}/{dataset}/{category}: input files not found on disk: "
+                f"{missing}. Available files in {ds_dir}: "
+                f"{sorted(q.name for q in ds_dir.glob('*')) if ds_dir.is_dir() else '(dir missing)'}"
+            )
+    return out
 
 
 def labels_for(dataset: str, data_path: Path | str | None = None) -> dict:

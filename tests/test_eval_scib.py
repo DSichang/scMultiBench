@@ -28,7 +28,7 @@ def _toy():
 def test_clustering_metrics_present_and_bounded():
     emb, ct, cl, ba = _toy()
     res = escib.compute(emb, ct, cl, ba, group="clustering")
-    for k in ["ARI", "NMI", "ASW", "iASW", "iFI", "cLISI"]:
+    for k in ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]:
         assert k in res.index
     assert 0.0 <= float(res.loc["ARI", "Value"]) <= 1.0
     # identical cluster==celltype -> high ARI

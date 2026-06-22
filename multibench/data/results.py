@@ -96,3 +96,27 @@ def load_results(
         wanted = [catalog.canonical_metric(m) for m in wanted]
         out = out[out["metric"].isin(wanted)]
     return out.reset_index(drop=True)
+
+
+def available_datasets(
+    category: str,
+    metric_set: str = "scib",
+    result_path: Path | str | None = None,
+) -> list[str]:
+    """Dataset ids that have published ``metric_set`` results for a category.
+
+    These are exactly the datasets ``load_results(category, dataset=...)`` can
+    load — i.e. the subdirectories under the category's result folder. Returns
+    ``[]`` if the category folder does not exist (e.g. ``mosaic``, which has no
+    published metrics). Useful for discovering what is actually loadable before
+    calling :func:`load_results`.
+    """
+    if metric_set != "scib":
+        raise NotImplementedError(
+            f"metric_set={metric_set!r} is not wired in v1 (only 'scib')."
+        )
+    base = Path(result_path) if result_path is not None else config.DEFAULT.result_path
+    root = base / config.metric_set_dir(metric_set) / config.category_folder(category)
+    if not root.exists():
+        return []
+    return sorted(p.name for p in root.iterdir() if p.is_dir())
