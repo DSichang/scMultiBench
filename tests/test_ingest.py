@@ -44,3 +44,16 @@ def test_from_csv(tmp_path):
     out = ingest.to_canonical(p, out=tmp_path / "c.h5")
     with h5py.File(out, "r") as f:
         assert np.array(f["matrix/data"]).shape == (2, 4)  # genes x cells
+
+
+def test_from_csv_labeled_roundtrip(tmp_path):
+    # labeled matrix (cell barcodes in col 0, gene names in header) must not
+    # crash on the string label column and should preserve names.
+    import pandas as pd, numpy as np
+    p = tmp_path / "labeled.csv"
+    pd.DataFrame(np.ones((3, 2)), index=["cellA", "cellB", "cellC"],
+                 columns=["geneX", "geneY"]).to_csv(p)
+    back = ingest.read_canonical(ingest.to_canonical(p, out=tmp_path / "c.h5"))
+    assert back.shape == (3, 2)
+    assert list(back.obs_names) == ["cellA", "cellB", "cellC"]
+    assert list(back.var_names) == ["geneX", "geneY"]

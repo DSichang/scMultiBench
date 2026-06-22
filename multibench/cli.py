@@ -9,7 +9,8 @@ from . import plot as plot_ns
 
 def _cmd_list(args) -> int:
     from .engine import registry
-    for m in registry.list_methods(category=args.category, task=args.task):
+    for m in registry.list_methods(category=args.category, task=args.task,
+                                   runnable=args.runnable or None):
         print(m)
     return 0
 
@@ -17,7 +18,8 @@ def _cmd_list(args) -> int:
 def _cmd_find(args) -> int:
     needs = True if args.needs_labels else None
     for m in discover.find_methods(category=args.category, task=args.task,
-                                   needs_labels=needs, atac=args.atac):
+                                   needs_labels=needs, atac=args.atac,
+                                   runnable=args.runnable or None):
         print(m)
     return 0
 
@@ -118,7 +120,8 @@ def _cmd_env(args) -> int:
         else:
             print(f"created environment for {method}")
         return 0
-    raise SystemExit("usage: multibench env {status|recipe|yml|create}")
+    raise SystemExit(
+        "usage: multibench env {status|groups|plan|recipe|yml|create|create-group}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -126,6 +129,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     pl = sub.add_parser("list"); pl.add_argument("--category"); pl.add_argument("--task")
+    pl.add_argument("--runnable", action="store_true",
+                    help="only methods with a declared variant (usable by run)")
     pl.set_defaults(func=_cmd_list)
 
     pf = sub.add_parser("find")
@@ -133,6 +138,8 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--needs-labels", action="store_true")
     pf.add_argument("--atac", choices=["peak", "gene_activity"],
                     help="filter by ATAC representation the method consumes")
+    pf.add_argument("--runnable", action="store_true",
+                    help="only methods with a declared variant (usable by run)")
     pf.set_defaults(func=_cmd_find)
 
     pp = sub.add_parser("plot")

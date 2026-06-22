@@ -37,13 +37,18 @@ def _modality_types(spec) -> set[str]:
 def find_methods(category: str | None = None, task: str | None = None,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
-                 modalities: list[str] | set[str] | None = None) -> list[str]:
+                 modalities: list[str] | set[str] | None = None,
+                 runnable: bool | None = None) -> list[str]:
     """Return method ids matching all supplied filters.
 
     ``atac`` is an exact match on the method's declared ATAC representation;
     valid values are ``"peak"`` or ``"gene_activity"`` (not a boolean flag).
     ``modalities`` keeps methods that consume ALL of the requested base modality
-    types (e.g. ``["rna", "atac"]``).
+    types (e.g. ``["rna", "atac"]``); because modality info is derived from a
+    method's variants, this filter implicitly excludes the declared-but-unwired
+    stub methods (those without variants). ``runnable=True`` restricts to methods
+    with at least one variant (usable by ``inputs_for``/``run``); ``runnable=False``
+    returns only the stubs.
     """
     want = set(modalities) if modalities is not None else None
     out = []
@@ -57,6 +62,8 @@ def find_methods(category: str | None = None, task: str | None = None,
         if atac and s.atac != atac:
             continue
         if want is not None and not want <= _modality_types(s):
+            continue
+        if runnable is not None and bool(s.variants) != runnable:
             continue
         out.append(s.id)
     return out

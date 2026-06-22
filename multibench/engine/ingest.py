@@ -31,8 +31,15 @@ def _to_anndata(src):
         return ad.read_h5ad(p)
     if suf in (".csv", ".tsv"):
         sep = "," if suf == ".csv" else "\t"
-        df = pd.read_csv(p, sep=sep, index_col=None)
-        return ad.AnnData(df.to_numpy(dtype=float))
+        df = pd.read_csv(p, sep=sep)
+        # A leading non-numeric column is row labels (cell barcodes): use it as
+        # the index (obs_names) instead of feeding it to the numeric matrix.
+        if df.shape[1] > 1 and not pd.api.types.is_numeric_dtype(df.iloc[:, 0]):
+            df = df.set_index(df.columns[0])
+        a = ad.AnnData(df.to_numpy(dtype=float))
+        a.obs_names = [str(x) for x in df.index]
+        a.var_names = [str(c) for c in df.columns]
+        return a
     if suf == ".loom":
         try:
             import loompy  # noqa: F401  (anndata.read_loom needs it)

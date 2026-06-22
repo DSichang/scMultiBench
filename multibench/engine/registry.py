@@ -63,12 +63,21 @@ def list_tasks() -> list[str]:
     return sorted({t for s in load() for t in s.tasks})
 
 
-def list_methods(category: str | None = None, task: str | None = None) -> list[str]:
+def list_methods(category: str | None = None, task: str | None = None,
+                 runnable: bool | None = None) -> list[str]:
+    """Registry method ids, optionally filtered.
+
+    ``runnable=True`` keeps only methods with at least one declared variant
+    (i.e. usable by ``inputs_for``/``run``); ``runnable=False`` keeps only the
+    declared-but-unwired stubs. ``None`` (default) returns all.
+    """
     out = []
     for s in load():
         if category and category not in s.categories:
             continue
         if task and task not in s.tasks:
+            continue
+        if runnable is not None and bool(s.variants) != runnable:
             continue
         out.append(s.id)
     return out

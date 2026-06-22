@@ -46,6 +46,12 @@ def test_metric_crosswalk_canonicalizes_codes():
     assert catalog.canonical_metric("iFI") == catalog.canonical_metric("iF1")
 
 
+def test_canonical_metric_blank_and_none_return_none():
+    assert catalog.canonical_metric("") is None
+    assert catalog.canonical_metric("nan") is None
+    assert catalog.canonical_metric(None) is None  # real None, not the string "None"
+
+
 def test_datasets_table_has_simulated_flag(files_dir):
     df = catalog.datasets(files_dir)
     assert "simulated" in df.columns

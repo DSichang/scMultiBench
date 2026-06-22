@@ -75,3 +75,15 @@ def test_find_methods_modalities_excludes_stub():
 def test_find_methods_modalities_none_unchanged():
     # modalities=None must behave exactly like the call without the kwarg
     assert discover.find_methods() == discover.find_methods(modalities=None)
+
+
+def test_find_methods_runnable_filter():
+    all_ids = discover.find_methods()
+    runnable = discover.find_methods(runnable=True)
+    stubs = discover.find_methods(runnable=False)
+    assert set(runnable) <= set(all_ids)
+    assert set(runnable) | set(stubs) == set(all_ids)        # complete partition
+    assert set(runnable) & set(stubs) == set()               # disjoint
+    assert "SCALEX" in runnable                              # has a variant
+    assert "GLUE" in stubs and "GLUE" not in runnable        # declared stub
+    assert len(runnable) < len(all_ids)

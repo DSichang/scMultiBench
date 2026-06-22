@@ -50,7 +50,7 @@ class MethodSpec:
     setup_hint: str = ""
     status: str = "declared"            # declared | verified
     variants: list[Variant] = field(default_factory=list)
-    # reproducible environment recipe (see multibench.run.envs); keys:
+    # reproducible environment recipe (see multibench.engine.envs); keys:
     # python_version, conda_channels, conda_packages, pip_packages, pip_git,
     # package_source, difficulty, verified_working, caveats
     env_spec: dict = field(default_factory=dict)

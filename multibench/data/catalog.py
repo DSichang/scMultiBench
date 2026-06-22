@@ -68,6 +68,8 @@ _METRIC_CANON = {
 
 def canonical_metric(code: str) -> str | None:
     """Canonicalize a raw metric short-code; None for blank/unknown-empty."""
+    if code is None:
+        return None
     key = str(code).strip().lower()
     if key == "" or key == "nan":
         return None
