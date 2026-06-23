@@ -126,6 +126,19 @@ def _merged_groups() -> dict:
     return {}
 
 
+@functools.lru_cache(maxsize=1)
+def _method_env() -> dict:
+    """Explicit ``{method: real conda env}`` overrides from env_groups.yaml.
+
+    These point at the actual installed envs (verified by import-testing) and
+    take precedence over the generated ``groups`` below, whose ``scmb_*`` names
+    are largely fictional / never built.
+    """
+    if _GROUPS_YAML.exists():
+        return (yaml.safe_load(_GROUPS_YAML.read_text()) or {}).get("method_env", {}) or {}
+    return {}
+
+
 def groups() -> dict:
     """All install groups: shared merged envs + singleton (own-env) methods.
 
@@ -134,6 +147,13 @@ def groups() -> dict:
     merged = _merged_groups()
     covered = {m for g in merged.values() for m in g.get("members", [])}
     out = {name: {**g, "shared": True} for name, g in merged.items()}
+    # explicit method->real-env overrides: ensure each target env is a group too
+    for method, env in _method_env().items():
+        g = out.setdefault(env, {"members": [], "shared": True})
+        g.setdefault("members", [])
+        if method not in g["members"]:
+            g["members"].append(method)
+        covered.add(method)
     for s in registry.load():
         if s.id not in covered:
             out[default_env_name(s.id)] = {
@@ -143,7 +163,11 @@ def groups() -> dict:
 
 
 def group_for(method: str) -> str:
-    """The env name that serves this method (a shared group, or its own env)."""
+    """The env name that serves this method (an explicit override, a shared
+    group, or its own env)."""
+    override = _method_env()
+    if method in override:
+        return override[method]
     for name, g in _merged_groups().items():
         if method in g.get("members", []):
             return name
