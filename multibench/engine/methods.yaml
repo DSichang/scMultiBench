@@ -234,7 +234,8 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
-    status: declared
+    status: verified
+    setup_hint: "runs in the `env_moETM` conda env. Verified end-to-end on D1 (rna+adt) -> (26169, 100) embedding."
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/moETM/main_moETM_rna_adt.py

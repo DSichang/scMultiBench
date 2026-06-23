@@ -236,3 +236,15 @@ groups:
     members:
     - GLUE
     notes: 'GLUE needs scglue (the shared scmb_torch env lacks it) and a gencode GTF (gencode.v43.*.annotation.gtf.gz) present in the run working dir. Verified end-to-end on D27 -> (21434, 50) embedding via the existing `glue` conda env.'
+  env_moETM:
+    python_version: '3.9'
+    conda_channels:
+    - conda-forge
+    pip_packages:
+    - torch
+    - scanpy
+    - anndata
+    - h5py
+    members:
+    - moETM
+    notes: 'moETM runs in the existing env_moETM conda env (torch + scanpy stack). Verified end-to-end on D1 (rna+adt) -> (26169, 100) embedding in 58s.'
