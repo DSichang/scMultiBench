@@ -19,6 +19,7 @@ def _parse_variant(d: dict) -> Variant:
         args=[ArgSpec(**a) for a in d.get("args", [])],
         output=OutputSpec(**d["output"]),
         params=d.get("params", {}),
+        run_env=d.get("run_env", {}),
         extra_outputs=[OutputSpec(**o) for o in d.get("extra_outputs", [])],
     )
 

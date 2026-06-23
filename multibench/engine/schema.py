@@ -32,6 +32,7 @@ class Variant:
     args: list[ArgSpec]
     output: OutputSpec
     params: dict = field(default_factory=dict)        # default hyperparams
+    run_env: dict = field(default_factory=dict)        # per-method env overrides (e.g. CUDA_VISIBLE_DEVICES)
     extra_outputs: list[OutputSpec] = field(default_factory=list)
 
     def matches(self, category: str, modalities: set[str]) -> bool:

@@ -24,10 +24,10 @@ method_env:
   Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
   VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
   iPOLNG: scmb_ipolng       # [v] fresh env: iPoLNG 0.0.2 + torch 1.11
-  scMVP: scmb_scmvp2        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
+  scMVP: scmb_scmvp4        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
   UINMF: scmb_r             # [v] fresh R env: rliger 2.2.1 (compiled from source)
-  iNMF: scmb_r              # [v] rliger
-  online_iNMF: scmb_r       # [v] rliger
+  iNMF: scmb_rv1            # [v] rliger 1.0.1 (datasets.use API)
+  online_iNMF: scmb_rv1            # [v] rliger 1.0.1 (datasets.use API)
   StabMap: scmb_r           # [v] bioconductor-stabmap
 
 # Shared 'group' environments: each hosts several compatible methods.

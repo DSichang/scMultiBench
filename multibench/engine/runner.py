@@ -93,7 +93,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # Isolate the method env from user site-packages (~/.local): a broken or
     # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch
     # egg breaking anndata imports). PYTHONNOUSERSITE=1 makes the env hermetic.
-    run_env = {**os.environ, "PYTHONNOUSERSITE": "1"}
+    run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **{k: str(v) for k, v in (variant.run_env or {}).items()}}
     proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True,
                           env=run_env)
     if proc.returncode != 0:
