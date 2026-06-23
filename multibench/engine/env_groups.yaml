@@ -14,13 +14,15 @@ method_env:
   scMSI: scvi-env           # [v]
   scBridge: scmb_torch      # [v] generic torch+scanpy
   Concerto: scmb_tf         # [blocked] BERT/TF2.8; needs openTSNE+faiss+tfds+bert-for-tf2 + uniout(py2-only=upstream script patch); scmb_concerto=partial build
-  VIMCCA: total_cpu         # [v] scbean
+  VIMCCA: scmb_vimcca       # [v] scbean==0.5.6 + TF2.4 + tfp0.12.2
   UnitedNet: unitednet      # [v]
   SPIRAL: spiral_environment # [v]
   MOFA2: MOFA2_env          # [v] R MOFA2
-  scMM: env_multigrate      # [v]
+  scMM: scmb_scmm           # [v] rebuilt: numpy 1.26 (np.mat restored)
+  scMDC: scmb_scmdc         # [v] rebuilt numpy<2; NOTE run hits 10845vs10846 shape mismatch (data/script)
+  sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl
   Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
-  VIPCCA: scmb_tf           # [broken] needs lowercase vipcca pkg (tools/model)+TF2.4.1; scmb_vipcca got wrong capital VIPCCA-0.1.5
+  VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
   iPOLNG: scmb_ipolng       # [v] fresh env: iPoLNG 0.0.2 + torch 1.11
   scMVP: multigrate         # [broken] needs CONDA py3.7 (pytorch=1.9.1 conda, numpy==1.19.5); pip wheel build fails
   UINMF: scmb_r             # [v] fresh R env: rliger 2.2.1 (compiled from source)
