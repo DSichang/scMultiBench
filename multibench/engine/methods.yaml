@@ -168,7 +168,7 @@ methods:
           - {role: rna, flag: "--path1"}
           - {role: adt, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
-        params: {model: rna_protein}
+        params: {model: rna_protein, no_cuda: true}
         output: {kind: embedding, file: embedding.h5, dataset: data}
       - when: {category: vertical, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/scMM/main_scMM.py
@@ -177,7 +177,7 @@ methods:
           - {role: rna, flag: "--path1"}
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
-        params: {model: rna_atac}
+        params: {model: rna_atac, no_cuda: true}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMDC
     language: python
