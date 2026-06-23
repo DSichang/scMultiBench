@@ -18,6 +18,7 @@ method_env:
   UnitedNet: unitednet      # [v]
   SPIRAL: spiral_environment # [v]
   MOFA2: MOFA2_env          # [v] R MOFA2
+  sciPENN: scmb_scipenn      # [v] torch 1.9.1 (dtype auto-promote)
   scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
   scMDC: scmb_scmdc         # [v] rebuilt numpy<2; NOTE run hits 10845vs10846 shape mismatch (data/script)
   sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl
