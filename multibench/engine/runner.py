@@ -69,7 +69,11 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
             values[role] = val
 
     repo = Path(repo_path) if repo_path else config.DEFAULT.repo_path
-    cmd = builder.build_command(variant, values=values, out_dir=str(out), params=params)
+    # Pass out_dir with a trailing separator: many method scripts build their
+    # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
+    # etc.), so a missing slash writes a SIBLING file instead of into out_dir.
+    cmd = builder.build_command(variant, values=values,
+                                out_dir=os.path.join(str(out), ""), params=params)
     # entrypoint is relative to the reference repo
     cmd[1] = str(repo / cmd[1])
     if cmd_template is None:
