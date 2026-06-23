@@ -13,7 +13,7 @@ method_env:
   MultiVI: scmb_scvi        # [v] MULTIVI + muon
   scMSI: scvi-env           # [v]
   scBridge: scmb_torch      # [v] generic torch+scanpy
-  Concerto: scmb_tf         # [v] tensorflow
+  Concerto: scmb_tf         # [blocked] BERT/TF2.8; needs openTSNE+faiss+tfds+bert-for-tf2 + uniout(py2-only=upstream script patch); scmb_concerto=partial build
   VIMCCA: total_cpu         # [v] scbean
   UnitedNet: unitednet      # [v]
   SPIRAL: spiral_environment # [v]
