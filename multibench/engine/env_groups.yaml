@@ -18,13 +18,13 @@ method_env:
   UnitedNet: unitednet      # [v]
   SPIRAL: spiral_environment # [v]
   MOFA2: MOFA2_env          # [v] R MOFA2
-  scMM: scmb_scmm           # [v] rebuilt: numpy 1.26 (np.mat restored)
+  scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
   scMDC: scmb_scmdc         # [v] rebuilt numpy<2; NOTE run hits 10845vs10846 shape mismatch (data/script)
   sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl
   Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
   VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
   iPOLNG: scmb_ipolng       # [v] fresh env: iPoLNG 0.0.2 + torch 1.11
-  scMVP: multigrate         # [broken] needs CONDA py3.7 (pytorch=1.9.1 conda, numpy==1.19.5); pip wheel build fails
+  scMVP: scmb_scmvp2        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
   UINMF: scmb_r             # [v] fresh R env: rliger 2.2.1 (compiled from source)
   iNMF: scmb_r              # [v] rliger
   online_iNMF: scmb_r       # [v] rliger
