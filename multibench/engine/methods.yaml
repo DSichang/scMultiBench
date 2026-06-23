@@ -417,7 +417,20 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - {id: SCALEX_cross, language: python, categories: [cross], tasks: [clustering], status: declared}
-  - {id: sciPENN, language: python, categories: [mosaic], tasks: [imputation], status: declared}
+  - id: sciPENN
+    language: python
+    categories: [vertical, mosaic]
+    tasks: [imputation, dimension_reduction]
+    status: declared
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/sciPENN/main_sciPENN.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMSI
     language: python
     categories: [vertical]
