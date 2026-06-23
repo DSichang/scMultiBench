@@ -86,7 +86,12 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         cmd_template = f"{conda} run -n {env_name} {{cmd}}"
     cmd = wrap_command(cmd, cmd_template)
 
-    proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True)
+    # Isolate the method env from user site-packages (~/.local): a broken or
+    # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch
+    # egg breaking anndata imports). PYTHONNOUSERSITE=1 makes the env hermetic.
+    run_env = {**os.environ, "PYTHONNOUSERSITE": "1"}
+    proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True,
+                          env=run_env)
     if proc.returncode != 0:
         raise RuntimeError(
             f"{method} failed (exit {proc.returncode}).\n"

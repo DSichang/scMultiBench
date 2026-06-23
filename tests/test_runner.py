@@ -48,7 +48,7 @@ def test_run_invokes_subprocess_and_loads_output(tmp_path, monkeypatch):
 
     calls = {}
 
-    def fake_run(cmd, cwd, capture_output, text):
+    def fake_run(cmd, cwd, capture_output, text, env=None):
         # simulate the method writing embedding.h5 into the out_dir (cwd)
         calls["cmd"] = cmd
         calls["cwd"] = cwd
@@ -72,7 +72,7 @@ def test_run_surfaces_stdout_and_stderr_on_failure(tmp_path, monkeypatch):
     from multibench.engine import runner
     import pytest
 
-    def fake_run(cmd, cwd, capture_output, text):
+    def fake_run(cmd, cwd, capture_output, text, env=None):
         class R: returncode = 1; stdout = "boom-out"; stderr = "boom-err"
         return R()
 
