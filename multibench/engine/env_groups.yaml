@@ -13,7 +13,7 @@ method_env:
   MultiVI: scmb_scvi        # [v] MULTIVI + muon
   scMSI: scvi-env           # [v]
   scBridge: scmb_torch      # [v] generic torch+scanpy
-  Concerto: scmb_tf         # [blocked] BERT/TF2.8; needs openTSNE+faiss+tfds+bert-for-tf2 + uniout(py2-only=upstream script patch); scmb_concerto=partial build
+  Concerto: scmb_concerto    # [v] uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
   VIMCCA: scmb_vimcca       # [v] scbean==0.5.6 + TF2.4 + tfp0.12.2
   UnitedNet: unitednet      # [v]
   SPIRAL: spiral_environment # [v]

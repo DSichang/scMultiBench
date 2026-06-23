@@ -32,5 +32,10 @@ def build_command(variant: Variant, values: dict, out_dir: str,
 
     merged = {**variant.params, **(params or {})}
     for k, v in merged.items():
-        cmd.extend([f"--{k}", str(v)])
+        if v is True:            # bare flag, e.g. --no_cuda
+            cmd.append(f"--{k}")
+        elif v is False or v is None:
+            continue
+        else:
+            cmd.extend([f"--{k}", str(v)])
     return cmd
