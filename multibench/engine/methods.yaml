@@ -155,8 +155,52 @@ methods:
           - {role: atac, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: scMM, language: python, categories: [vertical], tasks: [clustering], status: declared}
-  - {id: scMDC, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - id: scMM
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    status: declared
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/scMM/main_scMM.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {model: rna_protein}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/scMM/main_scMM.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {model: rna_atac}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+  - id: scMDC
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    status: declared
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/scMDC/main_scMDC.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/scMDC/main_scMDC.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMoMaT
     language: python
     categories: [vertical, mosaic, cross]
@@ -186,7 +230,28 @@ methods:
         extra_outputs:
           - {kind: graph, file: knn_dists.h5, dataset: data}
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
-  - {id: moETM, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - id: moETM
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    status: declared
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/moETM/main_moETM_rna_adt.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/moETM/main_moETM_rna_atac.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MIRA
     language: python
     categories: [vertical]
@@ -203,7 +268,20 @@ methods:
         output: {kind: graph, file: distancess.h5, dataset: data}
         extra_outputs:
           - {kind: graph, file: connectivities.h5, dataset: data}
-  - {id: Concerto, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - id: Concerto
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    status: declared
+    variants:
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/Concerto/main_Concerto.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - {id: Matilda, language: python, categories: [vertical], tasks: [clustering], status: declared}
   - id: VIMCCA
     language: python
@@ -305,7 +383,20 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - {id: scJoint, language: python, categories: [diagonal], tasks: [classification], status: declared}
-  - {id: GLUE, language: python, categories: [diagonal], tasks: [clustering], status: declared}
+  - id: GLUE
+    language: python
+    categories: [diagonal]
+    tasks: [clustering]
+    status: declared
+    variants:
+      - when: {category: diagonal, modalities: [rna, atac_peak]}
+        entrypoint: tools_scripts/GLUE/GLUE_human.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_peak, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MultiMAP
     language: python
     categories: [diagonal]
@@ -343,7 +434,20 @@ methods:
   - {id: GPSA, language: python, categories: [cross], tasks: [registration], status: declared}
   - {id: PASTE, language: python, categories: [cross], tasks: [registration], status: declared}
   - {id: PASTE2, language: python, categories: [cross], tasks: [registration], status: declared}
-  - {id: iPOLNG, language: python, categories: [vertical], tasks: [clustering], status: declared}
+  - id: iPOLNG
+    language: python
+    categories: [vertical]
+    tasks: [clustering]
+    status: declared
+    variants:
+      - when: {category: vertical, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/iPOLNG/main_iPOLNG.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - {id: StabMap, language: R, categories: [mosaic], tasks: [clustering], status: declared}
   - id: UINMF
     language: R
