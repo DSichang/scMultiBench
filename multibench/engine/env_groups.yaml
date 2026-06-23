@@ -60,7 +60,6 @@ groups:
     - uniPort
     - sciCAN
     - scJoint
-    - GLUE
     - MultiMAP
     - SCALEX_cross
     - sciPENN
@@ -224,3 +223,16 @@ groups:
     - method: Concerto
       reason: Hard-requires TensorFlow 2.4.1 with a rigid numpy==1.19.5 / scanpy==1.7.1 / pandas==1.1.5 / scipy==1.5.4 / h5py==2.10.0 stack that is incompatible with the shared TF 2.8.0 env (VIMCCA/VIPCCA); TF 2.4.1's numpy~=1.19.2 pin would break the others. Keeps its own per-method env.
     notes: 'VIMCCA and VIPCCA merge cleanly: both verified-working and both empirically need the same old-TF stack (tensorflow==2.8.0 + keras==2.8.0 + protobuf<3.20 + numpy<2), so those four pins are shared by both. tensorflow-probability==0.16.0 and astunparse are forced by VIMCCA only (scbean imports TFP and TF 2.8''s import path needs astunparse); they are additive and harmless for VIPCCA. protobuf<3.20 (both): avoids the ''Descriptors cannot be created directly'' error on TF 2.8. numpy<2 (both): VIPCCA''s data_loader uses np.mat (removed in numpy 2.x) and the old TF/scanpy stack requires it. keras==2.8.0 (both): standalone keras must match the TF 2.8 minor or imports break. Additive scientific deps (scanpy/anndata/h5py/scipy/pandas/python-igraph/louvain) left unpinned since neither member requires a specific version. Python pinned to 3.8 (group target); VIMCCA listed 3.9 but TF 2.8.0 ships cp38 wheels so 3.8 satisfies both. Apple Silicon caveat: tensorflow 2.8.0 x86 wheels may be unavailable on arm64 macOS; may need tensorflow-macos==2.8.0 + tensorflow-metal or an x86 conda/Rosetta env. Method dirs: VIMCCA at /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/VIMCCA/, VIPCCA at /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/VIPCCA/main_VIPCCA.py.'
+  glue:
+    python_version: '3.8'
+    conda_channels:
+    - conda-forge
+    - bioconda
+    pip_packages:
+    - scglue==0.3.2
+    - scanpy
+    - anndata
+    - networkx
+    members:
+    - GLUE
+    notes: 'GLUE needs scglue (the shared scmb_torch env lacks it) and a gencode GTF (gencode.v43.*.annotation.gtf.gz) present in the run working dir. Verified end-to-end on D27 -> (21434, 50) embedding via the existing `glue` conda env.'
