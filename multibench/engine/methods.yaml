@@ -569,6 +569,8 @@ methods:
         output: {kind: graph, file: dist.h5, dataset: data}
         extra_outputs:
           - {kind: graph, file: idx.h5, dataset: data}
+        cwd_at_script: true
+        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd
         language: R
