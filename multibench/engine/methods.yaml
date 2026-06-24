@@ -155,7 +155,6 @@ methods:
           - {role: atac, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-        run_env: {CUDA_VISIBLE_DEVICES: ""}   # torch 1.9.1 cannot target sm_89 4090 -> CPU
   - id: scMM
     language: python
     categories: [vertical]
@@ -431,7 +430,6 @@ methods:
           - {role: adt, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-        run_env: {CUDA_VISIBLE_DEVICES: ""}   # torch 1.9.1 cannot target sm_89 4090 -> CPU
   - id: scMSI
     language: python
     categories: [vertical]
