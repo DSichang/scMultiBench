@@ -18,17 +18,23 @@ _ROLE_FILE_CANDIDATES = {
 def _resolve_role(ds_dir: Path, role: str) -> Path:
     """Pick the real on-disk file for a modality role in a flat dataset dir.
 
-    Tries the role token and known aliases, each as ``<base>.h5`` then
-    ``<base>1.h5`` (some datasets store batched files), returning the first that
-    exists; falls back to the canonical ``<base>.h5`` when nothing matches.
+    Tries the role token and known aliases. Label roles (anything matching
+    ``cty`` or ``label``) try ``.csv`` first since cell-type files are CSV;
+    other roles try ``.h5`` then ``.h5`` with a trailing digit (some datasets
+    store batched files). Returns the canonical ``<base>.h5`` (or ``.csv``
+    for label roles) as a fallback when nothing matches.
     """
+    is_label = ("cty" in role) or ("label" in role)
     bases = _ROLE_FILE_CANDIDATES.get(role, (role,))
+    exts = (".csv", ".h5") if is_label else (".h5",)
     for base in bases:
-        for fname in (f"{base}.h5", f"{base}1.h5"):
-            p = ds_dir / fname
-            if p.exists():
-                return p
-    return ds_dir / f"{bases[0]}.h5"
+        for ext in exts:
+            for suffix in (ext, f"1{ext}"):
+                p = ds_dir / f"{base}{suffix}"
+                if p.exists():
+                    return p
+    fallback_ext = ".csv" if is_label else ".h5"
+    return ds_dir / f"{bases[0]}{fallback_ext}"
 
 
 def inputs_for(dataset: str, method: str, category: str,

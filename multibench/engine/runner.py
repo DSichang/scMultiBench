@@ -32,7 +32,7 @@ def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
 
 # Auxiliary roles are passed through verbatim (never converted to canonical .h5)
 # and are excluded from the modality set used for variant selection.
-_AUX_ROLES = {"data_dir", "source_data", "target_data", "source_cty", "target_cty",
+_AUX_ROLES = {"data_dir", "source_data", "target_data", "cty", "source_cty", "target_cty",
               "out_dir"}
 
 

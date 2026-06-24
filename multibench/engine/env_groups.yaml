@@ -19,6 +19,7 @@ method_env:
   SPIRAL: spiral_environment # [v]
   MOFA2: MOFA2_env          # [v] R MOFA2
   sciPENN: env_sciPENN       # [v] user existing env: torch 1.13.1+cu117, supports up to sm_86
+  Matilda: matilda          # [v] user existing env: torch + matilda local imports OK
   scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
   scMDC: scmb_scmdc         # [v] rebuilt numpy<2; NOTE run hits 10845vs10846 shape mismatch (data/script)
   sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl
