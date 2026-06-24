@@ -94,7 +94,12 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch
     # egg breaking anndata imports). PYTHONNOUSERSITE=1 makes the env hermetic.
     run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **{k: str(v) for k, v in (variant.run_env or {}).items()}}
-    proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True,
+    # Some scripts source/import local files relative to the entrypoint dir,
+    # so let variants opt into running with cwd=script's parent rather than
+    # cwd=out_dir. The out_dir is still passed via the --save_path arg, so
+    # outputs land in the correct place regardless.
+    exec_cwd = str((repo / variant.entrypoint).parent) if variant.cwd_at_script else str(workdir)
+    proc = subprocess.run(cmd, cwd=exec_cwd, capture_output=True, text=True,
                           env=run_env)
     if proc.returncode != 0:
         raise RuntimeError(

@@ -79,7 +79,8 @@ def inputs_for(dataset: str, method: str, category: str,
             )
         variant = candidates[0]
 
-    roles = [a.role for a in variant.args if a.role != "out_dir"]
+    # Skip args with a const (they don't need on-disk resolution) and out_dir.
+    roles = [a.role for a in variant.args if a.role != "out_dir" and getattr(a, "const", None) is None]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
     if check:
         missing = {r: p for r, p in out.items() if not Path(p).exists()}
