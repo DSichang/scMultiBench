@@ -28,8 +28,8 @@ method_env:
   iPOLNG: scmb_ipolng       # [v] fresh env: iPoLNG 0.0.2 + torch 1.11
   scMVP: scmb_scmvp4        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
   UINMF: scmb_r             # [v] fresh R env: rliger 2.2.1 (compiled from source)
-  iNMF: scmb_rv1            # [v] rliger 1.0.1 (datasets.use API)
-  online_iNMF: scmb_rv1            # [v] rliger 1.0.1 (datasets.use API)
+  iNMF: scmb_r              # [v] rliger 2.0.1 RUN-VERIFIED on D27 (rna+atac_gas)
+  online_iNMF: scmb_r       # [v] rliger 2.0.1 RUN-VERIFIED on D27 (rna+atac_gas)
   StabMap: scmb_r           # [v] bioconductor-stabmap
 
 # Shared 'group' environments: each hosts several compatible methods.

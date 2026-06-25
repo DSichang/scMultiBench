@@ -520,6 +520,7 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: online_iNMF
     language: R
     categories: [diagonal]
@@ -535,6 +536,7 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: Conos
     language: R
     categories: [diagonal]
