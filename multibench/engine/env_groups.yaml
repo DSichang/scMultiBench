@@ -10,7 +10,7 @@ method_env:
   MIRA: scmb_mira           # [v]
   Portal: scmb_torch_v2     # [v]
   totalVI: scmb_scvi        # [v] scvi-tools 1.3.3 TOTALVI
-  MultiVI: scmb_scvi        # [v] MULTIVI + muon
+  MultiVI: scmb_multivi      # [v] dedicated env scvi-tools 0.20.3 (older API; RUN-VERIFIED on D45)
   scMSI: scvi-env           # [v]
   scBridge: scmb_torch      # [v] generic torch+scanpy, RUN-VERIFIED on D28 (rna+atac_gas, gene-aligned, +harmonypy 0.0.9, --umap_plot disables figure)
   Concerto: scmb_concerto    # [v] uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
