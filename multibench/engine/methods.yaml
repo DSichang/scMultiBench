@@ -92,6 +92,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
         extra_outputs:
           - {kind: labels, file: Prediction.csv}
+        params: {umap_plot: true}    # action=store_false: passing this DISABLES the in-script figure save, which would otherwise crash on data-path-derived filename
 
   # ---- declared stubs (discoverable; not yet wired) ----
   - id: totalVI
@@ -193,6 +194,7 @@ methods:
           - {role: adt, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+        params: {nbatch: 1}    # single h5 source -> 1 batch one-hot col; default args.nbatch=2 produces 10797-vs-10796 dim mismatch
       - when: {category: vertical, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/scMDC/main_scMDC.py
         language: python

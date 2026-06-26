@@ -12,7 +12,7 @@ method_env:
   totalVI: scmb_scvi        # [v] scvi-tools 1.3.3 TOTALVI
   MultiVI: scmb_scvi        # [v] MULTIVI + muon
   scMSI: scvi-env           # [v]
-  scBridge: scmb_torch      # [v] generic torch+scanpy
+  scBridge: scmb_torch      # [v] generic torch+scanpy, RUN-VERIFIED on D28 (rna+atac_gas, gene-aligned, +harmonypy 0.0.9, --umap_plot disables figure)
   Concerto: scmb_concerto    # [v] uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
   VIMCCA: scmb_vimcca       # [v] scbean==0.5.6 + TF2.4 + tfp0.12.2
   UnitedNet: unitednet      # [v]
@@ -21,7 +21,7 @@ method_env:
   sciPENN: env_sciPENN       # [v] user existing env: torch 1.13.1+cu117, supports up to sm_86
   Matilda: matilda          # [v] user existing env: torch + matilda local imports OK
   scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
-  scMDC: scmb_scmdc         # [v] rebuilt numpy<2; NOTE run hits 10845vs10846 shape mismatch (data/script)
+  scMDC: scmb_scmdc         # [v] numpy<2+torch+munkres, RUN-VERIFIED on D2 with --nbatch 1 (single-batch fix)
   sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl
   Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
   VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
