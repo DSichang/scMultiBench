@@ -15,15 +15,16 @@ method_env:
   scBridge: scmb_torch      # [v] generic torch+scanpy, RUN-VERIFIED on D28 (rna+atac_gas, gene-aligned, +harmonypy 0.0.9, --umap_plot disables figure)
   Concerto: scmb_concerto    # [v] uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
   VIMCCA: scmb_vimcca       # [v] scbean==0.5.6 + TF2.4 + tfp0.12.2
-  UnitedNet: unitednet      # [v]
+  UnitedNet: unitednet      # [v] RUN-VERIFIED on D45 (train+test+labels)
   SPIRAL: spiral_environment # [v]
-  MOFA2: MOFA2_env          # [v] R MOFA2
+  MOFA2: MOFA2_env          # [v] R MOFA2 + RETICULATE_PYTHON=mofa_env_gpu/bin/python; RUN-VERIFIED on D2
   sciPENN: env_sciPENN       # [v] user existing env: torch 1.13.1+cu117, supports up to sm_86
   Matilda: matilda          # [v] user existing env: torch + matilda local imports OK
   scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
   scMDC: scmb_scmdc         # [v] numpy<2+torch+munkres, RUN-VERIFIED on D2 with --nbatch 1 (single-batch fix)
-  sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl
+  sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl; RUN-VERIFIED on D28 (gene-aligned atac_gas)
   Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
+  scJoint: scmb_scjoint     # [v] numpy<1.24 (np.float restored); needs pty (script -q); RUN-VERIFIED on D28
   VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
   iPOLNG: scmb_ipolng       # [v] fresh env: iPoLNG 0.0.2 + torch 1.11
   scMVP: scmb_scmvp4        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
