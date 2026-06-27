@@ -11,7 +11,7 @@ method_env:
   Portal: scmb_torch_v2     # [v]
   totalVI: scmb_scvi        # [v] scvi-tools 1.3.3 TOTALVI
   MultiVI: scmb_multivi      # [v] dedicated env scvi-tools 0.20.3 (older API; RUN-VERIFIED on D45)
-  scMSI: scvi-env           # [v]
+  scMSI: scmb_scmsi         # [v] dedicated torch 1.9.1+CPU; RUN-VERIFIED on D7 (D1 hits internal batch=1 BatchNorm; D7 cell count avoids it)
   scBridge: scmb_torch      # [v] generic torch+scanpy, RUN-VERIFIED on D28 (rna+atac_gas, gene-aligned, +harmonypy 0.0.9, --umap_plot disables figure)
   Concerto: scmb_concerto    # [v] uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
   VIMCCA: scmb_vimcca       # [v] scbean==0.5.6 + TF2.4 + tfp0.12.2
