@@ -12,7 +12,8 @@ def _build_adata(emb, celltype, cluster, batch):
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
     adata.obs["celltype"] = pd.Categorical(np.asarray(celltype))
-    adata.obs["cluster"] = pd.Categorical(np.asarray(cluster))
+    if cluster is not None:
+        adata.obs["cluster"] = pd.Categorical(np.asarray(cluster))
     adata.obs["batch"] = pd.Categorical(np.asarray(batch))
     return adata
 
@@ -30,12 +31,16 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering") -> pd.Data
 
     n = np.asarray(emb).shape[0]
     n_ct = len(np.asarray(celltype))
-    n_cl = len(np.asarray(cluster))
-    if not (n_ct == n_cl == n):
+    if n_ct != n:
         raise ValueError(
-            f"input length mismatch: emb has {n} cells, celltype has {n_ct}, "
-            f"cluster has {n_cl}"
+            f"input length mismatch: emb has {n} cells, celltype has {n_ct}"
         )
+    if cluster is not None:
+        n_cl = len(np.asarray(cluster))
+        if n_cl != n:
+            raise ValueError(
+                f"input length mismatch: emb has {n} cells, cluster has {n_cl}"
+            )
     if batch is not None:
         n_ba = len(np.asarray(batch))
         if n_ba != n:
@@ -45,6 +50,16 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering") -> pd.Data
 
     adata = _build_adata(emb, celltype, cluster, batch)
     sc.pp.neighbors(adata, use_rep="X_emb")
+
+    # When clustering metrics are requested but no precomputed clustering was
+    # supplied, derive one from the embedding with scIB optimal-resolution
+    # Leiden: sweep resolutions and keep the assignment that maximises NMI
+    # vs. the cell-type labels. This is the standard scib clustering protocol
+    # and is what lets evaluate() run directly on a method's embedding output.
+    if group in ("clustering", "all") and cluster is None:
+        me.cluster_optimal_resolution(
+            adata, label_key="celltype", cluster_key="cluster", verbose=False
+        )
     out: dict[str, float] = {}
 
     def _safe(name, fn):

@@ -40,3 +40,23 @@ def test_batch_metrics_present():
     res = escib.compute(emb, ct, cl, ba, group="batch")
     for k in ["ASW_batch", "GC", "iLISI", "kBET"]:
         assert k in res.index
+
+
+def test_clustering_derived_when_no_cluster_supplied():
+    """evaluate()/compute() must run directly on an embedding: when no
+    precomputed clustering is passed, one is derived via optimal-resolution
+    Leiden. Two well-separated cell types should be recovered (high ARI)."""
+    emb, ct, _cl, ba = _toy()
+    res = escib.compute(emb, ct, None, ba, group="clustering")
+    for k in ["ARI", "NMI", "ASW"]:
+        assert k in res.index
+    assert float(res.loc["ARI", "Value"]) > 0.9
+
+
+def test_pipeline_evaluate_without_clustering():
+    """Public evaluate() closes the chain with labels only (clustering=None)."""
+    from multibench.eval.pipeline import evaluate
+    emb, ct, _cl, _ba = _toy()
+    df = evaluate(emb, category="vertical", task="clustering", labels=ct)
+    assert "ARI" in df.index
+    assert float(df.loc["ARI", "Value"]) > 0.9
