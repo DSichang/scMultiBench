@@ -94,7 +94,6 @@ groups:
     - sciCAN
     - scJoint
     - MultiMAP
-    - SCALEX_cross
     - sciPENN
     - GPSA
     - PASTE
@@ -119,7 +118,7 @@ groups:
 
       - numpy<2: forced by nearly every member (np.mat/np.matrix/np.infty usage in SCALEX, Cobolt, scMM, scMDC, scMoMaT, SMILE, uniPort, GLUE, MultiMAP, sciCAN, scJoint, sciPENN, GPSA, PASTE, PASTE2). Kept as the env-wide floor.
 
-      - scalex==1.0.4 + torch>=2.2.2: scalex 1.0.2 calls np.warnings (removed in numpy>=1.24), so it crashes on import under the numpy 1.26.4 floor; scalex 1.0.4 fixes that but requires torch>=2.2.2 and numpy>=1.26.4. numpy>=1.26.4 sits WITHIN the numpy<2 ceiling (pip picks 1.26.4), so there is no conflict. Both must be pinned explicitly: left unpinned, pip''s resolver drifts to scalex 1.0.2 + torch 1.13.1 (the np.warnings crash). torch>=2.2.2 resolves cleanly for all 17 members (verified: -> torch 2.8.0). This single scalex pin serves SCALEX_cross (needs the classic `from scalex import SCALEX` API, present in 1.0.4) and plain SCALEX.
+      - scalex==1.0.4 + torch>=2.2.2: scalex 1.0.2 calls np.warnings (removed in numpy>=1.24), so it crashes on import under the numpy 1.26.4 floor; scalex 1.0.4 fixes that but requires torch>=2.2.2 and numpy>=1.26.4. numpy>=1.26.4 sits WITHIN the numpy<2 ceiling (pip picks 1.26.4), so there is no conflict. Both must be pinned explicitly: left unpinned, pip''s resolver drifts to scalex 1.0.2 + torch 1.13.1 (the np.warnings crash). torch>=2.2.2 resolves cleanly for all 17 members (verified: -> torch 2.8.0). This single scalex pin serves SCALEX (needs the classic `from scalex import SCALEX` API, present in 1.0.4).
 
       - paste2==1.0.1: pinned by PASTE2 for the PASTE2/projection submodule API.
 

@@ -434,7 +434,6 @@ methods:
           - {role: atac_gas, flag: "--path3"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: SCALEX_cross, language: python, categories: [cross], tasks: [clustering], status: declared}
   - id: sciPENN
     language: python
     categories: [vertical, mosaic]
