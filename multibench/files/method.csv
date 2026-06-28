@@ -30,7 +30,7 @@ GPSA,python,Yes,-,embedding,No,cross,registration
 PASTE,python,No,-,embedding,No,cross,registration
 PASTE2,python,No,-,embedding,No,cross,registration
 iPOLNG,python,Yes,-,embedding,No,vertical,clustering
-StabMap,R,No,-,embedding,No,mosaic,clustering
+StabMap,R,No,-,embedding,No,cross,clustering
 UINMF,R,No,-,embedding,No,vertical;cross,clustering
 iNMF,R,No,Gene Activity,embedding,No,diagonal,clustering
 online_iNMF,R,No,Gene Activity,embedding,No,diagonal,clustering
