@@ -481,7 +481,32 @@ methods:
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: StabMap, language: R, categories: [mosaic], tasks: [clustering], status: declared}
+  - id: StabMap
+    language: R
+    categories: [cross]
+    tasks: [clustering]
+    status: verified
+    variants:
+      # Cross integration. main_StabMap.Rmd has NO top-level call (defines
+      # run_StabMap + helpers, sources util.R), so it is run via the package
+      # driver engine/drivers/run_stabmap.R which source()s the UNMODIFIED .Rmd
+      # then calls run_StabMap(file_paths, save_path, reference). RUN-VERIFIED on
+      # D52 (3 rna + 3 adt batches, reference=data3) -> embedding.h5 (23478x50).
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
+        args:
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {role: rna3, flag: "--rna"}
+          - {role: adt1, flag: "--adt"}
+          - {role: adt2, flag: "--adt"}
+          - {role: adt3, flag: "--adt"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data3}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: UINMF
     language: R
     categories: [vertical, cross]

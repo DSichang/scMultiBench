@@ -74,8 +74,19 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # etc.), so a missing slash writes a SIBLING file instead of into out_dir.
     cmd = builder.build_command(variant, values=values,
                                 out_dir=os.path.join(str(out), ""), params=params)
-    # entrypoint is relative to the reference repo
-    cmd[1] = str(repo / cmd[1])
+    # entrypoint is relative to the reference repo. A variant may declare a
+    # package-side `driver`: a wrapper script (shipped with the package) that
+    # source()s the UNMODIFIED upstream entrypoint and calls its function. When
+    # set, run the driver instead and hand it the upstream script's dir via
+    # --script_dir (so the driver can source it in place; the method script
+    # stays byte-identical to upstream).
+    if getattr(variant, "driver", None):
+        pkg_root = Path(__file__).resolve().parents[1]      # .../multibench
+        driver_abs = pkg_root / variant.driver
+        script_dir = (repo / variant.entrypoint).parent
+        cmd = [cmd[0], str(driver_abs), "--script_dir", str(script_dir)] + cmd[2:]
+    else:
+        cmd[1] = str(repo / cmd[1])
     if cmd_template is None:
         # Resolve conda's full path when available (CONDA_EXE is set by an
         # initialized conda) so the default works even when bare `conda` is not
