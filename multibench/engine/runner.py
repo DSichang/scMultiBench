@@ -51,7 +51,11 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     passed through verbatim and are NOT converted to the canonical .h5.
     """
     spec = registry.get(method)
-    modalities = {k for k in inputs if k not in _AUX_ROLES}
+    # Label roles (anything containing "cty"/"label", e.g. rna_cty/atac_cty)
+    # are auxiliary too: they are method inputs but not modalities for variant
+    # selection (consistent with resolve.py treating them as .csv labels).
+    modalities = {k for k in inputs
+                  if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
     variant = spec.select(category, modalities)
 
     out = Path(out_dir)
@@ -63,11 +67,17 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # normalize modality inputs to canonical .h5 inside a dedicated inputs dir
     values: dict = {}
     for role, val in inputs.items():
-        if convert and role not in _AUX_ROLES:
+        if convert and role not in _AUX_ROLES and "cty" not in role and "label" not in role:
             values[role] = str(ingest.to_canonical(val, out=inputs_dir / f"{role}.h5"))
         else:
             values[role] = val
 
+    # Some methods (Seurat_v3 etc.) require ATAC peak ids in chr:start-end form;
+    # normalize the declared peak roles into per-run copies (originals untouched).
+    for role in (getattr(variant, "normalize_peaks", None) or []):
+        if role in values:
+            npath = inputs_dir / f"{role}_normpeaks.h5"
+            values[role] = str(ingest.normalize_peak_names(values[role], npath))
     repo = Path(repo_path) if repo_path else config.DEFAULT.repo_path
     # Pass out_dir with a trailing separator: many method scripts build their
     # output path by string-concatenation (R paste0(save_path,"embedding.h5"),

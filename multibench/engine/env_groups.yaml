@@ -5,7 +5,7 @@
 # needs a fix; R methods now on scmb_r (rliger/StabMap built); only Conos needs r-conos.
 method_env:
   Seurat_v5: liger          # [v] Seurat 5 + Signac bridge stack
-  Seurat_v3: liger          # [v]
+  Seurat_v3: scmb_seurat4b   # [v] Seurat 4.3.0.1 + SeuratObject 4.1.4 (5.x breaks RunCCA); clone of scmb_seurat4 w/ SeuratObject downgraded; RUN-VERIFIED D28
   Seurat_WNN: liger         # [v]
   MIRA: scmb_mira           # [v]
   Portal: scmb_torch_v2     # [v]
