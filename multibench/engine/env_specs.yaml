@@ -508,30 +508,6 @@ MultiMAP:
   difficulty: verified
   verified_working: true
   caveats: 'EMP confirmed it ran: pip install ''numpy<2'' scanpy h5py anndata + MultiMAP from git (github.com/Teichlab/MultiMAP). numpy<2 is REQUIRED: the script uses np.mat / np.matrix (line 26-38) which were removed in numpy 2.0, and MultiMAP internals use np.infty. Single entrypoint: /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/MultiMAP/main_MultiMAP.py (no requirements.txt/setup.py/yaml in the dir). It performs diagonal integration for RNA + ATAC: requires 3 inputs as .h5 files with dataset at ''matrix/data'' (cells x features stored transposed) -- path1=rna gene expr, path2=atac peak matrix, path3=atac gene activity score (GAS). Internally: MultiMAP.TFIDF_LSI on peaks -> copies X_lsi to GAS adata; scale+PCA on RNA; MultiMAP.Integration([rna, atac_genes], [''X_pca'',''X_lsi''], strengths=[0,1]). Output: joint embedding written to <save_path>/embedding.h5 (dataset ''data'' = adata.obsm[''X_multimap'']) plus time.csv. Run command (from script comment): python main_MultiMAP.py --path1 rna.h5 --path2 atac_peak.h5 --path3 atac_gas.h5 --save_path <out_dir>/. scanpy pulls in numba/llvmlite/umap-learn; pinning numpy<2 avoids ABI conflicts there too.'
-SCALEX_cross:
-  python_version: '3.9'
-  conda_channels: []
-  conda_packages: []
-  pip_packages:
-  - scalex==1.0.2
-  - numpy<2
-  - scanpy
-  - anndata
-  - h5py
-  - leidenalg
-  - torch
-  - scikit-learn
-  - scipy
-  - pandas
-  - matplotlib
-  - seaborn
-  - tqdm
-  - umap-learn
-  pip_git: []
-  package_source: 'PyPI: scalex (https://pypi.org/project/scalex/), official repo jsxlei/SCALEX. Pin scalex==1.0.2 (Oct 2022) for the era-appropriate classic API used by the script (`from scalex import SCALEX`); the latest 1.0.4 forces torch>=2.2.2 / numpy>=1.26.4.'
-  difficulty: easy
-  verified_working: false
-  caveats: 'Method dir is /Users/sdin3712/Documents/project_multibench/scMultiBench_ref/tools_scripts/SCALEX/ (folder name is ''SCALEX'', not ''SCALEX_cross''); the single script main_SCALEX.py implements the cross/diagonal-integration variant. Third-party imports: h5py, numpy, scanpy, scalex (from scalex import SCALEX), anndata. No requirements.txt/setup.py/yaml inside the method dir.\n\nInline run command (from script comment):\npython main_SCALEX.py --path1 \"../../data/dataset_final/D27/rna.h5\" --path2 \"../../data/dataset_final/D27/atac_gas.h5\" --save_path \"../../result/embedding/diagonal integration/D27/SCALEX/\"\n\nInput layout: two .h5 files, each with dataset ''matrix/data'' (loaded as np.array(f[''matrix/data'']).transpose()). path1 = RNA, path2 = ATAC converted to gene activity score (gas). Output: embedding.h5 (dataset ''data'') = SCALEX joint embedding (adata.obsm[''latent'']).\n\nNotes: (1) Script writes intermediate files into its CWD (''RNA-ATAC.h5ad'' and a ''./pbmc_RNA_ATAC/'' output dir), so run from a writable working directory. (2) Hardcodes gpu=0 in the SCALEX() call; SCALEX runs on CPU if no GPU is present but the gpu=0 arg is passed regardless — should still fall back to CPU. (3) scalex 1.0.2 deps have only loose lower bounds (numpy>=1.17.2, torch>=1.0.0, scanpy>=1.4.5) with no upper caps, so an unconstrained install can pull numpy 2.x / too-new scanpy; the explicit numpy<2 pin guards against that. (4) Script itself uses no removed numpy APIs, but numpy<2 is pinned for compatibility with the 2022-era scalex/scanpy stack. Not empirically verified to run; recipe derived from imports + official PyPI/GitHub install.'
 sciPENN:
   python_version: '3.9'
   conda_channels: []

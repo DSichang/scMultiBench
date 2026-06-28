@@ -22,7 +22,6 @@ sciCAN,python,Yes,Gene Activity,embedding,No,diagonal,clustering
 scJoint,python,Yes,-,embedding,No,diagonal,classification
 GLUE,python,Yes,-,embedding,No,diagonal,clustering
 MultiMAP,python,Yes,Peak,embedding,No,diagonal,clustering
-SCALEX_cross,python,Yes,-,embedding,No,cross,clustering
 sciPENN,python,Yes,-,embedding,No,mosaic,imputation
 scMSI,python,Yes,-,embedding,No,vertical,clustering
 UnitedNet,python,Yes,-,embedding,No,cross,clustering
