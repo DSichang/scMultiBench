@@ -349,6 +349,7 @@ methods:
       - when: {category: mosaic, modalities: [rna_ref, atac_ref, rna_query, atac_query]}
         entrypoint: tools_scripts/SMILE/main_SMILE.py
         language: python
+        cwd_at_script: true   # imports `from SMILE.SMILE import SMILE` (local package next to the entrypoint)
         args:
           - {role: rna_ref, flag: "--ref_path1"}
           - {role: atac_ref, flag: "--ref_path2"}
