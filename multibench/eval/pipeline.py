@@ -42,14 +42,20 @@ def evaluate(
             f"evaluate(task={task!r}, metric_set={metric_set!r}) is not wired in v1; "
             f"only scib clustering/batch are supported."
         )
-    if labels is None or clustering is None:
-        raise ValueError("clustering metrics require both `labels` (cty) and `clustering`.")
+    if labels is None:
+        raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
+    # `clustering` is optional: when omitted it is derived from the embedding
+    # inside scib.compute() via optimal-resolution Leiden.
     if task in {"batch", "all"} and batch is None:
         raise ValueError("batch labels required for batch/all metrics")
 
     emb = io.read_embedding(output) if not isinstance(output, np.ndarray) else output
     ct = io.read_labels(labels) if not isinstance(labels, np.ndarray) else labels
-    cl = io.read_clustering(clustering) if not isinstance(clustering, np.ndarray) else clustering
+    cl = (
+        None if clustering is None
+        else clustering if isinstance(clustering, np.ndarray)
+        else io.read_clustering(clustering)
+    )
     # clustering metrics need a batch_key but it is a no-op there, so a constant
     # vector is acceptable when no batch labels are supplied (task="clustering").
     ba = np.zeros(emb.shape[0], dtype=int) if batch is None else (
