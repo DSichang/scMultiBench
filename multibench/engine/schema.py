@@ -35,6 +35,7 @@ class Variant:
     run_env: dict = field(default_factory=dict)        # per-method env overrides (e.g. CUDA_VISIBLE_DEVICES)
     cwd_at_script: bool = False        # if True, run with cwd=script's parent dir (for scripts that source/import local files)
     driver: str | None = None          # package-relative R/py wrapper that source()s the (unmodified) upstream entrypoint then calls its function; see engine/drivers/
+    normalize_peaks: list = field(default_factory=list)  # roles whose .h5 ATAC peak names get normalized to chr:start-end before the run
     extra_outputs: list[OutputSpec] = field(default_factory=list)
 
     def matches(self, category: str, modalities: set[str]) -> bool:

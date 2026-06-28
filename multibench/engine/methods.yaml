@@ -580,7 +580,34 @@ methods:
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - {id: MOFA2, language: R, categories: [vertical], tasks: [clustering], status: declared}
-  - {id: Seurat_v3, language: R, categories: [vertical], tasks: [clustering], status: declared}
+  - id: Seurat_v3
+    language: R
+    categories: [diagonal]
+    tasks: [clustering, classification]
+    atac: peak
+    status: verified
+    variants:
+      # Diagonal transfer-anchor integration. Self-contained Rmd with commandArgs
+      # (6 positional: rna, atac_peak, atac_gas, rna_cty, atac_cty, save_path).
+      # Needs Seurat 4.3 + SeuratObject 4.1.x (5.x v5 objects break RunCCA) -> env
+      # scmb_seurat4b; LD_PRELOAD for Rtsne CXXABI. Signac CreateChromatinAssay
+      # needs chr:start-end peak ids -> normalize_peaks rewrites atac_peak names.
+      # RUN-VERIFIED on D28 (unpaired rna/atac) -> embedding.h5 (11014 x 50).
+      - when: {category: diagonal, modalities: [rna, atac_peak, atac_gas]}
+        entrypoint: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd
+        language: R
+        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
+        normalize_peaks: [atac_peak]
+        args:
+          - {role: rna}
+          - {role: atac_peak}
+          - {role: atac_gas}
+          - {role: rna_cty}
+          - {role: atac_cty}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+        extra_outputs:
+          - {kind: labels, file: predict.csv}
   - id: Seurat_WNN
     language: R
     categories: [vertical]

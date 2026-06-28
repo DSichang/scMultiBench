@@ -5,12 +5,18 @@ Method scripts are never modified.
 """
 from __future__ import annotations
 
+import re
+import shutil
 from pathlib import Path
 
 import h5py
 import numpy as np
 
-__all__ = ["to_canonical", "read_canonical"]
+__all__ = ["to_canonical", "read_canonical", "normalize_peak_names"]
+
+# ATAC peak ids come in chr_start_end / chr-start-end / chr:start-end flavours.
+# Signac CreateChromatinAssay(sep=c(":","-")) (Seurat_v3 etc.) needs chr:start-end.
+_PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
 
 
 def _is_canonical_h5(path: Path) -> bool:
@@ -95,3 +101,23 @@ def read_canonical(path: Path | str):
             a.obs_names = [x.decode() if isinstance(x, bytes) else str(x)
                            for x in np.array(f["matrix/barcodes"])]
     return a
+
+
+def normalize_peak_names(src, dst):
+    """Copy a canonical .h5, rewriting ATAC peak feature names to the
+    ``chr:start-end`` format Signac's ``CreateChromatinAssay(sep=c(":","-"))``
+    expects. Accepts chr_start_end / chr-start-end / chr:start-end; non-peak
+    names are passed through unchanged. The source file is never modified."""
+    src, dst = Path(src), Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
+    with h5py.File(dst, "r+") as f:
+        feats = f["matrix/features"][:]
+        def _norm(b):
+            x = b.decode() if isinstance(b, bytes) else str(b)
+            m = _PEAK_RE.match(x)
+            return f"{m.group(1)}:{m.group(2)}-{m.group(3)}" if m else x
+        new = np.array([_norm(v) for v in feats], dtype="S")
+        del f["matrix/features"]
+        f.create_dataset("matrix/features", data=new)
+    return dst
