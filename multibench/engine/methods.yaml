@@ -115,14 +115,20 @@ methods:
     tasks: [clustering]
     status: verified
     variants:
-      - when: {category: mosaic, modalities: [rna, atac, rna_pair, atac_pair]}
+      # Mosaic layout = 3 batches: RNA-only, paired (multiome) RNA+ATAC, ATAC-only.
+      # On D45-family data those are rna1 / (rna2,atac2) / atac3. Use the concrete
+      # file-name roles (like Cobolt/Multigrate below) so inputs_for resolves them
+      # directly; the flag names preserve the upstream RNA/ATAC/pair semantics.
+      # Upstream main_MultiVI.py canonical D45 cmd: --path1 rna1 --path2 atac3
+      # --pair_path1 rna2 --pair_path2 atac2.
+      - when: {category: mosaic, modalities: [rna1, atac3, rna2, atac2]}
         entrypoint: tools_scripts/MultiVI/main_MultiVI.py
         language: python
         args:
-          - {role: rna, flag: "--path1"}
-          - {role: atac, flag: "--path2"}
-          - {role: rna_pair, flag: "--pair_path1"}
-          - {role: atac_pair, flag: "--pair_path2"}
+          - {role: rna1, flag: "--path1"}        # RNA-only batch
+          - {role: atac3, flag: "--path2"}       # ATAC-only batch
+          - {role: rna2, flag: "--pair_path1"}   # paired (multiome) RNA
+          - {role: atac2, flag: "--pair_path2"}  # paired (multiome) ATAC
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Cobolt
@@ -346,15 +352,20 @@ methods:
     tasks: [clustering]
     status: verified
     variants:
-      - when: {category: mosaic, modalities: [rna_ref, atac_ref, rna_query, atac_query]}
+      # SMILE mosaic = reference (paired multiome) + query (RNA-only, ATAC-only).
+      # On D45-family data: reference = (rna2, atac2), query = (rna1, atac3). Use the
+      # concrete file-name roles so inputs_for resolves them directly; the flag names
+      # preserve the ref/query semantics. Upstream main_SMILE.py canonical D45 cmd:
+      # --ref_path1 rna2 --ref_path2 atac2 --query_path1 rna1 --query_path2 atac3.
+      - when: {category: mosaic, modalities: [rna2, atac2, rna1, atac3]}
         entrypoint: tools_scripts/SMILE/main_SMILE.py
         language: python
         cwd_at_script: true   # imports `from SMILE.SMILE import SMILE` (local package next to the entrypoint)
         args:
-          - {role: rna_ref, flag: "--ref_path1"}
-          - {role: atac_ref, flag: "--ref_path2"}
-          - {role: rna_query, flag: "--query_path1"}
-          - {role: atac_query, flag: "--query_path2"}
+          - {role: rna2, flag: "--ref_path1"}     # reference = paired (multiome) RNA
+          - {role: atac2, flag: "--ref_path2"}    # reference = paired (multiome) ATAC
+          - {role: rna1, flag: "--query_path1"}   # query = RNA-only
+          - {role: atac3, flag: "--query_path2"}  # query = ATAC-only
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Portal

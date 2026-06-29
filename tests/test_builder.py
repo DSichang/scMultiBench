@@ -44,13 +44,14 @@ def test_totalvi_command():
 
 
 def test_multivi_command():
-    v = registry.get("MultiVI").select("mosaic", {"rna", "atac", "rna_pair", "atac_pair"})
+    # Mosaic file-name roles: rna1=RNA-only, atac3=ATAC-only, rna2/atac2=paired.
+    v = registry.get("MultiVI").select("mosaic", {"rna1", "atac3", "rna2", "atac2"})
     cmd = builder.build_command(v, values={
-        "rna": "r.h5", "atac": "a.h5", "rna_pair": "rp.h5", "atac_pair": "ap.h5"},
+        "rna1": "r1.h5", "atac3": "a3.h5", "rna2": "r2.h5", "atac2": "a2.h5"},
         out_dir="out/")
     assert cmd == ["python", "tools_scripts/MultiVI/main_MultiVI.py",
-                   "--path1", "r.h5", "--path2", "a.h5",
-                   "--pair_path1", "rp.h5", "--pair_path2", "ap.h5",
+                   "--path1", "r1.h5", "--path2", "a3.h5",
+                   "--pair_path1", "r2.h5", "--pair_path2", "a2.h5",
                    "--save_path", "out/"]
 
 
@@ -116,13 +117,14 @@ def test_portal_command():
 
 
 def test_smile_command():
-    v = registry.get("SMILE").select("mosaic", {"rna_ref", "atac_ref", "rna_query", "atac_query"})
+    # Mosaic file-name roles: reference=(rna2,atac2 paired), query=(rna1,atac3).
+    v = registry.get("SMILE").select("mosaic", {"rna2", "atac2", "rna1", "atac3"})
     cmd = builder.build_command(v, values={
-        "rna_ref": "rr.h5", "atac_ref": "ar.h5",
-        "rna_query": "rq.h5", "atac_query": "aq.h5"}, out_dir="out/")
+        "rna2": "r2.h5", "atac2": "a2.h5",
+        "rna1": "r1.h5", "atac3": "a3.h5"}, out_dir="out/")
     assert cmd == ["python", "tools_scripts/SMILE/main_SMILE.py",
-                   "--ref_path1", "rr.h5", "--ref_path2", "ar.h5",
-                   "--query_path1", "rq.h5", "--query_path2", "aq.h5",
+                   "--ref_path1", "r2.h5", "--ref_path2", "a2.h5",
+                   "--query_path1", "r1.h5", "--query_path2", "a3.h5",
                    "--save_path", "out/"]
 
 
