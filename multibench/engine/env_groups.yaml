@@ -20,6 +20,7 @@ method_env:
   MOFA2: MOFA2_env          # [v] R MOFA2 + RETICULATE_PYTHON=mofa_env_gpu/bin/python; RUN-VERIFIED on D2
   sciPENN: env_sciPENN       # [v] user existing env: torch 1.13.1+cu117, supports up to sm_86
   SMILE: env_sciPENN        # [v] anndata 0.8.0/scanpy 1.9.3/numpy 1.21.6 thread BOTH np.matrix-coerce + bytes-varnames needles; RUN-VERIFIED on D45 (32151x20)
+  Cobolt: scmb_cobolt3      # [v] clone of scmb_cobolt w/ numpy 1.21.6 (np.quantile(np.matrix) bug needs numpy<1.22); RUN-VERIFIED on D45
   Matilda: matilda          # [v] user existing env: torch + matilda local imports OK
   scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
   scMDC: scmb_scmdc         # [v] numpy<2+torch+munkres, RUN-VERIFIED on D2 with --nbatch 1 (single-batch fix)
@@ -87,7 +88,6 @@ groups:
     - git+https://github.com/Teichlab/MultiMAP.git
     members:
     - SCALEX
-    - Cobolt
     - scMDC
     - scMoMaT
     - uniPort
