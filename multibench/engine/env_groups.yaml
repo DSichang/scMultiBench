@@ -28,7 +28,7 @@ method_env:
   Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
   scJoint: scmb_scjoint     # [v] numpy<1.24 (np.float restored); needs pty (script -q); RUN-VERIFIED on D28
   VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
-  iPOLNG: scmb_ipolng       # [v] fresh env: iPoLNG 0.0.2 + torch 1.11
+  iPOLNG: scmb_ipolng2      # [v] rebuilt env: iPoLNG 0.0.2 + pyro 1.8.1 + torch 1.13.1+cu117 (runs on 4090/sm_89) + numpy 1.23.5 + h5py 3.8.0. Old scmb_ipolng was DOUBLY broken (h5py 3.14 vs numpy 1.21 -> can't read float64; torch 1.11+cu102 -> no sm_89 kernels) and was deleted.
   scMVP: scmb_scmvp4        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
   UINMF: scmb_r             # [v] fresh R env: rliger 2.2.1 (compiled from source)
   iNMF: scmb_r              # [v] rliger 2.0.1 RUN-VERIFIED on D27 (rna+atac_gas)
