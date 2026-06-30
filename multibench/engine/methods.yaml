@@ -475,7 +475,19 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - {id: UnitedNet, language: python, categories: [cross], tasks: [clustering], status: declared}
-  - {id: SPIRAL, language: python, categories: [cross], tasks: [registration], status: declared}
+  - id: SPIRAL
+    language: python
+    categories: [cross]
+    tasks: [registration]
+    variants:
+      - when: {category: cross}
+        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/SPIRAL_latest/main_SPIRAL_ori.py
+        language: python
+        cwd_at_script: true            # needs cwd=SPIRAL_latest (local Process/spiral imports + ./txt_file/ intermediates); main_SPIRAL.py is broken, _ori is intact
+        args:
+          - {role: data_dir, flag: "--data_dir"}
+          - {role: out_dir,  flag: "--save_dir"}
+        output: {kind: coords, file: ""}
   - {id: GPSA, language: python, categories: [cross], tasks: [registration], status: declared}
   - id: PASTE
     language: python
@@ -490,7 +502,19 @@ methods:
           - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files
           - {role: out_dir,  flag: "--save_dir"}    # writes paste_pairwise_aligned_slices/ + metrics csv
         output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
-  - {id: PASTE2, language: python, categories: [cross], tasks: [registration], status: declared}
+  - id: PASTE2
+    language: python
+    categories: [cross]
+    tasks: [registration]
+    variants:
+      - when: {category: cross}
+        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/PASTE2_new/main_PASTE2_ori.py
+        language: python
+        cwd_at_script: true
+        args:
+          - {role: data_dir, flag: "--data_dir"}
+          - {role: out_dir,  flag: "--save_dir"}
+        output: {kind: coords, file: ""}
   - id: iPOLNG
     language: python
     categories: [vertical]
