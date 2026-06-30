@@ -24,13 +24,22 @@ import yaml
 from . import registry
 
 __all__ = [
-    "recipe", "default_env_name", "group_for", "groups", "plan",
+    # inspection
+    "recipe", "default_env_name", "group_for", "groups", "plan", "status",
+    "doctor", "required_envs", "installed_envs", "lockfile",
+    # recipe view (the declared, hand-written recipe — for transparency)
     "create_commands", "environment_yml", "group_create_commands",
-    "group_environment_yml", "installed_envs", "env_exists", "status",
-    "create", "create_group",
+    # provisioning (lockfile-based: build the REAL envs run() uses)
+    "create", "create_group", "create_env", "create_all", "freeze",
 ]
 
 _GROUPS_YAML = Path(__file__).resolve().parent / "env_groups.yaml"
+# Committed per-env lockfiles (`conda env export --no-builds`). These capture the
+# ACTUAL working envs (versions + pip section) and are the reproducible install
+# source: create_env/create_all rebuild a fresh machine's envs from them, by the
+# real env name run() uses — unlike the hand-written `recipe`/create_commands,
+# which build a method's OWN scmb_<method> env from a best-effort spec.
+_LOCKS_DIR = Path(__file__).resolve().parent / "env_locks"
 
 
 # --- recipes ---------------------------------------------------------------
@@ -187,13 +196,6 @@ def group_create_commands(group: str, env_name: str | None = None,
     return _install_commands(spec, env_name or group, conda)
 
 
-def group_environment_yml(group: str) -> str:
-    spec = groups().get(group)
-    if spec is None:
-        raise KeyError(f"unknown group {group!r}; see envs.groups()")
-    return _environment_yml(spec, group)
-
-
 def plan(category: str | None = None, methods: list[str] | None = None) -> list[dict]:
     """Which envs to build to cover a set of methods (e.g. all for a category).
 
@@ -237,10 +239,6 @@ def installed_envs(conda: str | None = None) -> list[str]:
     return names
 
 
-def env_exists(env_name: str, conda: str | None = None) -> bool:
-    return env_name in installed_envs(conda)
-
-
 def status(conda: str | None = None) -> list[dict]:
     """Per-method install status: difficulty, default env name, group, exists."""
     have = set(installed_envs(conda))
@@ -259,9 +257,173 @@ def status(conda: str | None = None) -> list[dict]:
     return out
 
 
+# --- lockfile-based provisioning (the reproducible install path) -----------
+def lockfile(env_name: str) -> Path | None:
+    """Path to the committed lockfile for a real env, or None if not captured.
+
+    Lockfiles live in ``env_locks/<env_name>.yml`` (a ``conda env export
+    --no-builds`` of the actual working env) and are the reproducible source
+    create_env/create_all rebuild from.
+    """
+    p = _LOCKS_DIR / f"{env_name}.yml"
+    return p if p.exists() else None
+
+
+def required_envs(category: str | None = None,
+                  methods: list[str] | None = None) -> list[str]:
+    """The distinct real conda envs needed to run the given methods (or all).
+
+    Exactly the env names ``run()`` shells into (via group_for) — i.e. what a
+    fresh machine must provision.
+    """
+    if methods is None:
+        methods = registry.list_methods(category=category)
+    seen: list[str] = []
+    for m in methods:
+        e = group_for(m)
+        if e not in seen:
+            seen.append(e)
+    return seen
+
+
+def create_env(env_name: str, conda: str | None = None,
+               dry_run: bool = True) -> list[list[str]]:
+    """Create one real env from its committed lockfile (the reproducible path).
+
+    Builds the env under its real name (the one run() uses), so 'what you build'
+    == 'what runs'. Raises if no lockfile was captured for it.
+    """
+    lock = lockfile(env_name)
+    if lock is None:
+        raise FileNotFoundError(
+            f"no lockfile for env {env_name!r} (expected {_LOCKS_DIR / (env_name + '.yml')}). "
+            f"Capture it on a host where the env exists via freeze({env_name!r}), "
+            f"or build from the hand recipe via create_commands()."
+        )
+    conda = conda or _conda_bin("conda")
+    cmds = [[conda, "env", "create", "-n", env_name, "-f", str(lock)]]
+    if not dry_run:
+        _run_all(cmds)
+    return cmds
+
+
+def create_all(category: str | None = None, methods: list[str] | None = None,
+               conda: str | None = None, dry_run: bool = True) -> list[dict]:
+    """Provision EVERY env needed to run the methods, from lockfiles.
+
+    One-shot 'set up a fresh machine'. Returns one entry per distinct env:
+    {env, methods, exists, has_lock, cmds}. With dry_run=False, builds the envs
+    that are MISSING and have a lockfile (existing envs are skipped; envs without
+    a lockfile are reported, not built).
+    """
+    have = set(installed_envs(conda))
+    if methods is None:
+        methods = registry.list_methods(category=category)
+    by_env: dict[str, list[str]] = {}
+    for m in methods:
+        by_env.setdefault(group_for(m), []).append(m)
+    out = []
+    for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        lock = lockfile(env)
+        exists = env in have
+        cmds: list[list[str]] = []
+        if not exists and lock is not None:
+            cmds = create_env(env, conda=conda, dry_run=True)
+            if not dry_run:
+                _run_all(cmds)
+        out.append({"env": env, "methods": sorted(ms), "exists": exists,
+                    "has_lock": lock is not None, "cmds": cmds})
+    return out
+
+
+def doctor(category: str | None = None, methods: list[str] | None = None,
+           conda: str | None = None) -> list[dict]:
+    """Preflight: per env needed to run the methods, is it present + is a lockfile
+    available to build it. [{env, methods, exists, has_lock}], coverage-sorted.
+
+    A fresh machine sees exists=False everywhere; run create_all(dry_run=False).
+    """
+    have = set(installed_envs(conda))
+    if methods is None:
+        methods = registry.list_methods(category=category)
+    by_env: dict[str, list[str]] = {}
+    for m in methods:
+        by_env.setdefault(group_for(m), []).append(m)
+    return [{"env": env, "methods": sorted(ms), "exists": env in have,
+             "has_lock": lockfile(env) is not None}
+            for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
+
+
+def freeze(env_name: str, conda: str | None = None,
+           out_dir: Path | str | None = None) -> Path:
+    """Capture an existing env to a committed lockfile (maintainer tool).
+
+    Runs ``conda env export -n <env> --no-builds``, strips the host-specific
+    ``prefix:`` line, and writes ``env_locks/<env>.yml`` — exactly what
+    create_env rebuilds. Run on the host where the working env lives.
+    """
+    import re
+    conda = conda or _conda_bin("conda")
+    dst_dir = Path(out_dir) if out_dir else _LOCKS_DIR
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    def _run(args):
+        return subprocess.run([conda, *args], capture_output=True, text=True)
+
+    def _has_real_deps(text: str) -> bool:
+        # real = a conda package beyond python/pip, OR a pip: section
+        if "- pip:" in text:
+            return True
+        in_deps = False
+        for ln in text.splitlines():
+            if ln.startswith("dependencies:"):
+                in_deps = True
+                continue
+            if in_deps and ln.lstrip().startswith("- "):
+                name = re.split(r"[=<>\s]", ln.split("- ", 1)[1].strip())[0]
+                if name not in ("python", "pip"):
+                    return True
+        return False
+
+    # Prefer a full export; fall back to explicit specs when it fails (corrupt
+    # transitive metadata) OR yields nothing (env whose pkgs are all pip and
+    # untracked by conda history — `--no-builds` then emits an empty deps list).
+    exp = _run(["env", "export", "-n", env_name, "--no-builds"])
+    if exp.returncode == 0 and _has_real_deps(exp.stdout):
+        body = exp.stdout
+    else:
+        hist = _run(["env", "export", "-n", env_name, "--from-history"])
+        body = hist.stdout if hist.returncode == 0 else (
+            f"name: {env_name}\nchannels:\n  - conda-forge\ndependencies:\n  - python\n")
+    lines = [ln for ln in body.splitlines() if not ln.startswith("prefix:")]
+    # If pip-installed packages weren't captured, append a pip: section from
+    # `pip freeze` so the lockfile actually reproduces the env.
+    if "- pip:" not in "\n".join(lines):
+        pip = _run(["run", "-n", env_name, "pip", "freeze"]).stdout
+        pip_pkgs = [ln.strip() for ln in pip.splitlines()
+                    if ln.strip() and not ln.startswith("-e ")]
+        if pip_pkgs:
+            if not any(l.startswith("dependencies:") for l in lines):
+                lines.append("dependencies:")
+            lines += ["  - pip", "  - pip:"] + [f"    - {p}" for p in pip_pkgs]
+    dst = dst_dir / f"{env_name}.yml"
+    dst.write_text("\n".join(lines) + "\n")
+    return dst
+
+
+# --- recipe/lockfile provisioning entry points -----------------------------
 def create(method: str, env_name: str | None = None, conda: str | None = None,
            dry_run: bool = True) -> list[list[str]]:
-    """Create a method's env. dry_run=True (default) returns commands without running."""
+    """Provision the env a method runs in. dry_run=True (default) returns the
+    commands without running.
+
+    Prefers the committed lockfile for the REAL env run() uses (group_for), so
+    'what you build' == 'what runs'. Falls back to the hand-written recipe
+    (its own scmb_<method> env) only when no lockfile was captured.
+    """
+    target = env_name or group_for(method)
+    if lockfile(target) is not None:
+        return create_env(target, conda=conda, dry_run=dry_run)
     cmds = create_commands(method, env_name=env_name, conda=conda)
     if not dry_run:
         _run_all(cmds)
@@ -270,7 +432,13 @@ def create(method: str, env_name: str | None = None, conda: str | None = None,
 
 def create_group(group: str, env_name: str | None = None, conda: str | None = None,
                  dry_run: bool = True) -> list[list[str]]:
-    """Create a shared group env. dry_run=True (default) returns commands."""
+    """Provision a shared group env. dry_run=True (default) returns the commands.
+
+    Prefers the committed lockfile for the env; falls back to the hand recipe.
+    """
+    target = env_name or group
+    if lockfile(target) is not None:
+        return create_env(target, conda=conda, dry_run=dry_run)
     cmds = group_create_commands(group, env_name=env_name, conda=conda)
     if not dry_run:
         _run_all(cmds)

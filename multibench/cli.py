@@ -86,6 +86,38 @@ def _cmd_env(args) -> int:
             tag = "shared" if p["shared"] else "own"
             print(f"{p['env']:16} [{tag:6}] <- {', '.join(p['methods'])}")
         return 0
+    if cmd == "doctor":
+        rows = envs.doctor(category=getattr(args, "category", None))
+        for r in rows:
+            mark = "x" if r["exists"] else ("L" if r["has_lock"] else "!")
+            print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}")
+        missing = [r for r in rows if not r["exists"]]
+        nolock = [r["env"] for r in missing if not r["has_lock"]]
+        print(f"# {len(rows)} envs needed, {len(missing)} missing"
+              + (f"; NO lockfile for: {', '.join(nolock)}" if nolock else ""))
+        print("# legend: [x]=installed  [L]=missing, lockfile ready (run `multibench env install --run`)  [!]=missing, no lockfile")
+        return 0
+    if cmd == "install":
+        rows = envs.create_all(category=getattr(args, "category", None),
+                               dry_run=not getattr(args, "run", False))
+        for r in rows:
+            state = ("have" if r["exists"]
+                     else ("BUILD" if r["has_lock"] and getattr(args, "run", False)
+                           else "build(dry-run)" if r["has_lock"] else "NO-LOCK"))
+            print(f"{r['env']:18} [{state:14}] <- {', '.join(r['methods'])}")
+        if not getattr(args, "run", False):
+            print("# dry-run — add --run to create the missing envs from their lockfiles")
+        return 0
+    if cmd == "freeze":
+        if getattr(args, "all", False):
+            for env in envs.required_envs(category=getattr(args, "category", None)):
+                try:
+                    print(f"froze {env} -> {envs.freeze(env)}")
+                except Exception as e:  # noqa: BLE001 - report per-env, keep going
+                    print(f"SKIP {env}: {str(e)[:120]}")
+        else:
+            print(f"froze {args.env} -> {envs.freeze(args.env)}")
+        return 0
     if cmd == "create-group":
         cmds = envs.create_group(args.group, dry_run=not getattr(args, "run", False))
         if not getattr(args, "run", False):
@@ -121,7 +153,7 @@ def _cmd_env(args) -> int:
             print(f"created environment for {method}")
         return 0
     raise SystemExit(
-        "usage: multibench env {status|groups|plan|recipe|yml|create|create-group}")
+        "usage: multibench env {status|groups|plan|doctor|install|freeze|recipe|yml|create|create-group}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -172,6 +204,9 @@ def build_parser() -> argparse.ArgumentParser:
     ec = ev.add_parser("create"); ec.add_argument("method"); ec.add_argument("--name"); ec.add_argument("--run", action="store_true"); ec.set_defaults(func=_cmd_env)
     ep = ev.add_parser("plan"); ep.add_argument("--category"); ep.set_defaults(func=_cmd_env)
     eg = ev.add_parser("create-group"); eg.add_argument("group"); eg.add_argument("--run", action="store_true"); eg.set_defaults(func=_cmd_env)
+    edoc = ev.add_parser("doctor", help="preflight: which envs are present / need building"); edoc.add_argument("--category"); edoc.set_defaults(func=_cmd_env)
+    ei = ev.add_parser("install", help="build every needed env from its lockfile"); ei.add_argument("--category"); ei.add_argument("--run", action="store_true"); ei.set_defaults(func=_cmd_env)
+    ef = ev.add_parser("freeze", help="capture an env (or --all) to a committed lockfile"); ef.add_argument("env", nargs="?"); ef.add_argument("--all", action="store_true"); ef.add_argument("--category"); ef.set_defaults(func=_cmd_env)
     return p
 
 
