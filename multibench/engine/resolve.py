@@ -37,6 +37,22 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     return ds_dir / f"{bases[0]}{fallback_ext}"
 
 
+def _resolve_data_dir(ds_dir: Path) -> str:
+    """Directory of spatial slices for a registration ``data_dir`` role.
+
+    Spatial-registration methods (PASTE/PASTE2/SPIRAL/GPSA) take a DIRECTORY of
+    per-slice ``.h5ad`` files, not a per-feature file. Datasets keep those slices
+    under ``<ds_dir>/processed/`` (sometimes directly in ``<ds_dir>/``). Return the
+    first dir that actually holds ``*.h5ad`` slices, WITH a trailing separator —
+    the upstream scripts string-concatenate ``data_dir + "*.h5ad"``.
+    """
+    import os
+    for cand in (ds_dir / "processed", ds_dir):
+        if cand.is_dir() and any(cand.glob("*.h5ad")):
+            return os.path.join(str(cand), "")
+    return os.path.join(str(ds_dir / "processed"), "")
+
+
 def inputs_for(dataset: str, method: str, category: str,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
@@ -80,8 +96,12 @@ def inputs_for(dataset: str, method: str, category: str,
         variant = candidates[0]
 
     # Skip args with a const (they don't need on-disk resolution) and out_dir.
-    roles = [a.role for a in variant.args if a.role != "out_dir" and getattr(a, "const", None) is None]
+    roles = [a.role for a in variant.args
+             if a.role not in ("out_dir", "data_dir") and getattr(a, "const", None) is None]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
+    # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
+    if any(a.role == "data_dir" for a in variant.args):
+        out["data_dir"] = _resolve_data_dir(ds_dir)
     if check:
         missing = {r: p for r, p in out.items() if not Path(p).exists()}
         if missing:

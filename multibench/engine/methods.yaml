@@ -477,7 +477,19 @@ methods:
   - {id: UnitedNet, language: python, categories: [cross], tasks: [clustering], status: declared}
   - {id: SPIRAL, language: python, categories: [cross], tasks: [registration], status: declared}
   - {id: GPSA, language: python, categories: [cross], tasks: [registration], status: declared}
-  - {id: PASTE, language: python, categories: [cross], tasks: [registration], status: declared}
+  - id: PASTE
+    language: python
+    categories: [cross]
+    tasks: [registration]
+    variants:
+      - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
+        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/PASTE/main_PASTE_updated_pairwise.py
+        language: python
+        cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT align (paste-bio)
+        args:
+          - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files
+          - {role: out_dir,  flag: "--save_dir"}    # writes paste_pairwise_aligned_slices/ + metrics csv
+        output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
   - {id: PASTE2, language: python, categories: [cross], tasks: [registration], status: declared}
   - id: iPOLNG
     language: python
