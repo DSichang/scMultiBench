@@ -37,7 +37,7 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     return ds_dir / f"{bases[0]}{fallback_ext}"
 
 
-def _resolve_data_dir(ds_dir: Path) -> str:
+def _resolve_data_dir(ds_dir: Path, method: str | None = None) -> str:
     """Directory of spatial slices for a registration ``data_dir`` role.
 
     Spatial-registration methods (PASTE/PASTE2/SPIRAL/GPSA) take a DIRECTORY of
@@ -49,8 +49,59 @@ def _resolve_data_dir(ds_dir: Path) -> str:
     import os
     for cand in (ds_dir / "processed", ds_dir):
         if cand.is_dir() and any(cand.glob("*.h5ad")):
+            # SPIRAL derives each slice's cross-slice ID prefix from
+            # filename.split('_')[0]; when every slice shares that leading
+            # token (e.g. D63's `modified_*.h5ad`) the prefixed obs_names
+            # collide and `coord.loc[ann.obs_names]` explodes. Stage a
+            # sibling dir of symlinks with a UNIQUE leading token per slice.
+            if method == "SPIRAL":
+                return _stage_unique_leading_token(cand)
             return os.path.join(str(cand), "")
     return os.path.join(str(ds_dir / "processed"), "")
+
+
+def _stage_unique_leading_token(slice_dir: Path) -> str:
+    """Return a dir of the same `.h5ad` slices but with a unique leading
+    filename token (the part before the first '_').
+
+    SPIRAL builds each slice's cross-slice cell-ID prefix from
+    ``filename.split('_')[0]``. Datasets whose slice files share that token
+    (D63: ``modified_E14-16h_a_S07.h5ad`` ... all split to ``modified``)
+    make SPIRAL's per-cell prefixes collide across slices, which inflates
+    ``coord.loc[ann.obs_names]`` into a cartesian product and crashes the
+    coordinate-assignment step. If the leading tokens are already unique we
+    return the original dir untouched; otherwise we materialize a sibling
+    ``<dir>__spiral_uniqtok/`` of SYMLINKS (no data copy, original dir is
+    never mutated) whose names start with a unique token derived from the
+    trailing token of each stem.
+    """
+    import os
+    files = sorted(p for p in slice_dir.glob("*.h5ad") if p.is_file())
+    if not files:
+        return os.path.join(str(slice_dir), "")
+    lead = [f.name.split("_")[0] for f in files]
+    if len(set(lead)) == len(lead):
+        return os.path.join(str(slice_dir), "")  # already unique
+    staged = slice_dir.parent / (slice_dir.name + "__spiral_uniqtok")
+    staged.mkdir(parents=True, exist_ok=True)
+    used = set()
+    for f in files:
+        stem = f.stem
+        tok = stem.split("_")[-1] or stem  # trailing token, e.g. S07
+        base = tok
+        i = 1
+        while tok in used:
+            i += 1
+            tok = f"{base}{i}"
+        used.add(tok)
+        link = staged / f"{tok}_{f.name}"
+        if link.is_symlink() or link.exists():
+            try:
+                link.unlink()
+            except OSError:
+                pass
+        os.symlink(os.path.realpath(str(f)), str(link))
+    return os.path.join(str(staged), "")
 
 
 def inputs_for(dataset: str, method: str, category: str,
@@ -101,7 +152,7 @@ def inputs_for(dataset: str, method: str, category: str,
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
     # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
     if any(a.role == "data_dir" for a in variant.args):
-        out["data_dir"] = _resolve_data_dir(ds_dir)
+        out["data_dir"] = _resolve_data_dir(ds_dir, method)
     if check:
         missing = {r: p for r, p in out.items() if not Path(p).exists()}
         if missing:

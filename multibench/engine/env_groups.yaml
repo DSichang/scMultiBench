@@ -19,6 +19,7 @@ method_env:
   SPIRAL: spiral_environment # [v]
   PASTE: paste_envi         # [v] user env: paste-bio + POT(TorchBackend) + torch CUDA; spatial registration on D63
   PASTE2: paste_envi        # [v] paste_envi has paste2==1.0.1 (PASTE2/projection); spatial registration
+  GPSA: scmb_gpsa2          # [v] clone of GPSA_environment: numpy 1.26.4 + h5py 3.10/sklearn 1.4.1 (orig env had unsatisfiable numpy 1.21.6 pin) + torch 2.2.2+cu118 (2.6 wheel rejects numpy<2 in from_numpy) + numba 0.59.1 + gpytorch/linear_operator/jaxtyping/morphops/kneed installed into-env (orig used .local eggs, broke under PYTHONNOUSERSITE=1); RUN-VERIFIED on D63
   MOFA2: MOFA2_env          # [v] R MOFA2 + RETICULATE_PYTHON=mofa_env_gpu/bin/python; RUN-VERIFIED on D2
   sciPENN: env_sciPENN       # [v] user existing env: torch 1.13.1+cu117, supports up to sm_86
   SMILE: env_sciPENN        # [v] anndata 0.8.0/scanpy 1.9.3/numpy 1.21.6 thread BOTH np.matrix-coerce + bytes-varnames needles; RUN-VERIFIED on D45 (32151x20)
@@ -97,7 +98,6 @@ groups:
     - scJoint
     - MultiMAP
     - sciPENN
-    - GPSA
     - PASTE
     - PASTE2
     excluded:
