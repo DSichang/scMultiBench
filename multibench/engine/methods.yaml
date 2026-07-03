@@ -474,7 +474,35 @@ methods:
           - {role: adt, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: UnitedNet, language: python, categories: [cross], tasks: [clustering], status: declared}
+  - id: UnitedNet
+    language: python
+    categories: [vertical]
+    tasks: [clustering, classification]
+    status: verified
+    variants:
+      # Supervised paired RNA+ATAC integration (needs matched cells + labels).
+      # main_UnitedNet.py imports src/ (from src.configs / src.interface) -> cwd_at_script.
+      # commandArgs: --train_path1/2 (rna/atac) --train_cty_path (labels)
+      #              --test_path1/2 (rna/atac to embed) --save_path [--index].
+      # Encoders size themselves from adata.shape[1], so no hardcoded dims. For a
+      # single paired dataset train == test on the same data -> joint embedding of
+      # all cells. Path args are nargs='+' (repeat) -> multi-batch cross possible later.
+      # Output embedding{index}.h5 (default index=1) dataset "data" (cells x dim) +
+      # predict1.csv (predicted labels). RUN-VERIFIED on D27 (paired multiome, 10717 cells).
+      - when: {category: vertical, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/UnitedNet/main_UnitedNet.py
+        language: python
+        cwd_at_script: true
+        args:
+          - {role: rna, flag: "--train_path1", repeat: true}
+          - {role: atac_gas, flag: "--train_path2", repeat: true}
+          - {role: rna_cty, flag: "--train_cty_path", repeat: true}
+          - {role: rna, flag: "--test_path1", repeat: true}
+          - {role: atac_gas, flag: "--test_path2", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding1.h5, dataset: data}
+        extra_outputs:
+          - {kind: labels, file: predict1.csv}
   - id: SPIRAL
     language: python
     categories: [cross]
