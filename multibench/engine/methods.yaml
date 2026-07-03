@@ -414,7 +414,35 @@ methods:
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: scJoint, language: python, categories: [diagonal], tasks: [classification], status: declared}
+  - id: scJoint
+    language: python
+    categories: [diagonal]
+    tasks: [classification, clustering]
+    atac: gene_activity
+    status: verified
+    variants:
+      # Diagonal integration: RNA + gene-activity ATAC with RNA cell-type labels
+      # (transfers labels to ATAC via a shared encoder + KNN). Imports
+      # config/process_db/util as siblings -> cwd_at_script. util/utils.py
+      # progress_bar reads os.popen('stty size') and crashes without a terminal
+      # -> pty: true (runner wraps in `script -q -e -c`). Feature dim / #classes
+      # are derived from the data at runtime (args override Config), so no dims
+      # are hardcoded here; requires GENE-ALIGNED atac_gas (== rna feature dim,
+      # shared encoder) -> D28 (D27's atac_gas is not aligned). Writes intermediate
+      # scriptdir/output/<name>_embeddings.txt then the final save_path/embedding.h5
+      # dataset "data" = concat(rna_emb, atac_emb) (rna cells then atac cells).
+      # RUN-VERIFIED on D28 (rna + atac_gas + rna_cty).
+      - when: {category: diagonal, modalities: [rna, atac_gas]}
+        entrypoint: tools_scripts/scJoint/main_scJoint.py
+        language: python
+        cwd_at_script: true
+        pty: true
+        args:
+          - {role: rna, flag: "--path1"}
+          - {role: atac_gas, flag: "--path2"}
+          - {role: rna_cty, flag: "--cty_path1"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: GLUE
     language: python
     categories: [diagonal]
