@@ -109,6 +109,18 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         # methods.yaml `env:` field is no longer consulted here.)
         env_name = envs.group_for(method)
         cmd_template = f"{conda} run -n {env_name} {{cmd}}"
+    # Opt-in pseudo-tty: some upstream scripts read the terminal size
+    # (os.popen('stty size')) to draw a progress bar and crash without a tty
+    # (scJoint's util/utils.py). Wrap the method command in `script`, which
+    # allocates a pty, forwards the child's output to captured stdout, and (-e)
+    # propagates the child's exit code so the returncode check below still fires.
+    # This must be INNERMOST -- inside the conda-run wrap -- so the method
+    # process's own stdin is the pty; conda run otherwise redirects stdio and
+    # `stty size` still fails. Hence wrap BEFORE wrap_command. Default off ->
+    # no other method affected.
+    if getattr(variant, "pty", False):
+        cmd = ["script", "-q", "-e", "-c",
+               " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
     cmd = wrap_command(cmd, cmd_template)
 
     # Isolate the method env from user site-packages (~/.local): a broken or

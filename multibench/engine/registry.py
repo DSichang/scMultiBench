@@ -21,6 +21,7 @@ def _parse_variant(d: dict) -> Variant:
         params=d.get("params", {}),
         run_env=d.get("run_env", {}),
         cwd_at_script=d.get("cwd_at_script", False),
+        pty=d.get("pty", False),
         driver=d.get("driver"),
         normalize_peaks=d.get("normalize_peaks", []),
         extra_outputs=[OutputSpec(**o) for o in d.get("extra_outputs", [])],
