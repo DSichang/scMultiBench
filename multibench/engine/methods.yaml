@@ -640,7 +640,33 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-  - {id: MOFA2, language: R, categories: [vertical], tasks: [clustering], status: declared}
+  - id: MOFA2
+    language: R
+    categories: [vertical]
+    tasks: [clustering]
+    status: verified
+    variants:
+      # Vertical joint-embedding via MOFA2 for matched multimodal data (e.g. RNA+ADT).
+      # The Rmd sources util.R (cwd_at_script) and run_mofa(use_basilisk=FALSE) bridges
+      # to mofapy2 through reticulate -> RETICULATE_PYTHON must point at an env with
+      # mofapy2 installed (mofa_env_gpu). LD_PRELOAD supplies the R CXXABI.
+      # commandArgs are POSITIONAL: <rna...> <adt...> <batch_num> <num=#modalities> <save_path>
+      # (script slices by count; num==2 -> 1 rna + 1 adt for a single batch).
+      # RUN-VERIFIED on D2 (rna+adt) -> embedding.h5 (dataset "data").
+      - when: {category: vertical, modalities: [rna, adt]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        run_env:
+          RETICULATE_PYTHON: /media/disk2/Sichang/.conda/envs/mofa_env_gpu/bin/python
+          LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6
+        args:
+          - {role: rna}
+          - {role: adt}
+          - {role: batch_num, const: "1"}
+          - {role: num, const: "2"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Seurat_v3
     language: R
     categories: [diagonal]

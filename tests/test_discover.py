@@ -67,9 +67,9 @@ def test_find_methods_modalities_rna_ubiquitous():
 
 
 def test_find_methods_modalities_excludes_stub():
-    # MOFA2 is a declared stub with no variants -> empty modality set
+    # scJoint is a declared stub with no variants -> empty modality set
     for req in (["rna"], ["rna", "atac"], ["adt"]):
-        assert "MOFA2" not in discover.find_methods(modalities=req)
+        assert "scJoint" not in discover.find_methods(modalities=req)
 
 
 def test_find_methods_modalities_none_unchanged():
@@ -85,5 +85,5 @@ def test_find_methods_runnable_filter():
     assert set(runnable) | set(stubs) == set(all_ids)        # complete partition
     assert set(runnable) & set(stubs) == set()               # disjoint
     assert "SCALEX" in runnable                              # has a variant
-    assert "MOFA2" in stubs and "MOFA2" not in runnable      # declared stub (not yet wired)
+    assert "scJoint" in stubs and "scJoint" not in runnable  # declared stub (not yet wired)
     assert len(runnable) < len(all_ids)
