@@ -99,24 +99,30 @@ def load_results(
 
 
 def available_datasets(
-    category: str,
+    category: str | None = None,
     metric_set: str = "scib",
     result_path: Path | str | None = None,
 ) -> list[str]:
-    """Dataset ids that have published ``metric_set`` results for a category.
+    """Dataset ids that have published ``metric_set`` results.
 
-    These are exactly the datasets ``load_results(category, dataset=...)`` can
-    load — i.e. the subdirectories under the category's result folder. Returns
-    ``[]`` if the category folder does not exist (e.g. ``mosaic``, which has no
-    published metrics). Useful for discovering what is actually loadable before
-    calling :func:`load_results`.
+    With ``category`` given, returns the datasets under that category's result
+    folder (exactly what ``load_results(category, dataset=...)`` can load). With
+    ``category=None`` (the default) returns the union across all integration
+    categories, so a bare ``available_datasets()`` "just works". Returns ``[]``
+    for a category folder that does not exist (e.g. ``mosaic``, which has no
+    published metrics). Useful for discovering what is loadable before calling
+    :func:`load_results`.
     """
     if metric_set != "scib":
         raise NotImplementedError(
             f"metric_set={metric_set!r} is not wired in v1 (only 'scib')."
         )
     base = Path(result_path) if result_path is not None else config.DEFAULT.result_path
-    root = base / config.metric_set_dir(metric_set) / config.category_folder(category)
-    if not root.exists():
-        return []
-    return sorted(p.name for p in root.iterdir() if p.is_dir())
+    # The four canonical integration categories (same set load_results validates).
+    cats = [category] if category is not None else ["cross", "diagonal", "mosaic", "vertical"]
+    found: set[str] = set()
+    for cat in cats:
+        root = base / config.metric_set_dir(metric_set) / config.category_folder(cat)
+        if root.exists():
+            found.update(p.name for p in root.iterdir() if p.is_dir())
+    return sorted(found)
