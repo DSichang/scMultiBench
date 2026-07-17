@@ -51,6 +51,13 @@ def evaluate(
 
     emb = io.read_embedding(output) if not isinstance(output, np.ndarray) else output
     ct = io.read_labels(labels) if not isinstance(labels, np.ndarray) else labels
+    # Orient a raw ndarray to cells x dims. read_embedding() already does this for
+    # file inputs; do the same for an ndarray so a caller can pass run().output
+    # (dims x cells for many methods) directly. Use the label count as the truth:
+    # only transpose when it resolves the cell-axis mismatch (never ambiguously).
+    emb = np.asarray(emb)
+    if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
+        emb = emb.T
     cl = (
         None if clustering is None
         else clustering if isinstance(clustering, np.ndarray)

@@ -60,3 +60,14 @@ def test_pipeline_evaluate_without_clustering():
     df = evaluate(emb, category="vertical", task="clustering", labels=ct)
     assert "ARI" in df.index
     assert float(df.loc["ARI", "Value"]) > 0.9
+
+
+def test_pipeline_evaluate_auto_orients_dims_by_cells():
+    """A raw ndarray in dims x cells orientation (what run().output is for many
+    methods) must be auto-oriented against the label count, matching the
+    file-path route — not raise 'input length mismatch'."""
+    from multibench.eval.pipeline import evaluate
+    emb, ct, _cl, _ba = _toy()          # emb is cells x dims (80 x 5)
+    df = evaluate(emb.T, category="vertical", task="clustering", labels=ct)  # dims x cells
+    assert "ARI" in df.index
+    assert float(df.loc["ARI", "Value"]) > 0.9
