@@ -57,7 +57,13 @@ def _resolve_data_dir(ds_dir: Path, method: str | None = None) -> str:
             if method == "SPIRAL":
                 return _stage_unique_leading_token(cand)
             return os.path.join(str(cand), "")
-    return os.path.join(str(ds_dir / "processed"), "")
+    # No `.h5ad` slices anywhere: this is a NON-spatial `data_dir` role (e.g.
+    # scBridge, which takes the dataset DIRECTORY plus bare filenames). Prefer a
+    # real `processed/` if one exists (keeps the spatial error message pointing
+    # at the slice dir); otherwise fall back to the dataset dir itself, which
+    # always exists, instead of a bogus `<ds>/processed/`.
+    proc = ds_dir / "processed"
+    return os.path.join(str(proc if proc.is_dir() else ds_dir), "")
 
 
 def _stage_unique_leading_token(slice_dir: Path) -> str:

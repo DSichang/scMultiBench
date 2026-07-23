@@ -26,13 +26,16 @@ def test_seurat_positional_R_command():
 
 
 def test_scbridge_eq_and_labels():
-    v = registry.get("scBridge").select("diagonal", {"rna", "atac_gas"})
-    cmd = builder.build_command(v, values={
-        "data_dir": "D27/", "source_data": "rna.h5", "target_data": "atac_gas.h5",
-        "source_cty": "rna_cty.csv", "target_cty": "atac_cty.csv"}, out_dir="out/")
+    # scBridge takes the dataset DIRECTORY plus BARE FILENAMES relative to it, so the
+    # four file roles are `const` and only data_dir is resolved -> the variant declares
+    # no modalities (same shape as the spatial data_dir methods).
+    v = registry.get("scBridge").select("diagonal", set())
+    cmd = builder.build_command(v, values={"data_dir": "D27/"}, out_dir="out/")
     assert "--data_path=D27/" in cmd
-    assert "--source_data=rna.h5" in cmd
+    assert "--source_data=rna.h5" in cmd            # const bare filename, not a path
+    assert "--target_data=atac_gas.h5" in cmd       # const bare filename, not a path
     assert "--source_cty" in cmd and "rna_cty.csv" in cmd
+    assert "--target_cty" in cmd and "atac_cty.csv" in cmd
     assert "--save_path=out/" in cmd
 
 
