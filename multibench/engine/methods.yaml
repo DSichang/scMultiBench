@@ -88,15 +88,23 @@ methods:
     needs_labels: true
     status: verified
     variants:
-      - when: {category: diagonal, modalities: [rna, atac_gas]}
+      # scBridge takes the dataset DIRECTORY plus BARE FILENAMES relative to it
+      # (upstream: --data_path="../D27/" --source_data="rna.h5" --target_data="atac_gas.h5"
+      # --source_cty "rna_cty.csv" --target_cty "atac_cty.csv"), NOT absolute paths.
+      # So the four file roles are `const` bare names (inputs_for skips const args)
+      # and only `data_dir` is resolved -> the sole input is the dataset dir, which
+      # leaves the modality set empty, hence `modalities: []` (same shape the
+      # spatial-registration data_dir methods use). source = labelled RNA reference,
+      # target = ATAC query. RUN-VERIFIED on D28 (which has all four files).
+      - when: {category: diagonal, modalities: []}
         entrypoint: tools_scripts/scBridge/main_scBridge.py
         language: python
         args:
           - {role: data_dir, flag: "--data_path", eq: true}
-          - {role: source_data, flag: "--source_data", eq: true}
-          - {role: target_data, flag: "--target_data", eq: true}
-          - {role: source_cty, flag: "--source_cty"}
-          - {role: target_cty, flag: "--target_cty"}
+          - {role: source_data, flag: "--source_data", const: "rna.h5", eq: true}
+          - {role: target_data, flag: "--target_data", const: "atac_gas.h5", eq: true}
+          - {role: source_cty, flag: "--source_cty", const: "rna_cty.csv"}
+          - {role: target_cty, flag: "--target_cty", const: "atac_cty.csv"}
           - {role: out_dir, flag: "--save_path", eq: true}
         output: {kind: embedding, file: embedding.h5, dataset: data}
         extra_outputs:
