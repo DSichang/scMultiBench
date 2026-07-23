@@ -305,19 +305,45 @@ methods:
     categories: [vertical]
     tasks: [dimension_reduction, classification]
     needs_labels: true
-    status: declared
+    status: verified
+    setup_hint: "Uses Matilda's supported object API (`matilda-sc`, import `matilda`) via the package driver engine/drivers/run_matilda.py, per https://pyanglab.github.io/Matilda/. The upstream main_matilda_train.py only ran the TRAIN stage and emitted no embedding; the driver trains once then runs dim_reduce + classification in ONE engine pass. Env `matilda` (matilda-sc 0.2.0, torch 2.1.2)."
     variants:
+      # Matilda is a MULTI-TASK model: one shared latent space drives classification,
+      # dimension reduction, feature selection and simulation. The driver calls
+      # matilda.train() then the combinable matilda.task(dim_reduce=True,
+      # classification=True) in a single pass, writing the integrated latent space
+      # (cells x z_dim=100) to embedding.h5 + per-cell predictions to predict.csv.
+      # Mode auto-detects from the modalities passed: rna+adt = CITE-seq,
+      # rna+atac = SHARE-seq, rna+adt+atac = TEA-seq (driver supports all).
+      # No upstream method script is modified.
+      # --- CITE-seq (rna + adt). RUN-VERIFIED on D1 (26169 cells, 17 types). ---
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/Matilda/main_matilda_train.py
+        driver: engine/drivers/run_matilda.py
         language: python
         args:
           - {role: rna, flag: "--rna"}
           - {role: adt, flag: "--adt"}
           - {role: cty, flag: "--cty"}
           - {role: out_dir, flag: "--save_path"}
-        params: {device: cpu, batch_size: 64, epochs: 100}
+        params: {epochs: 30, seed: 1, device: auto}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-        run_env: {PYTHONPATH: tools_scripts/Matilda}
+        extra_outputs:
+          - {kind: labels, file: predict.csv}
+      # --- SHARE-seq (rna + atac). ---
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/Matilda/main_matilda_train.py
+        driver: engine/drivers/run_matilda.py
+        language: python
+        args:
+          - {role: rna, flag: "--rna"}
+          - {role: atac, flag: "--atac"}
+          - {role: cty, flag: "--cty"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 30, seed: 1, device: auto}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+        extra_outputs:
+          - {kind: labels, file: predict.csv}
   - id: VIMCCA
     language: python
     categories: [vertical]
