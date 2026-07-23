@@ -171,9 +171,15 @@ methods:
     tasks: [clustering]
     status: verified
     variants:
+      # scMVP's torch (1.9.1+cu102 in scmb_scmvp4) has no sm_89 kernels, so on this
+      # host's RTX 4090 it dies with "CUDA error: no kernel image is available"
+      # inside multi_vae_attention. Force CPU (same treatment as scMSI; scMM does the
+      # equivalent with its own --no_cuda flag). RUN-VERIFIED on D15.
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/scMVP/main_scMVP.py
         language: python
+        run_env:
+          CUDA_VISIBLE_DEVICES: ""
         args:
           - {role: rna, flag: "--path1"}
           - {role: atac, flag: "--path2"}
