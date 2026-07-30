@@ -31,7 +31,9 @@ class Variant:
     language: str
     args: list[ArgSpec]
     output: OutputSpec
-    params: dict = field(default_factory=dict)        # default hyperparams
+    params: dict = field(default_factory=dict)        # default hyperparams ACTUALLY emitted on the command line
+    tunable: dict = field(default_factory=dict)       # DOC-ONLY: hyperparams the upstream script accepts,
+                                                      # {name: {default,type}}; NEVER emitted - surfaced by discover.params_for
     run_env: dict = field(default_factory=dict)        # per-method env overrides (e.g. CUDA_VISIBLE_DEVICES)
     cwd_at_script: bool = False        # if True, run with cwd=script's parent dir (for scripts that source/import local files)
     pty: bool = False                  # if True, run the command under a pseudo-tty (script -q -e -c ...), for scripts that read the terminal size (os.popen('stty size')) to draw a progress bar and crash without a tty (scJoint)

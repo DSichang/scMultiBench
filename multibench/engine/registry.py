@@ -9,9 +9,25 @@ import yaml
 from .schema import ArgSpec, MethodSpec, OutputSpec, Variant
 
 _YAML = Path(__file__).resolve().parent / "methods.yaml"
+# doc-only tunable hyperparams, auto-generated from upstream argparse
+_PARAMS_YAML = Path(__file__).resolve().parent / "params.yaml"
 
 
-def _parse_variant(d: dict) -> Variant:
+@functools.lru_cache(maxsize=1)
+def _tunable_map() -> dict:
+    """{method_id: {"category:mods": {param: {default,type}}}} from params.yaml."""
+    if not _PARAMS_YAML.exists():
+        return {}
+    with open(_PARAMS_YAML) as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def _variant_key(when: dict) -> str:
+    mods = "+".join(when.get("modalities", [])) or "-"
+    return f"{when.get('category')}:{mods}"
+
+
+def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
     return Variant(
         when=d["when"],
         entrypoint=d["entrypoint"],
@@ -19,6 +35,9 @@ def _parse_variant(d: dict) -> Variant:
         args=[ArgSpec(**a) for a in d.get("args", [])],
         output=OutputSpec(**d["output"]),
         params=d.get("params", {}),
+        tunable=(d.get("tunable")
+                 or _tunable_map().get(method_id, {}).get(_variant_key(d["when"]), {})
+                 or {}),
         run_env=d.get("run_env", {}),
         cwd_at_script=d.get("cwd_at_script", False),
         pty=d.get("pty", False),
@@ -34,7 +53,7 @@ def _parse_method(d: dict) -> MethodSpec:
         categories=d.get("categories", []), tasks=d.get("tasks", []),
         atac=d.get("atac"), needs_labels=d.get("needs_labels", False),
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
-        variants=[_parse_variant(v) for v in d.get("variants", [])],
+        variants=[_parse_variant(v, d["id"]) for v in d.get("variants", [])],
         env_spec=d.get("env_spec", {}) or {},
     )
 

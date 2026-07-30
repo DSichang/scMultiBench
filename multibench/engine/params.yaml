@@ -1,0 +1,582 @@
+# AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_params.py
+#
+# DOC-ONLY tunable hyperparameters, extracted from each UPSTREAM method
+# script's own argparse. These are NEVER added to a command line by the
+# package; they document what `run(..., params={...})` may override, and
+# are surfaced by `multibench.params_for(method, category, modalities)`.
+#
+# A method absent from this file exposes NO command-line hyperparameters
+# (they are hardcoded in its source). Since method scripts are never
+# modified, such a method is not tunable through the wrapper.
+Cobolt:
+  mosaic:rna1+rna2+atac2+atac3:
+    batch_size:
+      default: 128
+      type: int
+    lr:
+      default: 0.005
+      type: float
+MIRA:
+  vertical:rna+atac:
+    acc:
+      default: gpu
+      type: str
+    atac_topic_modal_path:
+      default: 'NULL'
+    epoch:
+      default: 24
+      type: int
+    filter_atac_cells:
+      default: null
+      type: flag
+    latent_dim:
+      default: 20
+      type: int
+    load_model:
+      default: null
+      type: flag
+    rna_topic_modal_path:
+      default: 'NULL'
+    save_name:
+      default: mira
+      type: str
+Matilda:
+  vertical:rna+adt:
+    augmentation:
+      default: true
+      type: bool
+    batch_size:
+      default: 64
+      type: int
+    device:
+      default: cuda
+      type: str
+    epochs:
+      default: 30
+      type: int
+    hidden_adt:
+      default: 30
+      type: int
+    hidden_atac:
+      default: 185
+      type: int
+    hidden_rna:
+      default: 185
+      type: int
+    lr:
+      default: 0.02
+      type: float
+    seed:
+      default: 1
+      type: int
+    z_dim:
+      default: 100
+      type: int
+  vertical:rna+atac:
+    augmentation:
+      default: true
+      type: bool
+    batch_size:
+      default: 64
+      type: int
+    device:
+      default: cuda
+      type: str
+    epochs:
+      default: 30
+      type: int
+    hidden_adt:
+      default: 30
+      type: int
+    hidden_atac:
+      default: 185
+      type: int
+    hidden_rna:
+      default: 185
+      type: int
+    lr:
+      default: 0.02
+      type: float
+    seed:
+      default: 1
+      type: int
+    z_dim:
+      default: 100
+      type: int
+Multigrate:
+  mosaic:rna1+rna2+adt2+adt3:
+    epochs:
+      default: 200
+      type: int
+    lr:
+      default: 0.0001
+      type: float
+  mosaic:rna1+rna2+atac2+atac3:
+    epochs:
+      default: 200
+      type: int
+    lr:
+      default: 0.001
+      type: float
+  vertical:rna+adt:
+    bs:
+      default: 256
+      type: int
+    epochs:
+      default: 200
+      type: int
+    lr:
+      default: 0.001
+      type: float
+SPIRAL:
+  cross:-:
+    AEdims:
+      default: '[N'
+      type: list
+    AEdimsR:
+      default: '[32'
+      type: list
+    CLdims:
+      default: '[4'
+      type: list
+    DIdims:
+      default: '[28'
+      type: list
+    GSdims:
+      default: '[512'
+      type: list
+    NUM_NEG:
+      default: NUM_NEG
+      type: int
+    N_WALKS:
+      default: N_WALKS
+      type: int
+    N_WALK_LEN:
+      default: N_WALK_LEN
+      type: int
+    Q:
+      default: 10
+      type: float
+    WALK_LEN:
+      default: WALK_LEN
+      type: int
+    agg_class:
+      default: MeanAggregator
+      type: str
+    alpha1:
+      default: N
+      type: float
+    alpha2:
+      default: 1
+      type: float
+    alpha3:
+      default: 1
+      type: float
+    alpha4:
+      default: 1
+      type: float
+    batch_size:
+      default: 512
+      type: int
+    beta:
+      default: 1.0
+      type: float
+    epochs:
+      default: 1
+      type: int
+    lamda:
+      default: 1
+      type: float
+    lr:
+      default: 0.001
+      type: float
+    num_samples:
+      default: knn
+      type: str
+    seed:
+      default: 0
+      type: int
+    weight_decay:
+      default: 0.0005
+      type: float
+    zdim:
+      default: 32
+      type: int
+    znoise_dim:
+      default: 4
+      type: int
+UnitedNet:
+  vertical:rna+atac_gas:
+    index:
+      default: 1
+      type: int
+scBridge:
+  diagonal:-:
+    align_loss_epoch:
+      default: 1
+      type: float
+    batch_size:
+      default: 512
+      type: int
+    early_stop_acc:
+      default: 0.99
+      type: float
+    learning_rate:
+      default: 0.0005
+      type: float
+    max_iteration:
+      default: 20
+      type: int
+    novel_type:
+      default: null
+      type: flag
+    prototype_momentum:
+      default: 0.9
+      type: float
+    random_seed:
+      default: 2023
+      type: int
+    reliability_threshold:
+      default: 0.95
+      type: float
+    source_preprocess:
+      default: Standard
+      type: str
+    target_preprocess:
+      default: TFIDF
+      type: str
+    train_epoch:
+      default: 20
+      type: int
+    umap_plot:
+      default: null
+scJoint:
+  diagonal:rna+atac_gas:
+    atac_protein_paths:
+      default: []
+    batch_size:
+      default: 256
+      type: int
+    center_weight:
+      default: 1
+      type: int
+    checkpoint:
+      default: []
+    cty_path1:
+      default: []
+    cty_path2:
+      default: []
+    embedding_size:
+      default: 64
+      type: int
+    epochs_stage1:
+      default: 20
+      type: int
+    epochs_stage3:
+      default: 20
+      type: int
+    input_size:
+      default: 17668
+      type: int
+    lr_decay_epoch:
+      default: 20
+      type: int
+    lr_stage1:
+      default: 0.01
+      type: float
+    lr_stage3:
+      default: 0.01
+      type: float
+    momentum:
+      default: 0.9
+      type: float
+    number_of_class:
+      default: 7
+      type: int
+    p:
+      default: 0.8
+      type: float
+    rna_protein_paths:
+      default: []
+    seed:
+      default: 1
+      type: int
+    threads:
+      default: 1
+      type: int
+    use_cuda:
+      default: true
+      type: bool
+    with_crossentorpy:
+      default: true
+      type: bool
+scMDC:
+  vertical:rna+adt:
+    batch_size:
+      default: 256
+      type: int
+    cutoff:
+      default: 0.5
+      type: float
+    data_file:
+      default: Normalized_filtered_BMNC_GSE128639_Seurat.h5
+    device:
+      default: cuda
+    f1:
+      default: 1000
+      type: float
+    f2:
+      default: 2000
+      type: float
+    filter1:
+      default: false
+      type: flag
+    filter2:
+      default: false
+      type: flag
+    gamma:
+      default: 0.1
+      type: float
+    lr:
+      default: 1.0
+      type: float
+    maxiter:
+      default: 5000
+      type: int
+    n_clusters:
+      default: 27
+      type: int
+    n_neighbors:
+      default: 30
+      type: int
+    nbatch:
+      default: 2
+      type: int
+    phi1:
+      default: 0.001
+      type: float
+    phi2:
+      default: 0.001
+      type: float
+    pretrain_epochs:
+      default: 400
+      type: int
+    resolution:
+      default: 0.2
+      type: float
+    run:
+      default: 1
+      type: int
+    sigma1:
+      default: 2.5
+      type: float
+    sigma2:
+      default: 1.5
+      type: float
+    tau:
+      default: 1.0
+      type: float
+    tol:
+      default: 0.001
+      type: float
+    update_interval:
+      default: 1
+      type: int
+  vertical:rna+atac_gas:
+    batch_size:
+      default: 256
+      type: int
+    cutoff:
+      default: 0.5
+      type: float
+    data_file:
+      default: Normalized_filtered_BMNC_GSE128639_Seurat.h5
+    device:
+      default: cuda
+    f1:
+      default: 1000
+      type: float
+    f2:
+      default: 2000
+      type: float
+    filter1:
+      default: false
+      type: flag
+    filter2:
+      default: false
+      type: flag
+    gamma:
+      default: 0.1
+      type: float
+    lr:
+      default: 1.0
+      type: float
+    maxiter:
+      default: 5000
+      type: int
+    n_clusters:
+      default: 27
+      type: int
+    n_neighbors:
+      default: 30
+      type: int
+    nbatch:
+      default: 2
+      type: int
+    phi1:
+      default: 0.001
+      type: float
+    phi2:
+      default: 0.001
+      type: float
+    pretrain_epochs:
+      default: 400
+      type: int
+    resolution:
+      default: 0.2
+      type: float
+    run:
+      default: 1
+      type: int
+    sigma1:
+      default: 2.5
+      type: float
+    sigma2:
+      default: 1.5
+      type: float
+    tau:
+      default: 1.0
+      type: float
+    tol:
+      default: 0.001
+      type: float
+    update_interval:
+      default: 1
+      type: int
+scMM:
+  vertical:rna+adt:
+    analytics:
+      default: true
+      type: flag
+    batch_size:
+      default: 64
+      type: int
+    deterministic_warmup:
+      default: 50
+      type: int
+    epochs:
+      default: 10
+      type: int
+    experiment:
+      default: test
+      type: str
+    latent_dim:
+      default: 10
+      type: int
+    learn_prior:
+      default: false
+      type: flag
+    llik_scaling:
+      default: 1.0
+      type: float
+    lr:
+      default: 0.0001
+      type: float
+    model:
+      default: rna_protein
+      type: str
+    no_cuda:
+      default: false
+      type: flag
+    num_hidden_layers:
+      default: 1
+      type: int
+    obj:
+      default: m_elbo_naive_warmup
+      type: str
+    p_dim:
+      default: 1
+      type: int
+    p_hidden_dim:
+      default: 20
+      type: int
+    print_freq:
+      default: 0
+      type: int
+    r_dim:
+      default: 1
+      type: int
+    r_hidden_dim:
+      default: 100
+      type: int
+    seed:
+      default: 1
+      type: int
+  vertical:rna+atac_gas:
+    analytics:
+      default: true
+      type: flag
+    batch_size:
+      default: 64
+      type: int
+    deterministic_warmup:
+      default: 50
+      type: int
+    epochs:
+      default: 10
+      type: int
+    experiment:
+      default: test
+      type: str
+    latent_dim:
+      default: 10
+      type: int
+    learn_prior:
+      default: false
+      type: flag
+    llik_scaling:
+      default: 1.0
+      type: float
+    lr:
+      default: 0.0001
+      type: float
+    model:
+      default: rna_protein
+      type: str
+    no_cuda:
+      default: false
+      type: flag
+    num_hidden_layers:
+      default: 1
+      type: int
+    obj:
+      default: m_elbo_naive_warmup
+      type: str
+    p_dim:
+      default: 1
+      type: int
+    p_hidden_dim:
+      default: 20
+      type: int
+    print_freq:
+      default: 0
+      type: int
+    r_dim:
+      default: 1
+      type: int
+    r_hidden_dim:
+      default: 100
+      type: int
+    seed:
+      default: 1
+      type: int
+sciPENN:
+  vertical:rna+adt:
+    seed:
+      default: 1
+      type: int
+uniPort:
+  diagonal:rna+atac_gas:
+    seed:
+      default: 1
+      type: int
