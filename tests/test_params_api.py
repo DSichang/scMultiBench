@@ -1,0 +1,69 @@
+"""Tests for the params-discovery API (params_for / method_info['params']).
+
+`tunable` is DOC-ONLY metadata describing what each upstream script accepts on
+its command line; it must never change the command the runner builds.
+"""
+import pytest
+
+import multibench as mtb
+from multibench.engine import builder, registry
+
+
+def test_params_for_returns_defaults_and_tunable():
+    r = mtb.params_for("Multigrate", "vertical", ["rna", "adt"])
+    assert r["method"] == "Multigrate"
+    assert r["variant"] == "vertical:rna+adt"
+    # defaults are what the package actually emits
+    assert r["defaults"]["epochs"] == 200
+    # tunable is documentation harvested from the upstream argparse
+    assert set(r["tunable"]) >= {"epochs", "lr"}
+
+
+def test_params_for_reports_untunable_methods_honestly():
+    # totalVI's upstream script exposes only paths -> nothing to tune
+    r = mtb.params_for("totalVI", "vertical", ["rna", "adt"])
+    assert r["tunable"] == {}
+
+
+def test_params_for_tunable_carries_default_and_type():
+    spec = mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
+    assert spec["lr"]["default"] == 1.0
+    assert spec["lr"]["type"] == "float"
+
+
+def test_params_for_requires_disambiguation_when_multiple_variants():
+    with pytest.raises(KeyError):
+        mtb.params_for("Multigrate")          # 3 variants -> ambiguous
+
+
+def test_params_for_single_variant_needs_no_selector():
+    r = mtb.params_for("totalVI")             # only one variant
+    assert r["variant"] == "vertical:rna+adt"
+
+
+def test_method_info_exposes_params_per_variant():
+    info = mtb.method_info("Multigrate")
+    assert "vertical:rna+adt" in info["params"]
+    assert info["params"]["vertical:rna+adt"]["defaults"]["bs"] == 256
+
+
+def test_tunable_is_doc_only_and_never_emitted():
+    """The safety property: documenting a param must not add it to the command."""
+    spec = registry.get("scMDC")
+    v = spec.select("vertical", {"rna", "adt"})
+    assert v.tunable, "scMDC should have documented tunable params"
+    cmd = builder.build_command(v, {"rna": "r.h5", "adt": "a.h5"}, "/out/")
+    # a documented-but-not-defaulted param must not appear
+    assert "--sigma1" not in cmd
+    assert "sigma1" in v.tunable
+    # while a declared default IS emitted
+    assert "--nbatch" in cmd
+
+
+def test_user_params_override_defaults_in_command():
+    spec = registry.get("Multigrate")
+    v = spec.select("vertical", {"rna", "adt"})
+    cmd = builder.build_command(v, {"rna": "r.h5", "adt": "a.h5"}, "/out/",
+                                params={"epochs": 5})
+    assert "--epochs" in cmd
+    assert cmd[cmd.index("--epochs") + 1] == "5"

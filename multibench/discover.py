@@ -80,6 +80,10 @@ def method_info(method: str, files_dir: Path | str | None = None) -> dict:
         "needs_labels": s.needs_labels, "status": s.status,
         "setup_hint": s.setup_hint,
         "variants": [v.entrypoint for v in s.variants],
+        # what the caller may pass to run(params=...): see params_for()
+        "params": {_variant_key(v): {"defaults": dict(v.params),
+                                     "tunable": dict(v.tunable)}
+                   for v in s.variants},
     }
     if files_dir is not None:
         from .data import catalog
@@ -90,3 +94,44 @@ def method_info(method: str, files_dir: Path | str | None = None) -> dict:
             info["deep_learning"] = row["deep_learning"]
             info["output"] = row["output"]
     return info
+
+
+def _variant_key(v) -> str:
+    """Stable human-readable key for a variant: 'category:mod1+mod2'."""
+    mods = "+".join(v.when.get("modalities", [])) or "-"
+    return f"{v.when.get('category')}:{mods}"
+
+
+def params_for(method: str, category: str | None = None,
+               modalities: list[str] | set[str] | None = None) -> dict:
+    """Return the hyperparameters of one method variant.
+
+    Returns ``{"method", "variant", "defaults", "tunable"}`` where:
+
+    * ``defaults`` — parameters the package emits on every run. Override them
+      with ``run(..., params={...})``; the override is merged over these.
+    * ``tunable`` — documentation of the parameters the UPSTREAM script accepts
+      on its command line, as ``{name: {"default": ..., "type": ...}}``.
+
+    An **empty** ``tunable`` means the upstream script exposes no hyperparameters
+    (they are hardcoded in its source). Because this project never modifies
+    method scripts, such a method cannot be tuned through the wrapper.
+
+    ``category``/``modalities`` select the variant, exactly like ``run``. They may
+    be omitted when the method has only one variant.
+    """
+    s = registry.get(method)
+    if not s.variants:
+        raise KeyError(f"{method}: no variants (declared stub); nothing to tune")
+    if category is None and modalities is None:
+        if len(s.variants) > 1:
+            raise KeyError(
+                f"{method} has {len(s.variants)} variants - pass category/modalities; "
+                f"available: {[_variant_key(v) for v in s.variants]}")
+        v = s.variants[0]
+    else:
+        if category is None or modalities is None:
+            raise KeyError("pass BOTH category and modalities (or neither)")
+        v = s.select(category, set(modalities))
+    return {"method": s.id, "variant": _variant_key(v),
+            "defaults": dict(v.params), "tunable": dict(v.tunable)}
