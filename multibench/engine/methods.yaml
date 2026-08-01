@@ -126,6 +126,14 @@ methods:
           - {role: adt, flag: "--path2", repeat: true}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/totalVI/main_totalVI.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MultiVI
     language: python
     categories: [mosaic]
@@ -187,7 +195,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMM
     language: python
-    categories: [vertical]
+    categories: [vertical, cross]
     tasks: [clustering]
     status: declared
     variants:
@@ -209,9 +217,18 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         params: {model: rna_atac, no_cuda: true}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/scMM/main_scMM.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {model: rna_protein, no_cuda: true}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMDC
     language: python
-    categories: [vertical]
+    categories: [vertical, cross]
     tasks: [clustering]
     status: declared
     variants:
@@ -231,6 +248,15 @@ methods:
           - {role: rna, flag: "--path1"}
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/scMDC/main_scMDC.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {nbatch: 3}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMoMaT
     language: python
@@ -256,6 +282,17 @@ methods:
           - {role: rna, flag: "--path1", repeat: true}
           - {role: adt, flag: "--path2", repeat: true}
           - {role: atac, flag: "--path3", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: graph, file: knn_indices.h5, dataset: data}
         extra_outputs:
@@ -302,7 +339,7 @@ methods:
           - {kind: graph, file: connectivities.h5, dataset: data}
   - id: Concerto
     language: python
-    categories: [vertical]
+    categories: [vertical, cross]
     tasks: [clustering]
     status: declared
     variants:
@@ -312,6 +349,14 @@ methods:
         args:
           - {role: rna, flag: "--path1"}
           - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/Concerto/main_Concerto.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Matilda
@@ -526,7 +571,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: sciPENN
     language: python
-    categories: [vertical, mosaic]
+    categories: [vertical, mosaic, cross]
     tasks: [imputation, dimension_reduction]
     status: declared
     variants:
@@ -536,6 +581,14 @@ methods:
         args:
           - {role: rna, flag: "--path1"}
           - {role: adt, flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/sciPENN/main_sciPENN.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMSI

@@ -153,8 +153,11 @@ def inputs_for(dataset: str, method: str, category: str,
         variant = candidates[0]
 
     # Skip args with a const (they don't need on-disk resolution) and out_dir.
-    roles = [a.role for a in variant.args
-             if a.role not in ("out_dir", "data_dir") and getattr(a, "const", None) is None]
+    # an arg may name ONE role (a.role) or GROUP several under one flag (a.roles)
+    roles = [r
+             for a in variant.args if getattr(a, "const", None) is None
+             for r in (getattr(a, "roles", None) or [a.role])
+             if r and r not in ("out_dir", "data_dir")]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
     # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
     if any(a.role == "data_dir" for a in variant.args):

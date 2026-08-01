@@ -37,8 +37,13 @@ def test_params_for_requires_disambiguation_when_multiple_variants():
 
 
 def test_params_for_single_variant_needs_no_selector():
-    r = mtb.params_for("totalVI")             # only one variant
-    assert r["variant"] == "vertical:rna+adt"
+    # pick a single-variant method dynamically: hardcoding one breaks as soon as
+    # someone wires an extra variant for it (which is exactly what happened to
+    # totalVI when its cross variant was added).
+    single = next(s.id for s in registry.load() if len(s.variants) == 1)
+    r = mtb.params_for(single)                # no selector needed
+    assert r["method"] == single
+    assert ":" in r["variant"]
 
 
 def test_method_info_exposes_params_per_variant():

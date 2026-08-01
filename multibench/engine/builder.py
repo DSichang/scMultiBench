@@ -16,6 +16,11 @@ def build_command(variant: Variant, values: dict, out_dir: str,
     for a in variant.args:
         if a.const is not None:
             items = [a.const]
+        elif a.roles:
+            missing = [r for r in a.roles if r not in vals]
+            if missing:
+                raise KeyError(f"missing input roles {missing} for {variant.entrypoint}")
+            items = [vals[r] for r in a.roles]
         else:
             if a.role not in vals:
                 raise KeyError(f"missing input role {a.role!r} for {variant.entrypoint}")
