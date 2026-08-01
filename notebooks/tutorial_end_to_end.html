@@ -3,7 +3,7 @@
 <html lang="en">
 <head><meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>tutorial_exec2</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
+<title>tut_final</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <style type="text/css">
     pre { line-height: 125%; }
 td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
@@ -8654,29 +8654,23 @@ vector in the embedding's <strong>cell order</strong>.</p>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Cluster for cluster_0.2 with leiden
 Cluster for cluster_0.4 with leiden
+Cluster for cluster_0.6 with leiden
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Cluster for cluster_0.6 with leiden
-Cluster for cluster_0.8 with leiden
+<pre>Cluster for cluster_0.8 with leiden
+Cluster for cluster_1.0 with leiden
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Cluster for cluster_1.0 with leiden
-Cluster for cluster_1.2 with leiden
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Cluster for cluster_1.4 with leiden
+<pre>Cluster for cluster_1.2 with leiden
+Cluster for cluster_1.4 with leiden
 </pre>
 </div>
 </div>
@@ -8722,7 +8716,7 @@ isolated labels: []
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>/media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
 /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
-/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_dz5c9u1d/graph_lisi_indices_0.txt'); recording NaN.
+/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_x8w0o2s1/graph_lisi_indices_0.txt'); recording NaN.
   warnings.warn(
 </pre>
 </div>
@@ -9127,13 +9121,13 @@ dataset can exercise all of them. Each scenario gets its own reference dataset:<
 <td><strong>diagonal</strong></td>
 <td>RNA and ATAC from <em>different</em> cells</td>
 <td><strong>D28</strong> (11,014)</td>
-<td>8 / 9</td>
+<td>9 / 9</td>
 </tr>
 <tr>
 <td><strong>mosaic</strong></td>
 <td>several batches, only <em>some</em> overlap in modality</td>
 <td><strong>D45</strong> (32,151)</td>
-<td>3 / 4</td>
+<td>4 / 4</td>
 </tr>
 <tr>
 <td><strong>cross</strong></td>
@@ -9224,23 +9218,23 @@ cross     D52   -&gt;  5 methods
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>
 ===== diagonal  (D28) =====
-     method     status     sec    ARI    NMI    ASW
-      Conos   CHAIN_OK   712.5 0.0004 0.0226 0.4301
-     Portal   CHAIN_OK   400.4 0.4798 0.6144 0.5186
-     SCALEX   CHAIN_OK  2232.3 0.5744 0.5859 0.5320
-     VIPCCA   CHAIN_OK   334.8 0.1518 0.3756 0.4785
-       iNMF   CHAIN_OK   120.2 0.4721 0.5136 0.4946
-online_iNMF   CHAIN_OK    80.7 0.3749 0.4690 0.4666
-    scJoint   CHAIN_OK   208.9 0.6178 0.6377 0.5349
-     sciCAN   CHAIN_OK 15735.0 0.1877 0.3688 0.5133
-    uniPort TIMEOUT_5H     NaN    NaN    NaN    NaN
+     method   status     sec    ARI    NMI    ASW
+      Conos CHAIN_OK   712.5 0.0004 0.0226 0.4301
+     Portal CHAIN_OK   400.4 0.4798 0.6144 0.5186
+     SCALEX CHAIN_OK  2232.3 0.5744 0.5859 0.5320
+     VIPCCA CHAIN_OK   334.8 0.1518 0.3756 0.4785
+       iNMF CHAIN_OK   120.2 0.4721 0.5136 0.4946
+online_iNMF CHAIN_OK    80.7 0.3749 0.4690 0.4666
+    scJoint CHAIN_OK   208.9 0.6178 0.6377 0.5349
+     sciCAN CHAIN_OK 15735.0 0.1877 0.3688 0.5133
+    uniPort CHAIN_OK  4133.0 0.5994 0.6198 0.5320
 
 ===== mosaic  (D45) =====
-    method     status     sec    ARI    NMI    ASW
-    Cobolt TIMEOUT_5H     NaN    NaN    NaN    NaN
-   MultiVI   CHAIN_OK 12041.7 0.8185 0.8099 0.5748
-Multigrate   CHAIN_OK 10368.1 0.7754 0.7715 0.5463
-     SMILE   CHAIN_OK  1915.5 0.3667 0.5800 0.5615
+    method   status     sec    ARI    NMI    ASW
+    Cobolt CHAIN_OK  3636.2 0.8173 0.8078 0.6120
+   MultiVI CHAIN_OK 12041.7 0.8185 0.8099 0.5748
+Multigrate CHAIN_OK 10368.1 0.7754 0.7715 0.5463
+     SMILE CHAIN_OK  1915.5 0.3667 0.5800 0.5615
 
 ===== cross  (D52) =====
  method   status   sec    ARI    NMI    ASW
@@ -9288,6 +9282,42 @@ get a number, no error, and it is wrong.</p>
 </table>
 <p>A naive sort makes a perfectly good method look completely broken. The same trap
 applies to diagonal methods that stack RNA-then-ATAC.</p>
+<p>Verifying the stacking order of every diagonal method on D28 makes the point — the
+wrong order collapses <strong>every</strong> method to ~0.000x, so the correct one is unambiguous:</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>rna→atac</th>
+<th>atac→rna</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>scJoint</td>
+<td><strong>0.618</strong></td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>SCALEX</td>
+<td><strong>0.574</strong></td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>uniPort</td>
+<td>0.001</td>
+<td><strong>0.599</strong> ← the only ATAC-first method</td>
+</tr>
+<tr>
+<td>Conos</td>
+<td>0.000</td>
+<td>0.001 ← genuinely ~0 in <em>both</em> (2-D layout)</td>
+</tr>
+</tbody>
+</table>
+<p><code>uniPort</code> alone stacks ATAC first; naive <code>rna+atac</code> labelling reports 0.0009 for it.
+<code>Conos</code> scoring ~0 under <em>both</em> orders is what tells you its low score is real
+(its output is a 2-D layout) rather than another alignment bug.</p>
 </div>
 </div>
 </div>

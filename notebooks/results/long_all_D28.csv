@@ -47,3 +47,9 @@ ASW,0.5133007252541624,sciCAN,D28,diagonal
 iASW,,sciCAN,D28,diagonal
 iF1,,sciCAN,D28,diagonal
 cLISI,,sciCAN,D28,diagonal
+ARI,0.5993905348379265,uniPort,D28,diagonal
+NMI,0.6197648642714019,uniPort,D28,diagonal
+ASW,0.5320415650677635,uniPort,D28,diagonal
+iASW,,uniPort,D28,diagonal
+iF1,,uniPort,D28,diagonal
+cLISI,,uniPort,D28,diagonal

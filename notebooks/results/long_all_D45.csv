@@ -1,4 +1,10 @@
 metric,value,method,dataset,category
+ARI,0.8172758792480528,Cobolt,D45,mosaic
+NMI,0.8077747649052915,Cobolt,D45,mosaic
+ASW,0.6119634983922815,Cobolt,D45,mosaic
+iASW,,Cobolt,D45,mosaic
+iF1,,Cobolt,D45,mosaic
+cLISI,,Cobolt,D45,mosaic
 ARI,0.8185183769251428,MultiVI,D45,mosaic
 NMI,0.8098577252545478,MultiVI,D45,mosaic
 ASW,0.5748256924424059,MultiVI,D45,mosaic
