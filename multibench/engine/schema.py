@@ -6,8 +6,13 @@ from dataclasses import dataclass, field
 
 @dataclass
 class ArgSpec:
-    role: str               # input role (e.g. 'rna') or 'out_dir'
+    role: str = ""          # input role (e.g. 'rna') or 'out_dir'
     flag: str | None = None # None -> positional
+    # Collect SEVERAL input roles under ONE flag, in order, e.g.
+    #   {roles: [rna1, rna2, rna3], flag: "--path1"}  ->  --path1 r1.h5 r2.h5 r3.h5
+    # This is how the upstream scripts take multi-batch (cross) input; their
+    # argparse declares nargs='+' on the path arguments.
+    roles: list = field(default_factory=list)
     repeat: bool = False    # value may be a list (nargs='+')
     eq: bool = False        # emit as --flag=value
     const: str | None = None  # literal value to emit, ignoring `values` (e.g. 'NULL')

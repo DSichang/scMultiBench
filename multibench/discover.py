@@ -28,9 +28,10 @@ def _modality_types(spec) -> set[str]:
     types: set[str] = set()
     for v in spec.variants:
         for a in v.args:
-            if a.role in _AUX_ROLES:
-                continue
-            types.add(_base_modality(a.role))
+            for r in (a.roles or [a.role]):
+                if not r or r in _AUX_ROLES:
+                    continue
+                types.add(_base_modality(r))
     return types
 
 
