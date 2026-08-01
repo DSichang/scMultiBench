@@ -1,5 +1,5 @@
 method,status,sec,kind,emb,std,tunable,env,ARI,NMI,ASW,iASW,iF1,cLISI
-Cobolt,TIMEOUT_5H,,,None,,,,,,,,,
-MultiVI,CHAIN_OK,12041.7,embedding,"[32151, 15]",0.931,0.0,scmb_multivi,0.8185,0.8099,0.5748,,,
-Multigrate,CHAIN_OK,10368.1,embedding,"[32151, 15]",0.4281,2.0,scmb_multigrate2,0.7754,0.7715,0.5463,,,
-SMILE,CHAIN_OK,1915.5,embedding,"[32151, 20]",0.2119,0.0,env_sciPENN,0.3667,0.58,0.5615,,,
+Cobolt,CHAIN_OK,3636.2,embedding,"[32151, 10]",0.6526,2,scmb_cobolt3,0.8173,0.8078,0.612,,,
+MultiVI,CHAIN_OK,12041.7,embedding,"[32151, 15]",0.931,0,scmb_multivi,0.8185,0.8099,0.5748,,,
+Multigrate,CHAIN_OK,10368.1,embedding,"[32151, 15]",0.4281,2,scmb_multigrate2,0.7754,0.7715,0.5463,,,
+SMILE,CHAIN_OK,1915.5,embedding,"[32151, 20]",0.2119,0,env_sciPENN,0.3667,0.58,0.5615,,,
