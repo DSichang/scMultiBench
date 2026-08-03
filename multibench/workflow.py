@@ -35,7 +35,68 @@ from .engine import envs, registry, resolve as _resolve
 from .engine.runner import run as _run
 from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
 
-__all__ = ["scan", "run_all", "BatchResult"]
+__all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout"]
+
+#: The four integration scenarios, and what each one's data looks like.
+CATEGORIES = {
+    "vertical": "Several modalities measured in the SAME cells (e.g. CITE-seq "
+                "RNA+ADT, or 10x multiome RNA+ATAC). Cells are already matched.",
+    "diagonal": "Modalities measured in DIFFERENT cells, with no pairing "
+                "(e.g. an RNA experiment and a separate ATAC experiment).",
+    "mosaic":   "Several batches where only SOME share a modality; a paired batch "
+                "bridges the others.",
+    "cross":    "Several batches in which ALL modalities are present; the task is "
+                "removing batch effects. (Spatial slice registration also lives here.)",
+}
+
+#: Modality role -> the file the loader looks for in <data_path>/<dataset>/.
+ROLES = {
+    "rna":       "rna.h5      - gene expression",
+    "adt":       "adt.h5      - surface protein (CITE-seq antibody-derived tags)",
+    "atac":      "atac.h5     - chromatin accessibility",
+    "atac_gas":  "atac.h5     - ATAC as GENE-ACTIVITY scores  <-- note: plain atac.h5",
+    "atac_peak": "peak.h5     - ATAC as PEAKS                 <-- note: peak.h5, NOT atac.h5",
+    "rna1/rna2/...": "rna1.h5, rna2.h5, ... - one file per BATCH (mosaic/cross)",
+    "adt1/adt2/...": "adt1.h5, adt2.h5, ... - one file per BATCH (mosaic/cross)",
+    "cty":       "cty.csv     - cell-type labels (cty1.csv, cty2.csv, ... per batch)",
+}
+
+
+def list_categories() -> dict:
+    """The valid ``category`` values, with a plain-language description of each.
+
+    ``category`` is a required argument of :func:`run_all`; this is the list.
+
+        >>> mtb.list_categories()["vertical"]
+        'Several modalities measured in the SAME cells ...'
+    """
+    return dict(CATEGORIES)
+
+
+def describe_layout(category: str | None = None) -> str:
+    """How to lay out your OWN dataset so the package can find it.
+
+    Prints the directory layout and the modality-role -> filename mapping. Start
+    here when bringing your own data, then confirm with :func:`scan`.
+    """
+    lines = ["Put your files in  <data_path>/<DATASET_NAME>/ , e.g. ./data/MYDATA/",
+             "", "Modality roles and the filenames they resolve to:"]
+    lines += [f"    {k:16s} {v}" for k, v in ROLES.items()]
+    lines += ["",
+              "!! Careful: the two ATAC representations do NOT map to the obvious names.",
+              "   gene-activity -> atac.h5   and   peaks -> peak.h5 .",
+              "   Putting a peak matrix in atac.h5 runs every method on the wrong",
+              "   representation without any error.",
+              "",
+              "Modality files are HDF5 with the matrix under 'matrix/data'.",
+              "Use mtb.io.to_canonical(src, dst) to convert another layout.",
+              "Labels are CSV with one row per cell; the last column (or a column",
+              "named 'x') holds the cell type.", ""]
+    if category:
+        lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
+    lines += ["Then:  mtb.scan('MYDATA')  ->  mtb.run_all('MYDATA', '<category>', out_dir=...)"]
+    return "\n".join(lines)
+
 
 
 # --------------------------------------------------------------------------- scan
@@ -171,6 +232,14 @@ class BatchResult:
 
     @property
     def summary(self) -> pd.DataFrame:
+        """One row per method: ``method, status, run_sec, output_kind, emb_shape,
+        n_tunable`` plus one column per metric (``ARI``, ``NMI``, ``ASW``, ...).
+
+        ``status`` is ``CHAIN_OK`` (ran and scored), ``CHAIN_OK_GRAPH_METHOD``
+        (scored via a secondary embedding), ``RUN_OK_NO_EMBEDDING`` (ran, but the
+        method emits a graph/coordinates so clustering metrics do not apply) or
+        ``FAIL`` (see :attr:`failures`).
+        """
         rows = []
         for r in self.records:
             rows.append({k: r.get(k) for k in
@@ -180,16 +249,42 @@ class BatchResult:
 
     @property
     def long(self) -> pd.DataFrame:
+        """Tidy frame (``metric, value, method, dataset, category``) for plotting.
+
+        This is what :meth:`plot` and ``mtb.plot.bubble`` consume. Empty if no
+        method produced metrics.
+        """
         frames = [r["_long"] for r in self.records if r.get("_long") is not None]
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     @property
+    def results(self) -> list:
+        """Raw per-method records (status, out_dir, metrics, label-order spread).
+
+        Keeps a long sweep's outputs addressable so you can re-score or re-plot
+        WITHOUT re-running the methods.
+        """
+        return self.records
+
+    @property
     def failures(self) -> pd.DataFrame:
+        """Methods that did not complete: ``method, status, error``.
+
+        ``run_all`` records failures instead of raising, so ALWAYS check this - a
+        sweep can finish "successfully" with several methods having failed.
+        """
         bad = [r for r in self.records if r.get("status") not in ("CHAIN_OK", "CHAIN_OK_GRAPH_METHOD")]
         return pd.DataFrame([{k: r.get(k) for k in ("method", "status", "error")} for r in bad])
 
     def plot(self, **kw):
-        """Bubble figure of everything that produced metrics."""
+        """Bubble figure of every method that produced metrics.
+
+        Returns a matplotlib ``Figure``; save it with ``fig.savefig("out.png")``.
+        Keyword arguments are passed to ``mtb.plot.bubble`` (``metrics=``,
+        ``methods=``, ``order=``, ``title=``, ``cmap=``).
+
+        Raises ``ValueError`` if nothing scored - check :attr:`failures` then.
+        """
         from . import plot as _plot
         lng = self.long
         if lng.empty:
@@ -209,7 +304,9 @@ class BatchResult:
 # ---------------------------------------------------------------------- run_all
 def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=None,
             params: dict | None = None, data_path=None, evaluate: bool = True,
-            dry_run: bool = False, verbose: bool = True) -> BatchResult | pd.DataFrame:
+            dry_run: bool = False, verbose: bool = True,
+            timeout: float | None = None,
+            skip_existing: bool = False) -> "BatchResult | pd.DataFrame":
     """Run every method that applies to ``dataset`` under ``category``.
 
     Parameters
@@ -218,7 +315,14 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     modalities : restrict to one modality combination (default: all of them).
     params : per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``. Discover
         what a method accepts with :func:`multibench.params_for`.
-    dry_run : return the plan (a DataFrame) without running anything.
+    dry_run : return the plan (a DataFrame) without running anything. Do this
+        first - it is free and shows exactly what will be attempted.
+    timeout : per-method wall-clock cap in SECONDS. A method exceeding it is
+        recorded as ``TIMEOUT`` and the sweep moves on. Strongly recommended for
+        unattended runs - without it a single hanging method blocks everything.
+    skip_existing : if a method's output file is already present in ``out_dir``,
+        reuse it instead of recomputing. Lets an interrupted overnight sweep
+        resume without repeating the hours already done.
 
     Methods can take minutes to hours; a failure is recorded, never raised, so one
     bad method cannot abort the sweep.
@@ -249,18 +353,47 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         try:
             inp = _resolve.inputs_for(dataset, m, category, modalities=mod_list or None,
                                       data_path=data_path, check=True)
-            res = _run(method=m, category=category, inputs=inp,
-                       out_dir=str(out_dir / f"{m}_{dataset}"), params=params.get(m))
+            mdir = out_dir / f"{m}_{dataset}"
+            v0 = registry.get(m).select(category, set(mod_list))
+            reused = skip_existing and (mdir / v0.output.file).exists()
+            if reused:
+                if verbose:
+                    print(f"[run_all]   reusing existing output in {mdir}", flush=True)
+                res = None                       # read back from disk below
+            elif timeout:
+                import signal
+
+                def _timed_out(signum, frame):
+                    raise TimeoutError(f"exceeded timeout of {timeout}s")
+
+                prev = signal.signal(signal.SIGALRM, _timed_out)
+                signal.alarm(int(timeout))
+                try:
+                    res = _run(method=m, category=category, inputs=inp,
+                               out_dir=str(mdir), params=params.get(m))
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, prev)
+            else:
+                res = _run(method=m, category=category, inputs=inp,
+                           out_dir=str(mdir), params=params.get(m))
+            rec["reused"] = bool(reused)
             rec["run_sec"] = round(time.time() - t0, 1)
             spec = registry.get(m)
             v = spec.select(category, set(mod_list))
             emb = None
             if v.output.kind == "embedding":
-                emb = np.asarray(res.output)
+                if res is not None:
+                    emb = np.asarray(res.output)
+                else:
+                    import h5py
+                    with h5py.File(mdir / v.output.file) as h:
+                        k = v.output.dataset or ("data" if "data" in h else list(h.keys())[0])
+                        emb = np.array(h[k])
             else:
                 for o in v.extra_outputs:            # a graph method may still ship an embedding
                     if o.kind == "embedding":
-                        p = out_dir / f"{m}_{dataset}" / o.file
+                        p = mdir / o.file
                         if p.exists():
                             import h5py
                             with h5py.File(p) as h:
@@ -295,6 +428,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                                                     category=category)
                             rec["status"] = ("CHAIN_OK" if v.output.kind == "embedding"
                                              else "CHAIN_OK_GRAPH_METHOD")
+        except TimeoutError as e:
+            rec["status"] = "TIMEOUT"
+            rec["error"] = str(e)
+            rec["run_sec"] = round(time.time() - t0, 1)
         except Exception as e:
             rec["status"] = "FAIL"
             rec["error"] = f"{type(e).__name__}: {e}"[:300]
