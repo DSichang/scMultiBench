@@ -485,14 +485,16 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     if dry_run:
         return plan.reset_index(drop=True)
 
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # validate arguments BEFORE touching the filesystem, so a bad combination is
+    # reported as such instead of surfacing as an unrelated I/O error
     params = params or {}
     if skip_existing and params:
         raise ValueError(
             "skip_existing=True with params=... would silently return results computed "
             "with the OLD parameters (reuse is keyed on the output file, not on params). "
             "Use a fresh out_dir per parameter setting, or skip_existing=False.")
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     records = []
 
     for _, row in plan.iterrows():
