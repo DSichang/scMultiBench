@@ -20,8 +20,10 @@ It also handles two traps that otherwise yield silently WRONG numbers:
 """
 from __future__ import annotations
 
+import functools
 import glob
 import itertools
+import json
 import os
 import time
 import traceback
@@ -35,7 +37,34 @@ from .engine import envs, registry, resolve as _resolve
 from .engine.runner import run as _run
 from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
 
-__all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout"]
+__all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout",
+           "load_batch", "runtime_hint"]
+
+
+def load_batch(out_dir) -> "BatchResult":
+    """Reload a :class:`BatchResult` that :meth:`BatchResult.save` wrote.
+
+    ``run_all`` saves automatically, so after an overnight sweep you can come back
+    and re-plot or re-inspect without re-running anything::
+
+        res = mtb.load_batch("out/")
+        res.summary
+        res.plot().savefig("compare.png")
+    """
+    d = Path(out_dir)
+    with open(d / "batch_result.json") as fh:
+        blob = json.load(fh)
+    recs = blob["records"]
+    lp = d / "long.csv"
+    if lp.exists():
+        lng = pd.read_csv(lp)
+        for r in recs:
+            sub = lng[lng["method"] == r.get("method")]
+            r["_long"] = sub if len(sub) else None
+    else:
+        for r in recs:
+            r["_long"] = None
+    return BatchResult(recs, blob["dataset"], blob["category"], out_dir=d)
 
 #: The four integration scenarios, and what each one's data looks like.
 CATEGORIES = {
@@ -76,10 +105,34 @@ def list_categories() -> dict:
 def describe_layout(category: str | None = None) -> str:
     """How to lay out your OWN dataset so the package can find it.
 
-    Prints the directory layout and the modality-role -> filename mapping. Start
-    here when bringing your own data, then confirm with :func:`scan`.
+    Prints the directory layout and the role -> filename mapping. Start here when
+    bringing your own data, then confirm with :func:`scan`.
+
+    A "role" is just the name of one input a method takes. For CITE-seq the roles
+    are ``rna`` (``rna.h5``) and ``adt`` (``adt.h5``, surface protein /
+    antibody-derived tags), plus ``cty.csv`` for cell-type labels::
+
+        <data_path>/MYCITE/
+            rna.h5
+            adt.h5
+            cty.csv
+
+    **Several batches** (mosaic / cross integration) use one NUMBERED file per
+    batch, in the same flat directory - not sub-folders, and not one
+    pre-concatenated matrix. Three batches of CITE-seq::
+
+        <data_path>/COREBATCH/
+            rna1.h5   adt1.h5   cty1.csv     # batch 1
+            rna2.h5   adt2.h5   cty2.csv     # batch 2
+            rna3.h5   adt3.h5   cty3.csv     # batch 3
+
+    Batch membership is carried by the file numbering; there is no batch column.
     """
     lines = ["Put your files in  <data_path>/<DATASET_NAME>/ , e.g. ./data/MYDATA/",
+             "  (dataset = the folder NAME; data_path = the folder that CONTAINS it)",
+             "", "ONE batch  -> rna.h5, adt.h5, cty.csv",
+             "MANY batches -> rna1.h5/rna2.h5/..., adt1.h5/adt2.h5/..., cty1.csv/cty2.csv/...",
+             "              (numbered files in the SAME flat dir; no batch column)",
              "", "Modality roles and the filenames they resolve to:"]
     lines += [f"    {k:16s} {v}" for k, v in ROLES.items()]
     lines += ["",
@@ -97,6 +150,35 @@ def describe_layout(category: str | None = None) -> str:
     lines += ["Then:  mtb.scan('MYDATA')  ->  mtb.run_all('MYDATA', '<category>', out_dir=...)"]
     return "\n".join(lines)
 
+
+
+_RUNTIMES_YAML = Path(__file__).resolve().parent / "engine" / "runtimes.yaml"
+
+
+@functools.lru_cache(maxsize=1)
+def _runtimes() -> dict:
+    """Observed per-method runtimes (reference data; see engine/runtimes.yaml)."""
+    if not _RUNTIMES_YAML.exists():
+        return {}
+    import yaml
+    with open(_RUNTIMES_YAML) as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def runtime_hint(method: str) -> dict:
+    """What this method has been OBSERVED to cost, to help size a sweep.
+
+    Returns ``{"tier", "worst_sec", "observed"}`` - ``tier`` is one of ``fast``
+    (<5 min), ``medium`` (5-30 min), ``slow`` (30 min-2 h), ``very_slow`` (>2 h),
+    and ``observed`` lists the actual (dataset, cells, seconds) measurements.
+
+    .. note::
+       These are MEASUREMENTS on one shared machine, not predictions. Your runtime
+       depends on hardware, cell count and load. Use them to choose a sensible
+       ``run_all(timeout=...)``, not to promise a finish time.
+    """
+    return dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
+                                         "observed": []}))
 
 
 # --------------------------------------------------------------------------- scan
@@ -140,15 +222,32 @@ def scan(dataset: str, category: str | None = None,
     """Report every method that can run on ``dataset``, and why the rest cannot.
 
     Returns one row per (method, category, modalities) with ``runnable`` and, when
-    it is not, a ``reason``. Nothing is executed. This is the first call to make
+    it is not, a ``reason``. Also carries ``runtime_tier`` /
+    ``observed_worst_sec`` (see :func:`runtime_hint`) so you can size a sweep
+    BEFORE launching it. Nothing is executed. This is the first call to make
     when pointing the benchmark at a NEW dataset.
+
+    ::
+
+        mtb.scan("MYCITE", "vertical", data_path="/home/wen/data")
+        #   method    category  modalities  env      output_kind  runnable  reason
+        #   Matilda   vertical  rna+adt     matilda  embedding    True
+        #   totalVI   vertical  rna+adt     scmb_scvi embedding   True
+
+    A CITE-seq folder (``rna.h5`` + ``adt.h5`` + ``cty.csv``) is ``vertical`` with
+    modalities ``["rna", "adt"]``; RNA and ATAC from different cells is
+    ``diagonal``. See :func:`list_categories` and :func:`describe_layout`.
     """
     rows = []
     for spec, v, cat, mods in _variant_rows(category):
+        rt = _runtimes().get(spec.id, {})
         rec = {"method": spec.id, "category": cat,
                "modalities": "+".join(mods) or "(data_dir)",
                "env": envs.group_for(spec.id), "output_kind": v.output.kind,
-               "n_tunable": len(v.tunable), "runnable": False, "reason": ""}
+               "n_tunable": len(v.tunable),
+               "runtime_tier": rt.get("tier", "unknown"),
+               "observed_worst_sec": rt.get("worst_sec"),
+               "runnable": False, "reason": ""}
         try:
             got = _resolve.inputs_for(dataset, spec.id, cat, modalities=mods or None,
                                       data_path=data_path, check=True)
@@ -225,10 +324,11 @@ def _evaluate_best_order(emb, category, cands):
 class BatchResult:
     """Outcome of :func:`run_all` - a summary table, a tidy frame and a figure."""
 
-    def __init__(self, records, dataset, category):
+    def __init__(self, records, dataset, category, out_dir=None):
         self.records = records
         self.dataset = dataset
         self.category = category
+        self.out_dir = out_dir
 
     @property
     def summary(self) -> pd.DataFrame:
@@ -237,8 +337,9 @@ class BatchResult:
 
         ``status`` is ``CHAIN_OK`` (ran and scored), ``CHAIN_OK_GRAPH_METHOD``
         (scored via a secondary embedding), ``RUN_OK_NO_EMBEDDING`` (ran, but the
-        method emits a graph/coordinates so clustering metrics do not apply) or
-        ``FAIL`` (see :attr:`failures`).
+        method emits a graph/coordinates so clustering metrics do not apply),
+        ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or ``FAIL``.
+        ``TIMEOUT`` and ``FAIL`` both appear in :attr:`failures`.
         """
         rows = []
         for r in self.records:
@@ -279,6 +380,11 @@ class BatchResult:
     def plot(self, **kw):
         """Bubble figure of every method that produced metrics.
 
+        Methods are rows (best first), metrics are columns; bubble SIZE encodes the
+        method's rank and bubble COLOUR the value, both relative to the methods in
+        this figure. Read it next to :attr:`summary` - with few methods a small
+        absolute gap still spans the whole colour scale.
+
         Returns a matplotlib ``Figure``; save it with ``fig.savefig("out.png")``.
         Keyword arguments are passed to ``mtb.plot.bubble`` (``metrics=``,
         ``methods=``, ``order=``, ``title=``, ``cmap=``).
@@ -291,6 +397,25 @@ class BatchResult:
             raise ValueError("no method produced metrics; see .failures / .summary")
         kw.setdefault("title", f"{self.category} - {self.dataset}")
         return _plot.bubble(lng, **kw)
+
+    def save(self, out_dir=None) -> "Path":
+        """Write this result to disk so it outlives the process.
+
+        Produces ``summary.csv``, ``long.csv``, ``failures.csv`` and
+        ``batch_result.json``. Reload with :func:`load_batch` to re-score or
+        re-plot the next morning WITHOUT re-running any method.
+        """
+        d = Path(out_dir or self.out_dir or ".")
+        d.mkdir(parents=True, exist_ok=True)
+        self.summary.to_csv(d / "summary.csv", index=False)
+        if not self.long.empty:
+            self.long.to_csv(d / "long.csv", index=False)
+        self.failures.to_csv(d / "failures.csv", index=False)
+        slim = [{k: v for k, v in r.items() if k != "_long"} for r in self.records]
+        with open(d / "batch_result.json", "w") as fh:
+            json.dump({"dataset": self.dataset, "category": self.category,
+                       "records": slim}, fh, indent=1, default=str)
+        return d
 
     def __len__(self):
         return len(self.records)
@@ -311,18 +436,42 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
 
     Parameters
     ----------
-    methods : restrict to these method ids (default: everything runnable).
-    modalities : restrict to one modality combination (default: all of them).
+    dataset : the DIRECTORY NAME of your data, e.g. ``"MYCITE"`` - not a full path.
+    data_path : the folder that CONTAINS ``dataset``, e.g. ``"/home/wen/data"``
+        (so the files live in ``/home/wen/data/MYCITE/``). Defaults to the
+        package's configured data root.
+    out_dir : where each method's output goes (one sub-directory per method).
+    methods : restrict to these method ids, e.g. ``["Matilda", "totalVI"]``
+        (default: everything runnable).
+    modalities : restrict to ONE modality combination, given as a list of role
+        names, e.g. ``["rna", "adt"]`` for CITE-seq or ``["rna", "atac_gas"]``
+        for RNA + ATAC gene-activity. See :func:`describe_layout` for every role
+        name and the filename it expects. Default: run all combinations.
     params : per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``. Discover
         what a method accepts with :func:`multibench.params_for`.
     dry_run : return the plan (a DataFrame) without running anything. Do this
         first - it is free and shows exactly what will be attempted.
-    timeout : per-method wall-clock cap in SECONDS. A method exceeding it is
+    timeout : per-method wall-clock cap in SECONDS. Size it from the
+        ``runtime_tier`` / ``observed_worst_sec`` columns of :func:`scan` (or
+        :func:`runtime_hint`); the slowest methods observed here need >4 h. A method exceeding it is
         recorded as ``TIMEOUT`` and the sweep moves on. Strongly recommended for
         unattended runs - without it a single hanging method blocks everything.
     skip_existing : if a method's output file is already present in ``out_dir``,
         reuse it instead of recomputing. Lets an interrupted overnight sweep
         resume without repeating the hours already done.
+
+        .. warning::
+           Reuse is keyed on the output FILE, not on ``params``. If you change a
+           hyperparameter and re-run into the SAME ``out_dir`` with
+           ``skip_existing=True`` you will silently get the OLD result. When
+           tuning, use a fresh ``out_dir`` per setting (or leave this False).
+           ``run_all`` refuses this combination rather than mislead you.
+
+        .. warning::
+           Reuse only checks that the output file EXISTS, not that it is complete.
+           A method killed mid-write leaves a truncated file that would be reused
+           as if it had succeeded. After a hard kill, delete that method's
+           sub-directory before resuming.
 
     Methods can take minutes to hours; a failure is recorded, never raised, so one
     bad method cannot abort the sweep.
@@ -339,6 +488,11 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     params = params or {}
+    if skip_existing and params:
+        raise ValueError(
+            "skip_existing=True with params=... would silently return results computed "
+            "with the OLD parameters (reuse is keyed on the output file, not on params). "
+            "Use a fresh out_dir per parameter setting, or skip_existing=False.")
     records = []
 
     for _, row in plan.iterrows():
@@ -442,4 +596,6 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                   f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
         records.append(rec)
 
-    return BatchResult(records, dataset, category)
+    result = BatchResult(records, dataset, category, out_dir)
+    result.save()          # survive process exit; reload with load_batch()
+    return result
