@@ -12,9 +12,11 @@ from .engine.resolve import inputs_for, labels_for
 from .engine import ingest as io
 from .engine import envs as env
 from .discover import find_methods, method_info, params_for
+from .workflow import scan, run_all, BatchResult
 
 __version__ = "0.1.0"
 
 __all__ = ["config", "plot", "eval", "catalog", "load_results", "available_datasets",
            "evaluate", "to_long", "run", "list_methods", "list_tasks", "inputs_for",
-           "labels_for", "io", "env", "method_info", "find_methods", "params_for", "__version__"]
+           "labels_for", "io", "env", "method_info", "find_methods", "params_for",
+           "scan", "run_all", "BatchResult", "__version__"]
