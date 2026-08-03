@@ -81,6 +81,14 @@ def method_info(method: str, files_dir: Path | str | None = None) -> dict:
         "needs_labels": s.needs_labels, "status": s.status,
         "setup_hint": s.setup_hint,
         "variants": [v.entrypoint for v in s.variants],
+        # What this method can actually be dispatched for. Methods like Multigrate
+        # support several integration categories, each with its OWN modality
+        # combination - this is the list to pass to run()/inputs_for().
+        "supports": [{"category": v.when.get("category"),
+                      "modalities": list(v.when.get("modalities", [])),
+                      "output_kind": v.output.kind,
+                      "n_tunable": len(v.tunable)}
+                     for v in s.variants],
         # what the caller may pass to run(params=...): see params_for()
         "params": {_variant_key(v): {"defaults": dict(v.params),
                                      "tunable": dict(v.tunable)}

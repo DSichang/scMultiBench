@@ -1,0 +1,76 @@
+"""Tests for the high-level workflow API (scan / run_all / BatchResult)."""
+import pandas as pd
+import pytest
+
+import multibench as mtb
+
+
+def test_scan_returns_runnable_and_reasons():
+    df = mtb.scan("D11")
+    assert {"method", "category", "modalities", "runnable", "reason"} <= set(df.columns)
+    assert df["runnable"].any()
+    # anything not runnable must say why
+    bad = df[~df["runnable"]]
+    assert (bad["reason"].str.len() > 0).all()
+
+
+def test_scan_filters_by_category():
+    df = mtb.scan("D11", category="vertical")
+    assert set(df["category"]) == {"vertical"}
+
+
+def test_scan_rejects_spatial_methods_on_non_spatial_data():
+    """A data_dir path always exists, so existence alone must not imply runnable."""
+    df = mtb.scan("D11", category="cross")
+    spatial = df[df["method"].isin(["PASTE", "PASTE2", "SPIRAL", "GPSA"])]
+    assert len(spatial) == 4
+    assert not spatial["runnable"].any()
+    assert spatial["reason"].str.contains("h5ad").all()
+
+
+def test_scan_accepts_spatial_methods_on_spatial_data():
+    df = mtb.scan("D63", category="cross")
+    spatial = df[df["method"].isin(["PASTE", "PASTE2", "SPIRAL", "GPSA"])]
+    assert spatial["runnable"].all()
+
+
+def test_run_all_dry_run_lists_the_plan():
+    plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused", dry_run=True)
+    assert isinstance(plan, pd.DataFrame)
+    assert len(plan) == 14
+    assert plan["runnable"].all()
+
+
+def test_run_all_dry_run_respects_method_filter():
+    plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
+                       methods=["Matilda", "totalVI"], dry_run=True)
+    assert set(plan["method"]) == {"Matilda", "totalVI"}
+
+
+def test_run_all_plans_match_scan():
+    for ds, cat, n in [("D11", "vertical", 14), ("D52", "cross", 8),
+                       ("D63", "cross", 4), ("D45", "mosaic", 4)]:
+        plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True)
+        assert len(plan) == n, f"{ds}/{cat}: {len(plan)} != {n}"
+
+
+def test_method_info_supports_multi_category_methods():
+    """Requirement: a user must see what a multi-category method can be run as."""
+    sup = mtb.method_info("Multigrate")["supports"]
+    cats = {s["category"] for s in sup}
+    assert {"vertical", "mosaic"} <= cats
+    for s in sup:
+        assert s["modalities"] and s["output_kind"]
+
+
+def test_batch_result_shape():
+    from multibench.workflow import BatchResult
+    r = BatchResult([{"method": "X", "status": "CHAIN_OK", "run_sec": 1.0,
+                      "output_kind": "embedding", "emb_shape": [10, 2],
+                      "n_tunable": 0, "metrics": {"ARI": 0.5}, "_long": None}],
+                    "D11", "vertical")
+    assert len(r) == 1
+    assert r.summary.loc[0, "ARI"] == 0.5
+    assert r.failures.empty
+    with pytest.raises(ValueError):
+        r.plot()          # no long frame -> must refuse rather than draw nothing
