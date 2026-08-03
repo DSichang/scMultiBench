@@ -135,12 +135,32 @@ def params_for(method: str, category: str | None = None,
     if category is None and modalities is None:
         if len(s.variants) > 1:
             raise KeyError(
-                f"{method} has {len(s.variants)} variants - pass category/modalities; "
-                f"available: {[_variant_key(v) for v in s.variants]}")
+                f"{method} has {len(s.variants)} variants - pass category (and modalities "
+                f"if that is still ambiguous); available: {[_variant_key(v) for v in s.variants]}")
         v = s.variants[0]
+    elif modalities is None:
+        # category alone is enough whenever it selects exactly one variant. This is
+        # the ONLY way to reach a data_dir variant (scBridge, the spatial methods),
+        # which has no modalities to pass.
+        cands = [x for x in s.variants if x.when.get("category") == category]
+        if not cands:
+            raise KeyError(
+                f"{method}: no {category!r} variant; available: "
+                f"{[_variant_key(x) for x in s.variants]}")
+        if len(cands) > 1:
+            raise KeyError(
+                f"{method} has {len(cands)} {category!r} variants - also pass modalities; "
+                f"available: {[_variant_key(x) for x in cands]}")
+        v = cands[0]
+    elif category is None:
+        cands = [x for x in s.variants
+                 if set(x.when.get("modalities", [])) == set(modalities)]
+        if len(cands) != 1:
+            raise KeyError(
+                f"{method}: modalities {sorted(modalities)} match {len(cands)} variants - "
+                f"also pass category; available: {[_variant_key(x) for x in s.variants]}")
+        v = cands[0]
     else:
-        if category is None or modalities is None:
-            raise KeyError("pass BOTH category and modalities (or neither)")
         v = s.select(category, set(modalities))
     return {"method": s.id, "variant": _variant_key(v),
             "defaults": dict(v.params), "tunable": dict(v.tunable)}

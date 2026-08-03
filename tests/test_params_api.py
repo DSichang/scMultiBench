@@ -72,3 +72,33 @@ def test_user_params_override_defaults_in_command():
                                 params={"epochs": 5})
     assert "--epochs" in cmd
     assert cmd[cmd.index("--epochs") + 1] == "5"
+
+
+def test_params_for_category_only_reaches_data_dir_variants():
+    """A data_dir variant has NO modalities, so category alone must be enough.
+
+    Regression: params_for used to demand BOTH category and modalities, which made
+    scBridge and the spatial methods unreachable through this API.
+    """
+    r = mtb.params_for("scBridge", "diagonal")
+    assert r["variant"].startswith("diagonal")
+    assert r["tunable"]
+    assert mtb.params_for("PASTE", "cross")["variant"].startswith("cross")
+
+
+def test_params_for_modalities_only():
+    r = mtb.params_for("Multigrate", modalities=["rna", "adt"])
+    assert r["variant"] == "vertical:rna+adt"
+
+
+def test_params_for_ambiguous_category_lists_the_options():
+    with pytest.raises(KeyError) as e:
+        mtb.params_for("Matilda", "vertical")      # 2 vertical variants
+    assert "also pass modalities" in str(e.value)
+    assert "vertical:rna+adt" in str(e.value)
+
+
+def test_params_for_unknown_category_is_explicit():
+    with pytest.raises(KeyError) as e:
+        mtb.params_for("totalVI", "mosaic")        # declared, but no such variant
+    assert "no 'mosaic' variant" in str(e.value)
