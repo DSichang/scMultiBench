@@ -39,7 +39,8 @@ def find_methods(category: str | None = None, task: str | None = None,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
                  modalities: list[str] | set[str] | None = None,
-                 runnable: bool | None = None) -> list[str]:
+                 runnable: bool | None = None,
+                 tunable: bool | None = None) -> list[str]:
     """Return method ids matching all supplied filters.
 
     ``atac`` is an exact match on the method's declared ATAC representation;
@@ -49,7 +50,9 @@ def find_methods(category: str | None = None, task: str | None = None,
     method's variants, this filter implicitly excludes the declared-but-unwired
     stub methods (those without variants). ``runnable=True`` restricts to methods
     with at least one variant (usable by ``inputs_for``/``run``); ``runnable=False``
-    returns only the stubs.
+    returns only the stubs. ``tunable=True`` keeps only methods that expose at least
+    one hyperparameter on their command line (i.e. where ``run(params=...)`` can
+    change anything) - the rest hardcode their settings upstream.
     """
     want = set(modalities) if modalities is not None else None
     out = []
@@ -66,6 +69,10 @@ def find_methods(category: str | None = None, task: str | None = None,
             continue
         if runnable is not None and bool(s.variants) != runnable:
             continue
+        if tunable is not None:
+            has = any(v.tunable for v in s.variants)
+            if has != tunable:
+                continue
         out.append(s.id)
     return out
 
