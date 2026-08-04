@@ -1,5 +1,5 @@
-method,status,run_sec,output_kind,emb_shape,n_tunable,label_order,label_order_confidence,ARI,NMI,ASW,iASW,iF1,cLISI
-Cobolt,CHAIN_OK,3636.2,embedding,"[32151, 10]",2,cty1.csv+cty2.csv+cty3.csv,,0.8173,0.8078,0.612,,,
-MultiVI,CHAIN_OK,12041.7,embedding,"[32151, 15]",0,cty1.csv+cty2.csv+cty3.csv,,0.8185,0.8099,0.5748,,,
-Multigrate,CHAIN_OK,10368.1,embedding,"[32151, 15]",2,cty1.csv+cty2.csv+cty3.csv,,0.7754,0.7715,0.5463,,,
-SMILE,CHAIN_OK,1915.5,embedding,"[32151, 20]",0,cty1.csv+cty2.csv+cty3.csv,,0.3667,0.58,0.5615,,,
+method,status,run_sec,output_kind,label_order,n_batches,ARI,NMI,ASW,iASW,iF1,cLISI,ASW_batch,GC,iLISI,kBET
+Cobolt,CHAIN_OK,3636.2,embedding,cty1.csv+cty2.csv+cty3.csv,3,0.8173,0.8078,0.612,,,,0.9355,0.9606,,
+MultiVI,CHAIN_OK,12041.7,embedding,cty1.csv+cty2.csv+cty3.csv,3,0.8185,0.8099,0.5748,,,,0.9863,0.9902,,
+Multigrate,CHAIN_OK,10368.1,embedding,cty1.csv+cty2.csv+cty3.csv,3,0.7754,0.7715,0.5463,,,,0.9108,0.9708,,
+SMILE,CHAIN_OK,1915.5,embedding,cty1.csv+cty2.csv+cty3.csv,3,0.3667,0.58,0.5615,,,,0.8989,0.9719,,
