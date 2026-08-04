@@ -123,3 +123,25 @@ def test_runresult_is_documented():
 
 def test_sweep_exported():
     assert hasattr(mtb, "sweep")
+
+
+def test_run_all_raises_when_nothing_can_run():
+    """A per-method failure is recorded, but "not one method could start" means the
+    REQUEST is wrong. Returning an empty result would report "0 failed", which reads
+    as success and hides a typo in the dataset name - the reviewer's top concern."""
+    with pytest.raises(ValueError) as e:
+        mtb.run_all("NO_SUCH_DATASET_XYZ", "vertical",
+                    out_dir="/tmp/mtb_empty_test", verbose=False)
+    assert "nothing is runnable" in str(e.value)
+    assert "mtb.scan" in str(e.value)          # tells you how to diagnose it
+
+
+def test_describe_layout_is_category_specific():
+    """It used to print the CITE-seq layout whatever category you asked for, so an
+    unpaired user was told to write a single cty.csv - which silently mis-scores."""
+    diag = mtb.describe_layout("diagonal")
+    assert "rna_cty.csv" in diag and "atac_cty.csv" in diag
+    assert "LAYOUT FOR DIAGONAL" in diag
+    vert = mtb.describe_layout("vertical")
+    assert "LAYOUT FOR VERTICAL" in vert
+    assert "atac_cty.csv" not in vert

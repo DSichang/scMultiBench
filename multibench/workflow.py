@@ -135,9 +135,28 @@ def describe_layout(category: str | None = None) -> str:
     """
     lines = ["Put your files in  <data_path>/<DATASET_NAME>/ , e.g. ./data/MYDATA/",
              "  (dataset = the folder NAME; data_path = the folder that CONTAINS it)",
-             "", "ONE batch  -> rna.h5, adt.h5, cty.csv",
-             "MANY batches -> rna1.h5/rna2.h5/..., adt1.h5/adt2.h5/..., cty1.csv/cty2.csv/...",
-             "              (numbered files in the SAME flat dir; no batch column)",
+             ""]
+    LAYOUTS = {
+        "vertical": ["  rna.h5 + adt.h5 (CITE-seq)  or  rna.h5 + atac.h5 (multiome)",
+                     "  cty.csv        <- ONE label file; the cells are already matched"],
+        "diagonal": ["  rna.h5         <- the RNA cells",
+                     "  atac.h5        <- the ATAC cells (gene activity); peak.h5 for peaks",
+                     "  rna_cty.csv AND atac_cty.csv",
+                     "                 <- ONE LABEL FILE PER MODALITY. The two cell sets are",
+                     "                    disjoint, so they cannot share a single cty.csv."],
+        "mosaic":   ["  rna1.h5 rna2.h5 atac2.h5 atac3.h5   <- numbered, one per batch",
+                     "  cty1.csv cty2.csv cty3.csv          <- one per batch"],
+        "cross":    ["  rna1.h5 rna2.h5 rna3.h5 + adt1.h5 adt2.h5 adt3.h5",
+                     "  cty1.csv cty2.csv cty3.csv          <- one per batch",
+                     "  (spatial registration instead takes a directory of .h5ad slices)"],
+    }
+    if category in LAYOUTS:
+        lines += [f"LAYOUT FOR {category.upper()}:"] + LAYOUTS[category] + [""]
+    else:
+        for _c, _ls in LAYOUTS.items():
+            lines += [f"{_c}:"] + _ls
+        lines += [""]
+    lines += ["  (numbered files live in the SAME flat dir; there is no batch column)",
              "", "Modality roles and the filenames they resolve to:"]
     lines += [f"    {k:16s} {v}" for k, v in ROLES.items()]
     lines += ["",
@@ -388,6 +407,12 @@ class BatchResult:
         ``status`` is ``CHAIN_OK`` (ran and scored), ``CHAIN_OK_GRAPH_METHOD``
         (scored via a secondary embedding), ``RUN_OK_NO_EMBEDDING`` (ran, but the
         method emits a graph/coordinates so clustering metrics do not apply),
+        Two methods can both be ``output_kind=graph`` and still end differently:
+        scMoMaT also writes a UMAP embedding among its ``extra_outputs``, so it is
+        scored through that (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a
+        neighbour graph, so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and
+        its ``emb_shape`` then describes the graph written, not an embedding.
+
         ``RUN_OK_EVAL_FAILED`` (the method ran and produced an embedding, but every
         candidate label ordering failed to score - usually no label file matches the
         embedding's cell count), ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or
@@ -442,6 +467,10 @@ class BatchResult:
                         | {"label_order": "+".join(r.get("labels_used") or []) or None,
                            "label_order_confidence": _order_confidence(cands)}
                         | {m: v for m, v in (r.get("metrics") or {}).items()})
+        if not rows:      # nothing ran (e.g. no method was runnable on this dataset)
+            return pd.DataFrame(columns=["method", "status", "run_sec", "output_kind",
+                                         "emb_shape", "n_tunable", "label_order",
+                                         "label_order_confidence"])
         return pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
 
     @property
@@ -483,6 +512,8 @@ class BatchResult:
         bad = [r for r in self.records
                if str(r.get("status", "")).startswith(("FAIL", "TIMEOUT"))
                or r.get("status") == "RUN_OK_EVAL_FAILED"]
+        if not bad:
+            return pd.DataFrame(columns=["method", "status", "error"])
         return pd.DataFrame([{k: r.get(k) for k in ("method", "status", "error")} for r in bad])
 
     def plot(self, **kw):
@@ -601,6 +632,17 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         plan = plan[plan["modalities"] == "+".join(modalities)]
     if dry_run:
         return plan.reset_index(drop=True)
+    if plan.empty:
+        # A per-method failure is recorded, never raised - but "not one method could
+        # even start" is a different class: the REQUEST is wrong (bad dataset name,
+        # wrong category, missing files, missing env). Returning an empty result
+        # would report "0 failed", which reads as success and hides a typo.
+        why = scan(dataset, category=category, data_path=data_path)
+        reasons = [r for r in why["reason"].tolist() if r][:3]
+        raise ValueError(
+            f"nothing is runnable for dataset={dataset!r} category={category!r}. "
+            f"Inspect mtb.scan({dataset!r}, {category!r}) for the full table. "
+            f"First reasons: {reasons}")
 
     # validate arguments BEFORE touching the filesystem, so a bad combination is
     # reported as such instead of surfacing as an unrelated I/O error
