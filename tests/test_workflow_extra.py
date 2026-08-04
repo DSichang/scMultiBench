@@ -69,28 +69,29 @@ def test_failures_excludes_successful_but_unscorable_runs():
     assert set(r.failures["method"]) == {"Broken", "Slow"}
     assert "ran but not scorable" in repr(r)
 import multibench as mtb
-from multibench.workflow import BatchResult
+from multibench.workflow import BatchResult, _order_confidence
 
 
-def test_summary_surfaces_label_order_and_margin():
-    """Priya's blocker: 'I get an ARI and have no way to know if it is meaningful.'
+def test_order_confidence_is_scale_free():
+    """A plain difference is bounded above by the ARI, so a method scoring 0.3 could
+    never look well-separated however unambiguous its ordering. The ratio must."""
+    strong_high = _order_confidence([{"ARI": 0.90}, {"ARI": 0.001}])
+    strong_low = _order_confidence([{"ARI": 0.30}, {"ARI": 0.001}])
+    ambiguous = _order_confidence([{"ARI": 0.30}, {"ARI": 0.28}])
+    assert strong_high > 0.99
+    assert strong_low > 0.99, "a low-ARI method with an unambiguous order must still read high"
+    assert ambiguous < 0.2
+    assert _order_confidence([{"ARI": 0.5}]) is None      # nothing to choose between
+    assert _order_confidence([]) is None
+    assert _order_confidence([{"ARI": 0.0}, {"ARI": 0.0}]) == 0.0
 
-    The chosen label order and its lead over the runner-up must be visible in
-    .summary - the table people actually read - not buried in .results.
-    """
-    recs = [{"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.7},
+
+def test_summary_reports_label_order_and_confidence():
+    recs = [{"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.3},
              "labels_used": ["rna_cty.csv", "atac_cty.csv"],
-             "label_order_candidates": [{"order": ["rna_cty.csv", "atac_cty.csv"], "ARI": 0.7005},
-                                        {"order": ["atac_cty.csv", "rna_cty.csv"], "ARI": 0.0009}],
+             "label_order_candidates": [{"order": ["rna_cty.csv", "atac_cty.csv"], "ARI": 0.30},
+                                        {"order": ["atac_cty.csv", "rna_cty.csv"], "ARI": 0.001}],
              "_long": None}]
     s = BatchResult(recs, "D28", "diagonal").summary
     assert s.loc[0, "label_order"] == "rna_cty.csv+atac_cty.csv"
-    assert abs(s.loc[0, "label_order_margin"] - 0.6996) < 1e-6
-
-
-def test_summary_label_order_margin_none_when_unambiguous():
-    recs = [{"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.9},
-             "labels_used": ["cty.csv"], "_long": None}]
-    s = BatchResult(recs, "D11", "vertical").summary
-    assert s.loc[0, "label_order"] == "cty.csv"
-    assert s.loc[0, "label_order_margin"] is None
+    assert s.loc[0, "label_order_confidence"] > 0.99
