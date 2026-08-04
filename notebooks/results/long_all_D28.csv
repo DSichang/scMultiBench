@@ -53,3 +53,9 @@ ASW,0.5320415650677635,uniPort,D28,diagonal
 iASW,,uniPort,D28,diagonal
 iF1,,uniPort,D28,diagonal
 cLISI,,uniPort,D28,diagonal
+ARI,0.6055,Seurat_v3,D28,diagonal
+NMI,0.6339,Seurat_v3,D28,diagonal
+ASW,0.4724,Seurat_v3,D28,diagonal
+ARI,0.2368,MultiMAP,D28,diagonal
+NMI,0.4966,MultiMAP,D28,diagonal
+ASW,0.5529,MultiMAP,D28,diagonal

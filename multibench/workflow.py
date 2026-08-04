@@ -374,7 +374,11 @@ def _label_candidates(dataset, n, data_path=None):
         if len(lab) != n or tuple(names) in seen:
             continue
         seen.add(tuple(names))
-        out.append((list(names), lab))
+        # batch = which label FILE each cell came from. For multi-batch designs
+        # (mosaic / cross) that IS the batch, so batch-correction metrics become
+        # computable without asking the caller for anything extra.
+        bat = np.concatenate([np.full(len(ctys[k]), i + 1) for i, k in enumerate(names)])
+        out.append((list(names), lab, bat))
     return out
 
 
@@ -407,9 +411,13 @@ def _order_confidence(cands) -> float | None:
 def _evaluate_best_order(emb, category, cands):
     """Score each candidate label order, keep the best, return the full spread."""
     scored = []
-    for names, lab in cands:
+    for names, lab, bat in cands:
         try:
-            val = _evaluate(emb, category=category, task="clustering", labels=lab)
+            # more than one distinct source file => a real batch structure, so ask
+            # for BOTH metric groups; otherwise clustering only.
+            grp = "all" if len(set(bat)) > 1 else "clustering"
+            val = _evaluate(emb, category=category, task=grp, labels=lab,
+                            batch=(bat if grp == "all" else None))
             scored.append((float(val["Value"]["ARI"]), names, val))
         except Exception:
             continue
