@@ -730,6 +730,22 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
             mdir = out_dir / f"{m}_{dataset}"
             v0 = registry.get(m).select(category, set(mod_list))
             reused = skip_existing and (mdir / v0.output.file).exists()
+
+            # Validate overrides BEFORE dispatching, on every path: an unknown key
+            # must fail loudly instead of being dropped from the command line.
+            mp = params.get(m)
+            if mp:
+                allowed = set(v0.tunable) | set(v0.params)
+                # NB: an EMPTY allowed-set must reject everything - a method that
+                # hardcodes its hyperparameters accepts no overrides at all. The
+                # earlier guard skipped exactly that case, which is the one that
+                # matters most.
+                unknown = [k for k in mp if k not in allowed]
+                if unknown:
+                    raise KeyError(
+                        f"{m} does not accept {unknown}; it accepts {sorted(allowed)}. "
+                        "An empty set means it hardcodes its hyperparameters upstream.")
+
             if reused:
                 if verbose:
                     print(f"[run_all]   reusing existing output in {mdir}", flush=True)
@@ -744,24 +760,12 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                 signal.alarm(int(timeout))
                 try:
                     res = _run(method=m, category=category, inputs=inp,
-                               out_dir=str(mdir), params=params.get(m))
+                               out_dir=str(mdir), params=mp)
                 finally:
                     signal.alarm(0)
                     signal.signal(signal.SIGALRM, prev)
             else:
-                mp = params.get(m)
-            if mp:
-                allowed = set(v0.tunable) | set(v0.params)
-                # NB: an EMPTY allowed-set must reject everything - a method that
-                # hardcodes its hyperparameters accepts no overrides at all. The
-                # earlier guard skipped exactly that case, which is the one that
-                # matters most.
-                unknown = [k for k in mp if k not in allowed]
-                if unknown:
-                    raise KeyError(
-                        f"{m} does not accept {unknown}; it accepts {sorted(allowed)}. "
-                        "An empty set means it hardcodes its hyperparameters upstream.")
-            res = _run(method=m, category=category, inputs=inp,
+                res = _run(method=m, category=category, inputs=inp,
                            out_dir=str(mdir), params=mp)
             rec["reused"] = bool(reused)
             rec["run_sec"] = round(time.time() - t0, 1)
