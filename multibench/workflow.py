@@ -558,7 +558,14 @@ class BatchResult:
         """
         d = Path(out_dir or self.out_dir or ".")
         d.mkdir(parents=True, exist_ok=True)
-        self.summary.to_csv(d / "summary.csv", index=False)
+        sm = self.summary.copy()
+        # "one ordering only" is a RESULT, "never ran" is an absence - a bare NaN
+        # cannot tell them apart once written to CSV, so make the former explicit.
+        if "label_order_confidence" in sm:
+            scored = sm["status"].astype(str).str.startswith("CHAIN_OK")
+            sm.loc[scored & sm["label_order_confidence"].isna(),
+                   "label_order_confidence"] = "n/a (single ordering)"
+        sm.to_csv(d / "summary.csv", index=False)
         if not self.long.empty:
             self.long.to_csv(d / "long.csv", index=False)
         self.failures.to_csv(d / "failures.csv", index=False)
@@ -778,9 +785,9 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         except Exception as e:
             rec["status"] = "FAIL"
             em = f"{type(e).__name__}: {e}"
-            # keep the TAIL: a traceback ends with the actual exception, which is
-            # the whole point. Right-truncation discarded exactly that.
-            rec["error"] = em if len(em) <= 600 else em[:120] + " ... " + em[-460:]
+            # Truncate from the LEFT only. A traceback ends with the actual
+            # exception; any right-side cut discards precisely the payload.
+            rec["error"] = em if len(em) <= 600 else "... " + em[-596:]
             rec["traceback"] = traceback.format_exc()[-1200:]
             rec["run_sec"] = round(time.time() - t0, 1)
         if verbose:
