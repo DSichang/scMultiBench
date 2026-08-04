@@ -83,7 +83,11 @@ def test_order_confidence_is_scale_free():
     assert ambiguous < 0.2
     assert _order_confidence([{"ARI": 0.5}]) is None      # nothing to choose between
     assert _order_confidence([]) is None
-    assert _order_confidence([{"ARI": 0.0}, {"ARI": 0.0}]) == 0.0
+    # At chance the ratio would compare two noise values (0.0004 vs 0.0002 reads
+    # 0.5 while BOTH orderings are garbage), so it must refuse to answer.
+    assert _order_confidence([{"ARI": 0.0}, {"ARI": 0.0}]) is None
+    assert _order_confidence([{"ARI": 0.0004}, {"ARI": 0.0002}]) is None
+    assert _order_confidence([{"ARI": 0.30}, {"ARI": 0.001}]) > 0.99
 
 
 def test_summary_reports_label_order_and_confidence():
