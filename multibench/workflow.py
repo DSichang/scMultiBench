@@ -703,7 +703,11 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                 mp = params.get(m)
             if mp:
                 allowed = set(v0.tunable) | set(v0.params)
-                unknown = [k for k in mp if allowed and k not in allowed]
+                # NB: an EMPTY allowed-set must reject everything - a method that
+                # hardcodes its hyperparameters accepts no overrides at all. The
+                # earlier guard skipped exactly that case, which is the one that
+                # matters most.
+                unknown = [k for k in mp if k not in allowed]
                 if unknown:
                     raise KeyError(
                         f"{m} does not accept {unknown}; it accepts {sorted(allowed)}. "
