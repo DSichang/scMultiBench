@@ -13,6 +13,30 @@ from . import builder, io, ingest, registry, envs
 
 @dataclass
 class RunResult:
+    """What :func:`run` returns for a single method.
+
+    Attributes
+    ----------
+    method : the method id that was run.
+    out_dir : directory holding everything the method wrote. The primary file is
+        named by the variant's ``output.file`` (usually ``embedding.h5``).
+    cmd : the exact argv that was executed - useful for reproducing a run by hand.
+    output : the primary output ALREADY LOADED. For an embedding method this is a
+        numpy array; pass it straight to :func:`multibench.evaluate`. Note it may be
+        dims x cells rather than cells x dims - ``evaluate`` re-orients a raw array
+        against the label count for you.
+    extra : ``{filename: loaded object}`` for any ``extra_outputs`` the variant
+        declares (e.g. scMoMaT's UMAP embedding alongside its KNN graph).
+    stdout, stderr : captured output of the method process. ``stderr`` is where a
+        method's own diagnostics go and is the first place to look when a run
+        produced a file but the numbers look wrong.
+
+    Not every method returns an embedding: check
+    ``registry.get(method).select(...).output.kind`` first (``embedding`` /
+    ``graph`` / ``coords``). :func:`multibench.run_all` does this for you, which is
+    why it is the recommended entry point.
+    """
+
     method: str
     out_dir: Path
     cmd: list[str]

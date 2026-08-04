@@ -34,7 +34,7 @@ from .engine import ingest as io
 from .engine import envs as env
 from .discover import find_methods, method_info, params_for
 from .workflow import (scan, run_all, BatchResult, list_categories,
-                       describe_layout, load_batch, runtime_hint)
+                       describe_layout, load_batch, runtime_hint, sweep)
 
 __version__ = "0.1.0"
 
@@ -43,4 +43,4 @@ __all__ = ["config", "plot", "eval", "catalog", "load_results", "available_datas
            "labels_for", "io", "env", "method_info", "find_methods", "params_for",
            "scan", "run_all", "BatchResult",
            "list_categories", "describe_layout", "load_batch",
-           "runtime_hint", "__version__"]
+           "runtime_hint", "sweep", "__version__"]

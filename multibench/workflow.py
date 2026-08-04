@@ -38,7 +38,7 @@ from .engine.runner import run as _run
 from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
 
 __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout",
-           "load_batch", "runtime_hint"]
+           "load_batch", "runtime_hint", "sweep"]
 
 
 def load_batch(out_dir) -> "BatchResult":
@@ -694,3 +694,50 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     result = BatchResult(records, dataset, category, out_dir)
     result.save()          # survive process exit; reload with load_batch()
     return result
+
+
+def sweep(dataset: str, category: str, method: str, param: str, values, *,
+          out_dir, modalities=None, data_path=None, timeout=None,
+          verbose: bool = True) -> pd.DataFrame:
+    """Run ONE method repeatedly over a range of one hyperparameter.
+
+    Answers "did you try changing the learning rate?" without hand-rolling the loop
+    - and, importantly, without the two mistakes that loop invites: reusing an
+    ``out_dir`` between settings (which silently returns the previous result) and
+    losing track of which row came from which value.
+
+    Returns the per-setting metrics with the swept value as a column, so the result
+    is directly plottable::
+
+        df = mtb.sweep("MYDATA", "vertical", "Multigrate", "lr",
+                       [1e-4, 1e-3, 1e-2], out_dir="out/lr")
+        df[["lr", "ARI", "NMI"]]
+
+    Check :func:`multibench.params_for` first - a method whose ``tunable`` is empty
+    hardcodes its hyperparameters and cannot be swept at all.
+    """
+    tune = _params_for_method(method, category, modalities)
+    if tune is not None and tune != {} and param not in tune:
+        raise KeyError(
+            f"{method} does not expose {param!r}; it accepts {sorted(tune)}. "
+            f"(An empty set means it hardcodes its hyperparameters upstream.)")
+    frames = []
+    for v in values:
+        tag = str(v).replace(".", "p").replace("-", "m")
+        res = run_all(dataset, category, out_dir=Path(out_dir) / f"{param}_{tag}",
+                      methods=[method], modalities=modalities, data_path=data_path,
+                      params={method: {param: v}}, timeout=timeout, verbose=verbose)
+        df = res.summary
+        df.insert(0, param, v)
+        frames.append(df)
+    return pd.concat(frames, ignore_index=True)
+
+
+def _params_for_method(method, category, modalities):
+    """The method's tunable set, or None if it cannot be determined."""
+    try:
+        from .discover import params_for
+        return params_for(method, category,
+                          list(modalities) if modalities else None)["tunable"]
+    except Exception:
+        return None
