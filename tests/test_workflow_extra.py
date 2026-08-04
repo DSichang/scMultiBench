@@ -50,3 +50,47 @@ def test_batch_result_attributes_are_documented():
         a = getattr(mtb.BatchResult, attr)
         doc = inspect.getdoc(a.fget if isinstance(a, property) else a)
         assert doc and len(doc) > 40, f"BatchResult.{attr} needs a real docstring"
+
+
+def test_failures_excludes_successful_but_unscorable_runs():
+    """A method that ran fine but emits coords/graph is NOT a failure.
+
+    The four spatial-registration methods produce aligned coordinates, so there is
+    no embedding to score - listing them under .failures sends users hunting for a
+    bug that does not exist.
+    """
+    from multibench.workflow import BatchResult
+    recs = [{"method": "PASTE", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
+            {"method": "SPIRAL", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
+            {"method": "Broken", "status": "FAIL", "error": "boom", "_long": None},
+            {"method": "Slow", "status": "TIMEOUT", "error": "too long", "_long": None},
+            {"method": "Good", "status": "CHAIN_OK", "_long": None}]
+    r = BatchResult(recs, "D63", "cross")
+    assert set(r.failures["method"]) == {"Broken", "Slow"}
+    assert "ran but not scorable" in repr(r)
+import multibench as mtb
+from multibench.workflow import BatchResult
+
+
+def test_summary_surfaces_label_order_and_margin():
+    """Priya's blocker: 'I get an ARI and have no way to know if it is meaningful.'
+
+    The chosen label order and its lead over the runner-up must be visible in
+    .summary - the table people actually read - not buried in .results.
+    """
+    recs = [{"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.7},
+             "labels_used": ["rna_cty.csv", "atac_cty.csv"],
+             "label_order_candidates": [{"order": ["rna_cty.csv", "atac_cty.csv"], "ARI": 0.7005},
+                                        {"order": ["atac_cty.csv", "rna_cty.csv"], "ARI": 0.0009}],
+             "_long": None}]
+    s = BatchResult(recs, "D28", "diagonal").summary
+    assert s.loc[0, "label_order"] == "rna_cty.csv+atac_cty.csv"
+    assert abs(s.loc[0, "label_order_margin"] - 0.6996) < 1e-6
+
+
+def test_summary_label_order_margin_none_when_unambiguous():
+    recs = [{"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.9},
+             "labels_used": ["cty.csv"], "_long": None}]
+    s = BatchResult(recs, "D11", "vertical").summary
+    assert s.loc[0, "label_order"] == "cty.csv"
+    assert s.loc[0, "label_order_margin"] is None
