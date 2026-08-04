@@ -340,11 +340,28 @@ class BatchResult:
         method emits a graph/coordinates so clustering metrics do not apply),
         ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or ``FAIL``.
         ``TIMEOUT`` and ``FAIL`` both appear in :attr:`failures`.
+
+        Two columns describe how the cells were matched to labels:
+
+        ``label_order``
+            WHICH label file(s), in which order, the metrics were computed against
+            (e.g. ``rna_cty.csv+atac_cty.csv``). For unpaired/diagonal data the
+            embedding holds two disjoint cell sets stacked in a method-specific
+            order, so this is the difference between a meaningful ARI and a
+            meaningless one.
+        ``label_order_margin``
+            ARI of the chosen order minus the runner-up. A LARGE margin (~0.5+)
+            means the ordering is unambiguous. A SMALL margin means no ordering
+            explained the embedding well - treat that row's metrics with suspicion.
         """
         rows = []
         for r in self.records:
+            cands = r.get("label_order_candidates") or []
             rows.append({k: r.get(k) for k in
                          ("method", "status", "run_sec", "output_kind", "emb_shape", "n_tunable")}
+                        | {"label_order": "+".join(r.get("labels_used") or []) or None,
+                           "label_order_margin": (round(cands[0]["ARI"] - cands[1]["ARI"], 4)
+                                                  if len(cands) > 1 else None)}
                         | {m: v for m, v in (r.get("metrics") or {}).items()})
         return pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
 
@@ -369,12 +386,21 @@ class BatchResult:
 
     @property
     def failures(self) -> pd.DataFrame:
-        """Methods that did not complete: ``method, status, error``.
+        """Methods that genuinely went wrong: ``method, status, error``.
 
         ``run_all`` records failures instead of raising, so ALWAYS check this - a
         sweep can finish "successfully" with several methods having failed.
+
+        Only ``FAIL``, ``TIMEOUT`` and ``RUN_OK_EVAL_FAILED`` appear here.
+        ``RUN_OK_NO_EMBEDDING`` does NOT: those methods ran correctly and merely
+        emit a graph or spatial coordinates instead of an embedding, so there is
+        nothing for clustering metrics to score. See :attr:`summary` for them.
         """
-        bad = [r for r in self.records if r.get("status") not in ("CHAIN_OK", "CHAIN_OK_GRAPH_METHOD")]
+        # A method that RAN and simply has no embedding to score is NOT a failure -
+        # listing it here sends people hunting for a bug that does not exist.
+        bad = [r for r in self.records
+               if str(r.get("status", "")).startswith(("FAIL", "TIMEOUT"))
+               or r.get("status") == "RUN_OK_EVAL_FAILED"]
         return pd.DataFrame([{k: r.get(k) for k in ("method", "status", "error")} for r in bad])
 
     def plot(self, **kw):
@@ -422,8 +448,11 @@ class BatchResult:
 
     def __repr__(self):
         ok = sum(1 for r in self.records if str(r.get("status", "")).startswith("CHAIN_OK"))
+        noemb = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_EMBEDDING")
+        bad = len(self.failures)
+        extra = f", {noemb} ran but not scorable" if noemb else ""
         return (f"<BatchResult {self.category}/{self.dataset}: "
-                f"{ok}/{len(self.records)} with metrics>")
+                f"{ok}/{len(self.records)} with metrics{extra}, {bad} failed>")
 
 
 # ---------------------------------------------------------------------- run_all
@@ -444,9 +473,15 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     methods : restrict to these method ids, e.g. ``["Matilda", "totalVI"]``
         (default: everything runnable).
     modalities : restrict to ONE modality combination, given as a list of role
-        names, e.g. ``["rna", "adt"]`` for CITE-seq or ``["rna", "atac_gas"]``
-        for RNA + ATAC gene-activity. See :func:`describe_layout` for every role
-        name and the filename it expects. Default: run all combinations.
+        names, e.g. ``["rna", "adt"]`` for CITE-seq, ``["rna", "atac_gas"]`` for
+        RNA + ATAC gene-activity, or ``["rna", "atac_peak"]`` for RNA + ATAC peaks.
+        See :func:`describe_layout` for every role name. Default: all combinations.
+
+        .. warning::
+           The two ATAC representations do NOT map to the obvious filenames:
+           gene-activity is ``atac.h5`` but peaks are ``peak.h5``. Putting a peak
+           matrix in ``atac.h5`` runs every method on the wrong representation and
+           raises NO error - you simply get confident, wrong numbers.
     params : per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``. Discover
         what a method accepts with :func:`multibench.params_for`.
     dry_run : return the plan (a DataFrame) without running anything. Do this
