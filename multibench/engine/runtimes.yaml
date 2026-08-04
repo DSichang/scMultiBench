@@ -2,19 +2,18 @@
 #
 # Measured on ONE shared machine (2x RTX 4090, 64 cores, often contended) on the
 # datasets listed. Your runtime will differ with hardware, cell count and load.
-# Use it to SIZE a sweep (pick run_all(timeout=...)), not to promise a deadline.
 #
-# tier:  fast      < 5 min
-#        medium    5-30 min
-#        slow      30 min - 2 h
-#        very_slow > 2 h
+# Every value is rounded UP, so a recorded time is never SHORTER than the run
+# actually took. Use it to size run_all(timeout=...), and still add headroom.
+#
+# tier:  fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h
 Cobolt:
   observed:
   - cells: 32151
     dataset: D45
-    sec: 3636
+    sec: 3637
   tier: slow
-  worst_sec: 3636
+  worst_sec: 3637
 Concerto:
   observed:
   - cells: 2864
@@ -29,23 +28,23 @@ Conos:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 712
+    sec: 713
   tier: medium
-  worst_sec: 712
+  worst_sec: 713
 MOFA2:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 868
+    sec: 869
   tier: medium
-  worst_sec: 868
+  worst_sec: 869
 Matilda:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 189
+    sec: 190
   tier: fast
-  worst_sec: 189
+  worst_sec: 190
 MultiVI:
   observed:
   - cells: 32151
@@ -57,26 +56,26 @@ Multigrate:
   observed:
   - cells: 32151
     dataset: D45
-    sec: 10368
+    sec: 10369
   - cells: 2864
     dataset: D11
     sec: 1277
   tier: very_slow
-  worst_sec: 10368
+  worst_sec: 10369
 Portal:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 400
+    sec: 401
   tier: medium
-  worst_sec: 400
+  worst_sec: 401
 SCALEX:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 2232
+    sec: 2233
   tier: slow
-  worst_sec: 2232
+  worst_sec: 2233
 SMILE:
   observed:
   - cells: 32151
@@ -88,9 +87,9 @@ Seurat_WNN:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 329
+    sec: 330
   tier: medium
-  worst_sec: 329
+  worst_sec: 330
 StabMap:
   observed:
   - cells: 23478
@@ -102,12 +101,12 @@ UINMF:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 261
+    sec: 262
   - cells: 23478
     dataset: D52
     sec: 63
   tier: fast
-  worst_sec: 261
+  worst_sec: 262
 VIMCCA:
   observed:
   - cells: 2864
@@ -126,16 +125,16 @@ iNMF:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 120
+    sec: 121
   tier: fast
-  worst_sec: 120
+  worst_sec: 121
 moETM:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 428
+    sec: 429
   tier: medium
-  worst_sec: 428
+  worst_sec: 429
 online_iNMF:
   observed:
   - cells: 11014
@@ -154,7 +153,7 @@ scMDC:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 888
+    sec: 889
   - cells: 23478
     dataset: D52
     sec: 2702
@@ -184,9 +183,9 @@ scMoMaT:
     sec: 412
   - cells: 23478
     dataset: D52
-    sec: 1022
+    sec: 1023
   tier: medium
-  worst_sec: 1022
+  worst_sec: 1023
 sciCAN:
   observed:
   - cells: 11014
@@ -201,19 +200,19 @@ sciPENN:
     sec: 144
   - cells: 23478
     dataset: D52
-    sec: 64
+    sec: 65
   tier: fast
   worst_sec: 144
 totalVI:
   observed:
   - cells: 2864
     dataset: D11
-    sec: 2096
+    sec: 2097
   - cells: 23478
     dataset: D52
-    sec: 2839
+    sec: 2840
   tier: slow
-  worst_sec: 2839
+  worst_sec: 2840
 uniPort:
   observed:
   - cells: 11014
