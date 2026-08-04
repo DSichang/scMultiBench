@@ -811,7 +811,8 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     losing track of which row came from which value.
 
     Returns the per-setting metrics with the swept value as a column. A tidy frame
-    is attached as ``df.attrs["long"]`` in which each setting is a separate series
+    is written to ``<out_dir>/sweep_long.csv`` (and attached as ``df.attrs["long"]``,
+    which does not survive ``to_csv``) in which each setting is a separate series
     (``"Multigrate (lr=0.001)"``), so it can go straight into ``mtb.plot.bubble`` -
     ``.long`` keys rows by method, so without this every setting would collapse onto
     one row::
@@ -849,8 +850,15 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
             lg["method"] = lg["method"].astype(str) + f" ({param}={v})"
             longs.append(lg)
     out = pd.concat(frames, ignore_index=True)
-    out.attrs["long"] = (pd.concat(longs, ignore_index=True) if longs
-                         else pd.DataFrame())
+    lng = pd.concat(longs, ignore_index=True) if longs else pd.DataFrame()
+    out.attrs["long"] = lng
+    # DataFrame.attrs does NOT survive to_csv, so also write the tidy frame beside
+    # the run. An overnight sweep must be re-plottable tomorrow, not only in-process.
+    if not lng.empty:
+        lp = Path(out_dir) / "sweep_long.csv"
+        lp.parent.mkdir(parents=True, exist_ok=True)
+        lng.to_csv(lp, index=False)
+        out.attrs["long_path"] = str(lp)
     return out
 
 
