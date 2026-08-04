@@ -7796,7 +7796,7 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e464c900">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9cf8df34">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7812,7 +7812,7 @@ a.anchor-link {
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a2599262">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f5cc7333">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7824,6 +7824,7 @@ a.anchor-link {
 <span class="o">%</span><span class="k">matplotlib</span> inline
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.max_colwidth"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>  <span class="c1"># show `reason` in full - paths are long</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 
 <span class="n">RESULTS</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"results"</span><span class="p">)</span>          <span class="c1"># stored results, so the comparisons reproduce</span>
@@ -7846,7 +7847,7 @@ a.anchor-link {
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=0433b602">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=77c31056">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7856,13 +7857,14 @@ a.anchor-link {
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">DATASET</span>  <span class="o">=</span> <span class="s2">"D11"</span>
 <span class="n">CATEGORY</span> <span class="o">=</span> <span class="s2">"vertical"</span>
+<span class="n">FAST_METHOD</span> <span class="o">=</span> <span class="s2">"Matilda"</span>        <span class="c1"># used for the quick live demos below</span>
 </pre></div>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=495adbbd">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=624b1ac0">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7873,7 +7875,7 @@ everywhere, so start by seeing the legal values:</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=81e80a29">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ef586855">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7903,7 +7905,7 @@ everywhere, so start by seeing the legal values:</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3a08d2da">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=87971998">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7914,7 +7916,7 @@ batches</strong> are named (numbered files in one flat directory):</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5d7f4d14">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=05b64468">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7938,9 +7940,11 @@ batches</strong> are named (numbered files in one flat directory):</p>
 <pre>Put your files in  &lt;data_path&gt;/&lt;DATASET_NAME&gt;/ , e.g. ./data/MYDATA/
   (dataset = the folder NAME; data_path = the folder that CONTAINS it)
 
-ONE batch  -&gt; rna.h5, adt.h5, cty.csv
-MANY batches -&gt; rna1.h5/rna2.h5/..., adt1.h5/adt2.h5/..., cty1.csv/cty2.csv/...
-              (numbered files in the SAME flat dir; no batch column)
+LAYOUT FOR VERTICAL:
+  rna.h5 + adt.h5 (CITE-seq)  or  rna.h5 + atac.h5 (multiome)
+  cty.csv        &lt;- ONE label file; the cells are already matched
+
+  (numbered files live in the SAME flat dir; there is no batch column)
 
 Modality roles and the filenames they resolve to:
     rna              rna.h5      - gene expression
@@ -7950,7 +7954,9 @@ Modality roles and the filenames they resolve to:
     atac_peak        peak.h5     - ATAC as PEAKS                 &lt;-- note: peak.h5, NOT atac.h5
     rna1/rna2/...    rna1.h5, rna2.h5, ... - one file per BATCH (mosaic/cross)
     adt1/adt2/...    adt1.h5, adt2.h5, ... - one file per BATCH (mosaic/cross)
-    cty              cty.csv     - cell-type labels (cty1.csv, cty2.csv, ... per batch)
+    cty              cty.csv     - cell-type labels, ONE label set (vertical)
+    rna_cty / atac_cty rna_cty.csv, atac_cty.csv - one label file PER MODALITY, used when RNA and ATAC come from different cells (diagonal)
+    cty1/cty2/...    cty1.csv, cty2.csv, ... - one label file per BATCH (mosaic/cross)
 
 !! Careful: the two ATAC representations do NOT map to the obvious names.
    gene-activity -&gt; atac.h5   and   peaks -&gt; peak.h5 .
@@ -7971,7 +7977,7 @@ Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=07e54875">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f5cf05cb">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7982,7 +7988,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=03288950">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=13880ecc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8181,7 +8187,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=55320fab">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d98dae80">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8191,7 +8197,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cc351210">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c9098d73">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8241,31 +8247,31 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 <th>14</th>
 <td>MIRA</td>
 <td>rna+atac</td>
-<td>FileNotFoundError: MIRA/D11/vertical: input fi...</td>
+<td>FileNotFoundError: MIRA/D11/vertical: input files not found on disk: {'atac': '/media/disk2/Sichang/scmbench_pkg/data/D11/atac.h5'}. Available files in /media/d</td>
 </tr>
 <tr>
 <th>15</th>
 <td>Matilda</td>
 <td>rna+atac</td>
-<td>FileNotFoundError: Matilda/D11/vertical: input...</td>
+<td>FileNotFoundError: Matilda/D11/vertical: input files not found on disk: {'atac': '/media/disk2/Sichang/scmbench_pkg/data/D11/atac.h5'}. Available files in /medi</td>
 </tr>
 <tr>
 <th>16</th>
 <td>Seurat_WNN</td>
 <td>rna+atac</td>
-<td>FileNotFoundError: Seurat_WNN/D11/vertical: in...</td>
+<td>FileNotFoundError: Seurat_WNN/D11/vertical: input files not found on disk: {'atac': '/media/disk2/Sichang/scmbench_pkg/data/D11/atac.h5'}. Available files in /m</td>
 </tr>
 <tr>
 <th>17</th>
 <td>UnitedNet</td>
 <td>rna+atac_gas</td>
-<td>FileNotFoundError: UnitedNet/D11/vertical: inp...</td>
+<td>FileNotFoundError: UnitedNet/D11/vertical: input files not found on disk: {'atac_gas': '/media/disk2/Sichang/scmbench_pkg/data/D11/atac_gas.h5', 'rna_cty': '/me</td>
 </tr>
 <tr>
 <th>18</th>
 <td>VIMCCA</td>
 <td>rna+atac</td>
-<td>FileNotFoundError: VIMCCA/D11/vertical: input ...</td>
+<td>FileNotFoundError: VIMCCA/D11/vertical: input files not found on disk: {'atac': '/media/disk2/Sichang/scmbench_pkg/data/D11/atac.h5'}. Available files in /media</td>
 </tr>
 </tbody>
 </table>
@@ -8275,7 +8281,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3f42ea9a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=179410f7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8288,7 +8294,7 @@ cannot be tuned without editing it, which this project never does.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=623a1f05">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a61feb7e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8353,7 +8359,7 @@ cannot be tuned without editing it, which this project never does.</p>
 <td>scMM</td>
 <td>19</td>
 <td>{'model': 'rna_protein', 'no_cuda': True}</td>
-<td>analytics, batch_size, deterministic_warmup, e...</td>
+<td>analytics, batch_size, deterministic_warmup, epochs</td>
 </tr>
 <tr>
 <th>2</th>
@@ -8447,7 +8453,7 @@ cannot be tuned without editing it, which this project never does.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fea8c51c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=6c621c95">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8458,7 +8464,7 @@ just listed.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f508a423">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=710b2b14">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8467,8 +8473,7 @@ just listed.</p>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="n">DATASET</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span>
-                  <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"Matilda"</span><span class="p">],</span>
-                  <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"Matilda"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs"</span><span class="p">:</span> <span class="mi">5</span><span class="p">}}</span> <span class="k">if</span> <span class="p">{</span><span class="s2">"epochs"</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                  <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"Matilda"</span><span class="p">],</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"Matilda"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs"</span><span class="p">:</span> <span class="mi">5</span><span class="p">}},</span>
                   <span class="n">out_dir</span><span class="o">=</span><span class="s2">"/tmp/tutorial_vertical"</span><span class="p">)</span>
 <span class="n">res</span>
 </pre></div>
@@ -8526,7 +8531,6 @@ Cluster for cluster_1.8 with leiden
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Cluster for cluster_2.0 with leiden
-isolated labels: []
 </pre>
 </div>
 </div>
@@ -8548,7 +8552,14 @@ isolated labels: []
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>isolated labels: []
-[run_all]   -&gt; CHAIN_OK (8.6s) 0.8731
+isolated labels: []
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[run_all]   -&gt; CHAIN_OK (9.1s) 0.8731
 </pre>
 </div>
 </div>
@@ -8557,7 +8568,7 @@ isolated labels: []
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>/media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
 /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
-/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_qm6xwh_y/graph_lisi_indices_0.txt'); recording NaN.
+/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_je3j4lsz/graph_lisi_indices_0.txt'); recording NaN.
   warnings.warn(
 </pre>
 </div>
@@ -8570,7 +8581,7 @@ isolated labels: []
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a83e28c1">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=67f9fb37">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8616,7 +8627,7 @@ isolated labels: []
 <th>emb_shape</th>
 <th>n_tunable</th>
 <th>label_order</th>
-<th>label_order_margin</th>
+<th>label_order_confidence</th>
 <th>ARI</th>
 <th>NMI</th>
 <th>ASW</th>
@@ -8630,7 +8641,7 @@ isolated labels: []
 <th>0</th>
 <td>Matilda</td>
 <td>CHAIN_OK</td>
-<td>8.6</td>
+<td>9.1</td>
 <td>embedding</td>
 <td>[2864, 100]</td>
 <td>10</td>
@@ -8651,7 +8662,7 @@ isolated labels: []
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2c0ef810">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=69841f87">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8662,7 +8673,7 @@ label order, and evaluates in one step.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=30b6bf7e">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e7990b85">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8689,7 +8700,7 @@ label order, and evaluates in one step.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d9dc4754">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1b15e2a4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8717,7 +8728,7 @@ stored results of exactly that sweep.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a5f99536">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=68e26844">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8759,11 +8770,11 @@ stored results of exactly that sweep.</p>
 <th></th>
 <th>method</th>
 <th>status</th>
-<th>sec</th>
-<th>emb</th>
-<th>std</th>
-<th>env</th>
-<th>tunable</th>
+<th>run_sec</th>
+<th>emb_shape</th>
+<th>n_tunable</th>
+<th>label_order</th>
+<th>label_order_confidence</th>
 <th>ARI</th>
 <th>NMI</th>
 <th>ASW</th>
@@ -8779,9 +8790,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>1387.6</td>
 <td>[2864, 128]</td>
-<td>0.0831</td>
-<td>scmb_concerto</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.3724</td>
 <td>0.4705</td>
 <td>0.5086</td>
@@ -8795,9 +8806,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>868.4</td>
 <td>[2864, 17]</td>
-<td>1.3408</td>
-<td>MOFA2_env</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.4444</td>
 <td>0.6691</td>
 <td>0.4733</td>
@@ -8811,9 +8822,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>189.2</td>
 <td>[2864, 100]</td>
-<td>1.4291</td>
-<td>matilda</td>
 <td>10</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.9238</td>
 <td>0.9186</td>
 <td>0.6793</td>
@@ -8827,9 +8838,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>1276.6</td>
 <td>[2864, 15]</td>
-<td>1.5993</td>
-<td>scmb_multigrate2</td>
 <td>3</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.6556</td>
 <td>0.7643</td>
 <td>0.6609</td>
@@ -8843,9 +8854,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>261.2</td>
 <td>[2864, 30]</td>
-<td>0.0158</td>
-<td>scmb_r</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.4983</td>
 <td>0.6286</td>
 <td>0.5541</td>
@@ -8859,9 +8870,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>548.8</td>
 <td>[2864, 8]</td>
-<td>1.1730</td>
-<td>scmb_vimcca</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.5985</td>
 <td>0.7300</td>
 <td>0.5847</td>
@@ -8875,9 +8886,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>428.3</td>
 <td>[2864, 100]</td>
-<td>0.6766</td>
-<td>env_moETM</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.6605</td>
 <td>0.7323</td>
 <td>0.5478</td>
@@ -8891,9 +8902,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>888.1</td>
 <td>[2864, 16]</td>
-<td>0.7391</td>
-<td>scmb_scmdc</td>
 <td>24</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.6494</td>
 <td>0.7111</td>
 <td>0.6104</td>
@@ -8907,9 +8918,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>234.9</td>
 <td>[2864, 10]</td>
-<td>0.6370</td>
-<td>scmb_scmm2</td>
 <td>19</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.6939</td>
 <td>0.7228</td>
 <td>0.5722</td>
@@ -8923,9 +8934,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>8163.9</td>
 <td>[2864, 20]</td>
-<td>0.8213</td>
-<td>scmb_scmsi</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.7518</td>
 <td>0.8019</td>
 <td>0.5743</td>
@@ -8939,9 +8950,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>143.5</td>
 <td>[2864, 512]</td>
-<td>0.6923</td>
-<td>env_sciPENN</td>
 <td>1</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.5839</td>
 <td>0.6890</td>
 <td>0.6311</td>
@@ -8955,9 +8966,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK</td>
 <td>2096.1</td>
 <td>[2864, 20]</td>
-<td>1.1481</td>
-<td>scmb_scvi</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.8206</td>
 <td>0.8400</td>
 <td>0.5504</td>
@@ -8971,9 +8982,9 @@ stored results of exactly that sweep.</p>
 <td>CHAIN_OK_GRAPH_METHOD</td>
 <td>411.6</td>
 <td>[2864, 2]</td>
-<td>826.6672</td>
-<td>scmb_torch</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>0.4469</td>
 <td>0.5495</td>
 <td>0.5805</td>
@@ -8984,12 +8995,12 @@ stored results of exactly that sweep.</p>
 <tr>
 <th>13</th>
 <td>Seurat_WNN</td>
-<td>RUN_OK_GRAPH_ONLY</td>
+<td>RUN_OK_NO_EMBEDDING</td>
 <td>329.3</td>
 <td>[2864, 20]</td>
-<td>0.0585</td>
-<td>liger</td>
 <td>0</td>
+<td>cty.csv</td>
+<td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
@@ -9005,7 +9016,133 @@ stored results of exactly that sweep.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2bb1f770">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=93c59e32">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="What-a-failure-looks-like">What a failure looks like<a class="anchor-link" href="#What-a-failure-looks-like">¶</a></h3><p><code>.failures</code> is the table to check after every sweep, because a method that dies is
+<strong>recorded, not raised</strong> — the sweep keeps going. Here is a genuine failure: a
+method given an impossible hyperparameter. Note the sweep still returns normally
+and the error is in the table.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9ad8e606">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">broken</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="n">DATASET</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="n">FAST_METHOD</span><span class="p">],</span>
+                     <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="n">FAST_METHOD</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs"</span><span class="p">:</span> <span class="o">-</span><span class="mi">5</span><span class="p">}},</span>   <span class="c1"># nonsense on purpose</span>
+                     <span class="n">out_dir</span><span class="o">=</span><span class="s2">"/tmp/tut_fail"</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"failures:"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">broken</span><span class="o">.</span><span class="n">failures</span><span class="p">))</span>
+<span class="n">broken</span><span class="o">.</span><span class="n">failures</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>failures: 1
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[12]:</div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+<thead>
+<tr style="text-align: right;">
+<th></th>
+<th>method</th>
+<th>status</th>
+<th>error</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th>0</th>
+<td>Matilda</td>
+<td>FAIL</td>
+<td>RuntimeError: Matilda failed (exit 1).\nstderr tail:\n\n0it [00:00, ?it/s]\n0it [00:00, ?it/s]\nTraceback (most recent call last):\n  File "/media/disk2/Sichang/scmbench_pkg/multibench/engine/drivers/run_matilda.py", line 84, in &lt;module&gt;\n    main()\n  File "/media/disk2/Sichang/scmbench_pkg/multibench/engi</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c8032619">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>By contrast, if <strong>nothing at all</strong> can run — a mistyped dataset name, say —
+that is not a per-method failure, it means the request itself was wrong, so
+<code>run_all</code> raises instead of handing back an empty result that reads as success:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2240a83f">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [13]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"NO_SUCH_DATASET"</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"/tmp/tut_none"</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"ValueError:"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)[:</span><span class="mi">160</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>ValueError: nothing is runnable for dataset='NO_SUCH_DATASET' category='vertical'. Inspect mtb.scan('NO_SUCH_DATASET', 'vertical') for the full table. First reasons: ["File
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3b2fe49f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9015,12 +9152,12 @@ stored results of exactly that sweep.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1929b183">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=498a064f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">long</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">RESULTS</span> <span class="o">/</span> <span class="s2">"long_all_D11.csv"</span><span class="p">)</span>
@@ -9045,7 +9182,7 @@ stored results of exactly that sweep.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b82ac6fa">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b0bdf5eb">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9060,19 +9197,17 @@ with few methods a tiny gap can look decisive.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=30ad4fa3">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=12241d7e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6.-Using-your-OWN-dataset">6. Using your OWN dataset<a class="anchor-link" href="#6.-Using-your-OWN-dataset">¶</a></h2><p>Put your files in a directory named after the dataset, using the role names this
-scenario expects (<code>rna</code>, <code>adt</code>), plus a <code>cty.csv</code> of cell-type labels:</p>
-<pre><code>&lt;data_path&gt;/MYDATA/
-    rna.h5
-    adt.h5
-    cty.csv
-</code></pre>
+<h2 id="6.-Using-your-OWN-dataset">6. Using your OWN dataset<a class="anchor-link" href="#6.-Using-your-OWN-dataset">¶</a></h2><p><code>describe_layout</code> above already printed the exact filenames for this scenario —
+<strong>use those, not the role names.</strong> They are not always the same: the <code>atac_gas</code>
+role lives in <code>atac.h5</code>, and <code>atac_peak</code> lives in <code>peak.h5</code>.</p>
+<div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">(</span><span class="n">CATEGORY</span><span class="p">))</span>   <span class="c1"># the authoritative filename list</span>
+</pre></div>
 <p>Then the same three calls work unchanged:</p>
 <div class="highlight"><pre><span></span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYDATA"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>                     <span class="c1"># confirm it is picked up</span>
 <span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"MYDATA"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span><span class="p">)</span>     <span class="c1"># run everything</span>
