@@ -23,13 +23,13 @@ def test_bar_returns_a_figure_and_ranks_methods():
 def test_bar_aggregates_across_datasets():
     one = mtb.plot.bar(_long(datasets=("D1",)))
     two = mtb.plot.bar(_long(datasets=("D1", "D2", "D3")))
-    assert "1 dataset" in one.axes[0].get_title()
-    assert "3 datasets" in two.axes[0].get_title()
+    assert "1 dataset" in one.axes[0].get_title(loc="left")
+    assert "3 datasets" in two.axes[0].get_title(loc="left")
 
 
 def test_bar_group_selects_metric_family():
     fig = mtb.plot.bar(_long(metrics=("ARI", "NMI")), group="clustering")
-    assert "clustering" in fig.axes[0].get_title()
+    assert "clustering" in fig.axes[0].get_title(loc="left")
 
 
 def test_bar_group_batch_errors_clearly_without_batch_metrics():
