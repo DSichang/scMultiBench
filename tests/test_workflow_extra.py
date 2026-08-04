@@ -144,4 +144,9 @@ def test_describe_layout_is_category_specific():
     assert "LAYOUT FOR DIAGONAL" in diag
     vert = mtb.describe_layout("vertical")
     assert "LAYOUT FOR VERTICAL" in vert
-    assert "atac_cty.csv" not in vert
+    # the LAYOUT block is category-specific; the role table below it is a general
+    # reference and legitimately lists every role, so scope the check to the block
+    block = vert.split("LAYOUT FOR VERTICAL")[1].split("Modality roles")[0]
+    assert "atac_cty.csv" not in block
+    diag_block = diag.split("LAYOUT FOR DIAGONAL")[1].split("Modality roles")[0]
+    assert "atac_cty.csv" in diag_block
