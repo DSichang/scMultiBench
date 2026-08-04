@@ -11,14 +11,20 @@ import pandas as pd
 def _build_adata(emb, celltype, cluster, batch):
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
-    adata.obs["celltype"] = pd.Categorical(np.asarray(celltype))
+    adata.obs["celltype"] = pd.Categorical(np.asarray(celltype).astype(str))
     if cluster is not None:
         adata.obs["cluster"] = pd.Categorical(np.asarray(cluster))
-    adata.obs["batch"] = pd.Categorical(np.asarray(batch))
+    # kBET converts this to an R factor via rpy2, which refuses non-string
+    # categories ("Converting pandas Category series to R factor is only
+    # possible when categories are strings"). Integer batch ids are the
+    # natural thing for a caller to pass, so coerce here rather than making
+    # every caller remember.
+    adata.obs["batch"] = pd.Categorical(np.asarray(batch).astype(str))
     return adata
 
 
-def compute(emb, celltype, cluster, batch, group: str = "clustering") -> pd.DataFrame:
+def compute(emb, celltype, cluster, batch, group: str = "clustering",
+            slow_metrics: bool = False) -> pd.DataFrame:
     """Compute scib metrics. group in {'clustering','batch','all'}.
 
     Returns a metric.csv-shaped DataFrame (index = metric, column 'Value').
@@ -86,13 +92,25 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering") -> pd.Data
         _safe("ARI", lambda: me.ari(adata, cluster_key="cluster", label_key="celltype"))
         _safe("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
         _safe("ASW", lambda: me.silhouette(adata, label_key="celltype", embed="X_emb"))
-        _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
-        _safe("iF1", lambda: me.isolated_labels_f1(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
+        # Isolated-label convention: treat EVERY cell type as isolated and score
+        # them all. scib's default picks only types confined to few batches, and
+        # returns NOTHING when every type appears in every batch (it short-circuits
+        # on iso_threshold == n_batches) - so a well-balanced dataset silently got
+        # no iASW/iF1 at all. n_batches + 1 clears that check and admits every label.
+        _iso = int(adata.obs["batch"].nunique()) + 1
+        _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="celltype",
+                                                     embed="X_emb", iso_threshold=_iso))
+        _safe("iF1", lambda: me.isolated_labels_f1(adata, batch_key="batch", label_key="celltype",
+                                                   embed="X_emb", iso_threshold=_iso))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
         _safe("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
         _safe("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="embed", use_rep="X_emb"))
-        _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))
+        # kBET shells out to R once per method and dominates the runtime of a
+        # sweep (hours per dataset at 10-30k cells), so it is opt-in. Everything
+        # it needs IS installed - pass slow_metrics=True to compute it.
+        if slow_metrics:
+            _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))
 
     return pd.DataFrame.from_dict(out, orient="index", columns=["Value"])

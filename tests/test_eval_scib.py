@@ -36,10 +36,22 @@ def test_clustering_metrics_present_and_bounded():
 
 
 def test_batch_metrics_present():
+    """The default batch set is the FAST metrics.
+
+    kBET shells out to R once per method and dominated sweep runtime (hours per
+    dataset at 10-30k cells), so it is opt-in rather than always-on.
+    """
     emb, ct, cl, ba = _toy()
     res = escib.compute(emb, ct, cl, ba, group="batch")
-    for k in ["ASW_batch", "GC", "iLISI", "kBET"]:
+    for k in ["ASW_batch", "GC", "iLISI"]:
         assert k in res.index
+    assert "kBET" not in res.index
+
+
+def test_kbet_computed_when_requested():
+    emb, ct, cl, ba = _toy()
+    res = escib.compute(emb, ct, cl, ba, group="batch", slow_metrics=True)
+    assert "kBET" in res.index
 
 
 def test_clustering_derived_when_no_cluster_supplied():
