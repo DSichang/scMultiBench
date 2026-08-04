@@ -115,7 +115,7 @@ methods:
   - id: totalVI
     language: python
     categories: [vertical, mosaic, cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -137,7 +137,7 @@ methods:
   - id: MultiVI
     language: python
     categories: [mosaic]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       # Mosaic layout = 3 batches: RNA-only, paired (multiome) RNA+ATAC, ATAC-only.
@@ -159,7 +159,7 @@ methods:
   - id: Cobolt
     language: python
     categories: [mosaic]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
@@ -196,7 +196,7 @@ methods:
   - id: scMM
     language: python
     categories: [vertical, cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: declared
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -229,7 +229,7 @@ methods:
   - id: scMDC
     language: python
     categories: [vertical, cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: declared
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -261,7 +261,7 @@ methods:
   - id: scMoMaT
     language: python
     categories: [vertical, mosaic, cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -340,7 +340,7 @@ methods:
   - id: Concerto
     language: python
     categories: [vertical, cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: declared
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -362,7 +362,7 @@ methods:
   - id: Matilda
     language: python
     categories: [vertical]
-    tasks: [dimension_reduction, classification]
+    tasks: [classification, clustering, dimension_reduction]
     needs_labels: true
     status: verified
     setup_hint: "Uses Matilda's supported object API (`matilda-sc`, import `matilda`) via the package driver engine/drivers/run_matilda.py, per https://pyanglab.github.io/Matilda/. The upstream main_matilda_train.py only ran the TRAIN stage and emitted no embedding; the driver trains once then runs dim_reduce + classification in ONE engine pass. Env `matilda` (matilda-sc 0.2.0, torch 2.1.2)."
@@ -428,7 +428,7 @@ methods:
   - id: VIPCCA
     language: python
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -443,7 +443,7 @@ methods:
   - id: SMILE
     language: python
     categories: [mosaic]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       # SMILE mosaic = reference (paired multiome) + query (RNA-only, ATAC-only).
@@ -465,7 +465,7 @@ methods:
   - id: Portal
     language: python
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -480,7 +480,7 @@ methods:
   - id: uniPort
     language: python
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -496,7 +496,7 @@ methods:
   - id: sciCAN
     language: python
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -511,7 +511,7 @@ methods:
   - id: scJoint
     language: python
     categories: [diagonal]
-    tasks: [classification, clustering]
+    tasks: [batch, classification, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -540,7 +540,7 @@ methods:
   - id: GLUE
     language: python
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     setup_hint: "runs in the `glue` env (scglue); GLUE_human.py reads a gencode GTF by RELATIVE name (gencode.v43.*.annotation.gtf.gz), so it must sit in the process cwd -> cwd_at_script:true runs in the GLUE script dir where the GTF is symlinked. Runner's PYTHONNOUSERSITE=1 is required (else the broken ~/.local torch egg shadows the env's torch 2.4.1 and libcudnn.so.8 is missing). RUN-VERIFIED on D28 (rna+atac_peak)."
     variants:
@@ -556,7 +556,7 @@ methods:
   - id: MultiMAP
     language: python
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: peak
     status: verified
     variants:
@@ -572,7 +572,7 @@ methods:
   - id: sciPENN
     language: python
     categories: [vertical, mosaic, cross]
-    tasks: [imputation, dimension_reduction]
+    tasks: [batch, clustering, dimension_reduction, imputation]
     status: declared
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -712,7 +712,7 @@ methods:
   - id: StabMap
     language: R
     categories: [cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       # Cross integration. main_StabMap.Rmd has NO top-level call (defines
@@ -738,7 +738,7 @@ methods:
   - id: UINMF
     language: R
     categories: [vertical, cross]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -762,7 +762,7 @@ methods:
   - id: iNMF
     language: R
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -778,7 +778,7 @@ methods:
   - id: online_iNMF
     language: R
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -794,7 +794,7 @@ methods:
   - id: Conos
     language: R
     categories: [diagonal]
-    tasks: [clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -836,7 +836,7 @@ methods:
   - id: Seurat_v3
     language: R
     categories: [diagonal]
-    tasks: [clustering, classification]
+    tasks: [batch, classification, clustering]
     atac: peak
     status: verified
     variants:

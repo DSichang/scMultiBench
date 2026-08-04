@@ -7,7 +7,9 @@ import pandas as pd
 from . import io
 from ..data import catalog
 
-_SCIB_TASKS = {"clustering", "batch", "all"}
+# "DR and clustering" are ONE metric group in the benchmark paper, so a
+# dimension_reduction request is served by the clustering metrics.
+_SCIB_TASKS = {"clustering", "dimension_reduction", "batch", "all"}
 
 
 def to_long(value_df, method, dataset, category):
@@ -70,4 +72,7 @@ def evaluate(
     )
 
     from . import scib as escib  # imported lazily so non-scib paths don't require it
-    return escib.compute(emb, ct, cl, ba, group=task)
+    # "DR and clustering" are one metric group in the benchmark paper,
+    # so dimension_reduction is evaluated with the clustering metrics.
+    group = "clustering" if task == "dimension_reduction" else task
+    return escib.compute(emb, ct, cl, ba, group=group)
