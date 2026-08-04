@@ -32,6 +32,7 @@ def evaluate(
     clustering=None,
     batch=None,
     metric_set: str = "scib",
+    slow_metrics: bool = False,
 ) -> pd.DataFrame:
     """Compute metrics for a run output. v1 supports metric_set='scib' only.
 
@@ -75,4 +76,5 @@ def evaluate(
     # "DR and clustering" are one metric group in the benchmark paper,
     # so dimension_reduction is evaluated with the clustering metrics.
     group = "clustering" if task == "dimension_reduction" else task
-    return escib.compute(emb, ct, cl, ba, group=group)
+    return escib.compute(emb, ct, cl, ba, group=group,
+                         slow_metrics=slow_metrics)
