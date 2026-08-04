@@ -17,4 +17,6 @@ class _BubbleNamespace:
 bubble = _BubbleNamespace()
 # Also expose the underlying callables directly for discoverability
 # (``mtb.plot.plot_bubble`` / ``mtb.plot.build_table`` / ``mtb.plot.render``).
-__all__ = ["bubble", "plot_bubble", "build_table", "render", "BubbleTable"]
+__all__ = ["bar", "bubble", "plot_bubble", "build_table", "render", "BubbleTable"]
+
+from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS
