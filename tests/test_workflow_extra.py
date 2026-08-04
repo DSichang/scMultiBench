@@ -95,3 +95,27 @@ def test_summary_reports_label_order_and_confidence():
     s = BatchResult(recs, "D28", "diagonal").summary
     assert s.loc[0, "label_order"] == "rna_cty.csv+atac_cty.csv"
     assert s.loc[0, "label_order_confidence"] > 0.99
+import pytest
+import multibench as mtb
+
+
+def test_sweep_rejects_a_param_the_method_does_not_expose():
+    """A sweep over a nonexistent knob would burn hours and change nothing."""
+    with pytest.raises(KeyError) as e:
+        mtb.sweep("D11", "vertical", "Multigrate", "not_a_real_param", [1, 2],
+                  out_dir="/tmp/unused", modalities=["rna", "adt"])
+    assert "does not expose" in str(e.value)
+    assert "lr" in str(e.value)          # tells you what it DOES accept
+
+
+def test_runresult_is_documented():
+    import inspect
+    from multibench.engine.runner import RunResult
+    doc = inspect.getdoc(RunResult) or ""
+    assert len(doc) > 200, "RunResult is the return of run(); it needs real docs"
+    for word in ("out_dir", "output", "stderr", "extra"):
+        assert word in doc
+
+
+def test_sweep_exported():
+    assert hasattr(mtb, "sweep")
