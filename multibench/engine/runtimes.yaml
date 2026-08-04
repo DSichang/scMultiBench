@@ -31,6 +31,27 @@ Conos:
     sec: 713
   tier: medium
   worst_sec: 713
+GLUE:
+  observed:
+  - cells: 10717
+    dataset: D27
+    sec: 9031
+  tier: very_slow
+  worst_sec: 9031
+GPSA:
+  observed:
+  - cells: 1272
+    dataset: D63
+    sec: 1
+  tier: fast
+  worst_sec: 1
+MIRA:
+  observed:
+  - cells: 10717
+    dataset: D15
+    sec: 7168
+  tier: slow
+  worst_sec: 7168
 MOFA2:
   observed:
   - cells: 2864
@@ -45,6 +66,13 @@ Matilda:
     sec: 190
   tier: fast
   worst_sec: 190
+MultiMAP:
+  observed:
+  - cells: 11014
+    dataset: D28
+    sec: 2041
+  tier: slow
+  worst_sec: 2041
 MultiVI:
   observed:
   - cells: 32151
@@ -62,6 +90,20 @@ Multigrate:
     sec: 1277
   tier: very_slow
   worst_sec: 10369
+PASTE:
+  observed:
+  - cells: 1272
+    dataset: D63
+    sec: 1
+  tier: fast
+  worst_sec: 1
+PASTE2:
+  observed:
+  - cells: 1272
+    dataset: D63
+    sec: 1
+  tier: fast
+  worst_sec: 1
 Portal:
   observed:
   - cells: 11014
@@ -83,6 +125,13 @@ SMILE:
     sec: 1916
   tier: slow
   worst_sec: 1916
+SPIRAL:
+  observed:
+  - cells: 1272
+    dataset: D63
+    sec: 1
+  tier: fast
+  worst_sec: 1
 Seurat_WNN:
   observed:
   - cells: 2864
@@ -90,6 +139,20 @@ Seurat_WNN:
     sec: 330
   tier: medium
   worst_sec: 330
+Seurat_v3:
+  observed:
+  - cells: 11014
+    dataset: D28
+    sec: 3365
+  tier: slow
+  worst_sec: 3365
+Seurat_v5:
+  observed:
+  - cells: 10717
+    dataset: D27
+    sec: 15778
+  tier: very_slow
+  worst_sec: 15778
 StabMap:
   observed:
   - cells: 23478
@@ -107,6 +170,13 @@ UINMF:
     sec: 63
   tier: fast
   worst_sec: 262
+UnitedNet:
+  observed:
+  - cells: 10717
+    dataset: D27
+    sec: 1565
+  tier: medium
+  worst_sec: 1565
 VIMCCA:
   observed:
   - cells: 2864
@@ -128,6 +198,13 @@ iNMF:
     sec: 121
   tier: fast
   worst_sec: 121
+iPOLNG:
+  observed:
+  - cells: 10717
+    dataset: D27
+    sec: 357
+  tier: medium
+  worst_sec: 357
 moETM:
   observed:
   - cells: 2864
@@ -142,6 +219,13 @@ online_iNMF:
     sec: 81
   tier: fast
   worst_sec: 81
+scBridge:
+  observed:
+  - cells: 11014
+    dataset: D28
+    sec: 1
+  tier: fast
+  worst_sec: 1
 scJoint:
   observed:
   - cells: 11014

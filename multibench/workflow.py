@@ -282,7 +282,13 @@ def scan(dataset: str, category: str | None = None,
     A CITE-seq folder (``rna.h5`` + ``adt.h5`` + ``cty.csv``) is ``vertical`` with
     modalities ``["rna", "adt"]``; RNA and ATAC from different cells is
     ``diagonal``. See :func:`list_categories` and :func:`describe_layout`.
-    """
+    
+    Each method runs in its OWN conda environment (they need mutually
+    incompatible framework versions). ``runnable=True`` verifies BOTH that the
+    input files exist AND that that environment is installed, so a sweep never
+    starts a method that cannot finish. List them with ``multibench env
+    doctor``; build them with ``multibench env install --run``.
+"""
     rows = []
     for spec, v, cat, mods in _variant_rows(category):
         rt = _runtimes().get(spec.id, {})
@@ -797,8 +803,11 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     ``out_dir`` between settings (which silently returns the previous result) and
     losing track of which row came from which value.
 
-    Returns the per-setting metrics with the swept value as a column, so the result
-    is directly plottable::
+    Returns the per-setting metrics with the swept value as a column. A tidy frame
+    is attached as ``df.attrs["long"]`` in which each setting is a separate series
+    (``"Multigrate (lr=0.001)"``), so it can go straight into ``mtb.plot.bubble`` -
+    ``.long`` keys rows by method, so without this every setting would collapse onto
+    one row::
 
         df = mtb.sweep("MYDATA", "vertical", "Multigrate", "lr",
                        [1e-4, 1e-3, 1e-2], out_dir="out/lr")
@@ -817,7 +826,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         raise KeyError(
             f"{method} does not expose {param!r}; it accepts {sorted(tune)}. "
             f"(An empty set means it hardcodes its hyperparameters upstream.)")
-    frames = []
+    frames, longs = [], []
     for v in values:
         tag = str(v).replace(".", "p").replace("-", "m")
         res = run_all(dataset, category, out_dir=Path(out_dir) / f"{param}_{tag}",
@@ -826,7 +835,16 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         df = res.summary
         df.insert(0, param, v)
         frames.append(df)
-    return pd.concat(frames, ignore_index=True)
+        lg = res.long
+        if not lg.empty:                       # tag the tidy frame too, so the sweep
+            lg = lg.copy()                     # is plottable: each setting becomes its
+            lg[param] = v                      # own series instead of collapsing onto
+            lg["method"] = lg["method"].astype(str) + f" ({param}={v})"
+            longs.append(lg)
+    out = pd.concat(frames, ignore_index=True)
+    out.attrs["long"] = (pd.concat(longs, ignore_index=True) if longs
+                         else pd.DataFrame())
+    return out
 
 
 def _params_for_method(method, category, modalities):
