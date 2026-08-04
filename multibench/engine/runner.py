@@ -161,8 +161,13 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     if proc.returncode != 0:
         raise RuntimeError(
             f"{method} failed (exit {proc.returncode}).\n"
-            f"stderr tail:\n{proc.stderr[-2000:]}\n"
-            f"stdout tail:\n{proc.stdout[-2000:]}"
+            # stdout FIRST, stderr LAST. Callers truncate this message from the
+            # left (a traceback's payload is its tail), so whatever is most
+            # diagnostic has to sit at the end - and that is stderr. Ordering it
+            # the other way meant a left-truncated message kept conda's
+            # "see above for error" summary and discarded the error it referred to.
+            f"stdout tail:\n{proc.stdout[-1500:]}\n"
+            f"stderr tail:\n{proc.stderr[-2500:]}"
         )
 
     primary = io.load_output(out, variant.output)
