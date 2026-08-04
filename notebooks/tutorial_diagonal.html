@@ -7796,7 +7796,7 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=81042798">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d9417113">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7812,7 +7812,7 @@ a.anchor-link {
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=edfc8b65">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c789755d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7847,7 +7847,7 @@ a.anchor-link {
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=5bb69228">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=7a1a09fa">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7864,7 +7864,7 @@ a.anchor-link {
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a20f2b50">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f4cdc66d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7875,7 +7875,7 @@ everywhere, so start by seeing the legal values:</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8f404e14">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=619fd653">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7905,7 +7905,7 @@ everywhere, so start by seeing the legal values:</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8417cc8b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cdd560fa">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7916,7 +7916,7 @@ batches</strong> are named (numbered files in one flat directory):</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ca29aa82">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=09d9f1aa">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7973,6 +7973,14 @@ named 'x') holds the cell type.
 
 diagonal: Modalities measured in DIFFERENT cells, with no pairing (e.g. an RNA experiment and a separate ATAC experiment).
 
+
+ENVIRONMENTS
+  Every method runs in its OWN conda env (they need mutually
+  incompatible framework versions). scan() marks a method NOT runnable
+  if its env is missing, so a sweep never starts one that cannot finish.
+      multibench env doctor          # what is needed / what is missing
+      multibench env install --run   # build them all from lockfiles
+
 Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_dir=...)
 </pre>
 </div>
@@ -7980,7 +7988,7 @@ Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=50030f21">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d7407f64">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7991,7 +7999,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2aca3a73">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fa47938e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8050,7 +8058,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 <td>embedding</td>
 <td>0</td>
 <td>medium</td>
-<td>712.0</td>
+<td>713.0</td>
 </tr>
 <tr>
 <th>1</th>
@@ -8080,7 +8088,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 <td>embedding</td>
 <td>0</td>
 <td>medium</td>
-<td>400.0</td>
+<td>401.0</td>
 </tr>
 <tr>
 <th>4</th>
@@ -8090,7 +8098,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 <td>embedding</td>
 <td>0</td>
 <td>slow</td>
-<td>2232.0</td>
+<td>2233.0</td>
 </tr>
 <tr>
 <th>5</th>
@@ -8130,7 +8138,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 <td>embedding</td>
 <td>0</td>
 <td>fast</td>
-<td>120.0</td>
+<td>121.0</td>
 </tr>
 <tr>
 <th>9</th>
@@ -8190,7 +8198,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0b2c9cc4">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=78e53f6d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8200,7 +8208,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=76bc713b">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e6c0e689">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8228,7 +8236,7 @@ rest, exactly why not. Nothing is executed, so this is safe and instant.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8455af28">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=83c0e716">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8241,7 +8249,7 @@ cannot be tuned without editing it, which this project never does.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f4885918">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ec96b735">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8400,7 +8408,7 @@ cannot be tuned without editing it, which this project never does.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7690141b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f63eab0c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8411,7 +8419,7 @@ just listed.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6705466d">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=aa94478f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8556,7 +8564,7 @@ just listed.</p>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>/media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
 /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
-/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_n_1nbyzr/graph_lisi_indices_0.txt'); recording NaN.
+/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_kggucaji/graph_lisi_indices_0.txt'); recording NaN.
   warnings.warn(
 </pre>
 </div>
@@ -8668,7 +8676,7 @@ just listed.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (18.6s) 0.3749
+<pre>[run_all]   -&gt; CHAIN_OK (18.4s) 0.3749
 </pre>
 </div>
 </div>
@@ -8677,7 +8685,7 @@ just listed.</p>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
 <pre>/media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
 /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o: /lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found (required by /media/disk2/Sichang/.conda/envs/scmbench_eval/lib/python3.10/site-packages/scib/knn_graph/knn_graph.o)
-/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_bmdk11ac/graph_lisi_indices_0.txt'); recording NaN.
+/media/disk2/Sichang/scmbench_pkg/multibench/eval/scib.py:76: UserWarning: scib metric 'cLISI' could not be computed (FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lisi_0stgl8cz/graph_lisi_indices_0.txt'); recording NaN.
   warnings.warn(
 </pre>
 </div>
@@ -8690,7 +8698,7 @@ just listed.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=edcda7b0">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=77392a37">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8750,7 +8758,7 @@ just listed.</p>
 <th>0</th>
 <td>online_iNMF</td>
 <td>CHAIN_OK</td>
-<td>18.6</td>
+<td>18.4</td>
 <td>embedding</td>
 <td>[11014, 20]</td>
 <td>0</td>
@@ -8771,7 +8779,7 @@ just listed.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e4a576ca">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b662a30d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8782,7 +8790,7 @@ label order, and evaluates in one step.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4e4bd281">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ee07be9a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8809,7 +8817,7 @@ label order, and evaluates in one step.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1cf4e7a4">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=97b17f8f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8837,7 +8845,7 @@ stored results of exactly that sweep.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=bf1bb157">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c747fe8c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8901,8 +8909,8 @@ stored results of exactly that sweep.</p>
 <td>712.5</td>
 <td>embedding</td>
 <td>[11014, 2]</td>
-<td>0</td>
-<td>rna_cty.csv+atac_cty.csv</td>
+<td>0.0</td>
+<td>atac_cty.csv+rna_cty.csv</td>
 <td>NaN</td>
 <td>0.0004</td>
 <td>0.0226</td>
@@ -8913,14 +8921,31 @@ stored results of exactly that sweep.</p>
 </tr>
 <tr>
 <th>1</th>
+<td>MultiMAP</td>
+<td>CHAIN_OK</td>
+<td>2040.2</td>
+<td>embedding</td>
+<td>[11014, 2]</td>
+<td>0.0</td>
+<td>rna_cty.csv+atac_cty.csv</td>
+<td>0.9992</td>
+<td>0.2368</td>
+<td>0.4966</td>
+<td>0.5529</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr>
+<th>2</th>
 <td>Portal</td>
 <td>CHAIN_OK</td>
 <td>400.4</td>
 <td>embedding</td>
 <td>[11014, 20]</td>
-<td>0</td>
+<td>0.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9979</td>
 <td>0.4798</td>
 <td>0.6144</td>
 <td>0.5186</td>
@@ -8929,15 +8954,15 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>2</th>
+<th>3</th>
 <td>SCALEX</td>
 <td>CHAIN_OK</td>
 <td>2232.3</td>
 <td>embedding</td>
 <td>[11014, 10]</td>
-<td>0</td>
+<td>0.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9995</td>
 <td>0.5744</td>
 <td>0.5859</td>
 <td>0.5320</td>
@@ -8946,15 +8971,32 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>3</th>
+<th>4</th>
+<td>Seurat_v3</td>
+<td>CHAIN_OK</td>
+<td>3364.6</td>
+<td>embedding</td>
+<td>[11014, 50]</td>
+<td>0.0</td>
+<td>rna_cty.csv+atac_cty.csv</td>
+<td>1.0002</td>
+<td>0.6055</td>
+<td>0.6339</td>
+<td>0.4724</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr>
+<th>5</th>
 <td>VIPCCA</td>
 <td>CHAIN_OK</td>
 <td>334.8</td>
 <td>embedding</td>
 <td>[11014, 16]</td>
-<td>0</td>
+<td>0.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9960</td>
 <td>0.1518</td>
 <td>0.3756</td>
 <td>0.4785</td>
@@ -8963,15 +9005,15 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>4</th>
+<th>6</th>
 <td>iNMF</td>
 <td>CHAIN_OK</td>
 <td>120.2</td>
 <td>embedding</td>
 <td>[11014, 20]</td>
-<td>0</td>
+<td>0.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9983</td>
 <td>0.4721</td>
 <td>0.5136</td>
 <td>0.4946</td>
@@ -8980,15 +9022,15 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>5</th>
+<th>7</th>
 <td>online_iNMF</td>
 <td>CHAIN_OK</td>
 <td>80.7</td>
 <td>embedding</td>
 <td>[11014, 20]</td>
-<td>0</td>
+<td>0.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9976</td>
 <td>0.3749</td>
 <td>0.4690</td>
 <td>0.4666</td>
@@ -8997,15 +9039,32 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>6</th>
+<th>8</th>
+<td>scBridge</td>
+<td>FAIL</td>
+<td>0.2</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>NaN</td>
+</tr>
+<tr>
+<th>9</th>
 <td>scJoint</td>
 <td>CHAIN_OK</td>
 <td>208.9</td>
 <td>embedding</td>
 <td>[11014, 64]</td>
-<td>21</td>
+<td>21.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9992</td>
 <td>0.6178</td>
 <td>0.6377</td>
 <td>0.5349</td>
@@ -9014,15 +9073,15 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>7</th>
+<th>10</th>
 <td>sciCAN</td>
 <td>CHAIN_OK</td>
 <td>15735.0</td>
 <td>embedding</td>
 <td>[11014, 25]</td>
-<td>0</td>
+<td>0.0</td>
 <td>rna_cty.csv+atac_cty.csv</td>
-<td>NaN</td>
+<td>0.9968</td>
 <td>0.1877</td>
 <td>0.3688</td>
 <td>0.5133</td>
@@ -9031,15 +9090,15 @@ stored results of exactly that sweep.</p>
 <td>NaN</td>
 </tr>
 <tr>
-<th>8</th>
+<th>11</th>
 <td>uniPort</td>
 <td>CHAIN_OK</td>
 <td>4133.0</td>
 <td>embedding</td>
 <td>[11014, 16]</td>
-<td>1</td>
+<td>1.0</td>
 <td>atac_cty.csv+rna_cty.csv</td>
-<td>NaN</td>
+<td>0.9985</td>
 <td>0.5994</td>
 <td>0.6198</td>
 <td>0.5320</td>
@@ -9055,7 +9114,7 @@ stored results of exactly that sweep.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e54e7480">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=24194255">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9068,7 +9127,7 @@ and the error is in the table.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7231cf93">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=50852e72">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9138,7 +9197,7 @@ and the error is in the table.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d3db4262">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=4d778189">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9150,7 +9209,7 @@ that is not a per-method failure, it means the request itself was wrong, so
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5be8ce63">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fd690903">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9181,7 +9240,84 @@ that is not a per-method failure, it means the request itself was wrong, so
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f9aa1128">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=88321d30">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="Reloading-a-finished-sweep">Reloading a finished sweep<a class="anchor-link" href="#Reloading-a-finished-sweep">¶</a></h3><p><code>run_all</code> saves itself, so the morning after an overnight run you can reopen the
+results and re-plot <strong>without recomputing anything</strong>:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=89511bdf">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">reloaded</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="s2">"/tmp/tut_fail"</span><span class="p">)</span>      <span class="c1"># the sweep we just ran</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">reloaded</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="s2">"|"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">reloaded</span><span class="p">),</span> <span class="s2">"method(s)"</span><span class="p">)</span>
+<span class="n">reloaded</span><span class="o">.</span><span class="n">summary</span><span class="p">[[</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">]]</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>BatchResult | 1 method(s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[14]:</div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+<thead>
+<tr style="text-align: right;">
+<th></th>
+<th>method</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th>0</th>
+<td>online_iNMF</td>
+<td>FAIL</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2751a215">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9191,12 +9327,12 @@ that is not a per-method failure, it means the request itself was wrong, so
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3ea86cb3">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c59be17b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">long</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">RESULTS</span> <span class="o">/</span> <span class="s2">"long_all_D28.csv"</span><span class="p">)</span>
@@ -9221,22 +9357,23 @@ that is not a per-method failure, it means the request itself was wrong, so
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=339f81e9">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=80612927">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <blockquote>
-<p>The bubble chart encodes <strong>radius = rank</strong> and <strong>fill = value normalised within
-the plotted set</strong> — both relative to what you plotted. Read the table beside it;
+<p>The bubble chart encodes <strong>radius = rank</strong> — <strong>rank 1 is the LARGEST bubble</strong> —
+and <strong>fill = value normalised within the plotted set</strong>, darker being higher.
+Both are relative to what you plotted. Read the table beside it;
 with few methods a tiny gap can look decisive.</p>
 </blockquote>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=48af0364">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b0cc4be4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

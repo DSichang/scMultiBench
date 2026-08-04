@@ -417,17 +417,17 @@ class BatchResult:
         ``status`` is ``CHAIN_OK`` (ran and scored), ``CHAIN_OK_GRAPH_METHOD``
         (scored via a secondary embedding), ``RUN_OK_NO_EMBEDDING`` (ran, but the
         method emits a graph/coordinates so clustering metrics do not apply),
-        Two methods can both be ``output_kind=graph`` and still end differently:
-        scMoMaT also writes a UMAP embedding among its ``extra_outputs``, so it is
-        scored through that (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a
-        neighbour graph, so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and
-        its ``emb_shape`` then describes the graph written, not an embedding.
-
         ``RUN_OK_EVAL_FAILED`` (the method ran and produced an embedding, but every
         candidate label ordering failed to score - usually no label file matches the
         embedding's cell count), ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or
         ``FAIL`` (the method itself errored; see ``error``).
         ``FAIL``, ``TIMEOUT`` and ``RUN_OK_EVAL_FAILED`` appear in :attr:`failures`.
+
+        Two methods can both be ``output_kind=graph`` and still end differently:
+        scMoMaT also writes a UMAP embedding among its ``extra_outputs``, so it is
+        scored through that (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a
+        neighbour graph, so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and
+        its ``emb_shape`` then describes the graph written, not an embedding.
 
         Two columns describe how the cells were matched to labels:
 
@@ -437,12 +437,6 @@ class BatchResult:
             embedding holds two disjoint cell sets stacked in a method-specific
             order, so this is the difference between a meaningful ARI and a
             meaningless one.
-        Metrics that come back ``NaN`` for every method are not a bug in the run:
-        the batch-aware ones (``iASW``, ``iF1``) are undefined on a single-batch
-        dataset, and ``cLISI``/``iLISI`` additionally need a ``scib`` C extension
-        that fails to load against older system libraries. Clustering metrics
-        (``ARI``, ``NMI``, ``ASW``) are unaffected.
-
         ``label_order_confidence``
             ``(best - runner_up) / best`` over the candidate orderings, on a 0-1
             scale, or ``None`` when only one ordering was possible (so there was
@@ -452,7 +446,9 @@ class BatchResult:
             correspondence is unambiguous and the metrics can be read normally.
             **Below ~0.5** - two orderings explained the embedding comparably well,
             which should not happen for a correct one; treat that row with suspicion.
-            **``None``** - either only one ordering was possible, or the WINNING
+            **``None``** - either only one ordering was possible (normal for a
+            paired/vertical dataset with a single ``cty.csv``: there is nothing to
+            choose between), or the WINNING
             ordering was itself at chance (ARI < 0.05), in which case the ratio would
             just compare two noise values. A ``None`` next to a near-zero ARI means
             no ordering explained the embedding; the method failed at the task, and
@@ -788,6 +784,11 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         df = mtb.sweep("MYDATA", "vertical", "Multigrate", "lr",
                        [1e-4, 1e-3, 1e-2], out_dir="out/lr")
         df[["lr", "ARI", "NMI"]]
+
+    A setting that fails is not fatal: ``run_all`` records it, so that value's row
+    appears with ``status`` ``FAIL`` (or ``TIMEOUT``) and empty metrics rather than
+    aborting the sweep. Check the ``status`` column before reading the curve - a
+    failed setting and a genuinely poor one must not be confused.
 
     Check :func:`multibench.params_for` first - a method whose ``tunable`` is empty
     hardcodes its hyperparameters and cannot be swept at all.
