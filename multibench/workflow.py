@@ -248,6 +248,21 @@ def _installed_envs() -> frozenset:
         return frozenset()
 
 
+#: Known method x dataset incompatibilities that file/env checks cannot see.
+#: These are CONTENT problems - the files exist and the env is installed, but the
+#: method still cannot finish. Surfaced by scan() so a sweep does not discover them
+#: hours in.
+_CAVEATS = {
+    ("GLUE", "D28"): ("GLUE parses coordinates out of peak NAMES and needs them "
+                      "colon-delimited (chr1:1-200); D28's are underscore-delimited "
+                      "and it IndexErrors. Use D27, or rename the peaks."),
+}
+
+
+def _caveat(method: str, dataset: str) -> str:
+    return _CAVEATS.get((method, dataset), "")
+
+
 def _variant_rows(category=None):
     for spec in registry.load():
         for v in spec.variants:
@@ -292,13 +307,14 @@ def scan(dataset: str, category: str | None = None,
     rows = []
     for spec, v, cat, mods in _variant_rows(category):
         rt = _runtimes().get(spec.id, {})
+        cav = _caveat(spec.id, dataset)
         rec = {"method": spec.id, "category": cat,
                "modalities": "+".join(mods) or "(data_dir)",
                "env": envs.group_for(spec.id), "output_kind": v.output.kind,
                "n_tunable": len(v.tunable),
                "runtime_tier": rt.get("tier", "unknown"),
                "observed_worst_sec": rt.get("worst_sec"),
-               "runnable": False, "reason": ""}
+               "caveat": cav, "runnable": False, "reason": ""}
         if rec["env"] and rec["env"] not in _installed_envs():
             rec["reason"] = (f"conda env {rec['env']!r} is not installed - run "
                              "`multibench env install --run` (see mtb.env.doctor())")
@@ -452,6 +468,10 @@ class BatchResult:
             correspondence is unambiguous and the metrics can be read normally.
             **Below ~0.5** - two orderings explained the embedding comparably well,
             which should not happen for a correct one; treat that row with suspicion.
+            The column stays NUMERIC so ``> 0.5`` and ``.isna()`` behave; when it is
+            empty, the sibling column ``label_order_note`` says which case applies
+            (``"single ordering"`` / ``"winner at chance"`` / ``"not scored"``).
+
             **``None``** - either only one ordering was possible (normal for a
             paired/vertical dataset with a single ``cty.csv``: there is nothing to
             choose between), or the WINNING
@@ -560,11 +580,19 @@ class BatchResult:
         d.mkdir(parents=True, exist_ok=True)
         sm = self.summary.copy()
         # "one ordering only" is a RESULT, "never ran" is an absence - a bare NaN
-        # cannot tell them apart once written to CSV, so make the former explicit.
+        # cannot tell them apart on disk. Put the explanation in its OWN column:
+        # mixing a sentinel string into the numeric one breaks `> 0.5`, makes
+        # .isna() miss the very rows it should catch, and trips a pandas
+        # incompatible-dtype FutureWarning.
         if "label_order_confidence" in sm:
             scored = sm["status"].astype(str).str.startswith("CHAIN_OK")
-            sm.loc[scored & sm["label_order_confidence"].isna(),
-                   "label_order_confidence"] = "n/a (single ordering)"
+            blank = scored & sm["label_order_confidence"].isna()
+            ari = pd.to_numeric(sm.get("ARI"), errors="coerce")
+            why = pd.Series([None] * len(sm), index=sm.index, dtype=object)
+            why[blank & (ari < 0.05)] = "winner at chance"
+            why[blank & ~(ari < 0.05)] = "single ordering"
+            why[~scored] = "not scored"
+            sm["label_order_note"] = why
         sm.to_csv(d / "summary.csv", index=False)
         if not self.long.empty:
             self.long.to_csv(d / "long.csv", index=False)
