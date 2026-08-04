@@ -171,6 +171,13 @@ def describe_layout(category: str | None = None) -> str:
               "named 'x') holds the cell type.", ""]
     if category:
         lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
+    lines += ["", "ENVIRONMENTS",
+              "  Every method runs in its OWN conda env (they need mutually",
+              "  incompatible framework versions). scan() marks a method NOT runnable",
+              "  if its env is missing, so a sweep never starts one that cannot finish.",
+              "      multibench env doctor          # what is needed / what is missing",
+              "      multibench env install --run   # build them all from lockfiles",
+              ""]
     lines += ["Then:  mtb.scan('MYDATA')  ->  mtb.run_all('MYDATA', '<category>', out_dir=...)"]
     return "\n".join(lines)
 
@@ -301,7 +308,10 @@ def scan(dataset: str, category: str | None = None,
             if not ok:
                 rec["reason"] = why
         except Exception as e:  # missing files / no variant / bad layout
-            rec["reason"] = f"{type(e).__name__}: {e}"[:160]
+            msg = f"{type(e).__name__}: {e}"
+            # keep the TAIL: the filename is at the END of the message and is the
+            # whole point of it. Right-truncation ate exactly what the user needs.
+            rec["reason"] = msg if len(msg) <= 500 else msg[:100] + " ... " + msg[-380:]
         rows.append(rec)
     df = pd.DataFrame(rows).sort_values(
         ["runnable", "category", "method"], ascending=[False, True, True])
