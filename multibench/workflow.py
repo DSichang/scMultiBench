@@ -87,7 +87,12 @@ ROLES = {
     "atac_peak": "peak.h5     - ATAC as PEAKS                 <-- note: peak.h5, NOT atac.h5",
     "rna1/rna2/...": "rna1.h5, rna2.h5, ... - one file per BATCH (mosaic/cross)",
     "adt1/adt2/...": "adt1.h5, adt2.h5, ... - one file per BATCH (mosaic/cross)",
-    "cty":       "cty.csv     - cell-type labels (cty1.csv, cty2.csv, ... per batch)",
+    "cty":       "cty.csv     - cell-type labels, ONE label set (vertical)",
+    "rna_cty / atac_cty":
+                 "rna_cty.csv, atac_cty.csv - one label file PER MODALITY, used when "
+                 "RNA and ATAC come from different cells (diagonal)",
+    "cty1/cty2/...":
+                 "cty1.csv, cty2.csv, ... - one label file per BATCH (mosaic/cross)",
 }
 
 
@@ -322,6 +327,11 @@ def _label_candidates(dataset, n, data_path=None):
     return out
 
 
+#: Below this ARI the winning ordering is itself at chance, so the confidence
+#: ratio would compare two noise values and mean nothing.
+_CHANCE_ARI = 0.05
+
+
 def _order_confidence(cands) -> float | None:
     """How clearly the winning label order beat the alternatives, on a 0-1 scale.
 
@@ -335,8 +345,11 @@ def _order_confidence(cands) -> float | None:
     if not cands or len(cands) < 2:
         return None
     best, second = cands[0]["ARI"], cands[1]["ARI"]
-    if best <= 0:
-        return 0.0
+    # A ratio of two chance-level numbers is noise, not confidence: 0.0004 vs
+    # 0.0002 would read 0.5 while BOTH orderings are garbage. Report None so the
+    # column cannot be misread as evidence when no ordering worked at all.
+    if best < _CHANCE_ARI:
+        return None
     return round(max(0.0, (best - second) / best), 4)
 
 
@@ -389,6 +402,12 @@ class BatchResult:
             embedding holds two disjoint cell sets stacked in a method-specific
             order, so this is the difference between a meaningful ARI and a
             meaningless one.
+        Metrics that come back ``NaN`` for every method are not a bug in the run:
+        the batch-aware ones (``iASW``, ``iF1``) are undefined on a single-batch
+        dataset, and ``cLISI``/``iLISI`` additionally need a ``scib`` C extension
+        that fails to load against older system libraries. Clustering metrics
+        (``ARI``, ``NMI``, ``ASW``) are unaffected.
+
         ``label_order_confidence``
             ``(best - runner_up) / best`` over the candidate orderings, on a 0-1
             scale, or ``None`` when only one ordering was possible (so there was
@@ -398,6 +417,11 @@ class BatchResult:
             correspondence is unambiguous and the metrics can be read normally.
             **Below ~0.5** - two orderings explained the embedding comparably well,
             which should not happen for a correct one; treat that row with suspicion.
+            **``None``** - either only one ordering was possible, or the WINNING
+            ordering was itself at chance (ARI < 0.05), in which case the ratio would
+            just compare two noise values. A ``None`` next to a near-zero ARI means
+            no ordering explained the embedding; the method failed at the task, and
+            the ordering machinery has nothing to say about it.
 
             It is deliberately a RATIO, not a difference. The runner-up sits near
             chance, so a difference is bounded above by the ARI itself and a method
@@ -465,8 +489,8 @@ class BatchResult:
         """Bubble figure of every method that produced metrics.
 
         Methods are rows (best first), metrics are columns; bubble SIZE encodes the
-        method's rank and bubble COLOUR the value, both relative to the methods in
-        this figure. Read it next to :attr:`summary` - with few methods a small
+        method's rank - **rank 1 is the LARGEST bubble** - and bubble COLOUR the
+        value, darker being higher. Both are relative to the methods in this figure. Read it next to :attr:`summary` - with few methods a small
         absolute gap still spans the whole colour scale.
 
         Returns a matplotlib ``Figure``; save it with ``fig.savefig("out.png")``.

@@ -1,9 +1,9 @@
-method,status,sec,kind,emb,std,tunable,env,ARI,NMI,ASW,iASW,iF1,cLISI
-Concerto,CHAIN_OK,8797.8,embedding,"[23478, 128]",0.0761,0,scmb_concerto,0.6741,0.7371,0.5175,,,
-StabMap,CHAIN_OK,68.6,embedding,"[23478, 50]",2.5945,0,scmb_r,0.688,0.776,0.5569,,,
-UINMF,CHAIN_OK,62.8,embedding,"[14764, 30]",0.0137,0,scmb_r,0.6905,0.7772,0.5668,,,
-scMDC,CHAIN_OK,2701.5,embedding,"[23478, 16]",0.7674,0,scmb_scmdc,0.7048,0.7791,0.6159,,,
-scMM,CHAIN_OK,627.8,embedding,"[23478, 10]",1.2768,0,scmb_scmm2,0.3745,0.5715,0.499,,,
-scMoMaT,CHAIN_OK_GRAPH_METHOD,1022.1,graph,"[23478, 2]",5.696,0,scmb_torch,0.4738,0.6855,0.5512,,,
-sciPENN,CHAIN_OK,64.2,embedding,"[23478, 512]",0.5456,0,env_sciPENN,0.6947,0.7914,0.6062,,,
-totalVI,CHAIN_OK,2839.3,embedding,"[23478, 20]",0.8036,0,scmb_scvi,0.7668,0.803,0.5455,,,
+method,status,run_sec,output_kind,emb_shape,n_tunable,ARI,NMI,ASW,iASW,iF1,cLISI
+Concerto,CHAIN_OK,8797.8,embedding,"[23478, 128]",0,0.6741,0.7371,0.5175,,,
+StabMap,CHAIN_OK,68.6,embedding,"[23478, 50]",0,0.688,0.776,0.5569,,,
+UINMF,CHAIN_OK,62.8,embedding,"[14764, 30]",0,0.6905,0.7772,0.5668,,,
+scMDC,CHAIN_OK,2701.5,embedding,"[23478, 16]",0,0.7048,0.7791,0.6159,,,
+scMM,CHAIN_OK,627.8,embedding,"[23478, 10]",0,0.3745,0.5715,0.499,,,
+scMoMaT,CHAIN_OK_GRAPH_METHOD,1022.1,graph,"[23478, 2]",0,0.4738,0.6855,0.5512,,,
+sciPENN,CHAIN_OK,64.2,embedding,"[23478, 512]",0,0.6947,0.7914,0.6062,,,
+totalVI,CHAIN_OK,2839.3,embedding,"[23478, 20]",0,0.7668,0.803,0.5455,,,
