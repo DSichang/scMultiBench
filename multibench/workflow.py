@@ -627,6 +627,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
            as if it had succeeded. After a hard kill, delete that method's
            sub-directory before resuming.
 
+    Only methods that :func:`scan` marks runnable are attempted, which means their
+    conda environment was found - a missing env is reported there rather than
+    failing hours in (``multibench env doctor`` / ``env install --run``).
+
     Methods can take minutes to hours; a failure is recorded, never raised, so one
     bad method cannot abort the sweep.
     """
@@ -696,8 +700,16 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                     signal.alarm(0)
                     signal.signal(signal.SIGALRM, prev)
             else:
-                res = _run(method=m, category=category, inputs=inp,
-                           out_dir=str(mdir), params=params.get(m))
+                mp = params.get(m)
+            if mp:
+                allowed = set(v0.tunable) | set(v0.params)
+                unknown = [k for k in mp if allowed and k not in allowed]
+                if unknown:
+                    raise KeyError(
+                        f"{m} does not accept {unknown}; it accepts {sorted(allowed)}. "
+                        "An empty set means it hardcodes its hyperparameters upstream.")
+            res = _run(method=m, category=category, inputs=inp,
+                           out_dir=str(mdir), params=mp)
             rec["reused"] = bool(reused)
             rec["run_sec"] = round(time.time() - t0, 1)
             spec = registry.get(m)
@@ -755,7 +767,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
             rec["run_sec"] = round(time.time() - t0, 1)
         except Exception as e:
             rec["status"] = "FAIL"
-            rec["error"] = f"{type(e).__name__}: {e}"[:300]
+            em = f"{type(e).__name__}: {e}"
+            # keep the TAIL: a traceback ends with the actual exception, which is
+            # the whole point. Right-truncation discarded exactly that.
+            rec["error"] = em if len(em) <= 600 else em[:120] + " ... " + em[-460:]
             rec["traceback"] = traceback.format_exc()[-1200:]
             rec["run_sec"] = round(time.time() - t0, 1)
         if verbose:
