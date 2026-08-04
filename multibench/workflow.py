@@ -208,6 +208,15 @@ def _data_dir_usable(variant, ds_dir) -> tuple[bool, str]:
 
 
 
+@functools.lru_cache(maxsize=1)
+def _installed_envs() -> frozenset:
+    """Conda envs present on this machine (cached; see mtb.env.doctor())."""
+    try:
+        return frozenset(envs.installed_envs())
+    except Exception:      # never let an env probe break discovery
+        return frozenset()
+
+
 def _variant_rows(category=None):
     for spec in registry.load():
         for v in spec.variants:
@@ -222,7 +231,12 @@ def scan(dataset: str, category: str | None = None,
     """Report every method that can run on ``dataset``, and why the rest cannot.
 
     Returns one row per (method, category, modalities) with ``runnable`` and, when
-    it is not, a ``reason``. Also carries ``runtime_tier`` /
+    it is not, a ``reason``. ``modalities`` is a ``+``-joined STRING here (e.g.
+    ``"rna+adt"``); ``run_all``/``inputs_for`` take it as a LIST
+    (``["rna", "adt"]``), so split on ``"+"``. The sentinel ``"(data_dir)"`` marks a
+    method that consumes a whole DIRECTORY rather than named modality files (the
+    spatial-registration methods, and scBridge) - for those, pass no ``modalities``
+    at all. Also carries ``runtime_tier`` /
     ``observed_worst_sec`` (see :func:`runtime_hint`) so you can size a sweep
     BEFORE launching it. Nothing is executed. This is the first call to make
     when pointing the benchmark at a NEW dataset.
@@ -248,6 +262,11 @@ def scan(dataset: str, category: str | None = None,
                "runtime_tier": rt.get("tier", "unknown"),
                "observed_worst_sec": rt.get("worst_sec"),
                "runnable": False, "reason": ""}
+        if rec["env"] and rec["env"] not in _installed_envs():
+            rec["reason"] = (f"conda env {rec['env']!r} is not installed - run "
+                             "`multibench env install --run` (see mtb.env.doctor())")
+            rows.append(rec)
+            continue
         try:
             got = _resolve.inputs_for(dataset, spec.id, cat, modalities=mods or None,
                                       data_path=data_path, check=True)
@@ -303,6 +322,24 @@ def _label_candidates(dataset, n, data_path=None):
     return out
 
 
+def _order_confidence(cands) -> float | None:
+    """How clearly the winning label order beat the alternatives, on a 0-1 scale.
+
+    ``(best - runner_up) / best``. A plain DIFFERENCE would be useless here: the
+    runner-up sits near chance (ARI ~ 0), so the difference is bounded above by the
+    ARI itself, and any method scoring 0.3 could never look "clearly separated" no
+    matter how unambiguous its ordering. Dividing by the winner removes that
+    coupling, so a genuinely unambiguous order reads ~1.0 whether the method scored
+    0.9 or 0.2.
+    """
+    if not cands or len(cands) < 2:
+        return None
+    best, second = cands[0]["ARI"], cands[1]["ARI"]
+    if best <= 0:
+        return 0.0
+    return round(max(0.0, (best - second) / best), 4)
+
+
 def _evaluate_best_order(emb, category, cands):
     """Score each candidate label order, keep the best, return the full spread."""
     scored = []
@@ -338,8 +375,11 @@ class BatchResult:
         ``status`` is ``CHAIN_OK`` (ran and scored), ``CHAIN_OK_GRAPH_METHOD``
         (scored via a secondary embedding), ``RUN_OK_NO_EMBEDDING`` (ran, but the
         method emits a graph/coordinates so clustering metrics do not apply),
-        ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or ``FAIL``.
-        ``TIMEOUT`` and ``FAIL`` both appear in :attr:`failures`.
+        ``RUN_OK_EVAL_FAILED`` (the method ran and produced an embedding, but every
+        candidate label ordering failed to score - usually no label file matches the
+        embedding's cell count), ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or
+        ``FAIL`` (the method itself errored; see ``error``).
+        ``FAIL``, ``TIMEOUT`` and ``RUN_OK_EVAL_FAILED`` appear in :attr:`failures`.
 
         Two columns describe how the cells were matched to labels:
 
@@ -349,10 +389,26 @@ class BatchResult:
             embedding holds two disjoint cell sets stacked in a method-specific
             order, so this is the difference between a meaningful ARI and a
             meaningless one.
-        ``label_order_margin``
-            ARI of the chosen order minus the runner-up. A LARGE margin (~0.5+)
-            means the ordering is unambiguous. A SMALL margin means no ordering
-            explained the embedding well - treat that row's metrics with suspicion.
+        ``label_order_confidence``
+            ``(best - runner_up) / best`` over the candidate orderings, on a 0-1
+            scale, or ``None`` when only one ordering was possible (so there was
+            nothing to choose).
+
+            **Near 1.0** - every alternative ordering scored near chance, so the
+            correspondence is unambiguous and the metrics can be read normally.
+            **Below ~0.5** - two orderings explained the embedding comparably well,
+            which should not happen for a correct one; treat that row with suspicion.
+
+            It is deliberately a RATIO, not a difference. The runner-up sits near
+            chance, so a difference is bounded above by the ARI itself and a method
+            scoring 0.3 could never look well-separated however unambiguous its
+            ordering. The ratio is scale-free.
+
+            .. note::
+               When more than one ordering is possible the reported metrics are the
+               MAXIMUM over them, so they carry a small optimistic bias. That is the
+               price of not making the caller guess the order; this column is how you
+               see whether the choice was clear-cut.
         """
         rows = []
         for r in self.records:
@@ -360,8 +416,7 @@ class BatchResult:
             rows.append({k: r.get(k) for k in
                          ("method", "status", "run_sec", "output_kind", "emb_shape", "n_tunable")}
                         | {"label_order": "+".join(r.get("labels_used") or []) or None,
-                           "label_order_margin": (round(cands[0]["ARI"] - cands[1]["ARI"], 4)
-                                                  if len(cands) > 1 else None)}
+                           "label_order_confidence": _order_confidence(cands)}
                         | {m: v for m, v in (r.get("metrics") or {}).items()})
         return pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
 
@@ -377,7 +432,10 @@ class BatchResult:
 
     @property
     def results(self) -> list:
-        """Raw per-method records (status, out_dir, metrics, label-order spread).
+        """Raw per-method records: status, out_dir, metrics, and
+        ``label_order_candidates`` - every label ordering that was tried, with the
+        ARI each achieved (the evidence behind
+        :attr:`summary`'s ``label_order_confidence``).
 
         Keeps a long sweep's outputs addressable so you can re-score or re-plot
         WITHOUT re-running the methods.
@@ -496,11 +554,11 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         resume without repeating the hours already done.
 
         .. warning::
-           Reuse is keyed on the output FILE, not on ``params``. If you change a
-           hyperparameter and re-run into the SAME ``out_dir`` with
-           ``skip_existing=True`` you will silently get the OLD result. When
-           tuning, use a fresh ``out_dir`` per setting (or leave this False).
-           ``run_all`` refuses this combination rather than mislead you.
+           **``skip_existing=True`` together with ``params=...`` raises
+           ``ValueError``.** Reuse is keyed on the output FILE, not on ``params``,
+           so without that guard you would silently receive results computed with
+           the OLD parameters. When tuning, give each setting a fresh ``out_dir``
+           (or leave ``skip_existing`` False).
 
         .. warning::
            Reuse only checks that the output file EXISTS, not that it is complete.
