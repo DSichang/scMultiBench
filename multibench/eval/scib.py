@@ -24,6 +24,35 @@ def _build_adata(emb, celltype, cluster, batch):
 
 
 
+def leiden_sweep(emb):
+    """Run the scIB optimal-resolution Leiden sweep ONCE, reusably.
+
+    ``cluster_optimal_resolution`` clusters the embedding at 10 resolutions and
+    keeps whichever maximises NMI against a label vector. The clustering at a
+    given resolution depends only on the embedding - the label vector enters
+    solely through the argmax - so ranking N candidate label orderings needs one
+    sweep, not N. On D52 cross (6 candidate orderings, 23,478 cells) the per-
+    candidate sweeps cost ~250s each and dominated the whole evaluation.
+
+    Returns ``(adata, keys)``. The caller assigns ``adata.obs["celltype"]`` and
+    scores with scib's OWN ``nmi``/``ari`` against each key, so the selection
+    protocol stays identical to ``cluster_optimal_resolution``'s rather than
+    being reimplemented.
+    """
+    import scanpy as sc
+    from scib.metrics.clustering import get_resolutions
+
+    adata = ad.AnnData(np.asarray(emb, dtype=float))
+    adata.obsm["X_emb"] = adata.X
+    sc.pp.neighbors(adata, use_rep="X_emb")
+    keys = []
+    for res in get_resolutions(n=10, max=2):
+        key = f"_mb_res_{res}"
+        sc.tl.leiden(adata, resolution=res, key_added=key)
+        keys.append(key)
+    return adata, keys
+
+
 def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold):
     """Isolated-label F1, identical to scib's but without the per-label re-clustering.
 
