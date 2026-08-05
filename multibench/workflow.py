@@ -347,6 +347,42 @@ def _read_cty(path):
     return d[col].to_numpy()
 
 
+_NOT_ARMED = object()
+
+
+def _arm_deadline(seconds):
+    """Start a SIGALRM deadline covering an ENTIRE per-method step.
+
+    The alarm used to wrap only the dispatch call and was cancelled immediately
+    after it, so everything downstream - reading the output back, and above all
+    computing the metrics - ran unbounded. A method finishing in 35s could then
+    spend 105 minutes in the metric layer with timeout= set and never fire.
+
+    Returns the previous handler, or ``_NOT_ARMED`` when no deadline was asked
+    for. ``None`` is not usable as that sentinel: signal.signal legitimately
+    returns None when the previous handler was not installed from Python.
+    """
+    if not seconds:
+        return _NOT_ARMED
+    import signal
+
+    def _fire(signum, frame):
+        raise TimeoutError(f"exceeded timeout of {seconds}s")
+
+    prev = signal.signal(signal.SIGALRM, _fire)
+    signal.alarm(int(seconds))
+    return prev
+
+
+def _disarm_deadline(prev):
+    if prev is _NOT_ARMED:
+        return
+    import signal
+    signal.alarm(0)
+    signal.signal(signal.SIGALRM, prev)
+
+
+
 def _label_candidates(dataset, n, data_path=None):
     """Every label ordering whose length matches ``n`` (length alone cannot pick one)."""
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
@@ -724,7 +760,9 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         t0 = time.time()
         if verbose:
             print(f"[run_all] {m} ({category}/{dataset}) ...", flush=True)
+        _deadline_prev = _NOT_ARMED
         try:
+            _deadline_prev = _arm_deadline(timeout)
             inp = _resolve.inputs_for(dataset, m, category, modalities=mod_list or None,
                                       data_path=data_path, check=True)
             mdir = out_dir / f"{m}_{dataset}"
@@ -750,20 +788,6 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                 if verbose:
                     print(f"[run_all]   reusing existing output in {mdir}", flush=True)
                 res = None                       # read back from disk below
-            elif timeout:
-                import signal
-
-                def _timed_out(signum, frame):
-                    raise TimeoutError(f"exceeded timeout of {timeout}s")
-
-                prev = signal.signal(signal.SIGALRM, _timed_out)
-                signal.alarm(int(timeout))
-                try:
-                    res = _run(method=m, category=category, inputs=inp,
-                               out_dir=str(mdir), params=mp)
-                finally:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, prev)
             else:
                 res = _run(method=m, category=category, inputs=inp,
                            out_dir=str(mdir), params=mp)
@@ -830,6 +854,8 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
             rec["error"] = em if len(em) <= 600 else "... " + em[-596:]
             rec["traceback"] = traceback.format_exc()[-1200:]
             rec["run_sec"] = round(time.time() - t0, 1)
+        finally:
+            _disarm_deadline(_deadline_prev)
         if verbose:
             print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) "
                   f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)

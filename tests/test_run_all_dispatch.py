@@ -10,6 +10,8 @@ These tests fake ``_run`` so they assert dispatch behaviour without launching a
 real method.
 """
 
+import time
+
 import numpy as np
 import pytest
 
@@ -86,6 +88,37 @@ def test_valid_override_reaches_the_method_with_timeout(monkeypatch, tmp_path):
     assert len(calls) == 1
     assert calls[0]["params"] == {key: tunable[key]}, \
         "override was dropped on the timeout path"
+
+
+def test_timeout_bounds_evaluation_not_just_dispatch(monkeypatch, tmp_path):
+    """Regression: the SIGALRM guard wrapped only the dispatch call and was
+    cancelled right after it, so the metric layer ran unbounded. A method that
+    finished in 35 s then spent 105 min in evaluation with timeout= set."""
+    calls = []
+    monkeypatch.setattr(W, "_run", _fake_run(calls))
+
+    def _slow_eval(*a, **k):
+        time.sleep(60)
+        raise AssertionError("evaluation should have been cut short by the deadline")
+
+    monkeypatch.setattr(W, "_evaluate_best_order", _slow_eval)
+
+    t0 = time.time()
+    res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+                      timeout=2, evaluate=True, verbose=False)
+    elapsed = time.time() - t0
+    assert res.summary.iloc[0]["status"] == "TIMEOUT", res.summary.to_string()
+    assert elapsed < 30, f"deadline never fired during evaluation ({elapsed:.1f}s)"
+
+
+def test_deadline_is_disarmed_after_each_method(monkeypatch, tmp_path):
+    """A leaked SIGALRM would fire during an unrelated later call."""
+    import signal
+    calls = []
+    monkeypatch.setattr(W, "_run", _fake_run(calls))
+    mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+                timeout=600, evaluate=False, verbose=False)
+    assert signal.alarm(0) == 0, "an armed alarm outlived run_all"
 
 
 def test_skip_existing_does_not_redispatch(monkeypatch, tmp_path):
