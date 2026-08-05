@@ -115,7 +115,6 @@ dependencies:
       - cliff==4.9.1
       - cmaes==0.13.0
       - cmd2==2.7.0
-      - cobolt==0.0.1
       - colorlog==6.10.1
       - contourpy==1.3.0
       - cycler==0.12.1
@@ -163,7 +162,6 @@ dependencies:
       - mpmath==1.3.0
       - msgpack==1.1.2
       - mudata==0.2.4
-      - multimap==0.0.1
       - munkres==1.1.4
       - muon==0.1.6
       - natsort==8.4.0
