@@ -571,6 +571,7 @@ dependencies:
   - zstandard=0.23.0
   - zstd=1.5.6
   - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu118
       - anndata==0.10.5.post1
       - argparse==1.4.0
       - array-api-compat==1.4.1
