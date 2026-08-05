@@ -11,8 +11,16 @@ import pandas as pd
 from .style import compute_overall, minmax, rank_max
 
 # scIB metric families, so a summary can be split the way the benchmark reports it
-CLUSTERING_METRICS = ["ARI", "NMI", "ASW", "cLISI"]
-BATCH_METRICS = ["iASW", "iF1", "ASW_batch", "GC", "iLISI", "kBET"]
+# These must agree with the groups eval.scib.compute() actually emits - see
+# tests/test_metric_groups.py, which pins them together. iASW and iF1 are
+# ISOLATED-LABEL scores: scib files them under bio conservation, alongside
+# ARI/NMI/ASW/cLISI, not under batch correction. They used to sit in
+# BATCH_METRICS here while compute() emitted them for group="clustering", so the
+# same number was labelled a different family depending on which module you
+# asked - and a single-batch dataset like D11, which legitimately has iASW/iF1
+# and no batches at all, rendered as though it had batch-correction results.
+CLUSTERING_METRICS = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
+BATCH_METRICS = ["ASW_batch", "GC", "iLISI", "kBET"]
 
 
 def _score_per_dataset(long_df: pd.DataFrame, metrics=None) -> pd.DataFrame:
