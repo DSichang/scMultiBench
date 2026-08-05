@@ -28,6 +28,7 @@ dependencies:
   - wheel=0.45.1
   - zstd=1.5.7
   - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu117
       - anndata==0.8.0
       - array-api-compat==1.11.2
       - contourpy==1.2.1

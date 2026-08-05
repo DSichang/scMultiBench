@@ -59,6 +59,7 @@ dependencies:
   - xz=5.2.6
   - zeromq=4.3.5
   - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu118
       - absl-py==2.1.0
       - aiohappyeyeballs==2.3.5
       - aiohttp==3.10.1

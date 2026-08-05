@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 import shutil
+import re
 import subprocess
 from pathlib import Path
 
@@ -286,6 +287,18 @@ def required_envs(category: str | None = None,
     return seen
 
 
+
+def post_install(env_name: str):
+    """Path to the committed post-install script for an env, or None.
+
+    Covers what a conda lockfile provably cannot: packages installed inside the
+    env by a language-native installer (install.packages(), install_github())
+    which conda never sees and therefore never restores.
+    """
+    p = _LOCKS_DIR / f"{env_name}.post.sh"
+    return p if p.is_file() else None
+
+
 def create_env(env_name: str, conda: str | None = None,
                dry_run: bool = True) -> list[list[str]]:
     """Create one real env from its committed lockfile (the reproducible path).
@@ -302,6 +315,14 @@ def create_env(env_name: str, conda: str | None = None,
         )
     conda = conda or _conda_bin("conda")
     cmds = [[conda, "env", "create", "-n", env_name, "-f", str(lock)]]
+    # Some packages cannot be captured by `conda env export` at all: an R package
+    # installed with install.packages() lives in the env's R library but conda has
+    # no record of it, so the lockfile rebuilds an env WITHOUT it. scmb_r lost
+    # rliger exactly this way - the one package UINMF needs - while still
+    # reporting a clean build. A committed <env>.post.sh restores those.
+    post = _LOCKS_DIR / f"{env_name}.post.sh"
+    if post.is_file():
+        cmds.append([conda, "run", "-n", env_name, "bash", str(post)])
     if not dry_run:
         _run_all(cmds)
     return cmds
@@ -354,6 +375,113 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
 
 
+
+_LOCAL_PIP_RE = re.compile(r"@\s*file://|feedstock_root")
+# conda's own installer machinery. `pip freeze` inside a conda env reports these
+# because they ARE importable there, but they are distributed only through conda
+# channels, so pip resolves nothing and the whole install aborts. scmb_r carried
+# `conda==23.3.1` and failed with "No matching distribution found for conda".
+# Deliberately narrow: packages that are genuinely conda-only, not everything
+# that happens to ship on conda-forge.
+_CONDA_ONLY_PIP = frozenset({
+    "conda", "mamba", "libmambapy", "boa",
+    "conda-build", "conda-libmamba-solver", "conda-content-trust",
+})
+_CUDA_PIN_RE = re.compile(r"==[0-9][^\s]*\+(cu\d+)")
+
+
+def sanitize_lock(text: str) -> str:
+    """Make an exported lockfile rebuildable on a DIFFERENT machine.
+
+    ``conda env export`` faithfully records two things that cannot resolve
+    anywhere except the machine that produced them, so a lockfile can look
+    complete and still fail every install:
+
+    * pip entries pointing into the conda-forge BUILD tree, e.g.
+      ``argcomplete @ file:///home/conda/feedstock_root/build_artifacts/...``.
+      These are conda packages pip merely observed; the conda dependency list
+      already provides them. Kept, they abort the install with
+      ``OSError: [Errno 2] No such file or directory``. They are dropped.
+
+    * CUDA-local torch pins, e.g. ``torch==2.6.0+cu118``. Those wheels are
+      published on download.pytorch.org and never on PyPI, so pip reports
+      ``No matching distribution found``. The matching ``--extra-index-url`` is
+      inserted rather than relaxing the pin, since the CUDA build is the point
+      of pinning it.
+
+    The pip block is located by INDENTATION rather than a fixed prefix: conda's
+    own export indents entries six spaces while freeze()'s fallback path writes
+    four, and a hard-coded width silently skips half the files.
+
+    Idempotent: re-sanitising an already-clean lockfile changes nothing.
+    """
+    out, cuda_tags = [], []
+    pip_indent = None
+    entry_indent = None
+    for ln in text.splitlines():
+        stripped = ln.strip()
+        indent = len(ln) - len(ln) + (len(ln) - len(ln.lstrip()))
+        if stripped == "- pip:":
+            pip_indent, entry_indent = indent, None
+            out.append(ln)
+            continue
+        if pip_indent is not None and stripped:
+            if indent <= pip_indent:
+                pip_indent = None          # dedented out of the pip block
+            else:
+                if entry_indent is None:
+                    entry_indent = indent
+                if _LOCAL_PIP_RE.search(stripped):
+                    continue               # unresolvable off this machine
+                name = re.split(r"[=<>!~\s\[]", stripped[2:].strip())[0].lower()
+                if name in _CONDA_ONLY_PIP:
+                    continue               # conda-only: pip can never supply it
+                m = _CUDA_PIN_RE.search(stripped)
+                if m and m.group(1) not in cuda_tags:
+                    cuda_tags.append(m.group(1))
+        out.append(ln)
+
+    if cuda_tags:
+        pad = " " * (entry_indent if entry_indent is not None else 6)
+        merged, inserted = [], False
+        for ln in out:
+            merged.append(ln)
+            if not inserted and ln.strip() == "- pip:":
+                for tag in cuda_tags:
+                    url = f"https://download.pytorch.org/whl/{tag}"
+                    if not any(url in x for x in out):
+                        merged.append(f"{pad}- --extra-index-url {url}")
+                inserted = True
+        out = merged
+    return "\n".join(out) + "\n"
+
+
+
+def _has_own_python(env_name: str, conda: str | None = None) -> bool:
+    """Does this env contain its OWN python interpreter?
+
+    ``conda run -n <env> pip freeze`` in an env that has no pip does not fail -
+    it falls through to whatever pip is next on PATH, which is the BASE
+    environment's. The captured list is then the base env's packages, written
+    into this env's lockfile.
+
+    That is not hypothetical: scmb_r is a pure R env with no python binary at
+    all, and its lockfile had picked up 229 base-environment entries including
+    ``conda==23.3.1`` (the base conda's own version), torch, and grpcio. On a
+    fresh machine the install aborted, and had it succeeded it would have
+    polluted an R env with the whole base interpreter.
+    """
+    conda = conda or _conda_bin("conda")
+    probe = subprocess.run(
+        [conda, "run", "-n", env_name, "python", "-c",
+         "import sys; print(sys.prefix)"],
+        capture_output=True, text=True)
+    if probe.returncode != 0:
+        return False
+    prefix = probe.stdout.strip()
+    return bool(prefix) and Path(prefix).name == env_name
+
+
 def freeze(env_name: str, conda: str | None = None,
            out_dir: Path | str | None = None) -> Path:
     """Capture an existing env to a committed lockfile (maintainer tool).
@@ -398,7 +526,7 @@ def freeze(env_name: str, conda: str | None = None,
     lines = [ln for ln in body.splitlines() if not ln.startswith("prefix:")]
     # If pip-installed packages weren't captured, append a pip: section from
     # `pip freeze` so the lockfile actually reproduces the env.
-    if "- pip:" not in "\n".join(lines):
+    if "- pip:" not in "\n".join(lines) and _has_own_python(env_name, conda):
         pip = _run(["run", "-n", env_name, "pip", "freeze"]).stdout
         pip_pkgs = [ln.strip() for ln in pip.splitlines()
                     if ln.strip() and not ln.startswith("-e ")]
@@ -407,7 +535,8 @@ def freeze(env_name: str, conda: str | None = None,
                 lines.append("dependencies:")
             lines += ["  - pip", "  - pip:"] + [f"    - {p}" for p in pip_pkgs]
     dst = dst_dir / f"{env_name}.yml"
-    dst.write_text("\n".join(lines) + "\n")
+    # an export is not automatically installable elsewhere - see sanitize_lock
+    dst.write_text(sanitize_lock("\n".join(lines)))
     return dst
 
 
