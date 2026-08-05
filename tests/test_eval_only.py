@@ -67,6 +67,40 @@ def test_best_order_still_returns_the_full_metric_set():
     assert {"ARI", "NMI", "ASW", "iASW", "iF1"} <= set(val.index), sorted(val.index)
 
 
+def test_shared_sweep_reproduces_the_standard_protocol_ari():
+    """The screening ARI must equal what a self-contained evaluation computes.
+
+    Candidates are now ranked against ONE shared Leiden sweep instead of one
+    sweep each. That is only legitimate if the resulting ARI is the same number
+    cluster_optimal_resolution would have produced per candidate - otherwise the
+    ranking is on a different quantity than the one reported.
+    """
+    from multibench.eval.pipeline import evaluate as _evaluate
+
+    emb, lab, bat = _blobs()
+    rng = np.random.default_rng(0)
+    wrong = rng.permutation(lab)
+    cands = [(["good.csv"], lab, bat), (["scrambled.csv"], wrong, bat)]
+    names, val, spread = W._evaluate_best_order(emb, "vertical", cands)
+
+    by_order = {tuple(d["order"]): d["ARI"] for d in spread}
+    for order, labels in ((["good.csv"], lab), (["scrambled.csv"], wrong)):
+        ref = _evaluate(emb, category="vertical", task="clustering", labels=labels)
+        assert by_order[tuple(order)] == pytest.approx(
+            round(float(ref["Value"]["ARI"]), 4), abs=1e-4), (
+            f"{order}: shared-sweep ARI {by_order[tuple(order)]} != "
+            f"per-candidate ARI {float(ref['Value']['ARI'])}")
+
+
+def test_leiden_sweep_is_reusable_across_label_vectors():
+    emb, lab, _ = _blobs()
+    adata, keys = escib.leiden_sweep(emb)
+    assert len(keys) == 10, keys
+    assert adata.n_obs == emb.shape[0]
+    # the sweep must not depend on any label vector having been supplied
+    assert "celltype" not in adata.obs
+
+
 def test_best_order_single_candidate_skips_screening():
     """One candidate has nothing to disambiguate; it must not pay for two passes."""
     emb, lab, bat = _blobs()

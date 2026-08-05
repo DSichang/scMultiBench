@@ -35,6 +35,7 @@ import pandas as pd
 from . import config
 from .engine import envs, registry, resolve as _resolve
 from .engine.runner import run as _run
+from .eval import scib as _escib
 from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
 
 __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout",
@@ -446,12 +447,13 @@ def _order_confidence(cands) -> float | None:
 
 def _evaluate_best_order(emb, category, cands):
     """Score each candidate label order, keep the best, return the full spread."""
-    def _full(lab, bat):
+    def _full(lab, bat, clustering=None):
         # several distinct source files => a real batch structure, so ask for BOTH
         # metric groups; otherwise clustering only.
         grp = "all" if len(set(bat)) > 1 else "clustering"
         return _evaluate(emb, category=category, task=grp, labels=lab,
-                         batch=(bat if grp == "all" else None))
+                         batch=(bat if grp == "all" else None),
+                         clustering=clustering)
 
     if len(cands) == 1:
         # nothing to disambiguate - do not pay for a screening pass
@@ -463,28 +465,52 @@ def _evaluate_best_order(emb, category, cands):
         return names, val, [{"order": names,
                              "ARI": round(float(val["Value"]["ARI"]), 4)}]
 
-    # Ranking orderings needs ARI and nothing else, so screen cheaply and pay for
-    # the full metric set exactly once, on the winner. Previously every candidate
-    # ran the complete suite: on D52 cross that is 6 permutations x iF1 + cLISI +
-    # iLISI + ASW_batch + GC over 23,478 cells, which is what actually timed the
-    # cross tutorial out.
+    # Ranking orderings needs ARI and nothing else, and the Leiden sweep ARI rests
+    # on depends only on the embedding - not on which label vector it is scored
+    # against. So sweep ONCE and reuse it for every candidate, then pay for the
+    # full metric set exactly once, on the winner. Both of those were previously
+    # per-candidate: on D52 cross that is 6 permutations each running their own
+    # 10-resolution sweep over 23,478 cells (~250s apiece), which is what actually
+    # timed the cross tutorial out.
+    import scib.metrics as _me
+
+    try:
+        sweep_adata, sweep_keys = _escib.leiden_sweep(emb)
+    except Exception:
+        sweep_adata = None
+
     scored = []
     for names, lab, bat in cands:
         try:
-            val = _evaluate(emb, category=category, task="clustering", labels=lab,
-                            only={"ARI"})
-            scored.append((float(val["Value"]["ARI"]), names, lab, bat))
+            if sweep_adata is None:      # fall back to a self-contained screen
+                val = _evaluate(emb, category=category, task="clustering",
+                                labels=lab, only={"ARI"})
+                scored.append((float(val["Value"]["ARI"]), names, lab, bat, None))
+                continue
+            sweep_adata.obs["celltype"] = pd.Categorical(
+                np.asarray(lab).astype(str))
+            best_key, best_nmi = None, -1.0
+            for k in sweep_keys:
+                s = float(_me.nmi(sweep_adata, cluster_key=k, label_key="celltype"))
+                if s > best_nmi:
+                    best_nmi, best_key = s, k
+            ari = float(_me.ari(sweep_adata, cluster_key=best_key,
+                                label_key="celltype"))
+            scored.append((ari, names, lab, bat,
+                           np.asarray(sweep_adata.obs[best_key].values)))
         except Exception:
             continue
     if not scored:
         return None, None, []
     scored.sort(key=lambda r: -r[0])
-    ari, names, lab, bat = scored[0]
+    ari, names, lab, bat, clus = scored[0]
     try:
-        val = _full(lab, bat)
+        # hand the winning clustering to the full evaluation so it does not
+        # repeat the sweep a seventh time
+        val = _full(lab, bat, clustering=clus)
     except Exception:
         return None, None, []
-    spread = [{"order": n, "ARI": round(a, 4)} for a, n, _, _ in scored]
+    spread = [{"order": n, "ARI": round(a, 4)} for a, n, _, _, _ in scored]
     return names, val, spread
 
 
