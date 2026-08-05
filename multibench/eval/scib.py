@@ -80,11 +80,20 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold):
     return float(np.mean(scores))
 
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
-            slow_metrics: bool = False) -> pd.DataFrame:
+            slow_metrics: bool = False, only=None) -> pd.DataFrame:
     """Compute scib metrics. group in {'clustering','batch','all'}.
 
     Returns a metric.csv-shaped DataFrame (index = metric, column 'Value').
+
+    ``only`` restricts the computation to the named metrics, e.g.
+    ``only={"ARI"}``. Everything not named is skipped rather than computed and
+    discarded, and the optimal-resolution Leiden sweep is skipped too when no
+    requested metric needs it. This exists because ranking candidate label
+    orderings needs ARI alone, and paying for iF1/cLISI/iLISI once per candidate
+    made that ranking cost more than the entire rest of the evaluation.
     """
+    if only is not None:
+        only = set(only)
     if group not in {"clustering", "batch", "all"}:
         raise ValueError(f"unknown group {group!r}; valid: clustering|batch|all")
 
@@ -118,7 +127,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     # Leiden: sweep resolutions and keep the assignment that maximises NMI
     # vs. the cell-type labels. This is the standard scib clustering protocol
     # and is what lets evaluate() run directly on a method's embedding output.
-    if group in ("clustering", "all") and cluster is None:
+    _needs_clustering = only is None or bool(only & {"ARI", "NMI"})
+    if group in ("clustering", "all") and cluster is None and _needs_clustering:
         me.cluster_optimal_resolution(
             adata, label_key="celltype", cluster_key="cluster", verbose=False
         )
@@ -132,6 +142,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         Degrading gracefully lets evaluate() still return every metric that does
         compute, instead of failing the whole evaluation on one optional metric.
         """
+        if only is not None and name not in only:
+            return
         try:
             out[name] = float(fn())
         except Exception as exc:  # noqa: BLE001 - report and continue

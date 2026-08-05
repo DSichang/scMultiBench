@@ -446,22 +446,45 @@ def _order_confidence(cands) -> float | None:
 
 def _evaluate_best_order(emb, category, cands):
     """Score each candidate label order, keep the best, return the full spread."""
+    def _full(lab, bat):
+        # several distinct source files => a real batch structure, so ask for BOTH
+        # metric groups; otherwise clustering only.
+        grp = "all" if len(set(bat)) > 1 else "clustering"
+        return _evaluate(emb, category=category, task=grp, labels=lab,
+                         batch=(bat if grp == "all" else None))
+
+    if len(cands) == 1:
+        # nothing to disambiguate - do not pay for a screening pass
+        names, lab, bat = cands[0]
+        try:
+            val = _full(lab, bat)
+        except Exception:
+            return None, None, []
+        return names, val, [{"order": names,
+                             "ARI": round(float(val["Value"]["ARI"]), 4)}]
+
+    # Ranking orderings needs ARI and nothing else, so screen cheaply and pay for
+    # the full metric set exactly once, on the winner. Previously every candidate
+    # ran the complete suite: on D52 cross that is 6 permutations x iF1 + cLISI +
+    # iLISI + ASW_batch + GC over 23,478 cells, which is what actually timed the
+    # cross tutorial out.
     scored = []
     for names, lab, bat in cands:
         try:
-            # more than one distinct source file => a real batch structure, so ask
-            # for BOTH metric groups; otherwise clustering only.
-            grp = "all" if len(set(bat)) > 1 else "clustering"
-            val = _evaluate(emb, category=category, task=grp, labels=lab,
-                            batch=(bat if grp == "all" else None))
-            scored.append((float(val["Value"]["ARI"]), names, val))
+            val = _evaluate(emb, category=category, task="clustering", labels=lab,
+                            only={"ARI"})
+            scored.append((float(val["Value"]["ARI"]), names, lab, bat))
         except Exception:
             continue
     if not scored:
         return None, None, []
     scored.sort(key=lambda r: -r[0])
-    ari, names, val = scored[0]
-    spread = [{"order": n, "ARI": round(a, 4)} for a, n, _ in scored]
+    ari, names, lab, bat = scored[0]
+    try:
+        val = _full(lab, bat)
+    except Exception:
+        return None, None, []
+    spread = [{"order": n, "ARI": round(a, 4)} for a, n, _, _ in scored]
     return names, val, spread
 
 
