@@ -23,6 +23,62 @@ def _build_adata(emb, celltype, cluster, batch):
     return adata
 
 
+
+def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold):
+    """Isolated-label F1, identical to scib's but without the per-label re-clustering.
+
+    ``scib.metrics.isolated_labels_f1`` calls ``cluster_optimal_resolution`` once
+    per isolated label, and every call recomputes the kNN graph and a full Leiden
+    resolution sweep. The clustering at a given resolution does not depend on
+    which label is being scored - only the F1 target does. Under our convention
+    that EVERY label is isolated, scib therefore repeats the same 10 clusterings
+    once per label: on a 28-label dataset that is 280 Leiden runs where 10 suffice,
+    which is ~90 min on 23k cells.
+
+    Each resolution is clustered once here, then each label takes its max F1 over
+    all resolutions - the same quantity scib's per-label optimisation returns.
+    ``tests/test_eval_isolated_f1.py`` pins this to scib's own result.
+    """
+    import scanpy as sc
+    from sklearn.metrics import f1_score
+    from scib.metrics.clustering import get_resolutions
+    from scib.metrics.isolated_labels import get_isolated_labels
+
+    labels = get_isolated_labels(adata, label_key, batch_key, iso_threshold,
+                                 verbose=False)
+    if len(labels) == 0:
+        return float("nan")
+
+    sc.pp.neighbors(adata, use_rep=embed)
+    resolutions = get_resolutions(n=10, max=2)
+
+    keys = []
+    for res in resolutions:
+        key = f"_mb_isof1_{res}"
+        sc.tl.leiden(adata, resolution=res, key_added=key)
+        keys.append(key)
+
+    try:
+        scores = []
+        for label in labels:
+            y_true = (adata.obs[label_key] == label).values
+            best = 0.0
+            for key in keys:
+                col = adata.obs[key]
+                for cluster in col.unique():
+                    # argument order mirrors scib's max_f1 exactly; F1 is
+                    # symmetric under swapping y_true/y_pred, but match it anyway
+                    f1 = f1_score((col == cluster).values, y_true)
+                    if f1 > best:
+                        best = f1
+            scores.append(best)
+    finally:
+        for key in keys:
+            if key in adata.obs:
+                del adata.obs[key]
+
+    return float(np.mean(scores))
+
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
             slow_metrics: bool = False) -> pd.DataFrame:
     """Compute scib metrics. group in {'clustering','batch','all'}.
@@ -100,8 +156,9 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         _iso = int(adata.obs["batch"].nunique()) + 1
         _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="celltype",
                                                      embed="X_emb", iso_threshold=_iso))
-        _safe("iF1", lambda: me.isolated_labels_f1(adata, batch_key="batch", label_key="celltype",
-                                                   embed="X_emb", iso_threshold=_iso))
+        _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
+                                                 batch_key="batch", embed="X_emb",
+                                                 iso_threshold=_iso))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
