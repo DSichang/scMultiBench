@@ -288,6 +288,53 @@ def required_envs(category: str | None = None,
 
 
 
+
+def split_lock(text: str):
+    """Split a lockfile into (conda-only YAML, pip requirement lines).
+
+    `conda env create` hands the whole pip section to `pip install -r`, which
+    RE-RESOLVES it. But the section is a full `pip freeze` closure: every
+    transitive dependency is already present and pinned. Re-resolving it is
+    unnecessary, and it fails outright whenever the working env contains a
+    combination pip considers inconsistent - which is common in envs built up
+    incrementally over time. Four of the 29 lockfiles died with
+    ResolutionImpossible for exactly this reason.
+
+    Installing the closure with --no-deps reproduces the env as recorded instead
+    of asking pip to re-derive it. That requires the two halves to be installed
+    separately, because --no-deps cannot be expressed inside a requirements file.
+    """
+    conda_lines, pip_lines = [], []
+    pip_indent = None
+    for ln in text.splitlines():
+        stripped = ln.strip()
+        indent = len(ln) - len(ln.lstrip())
+        if stripped == "- pip:":
+            pip_indent = indent
+            continue                       # drop the header from the conda half
+        if pip_indent is not None and stripped:
+            if indent <= pip_indent:
+                pip_indent = None          # dedented back out
+            else:
+                pip_lines.append(stripped[2:].strip() if stripped.startswith("- ")
+                                 else stripped)
+                continue
+        conda_lines.append(ln)
+    return "\n".join(conda_lines) + "\n", pip_lines
+
+
+def _materialise_split(env_name: str, lock):
+    """Write the conda-only YAML and pip requirements a two-phase install needs."""
+    build_dir = _LOCKS_DIR / ".build" / env_name
+    build_dir.mkdir(parents=True, exist_ok=True)
+    conda_yaml, pip_lines = split_lock(lock.read_text(encoding="utf-8"))
+    y = build_dir / "conda.yml"
+    y.write_text(conda_yaml, encoding="utf-8")
+    r = build_dir / "requirements.txt"
+    r.write_text("\n".join(pip_lines) + "\n" if pip_lines else "", encoding="utf-8")
+    return y, r, pip_lines
+
+
 def post_install(env_name: str):
     """Path to the committed post-install script for an env, or None.
 
@@ -314,7 +361,12 @@ def create_env(env_name: str, conda: str | None = None,
             f"or build from the hand recipe via create_commands()."
         )
     conda = conda or _conda_bin("conda")
-    cmds = [[conda, "env", "create", "-n", env_name, "-f", str(lock)]]
+    # Two phases: conda deps, then the pip closure with --no-deps. See split_lock.
+    conda_yaml, req, pip_lines = _materialise_split(env_name, lock)
+    cmds = [[conda, "env", "create", "-n", env_name, "-f", str(conda_yaml)]]
+    if pip_lines:
+        cmds.append([conda, "run", "-n", env_name,
+                     "pip", "install", "--no-deps", "-r", str(req)])
     # Some packages cannot be captured by `conda env export` at all: an R package
     # installed with install.packages() lives in the env's R library but conda has
     # no record of it, so the lockfile rebuilds an env WITHOUT it. scmb_r lost
@@ -383,6 +435,18 @@ _LOCAL_PIP_RE = re.compile(r"@\s*file://|feedstock_root")
 # `conda==23.3.1` and failed with "No matching distribution found for conda".
 # Deliberately narrow: packages that are genuinely conda-only, not everything
 # that happens to ship on conda-forge.
+# conda-forge and PyPI disagree on some package names. `pip freeze` inside a
+# conda env reports the CONDA name, which PyPI has never heard of: unitednet
+# pinned `python-graphviz==0.8.4` and failed with "No matching distribution".
+_CONDA_TO_PYPI = {
+    "python-graphviz": "graphviz",
+}
+# Packages that are simply not on PyPI under any name - installed from git or
+# from source in the working env, and recorded by `pip freeze` as a bare
+# `name==version` that no index can satisfy. They are stripped from the pip
+# section and restored by a committed <env>.post.sh, which can name the real
+# source (a git URL + commit, or a path inside this repo).
+_NOT_ON_PYPI = frozenset({"cobolt", "spiral", "multimap"})
 _CONDA_ONLY_PIP = frozenset({
     "conda", "mamba", "libmambapy", "boa",
     "conda-build", "conda-libmamba-solver", "conda-content-trust",
@@ -436,6 +500,10 @@ def sanitize_lock(text: str) -> str:
                 name = re.split(r"[=<>!~\s\[]", stripped[2:].strip())[0].lower()
                 if name in _CONDA_ONLY_PIP:
                     continue               # conda-only: pip can never supply it
+                if name in _NOT_ON_PYPI:
+                    continue               # restored by <env>.post.sh instead
+                if name in _CONDA_TO_PYPI:
+                    ln = ln.replace(name, _CONDA_TO_PYPI[name], 1)
                 m = _CUDA_PIN_RE.search(stripped)
                 if m and m.group(1) not in cuda_tags:
                     cuda_tags.append(m.group(1))

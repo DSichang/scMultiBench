@@ -563,7 +563,6 @@ dependencies:
   - xorg-xextproto=7.3.0
   - xorg-xproto=7.0.31
   - xyzservices=2024.4.0
-  - xz=5.2.6
   - yaml=0.2.5
   - zeromq=4.3.5
   - zipp=3.17.0
@@ -633,7 +632,6 @@ dependencies:
       - seaborn==0.13.2
       - session-info==1.0.0
       - spatialglue==1.1.5
-      - spiral==1.0
       - statsmodels==0.14.1
       - stdlib-list==0.10.0
       - sympy==1.13.1
