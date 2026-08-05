@@ -170,7 +170,56 @@ def inputs_for(dataset: str, method: str, category: str,
                 f"{missing}. Available files in {ds_dir}: "
                 f"{sorted(q.name for q in ds_dir.glob('*')) if ds_dir.is_dir() else '(dir missing)'}"
             )
+        _check_orientation(method, dataset, category, out)
     return out
+
+
+
+def _check_orientation(method, dataset, category, resolved):
+    """Reject a transposed matrix at preflight instead of many minutes later.
+
+    Modality files store ``matrix/data`` as (features x cells). Storing it the
+    other way round is the easy mistake - cells x features is the scanpy/AnnData
+    convention, and describe_layout only says "the matrix under matrix/data"
+    without stating an orientation. The file-existence check cannot see it, so
+    the method is dispatched, pays its conda-env startup (and for a slow method
+    potentially hours of compute) and only then dies inside third-party code
+    with an error that does not mention orientation at all.
+
+    ``matrix/features`` and ``matrix/barcodes`` pin the intended orientation
+    without reference to the labels, so this is checkable up front. A square
+    matrix is genuinely ambiguous and is left alone.
+    """
+    import h5py
+
+    for path in resolved.values():
+        p = Path(path)
+        if p.suffix != ".h5" or not p.is_file():
+            continue
+        try:
+            with h5py.File(p, "r") as f:
+                if "matrix/data" not in f:
+                    continue
+                shape = tuple(f["matrix/data"].shape)
+                if len(shape) != 2:
+                    continue
+                if "matrix/features" not in f or "matrix/barcodes" not in f:
+                    continue          # nothing to compare against
+                n_feat = int(f["matrix/features"].shape[0])
+                n_cell = int(f["matrix/barcodes"].shape[0])
+        except OSError:
+            continue                  # an unreadable file is a different error
+        if n_feat == n_cell or shape == (n_feat, n_cell):
+            continue                  # ambiguous, or already correct
+        if shape == (n_cell, n_feat):
+            raise ValueError(
+                f"{method}/{dataset}/{category}: {p.name} stores matrix/data as "
+                f"{shape}, which is cells x features. This layout expects "
+                f"features x cells - here ({n_feat}, {n_cell}), matching "
+                f"matrix/features ({n_feat}) and matrix/barcodes ({n_cell}). "
+                f"Re-export with mtb.io.to_canonical(src, dst), or transpose "
+                f"matrix/data."
+            )
 
 
 def labels_for(dataset: str, data_path: Path | str | None = None) -> dict:
