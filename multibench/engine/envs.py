@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 import shutil
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -643,6 +644,15 @@ def create_group(group: str, env_name: str | None = None, conda: str | None = No
 
 
 def _run_all(cmds: list[list[str]]) -> None:
+    # PYTHONNOUSERSITE is essential while BUILDING, not just while running: pip
+    # treats a package already importable from ~/.local/lib/pythonX/site-packages
+    # as satisfied and skips installing it into the target env. The build then
+    # reports success while producing an env that only works if user-site leakage
+    # is allowed - and run() correctly sets PYTHONNOUSERSITE=1, so the method
+    # fails at dispatch. Six of the 29 envs were built short of 32 packages this
+    # way, and VIPCCA died with ModuleNotFoundError on a package its lockfile
+    # pinned.
+    os.environ.setdefault("PYTHONNOUSERSITE", "1")
     for c in cmds:
         proc = subprocess.run(c, capture_output=True, text=True)
         if proc.returncode != 0:
