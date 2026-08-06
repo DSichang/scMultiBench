@@ -1,7 +1,0 @@
-name: scmb_scmm2
-channels:
-  - bioconda
-  - conda-forge
-dependencies:
-  - python=3.7
-  - pip

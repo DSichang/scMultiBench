@@ -2,8 +2,8 @@
 # bytecode / build / cache
 /data
 *.egg-info/
-engine/env_locks/.build/
 # external data symlinks (machine-specific, not part of the package source)
+multibench/engine/env_locks/.build/
 /multibench/result
 __pycache__/
 *.py[cod]
