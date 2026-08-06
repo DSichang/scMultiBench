@@ -4,6 +4,26 @@ import nbformat as nbf, os
 OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
 
+
+# Method sets benchmarked per category in the paper (Nature Methods 22:2449-2460
+# and the PYangLab/scMultiBench README). Kept here so each tutorial can state its
+# own coverage instead of letting a reader assume parity: vertical and diagonal
+# are complete, mosaic wires 4 of 12 and cross 12 of 15.
+PAPER_METHODS = {
+ "vertical": ["totalVI","sciPENN","Concerto","scMSI","Matilda","MOFA2","Multigrate",
+              "UINMF","scMoMaT","Seurat_WNN","scMM","scMDC","moETM","VIMCCA",
+              "iPOLNG","MIRA","UnitedNet","scMVP"],
+ "diagonal": ["scBridge","Portal","SCALEX","VIPCCA","Seurat_v3","MultiMAP","Seurat_v5",
+              "sciCAN","Conos","iNMF","online_iNMF","scJoint","GLUE","uniPort"],
+ "mosaic":   ["MultiVI","scMoMaT","StabMap","Cobolt","UINMF","Multigrate","SMILE",
+              "scMM","moETM","UnitedNet","totalVI","sciPENN"],
+ "cross":    ["totalVI","scMoMaT","UnitedNet","sciPENN","Concerto","scMDC","StabMap",
+              "UINMF","scMM","MOFA2","Multigrate","PASTE","PASTE2","SPIRAL","GPSA"],
+}
+# The paper exercises these in mosaic ONLY through imputation, a task this package
+# does not wire - so their absence is a task gap, not an oversight.
+MOSAIC_IMPUTATION_ONLY = ["scMM","moETM","UnitedNet","totalVI","sciPENN"]
+
 SCEN = {
  "vertical": dict(
    ds="D11", n=14, mods=["rna","adt"], cells="2,864",
@@ -95,6 +115,31 @@ avail[avail.runnable][["method", "modalities", "env", "output_kind",
     code("""not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
 not_ok.head(5) if len(not_ok) else "(everything in this category runs on this dataset)"
 """)
+
+    md(f"""## 1b. How much of the paper does this cover?
+
+`scan()` above says what runs on THIS dataset. This is a different question: how many
+of the methods the paper benchmarks for {cat} does this package actually wire? Worth
+knowing before you read the comparison as complete.""")
+    code("""from multibench.engine import registry
+
+PAPER = {'vertical': ['totalVI', 'sciPENN', 'Concerto', 'scMSI', 'Matilda', 'MOFA2', 'Multigrate', 'UINMF', 'scMoMaT', 'Seurat_WNN', 'scMM', 'scMDC', 'moETM', 'VIMCCA', 'iPOLNG', 'MIRA', 'UnitedNet', 'scMVP'], 'diagonal': ['scBridge', 'Portal', 'SCALEX', 'VIPCCA', 'Seurat_v3', 'MultiMAP', 'Seurat_v5', 'sciCAN', 'Conos', 'iNMF', 'online_iNMF', 'scJoint', 'GLUE', 'uniPort'], 'mosaic': ['MultiVI', 'scMoMaT', 'StabMap', 'Cobolt', 'UINMF', 'Multigrate', 'SMILE', 'scMM', 'moETM', 'UnitedNet', 'totalVI', 'sciPENN'], 'cross': ['totalVI', 'scMoMaT', 'UnitedNet', 'sciPENN', 'Concerto', 'scMDC', 'StabMap', 'UINMF', 'scMM', 'MOFA2', 'Multigrate', 'PASTE', 'PASTE2', 'SPIRAL', 'GPSA']}
+IMPUTATION_ONLY = ['scMM', 'moETM', 'UnitedNet', 'totalVI', 'sciPENN']
+
+paper = PAPER[CATEGORY]
+wired = sorted({m for m in mtb.list_methods()
+                if any(v.when.get("category") == CATEGORY
+                       for v in registry.get(m).variants)})
+missing = [m for m in paper if m not in wired]
+print(f"paper benchmarks {len(paper)} methods for {CATEGORY}; this package wires {len(wired)}")
+if missing:
+    print("not wired here:", ", ".join(missing))
+    imp = [m for m in missing if m in IMPUTATION_ONLY]
+    if imp:
+        print("  the paper evaluates these only via IMPUTATION, which is not wired:",
+              ", ".join(imp))
+else:
+    print("full parity with the paper for this category")""")
 
     md("""## 2. What can I tune?
 
