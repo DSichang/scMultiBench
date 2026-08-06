@@ -60,7 +60,7 @@ methods:
     atac: peak
     status: verified
     variants:
-      # Bridge/anchor integration via Seurat v5 (env liger, Seurat 5.4.0). Needs
+      # Bridge/anchor integration via Seurat v5 (env scmb_seurat5, Seurat 5.4.0). Needs
       # LD_PRELOAD for the R CXXABI (else "namespace load failed for Seurat"), and
       # sctransform exports ~520MiB of globals to `future` workers, over the 500MiB
       # default -> raise R_FUTURE_GLOBALS_MAXSIZE (the `future` pkg reads this env
