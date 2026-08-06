@@ -1,0 +1,44 @@
+method	dataset	category	status	wall_s	ARI	env	note
+sciPENN	D11	vertical	CHAIN_OK	33	0.6398	env_sciPENN	
+Matilda	D11	vertical	CHAIN_OK	36	0.9238	matilda	
+UINMF	D11	vertical	CHAIN_OK	38	0.4983	scmb_r	
+online_iNMF	D28	diagonal	CHAIN_OK	103	0.3749	scmb_r	
+iNMF	D28	diagonal	CHAIN_OK	137	0.4721	scmb_r	
+scJoint	D28	diagonal	CHAIN_OK	146	0.6178	scmb_scjoint	
+scBridge	D28	diagonal	CHAIN_OK	170	0.7005	scmb_torch	
+StabMap	D52	cross	CHAIN_OK	218	0.688	scmb_r	
+PASTE	D63	cross	RUN_OK_NO_EMBEDDING	630		paste_envi	
+MOFA2	D11	vertical	CHAIN_OK	304	0.4444	MOFA2_env	
+Seurat_WNN	D11	vertical	RUN_OK_NO_EMBEDDING	27		scmb_seurat5	
+VIMCCA	D11	vertical	CHAIN_OK	49	0.675	scmb_vimcca	
+moETM	D11	vertical	CHAIN_OK	38	0.6655	env_moETM	
+scMM	D11	vertical	CHAIN_OK	278	0.6939	scmb_scmm2	
+scMoMaT	D11	vertical	CHAIN_OK_GRAPH_METHOD	158	0.4469	scmb_torch	
+Conos	D28	diagonal	CHAIN_OK	186	0.0005	scmb_r	
+Portal	D28	diagonal	CHAIN_OK	392	0.4798	scmb_torch_v2	
+VIPCCA	D28	diagonal	CHAIN_OK	114	0.1668	scmb_vipcca27	
+MIRA	-	-	NO_RUNNABLE_DATASET	0			scan() found no dataset where this method is runnable
+UnitedNet	-	-	NO_RUNNABLE_DATASET	0			scan() found no dataset where this method is runnable
+iPOLNG	-	-	NO_RUNNABLE_DATASET	0			scan() found no dataset where this method is runnable
+scMVP	-	-	NO_RUNNABLE_DATASET	0			scan() found no dataset where this method is runnable
+scMDC	D11	vertical	CHAIN_OK	615	0.6618	scmb_scmdc	
+totalVI	D11	vertical	CHAIN_OK	101	0.8206	scmb_scvi	
+MultiMAP	D28	diagonal	CHAIN_OK	221	0.2307	scmb_torch	
+SCALEX	D28	diagonal	CHAIN_OK	1309	0.5744	scmb_torch	
+GPSA	D63	cross	RUN_OK_NO_EMBEDDING	4564		scmb_gpsa2	
+Seurat_v3	D28	diagonal	CHAIN_OK	506	0.6055	scmb_seurat4b	
+Cobolt	D45	mosaic	FAIL	30		scmb_cobolt3	/D45/rna1.h5 --path2 /media/disk2/Sichang/scmbench_pkg/data/D45/rna2.h5 --path3 /media/disk2/Sichang/scmbench_pkg/data/D45/atac2.h5 --path4 /media/disk2/Sichang/scmbench_pkg/data/D45/atac3.h5 --save_path /tmp/verify40/Cobolt_D45/Cobolt_D45/ --batch_size 128 --lr 0.005` failed. (See above for error)
+
+PASTE2	D63	cross	TIMEOUT	5404		paste_envi	exceeded timeout of 5400s
+SPIRAL	D63	cross	TIMEOUT	5406		spiral_environment	exceeded timeout of 5400s
+Multigrate	D11	vertical	CHAIN_OK	221	0.6556	scmb_multigrate2	
+SMILE	D45	mosaic	CHAIN_OK	1267	0.2821	env_sciPENN	
+GLUE	D28	diagonal	FAIL	12		glue	`conda run python /media/disk2/Sichang/scmbench_pkg/scMultiBench_ref/tools_scripts/GLUE/GLUE_human.py --path1 /media/disk2/Sichang/scmbench_pkg/data/D28/rna.h5 --path2 /media/disk2/Sichang/scmbench_pkg/data/D28/atac_peak.h5 --save_path /tmp/verify40/GLUE_D28/GLUE_D28/` failed. (See above for error)
+
+Seurat_v5	D28	diagonal	FAIL	36		scmb_seurat5	Seurat_v5.Rmd /media/disk2/Sichang/scmbench_pkg/data/D28/rna.h5 /media/disk2/Sichang/scmbench_pkg/data/D28/rna.h5 /media/disk2/Sichang/scmbench_pkg/data/D28/atac_peak.h5 /media/disk2/Sichang/scmbench_pkg/data/D28/atac_peak.h5 /tmp/verify40/Seurat_v5_D28/Seurat_v5_D28/` failed. (See above for error)
+
+Concerto	D11	vertical	CHAIN_OK	867	0.4078	scmb_concerto	
+scMSI	D11	vertical	CHAIN_OK	2592	0.7575	scmb_scmsi	
+sciCAN	D28	diagonal	CHAIN_OK	2144	0.1874	scmb_scican	
+uniPort	D28	diagonal	CHAIN_OK	4319	0.5994	scmb_torch	
+MultiVI	D45	mosaic	CHAIN_OK	4430	0.8185	scmb_multivi	

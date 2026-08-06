@@ -1,0 +1,10 @@
+method	dataset	category	status	wall_s	ARI	note
+MIRA	D12	vertical	RUN_OK_NO_EMBEDDING	7651		
+UnitedNet	D27	vertical	CHAIN_OK	2035	0.9472	
+iPOLNG	D12	vertical	CHAIN_OK	1936	0.4791	
+scMVP	D12	vertical	FAIL	6		scmbench_pkg/scMultiBench_ref/tools_scripts/scMVP/main_scMVP.py --path1 /media/disk2/Sichang/scmbench_pkg/data/D12/rna.h5 --path2 /media/disk2/Sichang/scmbench_pkg/data/D12/atac.h5 --save_path /tmp/verify40b/scMVP_D12/scMVP_D12/` failed. (See above for error) 
+GLUE	D27	diagonal	FAIL	7		ng/scmbench_pkg/scMultiBench_ref/tools_scripts/GLUE/GLUE_human.py --path1 /media/disk2/Sichang/scmbench_pkg/data/D27/rna.h5 --path2 /media/disk2/Sichang/scmbench_pkg/data/D27/peak.h5 --save_path /tmp/verify40b/GLUE_D27/GLUE_D27/` failed. (See above for error) 
+Seurat_v5	D27	diagonal	CHAIN_OK	2934	0.3753	
+Cobolt	D45	mosaic	FAIL	6		/scmbench_pkg/data/D45/rna2.h5 --path3 /media/disk2/Sichang/scmbench_pkg/data/D45/atac2.h5 --path4 /media/disk2/Sichang/scmbench_pkg/data/D45/atac3.h5 --save_path /tmp/verify40b/Cobolt_D45/Cobolt_D45/ --batch_size 128 --lr 0.005` failed. (See above for error) 
+PASTE2	D63	cross	RUN_OK_NO_EMBEDDING	6322		
+SPIRAL	D63	cross	RUN_OK_NO_EMBEDDING	5265		
