@@ -16,7 +16,13 @@ def test_describe_layout_names_files_and_flags_the_atac_trap():
     assert "rna.h5" in txt and "adt.h5" in txt and "cty.csv" in txt
     # a peak matrix dropped into atac.h5 runs everything on the wrong representation
     assert "peak.h5" in txt and "atac.h5" in txt
-    assert "Careful" in txt
+    # assert the SUBSTANCE of the warning, not one word of its phrasing: the
+    # text must say the ATAC representation can differ from what the role name
+    # implies, and that feeding the wrong one does not raise.
+    low = txt.lower()
+    assert "atac_gas" in txt and "atac_peak" in txt
+    assert "peaks" in low and ("gene activity" in low or "gene-activity" in low)
+    assert "wrong" in low, "must warn that the wrong representation is silently wrong"
 
 
 def test_package_docstring_has_import_and_categories():
