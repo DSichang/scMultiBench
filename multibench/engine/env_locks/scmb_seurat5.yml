@@ -1,4 +1,4 @@
-name: liger
+name: scmb_seurat5
 channels:
   - anaconda
   - bioconda
