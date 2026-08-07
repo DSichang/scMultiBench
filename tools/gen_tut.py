@@ -1,14 +1,21 @@
-"""Generate one tutorial notebook per integration scenario."""
-import nbformat as nbf, os
+"""Generate the four integration tutorials (vertical / diagonal / mosaic / cross).
+
+Style reference: the M3 / Matilda docs notebooks - short purposeful code cells,
+markdown narration between them, tables for structured facts, an Install section
+up front, and a RUNNABLE "your own dataset" walkthrough rather than prose.
+
+Every numeric claim in the text (runtimes, coverage counts, install cost) is a
+measured value from the verification runs, not an estimate.
+"""
+import nbformat as nbf
+import os
 
 OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
 
-
 # Method sets benchmarked per category in the paper (Nature Methods 22:2449-2460
-# and the PYangLab/scMultiBench README). Kept here so each tutorial can state its
-# own coverage instead of letting a reader assume parity: vertical and diagonal
-# are complete, mosaic wires 4 of 12 and cross 12 of 15.
+# and the PYangLab/scMultiBench README), so each tutorial states its own
+# coverage instead of letting the reader assume parity.
 PAPER_METHODS = {
  "vertical": ["totalVI","sciPENN","Concerto","scMSI","Matilda","MOFA2","Multigrate",
               "UINMF","scMoMaT","Seurat_WNN","scMM","scMDC","moETM","VIMCCA",
@@ -20,118 +27,218 @@ PAPER_METHODS = {
  "cross":    ["totalVI","scMoMaT","UnitedNet","sciPENN","Concerto","scMDC","StabMap",
               "UINMF","scMM","MOFA2","Multigrate","PASTE","PASTE2","SPIRAL","GPSA"],
 }
-# The paper exercises these in mosaic ONLY through imputation, a task this package
-# does not wire - so their absence is a task gap, not an oversight.
 MOSAIC_IMPUTATION_ONLY = ["scMM","moETM","UnitedNet","totalVI","sciPENN"]
 
 SCEN = {
  "vertical": dict(
-   ds="D11", n=14, mods=["rna","adt"], cells="2,864",
-   blurb=("**Vertical integration** takes several modalities measured **in the same cell** "
-          "(here CITE-seq: RNA + surface protein) and learns one joint representation. "
-          "Cells are already matched, so the task is fusing modalities, not aligning cells."),
+   ds="D11", cells="2,864",
+   blurb=("**Vertical integration** fuses several modalities measured **in the same "
+          "cells** (here CITE-seq: RNA + surface protein). Cells are already matched, "
+          "so the task is combining modalities, not aligning cells."),
    live=("Matilda", '{"epochs": 5}', "Matilda takes well under a minute at 5 epochs"),
+   live_ds=None,
+   own_src="D11", own_fast="Matilda",
+   own_note="Matilda scored ARI 0.95 on this subsample when we ran it - your exact "
+            "number will differ slightly, the point is that it is high and computed "
+            "end-to-end on data the package has never seen.",
  ),
  "diagonal": dict(
-   ds="D28", n=14, mods=["rna","atac_gas"], cells="6,408 RNA + 4,606 ATAC",
-   blurb=("**Diagonal integration** is the hard case: RNA and ATAC come from **different cells**, "
-          "with no pairing and no shared cell ids. A method must align two populations using only "
-          "shared feature space (e.g. gene-activity scores)."),
-   live=("online_iNMF", "None", "online_iNMF finishes in ~80 s"),
+   ds="D28", cells="6,408 RNA + 4,606 ATAC",
+   blurb=("**Diagonal integration** is the hard case: RNA and ATAC come from "
+          "**different cells**, with no pairing and no shared cell ids. A method must "
+          "align two populations using only a shared feature space (for RNA + ATAC, "
+          "gene-activity scores)."),
+   live=("online_iNMF", "None", "online_iNMF finishes in about 80 s"),
+   live_ds=None,
+   own_src="D28", own_fast="Portal",
+   own_note="Portal reached CHAIN_OK with all nine metrics on this subsample in "
+            "about 40 s when we ran it.",
  ),
  "mosaic": dict(
-   ds="D45", n=4, mods=["rna1","rna2","atac2","atac3"], cells="32,151",
-   blurb=("**Mosaic integration** has several batches where only **some** share a modality — "
-          "here an RNA-only batch, an ATAC-only batch and a paired RNA+ATAC batch that bridges them. "
-          "The paired batch is the bridge that makes the others comparable."),
-   live=(None, None, "every mosaic method needs >30 min on 32k cells, so this tutorial uses "
-                     "the stored results instead of running one live"),
+   ds="D45", cells="32,151",
+   blurb=("**Mosaic integration** has several batches where only **some** share a "
+          "modality - an RNA-only batch, an ATAC-only batch, and a paired batch that "
+          "bridges them. Mosaic methods are the most layout-sensitive of the four "
+          "categories: each supports specific per-batch modality patterns, so "
+          "`scan()` per dataset is the source of truth for what applies."),
+   live=("StabMap", "None", "StabMap finishes in about 75 s on D46"),
+   live_ds="D46",
+   own_src="D46", own_fast="StabMap",
+   own_note="StabMap reached CHAIN_OK on this subsample in about a minute when we "
+            "ran it.",
  ),
  "cross": dict(
-   ds="D52", n=8, mods=["rna1","rna2","rna3","adt1","adt2","adt3"], cells="23,478",
-   blurb=("**Cross integration** has several batches in which **all** modalities are present. "
-          "The task is removing batch effects while keeping biological structure. "
-          "(Spatial registration also lives under `cross` — see the note at the end.)"),
-   live=("StabMap", "None", "StabMap finishes in ~70 s"),
+   ds="D52", cells="23,478",
+   blurb=("**Cross integration** has several batches in which **all** modalities are "
+          "present; the task is removing batch effects while keeping biological "
+          "structure. Spatial registration (PASTE, PASTE2, SPIRAL, GPSA) also lives "
+          "under `cross` - see the note at the end."),
+   live=("StabMap", "None", "StabMap finishes in about 70 s"),
+   live_ds=None,
+   own_src="D52", own_fast="StabMap",
+   own_note="StabMap reached CHAIN_OK on this subsample in under 30 s when we ran it.",
  ),
 }
+
+SUBSAMPLE_FN = '''import os, shutil
+import h5py
+import numpy as np
+import pandas as pd
+
+def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
+    """Copy a dataset to a new name, keeping a random fraction of the cells.
+
+    Files sharing a cell count get the SAME kept-cell index, so modality files
+    and their label CSVs stay aligned - which is exactly the property your own
+    export pipeline must preserve. The output is the canonical layout:
+    matrix/data as features x cells, plus matrix/features and matrix/barcodes.
+    """
+    rng = np.random.default_rng(seed)
+    os.makedirs(dst_dir, exist_ok=True)
+    counts, keep = {}, {}
+    for fn in sorted(os.listdir(src_dir)):
+        p = os.path.join(src_dir, fn)
+        if fn.endswith(".h5"):
+            with h5py.File(p) as f:
+                if "matrix/data" in f:
+                    counts[fn] = f["matrix/data"].shape[1]   # features x cells
+        elif fn.endswith(".csv"):
+            counts[fn] = len(pd.read_csv(p))
+    for n in set(counts.values()):
+        k = max(50, int(n * frac))
+        keep[n] = np.sort(rng.choice(n, size=k, replace=False))
+    for fn, n in counts.items():
+        sp, dp = os.path.join(src_dir, fn), os.path.join(dst_dir, fn)
+        idx = keep[n]
+        if fn.endswith(".csv"):
+            pd.read_csv(sp).iloc[idx].to_csv(dp, index=False)
+        else:
+            with h5py.File(sp) as f, h5py.File(dp, "w") as g:
+                grp = g.create_group("matrix")
+                grp.create_dataset("data", data=np.asarray(f["matrix/data"])[:, idx])
+                if "matrix/features" in f:
+                    grp.create_dataset("features", data=np.asarray(f["matrix/features"]))
+                if "matrix/barcodes" in f:
+                    grp.create_dataset("barcodes", data=np.asarray(f["matrix/barcodes"])[idx])
+    return dst_dir'''
+
 
 for cat, s in SCEN.items():
     C = []
     md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
     code = lambda t: C.append(nbf.v4.new_code_cell(t))
+    fastm = s["live"][0]
+    live_ds = s["live_ds"] or s["ds"]
 
-    md(f"""# {cat.capitalize()} integration — a complete walkthrough
+    # ------------------------------------------------------------------ title
+    md(f"""# {cat.capitalize()} integration with `multibench`
 
 {s['blurb']}
 
-**Reference dataset:** `{s['ds']}` ({s['cells']} cells) — **{s['n']} methods** apply to it.
-Every one has a row in the results table below: scored, failed, or explicitly marked
-as verified on another dataset. None disappears silently.
+This tutorial covers, end to end:
 
-Everything below uses the same three calls, whatever the scenario:
+- installing the package and the per-method environments
+- the on-disk data layout this category expects
+- seeing what runs on a dataset (`scan`) and what each method exposes for tuning
+- running one method live, then a whole benchmark sweep with metrics
+- reading the two metric families and drawing the standard figures
+- **running the same pipeline on your own dataset**, demonstrated for real
 
-```python
-mtb.scan(dataset)                    # what can I run?
-res = mtb.run_all(dataset, category) # run it, with metrics
-res.plot()                           # one figure
-```""")
+**Reference dataset:** `{s['ds']}` ({s['cells']} cells). The stored results shipped
+with these notebooks were produced on it, so every table below reproduces.""")
+
+    # ---------------------------------------------------------------- install
+    md("""## Install
+
+From the repository directory:
+
+```bash
+pip install -e .                # the multibench package + CLI
+multibench env doctor           # which method environments exist / are missing
+multibench env install --run    # build them all from the committed lockfiles
+```
+
+Each method runs in its **own conda environment** (they need mutually
+incompatible framework versions), so the wrapper can run torch 1.x, torch 2.x,
+TensorFlow and R methods in one sweep. `env install` is a dry run until you add
+`--run`.
+
+Measured on a clean machine: **29 environments, ~50 min build, 175 GB** (plus a
+52 GB package cache you can drop afterwards with `conda clean -a`). Details and
+the smallest end-to-end check live in `SETUP.md`.""")
 
     code("""import warnings; warnings.filterwarnings("ignore")
 %matplotlib inline
 from pathlib import Path
 import pandas as pd
-pd.set_option("display.max_colwidth", None)  # show `reason` in full - paths are long
-pd.set_option("display.max_columns", None)   # a metric pandas hides is a metric
-pd.set_option("display.width", 200)          # the reader never learns exists
+pd.set_option("display.max_colwidth", None)   # never truncate a `reason`
+pd.set_option("display.max_columns", None)    # never hide a metric column
+pd.set_option("display.width", 200)
 import multibench as mtb
 
-RESULTS = Path("results")          # stored results, so the comparisons reproduce
+RESULTS = Path("results")     # stored sweep results, so comparisons reproduce
 print("multibench", mtb.__version__)""")
 
-    fastm = s["live"][0] or {"mosaic": "SMILE"}.get(cat, "Matilda")
     code(f'''DATASET  = "{s['ds']}"
 CATEGORY = "{cat}"
-FAST_METHOD = "{fastm}"        # used for the quick live demos below''')
+FAST_METHOD = "{fastm}"       # used for the quick live demos below''')
 
-    md("""## 0. Which scenario is my data, and how do I lay it out?
+    # ------------------------------------------------------------------ layout
+    md(f"""## 1. The data layout
 
-Two calls answer what every new user hits first. `category` is a required argument
-everywhere, so start by seeing the legal values:""")
-    code("""mtb.list_categories()""")
-    md("""And this prints exactly which filenames to use \u2014 including how **several
-batches** are named (numbered files in one flat directory):""")
+A dataset is a **folder of flat files**; the folder name is the dataset name.
+`describe_layout` prints the exact filenames for each category:""")
     code("""print(mtb.describe_layout(CATEGORY))""")
+    md("""The modality files are HDF5 with three required datasets:
 
-    md("""## 1. What can I run on this data?
+| dataset | contents | shape |
+|---|---|---|
+| `matrix/data` | the matrix, **features x cells** | `(n_features, n_cells)` |
+| `matrix/features` | one name per feature | `(n_features,)` |
+| `matrix/barcodes` | one id per cell | `(n_cells,)` |
 
-`scan` inspects the dataset and reports every method that can run — and, for the
-rest, exactly why not. Nothing is executed, so this is safe and instant.""")
+Note this is the **transpose** of the scanpy/AnnData convention (`AnnData.X` is
+cells x genes). Two safety nets exist: `mtb.io.to_canonical(src, dst)` converts
+an `.h5ad` correctly, and `scan()` rejects a transposed file at preflight instead
+of letting a method fail half an hour in.
+
+> **ATAC caution.** Methods disagree about the ATAC representation - some need
+> **gene-activity scores**, others need **peaks** - and feeding the wrong one
+> runs to completion and returns a plausible but wrong embedding, with no error.
+> `describe_layout` above states which file resolves where; check what your
+> files actually contain before trusting a result.""")
+
+    # ------------------------------------------------------------------- scan
+    md("""## 2. What can I run on this dataset?
+
+`scan` inspects the folder and reports every method that can run - and, for the
+rest, exactly why not (missing file, missing environment, wrong layout). Nothing
+executes, so this is instant and safe.""")
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
 avail[avail.runnable][["method", "modalities", "env", "output_kind",
-                       "n_tunable", "runtime_tier", "observed_worst_sec"]]""")
-
-    md("""Methods that are *not* runnable here come with a reason rather than a silent absence:""")
+                       "n_tunable", "runtime_tier"]]""")
+    md("""Methods that are *not* runnable come with a reason rather than a silent absence:""")
     code("""not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
-not_ok.head(5) if len(not_ok) else "(everything in this category runs on this dataset)"
+not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
 """)
 
-    md(f"""## 1b. How much of the paper does this cover?
+    # -------------------------------------------------------- paper coverage
+    md(f"""## 2b. How much of the paper does this cover?
 
-`scan()` above says what runs on THIS dataset. This is a different question: how many
-of the methods the paper benchmarks for {cat} does this package actually wire? Worth
-knowing before you read the comparison as complete.""")
-    code("""from multibench.engine import registry
+`scan()` answers "what runs on THIS dataset". A different question: how many of
+the methods the paper benchmarks for **{cat}** does this package wire at all?
+Stated explicitly so you never mistake a dataset limitation for full coverage.""")
+    code(f"""from multibench.engine import registry
 
-PAPER = {'vertical': ['totalVI', 'sciPENN', 'Concerto', 'scMSI', 'Matilda', 'MOFA2', 'Multigrate', 'UINMF', 'scMoMaT', 'Seurat_WNN', 'scMM', 'scMDC', 'moETM', 'VIMCCA', 'iPOLNG', 'MIRA', 'UnitedNet', 'scMVP'], 'diagonal': ['scBridge', 'Portal', 'SCALEX', 'VIPCCA', 'Seurat_v3', 'MultiMAP', 'Seurat_v5', 'sciCAN', 'Conos', 'iNMF', 'online_iNMF', 'scJoint', 'GLUE', 'uniPort'], 'mosaic': ['MultiVI', 'scMoMaT', 'StabMap', 'Cobolt', 'UINMF', 'Multigrate', 'SMILE', 'scMM', 'moETM', 'UnitedNet', 'totalVI', 'sciPENN'], 'cross': ['totalVI', 'scMoMaT', 'UnitedNet', 'sciPENN', 'Concerto', 'scMDC', 'StabMap', 'UINMF', 'scMM', 'MOFA2', 'Multigrate', 'PASTE', 'PASTE2', 'SPIRAL', 'GPSA']}
-IMPUTATION_ONLY = ['scMM', 'moETM', 'UnitedNet', 'totalVI', 'sciPENN']
+PAPER = {PAPER_METHODS!r}
+IMPUTATION_ONLY = {MOSAIC_IMPUTATION_ONLY!r}
 
 paper = PAPER[CATEGORY]
-wired = sorted({m for m in mtb.list_methods()
+wired = sorted({{m for m in mtb.list_methods()
                 if any(v.when.get("category") == CATEGORY
-                       for v in registry.get(m).variants)})
+                       for v in registry.get(m).variants)}})
 missing = [m for m in paper if m not in wired]
-print(f"paper benchmarks {len(paper)} methods for {CATEGORY}; this package wires {len(wired)}")
+print(f"paper benchmarks {{len(paper)}} methods for {{CATEGORY}}; this package wires {{len(wired)}}")
 if missing:
     print("not wired here:", ", ".join(missing))
     imp = [m for m in missing if m in IMPUTATION_ONLY]
@@ -141,199 +248,183 @@ if missing:
 else:
     print("full parity with the paper for this category")""")
 
-    md("""## 2. What can I tune?
+    # ------------------------------------------------------------------ params
+    md("""## 3. What can I tune?
 
-`params_for` reports the parameters a method accepts. `defaults` are what the
-wrapper passes; `tunable` is what the **upstream script** exposes on its command
-line. An empty `tunable` means that method hardcodes its hyperparameters — it
-cannot be tuned without editing it, which this project never does.""")
+`params_for` reports each method's defaults and, where the upstream script
+exposes any, the tunable hyperparameters. **An empty `tunable` is honest**: many
+upstream scripts hardcode their hyperparameters, and this package never edits
+upstream code, so it reports rather than pretends.""")
     code("""rows = []
 for m in avail[avail.runnable]["method"]:
-    p = mtb.params_for(m, CATEGORY, None if avail[avail.method==m].iloc[0]["modalities"]=="(data_dir)"
-                       else avail[avail.method==m].iloc[0]["modalities"].split("+"))
-    rows.append({"method": m, "n_tunable": len(p["tunable"]),
-                 "defaults": p["defaults"],
-                 "example": ", ".join(sorted(p["tunable"])[:4]) or "(hardcoded upstream)"})
+    try:
+        p = mtb.params_for(m, CATEGORY)
+    except Exception:                      # multi-variant: needs modalities
+        mods = avail[avail.method == m].iloc[0]["modalities"].split("+")
+        p = mtb.params_for(m, CATEGORY, mods)
+    rows.append({"method": m, "n_tunable": len(p.get("tunable") or {}),
+                 "tunable": ", ".join(sorted((p.get("tunable") or {}))[:6])})
 pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=True)""")
 
-    live_m, live_p, live_why = s["live"]
-    if live_m:
-        md(f"""## 3. Run one method
+    # ------------------------------------------------------------- run one
+    live_p = s["live"][1]
+    pstr = (f', params={{"{fastm}": {live_p}}}' if live_p != "None" else "")
+    extra = (f'\n\n(This demo runs on `{live_ds}`, whose layout fits {fastm}; '
+             f'mosaic layouts vary per dataset - see the note above.)'
+             if live_ds != s["ds"] else "")
+    md(f"""## 4. Run one method
 
-{live_why}. Tuning happens through `params=` — the same parameters `params_for`
-just listed.""")
-        pstr = (f', params={{"{live_m}": {live_p}}}' if live_p != "None" else "")
-        code(f'''res = mtb.run_all(DATASET, CATEGORY,
-                  methods=["{live_m}"]{pstr},
+`run_all` runs methods end to end: resolve inputs -> run in the method's own
+conda env -> load the output -> compute metrics -> keep everything in a
+`BatchResult`. {s['live'][2]}.{extra}""")
+    code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
+                  methods=["{fastm}"]{pstr},
                   out_dir="/tmp/tutorial_{cat}")
-res''')
-        code("""res.summary""")
-        md("""The metrics are already computed — `run_all` runs the method, picks the correct
-label order, and evaluates in one step.""")
-        code("""res.plot()""")
-    else:
-        md(f"""## 3. Running a method
+res.summary''')
+    md("""The metrics are already computed - `run_all` picked the right label files,
+resolved the label order (see `label_order` in the summary), and scored the
+embedding. One figure:""")
+    code("""res.plot()""")
 
-{live_why}. The call is identical to every other scenario:
+    # ------------------------------------------------------------ run all
+    md(f"""## 5. Run the whole benchmark
 
-```python
-res = mtb.run_all(DATASET, CATEGORY, methods=["Cobolt"],
-                  params={{"Cobolt": {{"lr": 1e-3}}}},   # Cobolt DIVERGES at its default lr
-                  out_dir="/tmp/tutorial_mosaic")
-res.plot()
-```
-
-`dry_run=True` shows the plan without running anything:""")
-        code("""mtb.run_all(DATASET, CATEGORY, out_dir="/tmp/unused", dry_run=True)[
-    ["method", "modalities", "env", "output_kind"]]""")
-
-    md(f"""## 4. Run everything
-
-One call runs every applicable method and evaluates each:
+The same call without `methods=` runs everything runnable. On `{s['ds']}` that is
+hours of compute, so this cell is shown but not executed here - the stored
+results it produced are loaded right below.
 
 ```python
-res = mtb.run_all(DATASET, CATEGORY, out_dir="/tmp/{cat}_all",
-                  timeout=4*3600,        # a hung method is recorded, not fatal
-                  skip_existing=True)    # resume instead of repeating hours
-print(res.failures)                      # ALWAYS check: failures are recorded, not raised
-res.plot()
+res = mtb.run_all(DATASET, CATEGORY, out_dir="results/{cat}_all",
+                  timeout=4*3600,       # a hung method is recorded, not fatal
+                  skip_existing=True)   # resume instead of repeating hours
+print(res.failures)                     # ALWAYS check: failures are recorded, not raised
 ```
 
-Next morning, re-plot **without re-running anything** (`run_all` saved it for you):
+Three behaviours worth knowing before a long sweep:
 
-```python
-res = mtb.load_batch("/tmp/{cat}_all")
-res.plot().savefig("compare.png")
-```
-
-> WARNING `skip_existing` reuses a method's existing output FILE. Do not combine it
-> with a changed `params=` (you would silently get the old result, so `run_all`
-> refuses it), and after a hard kill delete that method's directory, since a
-> half-written file would be reused as if it had succeeded.
-
-That takes from minutes to hours depending on the scenario, so here we load the
-stored results of exactly that sweep.""")
+- **a method that fails is a row, not an exception** - the sweep continues and
+  `res.failures` carries the error text;
+- **`timeout=` bounds each method's whole step** including metric computation;
+- **`skip_existing=True` resumes** a killed sweep, but refuses to combine with
+  `params=` (it cannot know the old output used your new parameters).""")
     code(f'''summary = pd.read_csv(RESULTS / "summary_{s['ds']}.csv")
-# clustering metrics, then batch-correction metrics where the design has batches
 cols = [c for c in ["method","status","run_sec",
-                    "ARI","NMI","ASW","iASW","iF1","cLISI",     # clustering
-                    "ASW_batch","GC","iLISI"                    # batch correction
+                    "ARI","NMI","ASW","iASW","iF1","cLISI",      # clustering
+                    "ASW_batch","GC","iLISI"                     # batch correction
                     ] if c in summary.columns]
 summary[cols]''')
 
-    md("""### What a failure looks like
+    # ------------------------------------------------------------- metrics
+    md("""## 6. Reading the metrics
 
-`.failures` is the table to check after every sweep, because a method that dies is
-**recorded, not raised** — the sweep keeps going. Here is a genuine failure: a
-method given an impossible hyperparameter. Note the sweep still returns normally
-and the error is in the table.""")
-    code("""broken = mtb.run_all(DATASET, CATEGORY, methods=[FAST_METHOD],
-                     params={FAST_METHOD: {"epochs": -5}},   # nonsense on purpose
-                     out_dir="/tmp/tut_fail", verbose=False)
-print("failures:", len(broken.failures))
-broken.failures""")
+Two families, matching the paper's grouping. All are **higher = better**, on
+[0, 1] except ARI (can be slightly negative at chance level).
 
-    md("""By contrast, if **nothing at all** can run — a mistyped dataset name, say —
-that is not a per-method failure, it means the request itself was wrong, so
-`run_all` raises instead of handing back an empty result that reads as success:""")
-    code("""try:
-    mtb.run_all("NO_SUCH_DATASET", CATEGORY, out_dir="/tmp/tut_none")
-except ValueError as e:
-    print("ValueError:", str(e)[:160])""")
+| family | metrics | what they measure |
+|---|---|---|
+| clustering / bio-conservation | `ARI`, `NMI`, `ASW`, `iASW`, `iF1`, `cLISI` | does the embedding separate the annotated cell types? |
+| batch correction | `ASW_batch`, `GC`, `iLISI` (+ opt-in `kBET`) | are the batches mixed within each cell type? |
 
-    md("""### Reloading a finished sweep
+Notes that save confusion later:
 
-`run_all` saves itself, so the morning after an overnight run you can reopen the
-results and re-plot **without recomputing anything**:""")
-    code("""reloaded = mtb.load_batch("/tmp/tut_fail")      # the sweep we just ran
-print(type(reloaded).__name__, "|", len(reloaded), "method(s)")
-reloaded.summary[["method", "status"]]""")
+- `iASW`/`iF1` are **isolated-label** scores; this benchmark scores *every*
+  label, so they exist even on a single-batch dataset.
+- batch metrics appear only when the dataset has real batches - their absence on
+  a single-batch dataset is correct, not missing data.
+- `kBET` is opt-in (`mtb.evaluate(..., slow_metrics=True)`): it spawns R per
+  method and costs hours per dataset.
+- graph-output methods (e.g. Seurat_WNN) legitimately have **no** embedding
+  metrics; their status says so rather than scoring garbage.""")
 
-    md("""> **Reading the metric columns.** This benchmark reports two families:
->
-> * **Clustering / dimension reduction** — `ARI`, `NMI`, `ASW`. Always computed.
-> * **Batch correction** — `iASW`, `iF1`, `ASW_batch`, `GC`. Computed automatically
->   whenever the dataset has more than one batch; `run_all` derives the batch from
->   which label file each cell came from.
->
-> A blank cell has a specific meaning, and it is worth knowing which:
->
-> * On a **single-batch** dataset (one `cty.csv`, i.e. vertical integration) the
->   batch family does not exist at all — there is nothing to correct.
-> * `iASW` / `iF1` measure **isolated labels** — cell types confined to a subset of
->   batches. If every cell type appears in every batch there are none, so both are
->   blank even though the dataset is multi-batch. That is the case on D45.
-> * `cLISI` / `iLISI` need a compiled scIB extension that will not load against this
->   machine's GLIBC, and `kBET` needs `rpy2`, which is not installed in the
->   evaluation environment. Those three are environmental, not properties of your
->   data.""")
+    # ------------------------------------------------------------- figures
+    md("""## 7. The figures
 
-    md("""## 5. The figure""")
+**Per-dataset bubble chart** - radius encodes rank (rank 1 = largest bubble),
+colour the value:""")
     code(f'''long = pd.read_csv(RESULTS / "long_all_{s['ds']}.csv")
-fig = mtb.plot.bubble(long, title="{cat} integration — {s['ds']}")
+fig = mtb.plot.bubble(long, title="{cat} integration - {s['ds']}")
 fig.set_dpi(110)
-display(fig)''')
-
-    md("""### Summarising across datasets
-
-The bubble chart above compares methods **on this dataset**. To compare them
-**across** datasets, concatenate the tidy frames and use `plot.bar`, which is the
-summary the benchmark reports:
+fig''')
+    md("""**Across datasets** - when you have `long` tables from several datasets,
+concatenate them and `mtb.plot.bar` summarises each method across all of them
+(only methods present in more than one dataset are truly comparative):
 
 ```python
-allf = pd.concat([pd.read_csv(p) for p in RESULTS.glob("long_all_*.csv")])
-mtb.plot.bar(allf, title="overall across scenarios")        # every metric
-mtb.plot.bar(allf, group="clustering")                      # one family
-mtb.plot.bar(allf, group="batch")                           # the other
-```
+allx = pd.concat([long_d1, long_d2, ...], ignore_index=True)
+mtb.plot.bar(allx, group="clustering")   # or group="batch", or all metrics
+```""")
 
-Each bar is a method's mean score over datasets; the dots behind it are its
-per-dataset scores, so a method that is uniformly good is distinguishable from one
-that averages well by winning a single dataset.""")
+    # ------------------------------------------------------------ own data
+    md(f"""## 8. Your own dataset - for real
 
-    md("""> The bubble chart encodes **radius = rank** — **rank 1 is the LARGEST bubble** —
-> and **fill = value normalised within the plotted set**, darker being higher.
-> Both are relative to what you plotted. Read the table beside it;
-> with few methods a tiny gap can look decisive.""")
+Everything above used shipped data. This section does what you will actually do:
+put files in a folder, point the package at it, and get scored results - executed
+here on a dataset the package has never seen (a {int(0.6*100)}% cell subsample of
+`{s['own_src']}` under a new name, built with ordinary h5py/pandas code you can
+adapt to your own export pipeline).""")
+    code(SUBSAMPLE_FN)
+    code(f'''DATA_ROOT = "/tmp/mydata"
+src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
+subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
 
-    md(f"""## 6. Using your OWN dataset
+sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
+print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")''')
+    code(f'''mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
+                   methods=["{s['own_fast']}"],
+                   out_dir=f"{{DATA_ROOT}}/out_{cat}",
+                   data_path=DATA_ROOT)
+mine.summary''')
+    code("""mine.plot()""")
+    md(f"""{s['own_note']}
 
-`describe_layout` above already printed the exact filenames for this scenario —
-**use those, not the role names.** They are not always the same: the `atac_gas`
-role lives in `atac.h5`, and `atac_peak` lives in `peak.h5`.
+For your real data the only work is producing the canonical files: export each
+modality with `mtb.io.to_canonical` (from `.h5ad`) or the h5py pattern above,
+write one label CSV per the layout in section 1, and the same three calls -
+`scan`, `run_all`, `plot` - do the rest.""")
 
-```python
-print(mtb.describe_layout(CATEGORY))   # the authoritative filename list
-```
-
-Then the same three calls work unchanged:
-
-```python
-mtb.scan("MYDATA", category="{cat}")                     # confirm it is picked up
-res = mtb.run_all("MYDATA", "{cat}", out_dir="out/")     # run everything
-res.plot()
-```
-
-If `scan` says a method is not runnable, the `reason` column names the missing
-file — fix that and re-scan. Modality files are HDF5 with the matrix under
-`matrix/data`; `mtb.io.to_canonical` converts other layouts.""")
-
+    # -------------------------------------------------------- troubleshooting
+    trouble_extra = ""
     if cat == "cross":
-        md("""### Note — spatial registration also lives under `cross`
+        trouble_extra = """
+### Note - spatial registration
 
-`PASTE`, `PASTE2`, `SPIRAL` and `GPSA` align spatial slices. They take a
-**directory of `.h5ad` slices** and return **aligned coordinates**, not an
-embedding, so scIB clustering metrics do not apply to them; they are scored with
-spatial measures (SCS / PAA) instead.
+`PASTE`, `PASTE2`, `SPIRAL` and `GPSA` are cross-integration methods whose output
+is **aligned spatial coordinates**, not an embedding - their status reports
+`RUN_OK_NO_EMBEDDING` and clustering metrics genuinely do not apply. Point them
+at a directory of spatial slices (see `mtb.scan("D63", category="cross")`)."""
+    if cat == "mosaic":
+        trouble_extra = """
+### Note - why is UINMF not in mosaic?
 
-`scan` separates them automatically — on a non-spatial dataset they are reported
-as not runnable, with the reason: """)
-        code("""mtb.scan("D52", category="cross")[["method", "runnable", "reason"]].tail(4)""")
-        code("""mtb.scan("D63", category="cross")[["method", "runnable", "output_kind"]].head(4)""")
+Two verified blockers, recorded in the registry: its upstream script derives the
+second batch's unshared features from the FIRST batch's object (harmless when
+both unshared blocks are the same modality, fatal otherwise), and its two-batch
+shape fits no mosaic dataset shipped here. A method `scan()` reports as runnable
+must actually run, so it is deliberately not offered."""
+    md(f"""## Troubleshooting
 
-    nb = nbf.v4.new_notebook()
-    nb["cells"] = C
-    nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
-    path = f"{OUT}/tutorial_{cat}.ipynb"
+| symptom | meaning | fix |
+|---|---|---|
+| `scan` says not runnable: input files not found | a required file is absent | the reason names the exact file and lists what IS in the folder |
+| `scan` says env missing | that method's conda env is not built | `multibench env install --run` |
+| `... looks like cells x features` | matrix stored transposed | re-export with `mtb.io.to_canonical` |
+| a method FAILs in seconds | wrong input representation or layout | read `res.failures.iloc[0]["error"]` - the full command line and stderr tail are there |
+| a method TIMEOUTs | slow, not broken | raise `timeout=`; runtime tiers in `scan` are measured, not guessed |
+| `label_order_confidence` low | several label files fit the cell count | check `label_order_candidates` in the record |
+{trouble_extra}
+
+## Next steps
+
+- the other three tutorials: **vertical, diagonal, mosaic, cross** each have one
+- `SETUP.md` - measured install cost and the smallest end-to-end check
+- `mtb.method_info(name)` - everything the registry knows about one method
+- `mtb.sweep(...)` - one method over a range of one hyperparameter""")
+
+    nb = nbf.v4.new_notebook(cells=C, metadata={
+        "kernelspec": {"display_name": "Python 3", "language": "python",
+                       "name": "python3"},
+        "language_info": {"name": "python", "version": "3.10"},
+    })
+    path = os.path.join(OUT, f"tutorial_{cat}.ipynb")
     nbf.write(nb, path)
-    print("wrote", path, len(C), "cells")
+    print(f"wrote {path} {len(C)} cells")

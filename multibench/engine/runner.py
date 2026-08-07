@@ -151,6 +151,13 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch
     # egg breaking anndata imports). PYTHONNOUSERSITE=1 makes the env hermetic.
     run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **{k: str(v) for k, v in (variant.run_env or {}).items()}}
+    # A Jupyter kernel exports MPLBACKEND=module://matplotlib_inline.backend_inline,
+    # which leaks through `conda run` into the METHOD's env, where matplotlib_inline
+    # does not exist - so any method that imports matplotlib dies at import when
+    # run_all is called from a notebook (Portal was the first to hit it). Agg is
+    # the safe headless backend for a subprocess that at most saves figures.
+    if "MPLBACKEND" not in (variant.run_env or {}):
+        run_env["MPLBACKEND"] = "Agg"
     # Some scripts source/import local files relative to the entrypoint dir,
     # so let variants opt into running with cwd=script's parent rather than
     # cwd=out_dir. The out_dir is still passed via the --save_path arg, so
