@@ -65,12 +65,12 @@ dependencies:
       - seaborn==0.13.2
       - session-info==1.0.1
       - six==1.17.0
-      - statsmodels==0.12.2
+      - statsmodels==0.14.1
       - stdlib-list==0.12.0
       - threadpoolctl==3.6.0
       - torch==1.13.1+cu117
       - tqdm==4.68.3
       - typing-extensions==4.15.0
       - tzdata==2026.2
-      - umap-learn==0.5.7
+      - umap-learn==0.5.12
       - zipp==3.23.1
