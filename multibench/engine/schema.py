@@ -12,6 +12,10 @@ class ArgSpec:
     #   {roles: [rna1, rna2, rna3], flag: "--path1"}  ->  --path1 r1.h5 r2.h5 r3.h5
     # This is how the upstream scripts take multi-batch (cross) input; their
     # argparse declares nargs='+' on the path arguments.
+    # An entry written "=VALUE" emits VALUE literally instead of resolving an
+    # input role, e.g. {roles: [adt1, "=None", "=None"], flag: "--path2"} ->
+    # --path2 adt1.h5 None None. Upstream scripts that take one slot per batch
+    # need this to mark batches lacking a modality (scMoMaT documents `None`).
     roles: list = field(default_factory=list)
     repeat: bool = False    # value may be a list (nargs='+')
     eq: bool = False        # emit as --flag=value

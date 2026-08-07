@@ -298,6 +298,24 @@ methods:
         extra_outputs:
           - {kind: graph, file: knn_dists.h5, dataset: data}
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      # Mosaic integration. main_scMoMaT.py takes --path1/--path2/--path3 with
+      # nargs='+' plus --cty_path, so a per-batch modality pattern maps directly.
+      - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        args:
+          # one slot per batch; "=None" marks a batch lacking that modality,
+          # which is the form upstream's own example documents
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, "=None", "=None"], flag: "--path2"}
+          - {roles: ["=None", atac2, "=None"], flag: "--path3"}
+          - {roles: [cty1, cty2, cty3], flag: "--cty_path"}
+          - {role: out_dir, flag: "--save_path"}
+        # scMoMaT's primary product is a kNN GRAPH, not an embedding; the 2-D UMAP
+        # is a secondary output. Same as its vertical/cross variants.
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
   - id: moETM
     language: python
     categories: [vertical]
@@ -711,7 +729,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: StabMap
     language: R
-    categories: [cross]
+    categories: [cross, mosaic]
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -734,6 +752,31 @@ methods:
           - {role: adt3, flag: "--adt"}
           - {role: out_dir, flag: "--save_path"}
           - {role: reference, flag: "--reference", const: data3}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      # Mosaic integration. Same driver as cross; run_stabmap.R already accepts
+      # repeatable --rna/--adt/--atac, and util.R names datasets data1..dataN one
+      # per batch. D46 is rna1+adt1 | rna2+atac2 | rna3, so data1 is a bridge
+      # batch carrying two modalities.
+      - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
+        args:
+          # one slot per batch, in batch order; "=None" marks a batch that
+          # lacks the modality. StabMap indexes these by batch, so a collapsed
+          # list would pair adt1 with the wrong batch.
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {role: rna3, flag: "--rna"}
+          - {role: adt1, flag: "--adt"}
+          - {roles: ["=None"], flag: "--adt"}
+          - {roles: ["=None"], flag: "--adt"}
+          - {roles: ["=None"], flag: "--atac"}
+          - {role: atac2, flag: "--atac"}
+          - {roles: ["=None"], flag: "--atac"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data1}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: UINMF
     language: R
@@ -759,6 +802,21 @@ methods:
           - {role: adt2}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      # NO mosaic variant, deliberately. Two independent blockers, both verified:
+      #  1. main_UINMF_cross.Rmd computes the SECOND batch's unshared features
+      #     from the FIRST batch's Seurat object (`adt2_top2000 <- VariableFeatures(se1)`).
+      #     Harmless when both unshared blocks are the same modality (the intended
+      #     cross case), but on a mosaic layout where batch 2's unshared block is
+      #     ATAC, the ADT feature names are absent from the peak matrix and it dies
+      #     with "Not all features passed are found in dataset rna1". Hard rule #1
+      #     forbids editing tools_scripts/, so it cannot be fixed here.
+      #  2. The script takes exactly two batches, each needing RNA plus its own
+      #     unshared block, so a genuine mosaic run needs >=2 batches sharing the
+      #     SAME unshared modality type plus >=1 batch lacking it. No dataset on
+      #     disk has that layout.
+      # Offering a variant anyway would make scan() call it runnable and then fail
+      # every time, which is worse than not offering it.
+
   - id: iNMF
     language: R
     categories: [diagonal]
