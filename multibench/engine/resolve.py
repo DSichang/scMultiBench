@@ -157,7 +157,10 @@ def inputs_for(dataset: str, method: str, category: str,
     roles = [r
              for a in variant.args if getattr(a, "const", None) is None
              for r in (getattr(a, "roles", None) or [a.role])
-             if r and r not in ("out_dir", "data_dir")]
+             # "=VALUE" entries are literals emitted verbatim (e.g. scMoMaT's
+             # per-batch `None` placeholders), not input roles to find on disk
+             if r and not str(r).startswith("=")
+             and r not in ("out_dir", "data_dir")]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
     # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
     if any(a.role == "data_dir" for a in variant.args):
