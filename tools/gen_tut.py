@@ -35,24 +35,28 @@ SCEN = {
    blurb=("**Vertical integration** fuses several modalities measured **in the same "
           "cells** (here CITE-seq: RNA + surface protein). Cells are already matched, "
           "so the task is combining modalities, not aligning cells."),
-   live=("Matilda", '{"epochs": 5}', "Matilda takes well under a minute at 5 epochs"),
+   live=("Matilda", '{"epochs": 5}', "Matilda at 5 epochs is quick - `run_sec` below is the measured time on our host"),
    live_ds=None,
    own_src="D11", own_fast="Matilda",
-   own_note="Matilda scored ARI 0.95 on this subsample when we ran it - your exact "
-            "number will differ slightly, the point is that it is high and computed "
-            "end-to-end on data the package has never seen.",
+   own_note="When we ran this, Matilda scored ARI ~0.95 on the subsample - your "
+            "exact number will differ slightly; the point is that it is high and "
+            "computed end-to-end on data the package has never seen.",
  ),
  "diagonal": dict(
    ds="D28", cells="6,408 RNA + 4,606 ATAC",
    blurb=("**Diagonal integration** is the hard case: RNA and ATAC come from "
           "**different cells**, with no pairing and no shared cell ids. A method must "
           "align two populations using only a shared feature space (for RNA + ATAC, "
-          "gene-activity scores)."),
-   live=("online_iNMF", "None", "online_iNMF finishes in about 80 s"),
+          "gene-activity scores). If your RNA and ATAC come from the SAME cells "
+          "(10x multiome), that is vertical integration - use that tutorial instead. "
+          "Gene-activity scores are computed from peaks upstream of this package "
+          "(e.g. Signac's GeneActivity or ArchR's gene score matrix); section 1 "
+          "shows how to check which representation a file holds."),
+   live=("online_iNMF", "None", "online_iNMF is among the fastest methods in this category - the `run_sec` column below is the measured time on our host"),
    live_ds=None,
    own_src="D28", own_fast="Portal",
-   own_note="Portal reached CHAIN_OK with all nine metrics on this subsample in "
-            "about 40 s when we ran it.",
+   own_note="Portal reached CHAIN_OK with all nine metrics on this subsample when "
+            "we ran it; `run_sec` above is the measured time.",
  ),
  "mosaic": dict(
    ds="D45", cells="32,151",
@@ -61,11 +65,11 @@ SCEN = {
           "bridges them. Mosaic methods are the most layout-sensitive of the four "
           "categories: each supports specific per-batch modality patterns, so "
           "`scan()` per dataset is the source of truth for what applies."),
-   live=("StabMap", "None", "StabMap finishes in about 75 s on D46"),
+   live=("StabMap", "None", "StabMap runs in a few minutes on D46 - `run_sec` below is the measured time on our host"),
    live_ds="D46",
    own_src="D46", own_fast="StabMap",
-   own_note="StabMap reached CHAIN_OK on this subsample in about a minute when we "
-            "ran it.",
+   own_note="StabMap reached CHAIN_OK on this subsample when we ran it; `run_sec` "
+            "above is the measured time.",
  ),
  "cross": dict(
    ds="D52", cells="23,478",
@@ -73,10 +77,11 @@ SCEN = {
           "present; the task is removing batch effects while keeping biological "
           "structure. Spatial registration (PASTE, PASTE2, SPIRAL, GPSA) also lives "
           "under `cross` - see the note at the end."),
-   live=("StabMap", "None", "StabMap finishes in about 70 s"),
+   live=("StabMap", "None", "StabMap is among the fastest cross methods - `run_sec` below is the measured time on our host"),
    live_ds=None,
    own_src="D52", own_fast="StabMap",
-   own_note="StabMap reached CHAIN_OK on this subsample in under 30 s when we ran it.",
+   own_note="StabMap reached CHAIN_OK on this subsample when we ran it; `run_sec` "
+            "above is the measured time.",
  ),
 }
 
@@ -150,7 +155,8 @@ with these notebooks were produced on it, so every table below reproduces.""")
     # ---------------------------------------------------------------- install
     md("""## Install
 
-From the repository directory:
+Prerequisites: Linux, `conda` (mamba recommended) and ~230 GB free disk
+during the build. From the repository directory:
 
 ```bash
 pip install -e .                # the multibench package + CLI
@@ -180,8 +186,7 @@ RESULTS = Path("results")     # stored sweep results, so comparisons reproduce
 print("multibench", mtb.__version__)""")
 
     code(f'''DATASET  = "{s['ds']}"
-CATEGORY = "{cat}"
-FAST_METHOD = "{fastm}"       # used for the quick live demos below''')
+CATEGORY = "{cat}"''')
 
     # ------------------------------------------------------------------ layout
     md(f"""## 1. The data layout
@@ -202,11 +207,36 @@ cells x genes). Two safety nets exist: `mtb.io.to_canonical(src, dst)` converts
 an `.h5ad` correctly, and `scan()` rejects a transposed file at preflight instead
 of letting a method fail half an hour in.
 
-> **ATAC caution.** Methods disagree about the ATAC representation - some need
+**The label CSV** is the one file you author by hand, so its schema in full:
+one row per cell, in **the same order as `matrix/barcodes`** of the matching
+modality file(s); the cell-type label is the last column (or a column named
+`x`); a header row is expected. Where a category uses several label files
+(`cty1.csv`, `rna_cty.csv`, ...), each aligns with its own batch or modality.
+The next cell prints the head of a shipped one - this is the whole format:""")
+    code("""cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
+print(cty.name)
+print(*open(cty).read().splitlines()[:4], sep="\\n")""")
+    md("""> **ATAC caution.** Methods disagree about the ATAC representation - some need
 > **gene-activity scores**, others need **peaks** - and feeding the wrong one
 > runs to completion and returns a plausible but wrong embedding, with no error.
 > `describe_layout` above states which file resolves where; check what your
-> files actually contain before trusting a result.""")
+> files actually contain before trusting a result.
+
+**From AnnData to canonical, executed.** Most real data starts as `.h5ad`;
+`mtb.io.to_canonical` writes the layout above correctly (including the
+transpose). Converting a small demo object end to end:""")
+    code("""import anndata as ad, numpy as np, h5py, tempfile, os
+tmp = tempfile.mkdtemp()
+demo = ad.AnnData(X=np.random.poisson(2.0, size=(120, 40)).astype(float))
+demo.obs_names = [f"cell{i}" for i in range(120)]
+demo.var_names = [f"gene{i}" for i in range(40)]
+src = os.path.join(tmp, "demo.h5ad"); demo.write_h5ad(src)
+
+dst = os.path.join(tmp, "rna.h5")
+mtb.io.to_canonical(src, dst)
+with h5py.File(dst) as f:
+    print("keys :", sorted(f["matrix"].keys()))
+    print("shape:", f["matrix/data"].shape, "(features x cells - transposed for you)")""")
 
     # ------------------------------------------------------------------- scan
     md("""## 2. What can I run on this dataset?
@@ -281,7 +311,10 @@ conda env -> load the output -> compute metrics -> keep everything in a
                   methods=["{fastm}"]{pstr},
                   out_dir="/tmp/tutorial_{cat}")
 res.summary''')
-    md("""The metrics are already computed - `run_all` picked the right label files,
+    md("""(The lines scrolling above the table are scIB's own progress chatter from
+the metric computation - harmless; the result is the summary row below.)
+
+The metrics are already computed - `run_all` picked the right label files,
 resolved the label order (see `label_order` in the summary), and scored the
 embedding. One figure:""")
     code("""res.plot()""")
@@ -299,6 +332,12 @@ res = mtb.run_all(DATASET, CATEGORY, out_dir="results/{cat}_all",
                   skip_existing=True)   # resume instead of repeating hours
 print(res.failures)                     # ALWAYS check: failures are recorded, not raised
 ```
+
+`run_all` writes `summary.csv`, `long.csv` and `failures.csv` into `out_dir` -
+the stored files under `results/` loaded below are exactly those, kept so the
+notebook reproduces without re-running the sweep. (The live demo above used
+reduced settings where noted; the stored sweep ran defaults, so its `run_sec`
+differs.)
 
 Three behaviours worth knowing before a long sweep:
 
@@ -331,10 +370,16 @@ Notes that save confusion later:
   label, so they exist even on a single-batch dataset.
 - batch metrics appear only when the dataset has real batches - their absence on
   a single-batch dataset is correct, not missing data.
+- `label_order` in the summary records which label files scored the embedding,
+  in which order - when several candidate orders fit the cell counts, each is
+  screened and the best kept; a low `label_order_confidence` means the ranking
+  was close and `label_order_candidates` in the record shows the alternatives.
 - `kBET` is opt-in (`mtb.evaluate(..., slow_metrics=True)`): it spawns R per
   method and costs hours per dataset.
-- graph-output methods (e.g. Seurat_WNN) legitimately have **no** embedding
-  metrics; their status says so rather than scoring garbage.""")
+- graph-output methods come in two kinds: scMoMaT also ships a secondary UMAP
+  embedding, which is what gets scored (status `CHAIN_OK_GRAPH_METHOD`), while
+  Seurat_WNN emits only the graph - it legitimately has **no** embedding metrics
+  and its status says so rather than scoring garbage.""")
 
     # ------------------------------------------------------------- figures
     md("""## 7. The figures
@@ -401,6 +446,7 @@ second batch's unshared features from the FIRST batch's object (harmless when
 both unshared blocks are the same modality, fatal otherwise), and its two-batch
 shape fits no mosaic dataset shipped here. A method `scan()` reports as runnable
 must actually run, so it is deliberately not offered."""
+    siblings = ", ".join(f"**{c}**" for c in SCEN if c != cat)
     md(f"""## Troubleshooting
 
 | symptom | meaning | fix |
@@ -415,7 +461,7 @@ must actually run, so it is deliberately not offered."""
 
 ## Next steps
 
-- the other three tutorials: **vertical, diagonal, mosaic, cross** each have one
+- the other three tutorials: {siblings}
 - `SETUP.md` - measured install cost and the smallest end-to-end check
 - `mtb.method_info(name)` - everything the registry knows about one method
 - `mtb.sweep(...)` - one method over a range of one hyperparameter""")
