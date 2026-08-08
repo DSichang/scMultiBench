@@ -142,11 +142,17 @@ def _method_language(name):
 
 def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
            show_language: bool = True):
-    """Render the paper-style table. Returns a matplotlib Figure.
+    """Render in the Shiny app's scIB knit-table format. Returns a Figure.
 
-    ``cmap`` overrides the FIRST family's colormap only (compatibility with the
-    old single-colormap signature); the batch family stays green like the paper.
-    ``show_language`` adds the paper's language chip (Py / R) beside each method.
+    Faithful to scIB_knit_table.R: metric CIRCLES whose radius encodes the
+    within-column rank (sqrt-scaled to [0.15, 0.85]) and whose fill encodes the
+    min-max-scaled value; each family's Overall as a HORIZONTAL bar whose length
+    is the min-max-scaled mean rank; alternating #DDDDDD row stripes; column
+    titles slanted 30 degrees above the table; a Score colour-ramp legend and a
+    Rank circle-size legend underneath. With ``aggregate="summary"`` every
+    metric becomes a horizontal bar too, exactly like the Shiny summary tables.
+    ``cmap`` overrides the first family's palette; no rank numbers are drawn -
+    marker size carries the rank, as in the Shiny output.
     """
     from matplotlib.figure import Figure
     from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
@@ -154,129 +160,139 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
 
     methods = tbl.methods
     n_rows = len(methods)
+    ROW_H, R_MAX = 1.0, 0.5          # row height; circle max radius = row/2
 
-    # x layout: [method labels] [gap] per family: [overall][metrics...] [gap]
-    xs, col_meta = 0.0, []   # col_meta: (x, family_idx, kind, name)
+    # ---- x layout: per family [overall][metrics...] with a family gap -----
+    xs, col_meta = 0.0, []
     for fi, b in enumerate(tbl.blocks):
-        col_meta.append((xs, fi, "overall", "Rank"))
-        xs += 1.15
+        col_meta.append((xs, fi, "overall", "Overall"))
+        xs += 1.5                                     # bar column is wider
         for mname in b.raw.columns:
             col_meta.append((xs, fi, "metric", mname))
-            xs += 1.0
-        xs += 0.55                                    # gap between families
-    total_w = xs - 0.55
+            xs += 1.1
+        xs += 0.5
+    total_w = xs - 0.5
 
-    fig = Figure(figsize=(0.62 * total_w + 2.6, 0.44 * n_rows + 1.7))
+    fig = Figure(figsize=(0.6 * total_w + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
     mappers = {fi: cm.ScalarMappable(norm=norm01,
                                      cmap=(cmap if (fi == 0 and cmap) else b.cmap))
                for fi, b in enumerate(tbl.blocks)}
 
-    # zebra row stripes, like the paper
+    # ---- alternating row stripes (#DDDDDD, like the Shiny output) ---------
     for i in range(n_rows):
         if i % 2 == 0:
-            ax.add_patch(Rectangle((-1.15, n_rows - i - 1), total_w + 1.5, 1.0,
-                                   facecolor="#ebebeb", edgecolor="none", zorder=0))
+            ax.add_patch(Rectangle((-1.3, n_rows - i - 1), total_w + 1.8, ROW_H,
+                                   facecolor="#DDDDDD", edgecolor="none", zorder=0))
 
-    # language chip per method (paper's metadata column), left of the grid
+    # ---- language chips ----------------------------------------------------
     if show_language:
-        langs = {m: _method_language(m) for m in methods}
-        if any(langs.values()):
-            for i, m in enumerate(methods):
-                lang = langs.get(m)
-                if not lang:
-                    continue
-                label, colr = ("Py", "#3572A5") if lang.startswith("py") else ("R", "#777777")
-                y = n_rows - i - 0.5
-                ax.add_patch(Circle((-0.75, y), 0.24, facecolor=colr,
-                                    edgecolor="none", zorder=3))
-                ax.text(-0.75, y, label, ha="center", va="center", zorder=4,
-                        fontsize=6.4, fontweight="bold", color="white")
-
-    def rank_label(ax_, x, y, rank_pos, fill):
-        lum = 0.299 * fill[0] + 0.587 * fill[1] + 0.114 * fill[2]
-        ax_.text(x, y, str(rank_pos), ha="center", va="center", zorder=5,
-                 fontsize=7.2, fontweight="bold",
-                 color="white" if lum < 0.55 else "#222222")
-
-    def vbar(ax_, x, y_row, frac, fill, width):
-        """Vertical bar whose LENGTH and colour both encode the score, as in the
-        paper: full row height = best, a sliver = worst."""
-        h = 0.10 + 0.66 * max(0.0, min(1.0, frac))
-        bottom = y_row - 0.38
-        ax_.add_patch(Rectangle((x - width / 2, bottom), width, h,
-                                facecolor=fill, edgecolor="#444444",
-                                linewidth=0.5, zorder=3))
-        return bottom + h
-
-    for x, fi, kind, name in col_meta:
-        b = tbl.blocks[fi]
-        mp = mappers[fi]
-        as_bars = (kind == "overall") or (tbl.aggregate == "summary")
-        if kind == "overall":
-            colvals, colnorm = b.overall, style.minmax(b.overall.to_numpy())
-            colnorm = pd.Series(colnorm, index=b.overall.index)
-        else:
-            colvals, colnorm = b.raw[name], b.norm[name]
-        pos = colvals.rank(ascending=False, method="min")
         for i, m in enumerate(methods):
-            v = colvals.loc[m]
-            if pd.isna(v):
+            lang = _method_language(m)
+            if not lang:
                 continue
+            label, colr = ("Py", "#3572A5") if lang.startswith("py") else ("R", "#777777")
             y = n_rows - i - 0.5
-            frac = float(colnorm.loc[m])
-            fill = mp.to_rgba(frac)
-            if as_bars:
-                width = 0.64 if kind == "overall" else 0.55
-                top = vbar(ax, x + 0.5, y, frac, fill, width)
-                if pos.loc[m] <= 3:
-                    if frac >= 0.30:            # label fits inside the bar
-                        rank_label(ax, x + 0.5, top - 0.16, int(pos.loc[m]), fill)
-                    else:                        # tiny bar: sit the label above it
-                        rank_label(ax, x + 0.5, top + 0.14, int(pos.loc[m]),
-                                   (1, 1, 1, 1))
-            else:
-                ax.add_patch(Circle((x + 0.5, y), 0.34, facecolor=fill,
-                                    edgecolor="#444444", linewidth=0.5, zorder=3))
-                if pos.loc[m] <= 3:
-                    rank_label(ax, x + 0.5, y, int(pos.loc[m]), fill)
+            ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colr,
+                                edgecolor="none", zorder=3))
+            ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
+                    fontsize=6.4, fontweight="bold", color="white")
 
-    # family header bands
+    def rank_radius(colvals):
+        """sqrt of the max-rank, rescaled to [0.15, 0.85] per column (scIB rule)."""
+        r = colvals.rank(ascending=True, method="max") / colvals.notna().sum()
+        r = np.sqrt(r.to_numpy(dtype=float))
+        lo, hi = np.nanmin(r), np.nanmax(r)
+        span = (hi - lo) if hi > lo else 1.0
+        return pd.Series(0.15 + 0.70 * (r - lo) / span, index=colvals.index)
+
+    # ---- markers -----------------------------------------------------------
+    for x, fi, kind, name in col_meta:
+        b, mp = tbl.blocks[fi], mappers[fi]
+        if kind == "overall":
+            vals = b.overall
+            length = style.minmax(vals.to_numpy())          # ranked overall, 0..1
+            for i, m in enumerate(methods):
+                v = vals.loc[m]
+                if pd.isna(v):
+                    continue
+                y0 = n_rows - i - 1
+                ax.add_patch(Rectangle((x + 0.08, y0 + 0.12),
+                                       1.24 * max(0.04, float(length[i])),
+                                       ROW_H - 0.24,
+                                       facecolor=mp.to_rgba(float(v)),
+                                       edgecolor="#333333", linewidth=0.5, zorder=3))
+        elif tbl.aggregate == "summary":
+            vals, normv = b.raw[name], b.norm[name]
+            for i, m in enumerate(methods):
+                v = vals.loc[m]
+                if pd.isna(v):
+                    continue
+                y0 = n_rows - i - 1
+                ax.add_patch(Rectangle((x + 0.06, y0 + 0.16),
+                                       0.95 * max(0.04, float(normv.loc[m])),
+                                       ROW_H - 0.32,
+                                       facecolor=mp.to_rgba(float(normv.loc[m])),
+                                       edgecolor="#333333", linewidth=0.4, zorder=3))
+        else:
+            vals, normv = b.raw[name], b.norm[name]
+            rad = rank_radius(vals)
+            for i, m in enumerate(methods):
+                v = vals.loc[m]
+                if pd.isna(v):
+                    continue
+                y = n_rows - i - 0.5
+                ax.add_patch(Circle((x + 0.55, y), R_MAX * float(rad.loc[m]) * 0.9,
+                                    facecolor=mp.to_rgba(float(normv.loc[m])),
+                                    edgecolor="#333333", linewidth=0.4, zorder=3))
+
+    # ---- column titles: slanted 30deg ABOVE the table, with tick marks -----
+    for x, fi, kind, name in col_meta:
+        cx = x + (0.7 if kind == "overall" else 0.55)
+        ax.plot([cx, cx], [n_rows + 0.05, n_rows + 0.22], color="#333333",
+                linewidth=0.6, zorder=2)
+        ax.text(cx - 0.05, n_rows + 0.30, name, rotation=30, ha="left",
+                va="bottom", fontsize=8, rotation_mode="anchor")
+
+    # ---- family bands above the slanted titles ----------------------------
+    band_y = n_rows + 2.05
     for fi, b in enumerate(tbl.blocks):
         xs_f = [x for x, f, k, _ in col_meta if f == fi]
-        kinds = [k for x, f, k, _ in col_meta if f == fi]
-        x0, x1 = xs_f[0], xs_f[-1] + 1.0
-        band = mappers[fi].to_rgba(0.28)
-        # the Overall chip and the family band, side by side like the paper
-        ax.add_patch(FancyBboxPatch((x0 + 0.06, n_rows + 0.25), 1.0, 0.62,
+        x0, x1 = xs_f[0], xs_f[-1] + 1.1
+        ax.add_patch(FancyBboxPatch((x0 + 0.05, band_y), x1 - x0 - 0.35, 0.6,
                                     boxstyle="round,pad=0.02,rounding_size=0.18",
-                                    facecolor=mappers[fi].to_rgba(0.55),
+                                    facecolor=mappers[fi].to_rgba(0.30),
                                     edgecolor="none", zorder=2))
-        ax.text(x0 + 0.56, n_rows + 0.56, "Overall", ha="center", va="center",
-                fontsize=7.6, color="white", fontweight="bold", zorder=3)
-        if len(xs_f) > 1:
-            ax.add_patch(FancyBboxPatch((xs_f[1] + 0.04, n_rows + 0.25),
-                                        x1 - xs_f[1] - 0.08, 0.62,
-                                        boxstyle="round,pad=0.02,rounding_size=0.18",
-                                        facecolor=band, edgecolor="none", zorder=2))
-            ax.text((xs_f[1] + x1) / 2, n_rows + 0.56, b.label, ha="center",
-                    va="center", fontsize=8.2, color="#1a1a1a", zorder=3)
+        ax.text((x0 + x1 - 0.3) / 2, band_y + 0.3, b.label, ha="center",
+                va="center", fontsize=8.6, color="#1a1a1a", zorder=3)
 
-    # column tick labels, slanted like the paper
-    for x, fi, kind, name in col_meta:
-        ax.text(x + 0.5, -0.18, name, rotation=38, ha="right", va="top", fontsize=8)
+    # ---- legends: Score ramps + Rank size, under the table (scIB layout) ---
+    ly = -1.1
+    ax.text(-0.9, ly, "Score", fontsize=8, fontweight="bold", va="center")
+    for fi, b in enumerate(tbl.blocks):
+        xoff = 1.2 + fi * 4.6
+        for k in range(40):
+            ax.add_patch(Rectangle((xoff + k * 0.07, ly - 0.28), 0.07, 0.56,
+                                   facecolor=mappers[fi].to_rgba(k / 39),
+                                   edgecolor="none", zorder=2))
+        ax.text(xoff - 0.12, ly, "Low", fontsize=6.6, ha="right", va="center")
+        ax.text(xoff + 40 * 0.07 + 0.12, ly, "High", fontsize=6.6, ha="left",
+                va="center")
+    if tbl.aggregate != "summary":
+        ly2 = ly - 1.35
+        ax.text(-0.9, ly2, "Rank", fontsize=8, fontweight="bold", va="center")
+        rr = np.linspace(0.15, 0.85, 5)
+        xoff = 1.5
+        for k, r in enumerate(rr):
+            ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,
+                                facecolor="#bbbbbb", edgecolor="#333333",
+                                linewidth=0.4, zorder=2))
+        ax.text(xoff - 0.65, ly2 - 0.62, str(n_rows), fontsize=6.6, ha="center")
+        ax.text(xoff + 4.0, ly2 - 0.62, "1", fontsize=6.6, ha="center")
 
-    legend_bits = ["numbers = top-3 per column", "Rank bar: length + colour = family overall"]
-    if tbl.aggregate == "summary":
-        legend_bits.insert(0, "bar length + colour = rank averaged across datasets")
-    else:
-        legend_bits.insert(0, "circle colour = value (scaled per column)")
-    ax.text(-0.35, -1.45, "  |  ".join(legend_bits), fontsize=7.4,
-            color="#555555", ha="left", va="center")
-
-    ax.set_xlim(-1.15, total_w + 0.35)
-    ax.set_ylim(-1.95, n_rows + 1.1)
+    ax.set_xlim(-1.35, total_w + 0.45)
+    ax.set_ylim((-2.9 if tbl.aggregate != "summary" else -1.8), band_y + 1.0)
     ax.set_yticks([n_rows - i - 0.5 for i in range(n_rows)])
     ax.set_yticklabels(methods, fontsize=8.6)
     ax.set_xticks([])
@@ -285,14 +301,14 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         spine.set_visible(False)
     ax.tick_params(left=False)
     if title:
-        ax.set_title(title, fontsize=10, pad=14)
+        ax.set_title(title, fontsize=10, pad=10)
     fig.tight_layout()
     return fig
 
 
 def plot_bubble(long_df, *, metrics=None, methods=None, order=None,
                 aggregate="dataset", cmap=None, title=None, save=None):
-    """Build + render the paper-style bubble table from a long results frame."""
+    """Build + render the Shiny-format table from a long results frame."""
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate)
     fig = render(tbl, cmap=cmap, title=title)
