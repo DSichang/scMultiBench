@@ -50,7 +50,7 @@ SCEN = {
           "gene-activity scores). If your RNA and ATAC come from the SAME cells "
           "(10x multiome), that is vertical integration - use that tutorial instead. "
           "Gene-activity scores are computed from peaks upstream of this package "
-          "(e.g. Signac's GeneActivity or ArchR's gene score matrix); section 1 "
+          "(e.g. Signac's GeneActivity or ArchR's gene score matrix); section 2 "
           "shows how to check which representation a file holds."),
    live=("online_iNMF", "None", "online_iNMF is among the fastest methods in this category - the `run_sec` column below is the measured time on our host"),
    live_ds=None,
@@ -150,10 +150,14 @@ This tutorial covers, end to end:
 - **running the same pipeline on your own dataset**, demonstrated for real
 
 **Reference dataset:** `{s['ds']}` ({s['cells']} cells). The stored results shipped
-with these notebooks were produced on it, so every table below reproduces.""")
+with these notebooks were produced on it, so every table below reproduces.
+
+**Contents** - 1 Install · 2 Data layout · 3 What can I run · 4 Paper coverage ·
+5 What can I tune · 6 Run one method · 7 Run the benchmark · 8 Reading the
+metrics · 9 Figures · 10 Your own dataset · Troubleshooting""")
 
     # ---------------------------------------------------------------- install
-    md("""## Install
+    md("""## 1. Install
 
 Prerequisites: Linux, `conda` (mamba recommended) and ~230 GB free disk
 during the build. From the repository directory:
@@ -189,7 +193,7 @@ print("multibench", mtb.__version__)""")
 CATEGORY = "{cat}"''')
 
     # ------------------------------------------------------------------ layout
-    md(f"""## 1. The data layout
+    md(f"""## 2. The data layout
 
 A dataset is a **folder of flat files**; the folder name is the dataset name.
 `describe_layout` prints the exact filenames for each category:""")
@@ -239,7 +243,7 @@ with h5py.File(dst) as f:
     print("shape:", f["matrix/data"].shape, "(features x cells - transposed for you)")""")
 
     # ------------------------------------------------------------------- scan
-    md("""## 2. What can I run on this dataset?
+    md("""## 3. What can I run on this dataset?
 
 `scan` inspects the folder and reports every method that can run - and, for the
 rest, exactly why not (missing file, missing environment, wrong layout). Nothing
@@ -253,7 +257,7 @@ not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
 """)
 
     # -------------------------------------------------------- paper coverage
-    md(f"""## 2b. How much of the paper does this cover?
+    md(f"""## 4. How much of the paper does this cover?
 
 `scan()` answers "what runs on THIS dataset". A different question: how many of
 the methods the paper benchmarks for **{cat}** does this package wire at all?
@@ -279,7 +283,7 @@ else:
     print("full parity with the paper for this category")""")
 
     # ------------------------------------------------------------------ params
-    md("""## 3. What can I tune?
+    md("""## 5. What can I tune?
 
 `params_for` reports each method's defaults and, where the upstream script
 exposes any, the tunable hyperparameters. **An empty `tunable` is honest**: many
@@ -302,7 +306,7 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
     extra = (f'\n\n(This demo runs on `{live_ds}`, whose layout fits {fastm}; '
              f'mosaic layouts vary per dataset - see the note above.)'
              if live_ds != s["ds"] else "")
-    md(f"""## 4. Run one method
+    md(f"""## 6. Run one method
 
 `run_all` runs methods end to end: resolve inputs -> run in the method's own
 conda env -> load the output -> compute metrics -> keep everything in a
@@ -320,7 +324,7 @@ embedding. One figure:""")
     code("""res.plot()""")
 
     # ------------------------------------------------------------ run all
-    md(f"""## 5. Run the whole benchmark
+    md(f"""## 7. Run the whole benchmark
 
 The same call without `methods=` runs everything runnable. On `{s['ds']}` that is
 hours of compute, so this cell is shown but not executed here - the stored
@@ -347,14 +351,18 @@ Three behaviours worth knowing before a long sweep:
 - **`skip_existing=True` resumes** a killed sweep, but refuses to combine with
   `params=` (it cannot know the old output used your new parameters).""")
     code(f'''summary = pd.read_csv(RESULTS / "summary_{s['ds']}.csv")
-cols = [c for c in ["method","status","run_sec",
-                    "ARI","NMI","ASW","iASW","iF1","cLISI",      # clustering
-                    "ASW_batch","GC","iLISI"                     # batch correction
-                    ] if c in summary.columns]
-summary[cols]''')
+clu = [c for c in ["ARI","NMI","ASW","iASW","iF1","cLISI"] if c in summary.columns]
+bat = [c for c in ["ASW_batch","GC","iLISI"] if c in summary.columns]
+cols = ["method","status","run_sec"] + clu + bat
+(summary[cols].sort_values(clu[0], ascending=False)
+ .style.background_gradient(subset=clu, cmap="Blues", vmin=0, vmax=1)
+       .background_gradient(subset=bat, cmap="Greens", vmin=0, vmax=1)
+       .format({{c: "{{:.3f}}" for c in clu + bat}}, na_rep="")
+       .format({{"run_sec": "{{:.0f}}"}})
+       .hide(axis="index"))''')
 
     # ------------------------------------------------------------- metrics
-    md("""## 6. Reading the metrics
+    md("""## 8. Reading the metrics
 
 Two families, matching the paper's grouping. All are **higher = better**, on
 [0, 1] except ARI (can be slightly negative at chance level).
@@ -382,7 +390,7 @@ Notes that save confusion later:
   and its status says so rather than scoring garbage.""")
 
     # ------------------------------------------------------------- figures
-    md("""## 7. The figures
+    md("""## 9. The figures
 
 **Per-dataset panel**, in the paper's layout: methods as rows (best first),
 metrics as columns grouped by task family - blues for DR & clustering, greens
@@ -415,7 +423,7 @@ per-dataset scores).""")
     code("""mtb.plot.bar(allx, group="clustering", title="Across datasets - DR and clustering")""")
 
     # ------------------------------------------------------------ own data
-    md(f"""## 8. Your own dataset - for real
+    md(f"""## 10. Your own dataset - for real
 
 Everything above used shipped data. This section does what you will actually do:
 put files in a folder, point the package at it, and get scored results - executed
@@ -439,7 +447,7 @@ mine.summary''')
 
 For your real data the only work is producing the canonical files: export each
 modality with `mtb.io.to_canonical` (from `.h5ad`) or the h5py pattern above,
-write one label CSV per the layout in section 1, and the same three calls -
+write one label CSV per the layout in section 2, and the same three calls -
 `scan`, `run_all`, `plot` - do the rest.""")
 
     # -------------------------------------------------------- troubleshooting
