@@ -384,20 +384,29 @@ Notes that save confusion later:
     # ------------------------------------------------------------- figures
     md("""## 7. The figures
 
-**Per-dataset bubble chart** - radius encodes rank (rank 1 = largest bubble),
-colour the value:""")
+**Per-dataset panel**, in the paper's layout: methods as rows (best first),
+metrics as columns grouped by task family - blues for DR & clustering, greens
+for batch correction - each family led by an **Overall** rank column, and the
+top three per column carry their rank number. A missing marker means the metric
+does not apply to that method.""")
     code(f'''long = pd.read_csv(RESULTS / "long_all_{s['ds']}.csv")
 fig = mtb.plot.bubble(long, title="{cat} integration - {s['ds']}")
 fig.set_dpi(110)
 fig''')
-    md("""**Across datasets** - when you have `long` tables from several datasets,
-concatenate them and `mtb.plot.bar` summarises each method across all of them
-(only methods present in more than one dataset are truly comparative):
-
-```python
-allx = pd.concat([long_d1, long_d2, ...], ignore_index=True)
-mtb.plot.bar(allx, group="clustering")   # or group="batch", or all metrics
-```""")
+    md("""**Across datasets, executed.** The results folder ships one `long` table per
+reference dataset (all four categories), so the cross-dataset summary can be
+drawn here for real. Bars are each method's mean overall score across the
+datasets it appears in; **whiskers are the SD across datasets** - a method
+present in a single dataset gets a bar but no whisker, because there is no
+spread to show. Only methods appearing in several datasets are truly
+comparative; the dots (one per dataset) make the difference visible.""")
+    code("""import glob
+longs = [pd.read_csv(p).assign(dataset=Path(p).stem.replace("long_all_", ""))
+         for p in sorted(RESULTS.glob("long_all_*.csv"))]
+allx = pd.concat(longs, ignore_index=True)
+print(f"{allx.dataset.nunique()} datasets, {allx.method.nunique()} methods")
+mtb.plot.bar(allx, group="clustering", title="Across datasets - DR and clustering")""")
+    code("""mtb.plot.bar(allx, group="batch", title="Across datasets - batch correction")""")
 
     # ------------------------------------------------------------ own data
     md(f"""## 8. Your own dataset - for real
