@@ -132,11 +132,21 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
     )
 
 
-def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None):
+def _method_language(name):
+    try:
+        from ..engine import registry
+        return (registry.get(name).language or "python").lower()
+    except Exception:
+        return None
+
+
+def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
+           show_language: bool = True):
     """Render the paper-style table. Returns a matplotlib Figure.
 
     ``cmap`` overrides the FIRST family's colormap only (compatibility with the
     old single-colormap signature); the batch family stays green like the paper.
+    ``show_language`` adds the paper's language chip (Py / R) beside each method.
     """
     from matplotlib.figure import Figure
     from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
@@ -166,8 +176,23 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None):
     # zebra row stripes, like the paper
     for i in range(n_rows):
         if i % 2 == 0:
-            ax.add_patch(Rectangle((-0.35, n_rows - i - 1), total_w + 0.7, 1.0,
+            ax.add_patch(Rectangle((-1.15, n_rows - i - 1), total_w + 1.5, 1.0,
                                    facecolor="#ebebeb", edgecolor="none", zorder=0))
+
+    # language chip per method (paper's metadata column), left of the grid
+    if show_language:
+        langs = {m: _method_language(m) for m in methods}
+        if any(langs.values()):
+            for i, m in enumerate(methods):
+                lang = langs.get(m)
+                if not lang:
+                    continue
+                label, colr = ("Py", "#3572A5") if lang.startswith("py") else ("R", "#777777")
+                y = n_rows - i - 0.5
+                ax.add_patch(Circle((-0.75, y), 0.24, facecolor=colr,
+                                    edgecolor="none", zorder=3))
+                ax.text(-0.75, y, label, ha="center", va="center", zorder=4,
+                        fontsize=6.4, fontweight="bold", color="white")
 
     def rank_label(ax_, x, y, rank_pos, fill):
         lum = 0.299 * fill[0] + 0.587 * fill[1] + 0.114 * fill[2]
@@ -206,8 +231,11 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None):
                 width = 0.64 if kind == "overall" else 0.55
                 top = vbar(ax, x + 0.5, y, frac, fill, width)
                 if pos.loc[m] <= 3:
-                    rank_label(ax, x + 0.5, max(top - 0.16, y - 0.24),
-                               int(pos.loc[m]), fill)
+                    if frac >= 0.30:            # label fits inside the bar
+                        rank_label(ax, x + 0.5, top - 0.16, int(pos.loc[m]), fill)
+                    else:                        # tiny bar: sit the label above it
+                        rank_label(ax, x + 0.5, top + 0.14, int(pos.loc[m]),
+                                   (1, 1, 1, 1))
             else:
                 ax.add_patch(Circle((x + 0.5, y), 0.34, facecolor=fill,
                                     edgecolor="#444444", linewidth=0.5, zorder=3))
@@ -239,8 +267,16 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None):
     for x, fi, kind, name in col_meta:
         ax.text(x + 0.5, -0.18, name, rotation=38, ha="right", va="top", fontsize=8)
 
-    ax.set_xlim(-0.35, total_w + 0.35)
-    ax.set_ylim(-1.7, n_rows + 1.1)
+    legend_bits = ["numbers = top-3 per column", "Rank bar: length + colour = family overall"]
+    if tbl.aggregate == "summary":
+        legend_bits.insert(0, "bar length + colour = rank averaged across datasets")
+    else:
+        legend_bits.insert(0, "circle colour = value (scaled per column)")
+    ax.text(-0.35, -1.45, "  |  ".join(legend_bits), fontsize=7.4,
+            color="#555555", ha="left", va="center")
+
+    ax.set_xlim(-1.15, total_w + 0.35)
+    ax.set_ylim(-1.95, n_rows + 1.1)
     ax.set_yticks([n_rows - i - 0.5 for i in range(n_rows)])
     ax.set_yticklabels(methods, fontsize=8.6)
     ax.set_xticks([])

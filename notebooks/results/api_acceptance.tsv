@@ -1,0 +1,27 @@
+api	status	detail
+list_categories	PASS	['vertical', 'diagonal', 'mosaic', 'cross']
+describe_layout	PASS	3517
+list_methods	PASS	40
+list_tasks	PASS	['batch', 'classification', 'clustering', 'dimension_reduction', 'imputation', 'registrati
+available_datasets	PASS	48
+find_methods	PASS	18
+method_info	PASS	['atac', 'categories', 'env', 'id', 'language']
+params_for	PASS	['augmentation', 'batch_size', 'device', 'epochs']
+runtime_hint	PASS	{'observed': [{'cells': 2864, 'dataset': 'D11', 'sec': 190}], 'tier': 'fast', 'worst_sec':
+labels_for	PASS	['cty']
+inputs_for	PASS	['adt', 'cty', 'rna']
+scan	PASS	14
+io.to_canonical	PASS	(30, 80)
+run_all	PASS	Matilda CHAIN_OK ARI=0.8766
+BatchResult.summary	PASS	(1, 14)
+BatchResult.long	PASS	(6, 5)
+BatchResult.failures	PASS	0
+BatchResult.plot	PASS	14472
+load_batch	PASS	(1, 14)
+run (low-level)	PASS	RunResult
+evaluate (direct)	PASS	{'ARI': 0.604, 'NMI': 0.688, 'ASW': 0.614}
+to_long	PASS	(6, 5)
+sweep	PASS	(2, 15)
+plot.bubble	PASS	14366
+plot.bar	PASS	8820
+env.doctor	PASS	29
