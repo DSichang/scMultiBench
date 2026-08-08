@@ -395,18 +395,24 @@ fig.set_dpi(110)
 fig''')
     md("""**Across datasets, executed.** The results folder ships one `long` table per
 reference dataset (all four categories), so the cross-dataset summary can be
-drawn here for real. Bars are each method's mean overall score across the
-datasets it appears in; **whiskers are the SD across datasets** - a method
-present in a single dataset gets a bar but no whisker, because there is no
-spread to show. Only methods appearing in several datasets are truly
-comparative; the dots (one per dataset) make the difference visible.""")
+drawn here for real - in the same layout as the paper's summary panels: every
+marker becomes a **bar whose length and colour encode the metric's rank averaged
+across datasets**. Two conventions to read it honestly: a method scores rank 0
+in any dataset it is absent from (the paper's own summary rule, so
+single-category methods sink), and a metric is averaged only over the datasets
+that computed it (a single-batch dataset has no batch metrics to contribute).""")
     code("""import glob
 longs = [pd.read_csv(p).assign(dataset=Path(p).stem.replace("long_all_", ""))
-         for p in sorted(RESULTS.glob("long_all_*.csv"))]
+         for p in sorted(RESULTS.glob("long_all_D*.csv"))]
 allx = pd.concat(longs, ignore_index=True)
 print(f"{allx.dataset.nunique()} datasets, {allx.method.nunique()} methods")
-mtb.plot.bar(allx, group="clustering", title="Across datasets - DR and clustering")""")
-    code("""mtb.plot.bar(allx, group="batch", title="Across datasets - batch correction")""")
+mtb.plot.bubble(allx, aggregate="summary",
+                title=f"Summary of {allx.dataset.nunique()} datasets")""")
+    md("""A supplementary view of the same data with explicit uncertainty: mean overall
+score per method with **SD whiskers across datasets** (a method present in a
+single dataset gets no whisker - there is no spread to show; the dots are the
+per-dataset scores).""")
+    code("""mtb.plot.bar(allx, group="clustering", title="Across datasets - DR and clustering")""")
 
     # ------------------------------------------------------------ own data
     md(f"""## 8. Your own dataset - for real

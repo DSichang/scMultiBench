@@ -2,10 +2,12 @@
 
 Layout follows the benchmark paper's figures: each task family (DR & clustering,
 batch correction) is a colour-banded block - blues and greens respectively -
-preceded by an *Overall* column that ranks methods within that family; the top
-three per column carry their rank number inside the marker. Methods missing a
-value simply have no marker there, matching how the paper shows inapplicable
-metrics.
+preceded by an *Overall* column drawn as a vertical bar whose LENGTH and colour
+both encode the family score; the top three per column carry their rank number.
+With ``aggregate="summary"`` (several datasets, the paper's panel c) every
+metric marker becomes such a bar too - the value is then the metric's rank
+averaged across datasets; with a single dataset the metric markers are circles
+(panel b). Methods missing a value simply have no marker there.
 """
 from __future__ import annotations
 
@@ -42,19 +44,31 @@ class BubbleTable:
     matrix: pd.DataFrame      # all families' normalized columns, concatenated
     raw: pd.DataFrame
     overall: pd.Series        # combined overall used for the row order
+    aggregate: str = "dataset"  # "dataset" -> circles; "summary" -> bars (paper c)
 
 
 def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
     if aggregate == "summary":
+        # Rank methods within each dataset per metric, then average the ranks -
+        # but average each METRIC only over the datasets that computed it. A
+        # naive sum of the per-dataset frames aligns columns and turns a metric
+        # into all-NaN as soon as ONE dataset lacks it (a single-batch dataset
+        # has no batch metrics), which silently erased whole families.
         parts = []
         for _, g in df.groupby("dataset"):
             piv = g.pivot_table(index="method", columns="metric", values="value",
                                 aggfunc="mean")
-            parts.append(piv.apply(lambda col: style.rank_max(col.to_numpy()), axis=0))
+            piv = piv.dropna(axis=1, how="all")   # a metric this dataset never computed
+            ranks = piv.apply(lambda col: style.rank_max(col.to_numpy()), axis=0)
+            parts.append(ranks)
         idx = parts[0].index
         for q in parts[1:]:
             idx = idx.union(q.index)
-        return sum(p.reindex(idx).fillna(0) for p in parts) / len(parts)
+        # a method absent from a dataset scores 0 there (as in the paper's
+        # summary), but only for metrics that dataset actually computed
+        aligned = [q.reindex(idx).fillna(0) for q in parts]
+        stacked = pd.concat(aligned, keys=range(len(aligned)))
+        return stacked.groupby(level=1).mean()
     return df.pivot_table(index="method", columns="metric", values="value",
                           aggfunc="mean")
 
@@ -114,6 +128,7 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         matrix=pd.concat([b.norm for b in blocks], axis=1),
         raw=pd.concat([b.raw for b in blocks], axis=1),
         overall=combined.loc[idx],
+        aggregate=aggregate,
     )
 
 
@@ -160,34 +175,40 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None):
                  fontsize=7.2, fontweight="bold",
                  color="white" if lum < 0.55 else "#222222")
 
+    def vbar(ax_, x, y_row, frac, fill, width):
+        """Vertical bar whose LENGTH and colour both encode the score, as in the
+        paper: full row height = best, a sliver = worst."""
+        h = 0.10 + 0.66 * max(0.0, min(1.0, frac))
+        bottom = y_row - 0.38
+        ax_.add_patch(Rectangle((x - width / 2, bottom), width, h,
+                                facecolor=fill, edgecolor="#444444",
+                                linewidth=0.5, zorder=3))
+        return bottom + h
+
     for x, fi, kind, name in col_meta:
         b = tbl.blocks[fi]
         mp = mappers[fi]
+        as_bars = (kind == "overall") or (tbl.aggregate == "summary")
         if kind == "overall":
-            vals = b.overall
-            # dense best-first positions for the numbers 1..3
-            pos = vals.rank(ascending=False, method="min")
-            for i, m in enumerate(methods):
-                v = vals.loc[m]
-                if pd.isna(v):
-                    continue
-                y = n_rows - i - 0.5
-                fill = mp.to_rgba(float(v))
-                ax.add_patch(Rectangle((x + 0.18, y - 0.32), 0.64, 0.64,
-                                       facecolor=fill, edgecolor="#444444",
-                                       linewidth=0.5, zorder=3))
-                if pos.loc[m] <= 3:
-                    rank_label(ax, x + 0.5, y, int(pos.loc[m]), fill)
+            colvals, colnorm = b.overall, style.minmax(b.overall.to_numpy())
+            colnorm = pd.Series(colnorm, index=b.overall.index)
         else:
-            colvals = b.raw[name]
-            colnorm = b.norm[name]
-            pos = colvals.rank(ascending=False, method="min")
-            for i, m in enumerate(methods):
-                v = colvals.loc[m]
-                if pd.isna(v):
-                    continue
-                y = n_rows - i - 0.5
-                fill = mp.to_rgba(float(colnorm.loc[m]))
+            colvals, colnorm = b.raw[name], b.norm[name]
+        pos = colvals.rank(ascending=False, method="min")
+        for i, m in enumerate(methods):
+            v = colvals.loc[m]
+            if pd.isna(v):
+                continue
+            y = n_rows - i - 0.5
+            frac = float(colnorm.loc[m])
+            fill = mp.to_rgba(frac)
+            if as_bars:
+                width = 0.64 if kind == "overall" else 0.55
+                top = vbar(ax, x + 0.5, y, frac, fill, width)
+                if pos.loc[m] <= 3:
+                    rank_label(ax, x + 0.5, max(top - 0.16, y - 0.24),
+                               int(pos.loc[m]), fill)
+            else:
                 ax.add_patch(Circle((x + 0.5, y), 0.34, facecolor=fill,
                                     edgecolor="#444444", linewidth=0.5, zorder=3))
                 if pos.loc[m] <= 3:
