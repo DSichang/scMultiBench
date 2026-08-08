@@ -60,7 +60,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         is uniformly good is distinguishable from one that averages well by
         winning on a single dataset.
 
-    Returns a matplotlib ``Figure``. Bars are the MEAN across datasets of a
+    Returns a matplotlib ``Figure``. Whiskers are the SD of the per-dataset
+    scores (methods present in a single dataset get none - there is no spread
+    to show). Bars are the MEAN across datasets of a
     per-dataset overall score, where that score is the benchmark's own rule
     (min-max scaled mean of per-metric max-ranks). Because it is rank-based, a
     score is only meaningful relative to the other methods in the same figure.
@@ -87,8 +89,18 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
 
     n = len(mean)
     fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
+    if group == "batch":
+        cmap = "Greens"        # match the paper's family colours
     colors = plt.get_cmap(cmap)(0.35 + 0.55 * minmax(mean.to_numpy()))
-    ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333", linewidth=0.6, zorder=2)
+    # error bar = SD across datasets; a method present in one dataset has no
+    # spread to show, so it gets a bar without a whisker rather than a fake one
+    sd = per_ds.std(axis=1, ddof=0).reindex(mean.index)
+    nds_per = per_ds.notna().sum(axis=1).reindex(mean.index)
+    xerr = np.where(nds_per.to_numpy() > 1, sd.to_numpy(), np.nan)
+    ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
+            linewidth=0.6, zorder=2,
+            xerr=np.where(np.isnan(xerr), 0.0, xerr),
+            error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
 
     if show_datasets and per_ds.shape[1] > 1:
         for i, m in enumerate(mean.index):

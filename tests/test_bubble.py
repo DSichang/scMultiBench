@@ -37,8 +37,16 @@ def test_render_returns_figure_with_circles(tmp_path):
     fig = bubble.render(bubble.build_table(_toy_long(), metrics=["ARI", "NMI"]))
     ax = fig.axes[0]
     circles = [p for p in ax.patches if isinstance(p, Circle)]
-    # 2 methods x (2 metrics + overall) = 6 circles
-    assert len(circles) == 6
+    # paper layout: circles are METRIC markers only - 2 methods x 2 metrics.
+    # the per-family Overall is a SQUARE, and the top-3 markers carry rank labels.
+    assert len(circles) == 4
+    from matplotlib.patches import Rectangle
+    squares = [p for p in ax.patches
+               if isinstance(p, Rectangle) and abs(p.get_width() - 0.64) < 1e-6]
+    assert len(squares) == 2, "one Overall square per method per family"
+    labels = [t.get_text() for t in ax.texts]
+    assert "1" in labels and "2" in labels, "top ranks must be annotated"
+    assert any(t == "Overall" for t in labels), "family Overall chip present"
     out = tmp_path / "fig.pdf"
     fig.savefig(out)
     assert out.exists() and out.stat().st_size > 0
