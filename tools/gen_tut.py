@@ -405,7 +405,11 @@ fig''')
 reference dataset (all four categories), so the cross-dataset summary can be
 drawn here for real - in the same layout as the paper's summary panels: every
 marker becomes a **bar whose length and colour encode the metric's rank averaged
-across datasets**. Two conventions to read it honestly: a method scores rank 0
+across datasets**, and each bar carries an **SD whisker over the datasets the method actually ran
+in** (>= 2 needed; a single-dataset method gets no whisker). Note the deliberate
+asymmetry: the bar's LENGTH follows the paper's convention of counting absence
+as rank 0, while the whisker measures performance variability only where the
+method ran - a spread made of structural zeros would measure absence instead. Two conventions to read it honestly: a method scores rank 0
 in any dataset it is absent from (the paper's own summary rule, so
 single-category methods sink), and a metric is averaged only over the datasets
 that computed it (a single-batch dataset has no batch metrics to contribute).""")
@@ -416,11 +420,7 @@ allx = pd.concat(longs, ignore_index=True)
 print(f"{allx.dataset.nunique()} datasets, {allx.method.nunique()} methods")
 mtb.plot.bubble(allx, aggregate="summary",
                 title=f"Summary of {allx.dataset.nunique()} datasets")""")
-    md("""A supplementary view of the same data with explicit uncertainty: mean overall
-score per method with **SD whiskers across datasets** (a method present in a
-single dataset gets no whisker - there is no spread to show; the dots are the
-per-dataset scores).""")
-    code("""mtb.plot.bar(allx, group="clustering", title="Across datasets - DR and clustering")""")
+
 
     # ------------------------------------------------------------ own data
     md(f"""## 10. Your own dataset - for real
