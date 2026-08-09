@@ -160,9 +160,11 @@ metrics · 9 Figures · 10 Your own dataset · Troubleshooting""")
     md("""## 1. Install
 
 Prerequisites: Linux, `conda` (mamba recommended) and ~230 GB free disk
-during the build. From the repository directory:
+during the build. `multibench` is not on PyPI yet - install from the repository:
 
 ```bash
+git clone https://github.com/PYangLab/scMultiBench.git
+cd scMultiBench
 pip install -e .                # the multibench package + CLI
 multibench env doctor           # which method environments exist / are missing
 multibench env install --run    # build them all from the committed lockfiles
