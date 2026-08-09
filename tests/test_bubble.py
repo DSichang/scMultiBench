@@ -97,3 +97,41 @@ def test_top_level_plot_namespace(tmp_path):
     out = tmp_path / "n.png"
     mtb.plot.bubble(_toy_long(), metrics=["ARI", "NMI"], save=out)
     assert out.exists()
+
+
+def test_summary_bars_carry_sd_whiskers():
+    """The across-datasets summary draws its error bars ON the bars, not as a
+    separate chart: SD whiskers appear at bar tips when a method+metric exists
+    in >=2 datasets, and are absent for single-dataset methods."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import pandas as pd
+    rows = []
+    for ds, bump in (("DS1", 0.0), ("DS2", 0.2)):
+        for m, v in (("A", 0.5), ("B", 0.8)):
+            for metric in ("ARI", "NMI"):
+                rows.append({"method": m, "metric": metric,
+                             "value": v + bump, "dataset": ds})
+    # method C exists in ONE dataset only -> must get no whisker
+    rows += [{"method": "C", "metric": "ARI", "value": 0.3, "dataset": "DS1"},
+             {"method": "C", "metric": "NMI", "value": 0.3, "dataset": "DS1"}]
+    fig = bubble.plot_bubble(pd.DataFrame(rows), aggregate="summary")
+    ax = fig.axes[0]
+    whiskers = [l for l in ax.lines if l.get_gid() == "whisker"]
+    assert whiskers, "summary mode must draw SD whiskers on the bars"
+    # Expected whiskers (3 segments each: body + 2 caps):
+    #   A, B on ARI and NMI (rank spread across the two datasets)  -> 4
+    #   A on Overall                                               -> 1
+    #   B on Overall has ZERO spread (top-ranked in both datasets,
+    #   minmax overall = 1 in each) -> correctly NO whisker; a zero
+    #   spread must not draw a fake one.
+    #   C is single-dataset -> none anywhere.
+    assert len(whiskers) == 5 * 3, (
+        f"expected 15 whisker segments, got {len(whiskers)}")
+    # and none of them may sit on C's row
+    tbl = bubble.build_table(pd.DataFrame(rows), aggregate="summary")
+    c_y = len(tbl.methods) - tbl.methods.index("C") - 0.5
+    ys = {round(float(l.get_ydata()[0]), 2) for l in whiskers
+          if l.get_ydata()[0] == l.get_ydata()[1]}
+    assert round(c_y, 2) not in ys, (
+        "single-dataset method C grew a whisker from structural zeros")
