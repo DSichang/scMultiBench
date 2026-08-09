@@ -259,11 +259,9 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
                                        facecolor=mp.to_rgba(float(v)),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
-                if b.overall_spread is not None:
-                    sd = b.overall_spread.loc[m]
-                    if pd.notna(sd):
-                        whisker(x + 0.08 + L, y0 + ROW_H / 2,
-                                1.24 * float(sd), x + 0.08)
+                # No whisker on Overall: each dataset's overall is a WITHIN-
+                # dataset relative score over that dataset's own method pool,
+                # so a cross-dataset SD of it would not compare like with like.
         elif tbl.aggregate == "summary":
             vals, normv = b.raw[name], b.norm[name]
             for i, m in enumerate(methods):
