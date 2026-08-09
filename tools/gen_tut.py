@@ -402,24 +402,32 @@ fig = mtb.plot.bubble(long, title="{cat} integration - {s['ds']}")
 fig.set_dpi(110)
 fig''')
     md("""**Across datasets, executed.** The results folder ships one `long` table per
-reference dataset (all four categories), so the cross-dataset summary can be
-drawn here for real - in the same layout as the paper's summary panels: every
-marker becomes a **bar whose length and colour encode the metric's rank averaged
-across datasets**, and each bar carries an **SD whisker over the datasets the method actually ran
-in** (>= 2 needed; a single-dataset method gets no whisker). Note the deliberate
-asymmetry: the bar's LENGTH follows the paper's convention of counting absence
-as rank 0, while the whisker measures performance variability only where the
-method ran - a spread made of structural zeros would measure absence instead. Two conventions to read it honestly: a method scores rank 0
-in any dataset it is absent from (the paper's own summary rule, so
-single-category methods sink), and a metric is averaged only over the datasets
-that computed it (a single-batch dataset has no batch metrics to contribute).""")
+reference dataset, so the summary API can be demonstrated for real: every marker
+becomes a **bar whose length and colour encode the metric's rank averaged across
+datasets**, with an **SD whisker over the datasets the method actually ran in**
+(>= 2 needed; single-dataset methods get no whisker). The bar's LENGTH follows
+the paper's convention of counting absence as rank 0, while the whisker measures
+variability only where the method ran. `Overall` carries no whisker by design -
+each dataset's overall is a within-dataset relative score over that dataset's
+own method pool, so a cross-dataset SD of it would not compare like with like.
+
+**Read this demonstration with its scope in mind.** It pools the four reference
+datasets - **one per integration category** - so rows are the union of every
+method that ran in any of them, each ranked only within its own dataset. That is
+an API demo, not a scientific comparison: the paper's own summary panels pool
+many datasets of ONE data type and category (e.g. "Summary of 12 datasets for
+[RNA, ATAC]"), which is what you should do with your own data - concatenate
+`long` tables from datasets of the same category and call this one function. It
+also explains why whiskers cluster on the clustering side here: batch metrics
+exist only in the three multi-batch reference datasets, whose method sets barely
+overlap, so almost no method has the >= 2 batch datasets a whisker needs.""")
     code("""import glob
 longs = [pd.read_csv(p).assign(dataset=Path(p).stem.replace("long_all_", ""))
          for p in sorted(RESULTS.glob("long_all_D*.csv"))]
 allx = pd.concat(longs, ignore_index=True)
 print(f"{allx.dataset.nunique()} datasets, {allx.method.nunique()} methods")
 mtb.plot.bubble(allx, aggregate="summary",
-                title=f"Summary of {allx.dataset.nunique()} datasets")""")
+                title=f"Pooled demo across {allx.dataset.nunique()} reference datasets (one per category)")""")
 
 
     # ------------------------------------------------------------ own data

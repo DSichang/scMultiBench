@@ -120,14 +120,13 @@ def test_summary_bars_carry_sd_whiskers():
     whiskers = [l for l in ax.lines if l.get_gid() == "whisker"]
     assert whiskers, "summary mode must draw SD whiskers on the bars"
     # Expected whiskers (3 segments each: body + 2 caps):
-    #   A, B on ARI and NMI (rank spread across the two datasets)  -> 4
-    #   A on Overall                                               -> 1
-    #   B on Overall has ZERO spread (top-ranked in both datasets,
-    #   minmax overall = 1 in each) -> correctly NO whisker; a zero
-    #   spread must not draw a fake one.
+    #   A, B on ARI and NMI (rank spread across the two datasets) -> 4.
+    #   Overall carries NO whisker by design: each dataset's overall is a
+    #   within-dataset relative score over that dataset's own method pool,
+    #   so a cross-dataset SD of it would not compare like with like.
     #   C is single-dataset -> none anywhere.
-    assert len(whiskers) == 5 * 3, (
-        f"expected 15 whisker segments, got {len(whiskers)}")
+    assert len(whiskers) == 4 * 3, (
+        f"expected 12 whisker segments, got {len(whiskers)}")
     # and none of them may sit on C's row
     tbl = bubble.build_table(pd.DataFrame(rows), aggregate="summary")
     c_y = len(tbl.methods) - tbl.methods.index("C") - 0.5
