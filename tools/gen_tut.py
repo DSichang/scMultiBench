@@ -36,7 +36,7 @@ SCEN = {
           "cells** (here CITE-seq: RNA + surface protein). Cells are already matched, "
           "so the task is combining modalities, not aligning cells."),
    live=("Matilda", '{"epochs": 5}', "Matilda at 5 epochs is quick - `run_sec` below is the measured time on our host"),
-   live_ds=None, ctx=["totalVI", "scMDC"],
+   live_ds=None,
    own_src="D11", own_trio=["Matilda", "sciPENN", "scMM"],
    own_note="When we ran this, Matilda scored ARI ~0.95 on the subsample - your "
             "exact numbers will differ slightly; the point is that they are high "
@@ -53,7 +53,7 @@ SCEN = {
           "(e.g. Signac's GeneActivity or ArchR's gene score matrix); section 2 "
           "shows how to check which representation a file holds."),
    live=("online_iNMF", "None", "online_iNMF is among the fastest methods in this category - the `run_sec` column below is the measured time on our host"),
-   live_ds=None, ctx=["scJoint", "Portal"],
+   live_ds=None,
    own_src="D28", own_trio=["online_iNMF", "iNMF", "scJoint"],
    own_note="All three reached CHAIN_OK with all nine metrics on this subsample "
             "when we ran them; `run_sec` above is the measured time.",
@@ -66,13 +66,13 @@ SCEN = {
           "categories: each supports specific per-batch modality patterns, so "
           "`scan()` per dataset is the source of truth for what applies."),
    live=("StabMap", "None", "Both methods run in minutes to tens of minutes on D46 - `run_sec` below is the measured time on our host"),
-   live_ds="D46", ctx=None,
+   live_ds="D46",
    own_src="D46", own_trio=["StabMap", "scMoMaT"],
    own_note="Both reached CHAIN_OK on this subsample when we ran them; `run_sec` "
             "above is the measured time. Two methods rather than three because "
             "that is every wired mosaic method D46's layout admits - the "
-            "four-method D45 panel in section 9 is where this category's "
-            "methods can be compared side by side.",
+            "four-method D45 figures in section 8 are where this category's "
+            "methods are compared side by side.",
  ),
  "cross": dict(
    ds="D52", cells="23,478",
@@ -81,7 +81,7 @@ SCEN = {
           "structure. Spatial registration (PASTE, PASTE2, SPIRAL, GPSA) also lives "
           "under `cross` - see the note at the end."),
    live=("StabMap", "None", "StabMap is among the fastest cross methods - `run_sec` below is the measured time on our host"),
-   live_ds=None, ctx=["totalVI", "scMDC"],
+   live_ds=None,
    own_src="D52", own_trio=["UINMF", "sciPENN", "StabMap"],
    own_note="All three reached CHAIN_OK on this subsample when we ran them; "
             "`run_sec` above is the measured time.",
@@ -141,6 +141,10 @@ for cat, s in SCEN.items():
     # ------------------------------------------------------------------ title
     md(f"""# {cat.capitalize()} integration
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PYangLab/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
+*Try the API right now in Colab - registry, stored results and figures run
+there directly; executing methods needs the conda environments below.*
+
 {s['blurb']}
 
 This tutorial covers, end to end:
@@ -148,16 +152,16 @@ This tutorial covers, end to end:
 - installing the package and the per-method environments
 - the on-disk data layout this category expects
 - seeing what runs on a dataset (`scan`) and what each method exposes for tuning
-- running one method live, then a whole benchmark sweep with metrics
-- reading the two metric families and drawing the standard figures
+- running one method live and reading its metrics
+- the standard figures: a per-dataset panel and an across-datasets summary
 - **running the same pipeline on your own dataset**, demonstrated for real
 
 **Reference dataset:** `{s['ds']}` ({s['cells']} cells). The stored results shipped
 with these notebooks were produced on it, so every table below reproduces.
 
 **Contents** - 1 Install · 2 Data layout · 3 What can I run · 4 Paper coverage ·
-5 What can I tune · 6 Run {'a few methods' if s['ctx'] is None else 'one method'} · 7 Run the benchmark · 8 Reading the
-metrics · 9 Figures · 10 Your own dataset · Troubleshooting""")
+5 What can I tune · 6 Run one method · 7 Reading the metrics · 8 Figures ·
+9 Your own dataset · Troubleshooting""")
 
     # ---------------------------------------------------------------- install
     md("""## 1. Install
@@ -217,11 +221,12 @@ an `.h5ad` correctly, and `scan()` rejects a transposed file at preflight instea
 of letting a method fail half an hour in.
 
 **The label CSV** is the one file you author by hand, so its schema in full:
-one row per cell, in **the same order as `matrix/barcodes`** of the matching
-modality file(s); the cell-type label is the last column (or a column named
-`x`); a header row is expected. Where a category uses several label files
-(`cty1.csv`, `rna_cty.csv`, ...), each aligns with its own batch or modality.
-The next cell prints the head of a shipped one - this is the whole format:""")
+a **single column** with one header line (typically `x`) and one label per
+cell, in **the same order as `matrix/barcodes`** of the matching modality
+file(s) - the evaluator reads the first column and skips the header line.
+Where a category uses several label files (`cty1.csv`, `rna_cty.csv`, ...),
+each aligns with its own batch or modality. The next cell prints the head of a
+shipped one - this is the whole format:""")
     code("""cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
 print(cty.name)
 print(*open(cty).read().splitlines()[:4], sep="\\n")""")
@@ -311,95 +316,25 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
     extra = (f'\n\n(This demo runs on `{live_ds}`, whose layout fits these methods; '
              f'mosaic layouts vary per dataset - see the note above.)'
              if live_ds != s["ds"] else "")
-    if s["ctx"] is not None:
-        md(f"""## 6. Run one method
+    md(f"""## 6. Run one method
 
 `run_all` runs methods end to end: resolve inputs -> run in the method's own
 conda env -> load the output -> compute metrics -> keep everything in a
 `BatchResult`. {s['live'][2]}.{extra}""")
-        code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
+    code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
                   methods=["{fastm}"]{pstr},
                   out_dir="/tmp/tutorial_{cat}")
 res.summary''')
-        ctx_a, ctx_b = s["ctx"]
-        md(f"""(The lines scrolling above the table are scIB's own progress chatter from
-the metric computation - harmless; the result is the summary row below.)
-
-The metrics are already computed - `run_all` picked the right label files,
+    md("""The metrics are already computed - `run_all` picked the right label files,
 resolved the label order (see `label_order` in the summary), and scored the
-embedding. One figure - the fresh run drawn **next to two stored benchmark
-results for the same dataset** ({ctx_a}, {ctx_b}), because rank size and colour
-are relative to the methods in the figure: a single-method figure has no
-within-column contrast to read.""")
-        code(f'''ctx = pd.read_csv(RESULTS / "long_all_{live_ds}.csv")
-ctx = ctx[ctx.method.isin(["{ctx_a}", "{ctx_b}"])]
-mtb.plot.bubble(pd.concat([res.long, ctx], ignore_index=True))''')
-    else:
-        trio = s["own_trio"]
-        md(f"""## 6. Run a few methods
-
-`run_all` runs methods end to end: resolve inputs -> run in the method's own
-conda env -> load the output -> compute metrics -> keep everything in a
-`BatchResult`. {s['live'][2]}.{extra}
-
-Several methods rather than one, deliberately: rank size and colour in the
-figure below are relative to the methods present, so a single-method figure has
-no within-column contrast to read. (These {len(trio)} are **every wired mosaic
-method this dataset's layout admits** - mosaic is the most layout-gated
-category, and `scan()` is how you find your own dataset's set. The stored `D45`
-panel in section 9 compares four methods side by side.)""")
-        code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
-                  methods={trio!r},
-                  out_dir="/tmp/tutorial_{cat}")
-res.summary''')
-        md("""(The lines scrolling above the table are scIB's own progress chatter from
-the metric computation - harmless; the result is the summary rows below.)
-
-The metrics are already computed - `run_all` picked the right label files,
-resolved the label order (see `label_order` in the summary), and scored the
-embeddings. One figure:""")
-        code("""res.plot()""")
-
-    # ------------------------------------------------------------ run all
-    md(f"""## 7. Run the whole benchmark
-
-The same call without `methods=` runs everything runnable. On `{s['ds']}` that is
-hours of compute, so this cell is shown but not executed here - the stored
-results it produced are loaded right below.
-
-```python
-res = mtb.run_all(DATASET, CATEGORY, out_dir="results/{cat}_all",
-                  timeout=4*3600,       # a hung method is recorded, not fatal
-                  skip_existing=True)   # resume instead of repeating hours
-print(res.failures)                     # ALWAYS check: failures are recorded, not raised
-```
-
-`run_all` writes `summary.csv`, `long.csv` and `failures.csv` into `out_dir` -
-the stored files under `results/` loaded below are exactly those, kept so the
-notebook reproduces without re-running the sweep. (The live demo above used
-reduced settings where noted; the stored sweep ran defaults, so its `run_sec`
-differs.)
-
-Three behaviours worth knowing before a long sweep:
-
-- **a method that fails is a row, not an exception** - the sweep continues and
-  `res.failures` carries the error text;
-- **`timeout=` bounds each method's whole step** including metric computation;
-- **`skip_existing=True` resumes** a killed sweep, but refuses to combine with
-  `params=` (it cannot know the old output used your new parameters).""")
-    code(f'''summary = pd.read_csv(RESULTS / "summary_{s['ds']}.csv")
-clu = [c for c in ["ARI","NMI","ASW","iASW","iF1","cLISI"] if c in summary.columns]
-bat = [c for c in ["ASW_batch","GC","iLISI"] if c in summary.columns]
-cols = ["method","status","run_sec"] + clu + bat
-(summary[cols].sort_values(clu[0], ascending=False)
- .style.background_gradient(subset=clu, cmap="Blues", vmin=0, vmax=1)
-       .background_gradient(subset=bat, cmap="Greens", vmin=0, vmax=1)
-       .format({{c: "{{:.3f}}" for c in clu + bat}}, na_rep="")
-       .format({{"run_sec": "{{:.0f}}"}})
-       .hide(axis="index"))''')
+embedding. The summary row above IS the result for a single method; the figures
+come in section 8, drawn from full benchmark results where ranks and colours
+have the whole method field to compare against. (This live run used reduced
+settings where noted, so its numbers are not directly comparable to the stored
+full-setting sweep - one more reason not to mix them in one figure.)""")
 
     # ------------------------------------------------------------- metrics
-    md("""## 8. Reading the metrics
+    md("""## 7. Reading the metrics
 
 Two families, matching the paper's grouping. All are **higher = better**, on
 [0, 1] except ARI (can be slightly negative at chance level).
@@ -415,64 +350,55 @@ Notes that save confusion later:
   label, so they exist even on a single-batch dataset.
 - batch metrics appear only when the dataset has real batches - their absence on
   a single-batch dataset is correct, not missing data.
-- `label_order` in the summary records which label files scored the embedding,
-  in which order - when several candidate orders fit the cell counts, each is
-  screened and the best kept; a low `label_order_confidence` means the ranking
-  was close and `label_order_candidates` in the record shows the alternatives.
-- `kBET` is opt-in (`mtb.evaluate(..., slow_metrics=True)`): it spawns R per
-  method and costs hours per dataset.
-- graph-output methods come in two kinds: scMoMaT also ships a secondary UMAP
-  embedding, which is what gets scored (status `CHAIN_OK_GRAPH_METHOD`), while
-  Seurat_WNN emits only the graph - it legitimately has **no** embedding metrics
-  and its status says so rather than scoring garbage.""")
+- `kBET` is opt-in (`mtb.evaluate(..., slow_metrics=True)`): it is much slower
+  than the other metrics.""")
 
     # ------------------------------------------------------------- figures
-    md("""## 9. The figures
+    ds, ds2 = s["ds"], s["ds"] + "s"
+    batch_note = (
+        "Both datasets are single-batch, so this category's summary shows the "
+        "clustering family only - the diagonal, mosaic and cross tutorials "
+        "show the batch-correction family alongside it."
+        if cat == "vertical" else
+        "Both metric families appear, and every bar carries its whisker - the "
+        "batch family included, because both datasets are multi-batch.")
+    md(f"""## 8. The figures
 
 **Per-dataset panel**, in the paper's layout: methods as rows (best first),
 metrics as columns grouped by task family - blues for DR & clustering, greens
-for batch correction - each family led by an **Overall** rank column, and the
-top three per column carry their rank number. A missing marker means the metric
-does not apply to that method.""")
-    code(f'''long = pd.read_csv(RESULTS / "long_all_{s['ds']}.csv")
+for batch correction - each family led by an **Overall** rank column. Read each
+circle as two encodings: its **size is the method's rank** within that column
+(largest = rank 1) and its **colour is the metric's value** (min-max scaled
+within the column, darker = higher); the Overall columns use bar length and
+colour the same way. This is the full stored benchmark for `{ds}`; to produce the same files for your own
+data, `mtb.run_all(DATASET, CATEGORY, out_dir=...)` without `methods=` runs
+everything runnable and writes `summary.csv` and `long.csv` into `out_dir`.""")
+    code(f'''long = pd.read_csv(RESULTS / "long_all_{ds}.csv")
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
 fig''')
-    md("""**Across datasets, executed.** The results folder ships one `long` table per
-reference dataset - plus `D28s`, a 60% cell subsample of `D28` swept with the
-same diagonal benchmark, so that at least one category has **two** datasets and
-the cross-dataset machinery below has something real to summarise. Every marker
-becomes a **bar whose length and colour encode the metric's rank averaged across
-datasets**, with an **SD whisker over the datasets the method actually ran in**
-(>= 2 needed; single-dataset methods get no whisker). The bar's LENGTH follows
-the paper's convention of counting absence as rank 0, while the whisker measures
-variability only where the method ran. `Overall` carries no whisker by design -
-each dataset's overall is a within-dataset relative score over that dataset's
-own method pool, so a cross-dataset SD of it would not compare like with like.
-
-**Read this demonstration with its scope in mind.** It pools reference datasets
-across ALL FOUR integration categories, so rows are the union of every method
-that ran in any of them, each ranked only within its own dataset. That is an API
-demo, not a scientific comparison: the paper's own summary panels pool many
-datasets of ONE data type and category (e.g. "Summary of 12 datasets for [RNA,
-ATAC]"), which is what you should do with your own data - concatenate `long`
-tables from datasets of the same category and call this one function. The
-diagonal rows (which appear in both `D28` and `D28s`) are the template: they
-carry whiskers on **both** metric families, batch correction included, because
-they are the only methods here with two multi-batch datasets - every other
-category is still single-dataset, so its batch metrics have no spread to
-draw.""")
-    code("""import glob
-longs = [pd.read_csv(p).assign(dataset=Path(p).stem.replace("long_all_", ""))
-         for p in sorted(RESULTS.glob("long_all_D*.csv"))]
-allx = pd.concat(longs, ignore_index=True)
-print(f"{allx.dataset.nunique()} datasets, {allx.method.nunique()} methods")
-mtb.plot.bubble(allx, aggregate="summary",
-                title=f"Pooled demo across {allx.dataset.nunique()} datasets")""")
+    md(f"""**Across datasets.** The summary figure needs every method to have results on
+every dataset it is averaged over - otherwise absence and performance get mixed
+into the same bar. The results folder therefore ships TWO {cat} datasets swept
+with the same benchmark: `{ds}` and `{ds2}` (a 60% cell subsample of `{ds}`
+under a new name). The code keeps the **intersection** of methods present in
+both, so the matrix behind the figure is complete by construction - copy this
+pattern with your own same-category datasets. Each bar's length and colour
+encode the metric's rank averaged across the two datasets, with an SD whisker
+over them; `Overall` carries no whisker because it is a within-dataset relative
+score. {batch_note}""")
+    code(f'''a = pd.read_csv(RESULTS / "long_all_{ds}.csv").assign(dataset="{ds}")
+b = pd.read_csv(RESULTS / "long_all_{ds2}.csv").assign(dataset="{ds2}")
+both = sorted(set(a.method) & set(b.method))   # complete matrix, by construction
+pair = pd.concat([a, b], ignore_index=True)
+pair = pair[pair.method.isin(both)]
+print(f"{{len(both)}} methods with results on both datasets")
+mtb.plot.bubble(pair, aggregate="summary",
+                title=f"Summary of 2 {cat} datasets, {{len(both)}} methods")''')
 
 
     # ------------------------------------------------------------ own data
-    md(f"""## 10. Your own dataset - for real
+    md(f"""## 9. Your own dataset - for real
 
 Everything above used shipped data. This section does what you will actually do:
 put files in a folder, point the package at it, and get scored results - executed

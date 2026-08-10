@@ -1,6 +1,8 @@
 """scib metric computation (clustering + batch), ported from qc/scib_metrics."""
 from __future__ import annotations
 
+import contextlib
+import io
 import warnings
 
 import anndata as ad
@@ -174,7 +176,14 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         if only is not None and name not in only:
             return
         try:
-            out[name] = float(fn())
+            # scib prints per-chunk progress from inside some metrics (the LISI
+            # family especially) and emits third-party deprecation warnings;
+            # neither carries information for the caller, so both are swallowed
+            # here. Our own could-not-compute warning below stays visible.
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                out[name] = float(fn())
         except Exception as exc:  # noqa: BLE001 - report and continue
             warnings.warn(
                 f"scib metric {name!r} could not be computed "

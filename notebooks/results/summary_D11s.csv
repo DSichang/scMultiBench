@@ -1,0 +1,15 @@
+method,status,run_sec,output_kind,emb_shape,n_tunable,label_order,label_order_confidence,ARI,NMI,ASW,iASW,iF1,cLISI
+Concerto,CHAIN_OK,1225.0,embedding,"[1718, 128]",0,cty.csv,,0.3976,0.4577,0.4987,0.5039,0.4747,0.8411
+MOFA2,CHAIN_OK,142.5,embedding,"[1718, 20]",0,cty.csv,,0.4129,0.6227,0.4776,0.4704,0.6226,0.9127
+Matilda,CHAIN_OK,11.3,embedding,"[1718, 100]",10,cty.csv,,0.9408,0.9344,0.6812,0.6844,0.9669,0.9995
+Multigrate,CHAIN_OK,39.2,embedding,"[1718, 15]",3,cty.csv,,0.608,0.7476,0.6603,0.6281,0.7081,0.9909
+Seurat_WNN,RUN_OK_NO_EMBEDDING,15.2,graph,,0,,,,,,,,
+UINMF,CHAIN_OK,14.6,embedding,"[1718, 30]",0,cty.csv,,0.3547,0.6225,0.5665,0.533,0.6077,0.9071
+VIMCCA,CHAIN_OK,15.4,embedding,"[1718, 8]",0,cty.csv,,0.5937,0.6966,0.5795,0.5586,0.7243,0.9753
+moETM,CHAIN_OK,8.1,embedding,"[1718, 100]",0,cty.csv,,0.5046,0.5794,0.5268,0.5214,0.561,0.9468
+scMDC,CHAIN_OK,49.7,embedding,"[1718, 16]",24,cty.csv,,0.65,0.7173,0.5985,0.5786,0.6344,0.9667
+scMM,CHAIN_OK,24.4,embedding,"[1718, 10]",19,cty.csv,,0.5203,0.6163,0.53,0.5286,0.6173,0.9315
+scMSI,CHAIN_OK,367.2,embedding,"[1718, 20]",0,cty.csv,,0.7413,0.7914,0.5794,0.5772,0.7612,0.9799
+scMoMaT,CHAIN_OK_GRAPH_METHOD,52.0,graph,"[1718, 2]",0,cty.csv,,0.4834,0.5743,0.5578,0.5497,0.5626,0.9551
+sciPENN,CHAIN_OK,8.5,embedding,"[1718, 512]",1,cty.csv,,0.6108,0.6901,0.6084,0.6066,0.6593,0.9709
+totalVI,CHAIN_OK,36.0,embedding,"[1718, 20]",0,cty.csv,,0.809,0.8388,0.5719,0.5786,0.7888,0.9801

@@ -1,0 +1,5 @@
+method,status,run_sec,output_kind,emb_shape,n_tunable,label_order,label_order_confidence,ARI,NMI,ASW,iASW,iF1,cLISI,ASW_batch,GC,iLISI
+Cobolt,CHAIN_OK,514.1,embedding,"[19290, 10]",2,cty1.csv+cty2.csv+cty3.csv,0.0,0.7757,0.7946,0.6122,0.6419,0.8647,0.9985,0.9467,0.9769,0.7914
+MultiVI,CHAIN_OK,1328.0,embedding,"[19290, 15]",0,cty1.csv+cty2.csv+cty3.csv,0.0,0.6974,0.744,0.5614,0.6084,0.883,0.9978,0.9848,0.9891,0.8853
+Multigrate,CHAIN_OK,476.1,embedding,"[19290, 15]",2,cty1.csv+cty2.csv+cty3.csv,0.0,0.732,0.7322,0.5433,0.5441,0.7246,0.9834,0.916,0.9422,0.6915
+SMILE,CHAIN_OK,86.0,embedding,"[19290, 20]",0,cty1.csv+cty2.csv+cty3.csv,0.0,0.267,0.4899,0.5338,0.5316,0.4764,0.9647,0.9409,0.8976,0.7238
