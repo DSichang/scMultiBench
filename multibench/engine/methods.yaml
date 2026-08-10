@@ -197,7 +197,7 @@ methods:
     language: python
     categories: [vertical, cross]
     tasks: [batch, clustering]
-    status: declared
+    status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/scMM/main_scMM.py
@@ -230,7 +230,7 @@ methods:
     language: python
     categories: [vertical, cross]
     tasks: [batch, clustering]
-    status: declared
+    status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/scMDC/main_scMDC.py
@@ -359,7 +359,7 @@ methods:
     language: python
     categories: [vertical, cross]
     tasks: [batch, clustering]
-    status: declared
+    status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/Concerto/main_Concerto.py
@@ -591,7 +591,7 @@ methods:
     language: python
     categories: [vertical, mosaic, cross]
     tasks: [batch, clustering, dimension_reduction, imputation]
-    status: declared
+    status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/sciPENN/main_sciPENN.py
@@ -660,6 +660,7 @@ methods:
         extra_outputs:
           - {kind: labels, file: predict1.csv}
   - id: SPIRAL
+    status: verified
     language: python
     categories: [cross]
     tasks: [registration]
@@ -673,6 +674,7 @@ methods:
           - {role: out_dir,  flag: "--save_dir"}
         output: {kind: coords, file: ""}
         run_env: {R_PROFILE_USER: /media/disk2/Sichang/scmbench_pkg/spiral_mclust_shim.Rprofile, OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # mclust dimnames fix: shim binds data to an R symbol before Mclust (rpy2 closure-call breaks mclust 6.x dimnames<-); thread caps for shared host
+    status: verified
   - id: GPSA
     language: python
     categories: [cross]
@@ -686,6 +688,7 @@ methods:
           - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files (obs[Ground_Truth] + obsm[spatial])
           - {role: out_dir,  flag: "--save_dir"}    # writes GPSA_aligned_slices/aligned_slice_*.h5ad (inline metric block buggy upstream, crashes AFTER writing slices)
         output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
+    status: verified
         run_env: {OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # thread caps for shared host
   - id: PASTE
     language: python
@@ -698,6 +701,7 @@ methods:
         cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT align (paste-bio)
         args:
           - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files
+    status: verified
           - {role: out_dir,  flag: "--save_dir"}    # writes paste_pairwise_aligned_slices/ + metrics csv
         output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
   - id: PASTE2
@@ -717,7 +721,7 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
-    status: declared
+    status: verified
     variants:
       - when: {category: vertical, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/iPOLNG/main_iPOLNG.py
