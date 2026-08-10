@@ -36,11 +36,11 @@ SCEN = {
           "cells** (here CITE-seq: RNA + surface protein). Cells are already matched, "
           "so the task is combining modalities, not aligning cells."),
    live=("Matilda", '{"epochs": 5}', "Matilda at 5 epochs is quick - `run_sec` below is the measured time on our host"),
-   live_ds=None,
-   own_src="D11", own_fast="Matilda",
+   live_ds=None, ctx=["totalVI", "scMDC"],
+   own_src="D11", own_trio=["Matilda", "sciPENN", "scMM"],
    own_note="When we ran this, Matilda scored ARI ~0.95 on the subsample - your "
-            "exact number will differ slightly; the point is that it is high and "
-            "computed end-to-end on data the package has never seen.",
+            "exact numbers will differ slightly; the point is that they are high "
+            "and computed end-to-end on data the package has never seen.",
  ),
  "diagonal": dict(
    ds="D28", cells="6,408 RNA + 4,606 ATAC",
@@ -53,10 +53,10 @@ SCEN = {
           "(e.g. Signac's GeneActivity or ArchR's gene score matrix); section 2 "
           "shows how to check which representation a file holds."),
    live=("online_iNMF", "None", "online_iNMF is among the fastest methods in this category - the `run_sec` column below is the measured time on our host"),
-   live_ds=None,
-   own_src="D28", own_fast="Portal",
-   own_note="Portal reached CHAIN_OK with all nine metrics on this subsample when "
-            "we ran it; `run_sec` above is the measured time.",
+   live_ds=None, ctx=["scJoint", "Portal"],
+   own_src="D28", own_trio=["online_iNMF", "iNMF", "scJoint"],
+   own_note="All three reached CHAIN_OK with all nine metrics on this subsample "
+            "when we ran them; `run_sec` above is the measured time.",
  ),
  "mosaic": dict(
    ds="D45", cells="32,151",
@@ -65,11 +65,14 @@ SCEN = {
           "bridges them. Mosaic methods are the most layout-sensitive of the four "
           "categories: each supports specific per-batch modality patterns, so "
           "`scan()` per dataset is the source of truth for what applies."),
-   live=("StabMap", "None", "StabMap runs in a few minutes on D46 - `run_sec` below is the measured time on our host"),
-   live_ds="D46",
-   own_src="D46", own_fast="StabMap",
-   own_note="StabMap reached CHAIN_OK on this subsample when we ran it; `run_sec` "
-            "above is the measured time.",
+   live=("StabMap", "None", "Both methods run in minutes to tens of minutes on D46 - `run_sec` below is the measured time on our host"),
+   live_ds="D46", ctx=None,
+   own_src="D46", own_trio=["StabMap", "scMoMaT"],
+   own_note="Both reached CHAIN_OK on this subsample when we ran them; `run_sec` "
+            "above is the measured time. Two methods rather than three because "
+            "that is every wired mosaic method D46's layout admits - the "
+            "four-method D45 panel in section 9 is where this category's "
+            "methods can be compared side by side.",
  ),
  "cross": dict(
    ds="D52", cells="23,478",
@@ -78,10 +81,10 @@ SCEN = {
           "structure. Spatial registration (PASTE, PASTE2, SPIRAL, GPSA) also lives "
           "under `cross` - see the note at the end."),
    live=("StabMap", "None", "StabMap is among the fastest cross methods - `run_sec` below is the measured time on our host"),
-   live_ds=None,
-   own_src="D52", own_fast="StabMap",
-   own_note="StabMap reached CHAIN_OK on this subsample when we ran it; `run_sec` "
-            "above is the measured time.",
+   live_ds=None, ctx=["totalVI", "scMDC"],
+   own_src="D52", own_trio=["UINMF", "sciPENN", "StabMap"],
+   own_note="All three reached CHAIN_OK on this subsample when we ran them; "
+            "`run_sec` above is the measured time.",
  ),
 }
 
@@ -136,7 +139,7 @@ for cat, s in SCEN.items():
     live_ds = s["live_ds"] or s["ds"]
 
     # ------------------------------------------------------------------ title
-    md(f"""# {cat.capitalize()} integration with `multibench`
+    md(f"""# {cat.capitalize()} integration
 
 {s['blurb']}
 
@@ -153,7 +156,7 @@ This tutorial covers, end to end:
 with these notebooks were produced on it, so every table below reproduces.
 
 **Contents** - 1 Install · 2 Data layout · 3 What can I run · 4 Paper coverage ·
-5 What can I tune · 6 Run one method · 7 Run the benchmark · 8 Reading the
+5 What can I tune · 6 Run {'a few methods' if s['ctx'] is None else 'one method'} · 7 Run the benchmark · 8 Reading the
 metrics · 9 Figures · 10 Your own dataset · Troubleshooting""")
 
     # ---------------------------------------------------------------- install
@@ -305,25 +308,57 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
     # ------------------------------------------------------------- run one
     live_p = s["live"][1]
     pstr = (f', params={{"{fastm}": {live_p}}}' if live_p != "None" else "")
-    extra = (f'\n\n(This demo runs on `{live_ds}`, whose layout fits {fastm}; '
+    extra = (f'\n\n(This demo runs on `{live_ds}`, whose layout fits these methods; '
              f'mosaic layouts vary per dataset - see the note above.)'
              if live_ds != s["ds"] else "")
-    md(f"""## 6. Run one method
+    if s["ctx"] is not None:
+        md(f"""## 6. Run one method
 
 `run_all` runs methods end to end: resolve inputs -> run in the method's own
 conda env -> load the output -> compute metrics -> keep everything in a
 `BatchResult`. {s['live'][2]}.{extra}""")
-    code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
+        code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
                   methods=["{fastm}"]{pstr},
                   out_dir="/tmp/tutorial_{cat}")
 res.summary''')
-    md("""(The lines scrolling above the table are scIB's own progress chatter from
+        ctx_a, ctx_b = s["ctx"]
+        md(f"""(The lines scrolling above the table are scIB's own progress chatter from
 the metric computation - harmless; the result is the summary row below.)
 
 The metrics are already computed - `run_all` picked the right label files,
 resolved the label order (see `label_order` in the summary), and scored the
-embedding. One figure:""")
-    code("""res.plot()""")
+embedding. One figure - the fresh run drawn **next to two stored benchmark
+results for the same dataset** ({ctx_a}, {ctx_b}), because rank size and colour
+are relative to the methods in the figure: a single-method figure has no
+within-column contrast to read.""")
+        code(f'''ctx = pd.read_csv(RESULTS / "long_all_{live_ds}.csv")
+ctx = ctx[ctx.method.isin(["{ctx_a}", "{ctx_b}"])]
+mtb.plot.bubble(pd.concat([res.long, ctx], ignore_index=True))''')
+    else:
+        trio = s["own_trio"]
+        md(f"""## 6. Run a few methods
+
+`run_all` runs methods end to end: resolve inputs -> run in the method's own
+conda env -> load the output -> compute metrics -> keep everything in a
+`BatchResult`. {s['live'][2]}.{extra}
+
+Several methods rather than one, deliberately: rank size and colour in the
+figure below are relative to the methods present, so a single-method figure has
+no within-column contrast to read. (These {len(trio)} are **every wired mosaic
+method this dataset's layout admits** - mosaic is the most layout-gated
+category, and `scan()` is how you find your own dataset's set. The stored `D45`
+panel in section 9 compares four methods side by side.)""")
+        code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
+                  methods={trio!r},
+                  out_dir="/tmp/tutorial_{cat}")
+res.summary''')
+        md("""(The lines scrolling above the table are scIB's own progress chatter from
+the metric computation - harmless; the result is the summary rows below.)
+
+The metrics are already computed - `run_all` picked the right label files,
+resolved the label order (see `label_order` in the summary), and scored the
+embeddings. One figure:""")
+        code("""res.plot()""")
 
     # ------------------------------------------------------------ run all
     md(f"""## 7. Run the whole benchmark
@@ -400,11 +435,13 @@ for batch correction - each family led by an **Overall** rank column, and the
 top three per column carry their rank number. A missing marker means the metric
 does not apply to that method.""")
     code(f'''long = pd.read_csv(RESULTS / "long_all_{s['ds']}.csv")
-fig = mtb.plot.bubble(long, title="{cat} integration - {s['ds']}")
+fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
 fig''')
     md("""**Across datasets, executed.** The results folder ships one `long` table per
-reference dataset, so the summary API can be demonstrated for real: every marker
+reference dataset - plus `D28s`, a 60% cell subsample of `D28` swept with the
+same diagonal benchmark, so that at least one category has **two** datasets and
+the cross-dataset machinery below has something real to summarise. Every marker
 becomes a **bar whose length and colour encode the metric's rank averaged across
 datasets**, with an **SD whisker over the datasets the method actually ran in**
 (>= 2 needed; single-dataset methods get no whisker). The bar's LENGTH follows
@@ -413,23 +450,25 @@ variability only where the method ran. `Overall` carries no whisker by design -
 each dataset's overall is a within-dataset relative score over that dataset's
 own method pool, so a cross-dataset SD of it would not compare like with like.
 
-**Read this demonstration with its scope in mind.** It pools the four reference
-datasets - **one per integration category** - so rows are the union of every
-method that ran in any of them, each ranked only within its own dataset. That is
-an API demo, not a scientific comparison: the paper's own summary panels pool
-many datasets of ONE data type and category (e.g. "Summary of 12 datasets for
-[RNA, ATAC]"), which is what you should do with your own data - concatenate
-`long` tables from datasets of the same category and call this one function. It
-also explains why whiskers cluster on the clustering side here: batch metrics
-exist only in the three multi-batch reference datasets, whose method sets barely
-overlap, so almost no method has the >= 2 batch datasets a whisker needs.""")
+**Read this demonstration with its scope in mind.** It pools reference datasets
+across ALL FOUR integration categories, so rows are the union of every method
+that ran in any of them, each ranked only within its own dataset. That is an API
+demo, not a scientific comparison: the paper's own summary panels pool many
+datasets of ONE data type and category (e.g. "Summary of 12 datasets for [RNA,
+ATAC]"), which is what you should do with your own data - concatenate `long`
+tables from datasets of the same category and call this one function. The
+diagonal rows (which appear in both `D28` and `D28s`) are the template: they
+carry whiskers on **both** metric families, batch correction included, because
+they are the only methods here with two multi-batch datasets - every other
+category is still single-dataset, so its batch metrics have no spread to
+draw.""")
     code("""import glob
 longs = [pd.read_csv(p).assign(dataset=Path(p).stem.replace("long_all_", ""))
          for p in sorted(RESULTS.glob("long_all_D*.csv"))]
 allx = pd.concat(longs, ignore_index=True)
 print(f"{allx.dataset.nunique()} datasets, {allx.method.nunique()} methods")
 mtb.plot.bubble(allx, aggregate="summary",
-                title=f"Pooled demo across {allx.dataset.nunique()} reference datasets (one per category)")""")
+                title=f"Pooled demo across {allx.dataset.nunique()} datasets")""")
 
 
     # ------------------------------------------------------------ own data
@@ -448,7 +487,7 @@ subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
 sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
 print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")''')
     code(f'''mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
-                   methods=["{s['own_fast']}"],
+                   methods={s['own_trio']!r},
                    out_dir=f"{{DATA_ROOT}}/out_{cat}",
                    data_path=DATA_ROOT)
 mine.summary''')
@@ -495,6 +534,8 @@ must actually run, so it is deliberately not offered."""
 ## Next steps
 
 - the other three tutorials: {siblings}
+- the hosted interactive explorer: <https://shiny.maths.usyd.edu.au/scMultiBench/> -
+  the full benchmark's rankings, browsable without installing anything
 - `SETUP.md` - measured install cost and the smallest end-to-end check
 - `mtb.method_info(name)` - everything the registry knows about one method
 - `mtb.sweep(...)` - one method over a range of one hyperparameter""")
