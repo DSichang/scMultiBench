@@ -340,14 +340,20 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     if tbl.aggregate != "summary":
         ly2 = ly - 1.35
         ax.text(-0.9, ly2, "Rank", fontsize=8, fontweight="bold", va="center")
-        rr = np.linspace(0.15, 0.85, 5)
+        # One legend bubble per rank actually present - a fixed 5 would show
+        # sizes that cannot occur when fewer methods are plotted.
+        n_bub = max(1, min(5, n_rows))
+        rr = np.linspace(0.15, 0.85, n_bub) if n_bub > 1 else np.array([0.85])
         xoff = 1.5
         for k, r in enumerate(rr):
             ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,
                                 facecolor="#bbbbbb", edgecolor="#333333",
                                 linewidth=0.4, zorder=2))
-        ax.text(xoff - 0.65, ly2 - 0.62, str(n_rows), fontsize=6.6, ha="center")
-        ax.text(xoff + 4.0, ly2 - 0.62, "1", fontsize=6.6, ha="center")
+        if n_bub > 1:
+            ax.text(xoff - 0.65, ly2 - 0.62, str(n_rows), fontsize=6.6,
+                    ha="center")
+        ax.text(xoff + (n_bub - 1) * 1.0, ly2 - 0.62, "1", fontsize=6.6,
+                ha="center")
 
     ax.set_xlim(-1.35, total_w + 0.45)
     ax.set_ylim((-2.9 if tbl.aggregate != "summary" else -1.8), band_y + 1.0)

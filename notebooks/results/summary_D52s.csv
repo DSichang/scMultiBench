@@ -1,0 +1,9 @@
+method,status,run_sec,output_kind,emb_shape,n_tunable,label_order,label_order_confidence,ARI,NMI,ASW,iASW,iF1,cLISI,ASW_batch,GC,iLISI
+Concerto,CHAIN_OK,1134.2,embedding,"[14085, 128]",0,cty3.csv+cty1.csv+cty2.csv,0.8302,0.6597,0.7315,0.5183,0.5198,0.5236,0.9792,0.9471,0.8764,0.5255
+StabMap,CHAIN_OK,23.7,embedding,"[14085, 50]",0,cty3.csv+cty1.csv+cty2.csv,0.8429,0.6989,0.7855,0.5556,0.5617,0.6647,0.9922,0.9159,0.935,0.5485
+UINMF,CHAIN_OK,25.7,embedding,"[8857, 30]",0,cty1.csv+cty2.csv,1.0003,0.6428,0.7507,0.5566,0.5496,0.6286,0.9878,0.9386,0.8994,0.8889
+scMDC,CHAIN_OK,330.8,embedding,"[14085, 16]",0,cty1.csv+cty2.csv+cty3.csv,0.864,0.7157,0.7635,0.6023,0.5681,0.6424,0.9931,0.8756,0.8757,0.6123
+scMM,CHAIN_OK,85.0,embedding,"[14085, 10]",0,cty1.csv+cty2.csv+cty3.csv,0.7435,0.3318,0.5363,0.4845,0.4848,0.4451,0.9611,0.8443,0.8399,0.2729
+scMoMaT,CHAIN_OK_GRAPH_METHOD,114.5,graph,"[14085, 2]",0,cty1.csv+cty2.csv+cty3.csv,0.847,0.5313,0.7025,0.5731,0.5268,0.565,0.9904,0.8314,0.657,0.7255
+sciPENN,CHAIN_OK,29.0,embedding,"[14085, 512]",0,cty1.csv+cty2.csv+cty3.csv,0.8684,0.7391,0.8158,0.6168,0.6237,0.7141,0.9971,0.8843,0.9081,0.4543
+totalVI,CHAIN_OK,275.0,embedding,"[14085, 20]",0,cty1.csv+cty2.csv+cty3.csv,0.8337,0.7563,0.8091,0.5469,0.5704,0.7322,0.9881,0.95,0.9612,0.7293
