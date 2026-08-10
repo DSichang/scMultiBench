@@ -678,7 +678,9 @@ class BatchResult:
         lng = self.long
         if lng.empty:
             raise ValueError("no method produced metrics; see .failures / .summary")
-        kw.setdefault("title", f"{self.category} - {self.dataset}")
+        # No default title: dataset-name banners add nothing a caption
+        # cannot say better, and they crowd the page layout. Pass
+        # title= explicitly when one is wanted.
         return _plot.bubble(lng, **kw)
 
     def save(self, out_dir=None) -> "Path":

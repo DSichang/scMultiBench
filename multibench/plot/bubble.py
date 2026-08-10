@@ -225,11 +225,20 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
                     fontsize=6.4, fontweight="bold", color="white")
 
-    def whisker(x_tip, y, half, x_min):
-        """SD whisker centred on the bar tip, as error bars ON the bar."""
+    def whisker(x_tip, y, half, x_min, x_max):
+        """SD whisker centred on the bar tip, as error bars ON the bar.
+
+        half is capped and both ends are clipped to the column's own
+        [x_min, x_max] span so a large cross-dataset SD can never draw
+        across neighbouring columns.
+        """
         if not np.isfinite(half) or half <= 0:
             return
-        x0, x1 = max(x_min, x_tip - half), x_tip + half
+        half = min(float(half), 0.45)
+        x0 = max(x_min, x_tip - half)
+        x1 = min(x_max, x_tip + half)
+        if x1 <= x0:
+            return
         ax.plot([x0, x1], [y, y], color="#333333", linewidth=0.9,
                 zorder=5, gid="whisker")
         for xc in (x0, x1):
@@ -241,8 +250,12 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         r = colvals.rank(ascending=True, method="max") / colvals.notna().sum()
         r = np.sqrt(r.to_numpy(dtype=float))
         lo, hi = np.nanmin(r), np.nanmax(r)
-        span = (hi - lo) if hi > lo else 1.0
-        return pd.Series(0.15 + 0.70 * (r - lo) / span, index=colvals.index)
+        if not np.isfinite(lo) or hi == lo:
+            # Constant column (e.g. a single method): everyone is tied at the
+            # top rank, so draw the LARGEST bubble - mirrors minmax()'s
+            # constant -> all-ones rule rather than collapsing to the minimum.
+            return pd.Series(0.85, index=colvals.index)
+        return pd.Series(0.15 + 0.70 * (r - lo) / (hi - lo), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
     for x, fi, kind, name in col_meta:
@@ -278,7 +291,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                     lo = np.nanmin(vals.to_numpy()); hi = np.nanmax(vals.to_numpy())
                     if pd.notna(sd) and hi > lo:
                         whisker(x + 0.06 + L, y0 + ROW_H / 2,
-                                0.95 * float(sd) / (hi - lo), x + 0.06)
+                                0.95 * float(sd) / (hi - lo),
+                                x + 0.06, x + 1.04)
         else:
             vals, normv = b.raw[name], b.norm[name]
             rad = rank_radius(vals)
