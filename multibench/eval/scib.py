@@ -5,12 +5,15 @@ import contextlib
 import io
 import warnings
 
-import anndata as ad
 import numpy as np
 import pandas as pd
 
 
 def _build_adata(emb, celltype, cluster, batch):
+    # anndata is an evaluation-only dependency: importing it lazily keeps
+    # `import multibench` working on environments (e.g. Colab) that have
+    # no anndata installed and only use discovery + plotting.
+    import anndata as ad
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
     adata.obs["celltype"] = pd.Categorical(np.asarray(celltype).astype(str))
@@ -44,6 +47,10 @@ def leiden_sweep(emb):
     import scanpy as sc
     from scib.metrics.clustering import get_resolutions
 
+    # anndata is an evaluation-only dependency: importing it lazily keeps
+    # `import multibench` working on environments (e.g. Colab) that have
+    # no anndata installed and only use discovery + plotting.
+    import anndata as ad
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
     sc.pp.neighbors(adata, use_rep="X_emb")
