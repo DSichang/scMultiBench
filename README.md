@@ -28,11 +28,13 @@ res = mtb.run_all("D11", "vertical", out_dir="out/")   # run + score
 res.plot()                         # the paper-style bubble panel
 ```
 
-Running methods needs their conda environments (Linux):
+Running methods needs their conda environments (Linux). The package itself is
+~2 MB - install only the environments you need:
 
 ```bash
 multibench env doctor                              # what exists / is missing
-multibench env install --category vertical --run   # build one category
+multibench env install --methods Matilda --run     # one method (2-14 GB)
+multibench env install --category vertical --run   # one category (45-101 GB)
 ```
 
 The benchmark datasets are downloaded separately - see

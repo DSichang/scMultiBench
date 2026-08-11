@@ -82,12 +82,16 @@ def _cmd_env(args) -> int:
                 print(f"{name:16} ({len(spec['members']):2}): {', '.join(spec['members'])}")
         return 0
     if cmd == "plan":
-        for p in envs.plan(category=getattr(args, "category", None)):
+        _mlist = getattr(args, "methods", None)
+        _mlist = [m.strip() for m in _mlist.split(",")] if _mlist else None
+        for p in envs.plan(category=getattr(args, "category", None), methods=_mlist):
             tag = "shared" if p["shared"] else "own"
             print(f"{p['env']:16} [{tag:6}] <- {', '.join(p['methods'])}")
         return 0
     if cmd == "doctor":
-        rows = envs.doctor(category=getattr(args, "category", None))
+        _mlist = getattr(args, "methods", None)
+        _mlist = [m.strip() for m in _mlist.split(",")] if _mlist else None
+        rows = envs.doctor(category=getattr(args, "category", None), methods=_mlist)
         for r in rows:
             mark = "x" if r["exists"] else ("L" if r["has_lock"] else "!")
             print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}")
@@ -98,7 +102,10 @@ def _cmd_env(args) -> int:
         print("# legend: [x]=installed  [L]=missing, lockfile ready (run `multibench env install --run`)  [!]=missing, no lockfile")
         return 0
     if cmd == "install":
+        _mlist = getattr(args, "methods", None)
+        _mlist = [m.strip() for m in _mlist.split(",")] if _mlist else None
         rows = envs.create_all(category=getattr(args, "category", None),
+                               methods=_mlist,
                                dry_run=not getattr(args, "run", False))
         for r in rows:
             state = ("have" if r["exists"]
@@ -202,10 +209,10 @@ def build_parser() -> argparse.ArgumentParser:
     er = ev.add_parser("recipe"); er.add_argument("method"); er.add_argument("--name"); er.set_defaults(func=_cmd_env)
     ey = ev.add_parser("yml"); ey.add_argument("method"); ey.add_argument("--name"); ey.add_argument("--out"); ey.set_defaults(func=_cmd_env)
     ec = ev.add_parser("create"); ec.add_argument("method"); ec.add_argument("--name"); ec.add_argument("--run", action="store_true"); ec.set_defaults(func=_cmd_env)
-    ep = ev.add_parser("plan"); ep.add_argument("--category"); ep.set_defaults(func=_cmd_env)
+    ep = ev.add_parser("plan"); ep.add_argument("--category"); ep.add_argument("--methods", help="comma-separated method names; only their envs"); ep.set_defaults(func=_cmd_env)
     eg = ev.add_parser("create-group"); eg.add_argument("group"); eg.add_argument("--run", action="store_true"); eg.set_defaults(func=_cmd_env)
-    edoc = ev.add_parser("doctor", help="preflight: which envs are present / need building"); edoc.add_argument("--category"); edoc.set_defaults(func=_cmd_env)
-    ei = ev.add_parser("install", help="build every needed env from its lockfile"); ei.add_argument("--category"); ei.add_argument("--run", action="store_true"); ei.set_defaults(func=_cmd_env)
+    edoc = ev.add_parser("doctor", help="preflight: which envs are present / need building"); edoc.add_argument("--category"); edoc.add_argument("--methods", help="comma-separated method names; only their envs"); edoc.set_defaults(func=_cmd_env)
+    ei = ev.add_parser("install", help="build every needed env from its lockfile"); ei.add_argument("--category"); ei.add_argument("--methods", help="comma-separated method names; only their envs"); ei.add_argument("--run", action="store_true"); ei.set_defaults(func=_cmd_env)
     ef = ev.add_parser("freeze", help="capture an env (or --all) to a committed lockfile"); ef.add_argument("env", nargs="?"); ef.add_argument("--all", action="store_true"); ef.add_argument("--category"); ef.set_defaults(func=_cmd_env)
     return p
 
