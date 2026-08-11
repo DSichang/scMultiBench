@@ -31,6 +31,7 @@
       
     
     
+  
       <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
       
         
@@ -40,6 +41,16 @@
 
 
     
+  <style>
+    /* Colab-button styling shipped INLINE with the page HTML (not via the
+       separately-cached extra.css), so a stale cached stylesheet can't revert
+       it. Absolute (not float) so it doesn't squeeze mkdocs-jupyter's
+       .jp-Notebook narrower, and above the .jupyter-wrapper so it stays
+       clickable. Same pattern as the M3 / Matilda sites. */
+    .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
+    .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+  </style>
+
     
       
     
@@ -1088,6 +1099,10 @@
               
               <article class="md-content__inner md-typeset">
                 
+  
+  
+  
+  
                   
   
 
@@ -1201,6 +1216,7 @@
 
 
                 
+
               </article>
             </div>
           
