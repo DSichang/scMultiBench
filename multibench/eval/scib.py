@@ -135,8 +135,14 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     if group not in {"clustering", "batch", "all"}:
         raise ValueError(f"unknown group {group!r}; valid: clustering|batch|all")
 
-    import scanpy as sc
-    import scib.metrics as me
+    try:
+        import scanpy as sc
+        import scib.metrics as me
+    except ImportError as e:
+        raise RuntimeError(
+            "metrics need the evaluation extra (scib + scanpy), which is not "
+            "installed here - run: pip install -e '.[eval]'"
+        ) from e
 
     n = np.asarray(emb).shape[0]
     n_ct = len(np.asarray(celltype))

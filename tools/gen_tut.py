@@ -196,13 +196,14 @@ else:
 if importlib.util.find_spec("multibench") is None:
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
-    !pip -q install -e .
+    !pip -q install -e ".[eval]"
 elif os.path.isdir("/content/scMultiBench"):
     # reused Colab runtime: refresh the editable install to the latest code,
     # then drop the already-imported modules so the NEXT import sees it -
     # a live kernel never re-reads changed files on its own
     %cd /content/scMultiBench
     !git pull -q
+    !pip -q install -e ".[eval]"
     import importlib, sys
     for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
         del sys.modules[_m]
