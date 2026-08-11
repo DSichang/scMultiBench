@@ -2167,7 +2167,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a4f5b20a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9338af1b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2192,7 +2192,7 @@ with these notebooks were produced on it, so every table below reproduces.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=72fd8345">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=28b9ee4d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2205,7 +2205,7 @@ itself when the package is already present:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=48c02004">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fa252019">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2224,8 +2224,15 @@ itself when the package is already present:</p>
 </clipboard-copy>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span>
-<span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="n">IN_COLAB</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"google.colab"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_has</span><span class="p">(</span><span class="n">mod</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="n">mod</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>   <span class="c1"># parent namespace absent (e.g. no `google`)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">_has</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">):</span>
+    <span class="n">IN_COLAB</span> <span class="o">=</span> <span class="n">_has</span><span class="p">(</span><span class="s2">"google.colab"</span><span class="p">)</span>
     <span class="err">!</span><span class="n">git</span> <span class="n">clone</span> <span class="o">--</span><span class="n">depth</span> <span class="mi">1</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">DSichang</span><span class="o">/</span><span class="n">scMultiBench</span><span class="o">.</span><span class="n">git</span>
     <span class="o">%</span><span class="n">cd</span> <span class="n">scMultiBench</span>
     <span class="k">if</span> <span class="n">IN_COLAB</span><span class="p">:</span>
@@ -2238,8 +2245,15 @@ itself when the package is already present:</p>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench already installed - skipping"</span><span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import importlib.util
-if importlib.util.find_spec("multibench") is None:
-    IN_COLAB = importlib.util.find_spec("google.colab") is not None
+
+def _has(mod):
+    try:
+        return importlib.util.find_spec(mod) is not None
+    except ModuleNotFoundError:   # parent namespace absent (e.g. no `google`)
+        return False
+
+if not _has("multibench"):
+    IN_COLAB = _has("google.colab")
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
     if IN_COLAB:
@@ -2269,7 +2283,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f032d9ef">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=066917d7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2294,7 +2308,7 @@ add <code>--run</code>, and it skips environments that already exist.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=25960382">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=771f9c58">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2374,7 +2388,7 @@ add <code>--run</code>, and it skips environments that already exist.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a234acc3">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9298e9ac">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2438,7 +2452,7 @@ print("multibench", mtb.__version__)</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ff6e2f89">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4a678319">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2496,7 +2510,7 @@ print(f"benchmark data present: {HAVE_DATA}"
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d3220cc8">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1fee87ed">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2508,7 +2522,7 @@ print(f"benchmark data present: {HAVE_DATA}"
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3c4eb08e">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=53bd0ab3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2611,7 +2625,7 @@ Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=aa902db7">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=82deabe6">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2659,7 +2673,7 @@ shipped one - this is the whole format:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0e3ea8c7">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0c82e9f5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2715,7 +2729,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=795f1b8d">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cb7b21f2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2735,7 +2749,7 @@ transpose). Converting a small demo object end to end:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ddc05313">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8c299f6a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2808,7 +2822,7 @@ shape: (40, 120) (features x cells - transposed for you)
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8ed40b0e">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cfbd9342">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2821,7 +2835,7 @@ executes, so this is instant and safe.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=aca4dbdf">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=416d7b6e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3025,7 +3039,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d2df136a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=774f9bbe">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3036,7 +3050,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3645f1e6">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6d6d38b8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3083,7 +3097,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=db4e0402">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2f0e45e6">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3096,7 +3110,7 @@ Stated explicitly so you never mistake a dataset limitation for full coverage.</
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8aae496e">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=477caacc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3173,7 +3187,7 @@ full parity with the paper for this category
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7fc871e7">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d0ff9c04">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3187,7 +3201,7 @@ upstream code, so it reports rather than pretends.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ef4b9860">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=06638375">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3205,24 +3219,50 @@ upstream code, so it reports rather than pretends.</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">avail</span><span class="p">[</span><span class="n">avail</span><span class="o">.</span><span class="n">runnable</span><span class="p">][</span><span class="s2">"method"</span><span class="p">]:</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># a registry question, so it needs no data on disk</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">multibench.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
+
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="n">CATEGORY</span><span class="p">)):</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">p</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">)</span>
-    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>                      <span class="c1"># multi-variant: needs modalities</span>
-        <span class="n">mods</span> <span class="o">=</span> <span class="n">avail</span><span class="p">[</span><span class="n">avail</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="n">m</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"modalities"</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"+"</span><span class="p">)</span>
-        <span class="n">p</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span> <span class="n">mods</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>                      <span class="c1"># multi-variant: try each variant's modalities</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">.</span><span class="n">variants</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">when</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"category"</span><span class="p">)</span> <span class="o">!=</span> <span class="n">CATEGORY</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">p</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">when</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"modalities"</span><span class="p">))</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">continue</span>
+    <span class="k">if</span> <span class="n">p</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>                          <span class="c1"># variant selection needs a concrete dataset</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">"method"</span><span class="p">:</span> <span class="n">m</span><span class="p">,</span> <span class="s2">"n_tunable"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"tunable"</span><span class="p">:</span> <span class="s2">"(see scan() on your dataset)"</span><span class="p">})</span>
+        <span class="k">continue</span>
     <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">"method"</span><span class="p">:</span> <span class="n">m</span><span class="p">,</span> <span class="s2">"n_tunable"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tunable"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}),</span>
                  <span class="s2">"tunable"</span><span class="p">:</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">((</span><span class="n">p</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tunable"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}))[:</span><span class="mi">6</span><span class="p">])})</span>
 <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"n_tunable"</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-11">rows = []
-for m in avail[avail.runnable]["method"]:
+<div class="clipboard-copy-txt" id="cell-11"># a registry question, so it needs no data on disk
+from multibench.engine import registry
+
+rows = []
+for m in sorted(mtb.list_methods(category=CATEGORY)):
+    p = None
     try:
         p = mtb.params_for(m, CATEGORY)
-    except Exception:                      # multi-variant: needs modalities
-        mods = avail[avail.method == m].iloc[0]["modalities"].split("+")
-        p = mtb.params_for(m, CATEGORY, mods)
+    except Exception:                      # multi-variant: try each variant's modalities
+        for v in registry.get(m).variants:
+            if v.when.get("category") != CATEGORY:
+                continue
+            try:
+                p = mtb.params_for(m, CATEGORY, v.when.get("modalities"))
+                break
+            except Exception:
+                continue
+    if p is None:                          # variant selection needs a concrete dataset
+        rows.append({"method": m, "n_tunable": 0, "tunable": "(see scan() on your dataset)"})
+        continue
     rows.append({"method": m, "n_tunable": len(p.get("tunable") or {}),
                  "tunable": ", ".join(sorted((p.get("tunable") or {}))[:6])})
 pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=True)</div>
@@ -3354,7 +3394,7 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2805991f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=18964695">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3367,7 +3407,7 @@ conda env -&gt; load the output -&gt; compute metrics -&gt; keep everything in a
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f4595586">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4c63719e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3426,7 +3466,7 @@ else:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (17.4s) 0.3749
+<pre>[run_all]   -&gt; CHAIN_OK (17.3s) 0.3749
 </pre>
 </div>
 </div>
@@ -3475,7 +3515,7 @@ else:
 <th>0</th>
 <td>online_iNMF</td>
 <td>CHAIN_OK</td>
-<td>17.4</td>
+<td>17.3</td>
 <td>embedding</td>
 <td>[11014, 20]</td>
 <td>0</td>
@@ -3500,7 +3540,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b096e5d3">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e80aae4f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3517,7 +3557,7 @@ full-setting sweep - one more reason not to mix them in one figure.)</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5a90e699">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ff29faee">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3559,7 +3599,7 @@ than the other metrics.</li>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=16955ce2">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1e3af0e4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3578,7 +3618,7 @@ everything runnable and writes <code>summary.csv</code> and <code>long.csv</code
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cf341d20">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f8390ce9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3623,7 +3663,7 @@ fig</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e768dfd3">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=38bbb7ef">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3644,7 +3684,7 @@ panels. Both metric families appear because both datasets are multi-batch.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4f27a334">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e70504d3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3704,7 +3744,7 @@ mtb.plot.bubble(pair, aggregate="summary",
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=35c9cc61">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bb3ae01d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3719,7 +3759,7 @@ adapt to your own export pipeline).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=e1ca9e04">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=a4f80f22">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3826,7 +3866,7 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9d95fec1">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8ed3bcc5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3880,7 +3920,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=602afdda">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fde275a7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3947,7 +3987,7 @@ else:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (11.5s) 0.391
+<pre>[run_all]   -&gt; CHAIN_OK (11.4s) 0.391
 </pre>
 </div>
 </div>
@@ -3961,7 +4001,7 @@ else:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (43.2s) 0.5634
+<pre>[run_all]   -&gt; CHAIN_OK (42.0s) 0.5634
 </pre>
 </div>
 </div>
@@ -4030,7 +4070,7 @@ else:
 <th>1</th>
 <td>online_iNMF</td>
 <td>CHAIN_OK</td>
-<td>11.5</td>
+<td>11.4</td>
 <td>embedding</td>
 <td>[6607, 20]</td>
 <td>0</td>
@@ -4050,7 +4090,7 @@ else:
 <th>2</th>
 <td>scJoint</td>
 <td>CHAIN_OK</td>
-<td>43.2</td>
+<td>42.0</td>
 <td>embedding</td>
 <td>[6607, 64]</td>
 <td>21</td>
@@ -4075,7 +4115,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5ca3d713">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0194a806">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4120,7 +4160,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a53f3760">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d029fcc5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4135,7 +4175,7 @@ write one label CSV per the layout in section 2, and the same three calls -
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ff252e90">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=570a3e4a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
