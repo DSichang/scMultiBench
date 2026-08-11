@@ -619,10 +619,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#optional-the-evaluation-extra" class="md-nav__link">
+  <a href="#the-evaluation-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Optional, the evaluation extra
+        The evaluation stack
       
     </span>
   </a>
@@ -1291,10 +1291,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#optional-the-evaluation-extra" class="md-nav__link">
+  <a href="#the-evaluation-stack" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Optional, the evaluation extra
+        The evaluation stack
       
     </span>
   </a>
@@ -1587,20 +1587,10 @@ any of it under <code>data/</code> at the repository root - <code>mtb.config.DEF
 defaults to exactly that folder, and every <code>data_path=</code> argument in the API
 accepts an alternative location.</p>
 <hr />
-<h2 id="optional-the-evaluation-extra">Optional, the evaluation extra<a class="headerlink" href="#optional-the-evaluation-extra" title="Anchor link to this section">&para;</a></h2>
-<p><code>mtb.evaluate(...)</code> computes scIB metrics on a run output. It needs the <code>scib</code>
-package, which is not part of the core install:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pip<span class="w"> </span>install<span class="w"> </span>scib
-</span></code></pre></div>
-<p>Or, if the project exposes an extra:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[eval]&quot;</span>
-</span></code></pre></div>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>                  <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="n">clustering</span><span class="p">)</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">df</span>    <span class="c1"># metric.csv-shaped frame: index=metric, column &quot;Value&quot; (NaN where a dep is absent)</span>
-</span></code></pre></div>
+<h2 id="the-evaluation-stack">The evaluation stack<a class="headerlink" href="#the-evaluation-stack" title="Anchor link to this section">&para;</a></h2>
+<p><code>mtb.evaluate(...)</code> computes scIB metrics on a run output. Since v0.2, <code>scib</code>
+and <code>scanpy</code> install with the package - no extra step. (<code>pip install -e
+".[eval]"</code> remains accepted for compatibility; it is now a no-op.)</p>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Anchor link to this section">&para;</a></h2>
 <div class="admonition question">
