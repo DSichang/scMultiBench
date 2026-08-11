@@ -2167,7 +2167,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9338af1b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8669698b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2192,7 +2192,7 @@ with these notebooks were produced on it, so every table below reproduces.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=28b9ee4d">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=857fa16e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2205,7 +2205,7 @@ itself when the package is already present:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fa252019">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1e1d58a8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2283,7 +2283,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=066917d7">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ba8c540a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2304,11 +2304,14 @@ cache afterwards with <code>conda clean -a</code> - details in <code>SETUP.md</c
 incompatible framework versions), so the wrapper can run torch 1.x, torch 2.x,
 TensorFlow and R methods in one sweep. <code>env install</code> is a dry run until you
 add <code>--run</code>, and it skips environments that already exist.</p>
+<p><strong>On Colab</strong> there is no conda, so the two cells that execute methods will say
+so and skip - everything else in this notebook, including the reference data
+(auto-downloaded), the scans and every figure, runs for real.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=771f9c58">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=26909908">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2388,7 +2391,7 @@ add <code>--run</code>, and it skips environments that already exist.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9298e9ac">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=bdfafcac">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2452,7 +2455,7 @@ print("multibench", mtb.__version__)</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4a678319">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e8e64768">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2473,24 +2476,92 @@ print("multibench", mtb.__version__)</div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="n">DATASET</span>  <span class="o">=</span> <span class="s2">"D28"</span>
 <span class="n">CATEGORY</span> <span class="o">=</span> <span class="s2">"diagonal"</span>
 
-<span class="c1"># The benchmark datasets are a separate download (see "Get the data" in the</span>
-<span class="c1"># installation guide). Every cell that needs them checks HAVE_DATA and says</span>
-<span class="c1"># so instead of failing; sections 7-8 use the shipped results and work</span>
-<span class="c1"># everywhere, including Colab.</span>
-<span class="n">HAVE_DATA</span> <span class="o">=</span> <span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">data_path</span> <span class="o">/</span> <span class="n">DATASET</span><span class="p">)</span><span class="o">.</span><span class="n">is_dir</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"benchmark data present: </span><span class="si">{</span><span class="n">HAVE_DATA</span><span class="si">}</span><span class="s2">"</span>
-      <span class="o">+</span> <span class="p">(</span><span class="s2">""</span> <span class="k">if</span> <span class="n">HAVE_DATA</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"  (looked in </span><span class="si">{</span><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">data_path</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">DATASET</span><span class="si">}</span><span class="s2">)"</span><span class="p">))</span>
+<span class="c1"># This tutorial's reference data (D28 137 MB) downloads automatically from</span>
+<span class="c1"># the repository's release assets when missing - nothing to fetch by hand.</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span><span class="o">,</span><span class="w"> </span><span class="nn">tarfile</span><span class="o">,</span><span class="w"> </span><span class="nn">urllib.request</span>
+<span class="n">NEED</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'D28'</span><span class="p">]</span>
+<span class="n">LIVE_METHODS</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'iNMF'</span><span class="p">,</span> <span class="s1">'online_iNMF'</span><span class="p">,</span> <span class="s1">'scJoint'</span><span class="p">]</span>
+<span class="n">DATA_URL</span> <span class="o">=</span> <span class="s2">"https://github.com/DSichang/scMultiBench/releases/download/data-v1"</span>
+<span class="n">root</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">data_path</span>
+<span class="k">for</span> <span class="n">_ds</span> <span class="ow">in</span> <span class="n">NEED</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">root</span> <span class="o">/</span> <span class="n">_ds</span><span class="p">)</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"downloading </span><span class="si">{</span><span class="n">_ds</span><span class="si">}</span><span class="s2"> from the release assets ..."</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">_tgz</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">DATA_URL</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">_ds</span><span class="si">}</span><span class="s2">.tar.gz"</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">_tgz</span><span class="p">)</span> <span class="k">as</span> <span class="n">_t</span><span class="p">:</span>
+                <span class="n">_t</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"could not download </span><span class="si">{</span><span class="n">_ds</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">_e</span><span class="si">}</span><span class="s2">) - see 'Get the data' in the installation guide"</span><span class="p">)</span>
+<span class="n">HAVE_DATA</span> <span class="o">=</span> <span class="nb">all</span><span class="p">((</span><span class="n">root</span> <span class="o">/</span> <span class="n">_d</span><span class="p">)</span><span class="o">.</span><span class="n">is_dir</span><span class="p">()</span> <span class="k">for</span> <span class="n">_d</span> <span class="ow">in</span> <span class="n">NEED</span><span class="p">)</span>
+
+<span class="c1"># Running a method needs its conda environment; check what THIS machine can do</span>
+<span class="c1"># and, when something is missing, say exactly how to get it.</span>
+<span class="n">CAN_RUN</span><span class="p">,</span> <span class="n">_note</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">""</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">HAVE_DATA</span><span class="p">:</span>
+    <span class="n">_note</span> <span class="o">=</span> <span class="s2">"data unavailable, so the live-run cells will skip"</span>
+<span class="k">elif</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">"conda"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">"mamba"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">_note</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"no conda here (Colab included) - the two live-run cells will skip; "</span>
+             <span class="s2">"everything else in this notebook runs for real"</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">multibench.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">envs</span> <span class="k">as</span> <span class="n">_envs</span>
+        <span class="n">_missing</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">r</span><span class="p">[</span><span class="s2">"env"</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">_envs</span><span class="o">.</span><span class="n">doctor</span><span class="p">(</span><span class="n">methods</span><span class="o">=</span><span class="n">LIVE_METHODS</span><span class="p">)</span>
+                           <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="p">[</span><span class="s2">"exists"</span><span class="p">]})</span>
+        <span class="k">if</span> <span class="n">_missing</span><span class="p">:</span>
+            <span class="n">_note</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"missing env(s): "</span> <span class="o">+</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_missing</span><span class="p">)</span> <span class="o">+</span> <span class="s2">" - build with: "</span>
+                     <span class="o">+</span> <span class="s2">"multibench env install --methods "</span> <span class="o">+</span> <span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">LIVE_METHODS</span><span class="p">)</span> <span class="o">+</span> <span class="s2">" --run"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">CAN_RUN</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_e</span><span class="p">:</span>
+        <span class="n">_note</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"environment check failed: </span><span class="si">{</span><span class="n">_e</span><span class="si">}</span><span class="s2">"</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"data ready: </span><span class="si">{</span><span class="n">HAVE_DATA</span><span class="si">}</span><span class="s2"> | can run methods here: </span><span class="si">{</span><span class="n">CAN_RUN</span><span class="si">}</span><span class="s2">"</span>
+      <span class="o">+</span> <span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">-&gt; </span><span class="si">{</span><span class="n">_note</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">_note</span> <span class="k">else</span> <span class="s2">""</span><span class="p">))</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-4">DATASET  = "D28"
 CATEGORY = "diagonal"
 
-# The benchmark datasets are a separate download (see "Get the data" in the
-# installation guide). Every cell that needs them checks HAVE_DATA and says
-# so instead of failing; sections 7-8 use the shipped results and work
-# everywhere, including Colab.
-HAVE_DATA = (mtb.config.DEFAULT.data_path / DATASET).is_dir()
-print(f"benchmark data present: {HAVE_DATA}"
-      + ("" if HAVE_DATA else f"  (looked in {mtb.config.DEFAULT.data_path / DATASET})"))</div>
+# This tutorial's reference data (D28 137 MB) downloads automatically from
+# the repository's release assets when missing - nothing to fetch by hand.
+import shutil, tarfile, urllib.request
+NEED = ['D28']
+LIVE_METHODS = ['iNMF', 'online_iNMF', 'scJoint']
+DATA_URL = "https://github.com/DSichang/scMultiBench/releases/download/data-v1"
+root = mtb.config.DEFAULT.data_path
+for _ds in NEED:
+    if not (root / _ds).is_dir():
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            print(f"downloading {_ds} from the release assets ...", flush=True)
+            _tgz, _ = urllib.request.urlretrieve(f"{DATA_URL}/{_ds}.tar.gz")
+            with tarfile.open(_tgz) as _t:
+                _t.extractall(root)
+        except Exception as _e:
+            print(f"could not download {_ds} ({_e}) - see 'Get the data' in the installation guide")
+HAVE_DATA = all((root / _d).is_dir() for _d in NEED)
+
+# Running a method needs its conda environment; check what THIS machine can do
+# and, when something is missing, say exactly how to get it.
+CAN_RUN, _note = False, ""
+if not HAVE_DATA:
+    _note = "data unavailable, so the live-run cells will skip"
+elif shutil.which("conda") is None and shutil.which("mamba") is None:
+    _note = ("no conda here (Colab included) - the two live-run cells will skip; "
+             "everything else in this notebook runs for real")
+else:
+    try:
+        from multibench.engine import envs as _envs
+        _missing = sorted({r["env"] for r in _envs.doctor(methods=LIVE_METHODS)
+                           if not r["exists"]})
+        if _missing:
+            _note = ("missing env(s): " + ", ".join(_missing) + " - build with: "
+                     + "multibench env install --methods " + ",".join(LIVE_METHODS) + " --run")
+        else:
+            CAN_RUN = True
+    except Exception as _e:
+        _note = f"environment check failed: {_e}"
+print(f"data ready: {HAVE_DATA} | can run methods here: {CAN_RUN}"
+      + (f"\n-&gt; {_note}" if _note else ""))</div>
 </div>
 </div>
 </div>
@@ -2502,7 +2573,7 @@ print(f"benchmark data present: {HAVE_DATA}"
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>benchmark data present: True
+<pre>data ready: True | can run methods here: True
 </pre>
 </div>
 </div>
@@ -2510,7 +2581,7 @@ print(f"benchmark data present: {HAVE_DATA}"
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1fee87ed">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0753a43c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2522,7 +2593,7 @@ print(f"benchmark data present: {HAVE_DATA}"
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=53bd0ab3">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=16a02966">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2625,7 +2696,7 @@ Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=82deabe6">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fd8e4db5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2673,7 +2744,7 @@ shipped one - this is the whole format:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0c82e9f5">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=97e9c470">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2729,7 +2800,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cb7b21f2">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5796f719">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2749,7 +2820,7 @@ transpose). Converting a small demo object end to end:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8c299f6a">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7ab1c36f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2822,7 +2893,7 @@ shape: (40, 120) (features x cells - transposed for you)
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cfbd9342">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a302912b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2835,7 +2906,7 @@ executes, so this is instant and safe.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=416d7b6e">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2ad2af0f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3039,7 +3110,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=774f9bbe">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d38cabf2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3050,7 +3121,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6d6d38b8">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7981508d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3097,7 +3168,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2f0e45e6">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2dccee20">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3110,7 +3181,7 @@ Stated explicitly so you never mistake a dataset limitation for full coverage.</
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=477caacc">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=bad5a717">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3187,7 +3258,7 @@ full parity with the paper for this category
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d0ff9c04">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=4e9e1d8c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3201,7 +3272,7 @@ upstream code, so it reports rather than pretends.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=06638375">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2bb8959e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3394,7 +3465,7 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=18964695">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=81956fbc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3407,7 +3478,7 @@ conda env -&gt; load the output -&gt; compute metrics -&gt; keep everything in a
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4c63719e">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=adc73bec">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3425,21 +3496,23 @@ conda env -&gt; load the output -&gt; compute metrics -&gt; keep everything in a
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="k">if</span> <span class="n">HAVE_DATA</span><span class="p">:</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="k">if</span> <span class="n">CAN_RUN</span><span class="p">:</span>
     <span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span>
                       <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"online_iNMF"</span><span class="p">],</span>
                       <span class="n">out_dir</span><span class="o">=</span><span class="s2">"/tmp/tutorial_diagonal"</span><span class="p">)</span>
     <span class="n">display</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"skipped - benchmark data not downloaded; see section 1"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"skipped - running methods needs their conda environments;"</span><span class="p">,</span>
+          <span class="s2">"the status line under section 1 says exactly what to install"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-12">if HAVE_DATA:
+<div class="clipboard-copy-txt" id="cell-12">if CAN_RUN:
     res = mtb.run_all("D28", CATEGORY,
                       methods=["online_iNMF"],
                       out_dir="/tmp/tutorial_diagonal")
     display(res.summary)
 else:
-    print("skipped - benchmark data not downloaded; see section 1")</div>
+    print("skipped - running methods needs their conda environments;",
+          "the status line under section 1 says exactly what to install")</div>
 </div>
 </div>
 </div>
@@ -3540,7 +3613,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e80aae4f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9d09ecde">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3557,7 +3630,7 @@ full-setting sweep - one more reason not to mix them in one figure.)</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ff29faee">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=88321fac">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3599,7 +3672,7 @@ than the other metrics.</li>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1e3af0e4">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7f2afcd7">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3618,7 +3691,7 @@ everything runnable and writes <code>summary.csv</code> and <code>long.csv</code
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f8390ce9">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9c535a25">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3663,7 +3736,7 @@ fig</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=38bbb7ef">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=885655c5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3684,7 +3757,7 @@ panels. Both metric families appear because both datasets are multi-batch.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e70504d3">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c2959e8b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3744,7 +3817,7 @@ mtb.plot.bubble(pair, aggregate="summary",
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bb3ae01d">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3cb76bec">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3759,7 +3832,7 @@ adapt to your own export pipeline).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=a4f80f22">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=1ef2bfad">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3866,7 +3939,7 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8ed3bcc5">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6b0cdcb8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3920,7 +3993,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fde275a7">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c853eacf">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3938,23 +4011,25 @@ else:
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="k">if</span> <span class="n">HAVE_DATA</span><span class="p">:</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="k">if</span> <span class="n">CAN_RUN</span><span class="p">:</span>
     <span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="sa">f</span><span class="s2">"MYDATA_diagonal"</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span>
                        <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">'online_iNMF'</span><span class="p">,</span> <span class="s1">'iNMF'</span><span class="p">,</span> <span class="s1">'scJoint'</span><span class="p">],</span>
                        <span class="n">out_dir</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">DATA_ROOT</span><span class="si">}</span><span class="s2">/out_diagonal"</span><span class="p">,</span>
                        <span class="n">data_path</span><span class="o">=</span><span class="n">DATA_ROOT</span><span class="p">)</span>
     <span class="n">display</span><span class="p">(</span><span class="n">mine</span><span class="o">.</span><span class="n">summary</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"skipped - benchmark data not downloaded; see section 1"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"skipped - running methods needs their conda environments;"</span><span class="p">,</span>
+          <span class="s2">"the status line under section 1 says exactly what to install"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-17">if HAVE_DATA:
+<div class="clipboard-copy-txt" id="cell-17">if CAN_RUN:
     mine = mtb.run_all(f"MYDATA_diagonal", CATEGORY,
                        methods=['online_iNMF', 'iNMF', 'scJoint'],
                        out_dir=f"{DATA_ROOT}/out_diagonal",
                        data_path=DATA_ROOT)
     display(mine.summary)
 else:
-    print("skipped - benchmark data not downloaded; see section 1")</div>
+    print("skipped - running methods needs their conda environments;",
+          "the status line under section 1 says exactly what to install")</div>
 </div>
 </div>
 </div>
@@ -3973,7 +4048,7 @@ else:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (31.9s) 0.4209
+<pre>[run_all]   -&gt; CHAIN_OK (32.0s) 0.4209
 </pre>
 </div>
 </div>
@@ -3987,7 +4062,7 @@ else:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (11.4s) 0.391
+<pre>[run_all]   -&gt; CHAIN_OK (11.5s) 0.391
 </pre>
 </div>
 </div>
@@ -4001,7 +4076,7 @@ else:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (42.0s) 0.5634
+<pre>[run_all]   -&gt; CHAIN_OK (41.6s) 0.5634
 </pre>
 </div>
 </div>
@@ -4050,7 +4125,7 @@ else:
 <th>0</th>
 <td>iNMF</td>
 <td>CHAIN_OK</td>
-<td>31.9</td>
+<td>32.0</td>
 <td>embedding</td>
 <td>[6607, 20]</td>
 <td>0</td>
@@ -4070,7 +4145,7 @@ else:
 <th>1</th>
 <td>online_iNMF</td>
 <td>CHAIN_OK</td>
-<td>11.4</td>
+<td>11.5</td>
 <td>embedding</td>
 <td>[6607, 20]</td>
 <td>0</td>
@@ -4090,7 +4165,7 @@ else:
 <th>2</th>
 <td>scJoint</td>
 <td>CHAIN_OK</td>
-<td>42.0</td>
+<td>41.6</td>
 <td>embedding</td>
 <td>[6607, 64]</td>
 <td>21</td>
@@ -4115,7 +4190,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0194a806">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0c5fd3d2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4133,15 +4208,17 @@ else:
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="k">if</span> <span class="n">HAVE_DATA</span><span class="p">:</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="k">if</span> <span class="n">CAN_RUN</span><span class="p">:</span>
     <span class="n">display</span><span class="p">(</span><span class="n">mine</span><span class="o">.</span><span class="n">plot</span><span class="p">())</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"skipped - benchmark data not downloaded; see section 1"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"skipped - running methods needs their conda environments;"</span><span class="p">,</span>
+          <span class="s2">"the status line under section 1 says exactly what to install"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-18">if HAVE_DATA:
+<div class="clipboard-copy-txt" id="cell-18">if CAN_RUN:
     display(mine.plot())
 else:
-    print("skipped - benchmark data not downloaded; see section 1")</div>
+    print("skipped - running methods needs their conda environments;",
+          "the status line under section 1 says exactly what to install")</div>
 </div>
 </div>
 </div>
@@ -4160,7 +4237,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d029fcc5">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=dcdaea9e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4175,7 +4252,7 @@ write one label CSV per the layout in section 2, and the same three calls -
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=570a3e4a">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8a76a583">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

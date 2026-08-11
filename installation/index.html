@@ -1572,26 +1572,34 @@ combinations cost less than their sum. <code>env doctor</code> is safe to run an
 <code>env install</code> skips environments that already exist, so it resumes after
 interruption.</p>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
-<p>The benchmark datasets are not part of the git clone. Download the processed
-datasets from the link in the
-<a href="https://github.com/PYangLab/scMultiBench#readme">scMultiBench README</a> and
-unpack them under <code>data/</code> at the repository root - <code>mtb.config.DEFAULT.data_path</code>
+<p>The benchmark datasets are not part of the git clone, and for the tutorials
+you do not need to fetch anything by hand: <strong>each tutorial auto-downloads its
+own reference data</strong> (11-290 MB) from the repository's
+<a href="https://github.com/DSichang/scMultiBench/releases/tag/data-v1">release assets</a>
+into <code>data/</code> on first run. Manual equivalent, e.g. for <code>D11</code>:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span>data/
+</span></code></pre></div>
+<p>Available there: <code>D11</code> (vertical, 11 MB), <code>D28</code> (diagonal, 137 MB), <code>D45</code>
+(mosaic, 290 MB), <code>D46</code> (mosaic, 97 MB), <code>D52</code> (cross, 179 MB). The <strong>full
+65-dataset collection</strong> is linked from the
+<a href="https://github.com/PYangLab/scMultiBench#readme">scMultiBench README</a>; unpack
+any of it under <code>data/</code> at the repository root - <code>mtb.config.DEFAULT.data_path</code>
 defaults to exactly that folder, and every <code>data_path=</code> argument in the API
 accepts an alternative location.</p>
 <hr />
 <h2 id="optional-the-evaluation-extra">Optional, the evaluation extra<a class="headerlink" href="#optional-the-evaluation-extra" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.evaluate(...)</code> computes scIB metrics on a run output. It needs the <code>scib</code>
 package, which is not part of the core install:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>pip<span class="w"> </span>install<span class="w"> </span>scib
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pip<span class="w"> </span>install<span class="w"> </span>scib
 </span></code></pre></div>
 <p>Or, if the project exposes an extra:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[eval]&quot;</span>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[eval]&quot;</span>
 </span></code></pre></div>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>                  <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="n">clustering</span><span class="p">)</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">df</span>    <span class="c1"># metric.csv-shaped frame: index=metric, column &quot;Value&quot; (NaN where a dep is absent)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>                  <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="n">clustering</span><span class="p">)</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">df</span>    <span class="c1"># metric.csv-shaped frame: index=metric, column &quot;Value&quot; (NaN where a dep is absent)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Anchor link to this section">&para;</a></h2>
