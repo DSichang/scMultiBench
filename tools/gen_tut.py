@@ -360,8 +360,7 @@ Notes that save confusion later:
         "clustering family only - the diagonal, mosaic and cross tutorials "
         "show the batch-correction family alongside it."
         if cat == "vertical" else
-        "Both metric families appear, and every bar carries its whisker - the "
-        "batch family included, because both datasets are multi-batch.")
+        "Both metric families appear because both datasets are multi-batch.")
     md(f"""## 8. The figures
 
 **Per-dataset panel**, in the paper's layout: methods as rows (best first),
@@ -383,11 +382,11 @@ into the same bar. The results folder therefore ships TWO {cat} datasets swept
 with the same benchmark: `{ds}` and `{ds2}` (a 60% cell subsample of `{ds}`
 under a new name). The code keeps the **intersection** of methods present in
 both, so the matrix behind the figure is complete by construction - copy this
-pattern with your own same-category datasets. Each bar's length and colour
-encode the metric's rank averaged across the two datasets, with an SD whisker
-over them - a very short whisker means the method's rank barely moved between
-the datasets, which is information, not an omission. `Overall` carries no
-whisker because it is a within-dataset relative score. {batch_note}""")
+pattern with your own same-category datasets. The encoding is the paper's:
+each metric's bar is its **grand rank** - the min-max scaled mean rank across
+the datasets - with length and colour both carrying it, and `Overall` is the
+min-max scaled mean rank of the grand ranks, exactly as in the paper's summary
+panels. {batch_note}""")
     code(f'''a = pd.read_csv(RESULTS / "long_all_{ds}.csv").assign(dataset="{ds}")
 b = pd.read_csv(RESULTS / "long_all_{ds2}.csv").assign(dataset="{ds2}")
 both = sorted(set(a.method) & set(b.method))   # complete matrix, by construction
