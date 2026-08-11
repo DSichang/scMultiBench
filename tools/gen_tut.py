@@ -155,7 +155,7 @@ This tutorial covers, end to end:
 - installing the package and the per-method environments
 - the on-disk data layout this category expects
 - seeing what runs on a dataset (`scan`) and what each method exposes for tuning
-- running one method live and reading its metrics
+- running several methods for real and reading their metrics
 - the standard figures: a per-dataset panel and an across-datasets summary
 - **running the same pipeline on your own dataset**, demonstrated for real
 
@@ -163,62 +163,50 @@ This tutorial covers, end to end:
 with these notebooks were produced on it, so every table below reproduces.
 
 **Contents** - 1 Install · 2 Data layout · 3 What can I run · 4 Paper coverage ·
-5 What can I tune · 6 Run one method · 7 Reading the metrics · 8 Figures ·
+5 What can I tune · 6 Run the analysis · 7 Reading the metrics · 8 Figures ·
 9 Your own dataset · Troubleshooting""")
 
     # ---------------------------------------------------------------- install
+    live_methods = sorted({fastm, *s["own_trio"]})
+    mlist = ",".join(live_methods)
     md("""## 1. Install
 
-Prerequisites: Linux and `conda` (mamba recommended). `multibench` is not on
-PyPI yet; the cell below installs it from the repository (~2 MB) and skips
-itself when the package is already present:""")
-    code("""import importlib.util
+Two layers: the `multibench` package (~2 MB) and the conda environments of the
+methods you run. On **Colab**, run the first cell and let the kernel restart
+once - then just keep running from the next cell.""")
+    code("""# Colab ships without conda; this provisions it (the kernel restarts ONCE).
+# On a machine that already has conda, this cell does nothing.
+import importlib.util, shutil
 
 def _has(mod):
     try:
         return importlib.util.find_spec(mod) is not None
-    except ModuleNotFoundError:   # parent namespace absent (e.g. no `google`)
+    except ModuleNotFoundError:
         return False
 
-if not _has("multibench"):
-    IN_COLAB = _has("google.colab")
+if shutil.which("conda") or shutil.which("mamba"):
+    print("conda available - nothing to do")
+elif _has("google.colab"):
+    !pip -q install condacolab
+    import condacolab
+    condacolab.install()   # restarts the kernel; afterwards, continue below
+else:
+    print("no conda found - install it first (mamba recommended); see the installation guide")""")
+    code("""import importlib.util
+if importlib.util.find_spec("multibench") is None:
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
-    if IN_COLAB:
-        # --no-deps keeps Colab's preinstalled numpy/pandas untouched;
-        # everything the API needs is already there
-        !pip -q install -e . --no-deps
-    else:
-        !pip -q install -e .
+    !pip -q install -e .
 else:
-    print("multibench already installed - skipping")""")
-    md(f"""The package itself is tiny; disk goes to the **conda environments of the
-methods you choose to run**. The next cell shows which environments exist on
-this machine; the commented lines build them - uncomment ONLY the tier you
-need (running methods requires Linux + conda; on Colab you can still run
-everything from section 7 on, which uses the shipped results):
-
-- one method: its env only, 2-14 GB
-- this tutorial's category ({cat}): {CAT_GB[cat]}
-- the whole benchmark: 29 envs, 175 GB (~50 min build; drop the 52 GB package
-  cache afterwards with `conda clean -a` - details in `SETUP.md`)
-
-Each method runs in its **own conda environment** (they need mutually
-incompatible framework versions), so the wrapper can run torch 1.x, torch 2.x,
-TensorFlow and R methods in one sweep. `env install` is a dry run until you
-add `--run`, and it skips environments that already exist.
-
-**On Colab** there is no conda, so the two cells that execute methods will say
-so and skip - everything else in this notebook, including the reference data
-(auto-downloaded), the scans and every figure, runs for real.""")
+    print("multibench already installed")""")
+    md(f"""Now the environments for the methods this tutorial runs
+({', '.join(live_methods)}). `env install` skips anything already present;
+other tiers are one flag away (`--category {cat}`: {CAT_GB[cat]}; no flag:
+the whole benchmark, 29 envs / 175 GB).""")
     code(f"""import sys
-!{{sys.executable}} -m multibench env doctor
-# Uncomment the tier you need:
-# !{{sys.executable}} -m multibench env install --methods {fastm} --run   # one method (2-14 GB)
-# !{{sys.executable}} -m multibench env install --category {cat} --run    # this category ({CAT_GB[cat]})
-# !{{sys.executable}} -m multibench env install --run                     # whole benchmark (175 GB)""")
+!{{sys.executable}} -m multibench env install --methods {mlist} --run""")
 
-    code("""import warnings; warnings.filterwarnings("ignore")
+    code(f'''import warnings; warnings.filterwarnings("ignore")
 %matplotlib inline
 from pathlib import Path
 import pandas as pd
@@ -227,59 +215,12 @@ pd.set_option("display.max_columns", None)    # never hide a metric column
 pd.set_option("display.width", 200)
 import multibench as mtb
 
-# stored sweep results ship with the repository; resolve them whether this
-# notebook runs from notebooks/ (its home) or from the repository root (Colab)
-RESULTS = Path("results") if Path("results").exists() else Path("notebooks/results")
-print("multibench", mtb.__version__)""")
-
-    live_methods = sorted({fastm, *s["own_trio"]})
-    need_ds = CAT_DATA[cat]
-    sizes_note = ", ".join(f"{d} {DS_MB[d]}" for d in need_ds)
-    new_probe = f'''DATASET  = "{s['ds']}"
+DATASET  = "{s['ds']}"
 CATEGORY = "{cat}"
+RESULTS = Path("results") if Path("results").exists() else Path("notebooks/results")
+mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})   # reference data ({', '.join(DS_MB[d] for d in CAT_DATA[cat])}); no-op when present
+print("multibench", mtb.__version__)''')
 
-# This tutorial's reference data ({sizes_note}) downloads automatically from
-# the repository's release assets when missing - nothing to fetch by hand.
-import shutil, tarfile, urllib.request
-NEED = {need_ds!r}
-LIVE_METHODS = {live_methods!r}
-DATA_URL = "https://github.com/DSichang/scMultiBench/releases/download/data-v1"
-root = mtb.config.DEFAULT.data_path
-for _ds in NEED:
-    if not (root / _ds).is_dir():
-        try:
-            root.mkdir(parents=True, exist_ok=True)
-            print(f"downloading {{_ds}} from the release assets ...", flush=True)
-            _tgz, _ = urllib.request.urlretrieve(f"{{DATA_URL}}/{{_ds}}.tar.gz")
-            with tarfile.open(_tgz) as _t:
-                _t.extractall(root)
-        except Exception as _e:
-            print(f"could not download {{_ds}} ({{_e}}) - see 'Get the data' in the installation guide")
-HAVE_DATA = all((root / _d).is_dir() for _d in NEED)
-
-# Running a method needs its conda environment; check what THIS machine can do
-# and, when something is missing, say exactly how to get it.
-CAN_RUN, _note = False, ""
-if not HAVE_DATA:
-    _note = "data unavailable, so the live-run cells will skip"
-elif shutil.which("conda") is None and shutil.which("mamba") is None:
-    _note = ("no conda here (Colab included) - the two live-run cells will skip; "
-             "everything else in this notebook runs for real")
-else:
-    try:
-        from multibench.engine import envs as _envs
-        _missing = sorted({{r["env"] for r in _envs.doctor(methods=LIVE_METHODS)
-                           if not r["exists"]}})
-        if _missing:
-            _note = ("missing env(s): " + ", ".join(_missing) + " - build with: "
-                     + "multibench env install --methods " + ",".join(LIVE_METHODS) + " --run")
-        else:
-            CAN_RUN = True
-    except Exception as _e:
-        _note = f"environment check failed: {{_e}}"
-print(f"data ready: {{HAVE_DATA}} | can run methods here: {{CAN_RUN}}"
-      + (f"\\n-> {{_note}}" if _note else ""))'''
-    code(new_probe)
 
     # ------------------------------------------------------------------ layout
     md(f"""## 2. The data layout
@@ -307,13 +248,9 @@ file(s) - the evaluator reads the first column and skips the header line.
 Where a category uses several label files (`cty1.csv`, `rna_cty.csv`, ...),
 each aligns with its own batch or modality. The next cell prints the head of a
 shipped one - this is the whole format:""")
-    code("""if HAVE_DATA:
-    cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
-    print(cty.name)
-    print(*open(cty).read().splitlines()[:4], sep="\\n")
-else:
-    print("skipped - benchmark data not downloaded (the format is fully",
-          "described above; see 'Get the data' in the installation guide)")""")
+    code("""cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
+print(cty.name)
+print(*open(cty).read().splitlines()[:4], sep="\\n")""")
     md("""> **ATAC caution.** Methods disagree about the ATAC representation - some need
 > **gene-activity scores**, others need **peaks** - and feeding the wrong one
 > runs to completion and returns a plausible but wrong embedding, with no error.
@@ -347,18 +284,13 @@ else:
 `scan` inspects the folder and reports every method that can run - and, for the
 rest, exactly why not (missing file, missing environment, wrong layout). Nothing
 executes, so this is instant and safe.""")
-    code("""if HAVE_DATA:
-    avail = mtb.scan(DATASET, category=CATEGORY)
-    display(avail[avail.runnable][["method", "modalities", "env", "output_kind",
-                                   "n_tunable", "runtime_tier"]])
-else:
-    print("skipped - benchmark data not downloaded; see section 1")""")
+    code("""avail = mtb.scan(DATASET, category=CATEGORY)
+avail[avail.runnable][["method", "modalities", "env", "output_kind",
+                       "n_tunable", "runtime_tier"]]""")
     md("""Methods that are *not* runnable come with a reason rather than a silent absence:""")
-    code("""if HAVE_DATA:
-    not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
-    display(not_ok.head(5) if len(not_ok) else "(everything in this category runs here)")
-else:
-    print("skipped - benchmark data not downloaded; see section 1")""")
+    code("""not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
+not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
+""")
 
     # -------------------------------------------------------- paper coverage
     md(f"""## 4. How much of the paper does this cover?
@@ -423,25 +355,21 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
     extra = (f'\n\n(This demo runs on `{live_ds}`, whose layout fits these methods; '
              f'mosaic layouts vary per dataset - see the note above.)'
              if live_ds != s["ds"] else "")
-    md(f"""## 6. Run one method
+    trio = s["own_trio"]
+    params_note = f', params={{"{fastm}": {s["live"][1]}}}' if s["live"][1] != "None" else ""
+    md(f"""## 6. Run the analysis
 
-`run_all` runs methods end to end: resolve inputs -> run in the method's own
-conda env -> load the output -> compute metrics -> keep everything in a
-`BatchResult`. {s['live'][2]}.{extra}""")
-    code(f'''if CAN_RUN:
-    res = mtb.run_all("{live_ds}", CATEGORY,
-                      methods=["{fastm}"]{pstr},
-                      out_dir="/tmp/tutorial_{cat}")
-    display(res.summary)
-else:
-    print("skipped - running methods needs their conda environments;",\n          "the status line under section 1 says exactly what to install")''')
-    md("""The metrics are already computed - `run_all` picked the right label files,
-resolved the label order (see `label_order` in the summary), and scored the
-embedding. The summary row above IS the result for a single method; the figures
-come in section 8, drawn from full benchmark results where ranks and colours
-have the whole method field to compare against. (This live run used reduced
-settings where noted, so its numbers are not directly comparable to the stored
-full-setting sweep - one more reason not to mix them in one figure.)""")
+`run_all` is the whole pipeline in one call: resolve inputs -> run each method
+in its own conda env -> load the outputs -> compute scIB metrics. Here:
+{', '.join(trio)} on `{live_ds}`. {s['live'][2]}.{extra}""")
+    code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
+                  methods={trio!r}{params_note},
+                  out_dir="/tmp/tutorial_{cat}")
+res.summary''')
+    md("""`run_all` picked the right label files, resolved the label order (see
+`label_order` in the summary), and scored every embedding. Your first figure -
+the methods you just ran, in the paper's panel layout:""")
+    code("""res.plot()""")
 
     # ------------------------------------------------------------- metrics
     md("""## 7. Reading the metrics
@@ -472,6 +400,11 @@ Notes that save confusion later:
         if cat == "vertical" else
         "Both metric families appear because both datasets are multi-batch.")
     md(f"""## 8. The figures
+
+Section 6 plotted the methods you ran; the same call scales to the **whole
+field**. The stored full-benchmark sweep for `{ds}` (every wired method,
+default settings - hours of compute, shipped with the repository so this
+reproduces instantly) gives the paper-style panel:
 
 **Per-dataset panel**, in the paper's layout: methods as rows (best first),
 metrics as columns grouped by task family - blues for DR & clustering, greens
@@ -518,24 +451,16 @@ adapt to your own export pipeline).""")
     code(SUBSAMPLE_FN)
     code(f'''DATA_ROOT = "/tmp/mydata"
 src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
-if src.is_dir():
-    subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
-    sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
-    print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")
-else:
-    print("skipped - benchmark data not downloaded; see section 1")''')
-    code(f'''if CAN_RUN:
-    mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
-                       methods={s['own_trio']!r},
-                       out_dir=f"{{DATA_ROOT}}/out_{cat}",
-                       data_path=DATA_ROOT)
-    display(mine.summary)
-else:
-    print("skipped - running methods needs their conda environments;",\n          "the status line under section 1 says exactly what to install")''')
-    code(f'''if CAN_RUN:
-    display(mine.plot())
-else:
-    print("skipped - running methods needs their conda environments;",\n          "the status line under section 1 says exactly what to install")''')
+subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
+
+sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
+print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")''')
+    code(f'''mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
+                   methods={s['own_trio']!r},
+                   out_dir=f"{{DATA_ROOT}}/out_{cat}",
+                   data_path=DATA_ROOT)
+mine.summary''')
+    code("""mine.plot()""")
     md(f"""{s['own_note']}
 
 For your real data the only work is producing the canonical files: export each
