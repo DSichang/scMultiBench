@@ -1557,14 +1557,20 @@ checkout of the method scripts. The default is <code>"conda run -n {env} {cmd}"<
 been cross-checked against the real entrypoint and executed end-to-end on a
 reference dataset.</p>
 <h3 id="build-the-environments">Build the environments<a class="headerlink" href="#build-the-environments" title="Anchor link to this section">&para;</a></h3>
-<p>The repository commits one lockfile per environment, and the CLI builds them
-reproducibly (Linux; method environments are not supported on macOS):</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                       </span><span class="c1"># which envs exist / are missing</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">   </span><span class="c1"># build one category&#39;s envs</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                </span><span class="c1"># or build everything (~230 GB)</span>
+<p>The <code>multibench</code> package itself is ~2 MB; disk goes to the conda environments
+of the methods you choose to run. The repository commits one lockfile per
+environment, and the CLI builds them reproducibly (Linux; method environments
+are not supported on macOS). <strong>Install only what you need</strong>:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only (2-14 GB)</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category (45-101 GB, see below)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs, 175 GB)</span>
 </span></code></pre></div>
-<p><code>env doctor</code> is safe to run any time; <code>env install</code> skips environments that
-already exist, so it resumes after interruption.</p>
+<p>Measured per-category footprints: vertical ~101 GB (18 envs), diagonal ~58 GB
+(9), mosaic ~45 GB (7), cross ~71 GB (11) - categories share environments, so
+combinations cost less than their sum. <code>env doctor</code> is safe to run any time;
+<code>env install</code> skips environments that already exist, so it resumes after
+interruption.</p>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
 <p>The benchmark datasets are not part of the git clone. Download the processed
 datasets from the link in the

@@ -2198,21 +2198,25 @@ with these notebooks were produced on it, so every table below reproduces.</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>Prerequisites: Linux, <code>conda</code> (mamba recommended) and ~230 GB free disk
-during the build. <code>multibench</code> is not on PyPI yet - install from the repository:</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>Prerequisites: Linux and <code>conda</code> (mamba recommended). <code>multibench</code> is not on
+PyPI yet - install from the repository:</p>
 <div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DSichang/scMultiBench.git
 <span class="nb">cd</span><span class="w"> </span>scMultiBench
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w">                </span><span class="c1"># the multibench package + CLI</span>
-multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">           </span><span class="c1"># which method environments exist / are missing</span>
-multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">    </span><span class="c1"># build them all from the committed lockfiles</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w">                </span><span class="c1"># the multibench package + CLI (~2 MB)</span>
+</pre></div>
+<p>The package itself is tiny; disk goes to the <strong>conda environments of the
+methods you choose to run</strong> - so install only what you need:</p>
+<div class="highlight"><pre><span></span>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing</span>
+multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># ONE method: its env only (2-14 GB)</span>
+multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">     </span><span class="c1"># this tutorial's category: ~101 GB (18 envs)</span>
+multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark: 29 envs, 175 GB</span>
 </pre></div>
 <p>Each method runs in its <strong>own conda environment</strong> (they need mutually
 incompatible framework versions), so the wrapper can run torch 1.x, torch 2.x,
 TensorFlow and R methods in one sweep. <code>env install</code> is a dry run until you add
-<code>--run</code>.</p>
-<p>Measured on a clean machine: <strong>29 environments, ~50 min build, 175 GB</strong> (plus a
-52 GB package cache you can drop afterwards with <code>conda clean -a</code>). Details and
-the smallest end-to-end check live in <code>SETUP.md</code>.</p>
+<code>--run</code>, and it skips environments that already exist. (Full-build cost,
+measured on a clean machine: ~50 min, plus a 52 GB package cache you can drop
+afterwards with <code>conda clean -a</code>. Details in <code>SETUP.md</code>.)</p>
 </div>
 </div>
 </div>
