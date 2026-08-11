@@ -169,8 +169,15 @@ Prerequisites: Linux and `conda` (mamba recommended). `multibench` is not on
 PyPI yet; the cell below installs it from the repository (~2 MB) and skips
 itself when the package is already present:""")
     code("""import importlib.util
-if importlib.util.find_spec("multibench") is None:
-    IN_COLAB = importlib.util.find_spec("google.colab") is not None
+
+def _has(mod):
+    try:
+        return importlib.util.find_spec(mod) is not None
+    except ModuleNotFoundError:   # parent namespace absent (e.g. no `google`)
+        return False
+
+if not _has("multibench"):
+    IN_COLAB = _has("google.colab")
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
     if IN_COLAB:
@@ -340,13 +347,26 @@ else:
 exposes any, the tunable hyperparameters. **An empty `tunable` is honest**: many
 upstream scripts hardcode their hyperparameters, and this package never edits
 upstream code, so it reports rather than pretends.""")
-    code("""rows = []
-for m in avail[avail.runnable]["method"]:
+    code("""# a registry question, so it needs no data on disk
+from multibench.engine import registry
+
+rows = []
+for m in sorted(mtb.list_methods(category=CATEGORY)):
+    p = None
     try:
         p = mtb.params_for(m, CATEGORY)
-    except Exception:                      # multi-variant: needs modalities
-        mods = avail[avail.method == m].iloc[0]["modalities"].split("+")
-        p = mtb.params_for(m, CATEGORY, mods)
+    except Exception:                      # multi-variant: try each variant's modalities
+        for v in registry.get(m).variants:
+            if v.when.get("category") != CATEGORY:
+                continue
+            try:
+                p = mtb.params_for(m, CATEGORY, v.when.get("modalities"))
+                break
+            except Exception:
+                continue
+    if p is None:                          # variant selection needs a concrete dataset
+        rows.append({"method": m, "n_tunable": 0, "tunable": "(see scan() on your dataset)"})
+        continue
     rows.append({"method": m, "n_tunable": len(p.get("tunable") or {}),
                  "tunable": ", ".join(sorted((p.get("tunable") or {}))[:6])})
 pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=True)""")
