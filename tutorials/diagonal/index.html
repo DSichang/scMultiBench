@@ -2301,11 +2301,12 @@ else:
 <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
     <span class="err">!</span><span class="n">git</span> <span class="n">clone</span> <span class="o">--</span><span class="n">depth</span> <span class="mi">1</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">DSichang</span><span class="o">/</span><span class="n">scMultiBench</span><span class="o">.</span><span class="n">git</span>
     <span class="o">%</span><span class="n">cd</span> <span class="n">scMultiBench</span>
-    <span class="err">!</span><span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
+    <span class="err">!</span><span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="s2">".[eval]"</span>
 <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="s2">"/content/scMultiBench"</span><span class="p">):</span>
     <span class="c1"># reused Colab runtime: refresh the editable install to the latest code</span>
     <span class="o">%</span><span class="n">cd</span> <span class="o">/</span><span class="n">content</span><span class="o">/</span><span class="n">scMultiBench</span>
     <span class="err">!</span><span class="n">git</span> <span class="n">pull</span> <span class="o">-</span><span class="n">q</span>
+    <span class="err">!</span><span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="s2">".[eval]"</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span><span class="o">,</span><span class="w"> </span><span class="nn">sys</span>
     <span class="k">for</span> <span class="n">_m</span> <span class="ow">in</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="s2">"multibench"</span> <span class="ow">or</span> <span class="n">m</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"multibench."</span><span class="p">)]:</span>
         <span class="k">del</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">_m</span><span class="p">]</span>
@@ -2318,11 +2319,12 @@ else:
 if importlib.util.find_spec("multibench") is None:
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
-    !pip -q install -e .
+    !pip -q install -e ".[eval]"
 elif os.path.isdir("/content/scMultiBench"):
     # reused Colab runtime: refresh the editable install to the latest code
     %cd /content/scMultiBench
     !git pull -q
+    !pip -q install -e ".[eval]"
     import importlib, sys
     for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
         del sys.modules[_m]
