@@ -141,10 +141,6 @@ for cat, s in SCEN.items():
     # ------------------------------------------------------------------ title
     md(f"""# {cat.capitalize()} integration
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
-*Try the API right now in Colab - registry, stored results and figures run
-there directly; executing methods needs the conda environments below.*
-
 {s['blurb']}
 
 This tutorial covers, end to end:
