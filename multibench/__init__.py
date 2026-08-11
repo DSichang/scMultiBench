@@ -36,7 +36,7 @@ from .discover import find_methods, method_info, params_for
 from .workflow import (scan, run_all, BatchResult, list_categories,
                        describe_layout, load_batch, runtime_hint, sweep)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["config", "plot", "eval", "catalog", "load_results", "available_datasets",
            "evaluate", "to_long", "run", "list_methods", "list_tasks", "inputs_for",

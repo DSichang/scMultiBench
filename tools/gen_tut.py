@@ -198,9 +198,15 @@ if importlib.util.find_spec("multibench") is None:
     %cd scMultiBench
     !pip -q install -e .
 elif os.path.isdir("/content/scMultiBench"):
-    # reused Colab runtime: refresh the editable install to the latest code
+    # reused Colab runtime: refresh the editable install to the latest code,
+    # then drop the already-imported modules so the NEXT import sees it -
+    # a live kernel never re-reads changed files on its own
     %cd /content/scMultiBench
     !git pull -q
+    import importlib, sys
+    for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
+        del sys.modules[_m]
+    importlib.invalidate_caches()
     print("multibench refreshed to the latest repository state")
 else:
     print("multibench already installed")""")
