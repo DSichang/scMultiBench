@@ -1,0 +1,2781 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Benchmark 40+ single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+      
+      
+        <meta name="author" content="PYangLab">
+      
+      
+        <link rel="canonical" href="https://dsichang.github.io/scMultiBench/api/">
+      
+      
+        <link rel="prev" href="../overview/">
+      
+      
+        <link rel="next" href="../faq/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/m3-logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>API reference - scMultiBench</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-header__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../assets/m3-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            scMultiBench
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../installation/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorials/vertical/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  How scMultiBench works
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../faq/" class="md-tabs__link">
+          
+  
+  
+  Resources
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-nav__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../assets/m3-logo.png" alt="logo">
+
+    </a>
+    scMultiBench
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/end_to_end/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    End-to-end walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluate a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load and plot results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discover methods
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shiny/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive explorer (Shiny)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/vertical/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/diagonal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagonal integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/mosaic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mosaic integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cross/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scMultiBench works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Top-level functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbrun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbevaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbload_results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.load_results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbavailable_datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.available_datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtblist_methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.list_methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtblist_tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.list_tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbfind_methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.find_methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbmethod_info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.method_info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbinputs_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.inputs_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtblabels_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.labels_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benchmark-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benchmark workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Benchmark workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbscan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbrun_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.run_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbparams_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.params_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbdescribe_layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.describe_layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbsweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbplot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.plot.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.plot.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbplotbubble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.plot.bubble
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbeval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.eval.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.eval.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbevalevaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.eval.evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbevalto_long" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.eval.to_long
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.io.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.io.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbioto_canonical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.io.to_canonical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbioread_canonical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.io.read_canonical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbcatalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.catalog.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogmethods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogdatasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogmetrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogcanonical_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.canonical_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogcanonical_metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.canonical_metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.config.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbconfigconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbconfigcategory_folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.category_folder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbconfigmetric_set_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.metric_set_dir
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbenv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.env.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvrecipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.recipe
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvgroup_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.group_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvdefault_env_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.default_env_name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvgroups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.groups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvplan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Top-level functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbrun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbevaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbload_results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.load_results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbavailable_datasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.available_datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtblist_methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.list_methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtblist_tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.list_tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbfind_methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.find_methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbmethod_info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.method_info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbinputs_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.inputs_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtblabels_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.labels_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benchmark-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benchmark workflow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Benchmark workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbscan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbrun_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.run_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbparams_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.params_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbdescribe_layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.describe_layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbsweep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.sweep
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbplot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.plot.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.plot.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbplotbubble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.plot.bubble
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbeval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.eval.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.eval.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbevalevaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.eval.evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbevalto_long" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.eval.to_long
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.io.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.io.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbioto_canonical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.io.to_canonical
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbioread_canonical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.io.read_canonical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbcatalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.catalog.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogmethods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogdatasets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.datasets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogmetrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogcanonical_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.canonical_id
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbcatalogcanonical_metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.catalog.canonical_metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.config.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbconfigconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbconfigcategory_folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.category_folder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbconfigmetric_set_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.config.metric_set_dir
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mtbenv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.*
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="mtb.env.*">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvrecipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.recipe
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvgroup_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.group_for
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvdefault_env_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.default_env_name
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvgroups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.groups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mtbenvplan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.env.plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api-reference">API reference<a class="headerlink" href="#api-reference" title="Anchor link to this section">&para;</a></h1>
+<p>The scMultiBench API (imported as <code>multibench</code>, aliased
+throughout the docs as <code>mtb</code>) exposes a small, flat, free-function API organised
+into a handful of namespaces:</p>
+<ul>
+<li><strong><code>mtb.*</code></strong> — the top-level surface: <a href="#mtbrun"><code>run</code></a> a method,
+  <a href="#mtbevaluate"><code>evaluate</code></a> an output, <a href="#mtbevalto_long"><code>to_long</code></a> to reshape
+  it, <a href="#mtbload_results"><code>load_results</code></a> from the published benchmark, and
+  discovery helpers (<a href="#mtblist_methods"><code>list_methods</code></a>,
+  <a href="#mtblist_tasks"><code>list_tasks</code></a>, <a href="#mtbfind_methods"><code>find_methods</code></a>,
+  <a href="#mtbmethod_info"><code>method_info</code></a>, <a href="#mtbinputs_for"><code>inputs_for</code></a>,
+  <a href="#mtblabels_for"><code>labels_for</code></a>, <a href="#mtbavailable_datasets"><code>available_datasets</code></a>).</li>
+<li><strong><code>mtb.plot.*</code></strong> — scIB-style figures (<a href="#mtbplotbubble"><code>bubble</code></a>).</li>
+<li><strong><code>mtb.eval.*</code></strong> — the evaluation pipeline (<a href="#mtbevalevaluate"><code>evaluate</code></a>,
+  <a href="#mtbevalto_long"><code>to_long</code></a>).</li>
+<li><strong><code>mtb.io.*</code></strong> — the canonical-format adapter
+  (<a href="#mtbioto_canonical"><code>to_canonical</code></a>, <a href="#mtbioread_canonical"><code>read_canonical</code></a>).</li>
+<li><strong><code>mtb.catalog.*</code></strong> — typed views of the paper's metadata tables.</li>
+<li><strong><code>mtb.config.*</code></strong> — resolved paths and on-disk token maps.</li>
+<li><strong><code>mtb.env.*</code></strong> — per-method conda environment recipes and provisioning plans.</li>
+</ul>
+<p><a href="#mtbrun"><code>mtb.run</code></a> returns a <a href="#runresult"><code>RunResult</code></a>; its <code>output</code> flows into
+<a href="#mtbevaluate"><code>mtb.evaluate</code></a>, whose wide frame is reshaped by
+<a href="#mtbevalto_long"><code>mtb.eval.to_long</code></a> into the same tidy long frame that
+<a href="#mtbload_results"><code>mtb.load_results</code></a> returns and <a href="#mtbplotbubble"><code>mtb.plot.bubble</code></a>
+consumes.</p>
+<div class="admonition note">
+<p class="admonition-title">Method environments</p>
+<p>Running a method shells out to the conda environment it shares with other
+compatible tools via <code>conda run -n &lt;env&gt; &lt;cmd&gt;</code>, where <code>&lt;env&gt;</code> is
+<a href="#mtbenvgroup_for"><code>mtb.env.group_for(method)</code></a> — the same env
+<a href="#mtbenvplan"><code>mtb.env.plan</code></a> provisions (overridable through
+<code>cmd_template</code>). The original method scripts are <strong>never modified</strong> —
+<code>multibench</code> only builds the command, converts inputs to the canonical
+<code>.h5</code>, and loads the typed output.</p>
+</div>
+<hr />
+<h2 id="top-level-functions">Top-level functions<a class="headerlink" href="#top-level-functions" title="Anchor link to this section">&para;</a></h2>
+<h3 id="mtbrun"><code>mtb.run</code><a class="headerlink" href="#mtbrun" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">convert</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">cmd_template</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">repo_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RunResult</span>
+</span></code></pre></div>
+<p>Build a method variant's command, wrap it (default <code>"conda run -n {env} {cmd}"</code>),
+run it in <code>out_dir</code>, and load the typed output. <code>inputs</code> is a <code>{modality_role:
+path}</code> dict; non-canonical modality inputs are auto-converted to the canonical
+scMultiBench <code>.h5</code> unless <code>convert=False</code>. Auxiliary roles (<code>data_dir</code>,
+<code>source_data</code>, <code>target_data</code>, <code>source_cty</code>, <code>target_cty</code>, <code>out_dir</code>) are passed
+through verbatim. Returns a <a href="#runresult"><code>RunResult</code></a>.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>method</code> (<code>str</code>) — registry method id (see <a href="#mtblist_methods"><code>list_methods</code></a>).</li>
+<li><code>category</code> (<code>str</code>) — one of <code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>, <code>cross</code>; drives variant selection together with the supplied modalities.</li>
+<li><code>task</code> (<code>str</code>) — reserved for future per-task dispatch; not used for variant selection in v1.</li>
+<li><code>inputs</code> (<code>dict</code>) — <code>{modality_role: path}</code>, e.g. <code>{"rna1": ..., "atac_gas1": ...}</code>.</li>
+<li><code>out_dir</code> (<code>str</code>) — working directory; created if missing.</li>
+<li><code>params</code> (<code>dict | None</code>) — extra method hyperparameters merged into the command.</li>
+<li><code>convert</code> (<code>bool</code>) — convert non-aux inputs to the canonical <code>.h5</code> (default <code>True</code>).</li>
+<li><code>cmd_template</code> (<code>str | None</code>) — command wrapper; <code>None</code> uses the method's env via <code>conda run -n {env} {cmd}</code>.</li>
+<li><code>repo_path</code> (<code>Path | None</code>) — path to the reference scMultiBench repo; defaults to <code>config.DEFAULT.repo_path</code>.</li>
+</ul>
+<h3 id="mtbevaluate"><code>mtb.evaluate</code><a class="headerlink" href="#mtbevaluate" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metric_set</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;scib&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>Compute scIB metrics on a run output, returning a <code>metric.csv</code>-shaped frame
+(index = metric, single <code>Value</code> column). v1 supports <code>metric_set="scib"</code> with
+<code>task</code> in <code>{clustering, batch, all}</code>. Clustering metrics require both <code>labels</code>
+(cell types) and <code>clustering</code>; <code>batch</code>/<code>all</code> additionally require <code>batch</code>. This
+is re-exported from <a href="#mtbevalevaluate"><code>mtb.eval.evaluate</code></a>.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>output</code> — a run embedding (<code>np.ndarray</code>) or a path/handle readable as one.</li>
+<li><code>category</code> (<code>str</code>) — reserved for future per-category metric dispatch; accepted but unused in v1.</li>
+<li><code>task</code> (<code>str</code>) — <code>clustering</code>, <code>batch</code>, or <code>all</code>.</li>
+<li><code>labels</code> — cell-type labels (<code>np.ndarray</code> or readable source).</li>
+<li><code>clustering</code> — predicted cluster assignments.</li>
+<li><code>batch</code> — batch labels (required for <code>batch</code>/<code>all</code>).</li>
+<li><code>metric_set</code> (<code>str</code>) — only <code>"scib"</code> is wired in v1.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Graceful degradation</p>
+<p>Metrics whose external dependency is unavailable return <code>NaN</code> with a warning
+rather than failing the call: <strong>cLISI / iLISI</strong> need a compiled LISI binary,
+and <strong>kBET</strong> needs <code>rpy2</code>. All other scIB metrics (ARI, NMI, ASW, iASW, iF1,
+ASW_batch, GC) compute in pure Python.</p>
+</div>
+<h3 id="mtbload_results"><code>mtb.load_results</code><a class="headerlink" href="#mtbload_results" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">metric_set</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;scib&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">metric</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">clustering</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">result_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>Return a tidy long frame (<code>metric, value, method, dataset, category</code>) of the
+published benchmark metric tables, with metric codes and method ids
+canonicalised. Optionally filter by <code>dataset</code>, <code>method</code>, and <code>metric</code>. When the
+default-clustering correction file <code>metric_asw_iasw_if1.csv</code> is present, its
+corrected ASW / iASW / iF1 values <strong>override</strong> those in <code>metric.csv</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Published-metric availability</p>
+<p>Only <code>metric_set="scib"</code> is wired in v1. Published <code>scib</code> metric tables
+exist for the <code>vertical</code>, <code>cross</code>, and <code>diagonal</code> categories; <code>mosaic</code>
+metrics are not published, so <code>load_results(category="mosaic")</code> raises
+<code>FileNotFoundError</code> (the methods still <code>run</code>, there is just no published
+table to load).</p>
+</div>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>category</code> (<code>str</code>) — <code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>, or <code>cross</code>.</li>
+<li><code>task</code> (<code>str</code>) — task token (v1 results are clustering/batch under <code>scib</code>).</li>
+<li><code>metric_set</code> (<code>str</code>) — only <code>"scib"</code> is wired in v1.</li>
+<li><code>dataset</code> (<code>str | None</code>) — restrict to a single dataset id (e.g. <code>"D12"</code>).</li>
+<li><code>method</code> (<code>str | None</code>) — restrict to one method (any known spelling).</li>
+<li><code>metric</code> (<code>list[str] | str | None</code>) — restrict to one or more metric codes.</li>
+<li><code>clustering</code> (<code>str</code>) — <code>default</code>, <code>louvain</code>, or <code>kmeans</code>.</li>
+<li><code>result_path</code> (<code>Path | str | None</code>) — override <code>config.DEFAULT.result_path</code>.</li>
+</ul>
+<h3 id="mtbavailable_datasets"><code>mtb.available_datasets</code><a class="headerlink" href="#mtbavailable_datasets" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">available_datasets</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">metric_set</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;scib&quot;</span><span class="p">,</span> <span class="n">result_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Return the dataset ids that have published <code>metric_set</code> results for a category —
+exactly the datasets <a href="#mtbload_results"><code>load_results</code></a> can load. Returns <code>[]</code>
+when the category has no published metrics (e.g. <code>mosaic</code>). Use this to discover
+what is loadable before calling <code>load_results</code>.</p>
+<h3 id="mtblist_methods"><code>mtb.list_methods</code><a class="headerlink" href="#mtblist_methods" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">runnable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Return the registry method ids, optionally filtered to those declaring a given
+<code>category</code> and/or <code>task</code>. Every registry method is wired to run; <code>runnable</code>
+remains as a filter for forward compatibility (<code>None</code>, the default, returns
+all).</p>
+<h3 id="mtblist_tasks"><code>mtb.list_tasks</code><a class="headerlink" href="#mtblist_tasks" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Return the sorted set of tasks declared across all method specs.</p>
+<h3 id="mtbfind_methods"><code>mtb.find_methods</code><a class="headerlink" href="#mtbfind_methods" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">needs_labels</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atac</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">modalities</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">runnable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Return method ids matching every supplied filter. <code>modalities</code> keeps only
+methods that consume <strong>all</strong> of the requested base modality types (e.g.
+<code>["rna", "atac"]</code>); <code>needs_labels</code> and <code>atac</code> filter by the method's declared
+requirements.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>category</code> (<code>str | None</code>) — integration category the method must declare.</li>
+<li><code>task</code> (<code>str | None</code>) — task the method must declare.</li>
+<li><code>needs_labels</code> (<code>bool | None</code>) — whether the method requires cell-type labels.</li>
+<li><code>atac</code> (<code>str | None</code>) — required <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation — exact match, one of <code>"peak"</code> or <code>"gene_activity"</code> (not a boolean).</li>
+<li><code>modalities</code> (<code>list[str] | set[str] | None</code>) — modality types the method must consume, e.g. <code>["rna", "atac"]</code>. Derived from a method's variants.</li>
+<li><code>runnable</code> (<code>bool | None</code>) — filter on whether the method has a runnable variant; every registry method currently does.</li>
+</ul>
+<h3 id="mtbmethod_info"><code>mtb.method_info</code><a class="headerlink" href="#mtbmethod_info" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</span></code></pre></div>
+<p>Return a flat dict combining the registry spec (<code>id</code>, <code>language</code>, <code>categories</code>,
+<code>tasks</code>, <code>env</code>, <code>atac</code>, <code>needs_labels</code>, <code>status</code>, <code>setup_hint</code>, <code>variants</code>) with
+optional catalog metadata (<code>deep_learning</code>, <code>output</code>) when <code>files_dir</code> is given.
+<code>env</code> is the conda environment <a href="#mtbrun"><code>mtb.run</code></a> actually executes the method
+in — the resolved <a href="#mtbenvgroup_for"><code>group_for</code></a> env (a shared group env, or the
+method's own <code>scmb_&lt;method&gt;</code> env).</p>
+<h3 id="mtbinputs_for"><code>mtb.inputs_for</code><a class="headerlink" href="#mtbinputs_for" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">modalities</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</span></code></pre></div>
+<p>Resolve a catalog dataset id + method to concrete <code>{modality_role: path}</code> input
+paths. The dataset tree is <strong>flat</strong> (<code>&lt;data_path&gt;/&lt;dataset&gt;/&lt;file&gt;</code>); each role
+is resolved to the file actually present in that directory — the role token or
+a known alias (<code>atac_peak</code> → <code>peak.h5</code>, <code>atac_gas</code> → <code>atac.h5</code>), falling back to
+<code>&lt;role&gt;.h5</code> when no candidate exists. When <code>modalities</code> is omitted and the
+method has exactly one variant for the category, that variant is used; if
+several match, a <code>ValueError</code> lists the modality-sets and asks you to
+disambiguate with <code>modalities=</code>. Pass <code>check=True</code> to raise <code>FileNotFoundError</code>
+(listing what is present) if any resolved file is missing, rather than returning
+a best-effort path that only fails later inside <code>run</code>. Use
+<a href="#mtblabels_for"><code>labels_for</code></a> to get the matching cell-type label files for
+<a href="#mtbevaluate"><code>evaluate</code></a>.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>dataset</code> (<code>str</code>) — catalog dataset id (e.g. <code>"D35"</code>).</li>
+<li><code>method</code> (<code>str</code>) — registry method id.</li>
+<li><code>category</code> (<code>str</code>) — integration category.</li>
+<li><code>modalities</code> (<code>list[str] | set[str] | None</code>) — exact modality-set to select a variant.</li>
+<li><code>data_path</code> (<code>Path | str | None</code>) — override <code>config.DEFAULT.data_path</code>.</li>
+<li><code>check</code> (<code>bool</code>) — if <code>True</code>, raise <code>FileNotFoundError</code> when a resolved input file does not exist.</li>
+</ul>
+<h3 id="mtblabels_for"><code>mtb.labels_for</code><a class="headerlink" href="#mtblabels_for" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</span></code></pre></div>
+<p>Return <code>{name: path}</code> of the cell-type label CSVs for a dataset — the
+<code>*cty*.csv</code> files in the (flat) dataset directory, under their dataset-specific
+names (<code>cty.csv</code>, <code>rna_cty.csv</code>, <code>cty1.csv</code>, …), excluding tool-specific
+<code>*_scjoint*</code> reformats. Use these as the <code>labels=</code> argument to
+<a href="#mtbevaluate"><code>mtb.evaluate</code></a>. Raises <code>FileNotFoundError</code> if the dataset
+directory is absent.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>dataset</code> (<code>str</code>) — catalog dataset id.</li>
+<li><code>data_path</code> (<code>Path | str | None</code>) — override <code>config.DEFAULT.data_path</code>.</li>
+</ul>
+<hr />
+<h2 id="benchmark-workflow">Benchmark workflow<a class="headerlink" href="#benchmark-workflow" title="Anchor link to this section">&para;</a></h2>
+<p>The four category tutorials are built on these functions.</p>
+<h3 id="mtbscan"><code>mtb.scan</code><a class="headerlink" href="#mtbscan" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>         <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>Report every method that can run on <code>dataset</code>, and why the rest cannot: one row
+per (method, category, modalities) with <code>runnable</code> and, when it is not, a
+<code>reason</code>. <code>modalities</code> is a <code>+</code>-joined string here (e.g. <code>"rna+adt"</code>);
+<code>run_all</code> / <code>inputs_for</code> take it as a list, so split on <code>"+"</code>.</p>
+<h3 id="mtbrun_all"><code>mtb.run_all</code><a class="headerlink" href="#mtbrun_all" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>            <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>            <span class="n">dry_run</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>            <span class="n">skip_existing</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BatchResult</span>
+</span></code></pre></div>
+<p>Run every applicable method (or the <code>methods=</code> subset) on <code>dataset</code> end to end
+- inputs, the method's own conda env, output loading, metrics - and collect
+everything in a <code>BatchResult</code>. <code>dataset</code> is the directory NAME of your data;
+<code>data_path</code> is the folder that contains it (defaults to the configured data
+root). A method that fails becomes a row in <code>.failures</code>, not an exception;
+<code>timeout=</code> bounds each method's whole step; <code>skip_existing=True</code> resumes an
+interrupted sweep.</p>
+<p><strong><code>BatchResult</code></strong>: <code>.summary</code> (one row per method), <code>.long</code> (tidy
+metric/value frame - the input to <code>mtb.plot.bubble</code>), <code>.failures</code>, <code>.plot()</code>
+(bubble figure of every scored method) and <code>.save(out_dir)</code> which writes
+<code>summary.csv</code>, <code>long.csv</code> and <code>failures.csv</code>.</p>
+<h3 id="mtbparams_for"><code>mtb.params_for</code><a class="headerlink" href="#mtbparams_for" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</span></code></pre></div>
+<p>The tunable hyperparameters a method's variant exposes (with defaults), plus
+the fixed arguments the wrapper controls. Multi-variant methods need
+<code>modalities=</code> to pick the variant.</p>
+<h3 id="mtbdescribe_layout"><code>mtb.describe_layout</code><a class="headerlink" href="#mtbdescribe_layout" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</span></code></pre></div>
+<p>Human-readable description of the on-disk data layout each category expects.</p>
+<h3 id="mtbsweep"><code>mtb.sweep</code><a class="headerlink" href="#mtbsweep" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">sweep</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">param</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>          <span class="n">out_dir</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>          <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>Run ONE method repeatedly over a range of one hyperparameter, one output
+directory per value, and return the collected metric rows.</p>
+<h2 id="mtbplot"><code>mtb.plot.*</code><a class="headerlink" href="#mtbplot" title="Anchor link to this section">&para;</a></h2>
+<h3 id="mtbplotbubble"><code>mtb.plot.bubble</code><a class="headerlink" href="#mtbplotbubble" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">long_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;Blues&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span>
+</span></code></pre></div>
+<p>Render an scIB-style bubble table from a tidy long frame: each circle's radius
+encodes the metric rank and its fill encodes the (min-max normalised) value, with
+methods sorted by an <code>overall</code> column shown first. <code>aggregate="dataset"</code> averages
+values across datasets; <code>aggregate="summary"</code> averages <strong>ranks</strong> across datasets.
+If <code>save</code> is given, the figure is written there (<code>bbox_inches="tight"</code>). Returns
+the <code>matplotlib.Figure</code>.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>long_df</code> (<code>pd.DataFrame</code>) — long frame with <code>metric, value, method, dataset</code> columns.</li>
+<li><code>metrics</code> (<code>list[str] | None</code>) — metric columns to include, in order.</li>
+<li><code>methods</code> (<code>list[str] | None</code>) — restrict to these methods.</li>
+<li><code>order</code> (<code>list[str] | None</code>) — explicit row order (overrides the overall sort).</li>
+<li><code>aggregate</code> (<code>str</code>) — <code>"dataset"</code> (mean value) or <code>"summary"</code> (mean rank).</li>
+<li><code>cmap</code> (<code>str</code>) — matplotlib colormap for the fill (default <code>"Blues"</code>).</li>
+<li><code>title</code> (<code>str | None</code>) — axes title.</li>
+<li><code>save</code> (<code>str | None</code>) — output path; e.g. <code>"fig.pdf"</code>.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Callable namespace</p>
+<p><code>mtb.plot.bubble</code> is callable for the common path <em>and</em> exposes the
+underlying builders — <code>mtb.plot.bubble.build_table(...)</code> and
+<code>mtb.plot.bubble.render(...)</code> reach the module functions directly. The same
+callables are also exported on the namespace itself —
+<code>mtb.plot.plot_bubble</code>, <code>mtb.plot.build_table</code>, <code>mtb.plot.render</code> — for
+discoverability.</p>
+</div>
+<hr />
+<h2 id="mtbeval"><code>mtb.eval.*</code><a class="headerlink" href="#mtbeval" title="Anchor link to this section">&para;</a></h2>
+<h3 id="mtbevalevaluate"><code>mtb.eval.evaluate</code><a class="headerlink" href="#mtbevalevaluate" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">eval</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metric_set</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;scib&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>The evaluation entry point, also re-exported as <a href="#mtbevaluate"><code>mtb.evaluate</code></a>.
+See that entry for the full parameter list and the LISI/kBET graceful-<code>NaN</code>
+behaviour.</p>
+<h3 id="mtbevalto_long"><code>mtb.eval.to_long</code><a class="headerlink" href="#mtbevalto_long" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">eval</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">value_df</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">category</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>Reshape an <a href="#mtbevalevaluate"><code>evaluate</code></a> wide frame (index = metric, column
+<code>Value</code>) into the long frame (<code>metric, value, method, dataset, category</code>) that
+<a href="#mtbload_results"><code>load_results</code></a> and <a href="#mtbplotbubble"><code>plot.bubble</code></a> consume,
+canonicalising metric codes along the way. This is the bridge from the
+<code>evaluate</code> (wide) output to the <code>load_results</code>/<code>plot.bubble</code> (long) shape, and is
+also re-exported at the top level as <code>mtb.to_long</code>.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>value_df</code> (<code>pd.DataFrame</code>) — an <code>evaluate()</code> result (index = metric, <code>Value</code> column).</li>
+<li><code>method</code> (<code>str</code>) — method id to stamp onto every row.</li>
+<li><code>dataset</code> (<code>str</code>) — dataset id to stamp onto every row.</li>
+<li><code>category</code> (<code>str</code>) — integration category to stamp onto every row.</li>
+</ul>
+<hr />
+<h2 id="mtbio"><code>mtb.io.*</code><a class="headerlink" href="#mtbio" title="Anchor link to this section">&para;</a></h2>
+<p>The input-format adapter to and from the canonical scMultiBench <code>.h5</code> (an HDF5
+file with <code>matrix/data</code> of shape <em>features × cells</em>, plus <code>matrix/features</code> and
+<code>matrix/barcodes</code>).</p>
+<h3 id="mtbioto_canonical"><code>mtb.io.to_canonical</code><a class="headerlink" href="#mtbioto_canonical" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">out</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">modality</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">convert</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</span></code></pre></div>
+<p>Convert <code>src</code> to a canonical <code>.h5</code> and return its path. Accepts <code>.h5ad</code>,
+<code>.csv</code> / <code>.tsv</code>, <code>.loom</code>, or an in-memory <code>AnnData</code>. An already-canonical
+path is returned as-is when no conversion is needed; otherwise <code>out</code> is required.</p>
+<p><strong>Parameters</strong></p>
+<ul>
+<li><code>src</code> — source data (path or <code>AnnData</code>).</li>
+<li><code>out</code> (<code>Path | str | None</code>) — destination <code>.h5</code>; required unless <code>src</code> is already canonical.</li>
+<li><code>modality</code> (<code>str | None</code>) — optional modality hint.</li>
+<li><code>convert</code> (<code>bool</code>) — force conversion even for a canonical source (default <code>True</code>).</li>
+</ul>
+<h3 id="mtbioread_canonical"><code>mtb.io.read_canonical</code><a class="headerlink" href="#mtbioread_canonical" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span>
+</span></code></pre></div>
+<p>Read a canonical <code>.h5</code> back into an <code>AnnData</code> (cells × genes), restoring
+<code>var_names</code> from <code>matrix/features</code> and <code>obs_names</code> from <code>matrix/barcodes</code>.</p>
+<hr />
+<h2 id="mtbcatalog"><code>mtb.catalog.*</code><a class="headerlink" href="#mtbcatalog" title="Anchor link to this section">&para;</a></h2>
+<p>Typed views of the paper's metadata CSVs, plus the canonicalisers used
+throughout the API.</p>
+<h3 id="mtbcatalogmethods"><code>mtb.catalog.methods</code><a class="headerlink" href="#mtbcatalogmethods" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">methods</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>The methods table with normalised columns (<code>method</code>, <code>canonical_id</code>, <code>language</code>,
+<code>deep_learning</code>, <code>atac</code>, <code>output</code>, <code>needs_labels</code>) and list-valued <code>categories</code> /
+<code>tasks</code>. Defaults to <code>config.DEFAULT.files_path</code>.</p>
+<h3 id="mtbcatalogdatasets"><code>mtb.catalog.datasets</code><a class="headerlink" href="#mtbcatalogdatasets" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>The datasets table with a derived <code>simulated</code> flag (true for ids beginning
+<code>SD</code>).</p>
+<h3 id="mtbcatalogmetrics"><code>mtb.catalog.metrics</code><a class="headerlink" href="#mtbcatalogmetrics" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span></code></pre></div>
+<p>The metric-details table (whitespace-normalised column names).</p>
+<h3 id="mtbcatalogcanonical_id"><code>mtb.catalog.canonical_id</code><a class="headerlink" href="#mtbcatalogcanonical_id" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</span></code></pre></div>
+<p>Return the canonical registry method id for any known display or result-dir
+spelling (e.g. <code>"seurat v5"</code> → <code>"Seurat_v5"</code>, <code>"mofa+"</code> → <code>"MOFA2"</code>).</p>
+<h3 id="mtbcatalogcanonical_metric"><code>mtb.catalog.canonical_metric</code><a class="headerlink" href="#mtbcatalogcanonical_metric" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+<p>Canonicalise a raw metric short-code (e.g. <code>"ari"</code> → <code>"ARI"</code>, <code>"kbet"</code> →
+<code>"kBET"</code>); returns <code>None</code> for blank or empty codes.</p>
+<hr />
+<h2 id="mtbconfig"><code>mtb.config.*</code><a class="headerlink" href="#mtbconfig" title="Anchor link to this section">&para;</a></h2>
+<h3 id="mtbconfigconfig"><code>mtb.config.Config</code><a class="headerlink" href="#mtbconfigconfig" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>    <span class="n">result_path</span><span class="p">:</span> <span class="n">Path</span>   <span class="c1"># published benchmark metric tables</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>    <span class="n">files_path</span><span class="p">:</span> <span class="n">Path</span>    <span class="c1"># metadata CSVs (method/dataset/metric)</span>
+</span><span id="__span-25-5"><a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>    <span class="n">repo_path</span><span class="p">:</span> <span class="n">Path</span>     <span class="c1"># reference scMultiBench repo (method entrypoints)</span>
+</span><span id="__span-25-6"><a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>    <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span>     <span class="c1"># resolved input datasets</span>
+</span></code></pre></div>
+<p>Resolved filesystem paths. Override any field to point at custom locations. A
+module-level default instance is exposed as <code>mtb.config.DEFAULT</code>; callers may
+replace its fields in place.</p>
+<h3 id="mtbconfigcategory_folder"><code>mtb.config.category_folder</code><a class="headerlink" href="#mtbconfigcategory_folder" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">category_folder</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</span></code></pre></div>
+<p>Map a clean category token to the benchmark's space-named result folder (e.g.
+<code>"vertical"</code> → <code>"vertical integration"</code>). Raises <code>ValueError</code> for an unknown
+token.</p>
+<h3 id="mtbconfigmetric_set_dir"><code>mtb.config.metric_set_dir</code><a class="headerlink" href="#mtbconfigmetric_set_dir" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">metric_set_dir</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</span></code></pre></div>
+<p>Map a metric-set token to its top-level result directory (e.g. <code>"scib"</code> →
+<code>"scib_metric"</code>). Raises <code>ValueError</code> for an unknown token.</p>
+<hr />
+<h2 id="mtbenv"><code>mtb.env.*</code><a class="headerlink" href="#mtbenv" title="Anchor link to this section">&para;</a></h2>
+<p>Helpers for the conda environments that <a href="#mtbrun"><code>mtb.run</code></a> orchestrates. They
+describe how to provision an env, they do not create it for you — the recipes
+are emitted for you to apply.</p>
+<div class="admonition note">
+<p class="admonition-title">Two provisioning routes</p>
+<p>There are two ways to provision, and <code>run</code> uses the <strong>shared group</strong> env by
+default. (1) <strong>Group</strong> (what <code>run</code> uses): <a href="#mtbenvplan"><code>plan</code></a> /
+<a href="#mtbenvgroups"><code>groups</code></a> build the shared env named by
+<a href="#mtbenvgroup_for"><code>group_for</code></a> (e.g. <code>scmb_torch_v2</code> serves several torch methods).
+(2) <strong>Per-method</strong>: <a href="#mtbenvrecipe"><code>recipe</code></a> / the <code>env recipe</code>/<code>env yml</code>
+CLI emit an <em>isolated</em> <code>scmb_&lt;method&gt;</code> env from one method's own deps; to run
+in it, pass <code>cmd_template="conda run -n scmb_&lt;method&gt; {cmd}"</code> to <code>run</code>. Prefer
+the group route unless you need an isolated per-method env.</p>
+</div>
+<h3 id="mtbenvrecipe"><code>mtb.env.recipe</code><a class="headerlink" href="#mtbenvrecipe" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">recipe</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+</span></code></pre></div>
+<p>Return the conda environment recipe for a method — the env name, language, channels,
+and the package/pin list needed to build the env that method runs in. The recipe
+mirrors what ships alongside the method in the reference scMultiBench repo.</p>
+<h3 id="mtbenvgroup_for"><code>mtb.env.group_for</code><a class="headerlink" href="#mtbenvgroup_for" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">group_for</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</span></code></pre></div>
+<p>Return the conda env a method <strong>runs and provisions in</strong>: its shared group env
+(e.g. SCALEX and Cobolt map to <code>"scmb_torch_v2"</code>; the R methods to
+<code>"scmb_r"</code>) when the method belongs to a group, otherwise its own
+<a href="#mtbenvdefault_env_name"><code>default_env_name</code></a> (<code>scmb_&lt;method&gt;</code>). This is the
+<code>{env}</code> the default <code>cmd_template</code> fills, and the same value as
+<a href="#mtbmethod_info"><code>mtb.method_info</code></a><code>(...)["env"]</code>. Because <a href="#mtbenvplan"><code>plan</code></a>
+/ <a href="#mtbenvgroups"><code>groups</code></a> build exactly these names, <em>the env you provision is
+the env <a href="#mtbrun"><code>run</code></a> executes in</em>.</p>
+<h3 id="mtbenvdefault_env_name"><code>mtb.env.default_env_name</code><a class="headerlink" href="#mtbenvdefault_env_name" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">default_env_name</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+</span></code></pre></div>
+<p>Return the method's <strong>own (singleton) env name</strong> — <code>scmb_&lt;method&gt;</code> (e.g.
+<code>"scmb_scalex"</code>). This is only the env used when a method is <strong>not</strong> a member of
+any shared group; the env <a href="#mtbrun"><code>run</code></a> actually executes in is always
+<a href="#mtbenvgroup_for"><code>group_for</code></a> (which returns the shared group env for grouped
+methods and falls back to this name otherwise).</p>
+<h3 id="mtbenvgroups"><code>mtb.env.groups</code><a class="headerlink" href="#mtbenvgroups" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span>
+</span></code></pre></div>
+<p>Return the mapping of shared env name → the methods that share it. Several
+methods reuse a single environment, so provisioning one env can unlock several
+methods; this view shows which.</p>
+<h3 id="mtbenvplan"><code>mtb.env.plan</code><a class="headerlink" href="#mtbenvplan" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span>
+</span></code></pre></div>
+<p>Return an ordered provisioning plan — the deduplicated set of envs needed to run
+the requested <code>methods</code> (or every verified method when <code>None</code>), each entry pairing
+an env name with its <a href="#mtbenvrecipe"><code>recipe</code></a> so shared envs are built only once.</p>
+<hr />
+<h2 id="runresult">RunResult<a class="headerlink" href="#runresult" title="Anchor link to this section">&para;</a></h2>
+<p><a href="#mtbrun"><code>mtb.run</code></a> returns a <code>RunResult</code> dataclass. Its fields:</p>
+<ul>
+<li><code>method</code> (<code>str</code>) — the method id that was run.</li>
+<li><code>out_dir</code> (<code>Path</code>) — the working directory the command ran in.</li>
+<li><code>cmd</code> (<code>list[str]</code>) — the fully wrapped argv that was executed (incl. the <code>conda run</code> prefix).</li>
+<li><code>output</code> — the loaded primary output (e.g. the joint embedding <code>ndarray</code>).</li>
+<li><code>extra</code> (<code>dict</code>) — <code>{file: loaded_output}</code> for any declared extra outputs.</li>
+<li><code>stdout</code> (<code>str</code>) — captured standard output.</li>
+<li><code>stderr</code> (<code>str</code>) — captured standard error.</li>
+</ul>
+<p>A failed run (non-zero exit) raises <code>RuntimeError</code> with the tail of stderr/stdout
+rather than returning a <code>RunResult</code>.</p>
+<hr />
+<h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link to this section">&para;</a></h2>
+<p>The package version is available as <code>multibench.__version__</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">__version__</span>   <span class="c1"># e.g. &quot;0.1.0&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li><a href="../tutorials/end_to_end/">End-to-end walkthrough</a></li>
+<li><a href="../tutorials/run/">Run a method</a></li>
+<li><a href="../faq/">FAQ</a></li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../overview/" class="md-footer__link md-footer__link--prev" aria-label="Previous: How scMultiBench works">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                How scMultiBench works
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../faq/" class="md-footer__link md-footer__link--next" aria-label="Next: FAQ">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                FAQ
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/PYangLab" target="_blank" rel="noopener" title="PYangLab on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "navigation.path", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "toc.follow", "search.highlight", "content.code.copy", "content.code.annotate", "content.code.select", "content.tabs.link", "announce.dismiss", "header.autohide", "navigation.footer"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+      
+        <script src="../javascripts/animations.js"></script>
+      
+        <script src="../javascripts/ui-tweaks.js"></script>
+      
+        <script src="../javascripts/mermaid-init.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
