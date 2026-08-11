@@ -99,10 +99,8 @@ def test_top_level_plot_namespace(tmp_path):
     assert out.exists()
 
 
-def test_summary_bars_carry_sd_whiskers():
-    """The across-datasets summary draws its error bars ON the bars, not as a
-    separate chart: SD whiskers appear at bar tips when a method+metric exists
-    in >=2 datasets, and are absent for single-dataset methods."""
+def test_summary_bars_carry_no_error_bars():
+    """The paper's summary panels carry no error bars - neither do ours."""
     import matplotlib
     matplotlib.use("Agg")
     import pandas as pd
@@ -118,19 +116,4 @@ def test_summary_bars_carry_sd_whiskers():
     fig = bubble.plot_bubble(pd.DataFrame(rows), aggregate="summary")
     ax = fig.axes[0]
     whiskers = [l for l in ax.lines if l.get_gid() == "whisker"]
-    assert whiskers, "summary mode must draw SD whiskers on the bars"
-    # Expected whiskers (3 segments each: body + 2 caps):
-    #   A, B on ARI and NMI (rank spread across the two datasets) -> 4.
-    #   Overall carries NO whisker by design: each dataset's overall is a
-    #   within-dataset relative score over that dataset's own method pool,
-    #   so a cross-dataset SD of it would not compare like with like.
-    #   C is single-dataset -> none anywhere.
-    assert len(whiskers) == 4 * 3, (
-        f"expected 12 whisker segments, got {len(whiskers)}")
-    # and none of them may sit on C's row
-    tbl = bubble.build_table(pd.DataFrame(rows), aggregate="summary")
-    c_y = len(tbl.methods) - tbl.methods.index("C") - 0.5
-    ys = {round(float(l.get_ydata()[0]), 2) for l in whiskers
-          if l.get_ydata()[0] == l.get_ydata()[1]}
-    assert round(c_y, 2) not in ys, (
-        "single-dataset method C grew a whisker from structural zeros")
+    assert whiskers == [], f"expected no whisker artists, got {len(whiskers)}"

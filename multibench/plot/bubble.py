@@ -34,8 +34,6 @@ class FamilyBlock:
     norm: pd.DataFrame        # per-column min-max normalized values
     ranks: pd.DataFrame       # per-column max-ranks (1 = best is HIGHEST rank number)
     overall: pd.Series        # family overall score per method
-    spread: pd.DataFrame | None = None       # SD of per-dataset ranks (summary mode)
-    overall_spread: pd.Series | None = None  # SD of per-dataset family overalls
 
 
 @dataclass
@@ -70,12 +68,9 @@ def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
         # summary), but only for metrics that dataset actually computed
         aligned = [q.reindex(idx).fillna(0) for q in parts]
         stacked = pd.concat(aligned, keys=range(len(aligned)))
-        # return the PRE-alignment parts: whiskers must reflect spread over the
-        # datasets a method actually ran in, not the structural zeros the bar
-        # mean uses for absences
-        return stacked.groupby(level=1).mean(), parts
+        return stacked.groupby(level=1).mean()
     return df.pivot_table(index="method", columns="metric", values="value",
-                          aggfunc="mean"), None
+                          aggfunc="mean")
 
 
 def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
@@ -86,7 +81,7 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         df = df[df["method"].isin(methods)]
     if metrics is not None:
         df = df[df["metric"].isin(metrics)]
-    raw_all, _parts = _pivot(df, aggregate)
+    raw_all = _pivot(df, aggregate)
 
     blocks = []
     for label, fam_metrics, cmap in FAMILIES:
@@ -96,30 +91,11 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         raw = raw_all[cols]
         if raw.notna().sum().sum() == 0:
             continue
-        spread = overall_spread = None
-        if _parts is not None:
-            # Whiskers: SD over the datasets a method ACTUALLY ran in (>=2),
-            # per metric over the datasets that computed it. The bar's length
-            # keeps the paper's absent-scores-0 convention; the whisker
-            # deliberately does not, because a spread made of structural zeros
-            # would measure absence, not performance variability.
-            have = [q[[c for c in cols if c in q.columns]] for q in _parts]
-            have = [q for q in have if q.shape[1]]
-            cat_ranks = pd.concat(have, keys=range(len(have)))
-            n_ds = cat_ranks.groupby(level=1).count()
-            spread = (cat_ranks.groupby(level=1).std(ddof=0)
-                      .where(n_ds >= 2).reindex(raw.index))
-            per_ds_overall = pd.concat(
-                [style.compute_overall(q) for q in have], axis=1)
-            overall_spread = (per_ds_overall.std(axis=1, ddof=0)
-                              .where(per_ds_overall.notna().sum(axis=1) >= 2)
-                              .reindex(raw.index))
         blocks.append(FamilyBlock(
             label=label, cmap=cmap, raw=raw,
             norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
             ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
             overall=style.compute_overall(raw),
-            spread=spread, overall_spread=overall_spread,
         ))
     # anything not in a known family still gets shown, neutrally coloured
     leftover = [c for c in raw_all.columns
@@ -175,8 +151,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     titles slanted 30 degrees above the table; a Score colour-ramp legend and a
     Rank circle-size legend underneath. With ``aggregate="summary"`` every
     metric becomes a horizontal bar too, exactly like the Shiny summary tables,
-    and each bar carries an SD whisker across the datasets that computed it
-    (methods or metrics present in a single dataset get no whisker).
+    exactly as in the paper's summary panels (no error bars there, and none
+    here).
     ``cmap`` overrides the first family's palette; no rank numbers are drawn -
     marker size carries the rank, as in the Shiny output.
     """
@@ -225,28 +201,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
                     fontsize=6.4, fontweight="bold", color="white")
 
-    def whisker(x_tip, y, half, x_min, x_max):
-        """SD whisker centred on the bar tip, as error bars ON the bar.
-
-        half is capped and both ends are clipped to the column's own
-        [x_min, x_max] span so a large cross-dataset SD can never draw
-        across neighbouring columns.
-        """
-        if not np.isfinite(half) or half <= 0:
-            return
-        half = min(float(half), 0.45)
-        x0 = max(x_min, x_tip - half)
-        x1 = min(x_max, x_tip + half)
-        if x1 <= x0:
-            return
-        ax.plot([x0, x1], [y, y], color="#333333", linewidth=0.9,
-                zorder=5, gid="whisker")
-        for xc in (x0, x1):
-            ax.plot([xc, xc], [y - 0.10, y + 0.10], color="#333333",
-                    linewidth=0.9, zorder=5, gid="whisker")
-
     def rank_radius(colvals):
-        """sqrt of the max-rank, rescaled to [0.30, 0.85] per column."""
+        """sqrt of the max-rank, rescaled to [0.15, 0.85] per column (scIB rule)."""
         r = colvals.rank(ascending=True, method="max") / colvals.notna().sum()
         r = np.sqrt(r.to_numpy(dtype=float))
         lo, hi = np.nanmin(r), np.nanmax(r)
@@ -255,7 +211,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             # top rank, so draw the LARGEST bubble - mirrors minmax()'s
             # constant -> all-ones rule rather than collapsing to the minimum.
             return pd.Series(0.85, index=colvals.index)
-        return pd.Series(0.30 + 0.55 * (r - lo) / (hi - lo), index=colvals.index)
+        return pd.Series(0.15 + 0.70 * (r - lo) / (hi - lo), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
     for x, fi, kind, name in col_meta:
@@ -268,13 +224,11 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 1.24 * max(0.10, float(length[i]))
+                L = 1.24 * max(0.04, float(length[i]))
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
                                        facecolor=mp.to_rgba(float(v)),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
-                # No whisker on Overall: each dataset's overall is a WITHIN-
-                # dataset relative score over that dataset's own method pool,
-                # so a cross-dataset SD of it would not compare like with like.
+
         elif tbl.aggregate == "summary":
             vals, normv = b.raw[name], b.norm[name]
             for i, m in enumerate(methods):
@@ -282,21 +236,10 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 0.95 * max(0.12, float(normv.loc[m]))
+                L = 0.95 * max(0.04, float(normv.loc[m]))
                 ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), L, ROW_H - 0.32,
                                        facecolor=mp.to_rgba(float(normv.loc[m])),
                                        edgecolor="#333333", linewidth=0.4, zorder=3))
-                if b.spread is not None and name in b.spread.columns:
-                    sd = b.spread[name].loc[m]
-                    lo = np.nanmin(vals.to_numpy()); hi = np.nanmax(vals.to_numpy())
-                    if pd.notna(sd) and hi > lo:
-                        # Zero spread still draws a MINIMUM-length whisker: the
-                        # method was measured on >= 2 datasets and its rank
-                        # simply did not move - visibly different from "not
-                        # measured" (no whisker at all).
-                        half = max(0.95 * float(sd) / (hi - lo), 0.05)
-                        whisker(x + 0.06 + L, y0 + ROW_H / 2, half,
-                                x + 0.06, x + 1.04)
         else:
             vals, normv = b.raw[name], b.norm[name]
             rad = rank_radius(vals)
@@ -347,7 +290,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         # One legend bubble per rank actually present - a fixed 5 would show
         # sizes that cannot occur when fewer methods are plotted.
         n_bub = max(1, min(5, n_rows))
-        rr = np.linspace(0.30, 0.85, n_bub) if n_bub > 1 else np.array([0.85])
+        rr = np.linspace(0.15, 0.85, n_bub) if n_bub > 1 else np.array([0.85])
         xoff = 1.5
         for k, r in enumerate(rr):
             ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,
