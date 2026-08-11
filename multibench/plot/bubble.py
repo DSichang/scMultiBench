@@ -246,7 +246,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                     linewidth=0.9, zorder=5, gid="whisker")
 
     def rank_radius(colvals):
-        """sqrt of the max-rank, rescaled to [0.15, 0.85] per column (scIB rule)."""
+        """sqrt of the max-rank, rescaled to [0.30, 0.85] per column."""
         r = colvals.rank(ascending=True, method="max") / colvals.notna().sum()
         r = np.sqrt(r.to_numpy(dtype=float))
         lo, hi = np.nanmin(r), np.nanmax(r)
@@ -255,7 +255,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             # top rank, so draw the LARGEST bubble - mirrors minmax()'s
             # constant -> all-ones rule rather than collapsing to the minimum.
             return pd.Series(0.85, index=colvals.index)
-        return pd.Series(0.15 + 0.70 * (r - lo) / (hi - lo), index=colvals.index)
+        return pd.Series(0.30 + 0.55 * (r - lo) / (hi - lo), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
     for x, fi, kind, name in col_meta:
@@ -268,7 +268,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 1.24 * max(0.04, float(length[i]))
+                L = 1.24 * max(0.10, float(length[i]))
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
                                        facecolor=mp.to_rgba(float(v)),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
@@ -282,7 +282,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 0.95 * max(0.04, float(normv.loc[m]))
+                L = 0.95 * max(0.12, float(normv.loc[m]))
                 ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), L, ROW_H - 0.32,
                                        facecolor=mp.to_rgba(float(normv.loc[m])),
                                        edgecolor="#333333", linewidth=0.4, zorder=3))
@@ -290,8 +290,12 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                     sd = b.spread[name].loc[m]
                     lo = np.nanmin(vals.to_numpy()); hi = np.nanmax(vals.to_numpy())
                     if pd.notna(sd) and hi > lo:
-                        whisker(x + 0.06 + L, y0 + ROW_H / 2,
-                                0.95 * float(sd) / (hi - lo),
+                        # Zero spread still draws a MINIMUM-length whisker: the
+                        # method was measured on >= 2 datasets and its rank
+                        # simply did not move - visibly different from "not
+                        # measured" (no whisker at all).
+                        half = max(0.95 * float(sd) / (hi - lo), 0.05)
+                        whisker(x + 0.06 + L, y0 + ROW_H / 2, half,
                                 x + 0.06, x + 1.04)
         else:
             vals, normv = b.raw[name], b.norm[name]
@@ -343,7 +347,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         # One legend bubble per rank actually present - a fixed 5 would show
         # sizes that cannot occur when fewer methods are plotted.
         n_bub = max(1, min(5, n_rows))
-        rr = np.linspace(0.15, 0.85, n_bub) if n_bub > 1 else np.array([0.85])
+        rr = np.linspace(0.30, 0.85, n_bub) if n_bub > 1 else np.array([0.85])
         xoff = 1.5
         for k, r in enumerate(rr):
             ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,

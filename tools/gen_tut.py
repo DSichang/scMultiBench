@@ -141,7 +141,7 @@ for cat, s in SCEN.items():
     # ------------------------------------------------------------------ title
     md(f"""# {cat.capitalize()} integration
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PYangLab/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
 *Try the API right now in Colab - registry, stored results and figures run
 there directly; executing methods needs the conda environments below.*
 
@@ -170,7 +170,7 @@ Prerequisites: Linux, `conda` (mamba recommended) and ~230 GB free disk
 during the build. `multibench` is not on PyPI yet - install from the repository:
 
 ```bash
-git clone https://github.com/PYangLab/scMultiBench.git
+git clone https://github.com/DSichang/scMultiBench.git
 cd scMultiBench
 pip install -e .                # the multibench package + CLI
 multibench env doctor           # which method environments exist / are missing
@@ -385,8 +385,9 @@ under a new name). The code keeps the **intersection** of methods present in
 both, so the matrix behind the figure is complete by construction - copy this
 pattern with your own same-category datasets. Each bar's length and colour
 encode the metric's rank averaged across the two datasets, with an SD whisker
-over them; `Overall` carries no whisker because it is a within-dataset relative
-score. {batch_note}""")
+over them - a very short whisker means the method's rank barely moved between
+the datasets, which is information, not an omission. `Overall` carries no
+whisker because it is a within-dataset relative score. {batch_note}""")
     code(f'''a = pd.read_csv(RESULTS / "long_all_{ds}.csv").assign(dataset="{ds}")
 b = pd.read_csv(RESULTS / "long_all_{ds2}.csv").assign(dataset="{ds2}")
 both = sorted(set(a.method) & set(b.method))   # complete matrix, by construction
