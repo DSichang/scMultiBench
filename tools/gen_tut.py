@@ -163,33 +163,45 @@ with these notebooks were produced on it, so every table below reproduces.
 9 Your own dataset · Troubleshooting""")
 
     # ---------------------------------------------------------------- install
-    md(f"""## 1. Install
+    md("""## 1. Install
 
 Prerequisites: Linux and `conda` (mamba recommended). `multibench` is not on
-PyPI yet - install from the repository:
+PyPI yet; the cell below installs it from the repository (~2 MB) and skips
+itself when the package is already present:""")
+    code("""import importlib.util
+if importlib.util.find_spec("multibench") is None:
+    IN_COLAB = importlib.util.find_spec("google.colab") is not None
+    !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
+    %cd scMultiBench
+    if IN_COLAB:
+        # --no-deps keeps Colab's preinstalled numpy/pandas untouched;
+        # everything the API needs is already there
+        !pip -q install -e . --no-deps
+    else:
+        !pip -q install -e .
+else:
+    print("multibench already installed - skipping")""")
+    md(f"""The package itself is tiny; disk goes to the **conda environments of the
+methods you choose to run**. The next cell shows which environments exist on
+this machine; the commented lines build them - uncomment ONLY the tier you
+need (running methods requires Linux + conda; on Colab you can still run
+everything from section 7 on, which uses the shipped results):
 
-```bash
-git clone https://github.com/DSichang/scMultiBench.git
-cd scMultiBench
-pip install -e .                # the multibench package + CLI (~2 MB)
-```
-
-The package itself is tiny; disk goes to the **conda environments of the
-methods you choose to run** - so install only what you need:
-
-```bash
-multibench env doctor                             # which envs exist / are missing
-multibench env install --methods Matilda --run    # ONE method: its env only (2-14 GB)
-multibench env install --category {cat} --run     # this tutorial's category: {CAT_GB[cat]}
-multibench env install --run                      # the whole benchmark: 29 envs, 175 GB
-```
+- one method: its env only, 2-14 GB
+- this tutorial's category ({cat}): {CAT_GB[cat]}
+- the whole benchmark: 29 envs, 175 GB (~50 min build; drop the 52 GB package
+  cache afterwards with `conda clean -a` - details in `SETUP.md`)
 
 Each method runs in its **own conda environment** (they need mutually
 incompatible framework versions), so the wrapper can run torch 1.x, torch 2.x,
-TensorFlow and R methods in one sweep. `env install` is a dry run until you add
-`--run`, and it skips environments that already exist. (Full-build cost,
-measured on a clean machine: ~50 min, plus a 52 GB package cache you can drop
-afterwards with `conda clean -a`. Details in `SETUP.md`.)""")
+TensorFlow and R methods in one sweep. `env install` is a dry run until you
+add `--run`, and it skips environments that already exist.""")
+    code(f"""import sys
+!{{sys.executable}} -m multibench env doctor
+# Uncomment the tier you need:
+# !{{sys.executable}} -m multibench env install --methods {fastm} --run   # one method (2-14 GB)
+# !{{sys.executable}} -m multibench env install --category {cat} --run    # this category ({CAT_GB[cat]})
+# !{{sys.executable}} -m multibench env install --run                     # whole benchmark (175 GB)""")
 
     code("""import warnings; warnings.filterwarnings("ignore")
 %matplotlib inline
