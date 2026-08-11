@@ -2306,6 +2306,10 @@ else:
     <span class="c1"># reused Colab runtime: refresh the editable install to the latest code</span>
     <span class="o">%</span><span class="n">cd</span> <span class="o">/</span><span class="n">content</span><span class="o">/</span><span class="n">scMultiBench</span>
     <span class="err">!</span><span class="n">git</span> <span class="n">pull</span> <span class="o">-</span><span class="n">q</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span><span class="o">,</span><span class="w"> </span><span class="nn">sys</span>
+    <span class="k">for</span> <span class="n">_m</span> <span class="ow">in</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="s2">"multibench"</span> <span class="ow">or</span> <span class="n">m</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"multibench."</span><span class="p">)]:</span>
+        <span class="k">del</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="n">_m</span><span class="p">]</span>
+    <span class="n">importlib</span><span class="o">.</span><span class="n">invalidate_caches</span><span class="p">()</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench refreshed to the latest repository state"</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench already installed"</span><span class="p">)</span>
@@ -2319,6 +2323,10 @@ elif os.path.isdir("/content/scMultiBench"):
     # reused Colab runtime: refresh the editable install to the latest code
     %cd /content/scMultiBench
     !git pull -q
+    import importlib, sys
+    for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
+        del sys.modules[_m]
+    importlib.invalidate_caches()
     print("multibench refreshed to the latest repository state")
 else:
     print("multibench already installed")</div>
