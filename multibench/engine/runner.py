@@ -102,7 +102,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         if role in values:
             npath = inputs_dir / f"{role}_normpeaks.h5"
             values[role] = str(ingest.normalize_peak_names(values[role], npath))
-    repo = Path(repo_path) if repo_path else config.DEFAULT.repo_path
+    repo = Path(config.ensure_repo(repo_path))
     # Pass out_dir with a trailing separator: many method scripts build their
     # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
     # etc.), so a missing slash writes a SIBLING file instead of into out_dir.

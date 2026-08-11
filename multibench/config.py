@@ -61,3 +61,29 @@ class Config:
 
 # module-level default instance; callers may replace its fields
 DEFAULT = Config()
+
+
+def ensure_repo(path=None):
+    """Return a directory that contains ``tools_scripts/``, provisioning it if needed.
+
+    Resolution order: the given (or configured) ``repo_path``; the package root
+    itself (the merged-repository layout, where ``tools_scripts/`` sits next to
+    ``multibench/``); otherwise a one-time shallow clone of the public
+    scMultiBench repository into the configured location - which is what makes
+    method execution work on a fresh machine or Colab, where the wrapper's
+    clone does not carry the 3 GB of upstream method scripts.
+    """
+    import subprocess
+    from pathlib import Path as _P
+
+    p = _P(path) if path else DEFAULT.repo_path
+    if (p / "tools_scripts").is_dir():
+        return p
+    if (_ROOT / "tools_scripts").is_dir():
+        return _ROOT
+    print(f"method scripts not found - fetching PYangLab/scMultiBench (once) into {p} ...",
+          flush=True)
+    subprocess.run(["git", "clone", "--depth", "1",
+                    "https://github.com/PYangLab/scMultiBench.git", str(p)],
+                   check=True)
+    return p
