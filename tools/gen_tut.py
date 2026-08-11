@@ -29,6 +29,9 @@ PAPER_METHODS = {
 }
 MOSAIC_IMPUTATION_ONLY = ["scMM","moETM","UnitedNet","totalVI","sciPENN"]
 
+CAT_GB = {"vertical": "~101 GB (18 envs)", "diagonal": "~58 GB (9 envs)",
+          "mosaic": "~45 GB (7 envs)", "cross": "~71 GB (11 envs)"}
+
 SCEN = {
  "vertical": dict(
    ds="D11", cells="2,864",
@@ -160,27 +163,33 @@ with these notebooks were produced on it, so every table below reproduces.
 9 Your own dataset · Troubleshooting""")
 
     # ---------------------------------------------------------------- install
-    md("""## 1. Install
+    md(f"""## 1. Install
 
-Prerequisites: Linux, `conda` (mamba recommended) and ~230 GB free disk
-during the build. `multibench` is not on PyPI yet - install from the repository:
+Prerequisites: Linux and `conda` (mamba recommended). `multibench` is not on
+PyPI yet - install from the repository:
 
 ```bash
 git clone https://github.com/DSichang/scMultiBench.git
 cd scMultiBench
-pip install -e .                # the multibench package + CLI
-multibench env doctor           # which method environments exist / are missing
-multibench env install --run    # build them all from the committed lockfiles
+pip install -e .                # the multibench package + CLI (~2 MB)
+```
+
+The package itself is tiny; disk goes to the **conda environments of the
+methods you choose to run** - so install only what you need:
+
+```bash
+multibench env doctor                             # which envs exist / are missing
+multibench env install --methods Matilda --run    # ONE method: its env only (2-14 GB)
+multibench env install --category {cat} --run     # this tutorial's category: {CAT_GB[cat]}
+multibench env install --run                      # the whole benchmark: 29 envs, 175 GB
 ```
 
 Each method runs in its **own conda environment** (they need mutually
 incompatible framework versions), so the wrapper can run torch 1.x, torch 2.x,
 TensorFlow and R methods in one sweep. `env install` is a dry run until you add
-`--run`.
-
-Measured on a clean machine: **29 environments, ~50 min build, 175 GB** (plus a
-52 GB package cache you can drop afterwards with `conda clean -a`). Details and
-the smallest end-to-end check live in `SETUP.md`.""")
+`--run`, and it skips environments that already exist. (Full-build cost,
+measured on a clean machine: ~50 min, plus a 52 GB package cache you can drop
+afterwards with `conda clean -a`. Details in `SETUP.md`.)""")
 
     code("""import warnings; warnings.filterwarnings("ignore")
 %matplotlib inline
