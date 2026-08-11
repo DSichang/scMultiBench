@@ -212,11 +212,21 @@ pd.set_option("display.max_columns", None)    # never hide a metric column
 pd.set_option("display.width", 200)
 import multibench as mtb
 
-RESULTS = Path("results")     # stored sweep results, so comparisons reproduce
+# stored sweep results ship with the repository; resolve them whether this
+# notebook runs from notebooks/ (its home) or from the repository root (Colab)
+RESULTS = Path("results") if Path("results").exists() else Path("notebooks/results")
 print("multibench", mtb.__version__)""")
 
     code(f'''DATASET  = "{s['ds']}"
-CATEGORY = "{cat}"''')
+CATEGORY = "{cat}"
+
+# The benchmark datasets are a separate download (see "Get the data" in the
+# installation guide). Every cell that needs them checks HAVE_DATA and says
+# so instead of failing; sections 7-8 use the shipped results and work
+# everywhere, including Colab.
+HAVE_DATA = (mtb.config.DEFAULT.data_path / DATASET).is_dir()
+print(f"benchmark data present: {{HAVE_DATA}}"
+      + ("" if HAVE_DATA else f"  (looked in {{mtb.config.DEFAULT.data_path / DATASET}})"))''')
 
     # ------------------------------------------------------------------ layout
     md(f"""## 2. The data layout
@@ -244,9 +254,13 @@ file(s) - the evaluator reads the first column and skips the header line.
 Where a category uses several label files (`cty1.csv`, `rna_cty.csv`, ...),
 each aligns with its own batch or modality. The next cell prints the head of a
 shipped one - this is the whole format:""")
-    code("""cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
-print(cty.name)
-print(*open(cty).read().splitlines()[:4], sep="\\n")""")
+    code("""if HAVE_DATA:
+    cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
+    print(cty.name)
+    print(*open(cty).read().splitlines()[:4], sep="\\n")
+else:
+    print("skipped - benchmark data not downloaded (the format is fully",
+          "described above; see 'Get the data' in the installation guide)")""")
     md("""> **ATAC caution.** Methods disagree about the ATAC representation - some need
 > **gene-activity scores**, others need **peaks** - and feeding the wrong one
 > runs to completion and returns a plausible but wrong embedding, with no error.
@@ -256,18 +270,23 @@ print(*open(cty).read().splitlines()[:4], sep="\\n")""")
 **From AnnData to canonical, executed.** Most real data starts as `.h5ad`;
 `mtb.io.to_canonical` writes the layout above correctly (including the
 transpose). Converting a small demo object end to end:""")
-    code("""import anndata as ad, numpy as np, h5py, tempfile, os
-tmp = tempfile.mkdtemp()
-demo = ad.AnnData(X=np.random.poisson(2.0, size=(120, 40)).astype(float))
-demo.obs_names = [f"cell{i}" for i in range(120)]
-demo.var_names = [f"gene{i}" for i in range(40)]
-src = os.path.join(tmp, "demo.h5ad"); demo.write_h5ad(src)
+    code("""import importlib.util
+if importlib.util.find_spec("anndata"):
+    import anndata as ad, numpy as np, h5py, tempfile, os
+    tmp = tempfile.mkdtemp()
+    demo = ad.AnnData(X=np.random.poisson(2.0, size=(120, 40)).astype(float))
+    demo.obs_names = [f"cell{i}" for i in range(120)]
+    demo.var_names = [f"gene{i}" for i in range(40)]
+    src = os.path.join(tmp, "demo.h5ad"); demo.write_h5ad(src)
 
-dst = os.path.join(tmp, "rna.h5")
-mtb.io.to_canonical(src, dst)
-with h5py.File(dst) as f:
-    print("keys :", sorted(f["matrix"].keys()))
-    print("shape:", f["matrix/data"].shape, "(features x cells - transposed for you)")""")
+    dst = os.path.join(tmp, "rna.h5")
+    mtb.io.to_canonical(src, dst)
+    with h5py.File(dst) as f:
+        print("keys :", sorted(f["matrix"].keys()))
+        print("shape:", f["matrix/data"].shape, "(features x cells - transposed for you)")
+else:
+    print("skipped - anndata not installed here (an evaluation-only dependency;",
+          "a full `pip install -e .` on your own machine brings it in)")""")
 
     # ------------------------------------------------------------------- scan
     md("""## 3. What can I run on this dataset?
@@ -275,13 +294,18 @@ with h5py.File(dst) as f:
 `scan` inspects the folder and reports every method that can run - and, for the
 rest, exactly why not (missing file, missing environment, wrong layout). Nothing
 executes, so this is instant and safe.""")
-    code("""avail = mtb.scan(DATASET, category=CATEGORY)
-avail[avail.runnable][["method", "modalities", "env", "output_kind",
-                       "n_tunable", "runtime_tier"]]""")
+    code("""if HAVE_DATA:
+    avail = mtb.scan(DATASET, category=CATEGORY)
+    display(avail[avail.runnable][["method", "modalities", "env", "output_kind",
+                                   "n_tunable", "runtime_tier"]])
+else:
+    print("skipped - benchmark data not downloaded; see section 1")""")
     md("""Methods that are *not* runnable come with a reason rather than a silent absence:""")
-    code("""not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
-not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
-""")
+    code("""if HAVE_DATA:
+    not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
+    display(not_ok.head(5) if len(not_ok) else "(everything in this category runs here)")
+else:
+    print("skipped - benchmark data not downloaded; see section 1")""")
 
     # -------------------------------------------------------- paper coverage
     md(f"""## 4. How much of the paper does this cover?
@@ -338,10 +362,13 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
 `run_all` runs methods end to end: resolve inputs -> run in the method's own
 conda env -> load the output -> compute metrics -> keep everything in a
 `BatchResult`. {s['live'][2]}.{extra}""")
-    code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
-                  methods=["{fastm}"]{pstr},
-                  out_dir="/tmp/tutorial_{cat}")
-res.summary''')
+    code(f'''if HAVE_DATA:
+    res = mtb.run_all("{live_ds}", CATEGORY,
+                      methods=["{fastm}"]{pstr},
+                      out_dir="/tmp/tutorial_{cat}")
+    display(res.summary)
+else:
+    print("skipped - benchmark data not downloaded; see section 1")''')
     md("""The metrics are already computed - `run_all` picked the right label files,
 resolved the label order (see `label_order` in the summary), and scored the
 embedding. The summary row above IS the result for a single method; the figures
@@ -425,16 +452,24 @@ adapt to your own export pipeline).""")
     code(SUBSAMPLE_FN)
     code(f'''DATA_ROOT = "/tmp/mydata"
 src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
-subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
-
-sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
-print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")''')
-    code(f'''mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
-                   methods={s['own_trio']!r},
-                   out_dir=f"{{DATA_ROOT}}/out_{cat}",
-                   data_path=DATA_ROOT)
-mine.summary''')
-    code("""mine.plot()""")
+if src.is_dir():
+    subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
+    sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
+    print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")
+else:
+    print("skipped - benchmark data not downloaded; see section 1")''')
+    code(f'''if HAVE_DATA:
+    mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
+                       methods={s['own_trio']!r},
+                       out_dir=f"{{DATA_ROOT}}/out_{cat}",
+                       data_path=DATA_ROOT)
+    display(mine.summary)
+else:
+    print("skipped - benchmark data not downloaded; see section 1")''')
+    code(f'''if HAVE_DATA:
+    display(mine.plot())
+else:
+    print("skipped - benchmark data not downloaded; see section 1")''')
     md(f"""{s['own_note']}
 
 For your real data the only work is producing the canonical files: export each
