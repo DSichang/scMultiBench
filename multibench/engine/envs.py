@@ -653,6 +653,14 @@ def _run_all(cmds: list[list[str]]) -> None:
     # way, and VIPCCA died with ModuleNotFoundError on a package its lockfile
     # pinned.
     os.environ.setdefault("PYTHONNOUSERSITE", "1")
+    if cmds and shutil.which(cmds[0][0]) is None:
+        raise RuntimeError(
+            "conda/mamba not found on this machine, so method environments "
+            "cannot be built here. They need Linux with conda (mamba "
+            "recommended) - see the installation guide. Everything that does "
+            "not run a method (the registry, stored results, figures) works "
+            "without them."
+        )
     for c in cmds:
         proc = subprocess.run(c, capture_output=True, text=True)
         if proc.returncode != 0:

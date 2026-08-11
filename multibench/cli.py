@@ -104,9 +104,13 @@ def _cmd_env(args) -> int:
     if cmd == "install":
         _mlist = getattr(args, "methods", None)
         _mlist = [m.strip() for m in _mlist.split(",")] if _mlist else None
-        rows = envs.create_all(category=getattr(args, "category", None),
-                               methods=_mlist,
-                               dry_run=not getattr(args, "run", False))
+        try:
+            rows = envs.create_all(category=getattr(args, "category", None),
+                                   methods=_mlist,
+                                   dry_run=not getattr(args, "run", False))
+        except RuntimeError as e:
+            print(f"error: {e}")
+            return 1
         for r in rows:
             state = ("have" if r["exists"]
                      else ("BUILD" if r["has_lock"] and getattr(args, "run", False)
