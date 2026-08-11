@@ -192,11 +192,16 @@ elif _has("google.colab"):
     condacolab.install()   # restarts the kernel; afterwards, continue below
 else:
     print("no conda found - install it first (mamba recommended); see the installation guide")""")
-    code("""import importlib.util
+    code("""import importlib.util, os
 if importlib.util.find_spec("multibench") is None:
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
     !pip -q install -e .
+elif os.path.isdir("/content/scMultiBench"):
+    # reused Colab runtime: refresh the editable install to the latest code
+    %cd /content/scMultiBench
+    !git pull -q
+    print("multibench refreshed to the latest repository state")
 else:
     print("multibench already installed")""")
     md(f"""Now the environments for the methods this tutorial runs
