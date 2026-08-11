@@ -2297,19 +2297,29 @@ else:
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span><span class="o">,</span><span class="w"> </span><span class="nn">os</span>
 <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
     <span class="err">!</span><span class="n">git</span> <span class="n">clone</span> <span class="o">--</span><span class="n">depth</span> <span class="mi">1</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">DSichang</span><span class="o">/</span><span class="n">scMultiBench</span><span class="o">.</span><span class="n">git</span>
     <span class="o">%</span><span class="n">cd</span> <span class="n">scMultiBench</span>
     <span class="err">!</span><span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
+<span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="s2">"/content/scMultiBench"</span><span class="p">):</span>
+    <span class="c1"># reused Colab runtime: refresh the editable install to the latest code</span>
+    <span class="o">%</span><span class="n">cd</span> <span class="o">/</span><span class="n">content</span><span class="o">/</span><span class="n">scMultiBench</span>
+    <span class="err">!</span><span class="n">git</span> <span class="n">pull</span> <span class="o">-</span><span class="n">q</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench refreshed to the latest repository state"</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench already installed"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-2">import importlib.util
+<div class="clipboard-copy-txt" id="cell-2">import importlib.util, os
 if importlib.util.find_spec("multibench") is None:
     !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
     %cd scMultiBench
     !pip -q install -e .
+elif os.path.isdir("/content/scMultiBench"):
+    # reused Colab runtime: refresh the editable install to the latest code
+    %cd /content/scMultiBench
+    !git pull -q
+    print("multibench refreshed to the latest repository state")
 else:
     print("multibench already installed")</div>
 </div>
