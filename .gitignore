@@ -11,3 +11,6 @@ __pycache__/
 # run outputs
 /runs/
 /scMultiBench_ref
+dist/
+build/
+*.egg-info/

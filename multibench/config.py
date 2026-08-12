@@ -27,6 +27,15 @@ _METRIC_SET_DIRS = {
 }
 
 _ROOT = Path(__file__).resolve().parent.parent  # <ROOT>
+# Where the package lives decides where large client-side artefacts go. In a
+# repository checkout (source tree / editable install) they sit next to the
+# package, as always; installed as a wheel, _ROOT lands inside site-packages,
+# which must not accumulate datasets or clones - use a per-user cache dir.
+import os as _os
+_IN_REPO = (_ROOT / "pyproject.toml").is_file()
+_BASE = _ROOT if _IN_REPO else (
+    Path(_os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+    / "multibench")
 
 
 def category_folder(token: str) -> str:
@@ -55,8 +64,8 @@ class Config:
 
     result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result")
     files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
-    repo_path: Path = field(default_factory=lambda: _ROOT / "scMultiBench_ref")
-    data_path: Path = field(default_factory=lambda: _ROOT / "data")
+    repo_path: Path = field(default_factory=lambda: _BASE / "scMultiBench_ref")
+    data_path: Path = field(default_factory=lambda: _BASE / "data")
 
 
 # module-level default instance; callers may replace its fields
