@@ -2,6 +2,7 @@
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
 [![Docs](https://img.shields.io/badge/docs-dsichang.github.io%2FscMultiBench-blue)](https://dsichang.github.io/scMultiBench/)
+[![PyPI](https://img.shields.io/pypi/v/multibench-sc)](https://pypi.org/project/multibench-sc/)
 
 A systematic benchmark of single-cell multimodal integration, with `multibench` -
 a typed Python API that runs 40 integration methods across four scenarios
@@ -13,13 +14,12 @@ the paper's figures.
 ## Quick start
 
 ```bash
-git clone https://github.com/DSichang/scMultiBench.git
-cd scMultiBench
-pip install -e .
+pip install multibench-sc          # the API (import name: multibench)
 ```
 
-(PyPI release planned as `pip install multibench-sc`; the import name is
-`multibench` either way.)
+For the tutorials (they also use the stored benchmark tables shipped in this
+repository), clone instead: `git clone https://github.com/DSichang/scMultiBench.git
+&& cd scMultiBench && pip install -e .`
 
 ```python
 import multibench as mtb
