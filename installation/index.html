@@ -1394,9 +1394,8 @@ a warm cache.</p>
 <div class="admonition tip">
 <p class="admonition-title">TL;DR</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>multibench<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>-y<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>multibench
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DSichang/scMultiBench.git
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">cd</span><span class="w"> </span>scMultiBench<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="w"> </span><span class="nv">editable_mode</span><span class="o">=</span>compat
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import multibench as mtb; print(mtb.__version__)&quot;</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import multibench as mtb; print(mtb.__version__)&quot;</span>
 </span></code></pre></div>
 </div>
 <div class="admonition note">
@@ -1437,13 +1436,27 @@ orchestration relies on named conda envs.</p>
 </div>
 <hr />
 <h2 id="step-2-install-multibench">Step 2, Install multibench<a class="headerlink" href="#step-2-install-multibench" title="Anchor link to this section">&para;</a></h2>
-<p><code>multibench</code> is <strong>not on PyPI yet</strong> (planned as <code>pip install multibench-sc</code>;
-the import name stays <code>multibench</code>); install it from the
-repository:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DSichang/scMultiBench.git
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">cd</span><span class="w"> </span>scMultiBench
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="w"> </span><span class="nv">editable_mode</span><span class="o">=</span>compat
+<p>Two ways in - both give you the same <code>import multibench</code>:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="pypi-your-own-data" name="__tabbed_2" type="radio" /><input id="repository-tutorials" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="pypi-your-own-data">PyPI (your own data)</label><label for="repository-tutorials">Repository (tutorials)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
 </span></code></pre></div>
+<p>The full API in a 184 KB package: discovery, running methods (environments
+build from the shipped lockfiles; the method scripts fetch themselves on
+first run), evaluation and figures. Datasets and clones go to
+<code>~/.cache/multibench/</code>.</p>
+</div>
+<div class="tabbed-block">
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DSichang/scMultiBench.git
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>scMultiBench
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="w"> </span><span class="nv">editable_mode</span><span class="o">=</span>compat
+</span></code></pre></div>
+<p>What the tutorials use: also carries the stored benchmark tables their
+figure sections reproduce, and the notebooks themselves.</p>
+</div>
+</div>
+</div>
 <div class="admonition note">
 <p class="admonition-title">What <code>multibench</code> is</p>
 <p><code>multibench</code> is the Python API for the scMultiBench benchmark (imported
@@ -1504,14 +1517,14 @@ results, plot, and resolve inputs without any heavy stack present.</p>
 </div>
 <hr />
 <h2 id="step-3-verify-the-install">Step 3, Verify the install<a class="headerlink" href="#step-3-verify-the-install" title="Anchor link to this section">&para;</a></h2>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import multibench as mtb; print(mtb.__version__)&quot;</span>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import multibench as mtb; print(mtb.__version__)&quot;</span>
 </span></code></pre></div>
 <p>Expected output: the installed version string (e.g. <code>0.1.0</code>). If a version
 prints, the public API is reachable. A quick smoke test of the read-only surface:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">())</span>                 <span class="c1"># available tasks</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">))</span>   <span class="c1"># methods declared for a category</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">())</span>                 <span class="c1"># available tasks</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">))</span>   <span class="c1"># methods declared for a category</span>
 </span></code></pre></div>
 <hr />
 <h2 id="method-environments">Method environments<a class="headerlink" href="#method-environments" title="Anchor link to this section">&para;</a></h2>
@@ -1531,15 +1544,15 @@ need R, scBridge / Portal / uniPort each pin their own PyTorch line, and these
    <code>cmd_template</code>, default <code>"conda run -n {env} {cmd}"</code>,</li>
 <li>Loads the typed output back into a <code>RunResult</code>.</li>
 </ol>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">},</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d35&quot;</span><span class="p">,</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">)</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>    <span class="c1"># the joint embedding (ndarray)</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>       <span class="c1"># the exact command that was executed (list[str])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">},</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d35&quot;</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>    <span class="c1"># the joint embedding (ndarray)</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>       <span class="c1"># the exact command that was executed (list[str])</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Create the method's env first</p>
@@ -1562,10 +1575,10 @@ reference dataset.</p>
 of the methods you choose to run. The repository commits one lockfile per
 environment, and the CLI builds them reproducibly (Linux; method environments
 are not supported on macOS). <strong>Install only what you need</strong>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only (2-14 GB)</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category (45-101 GB, see below)</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs, 175 GB)</span>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only (2-14 GB)</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category (45-101 GB, see below)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs, 175 GB)</span>
 </span></code></pre></div>
 <p>Measured per-category footprints: vertical ~101 GB (18 envs), diagonal ~58 GB
 (9), mosaic ~45 GB (7), cross ~71 GB (11) - categories share environments, so
@@ -1578,7 +1591,7 @@ you do not need to fetch anything by hand: <strong>each tutorial auto-downloads 
 own reference data</strong> (11-290 MB) from the repository's
 <a href="https://github.com/DSichang/scMultiBench/releases/tag/data-v1">release assets</a>
 into <code>data/</code> on first run. Manual equivalent, e.g. for <code>D11</code>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span>data/
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span>data/
 </span></code></pre></div>
 <p>Available there: <code>D11</code> (vertical, 11 MB), <code>D28</code> (diagonal, 137 MB), <code>D45</code>
 (mosaic, 290 MB), <code>D46</code> (mosaic, 97 MB), <code>D52</code> (cross, 179 MB). The <strong>full
