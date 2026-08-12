@@ -18,6 +18,9 @@ cd scMultiBench
 pip install -e .
 ```
 
+(PyPI release planned as `pip install multibench-sc`; the import name is
+`multibench` either way.)
+
 ```python
 import multibench as mtb
 
