@@ -7,6 +7,8 @@ name = "multibench"
 version = "0.2.0"
 description = "Clean Python API wrapping the scMultiBench benchmark: run methods, evaluate, and plot."
 requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+readme = "README.md"
 dependencies = ["pandas>=2.0,<3", "numpy>=1.24", "matplotlib>=3.7", "h5py>=3.8", "anndata>=0.9", "pyyaml>=6.0", "scanpy>=1.9", "scib>=1.1"]
 
 [project.optional-dependencies]
@@ -21,7 +23,7 @@ multibench = "multibench.cli:main"
 packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.engine"]
 
 [tool.setuptools.package-data]
-multibench = ["engine/methods.yaml", "engine/env_specs.yaml", "engine/env_groups.yaml"]
+multibench = ["engine/methods.yaml", "engine/env_specs.yaml", "engine/env_groups.yaml", "engine/env_locks/*.yml", "engine/env_locks/*.sh", "engine/drivers/*", "files/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
