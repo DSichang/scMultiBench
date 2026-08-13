@@ -217,6 +217,56 @@ def plan(category: str | None = None, methods: list[str] | None = None) -> list[
 
 
 # --- env existence / status -----------------------------------------------
+PACKED_URL = "https://github.com/DSichang/scMultiBench/releases/download/envs-v1"
+
+
+def install_packed(env: str, conda: str | None = None) -> bool:
+    """Provision ``env`` from a prebuilt conda-pack archive, if one is published.
+
+    Downloads ``<PACKED_URL>/<env>.tar.gz``, unpacks it into the conda envs
+    directory and runs the archive's own ``bin/conda-unpack`` to rewrite the
+    embedded prefixes. Returns True on success, False when no archive exists
+    for this env (the caller falls back to the lockfile build). This turns a
+    10-30 minute solve-and-download into a download-bound couple of minutes.
+    """
+    import subprocess
+    import tarfile
+    import tempfile
+    import urllib.error
+    import urllib.request
+
+    bin_ = _conda_bin() if conda is None else conda
+    if shutil.which(bin_) is None:
+        return False
+    base = subprocess.run([bin_, "info", "--base"], capture_output=True,
+                          text=True).stdout.strip()
+    if not base:
+        return False
+    dest = Path(base) / "envs" / env
+    if dest.exists():
+        return True
+    url = f"{PACKED_URL}/{env}.tar.gz"
+    try:
+        tgz, _ = urllib.request.urlretrieve(url)
+    except urllib.error.HTTPError:
+        return False
+    print(f"[env] unpacking prebuilt {env} ...", flush=True)
+    dest.mkdir(parents=True, exist_ok=True)
+    try:
+        with tarfile.open(tgz) as t:
+            t.extractall(dest)
+        # conda-unpack's shebang expects a `python` on PATH, which a bare
+        # machine may not have - run it through the env's own interpreter.
+        unpack = dest / "bin" / "conda-unpack"
+        if unpack.exists():
+            subprocess.run([str(dest / "bin" / "python"), str(unpack)],
+                           check=True, capture_output=True)
+        return True
+    except Exception:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
+
+
 def installed_envs(conda: str | None = None) -> list[str]:
     """Names (basenames) of existing conda envs.
 
