@@ -1578,8 +1578,12 @@ are not supported on macOS). <strong>Install only what you need</strong>:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only (2-14 GB)</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category (45-101 GB, see below)</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs, 175 GB)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs, ~167 GB)</span>
 </span></code></pre></div>
+<p>Add <code>--packed</code> to any <code>env install</code> to use <strong>prebuilt archives</strong> where
+published (download + unpack in minutes instead of a 10-30 minute
+solve-and-build; environments without an archive fall back to the lockfile
+build automatically).</p>
 <p>Measured per-category footprints: vertical ~101 GB (18 envs), diagonal ~58 GB
 (9), mosaic ~45 GB (7), cross ~71 GB (11) - categories share environments, so
 combinations cost less than their sum. <code>env doctor</code> is safe to run any time;
