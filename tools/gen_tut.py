@@ -216,7 +216,9 @@ else:
 other tiers are one flag away (`--category {cat}`: {CAT_GB[cat]}; no flag:
 the whole benchmark, 29 envs / 175 GB).""")
     code(f"""import sys
-!{{sys.executable}} -m multibench env install --methods {mlist} --run""")
+# --packed uses prebuilt archives where published (minutes instead of a
+# 10-30 min build); envs without one fall back to the lockfile build.
+!{{sys.executable}} -m multibench env install --methods {mlist} --packed --run""")
 
     code(f'''import warnings; warnings.filterwarnings("ignore")
 %matplotlib inline
