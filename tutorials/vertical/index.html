@@ -2388,10 +2388,14 @@ the whole benchmark, 29 envs / 175 GB).</p>
 </clipboard-copy>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-<span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">multibench</span> <span class="n">env</span> <span class="n">install</span> <span class="o">--</span><span class="n">methods</span> <span class="n">Matilda</span><span class="p">,</span><span class="n">scMM</span><span class="p">,</span><span class="n">sciPENN</span> <span class="o">--</span><span class="n">run</span>
+<span class="c1"># --packed uses prebuilt archives where published (minutes instead of a</span>
+<span class="c1"># 10-30 min build); envs without one fall back to the lockfile build.</span>
+<span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">multibench</span> <span class="n">env</span> <span class="n">install</span> <span class="o">--</span><span class="n">methods</span> <span class="n">Matilda</span><span class="p">,</span><span class="n">scMM</span><span class="p">,</span><span class="n">sciPENN</span> <span class="o">--</span><span class="n">packed</span> <span class="o">--</span><span class="n">run</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-3">import sys
-!{sys.executable} -m multibench env install --methods Matilda,scMM,sciPENN --run</div>
+# --packed uses prebuilt archives where published (minutes instead of a
+# 10-30 min build); envs without one fall back to the lockfile build.
+!{sys.executable} -m multibench env install --methods Matilda,scMM,sciPENN --packed --run</div>
 </div>
 </div>
 </div>
