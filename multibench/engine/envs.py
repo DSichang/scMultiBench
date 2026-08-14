@@ -238,9 +238,21 @@ def install_packed(env: str, conda: str | None = None) -> bool:
     bin_ = _conda_bin() if conda is None else conda
     if shutil.which(bin_) is None:
         return False
-    base = subprocess.run([bin_, "info", "--base"], capture_output=True,
-                          text=True).stdout.strip()
-    if not base:
+    # `info --base` is NOT parseable across tools: mamba prints
+    # "base environment : /usr/local" where conda prints the bare path -
+    # the naive parse built envs under a literal "base environment : ..."
+    # directory on condacolab. --json is stable for both.
+    import json as _json
+    try:
+        _info = _json.loads(subprocess.run([bin_, "info", "--json"],
+                                           capture_output=True,
+                                           text=True).stdout)
+        base = _info.get("root_prefix") or ""
+    except Exception:
+        base = ""
+    if not (base and str(base).startswith("/")):
+        print(f"[env] could not determine the conda root from {bin_}; "
+              "falling back to the lockfile build", flush=True)
         return False
     dest = Path(base) / "envs" / env
     if dest.exists():
@@ -250,21 +262,27 @@ def install_packed(env: str, conda: str | None = None) -> bool:
         tgz, _ = urllib.request.urlretrieve(url)
     except urllib.error.HTTPError:
         return False
-    print(f"[env] unpacking prebuilt {env} ...", flush=True)
-    dest.mkdir(parents=True, exist_ok=True)
+    print(f"[env] unpacking prebuilt {env} -> {dest} ...", flush=True)
     try:
+        dest.mkdir(parents=True, exist_ok=True)
         with tarfile.open(tgz) as t:
             t.extractall(dest)
         # conda-unpack's shebang expects a `python` on PATH, which a bare
         # machine may not have - run it through the env's own interpreter.
+        py = dest / "bin" / "python"
         unpack = dest / "bin" / "conda-unpack"
+        if not py.exists():
+            raise RuntimeError("archive did not contain bin/python")
         if unpack.exists():
-            subprocess.run([str(dest / "bin" / "python"), str(unpack)],
-                           check=True, capture_output=True)
+            subprocess.run([str(py), str(unpack)], check=True,
+                           capture_output=True)
         return True
-    except Exception:
+    except Exception as e:  # noqa: BLE001 - degrade to the lockfile build
         shutil.rmtree(dest, ignore_errors=True)
-        raise
+        print(f"[env] prebuilt {env} failed ({type(e).__name__}: "
+              f"{str(e)[:120]}); falling back to the lockfile build",
+              flush=True)
+        return False
 
 
 def installed_envs(conda: str | None = None) -> list[str]:
