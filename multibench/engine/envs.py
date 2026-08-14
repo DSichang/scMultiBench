@@ -257,7 +257,17 @@ def install_packed(env: str, conda: str | None = None) -> bool:
     dest = Path(base) / "envs" / env
     if dest.exists():
         return True
-    url = f"{PACKED_URL}/{env}.tar.gz"
+    # A shipped manifest maps env -> archive URL, so archives can live where
+    # their size dictates (GitHub release assets up to 2 GiB, Zenodo beyond);
+    # envs without an entry fall back to the release-asset convention.
+    _manifest = {}
+    _mf = Path(__file__).parent / "packed_urls.json"
+    if _mf.is_file():
+        try:
+            _manifest = _json.loads(_mf.read_text())
+        except Exception:
+            _manifest = {}
+    url = _manifest.get(env) or f"{PACKED_URL}/{env}.tar.gz"
     try:
         tgz, _ = urllib.request.urlretrieve(url)
     except urllib.error.HTTPError:

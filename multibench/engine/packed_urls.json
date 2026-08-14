@@ -1,0 +1,4 @@
+{
+  "scmb_r": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_r.tar.gz",
+  "env_sciPENN": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/env_sciPENN.tar.gz"
+}
