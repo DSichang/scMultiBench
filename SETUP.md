@@ -42,7 +42,7 @@ dispatch, because `run()` correctly sets `PYTHONNOUSERSITE=1`. Provisioning now 
 same variable, so this is handled; it is documented because the failure looked like a
 broken method rather than a provisioning gap.
 
-**Three packages cannot come from a lockfile** and are restored by committed
+**Several packages cannot come from a lockfile** and are restored by committed
 `<env>.post.sh` scripts, because conda cannot capture them:
 
 - `rliger` 2.0.1 in `scmb_r` — installed with `install.packages()`, invisible to conda.
@@ -62,7 +62,7 @@ producing a quietly broken environment.
 ## Verifying your install
 
 ```bash
-python -m pytest tests/ -q          # 213 tests
+python -m pytest tests/ -q          # 215 tests
 ```
 
 Then the smallest real end-to-end check:

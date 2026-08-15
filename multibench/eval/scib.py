@@ -62,7 +62,8 @@ def leiden_sweep(emb):
     return adata, keys
 
 
-def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold):
+def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
+                        precomputed_keys=None):
     """Isolated-label F1, identical to scib's but without the per-label re-clustering.
 
     ``scib.metrics.isolated_labels_f1`` calls ``cluster_optimal_resolution`` once
@@ -87,14 +88,21 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold):
     if len(labels) == 0:
         return float("nan")
 
-    sc.pp.neighbors(adata, use_rep=embed)
-    resolutions = get_resolutions(n=10, max=2)
-
-    keys = []
-    for res in resolutions:
-        key = f"_mb_isof1_{res}"
-        sc.tl.leiden(adata, resolution=res, key_added=key)
-        keys.append(key)
+    if precomputed_keys:
+        # the caller already ran the identical 10-resolution sweep on this
+        # adata (same graph, same resolutions) - re-running it here doubled
+        # the whole evaluation
+        keys = list(precomputed_keys)
+        _owned = False
+    else:
+        sc.pp.neighbors(adata, use_rep=embed)
+        resolutions = get_resolutions(n=10, max=2)
+        keys = []
+        for res in resolutions:
+            key = f"_mb_isof1_{res}"
+            sc.tl.leiden(adata, resolution=res, key_added=key)
+            keys.append(key)
+        _owned = True
 
     try:
         scores = []
@@ -111,9 +119,10 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold):
                         best = f1
             scores.append(best)
     finally:
-        for key in keys:
-            if key in adata.obs:
-                del adata.obs[key]
+        if _owned:
+            for key in keys:
+                if key in adata.obs:
+                    del adata.obs[key]
 
     return float(np.mean(scores))
 
@@ -172,10 +181,30 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     # vs. the cell-type labels. This is the standard scib clustering protocol
     # and is what lets evaluate() run directly on a method's embedding output.
     _needs_clustering = only is None or bool(only & {"ARI", "NMI"})
-    if group in ("clustering", "all") and cluster is None and _needs_clustering:
-        me.cluster_optimal_resolution(
-            adata, label_key="celltype", cluster_key="cluster", verbose=False
-        )
+    _needs_isof1 = group in ("clustering", "all") and (only is None or "iF1" in only)
+    _sweep_keys = []
+    if group in ("clustering", "all") and (
+            (cluster is None and _needs_clustering) or _needs_isof1):
+        # ONE 10-resolution Leiden sweep serves both consumers: the optimal-
+        # resolution cluster choice (argmax NMI vs the labels - the same
+        # protocol as scib.cluster_optimal_resolution) and the isolated-label
+        # F1, which needs every resolution's assignment. Running the two
+        # independently used to double the whole evaluation. Quietly: scanpy
+        # narrates each resolution otherwise.
+        from scib.metrics.clustering import get_resolutions
+        with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            for res in get_resolutions(n=10, max=2):
+                key = f"_mb_res_{res}"
+                sc.tl.leiden(adata, resolution=res, key_added=key)
+                _sweep_keys.append(key)
+            if cluster is None and _needs_clustering:
+                best_key, best_nmi = None, -1.0
+                for k in _sweep_keys:
+                    v = float(me.nmi(adata, cluster_key=k, label_key="celltype"))
+                    if v > best_nmi:
+                        best_nmi, best_key = v, k
+                adata.obs["cluster"] = adata.obs[best_key].values
     out: dict[str, float] = {}
 
     def _safe(name, fn):
@@ -221,7 +250,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
                                                      embed="X_emb", iso_threshold=_iso))
         _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
                                                  batch_key="batch", embed="X_emb",
-                                                 iso_threshold=_iso))
+                                                 iso_threshold=_iso,
+                                                 precomputed_keys=_sweep_keys or None))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))

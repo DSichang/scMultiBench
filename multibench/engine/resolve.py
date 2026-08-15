@@ -178,6 +178,34 @@ def inputs_for(dataset: str, method: str, category: str,
 
 
 
+import functools
+
+
+@functools.lru_cache(maxsize=512)
+def _sniff_h5(path: str, mtime_ns: int):
+    """Read (shape, n_features, n_cells) of a canonical .h5, cached by mtime.
+
+    scan() runs the orientation preflight once per (method, variant) row, so
+    the same handful of files used to be opened and sniffed dozens of times
+    per call; the mtime key keeps the cache honest across rewrites.
+    """
+    import h5py
+
+    try:
+        with h5py.File(path, "r") as f:
+            if "matrix/data" not in f:
+                return None
+            shape = tuple(f["matrix/data"].shape)
+            if len(shape) != 2:
+                return None
+            if "matrix/features" not in f or "matrix/barcodes" not in f:
+                return None
+            return (shape, int(f["matrix/features"].shape[0]),
+                    int(f["matrix/barcodes"].shape[0]))
+    except OSError:
+        return None
+
+
 def _check_orientation(method, dataset, category, resolved):
     """Reject a transposed matrix at preflight instead of many minutes later.
 
@@ -193,25 +221,14 @@ def _check_orientation(method, dataset, category, resolved):
     without reference to the labels, so this is checkable up front. A square
     matrix is genuinely ambiguous and is left alone.
     """
-    import h5py
-
     for path in resolved.values():
         p = Path(path)
         if p.suffix != ".h5" or not p.is_file():
             continue
-        try:
-            with h5py.File(p, "r") as f:
-                if "matrix/data" not in f:
-                    continue
-                shape = tuple(f["matrix/data"].shape)
-                if len(shape) != 2:
-                    continue
-                if "matrix/features" not in f or "matrix/barcodes" not in f:
-                    continue          # nothing to compare against
-                n_feat = int(f["matrix/features"].shape[0])
-                n_cell = int(f["matrix/barcodes"].shape[0])
-        except OSError:
-            continue                  # an unreadable file is a different error
+        sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
+        if sniff is None:
+            continue
+        shape, n_feat, n_cell = sniff
         if n_feat == n_cell or shape == (n_feat, n_cell):
             continue                  # ambiguous, or already correct
         if shape == (n_cell, n_feat):
