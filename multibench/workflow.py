@@ -5,7 +5,7 @@ you to know a method's name, its integration category AND its exact modality
 combination. This module removes that burden:
 
     mtb.scan("D11")                     # what can I run on this data?
-    res = mtb.run_all("D11", "vertical")  # run all of it, with metrics
+    res = mtb.run_all("D11", "vertical", out_dir="out/")  # run all of it, with metrics
     res.plot()                            # one figure
 
 It also handles two traps that otherwise yield silently WRONG numbers:
@@ -187,8 +187,9 @@ def describe_layout(category: str | None = None) -> str:
               "  NOTE this is the TRANSPOSE of the scanpy/AnnData convention",
               "  (AnnData.X is cells x genes). scan() rejects a transposed file, and",
               "  a file with only matrix/data fails with a KeyError about 'features'.",
-              "Labels are CSV with one row per cell; the last column (or a column",
-              "named 'x') holds the cell type.", ""]
+              "Labels are a single-column CSV: one header line (typically 'x'),",
+              "then one cell-type label per cell; the evaluator reads the first",
+              "column and skips the header.", ""]
     if category:
         lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
     lines += ["", "ENVIRONMENTS",
@@ -435,9 +436,19 @@ def _label_candidates(dataset, n, data_path=None):
                   ([b, a], np.concatenate([ctys[b], ctys[a]]))]
     nums = sorted(k for k in ctys if k.startswith("cty") and any(c.isdigit() for c in k))
     if len(nums) > 1:
+        # Only orderings whose TOTAL length equals n can survive the filter
+        # below, and length is order-independent - so pick length-matching
+        # SUBSETS first (combinations) and permute only those. The old code
+        # materialized a concatenated array for every permutation of every
+        # subset: factorial in files, gigabytes for nothing.
+        sizes = {k: len(ctys[k]) for k in nums}
         for r in range(len(nums), 1, -1):
-            for perm in itertools.permutations(nums, r):
-                cands.append((list(perm), np.concatenate([ctys[k] for k in perm])))
+            for combo in itertools.combinations(nums, r):
+                if sum(sizes[k] for k in combo) != n:
+                    continue
+                for perm in itertools.permutations(combo):
+                    cands.append((list(perm),
+                                  np.concatenate([ctys[k] for k in perm])))
     out, seen = [], set()
     for names, lab in cands:
         if len(lab) != n or tuple(names) in seen:
@@ -594,7 +605,7 @@ class BatchResult:
         scMoMaT also writes a UMAP embedding among its ``extra_outputs``, so it is
         scored through that (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a
         neighbour graph, so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and
-        its ``emb_shape`` then describes the graph written, not an embedding.
+        its ``emb_shape`` is ``None`` - there is no embedding to describe.
 
         Two columns describe how the cells were matched to labels:
 
