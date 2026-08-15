@@ -530,23 +530,43 @@ def _evaluate_best_order(emb, category, cands):
                                 label_key="celltype"))
             scored.append((ari, names, lab, bat,
                            np.asarray(sweep_adata.obs[best_key].values)))
-        except Exception:
+        except Exception as e:  # noqa: BLE001 - keep screening other orders
+            _last_err = f"{type(e).__name__}: {e}"
             continue
     if not scored:
-        return None, None, []
+        raise RuntimeError(
+            "no label ordering could be screened"
+            + (f"; last error: {_last_err}" if '_last_err' in dir() else ""))
     scored.sort(key=lambda r: -r[0])
     ari, names, lab, bat, clus = scored[0]
     try:
         # hand the winning clustering to the full evaluation so it does not
         # repeat the sweep a seventh time
         val = _full(lab, bat, clustering=clus)
-    except Exception:
-        return None, None, []
+    except Exception as e:
+        raise RuntimeError(
+            f"evaluation failed for the winning label order {names}: "
+            f"{type(e).__name__}: {e}") from e
     spread = [{"order": n, "ARI": round(a, 4)} for a, n, _, _, _ in scored]
     return names, val, spread
 
 
 # ------------------------------------------------------------------------ results
+def _with_label_order_note(sm: "pd.DataFrame") -> "pd.DataFrame":
+    """Attach ``label_order_note`` explaining a blank confidence (docstring
+    promise of :attr:`BatchResult.summary`; used by the property AND save())."""
+    if "label_order_confidence" in sm:
+        scored = sm["status"].astype(str).str.startswith("CHAIN_OK")
+        blank = scored & sm["label_order_confidence"].isna()
+        ari = pd.to_numeric(sm.get("ARI"), errors="coerce")
+        why = pd.Series([None] * len(sm), index=sm.index, dtype=object)
+        why[blank & (ari < 0.05)] = "winner at chance"
+        why[blank & ~(ari < 0.05)] = "single ordering"
+        why[~scored] = "not scored"
+        sm["label_order_note"] = why
+    return sm
+
+
 class BatchResult:
     """Outcome of :func:`run_all` - a summary table, a tidy frame and a figure."""
 
@@ -628,7 +648,8 @@ class BatchResult:
             return pd.DataFrame(columns=["method", "status", "run_sec", "output_kind",
                                          "emb_shape", "n_tunable", "label_order",
                                          "label_order_confidence"])
-        return pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
+        return _with_label_order_note(
+            pd.DataFrame(rows).sort_values("method").reset_index(drop=True))
 
     @property
     def long(self) -> pd.DataFrame:
@@ -659,7 +680,10 @@ class BatchResult:
         ``run_all`` records failures instead of raising, so ALWAYS check this - a
         sweep can finish "successfully" with several methods having failed.
 
-        Only ``FAIL``, ``TIMEOUT`` and ``RUN_OK_EVAL_FAILED`` appear here.
+        ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and
+        ``RUN_OK_NO_LABEL_MATCH`` (ran, but no label file matched the output's
+        cell count, so nothing could be scored - usually a data-layout problem
+        worth fixing) appear here.
         ``RUN_OK_NO_EMBEDDING`` does NOT: those methods ran correctly and merely
         emit a graph or spatial coordinates instead of an embedding, so there is
         nothing for clustering metrics to score. See :attr:`summary` for them.
@@ -668,7 +692,8 @@ class BatchResult:
         # listing it here sends people hunting for a bug that does not exist.
         bad = [r for r in self.records
                if str(r.get("status", "")).startswith(("FAIL", "TIMEOUT"))
-               or r.get("status") == "RUN_OK_EVAL_FAILED"]
+               or r.get("status") in ("RUN_OK_EVAL_FAILED",
+                                      "RUN_OK_NO_LABEL_MATCH")]
         if not bad:
             return pd.DataFrame(columns=["method", "status", "error"])
         return pd.DataFrame([{k: r.get(k) for k in ("method", "status", "error")} for r in bad])
@@ -711,15 +736,7 @@ class BatchResult:
         # mixing a sentinel string into the numeric one breaks `> 0.5`, makes
         # .isna() miss the very rows it should catch, and trips a pandas
         # incompatible-dtype FutureWarning.
-        if "label_order_confidence" in sm:
-            scored = sm["status"].astype(str).str.startswith("CHAIN_OK")
-            blank = scored & sm["label_order_confidence"].isna()
-            ari = pd.to_numeric(sm.get("ARI"), errors="coerce")
-            why = pd.Series([None] * len(sm), index=sm.index, dtype=object)
-            why[blank & (ari < 0.05)] = "winner at chance"
-            why[blank & ~(ari < 0.05)] = "single ordering"
-            why[~scored] = "not scored"
-            sm["label_order_note"] = why
+        sm = _with_label_order_note(sm)
         sm.to_csv(d / "summary.csv", index=False)
         if not self.long.empty:
             self.long.to_csv(d / "long.csv", index=False)
@@ -736,8 +753,10 @@ class BatchResult:
     def __repr__(self):
         ok = sum(1 for r in self.records if str(r.get("status", "")).startswith("CHAIN_OK"))
         noemb = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_EMBEDDING")
+        nolab = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_LABEL_MATCH")
         bad = len(self.failures)
-        extra = f", {noemb} ran but not scorable" if noemb else ""
+        extra = (f", {noemb} ran but not scorable" if noemb else "") + (
+            f", {nolab} ran but no labels matched" if nolab else "")
         return (f"<BatchResult {self.category}/{self.dataset}: "
                 f"{ok}/{len(self.records)} with metrics{extra}, {bad} failed>")
 
@@ -845,9 +864,16 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     for _, row in plan.iterrows():
         m, mods = row["method"], row["modalities"]
         mod_list = [] if mods == "(data_dir)" else mods.split("+")
+        from . import __version__ as _pkg_version
         rec = {"method": m, "category": category, "dataset": dataset,
                "modalities": mod_list, "output_kind": row["output_kind"],
-               "env": row["env"], "n_tunable": row["n_tunable"], "status": "?", "_long": None}
+               "env": row["env"], "n_tunable": row["n_tunable"], "status": "?", "_long": None,
+               # reproduction provenance: what actually ran, where, with what
+               "params_used": dict(params.get(m) or {}),
+               "out_dir": str(out_dir / f"{m}_{dataset}"),
+               "data_path": str(data_path) if data_path else None,
+               "multibench_version": _pkg_version,
+               "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
         t0 = time.time()
         if verbose:
             print(f"[run_all] {m} ({category}/{dataset}) ...", flush=True)
