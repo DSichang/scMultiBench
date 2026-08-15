@@ -2201,7 +2201,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=847b53c6">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d749011b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2226,7 +2226,7 @@ with these notebooks were produced on it, so every table below reproduces.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=011d9d57">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9a46901f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2239,7 +2239,7 @@ once - then just keep running from the next cell.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a5b52059">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4928a856">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2313,7 +2313,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d7f0ebcf">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c9fbb168">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2389,7 +2389,7 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=271525c2">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=83d9dc08">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2403,7 +2403,7 @@ the whole benchmark, 29 envs / 175 GB).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8caa8a07">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d02b1828">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2450,7 +2450,7 @@ scmb_torch         [have          ] &lt;- scMoMaT
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9be8ce55">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1958219c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2508,7 +2508,7 @@ print("multibench", mtb.__version__)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>multibench 0.2.0
+<pre>multibench 0.2.1
 </pre>
 </div>
 </div>
@@ -2516,7 +2516,7 @@ print("multibench", mtb.__version__)</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=09b33d70">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=07d2b82e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2528,7 +2528,7 @@ print("multibench", mtb.__version__)</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f245455b">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=eb90c07b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2607,8 +2607,9 @@ MODALITY FILE FORMAT (.h5) - easiest route first:
   NOTE this is the TRANSPOSE of the scanpy/AnnData convention
   (AnnData.X is cells x genes). scan() rejects a transposed file, and
   a file with only matrix/data fails with a KeyError about 'features'.
-Labels are CSV with one row per cell; the last column (or a column
-named 'x') holds the cell type.
+Labels are a single-column CSV: one header line (typically 'x'),
+then one cell-type label per cell; the evaluator reads the first
+column and skips the header.
 
 mosaic: Several batches where only SOME share a modality; a paired batch bridges the others.
 
@@ -2628,7 +2629,7 @@ Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=90ba3c73">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=01c0c29d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2676,7 +2677,7 @@ shipped one - this is the whole format:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=be45e5bb">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7377d9d2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2724,7 +2725,7 @@ print(*open(cty).read().splitlines()[:4], sep="\n")</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ab2e9e10">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b93270a9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2744,7 +2745,7 @@ transpose). Converting a small demo object end to end:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a9f678a8">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=96da39cb">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2817,7 +2818,7 @@ shape: (40, 120) (features x cells - transposed for you)
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8dff36c0">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=54c332c9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2830,7 +2831,7 @@ executes, so this is instant and safe.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3e56dd11">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6d36df55">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2938,7 +2939,7 @@ avail[avail.runnable][["method", "modalities", "env", "output_kind",
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=11c65c7c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=02d9f5cb">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2949,7 +2950,7 @@ avail[avail.runnable][["method", "modalities", "env", "output_kind",
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f5fde812">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e3ae3661">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3035,7 +3036,7 @@ not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0749299e">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9f522170">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3048,7 +3049,7 @@ Stated explicitly so you never mistake a dataset limitation for full coverage.</
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6fd5efa5">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b1fb22db">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3126,7 +3127,7 @@ not wired here: UINMF, scMM, moETM, UnitedNet, totalVI, sciPENN
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2dff28f5">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d2ed69b3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3140,7 +3141,7 @@ upstream code, so it reports rather than pretends.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ae2dbbeb">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=110caf47">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3297,7 +3298,7 @@ pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=Tr
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=6d8db113">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d1fcef3a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3311,7 +3312,7 @@ StabMap, scMoMaT on <code>D46</code>. Both methods run in minutes to tens of min
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7e2bfa26">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8466c5c0">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3364,7 +3365,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (66.1s) 0.574
+<pre>[run_all]   -&gt; CHAIN_OK (65.2s) 0.574
 </pre>
 </div>
 </div>
@@ -3378,7 +3379,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (189.7s) 0.2817
+<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (188.4s) 0.2817
 </pre>
 </div>
 </div>
@@ -3420,6 +3421,7 @@ res.summary</div>
 <th>ASW_batch</th>
 <th>GC</th>
 <th>iLISI</th>
+<th>label_order_note</th>
 </tr>
 </thead>
 <tbody>
@@ -3427,7 +3429,7 @@ res.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>66.1</td>
+<td>65.2</td>
 <td>embedding</td>
 <td>[21416, 50]</td>
 <td>0</td>
@@ -3442,12 +3444,13 @@ res.summary</div>
 <td>0.8100</td>
 <td>0.9545</td>
 <td>0.0273</td>
+<td>None</td>
 </tr>
 <tr>
 <th>1</th>
 <td>scMoMaT</td>
 <td>CHAIN_OK_GRAPH_METHOD</td>
-<td>189.7</td>
+<td>188.4</td>
 <td>graph</td>
 <td>[21416, 2]</td>
 <td>0</td>
@@ -3462,6 +3465,7 @@ res.summary</div>
 <td>0.4944</td>
 <td>0.4239</td>
 <td>0.1250</td>
+<td>None</td>
 </tr>
 </tbody>
 </table>
@@ -3472,7 +3476,7 @@ res.summary</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e8fd5856">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a644f85c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3485,7 +3489,7 @@ the methods you just ran, in the paper's panel layout:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=446e96ec">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=90a01dda">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3524,7 +3528,7 @@ the methods you just ran, in the paper's panel layout:</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9e84bea5">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b8715db3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3566,7 +3570,7 @@ than the other metrics.</li>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=be69216c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=57b2dbbe">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3589,7 +3593,7 @@ everything runnable and writes <code>summary.csv</code> and <code>long.csv</code
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=de79ce64">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a044cf90">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3634,7 +3638,7 @@ fig</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8daf8c63">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=604c5281">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3655,7 +3659,7 @@ panels. Both metric families appear because both datasets are multi-batch.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=0c7bb2c0">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cdf3b5a9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3715,7 +3719,7 @@ mtb.plot.bubble(pair, aggregate="summary",
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=635d3757">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=592742df">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3730,7 +3734,7 @@ adapt to your own export pipeline).</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=7db75da2">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=e5259169">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3837,7 +3841,7 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2129cb8a">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=76ea5eb8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3887,7 +3891,7 @@ print(f"{int(sc.runnable.sum())} of {len(sc)} methods can run on MYDATA_mosaic")
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1991ae0d">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c080f94c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3934,7 +3938,7 @@ mine.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (37.7s) 0.5597
+<pre>[run_all]   -&gt; CHAIN_OK (36.6s) 0.5597
 </pre>
 </div>
 </div>
@@ -3948,7 +3952,7 @@ mine.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (131.5s) 0.1995
+<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (137.6s) 0.1995
 </pre>
 </div>
 </div>
@@ -3990,6 +3994,7 @@ mine.summary</div>
 <th>ASW_batch</th>
 <th>GC</th>
 <th>iLISI</th>
+<th>label_order_note</th>
 </tr>
 </thead>
 <tbody>
@@ -3997,7 +4002,7 @@ mine.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>37.7</td>
+<td>36.6</td>
 <td>embedding</td>
 <td>[12849, 50]</td>
 <td>0</td>
@@ -4012,12 +4017,13 @@ mine.summary</div>
 <td>0.8071</td>
 <td>0.9588</td>
 <td>0.0500</td>
+<td>None</td>
 </tr>
 <tr>
 <th>1</th>
 <td>scMoMaT</td>
 <td>CHAIN_OK_GRAPH_METHOD</td>
-<td>131.5</td>
+<td>137.6</td>
 <td>graph</td>
 <td>[12849, 2]</td>
 <td>0</td>
@@ -4032,6 +4038,7 @@ mine.summary</div>
 <td>0.4627</td>
 <td>0.4544</td>
 <td>0.1357</td>
+<td>None</td>
 </tr>
 </tbody>
 </table>
@@ -4042,7 +4049,7 @@ mine.summary</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ec65286e">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8309c98f">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4081,7 +4088,7 @@ mine.summary</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cd29a01c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fe9c82ea">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4096,7 +4103,7 @@ write one label CSV per the layout in section 2, and the same three calls -
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ca9473fe">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2375ceb9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
