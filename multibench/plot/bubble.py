@@ -214,15 +214,19 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                     fontsize=6.4, fontweight="bold", color="white")
 
     def rank_radius(colvals):
-        """sqrt of the max-rank, rescaled to [0.15, 0.85] per column (scIB rule)."""
-        r = colvals.rank(ascending=True, method="max") / colvals.notna().sum()
-        r = np.sqrt(r.to_numpy(dtype=float))
-        lo, hi = np.nanmin(r), np.nanmax(r)
-        if not np.isfinite(lo) or hi == lo:
-            # Constant column (e.g. a single method): everyone is tied at the
-            # top rank, so draw the LARGEST bubble - mirrors minmax()'s
-            # constant -> all-ones rule rather than collapsing to the minimum.
-            return pd.Series(0.85, index=colvals.index)
+        """radius = 0.85 * sqrt(rank / n): area tracks the rank FRACTION.
+
+        No min-max stretch: stretching the sqrt to a fixed [0.15, 0.85] made
+        the worst of THREE methods as small as the worst of twenty-eight -
+        with few methods there is no need for the full dynamic range. Under
+        this mapping the worst of 3 is a clearly visible 0.49, while at
+        n = 28 the smallest is ~0.16, i.e. the familiar large-field look.
+        A single method (or an all-tied column) is rank fraction 1 -> 0.85.
+        """
+        n = colvals.notna().sum()
+        r = colvals.rank(ascending=True, method="max") / max(int(n), 1)
+        rad = 0.85 * np.sqrt(r.to_numpy(dtype=float))
+        return pd.Series(np.maximum(rad, 0.12), index=colvals.index)
         return pd.Series(0.15 + 0.70 * (r - lo) / (hi - lo), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
@@ -236,7 +240,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 1.24 * max(0.04, float(length[i]))
+                _floor = min(0.30, 1.2 / max(n_rows, 1))
+                L = 1.24 * max(_floor, float(length[i]))
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
                                        facecolor=mp.to_rgba(float(v)),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
@@ -248,7 +253,11 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 0.95 * max(0.04, float(normv.loc[m]))
+                # Adaptive floor: with n methods the shortest bar is at least
+                # ~1.2/n of the column (capped at 0.30) - visible in a small
+                # comparison, indistinguishable from the paper's look at scale.
+                _floor = min(0.30, 1.2 / max(n_rows, 1))
+                L = 0.95 * max(_floor, float(normv.loc[m]))
                 ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), L, ROW_H - 0.32,
                                        facecolor=mp.to_rgba(float(normv.loc[m])),
                                        edgecolor="#333333", linewidth=0.4, zorder=3))
@@ -302,7 +311,9 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         # One legend bubble per rank actually present - a fixed 5 would show
         # sizes that cannot occur when fewer methods are plotted.
         n_bub = max(1, min(5, n_rows))
-        rr = np.linspace(0.15, 0.85, n_bub) if n_bub > 1 else np.array([0.85])
+        # legend sizes follow the plot's own mapping: 0.85 * sqrt(rank / n)
+        _fracs = (np.linspace(1, n_rows, n_bub) / n_rows) if n_bub > 1 else np.array([1.0])
+        rr = np.maximum(0.85 * np.sqrt(_fracs), 0.12)
         xoff = 1.5
         for k, r in enumerate(rr):
             ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,
