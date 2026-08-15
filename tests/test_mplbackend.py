@@ -14,16 +14,12 @@ def test_method_subprocess_gets_headless_backend(monkeypatch):
     monkeypatch.setenv("MPLBACKEND", "module://matplotlib_inline.backend_inline")
     captured = {}
 
-    class R:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
     def fake_popen(cmd, **kw):
         captured["env"] = kw.get("env")
         raise RuntimeError("stop after env capture")
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_popen)
+    # the runner spawns via Popen (start_new_session, killpg on abort)
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     try:
         import multibench as mtb
         inp = mtb.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"])
