@@ -273,21 +273,29 @@ def install_packed(env: str, conda: str | None = None) -> bool:
     except urllib.error.HTTPError:
         return False
     print(f"[env] unpacking prebuilt {env} -> {dest} ...", flush=True)
+    from ..data.fetch import safe_extract
+    part = dest.with_name(dest.name + ".partial")
     try:
-        dest.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(part, ignore_errors=True)
+        part.mkdir(parents=True)
         with tarfile.open(tgz) as t:
-            t.extractall(dest)
+            safe_extract(t, part)
         # conda-unpack's shebang expects a `python` on PATH, which a bare
         # machine may not have - run it through the env's own interpreter.
-        py = dest / "bin" / "python"
-        unpack = dest / "bin" / "conda-unpack"
+        py = part / "bin" / "python"
+        unpack = part / "bin" / "conda-unpack"
         if not py.exists():
             raise RuntimeError("archive did not contain bin/python")
-        if unpack.exists():
-            subprocess.run([str(py), str(unpack)], check=True,
-                           capture_output=True)
+        # the env must carry its FINAL path before conda-unpack rewrites
+        # prefixes, so move first, then unpack
+        part.rename(dest)
+        if (dest / "bin" / "conda-unpack").exists():
+            subprocess.run([str(dest / "bin" / "python"),
+                            str(dest / "bin" / "conda-unpack")],
+                           check=True, capture_output=True)
         return True
     except Exception as e:  # noqa: BLE001 - degrade to the lockfile build
+        shutil.rmtree(part, ignore_errors=True)
         shutil.rmtree(dest, ignore_errors=True)
         print(f"[env] prebuilt {env} failed ({type(e).__name__}: "
               f"{str(e)[:120]}); falling back to the lockfile build",
@@ -639,6 +647,14 @@ def freeze(env_name: str, conda: str | None = None,
     """
     import re
     conda = conda or _conda_bin("conda")
+    # conda env export exits 0 with an EMPTY env for a name that does not
+    # exist, so without this check a typo silently overwrites a committed
+    # lockfile with a stub - and freeze --all on a machine without the envs
+    # would destroy all of them while printing success.
+    if env_name not in installed_envs(conda):
+        raise FileNotFoundError(
+            f"no conda env named {env_name!r} on this machine "
+            f"(see `conda env list`); freeze captures EXISTING envs only")
     dst_dir = Path(out_dir) if out_dir else _LOCKS_DIR
     dst_dir.mkdir(parents=True, exist_ok=True)
 

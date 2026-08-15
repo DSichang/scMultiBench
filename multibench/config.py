@@ -90,9 +90,20 @@ def ensure_repo(path=None):
         return p
     if (_ROOT / "tools_scripts").is_dir():
         return _ROOT
+    if p.exists():
+        # a directory without tools_scripts is most likely an interrupted
+        # clone; refuse to guess and never delete something we did not make
+        raise RuntimeError(
+            f"{p} exists but has no tools_scripts/ - remove it (or point "
+            f"repo_path elsewhere) and the method scripts will be fetched "
+            f"fresh")
     print(f"method scripts not found - fetching PYangLab/scMultiBench (once) into {p} ...",
           flush=True)
+    part = p.with_name(p.name + ".partial")
+    import shutil as _sh
+    _sh.rmtree(part, ignore_errors=True)
     subprocess.run(["git", "clone", "--depth", "1",
-                    "https://github.com/PYangLab/scMultiBench.git", str(p)],
+                    "https://github.com/PYangLab/scMultiBench.git", str(part)],
                    check=True)
+    part.rename(p)
     return p

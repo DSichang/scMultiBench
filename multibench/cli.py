@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 
 from . import discover, load_results
 from . import plot as plot_ns
@@ -132,6 +134,9 @@ def _cmd_env(args) -> int:
                 except Exception as e:  # noqa: BLE001 - report per-env, keep going
                     print(f"SKIP {env}: {str(e)[:120]}")
         else:
+            if not getattr(args, "env", None):
+                print("error: name an env to freeze, or pass --all")
+                return 2
             print(f"froze {args.env} -> {envs.freeze(args.env)}")
         return 0
     if cmd == "create-group":
@@ -228,7 +233,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        return 130
+    except Exception as e:  # noqa: BLE001 - the CLI's single error boundary
+        if os.environ.get("MULTIBENCH_DEBUG"):
+            raise
+        msg = e.args[0] if isinstance(e, KeyError) and e.args else e
+        print(f"error: {msg}", file=sys.stderr)
+        print("(set MULTIBENCH_DEBUG=1 for the full traceback)", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

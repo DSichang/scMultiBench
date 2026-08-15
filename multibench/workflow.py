@@ -384,13 +384,24 @@ def _arm_deadline(seconds):
     """
     if not seconds:
         return _NOT_ARMED
+    import math
     import signal
+    import threading
+    import warnings
+
+    if threading.current_thread() is not threading.main_thread():
+        # signal.signal raises off the main thread; a deadline that cannot be
+        # armed must be SAID, not silently dropped
+        warnings.warn("timeout= is unavailable off the main thread; "
+                      "running without a deadline")
+        return _NOT_ARMED
 
     def _fire(signum, frame):
         raise TimeoutError(f"exceeded timeout of {seconds}s")
 
     prev = signal.signal(signal.SIGALRM, _fire)
-    signal.alarm(int(seconds))
+    # int() truncation turned timeout=0.5 into alarm(0) = NO alarm at all
+    signal.alarm(max(1, math.ceil(seconds)))
     return prev
 
 
