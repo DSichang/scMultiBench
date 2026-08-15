@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import os
 import sys
 
-from . import discover, load_results
-from . import plot as plot_ns
 
 
 def _cmd_list(args) -> int:
@@ -19,6 +18,7 @@ def _cmd_list(args) -> int:
 
 def _cmd_find(args) -> int:
     needs = True if args.needs_labels else None
+    from . import discover
     for m in discover.find_methods(category=args.category, task=args.task,
                                    needs_labels=needs, atac=args.atac,
                                    runnable=args.runnable or None):
@@ -29,6 +29,8 @@ def _cmd_find(args) -> int:
 def _cmd_plot(args) -> int:
     if args.kind != "bubble":
         raise SystemExit(f"unknown plot kind {args.kind!r}")
+    from . import load_results
+    from . import plot as plot_ns
     df = load_results(category=args.category, dataset=args.dataset)
     metrics = args.metrics.split(",") if args.metrics else None
     plot_ns.bubble(df, metrics=metrics, aggregate=args.aggregate, save=args.out)
@@ -60,7 +62,8 @@ def _cmd_run(args) -> int:
 def _cmd_evaluate(args) -> int:
     import multibench
     df = multibench.evaluate(output=args.output, category=args.category, task=args.task,
-                           labels=args.labels, clustering=args.cluster)
+                           labels=args.labels, clustering=args.cluster,
+                           batch=getattr(args, "batch", None))
     if args.out:
         df.to_csv(args.out)
         print(f"wrote {args.out}")
@@ -144,7 +147,7 @@ def _cmd_env(args) -> int:
         if not getattr(args, "run", False):
             print("# dry-run — add --run to execute:")
             for c in cmds:
-                print(" ".join(c))
+                print(shlex.join(c))
         else:
             print(f"created group env {args.group}")
         return 0
@@ -152,7 +155,7 @@ def _cmd_env(args) -> int:
     name = getattr(args, "name", None)
     if cmd == "recipe":
         for c in envs.create_commands(method, env_name=name):
-            print(" ".join(c))
+            print(shlex.join(c))
         return 0
     if cmd == "yml":
         y = envs.environment_yml(method, env_name=name)
@@ -169,7 +172,7 @@ def _cmd_env(args) -> int:
         if not getattr(args, "run", False):
             print("# dry-run — add --run to execute:")
             for c in cmds:
-                print(" ".join(c))
+                print(shlex.join(c))
         else:
             print(f"created environment for {method}")
         return 0
@@ -213,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--output", required=True)
     pe.add_argument("--category", help="reserved; not used by v1 metrics")
     pe.add_argument("--task", default="clustering")
+    pe.add_argument("--batch", help="per-cell batch labels CSV (required for --task batch/all)")
     pe.add_argument("--labels"); pe.add_argument("--cluster"); pe.add_argument("--out")
     pe.set_defaults(func=_cmd_evaluate)
 

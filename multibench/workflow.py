@@ -324,6 +324,8 @@ def scan(dataset: str, category: str | None = None,
     starts a method that cannot finish. List them with ``multibench env
     doctor``; build them with ``multibench env install --run``.
 """
+    if category is not None:
+        config.category_folder(category)   # raises with the valid list on a typo
     rows = []
     for spec, v, cat, mods in _variant_rows(category):
         rt = _runtimes().get(spec.id, {})
@@ -800,6 +802,14 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     Methods can take minutes to hours; a failure is recorded, never raised, so one
     bad method cannot abort the sweep.
     """
+    config.category_folder(category)       # raises with the valid list on a typo
+    if methods is not None:
+        from .engine import registry as _reg
+        _known = set(_reg.list_methods())
+        _unknown = [m for m in methods if m not in _known]
+        if _unknown:
+            raise KeyError(
+                f"unknown method(s) {_unknown}; see mtb.list_methods()")
     plan = scan(dataset, category=category, data_path=data_path)
     plan = plan[plan["runnable"]]
     if methods is not None:
