@@ -62,7 +62,11 @@ producing a quietly broken environment.
 ## Verifying your install
 
 ```bash
-python -m pytest tests/ -q          # 215 tests
+python -m pytest tests/ -q          # 217 tests on the benchmark host;
+                                    # without the reference data the
+                                    # data-dependent subset fails with
+                                    # FileNotFoundError - expected, not a
+                                    # broken install
 ```
 
 Then the smallest real end-to-end check:
