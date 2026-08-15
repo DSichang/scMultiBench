@@ -48,16 +48,28 @@ def test_run_invokes_subprocess_and_loads_output(tmp_path, monkeypatch):
 
     calls = {}
 
-    def fake_run(cmd, cwd, capture_output, text, env=None):
-        # simulate the method writing embedding.h5 into the out_dir (cwd)
-        calls["cmd"] = cmd
-        calls["cwd"] = cwd
-        with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
-            f.create_dataset("data", data=np.zeros((6, 3)))
-        class R: returncode = 0; stdout = ""; stderr = ""
-        return R()
+    class FakePopen:
+        # the runner spawns via Popen(start_new_session=True) so a timeout
+        # can kill the whole process tree; the fake mirrors that interface
+        def __init__(self, cmd, cwd, stdout, stderr, text, env=None,
+                     start_new_session=False):
+            calls["cmd"] = cmd
+            calls["cwd"] = cwd
+            self.pid = 4242
+            self.returncode = 0
+            with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
+                f.create_dataset("data", data=np.zeros((6, 3)))
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+        def communicate(self):
+            return "", ""
+
+        def kill(self):
+            pass
+
+        def wait(self):
+            return self.returncode
+
+    monkeypatch.setattr(runner.subprocess, "Popen", FakePopen)
 
     res = mtb.run(method="SCALEX", category="diagonal",
                   inputs={"rna": str(tmp_path/"a.h5"), "atac_gas": str(tmp_path/"b.h5")},
@@ -72,11 +84,22 @@ def test_run_surfaces_stdout_and_stderr_on_failure(tmp_path, monkeypatch):
     from multibench.engine import runner
     import pytest
 
-    def fake_run(cmd, cwd, capture_output, text, env=None):
-        class R: returncode = 1; stdout = "boom-out"; stderr = "boom-err"
-        return R()
+    class FakePopen:
+        def __init__(self, cmd, cwd, stdout, stderr, text, env=None,
+                     start_new_session=False):
+            self.pid = 4242
+            self.returncode = 1
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+        def communicate(self):
+            return "boom-out", "boom-err"
+
+        def kill(self):
+            pass
+
+        def wait(self):
+            return self.returncode
+
+    monkeypatch.setattr(runner.subprocess, "Popen", FakePopen)
 
     with pytest.raises(RuntimeError) as excinfo:
         mtb.run(method="SCALEX", category="diagonal",
