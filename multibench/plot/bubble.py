@@ -76,6 +76,18 @@ def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
 def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
                 aggregate: str = "dataset") -> BubbleTable:
     """Pivot tidy long results into per-family matrices plus a combined row order."""
+    need = {"method", "metric", "value"}
+    have = set(getattr(long_df, "columns", []))
+    if not need.issubset(have):
+        missing = sorted(need - have)
+        hint = ""
+        if "Value" in have or getattr(long_df, "index", None) is not None and getattr(long_df.index, "name", None) == "metric":
+            hint = (" This looks like evaluate()'s wide output - convert it "
+                    "with mtb.eval.to_long(df, method=..., dataset=..., "
+                    "category=...) first.")
+        raise ValueError(
+            f"bubble() needs a tidy long frame with columns "
+            f"['method', 'metric', 'value']; missing {missing}.{hint}")
     df = long_df.copy()
     if methods is not None:
         df = df[df["method"].isin(methods)]

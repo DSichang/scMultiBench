@@ -58,6 +58,8 @@ def _to_anndata(src):
                 "alternatively convert the input to .h5ad/.csv first."
             ) from exc
         return ad.read_loom(p)
+    if not p.exists():
+        raise FileNotFoundError(f"input file does not exist: {p}")
     raise ValueError(f"unsupported input format: {p.name}")
 
 

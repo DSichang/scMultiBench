@@ -198,12 +198,24 @@ def group_create_commands(group: str, env_name: str | None = None,
     return _install_commands(spec, env_name or group, conda)
 
 
+def _check_methods(methods):
+    """Unknown names in methods= fabricated empty plans instead of failing."""
+    if not methods:
+        return
+    from . import registry
+    known = set(registry.list_methods())
+    unknown = [m for m in methods if m not in known]
+    if unknown:
+        raise KeyError(f"unknown method(s) {unknown}; see `multibench list`")
+
+
 def plan(category: str | None = None, methods: list[str] | None = None) -> list[dict]:
     """Which envs to build to cover a set of methods (e.g. all for a category).
 
     Returns [{env, shared, methods}] — one entry per distinct env, listing the
     methods it serves. Build these (few) envs instead of one per method.
     """
+    _check_methods(methods)
     if methods is None:
         methods = registry.list_methods(category=category)
     shared = _merged_groups()
@@ -412,7 +424,13 @@ def split_lock(text: str):
 
 def _materialise_split(env_name: str, lock):
     """Write the conda-only YAML and pip requirements a two-phase install needs."""
-    build_dir = _LOCKS_DIR / ".build" / env_name
+    # never scribble inside an installed package (site-packages must stay
+    # read-only); a repo checkout keeps the old path for inspectability
+    if (_LOCKS_DIR.parents[2] / "pyproject.toml").is_file():
+        build_dir = _LOCKS_DIR / ".build" / env_name
+    else:
+        import tempfile
+        build_dir = Path(tempfile.gettempdir()) / "multibench_envbuild" / env_name
     build_dir.mkdir(parents=True, exist_ok=True)
     conda_yaml, pip_lines = split_lock(lock.read_text(encoding="utf-8"))
     y = build_dir / "conda.yml"
@@ -476,6 +494,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
     that are MISSING and have a lockfile (existing envs are skipped; envs without
     a lockfile are reported, not built).
     """
+    _check_methods(methods)
     have = set(installed_envs(conda))
     if methods is None:
         methods = registry.list_methods(category=category)
@@ -503,6 +522,7 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
 
     A fresh machine sees exists=False everywhere; run create_all(dry_run=False).
     """
+    _check_methods(methods)
     have = set(installed_envs(conda))
     if methods is None:
         methods = registry.list_methods(category=category)
