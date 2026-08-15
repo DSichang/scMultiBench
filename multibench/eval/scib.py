@@ -140,8 +140,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         import scib.metrics as me
     except ImportError as e:
         raise RuntimeError(
-            "metrics need the evaluation extra (scib + scanpy), which is not "
-            "installed here - run: pip install -e '.[eval]'"
+            "metrics need scib and scanpy, which are not installed here - "
+            "run: pip install scib scanpy"
         ) from e
 
     n = np.asarray(emb).shape[0]

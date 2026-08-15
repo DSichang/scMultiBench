@@ -163,8 +163,24 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # cwd=out_dir. The out_dir is still passed via the --save_path arg, so
     # outputs land in the correct place regardless.
     exec_cwd = str((repo / variant.entrypoint).parent) if variant.cwd_at_script else str(workdir)
-    proc = subprocess.run(cmd, cwd=exec_cwd, capture_output=True, text=True,
-                          env=run_env)
+    # The child is `conda run` and the actual method is its GRANDchild;
+    # killing only the direct child on a timeout left the method computing
+    # for hours. Own session -> one killpg reaps the whole tree.
+    popen = subprocess.Popen(cmd, cwd=exec_cwd, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, env=run_env,
+                             start_new_session=True)
+    try:
+        _stdout, _stderr = popen.communicate()
+    except BaseException:            # TimeoutError from the deadline included
+        import os as _os
+        import signal as _sig
+        try:
+            _os.killpg(popen.pid, _sig.SIGKILL)
+        except Exception:
+            popen.kill()
+        popen.wait()
+        raise
+    proc = subprocess.CompletedProcess(cmd, popen.returncode, _stdout, _stderr)
     if proc.returncode != 0:
         raise RuntimeError(
             f"{method} failed (exit {proc.returncode}).\n"
