@@ -88,6 +88,14 @@ def method_info(method: str, files_dir: Path | str | None = None) -> dict:
         "needs_labels": s.needs_labels, "status": s.status,
         "setup_hint": s.setup_hint,
         "variants": [v.entrypoint for v in s.variants],
+        # Where this method's UNMODIFIED upstream scripts live - the folder
+        # carries the method's own imports/reference; the practical citation
+        # pointer the README promises.
+        "scripts_url": (
+            "https://github.com/PYangLab/scMultiBench/tree/main/"
+            + "/".join(s.variants[0].entrypoint.split("/")[:2])
+            if s.variants and s.variants[0].entrypoint.startswith("tools_scripts/")
+            else None),
         # What this method can actually be dispatched for. Methods like Multigrate
         # support several integration categories, each with its OWN modality
         # combination - this is the list to pass to run()/inputs_for().
