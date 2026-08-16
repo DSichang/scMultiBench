@@ -268,7 +268,7 @@ or peaks - because the wrong one runs to completion and returns a plausible but
 wrong embedding. A shipped label file, in full:""")
     code("""cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
 print(cty.name)
-print(*open(cty).read().splitlines()[:4], sep="\\n")""")
+print(*cty.read_text().splitlines()[:4], sep="\\n")""")
     md("""Converting an AnnData object to that layout, executed:""")
     code("""import anndata as ad, numpy as np, h5py, tempfile, os
 tmp = tempfile.mkdtemp()
