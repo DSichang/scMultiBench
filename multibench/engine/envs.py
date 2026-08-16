@@ -232,6 +232,51 @@ def plan(category: str | None = None, methods: list[str] | None = None) -> list[
 PACKED_URL = "https://github.com/DSichang/scMultiBench/releases/download/envs-v1"
 
 
+def _envs_dir(conda_bin: str) -> Path | None:
+    """Where this conda/mamba keeps named environments, or None.
+
+    The key names in ``info --json`` are not stable across tools or major
+    versions - conda answers ``envs_dirs``/``root_prefix``, mamba >= 2 answers
+    ``"envs directories"``/``"base environment"`` - and ``info --base`` is prose
+    in mamba and a bare path in conda. So: accept every spelling, and when the
+    tool answers with none of them, fall back to the layout every installation
+    shares regardless of schema (the launcher lives at ``<root>/bin/<tool>``).
+    Candidates are tried in order and the first writable one wins, because an
+    env unpacked into a directory conda does not search is invisible by name.
+    """
+    import json as _json
+    import os
+
+    def _paths(value):
+        items = value if isinstance(value, (list, tuple)) else [value]
+        return [Path(str(v)) for v in items if str(v or "").startswith("/")]
+
+    cands: list[Path] = []
+    try:
+        out = subprocess.run([conda_bin, "info", "--json"],
+                             capture_output=True, text=True).stdout
+        info = _json.loads(out) if out.strip().startswith("{") else {}
+    except Exception:  # noqa: BLE001 - any failure just means "ask elsewhere"
+        info = {}
+    for key in ("envs_dirs", "envs directories"):
+        cands += _paths(info.get(key))
+    for key in ("root_prefix", "base environment"):
+        cands += [p / "envs" for p in _paths(info.get(key))]
+    exe = shutil.which(conda_bin)
+    if exe:
+        root = Path(exe).resolve().parent.parent
+        if (root / "conda-meta").is_dir() or (root / "envs").is_dir():
+            cands.append(root / "envs")
+    for var in ("CONDA_ROOT", "MAMBA_ROOT_PREFIX"):
+        cands += [p / "envs" for p in _paths(os.environ.get(var))]
+
+    for d in cands:
+        probe = d if d.is_dir() else d.parent
+        if probe.is_dir() and os.access(probe, os.W_OK):
+            return d
+    return None
+
+
 def install_packed(env: str, conda: str | None = None) -> bool:
     """Provision ``env`` from a prebuilt conda-pack archive, if one is published.
 
@@ -250,23 +295,13 @@ def install_packed(env: str, conda: str | None = None) -> bool:
     bin_ = _conda_bin() if conda is None else conda
     if shutil.which(bin_) is None:
         return False
-    # `info --base` is NOT parseable across tools: mamba prints
-    # "base environment : /usr/local" where conda prints the bare path -
-    # the naive parse built envs under a literal "base environment : ..."
-    # directory on condacolab. --json is stable for both.
     import json as _json
-    try:
-        _info = _json.loads(subprocess.run([bin_, "info", "--json"],
-                                           capture_output=True,
-                                           text=True).stdout)
-        base = _info.get("root_prefix") or ""
-    except Exception:
-        base = ""
-    if not (base and str(base).startswith("/")):
-        print(f"[env] could not determine the conda root from {bin_}; "
+    envs_root = _envs_dir(bin_)
+    if envs_root is None:
+        print(f"[env] could not locate the environments directory of {bin_}; "
               "falling back to the lockfile build", flush=True)
         return False
-    dest = Path(base) / "envs" / env
+    dest = envs_root / env
     if dest.exists():
         return True
     # A shipped manifest maps env -> archive URL, so archives can live where
