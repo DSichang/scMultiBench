@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_READ = [
     "engine/methods.yaml",
     "engine/params.yaml",
+    "engine/upstream_knobs.yaml",
     "engine/runtimes.yaml",
     "engine/env_specs.yaml",
     "engine/env_groups.yaml",

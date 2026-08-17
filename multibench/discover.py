@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .engine import registry, envs
+from .engine import registry, upstream, envs
 from .engine.runner import _AUX_ROLES
 
 
@@ -109,6 +109,10 @@ def method_info(method: str, files_dir: Path | str | None = None) -> dict:
                                      "tunable": dict(v.tunable)}
                    for v in s.variants},
     }
+    # An empty `tunable` says the SCRIPT exposes nothing, not that the method
+    # has no hyperparameters - so ship what it pins and what its library
+    # documents, or the honest answer reads as a false one.
+    info.update(upstream.knobs_for(s.id))
     if files_dir is not None:
         from .data import catalog
         cat = catalog.methods(files_dir)
@@ -138,8 +142,16 @@ def params_for(method: str, category: str | None = None,
       on its command line, as ``{name: {"default": ..., "type": ...}}``.
 
     An **empty** ``tunable`` means the upstream script exposes no hyperparameters
-    (they are hardcoded in its source). Because this project never modifies
-    method scripts, such a method cannot be tuned through the wrapper.
+    on its command line. Because this project never modifies method scripts,
+    such a method cannot be tuned through the wrapper - but it is not
+    parameterless, so two further keys say what it actually does:
+
+    * ``fixed_in_script`` — the values the script pins, each with the
+      ``file:line`` that pins it.
+    * ``upstream_knobs`` — what the wrapped library documents (with its own
+      defaults), unreachable without editing the script.
+
+    Both are empty for methods outside the upstream audit.
 
     ``category``/``modalities`` select the variant, exactly like ``run``. They may
     be omitted when the method has only one variant.
@@ -177,5 +189,9 @@ def params_for(method: str, category: str | None = None,
         v = cands[0]
     else:
         v = s.select(category, set(modalities))
+    up = upstream.knobs_for(s.id)
     return {"method": s.id, "variant": _variant_key(v),
-            "defaults": dict(v.params), "tunable": dict(v.tunable)}
+            "defaults": dict(v.params), "tunable": dict(v.tunable),
+            "fixed_in_script": up["fixed_in_script"],
+            "upstream_knobs": up["upstream_knobs"],
+            "upstream_url": up["upstream_url"]}
