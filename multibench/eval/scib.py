@@ -2,11 +2,63 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import io
 import warnings
 
 import numpy as np
 import pandas as pd
+
+# Metrics that shell out to scib's prebuilt LISI helper binary.
+_LISI_METRICS = ("cLISI", "iLISI")
+
+
+@functools.lru_cache(maxsize=1)
+def _lisi_helper_problem() -> str | None:
+    """Why scib's LISI helper cannot run here, or None when it can.
+
+    scib runs a prebuilt C++ binary with neither ``check=True`` nor any capture
+    of its stderr, so a binary that fails to start is discovered much later - as
+    a FileNotFoundError on an output file that was never written, once per
+    metric, with the actual cause discarded. A loader failure (an older
+    libstdc++ ahead of the system one, a foreign architecture) is invisible that
+    way. Probing the binary once turns it into one message naming the cause.
+
+    Healthy behaviour, verified on Linux x86-64: exits 0 and prints its usage
+    line when called with no arguments.
+    """
+    import os
+    import subprocess
+    from pathlib import Path
+
+    try:
+        import scib
+    except Exception as exc:  # noqa: BLE001 - absence is the caller's problem
+        return f"scib is not importable ({type(exc).__name__})"
+    exe = Path(scib.__file__).parent / "knn_graph" / "knn_graph.o"
+    if not exe.is_file():
+        return f"{exe} is missing from the scib installation"
+    if not os.access(exe, os.X_OK):
+        try:
+            exe.chmod(exe.stat().st_mode | 0o111)
+        except OSError:
+            return f"{exe} is not executable and its mode cannot be changed"
+    try:
+        p = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
+    except OSError as exc:
+        return f"{exe} cannot be executed here ({type(exc).__name__}: {exc})"
+    except subprocess.TimeoutExpired:
+        return None                      # it started; that is all we asked
+    # Evidence that it ran at all: a clean exit, or anything on stdout (the
+    # binary answers a bare invocation with its usage line). Judging by the
+    # usage TEXT would turn a future wording change into a false alarm that
+    # silently drops two metrics; judging by "did it produce anything" does
+    # not, while still catching the loader failure (exit 127, stderr only)
+    # and the silent crash (non-zero, no output) that scib discards today.
+    if p.returncode == 0 or (p.stdout or "").strip():
+        return None
+    err = (p.stderr or "").strip().splitlines()
+    return err[0] if err else f"{exe} exited {p.returncode} with no output"
 
 
 def _build_adata(emb, celltype, cluster, batch):
@@ -217,6 +269,21 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         """
         if only is not None and name not in only:
             return
+        if name in _LISI_METRICS:
+            problem = _lisi_helper_problem()
+            if problem:
+                import pathlib as _pl
+                import scib as _scib
+                _kg = _pl.Path(_scib.__file__).parent / "knn_graph"
+                warnings.warn(
+                    f"scib metric {name!r} needs scib's LISI helper binary, "
+                    f"which cannot run here: {problem}. Recording NaN. To fix "
+                    f"it, rebuild the binary from the source scib ships:\n"
+                    f"    g++ -std=c++11 -O3 -o {_kg / 'knn_graph.o'} "
+                    f"{_kg / 'knn_graph.cpp'}"
+                )
+                out[name] = float("nan")
+                return
         try:
             # scib prints per-chunk progress from inside some metrics (the LISI
             # family especially) and emits third-party deprecation warnings;
