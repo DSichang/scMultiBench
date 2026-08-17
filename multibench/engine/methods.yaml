@@ -698,7 +698,7 @@ methods:
       - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
         entrypoint: tools_scripts/PASTE/main_PASTE_pairwise.py
         language: python
-        cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT align (paste-bio)
+        cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT align (paste-bio). RUN-VERIFIED on D60 from the PUBLISHED script: 12 aligned slices, every coordinate moved
         args:
           - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files
           - {role: out_dir,  flag: "--save_dir"}    # writes aligned_slice_*.h5ad into save_dir
@@ -712,7 +712,7 @@ methods:
       - when: {category: cross}
         entrypoint: tools_scripts/PASTE2/main_PASTE2.py
         language: python
-        cwd_at_script: true
+        cwd_at_script: true            # RUN-VERIFIED on D60 from the PUBLISHED script: 12 aligned slices, every coordinate moved
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}
