@@ -52,10 +52,17 @@ def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
     assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py")) == ""
 
 
-def test_the_four_spatial_variants_are_the_ones_affected():
-    """Documents the scope: these carry machine-specific absolute entrypoints."""
+def test_only_the_known_two_still_need_a_machine_specific_script():
+    """The outstanding list, so it cannot grow silently - or shrink unnoticed.
+
+    PASTE and PASTE2 were repointed at the published scripts once those were
+    shown to produce the same output. SPIRAL and GPSA cannot be: upstream
+    main_SPIRAL.py is the broken variant, and upstream main_GPSA.py writes an
+    elapsed time instead of the aligned slices. When their working scripts are
+    published, this set empties and the assertion below is what tells you.
+    """
     from multibench.engine import registry
     absolute = {m for m in mtb.list_methods()
                 for v in registry.get(m).variants
                 if Path(v.entrypoint).is_absolute()}
-    assert absolute == {"SPIRAL", "GPSA", "PASTE", "PASTE2"}, absolute
+    assert absolute == {"SPIRAL", "GPSA"}, absolute
