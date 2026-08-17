@@ -1,0 +1,1933 @@
+# AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_upstream_knobs.py
+#
+# Why a method reports zero tunable parameters. `params_for` lists what the
+# upstream script accepts on its command line; these are the hyperparameters it
+# FIXES in its source (with the file:line that fixes them), plus the knobs the
+# wrapped library documents but the script never exposes. Changing the latter
+# requires editing tools_scripts/, which this package never does.
+#
+# Every fixed_in_script entry was verified against the upstream file at
+# generation time.
+Concerto:
+  fixed_in_script:
+  - name: preprocessing_rna min_features (ADT/protein)
+    source: tools_scripts/Concerto/bgi/bert/tokenizers.py:184
+    value: '0'
+  - name: preprocessing_rna is_hvg (ADT/protein)
+    source: tools_scripts/Concerto/bgi/bert/tokenizers.py:184
+    value: 'False'
+  - name: preprocessing_rna min_features (RNA)
+    source: tools_scripts/Concerto/bgi/bert/optimizers.py:185
+    value: '0'
+  - name: preprocessing_rna is_hvg (RNA) — HVG selection disabled, so n_top_features=2000
+      never applies
+    source: tools_scripts/Concerto/bgi/bert/optimizers.py:185
+    value: 'False'
+  - name: train super_parameters (batch_size / epoch_pretrain / lr / drop_rate)
+    source: tools_scripts/Concerto/bgi/clustering/iic/graphs.py:202
+    value: batch_size=64, epoch_pretrain=5, lr=1e-4, drop_rate=0.1
+  - name: inference super_parameters (batch_size / epoch_pretrain / lr / drop_rate) and n_cells_for_sample
+    source: tools_scripts/Concerto/bgi/clustering/iic/models_iic.py:208
+    value: batch_size=128, epoch_pretrain=1, lr=1e-4, drop_rate=0.1, n_cells_for_sample=None
+  - name: saved_weight_path (which epoch checkpoint to use; None = last epoch)
+    source: tools_scripts/Concerto/main_Concerto.py:207
+    value: None
+  - name: encoder embedding_dims
+    source: tools_scripts/Concerto/bgi/bert/tokenizers.py:43
+    value: '128'
+  - name: encoder attention head widths head_1 / head_2 / head_3
+    source: tools_scripts/Concerto/bgi/clustering/iic/data.py:46
+    value: 128 / 128 / 128
+  - name: decoder embedding_dims
+    source: tools_scripts/Concerto/bgi/bert/backend.py:52
+    value: '128'
+  - name: LR-schedule horizon multiplier (total_update_steps = 300 x epochs)
+    source: tools_scripts/Concerto/bgi/bert/snippets.py:71
+    value: '300'
+  - name: PolynomialDecay end_learning_rate factor / power
+    source: tools_scripts/Concerto/bgi/bert/layers.py:72
+    value: lr*1e-2, power=1
+  - name: dataset shuffle_size
+    source: tools_scripts/Concerto/bgi/layers/gene_embedding.py:87
+    value: '10000'
+  - name: SimCLR contrastive loss temperature
+    source: tools_scripts/Concerto/bgi/bert/layers.py:110
+    value: '0.1'
+  - name: super_parameters None-fallback inside the script's own copy of concerto_train_multimodal
+      (dead in practice — line 202 always passes explicit values)
+    source: tools_scripts/Concerto/bgi/clustering/iic/graphs.py:34
+    value: batch_size=64, epoch_pretrain=3, lr=1e-4, drop_rate=0.1
+  notes: 'Only one candidate entrypoint exists (main_Concerto.py); concerto_function5_3.py
+    and bgi/ are the vendored library. Everything on the command line is I/O only (--path1,
+    --path2, --save_path) — not a single hyperparameter is exposed. Two structural caveats
+    worth flagging for the wrapper: (1) main_Concerto.py REDEFINES concerto_train_multimodal
+    in its own body (lines 27-131), shadowing the library function, so the architecture constants
+    (embedding_dims=128, head_1/2/3=128, shuffle_size=10000, temperature=0.1, total_update_steps=300*epochs)
+    are frozen in the benchmark script itself, not merely inherited from the library — a wrapper
+    cannot change them by passing arguments. (2) The vendored concerto_function5_3.py has
+    been EDITED relative to upstream: I diffed it against https://raw.githubusercontent.com/melobio/Concerto-reproducibility/main/concerto_function5_3.py
+    and preprocessing_rna''s defaults were changed from min_features=600/min_cells=3 to 0/0
+    and the sc.pp.filter_cells call was commented out (upstream line 64 ''sc.pp.filter_cells(adata,
+    min_genes=min_features)'' -> ''#sc.pp.filter_cells(...)''); the rest of the diff is added
+    debug prints. So the library defaults I quote for min_features/min_cells are the true
+    upstream ones, and the vendored copy no longer filters cells at all. Also note the script
+    writes adata_RNA.h5ad / adata_Protein.h5ad / tfrecord/ / weight/ into the CWD (''./''),
+    not into --save_path.'
+  upstream_knobs:
+  - default: '3'
+    effect: number of contrastive pre-training epochs over the TFRecord shards
+    name: epoch_pretrain
+  - default: 64 (train) / 32 (test)
+    effect: minibatch size for the SimCLR training and inference passes
+    name: batch_size
+  - default: 1e-4 (train) / 1e-5 (test)
+    effect: initial learning rate feeding the polynomial-decay Adam schedule
+    name: lr
+  - default: 0.1 in the super_parameters fallback; 0.05 in multi_embedding_attention_transfer's
+      own signature
+    effect: dropout rate inside the encoder/decoder attention networks
+    name: drop_rate
+  - default: '128'
+    effect: width of the learned gene/protein token embedding, i.e. latent dimensionality
+    name: embedding_dims
+  - default: 128 / 128 / 128
+    effect: widths of the three projection/attention head layers of the transfer network
+    name: head_1 / head_2 / head_3
+  - default: '0.1'
+    effect: softmax temperature of the contrastive objective, controlling how hard negatives
+      are weighted
+    name: temperature (simclr_loss)
+  - default: is_hvg=False, n_top_features=2000, min_features=600, min_cells=3, target_sum=10000,
+      log=True
+    effect: feature selection, cell/gene filtering and normalisation applied before TFRecord
+      creation
+    name: 'preprocessing_rna: is_hvg / n_top_features / min_features / min_cells / target_sum
+      / log'
+  upstream_url: https://github.com/melobio/Concerto-reproducibility/blob/main/concerto_function5_3.py
+Conos:
+  fixed_in_script:
+  - name: n.odgenes (pagoda2 preprocessing)
+    source: tools_scripts/Conos/main_Conos.Rmd:62
+    value: 3e3
+  - name: nPcs (pagoda2 preprocessing)
+    source: tools_scripts/Conos/main_Conos.Rmd:62
+    value: '30'
+  - name: min.transcripts.per.cell (pagoda2 cell filter)
+    source: tools_scripts/Conos/main_Conos.Rmd:62
+    value: '0'
+  - name: min.cells.per.gene (pagoda2 gene filter)
+    source: tools_scripts/Conos/main_Conos.Rmd:62
+    value: '0'
+  - name: k (inter-sample neighbourhood)
+    source: tools_scripts/Conos/main_Conos.Rmd:64
+    value: '15'
+  - name: k.self (within-sample neighbourhood)
+    source: tools_scripts/Conos/main_Conos.Rmd:64
+    value: '5'
+  - name: k.self.weight (spelled k.self.weigh; R partial matching)
+    source: tools_scripts/Conos/main_Conos.Rmd:64
+    value: '0.01'
+  - name: ncomps (alignment space dimensionality)
+    source: tools_scripts/Conos/main_Conos.Rmd:64
+    value: '30'
+  - name: n.odgenes (per-pair alignment)
+    source: tools_scripts/Conos/main_Conos.Rmd:64
+    value: 5e3
+  - name: space (reduced expression space)
+    source: tools_scripts/Conos/main_Conos.Rmd:64
+    value: '''PCA'''
+  - name: resolution (Leiden clustering)
+    source: tools_scripts/Conos/main_Conos.Rmd:65
+    value: '1.5'
+  - name: alpha (largeVis embedding)
+    source: tools_scripts/Conos/main_Conos.Rmd:66
+    value: 1/2
+  - name: n.cores
+    source: tools_scripts/Conos/main_Conos.Rmd:63
+    value: '1'
+  notes: 'Two main_*.Rmd files exist; I picked main_Conos.Rmd (no category suffix) over main_Conos_classification.Rmd.
+    The script takes only positional commandArgs() - N input paths plus a trailing save_path
+    (lines 82-88) - so every modelling knob is fixed in the body. Defaults above were read
+    from the library source at https://github.com/kharchenkolab/conos/blob/main/R/conclass.R
+    (buildGraph signature line 161, findCommunities line 431, embedGraph line 673) rather
+    than from a rendered docs page, because kharchenkolab.github.io/conos/reference/Conos.html
+    returns 404; a web search returned two conflicting sets of defaults, so I used the source
+    as the authority. leiden.community''s resolution=1.0 default is from kharchenkolab/leidenAlg
+    R/communities.R line 32: ''leiden.community <- function(graph, resolution=1.0, n.iterations=2)''.
+    Three things the wrapper author should know. (1) Line 64 spells the argument ''k.self.weigh'',
+    not ''k.self.weight''. This is not a bug - R partial argument matching resolves it unambiguously
+    to k.self.weight - but it is a 10x reduction from the library default of 0.1, which strongly
+    downweights within-dataset edges and pushes toward more aggressive cross-dataset mixing.
+    Any wrapper that also passes k.self.weight would collide with it. (2) The embedGraph alpha=1/2
+    on line 66 is 5x the library default of 0.1, which pulls neighbours much closer together
+    in the largeVis layout; embedGraph also has method=''largeVis'' (alternative ''UMAP''),
+    target.dims=2 and seed=1 left at defaults, and seed=1 is the only reason this script is
+    reproducible since it never calls set.seed(). (3) The pagoda2 preprocessing on line 62
+    deviates from basicP2proc defaults in two ways that matter: nPcs=30 vs the pagoda2 default
+    of 100, and min.transcripts.per.cell=0 vs the default of 100 (i.e. all cell filtering
+    is disabled); n.odgenes=3e3 and min.cells.per.gene=0 match the pagoda2 defaults. basicP2proc''s
+    signature is at kharchenkolab/pagoda2 R/pipelineHelpers.R line 24. Note also that line
+    62''s n.odgenes=3e3 (pagoda2, per-dataset overdispersed gene selection) and line 64''s
+    n.odgenes=5e3 (conos, per-pair alignment) are two different parameters in two different
+    packages and must be exposed separately. Unrelated to hyperparameters but worth flagging
+    for runnability: runConos() reads the global variable ''num'' at line 48 rather than deriving
+    it from its own path_list argument, and line 53 special-cases ''if (i == 3)'' to read
+    the third input with a different h5 layout, so the function is not safely callable outside
+    this script''s top-level context.'
+  upstream_knobs:
+  - default: '15'
+    effect: size of the inter-sample neighbourhood, i.e. how many cross-dataset cell-to-cell
+      links each cell gets
+    name: k
+  - default: '10'
+    effect: size of the within-sample neighbourhood
+    name: k.self
+  - default: '0.1'
+    effect: weight multiplier on intra-sample edges relative to inter-sample edges, trading
+      within-dataset structure against cross-dataset mixing
+    name: k.self.weight
+  - default: '40'
+    effect: number of components of the reduced space used for each pairwise alignment
+    name: ncomps
+  - default: '2000'
+    effect: number of overdispersed genes used in each pairwise alignment
+    name: n.odgenes
+  - default: '''PCA'''
+    effect: reduced expression space used to establish putative alignments; one of CPCA, JNMF,
+      genes, PCA, CCA, PMA
+    name: space
+  - default: NULL (equivalent to 0)
+    effect: single dial for how aggressively distinct subpopulations are forced together,
+      in place of hand-tuning k1/k
+    name: alignment.strength
+  - default: '1.0'
+    effect: granularity of the Leiden clustering, i.e. how many communities are returned
+    name: resolution (passed through findCommunities(...) to leidenAlg::leiden.community)
+  upstream_url: https://github.com/kharchenkolab/conos/blob/main/R/conclass.R
+GLUE:
+  fixed_in_script:
+  - name: n_top_genes (HVG selection, scanpy)
+    source: tools_scripts/GLUE/GLUE_human.py:71
+    value: '2000'
+  - name: flavor (HVG selection method)
+    source: tools_scripts/GLUE/GLUE_human.py:71
+    value: '"seurat_v3"'
+  - name: n_comps (RNA PCA dimensions fed to GLUE as use_rep="X_pca")
+    source: tools_scripts/GLUE/GLUE_human.py:75
+    value: '100'
+  - name: n_components (ATAC LSI dimensions fed to GLUE as use_rep="X_lsi")
+    source: tools_scripts/GLUE/GLUE_human.py:79
+    value: '100'
+  - name: n_iter (LSI randomized-SVD iterations)
+    source: tools_scripts/GLUE/GLUE_human.py:79
+    value: '15'
+  - name: prob_model for RNA (configure_dataset positional arg)
+    source: tools_scripts/GLUE/GLUE_human.py:115
+    value: '"NB"'
+  - name: use_highly_variable for RNA
+    source: tools_scripts/GLUE/GLUE_human.py:115
+    value: 'True'
+  - name: prob_model for ATAC (configure_dataset positional arg)
+    source: tools_scripts/GLUE/GLUE_human.py:120
+    value: '"NB"'
+  - name: use_highly_variable for ATAC
+    source: tools_scripts/GLUE/GLUE_human.py:120
+    value: 'True'
+  - name: use_batch (batch correction) — disabled by being commented out
+    source: tools_scripts/GLUE/GLUE_human.py:117
+    value: commented out (no batch key used)
+  notes: 'Script chosen: GLUE_human.py — the GLUE directory has no main_*.py; the three candidates
+    are GLUE_human.py, GLUE_human_multibatch.py and GLUE_mouse.py, and GLUE_human.py is the
+    plain/no-suffix variant. The other two fix the identical preprocessing constants (GLUE_human_multibatch.py
+    lines 75/79/83; GLUE_mouse.py lines 79/83/87), differing only in whether use_batch="batch"
+    is enabled and in species-specific gene-name handling. Big picture: NOTHING about the
+    GLUE model itself is exposed or even set. Line 128-131 reads `glue = scglue.models.fit_SCGLUE(\n
+    {"rna": rna, "atac": atac}, guidance_hvf,\n fit_kws={"directory": "glue"}\n)` — no init_kws,
+    no compile_kws, no balance_kws — so latent_dim, h_depth, h_dim, dropout, lam_*, lr, max_epochs,
+    patience and random_seed all silently take scglue''s library defaults and cannot be varied
+    without editing the script. All eight library knobs listed are therefore unreachable from
+    the command line. The three CLI flags are --path1/--path2/--save_path only (lines 22-24),
+    i.e. pure I/O. Excluded as I/O but worth flagging operationally: line 98 hardcodes the
+    annotation source as a bare relative filename, ` rna, gtf="gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz",`,
+    so the script only works if that GTF sits in the current working directory (see the method''s
+    README.md for the download link). Also excluded: `rcParams["figure.figsize"] = (4, 4)`
+    (line 18), which is cosmetic. Defaults cited from scglue master source (SCGLUEModel.__init__
+    / .compile / .fit); the readthedocs API page for fit_SCGLUE (https://scglue.readthedocs.io/en/latest/api/scglue.models.fit_SCGLUE.html)
+    documents only the kws-dict indirection, not the sub-parameter defaults.'
+  upstream_knobs:
+  - default: '50'
+    effect: dimensionality of the shared GLUE latent embedding (the actual benchmark output)
+    name: latent_dim
+  - default: '2'
+    effect: number of hidden layers in the per-modality encoders and the discriminator
+    name: h_depth
+  - default: '256'
+    effect: width of those hidden layers
+    name: h_dim
+  - default: '0.2'
+    effect: dropout rate used for regularization in encoders/discriminator
+    name: dropout
+  - default: '0.02'
+    effect: weight of the guidance-graph reconstruction term in the loss
+    name: lam_graph
+  - default: '0.05'
+    effect: weight of the adversarial cross-modality alignment term, i.e. how hard modalities
+      are forced together
+    name: lam_align
+  - default: 2e-3
+    effect: optimizer learning rate (SCGLUEModel.compile)
+    name: lr
+  - default: AUTO (heuristic from dataset size; paired with patience=AUTO, reduce_lr_patience=AUTO)
+    effect: training length and early-stopping behaviour (SCGLUEModel.fit)
+    name: max_epochs
+  upstream_url: https://raw.githubusercontent.com/gao-lab/GLUE/master/scglue/models/scglue.py
+GPSA:
+  fixed_in_script:
+  - name: n_top_genes (process_data default)
+    source: tools_scripts/GPSA/main_GPSA.py:52
+    value: '2000'
+  - name: filter_genes min_cells
+    source: tools_scripts/GPSA/main_GPSA.py:60
+    value: '10'
+  - name: highly_variable_genes flavor / subset
+    source: tools_scripts/GPSA/main_GPSA.py:65
+    value: flavor="seurat", subset=True
+  - name: n_top_genes (effective value at call site)
+    source: tools_scripts/GPSA/main_GPSA.py:75
+    value: '3000'
+  - name: KNeighborsRegressor n_neighbors / weights (spatial-autocorrelation gene screen)
+    source: tools_scripts/GPSA/main_GPSA.py:94
+    value: n_neighbors=10, weights="uniform"
+  - name: r2 threshold for keeping spatially-predictable genes
+    source: tools_scripts/GPSA/main_GPSA.py:98
+    value: '0.3'
+  - name: spatial coordinate rescaling max_val
+    source: tools_scripts/GPSA/main_GPSA.py:140
+    value: '10.0'
+  - name: S (Monte-Carlo samples per forward/training step)
+    source: tools_scripts/GPSA/main_GPSA.py:151
+    value: '5'
+  - name: N_GENES (size of final gene panel fed to the model)
+    source: tools_scripts/GPSA/main_GPSA.py:166
+    value: '20'
+  - name: fixed_view_idx (reference slice held fixed during alignment)
+    source: tools_scripts/GPSA/main_GPSA.py:169
+    value: '1'
+  - name: n_spatial_dims
+    source: tools_scripts/GPSA/main_GPSA.py:171
+    value: '2'
+  - name: m_G (inducing points in the common coordinate system)
+    source: tools_scripts/GPSA/main_GPSA.py:173
+    value: '200'
+  - name: m_X_per_view (inducing points per view/slice)
+    source: tools_scripts/GPSA/main_GPSA.py:174
+    value: '200'
+  - name: n_latent_gps
+    source: tools_scripts/GPSA/main_GPSA.py:176
+    value: '{"expression": None} (i.e. latent-GP layer disabled)'
+  - name: N_EPOCHS (training iterations)
+    source: tools_scripts/GPSA/main_GPSA.py:178
+    value: '5000'
+  - name: PRINT_EVERY (also the interval at which aligned coords are snapshotted)
+    source: tools_scripts/GPSA/main_GPSA.py:179
+    value: '25'
+  - name: data_init (inducing-point initialization)
+    source: tools_scripts/GPSA/main_GPSA.py:187
+    value: 'True'
+  - name: minmax_init
+    source: tools_scripts/GPSA/main_GPSA.py:188
+    value: 'False'
+  - name: grid_init
+    source: tools_scripts/GPSA/main_GPSA.py:189
+    value: 'False'
+  - name: mean_function
+    source: tools_scripts/GPSA/main_GPSA.py:191
+    value: '"identity_fixed"'
+  - name: kernel_func_warp
+    source: tools_scripts/GPSA/main_GPSA.py:192
+    value: rbf_kernel
+  - name: kernel_func_data
+    source: tools_scripts/GPSA/main_GPSA.py:193
+    value: rbf_kernel
+  - name: Adam learning rate
+    source: tools_scripts/GPSA/main_GPSA.py:197
+    value: 1e-2
+  notes: 'Only one entrypoint exists in tools_scripts/GPSA/ (main_GPSA.py), so no ambiguity
+    about which to pick. Its argparse (lines 25-28) exposes ONLY --data_dir and --save_dir,
+    both pure I/O; every modelling and preprocessing knob is fixed in the body, so the wrapper
+    currently offers zero hyperparameter surface for this method. Gotchas worth flagging for
+    the wrapper: - The n_top_genes=2000 default at line 52 is dead code — the only call site
+    (line 75) passes 3000, so the effective HVG count is 3000. - N_GENES=20 (line 166) is
+    the parameter that actually decides how many genes the GP sees: after the r2>0.3 spatial-autocorrelation
+    screen the panel is truncated to the 20 best-ranked genes (lines 98-104). This is by far
+    the most consequential fixed value and is not exposed. - Line 88, '' data_knn = processed_slices[1][:,
+    shared_gene_names]'', hardcodes slice index 1 as the reference for the kNN r2 gene screen;
+    it matches the hardcoded fixed_view_idx=1 at line 169, but both silently assume at least
+    two slices. - N_SAMPLES = None at line 167 ('' N_SAMPLES = None'') is assigned and never
+    used — I excluded it from the hardcoded list since it has no effect. - The n_latent_gps
+    branch at lines 205-207 writes ./out/W_st.csv, but is unreachable because N_LATENT_GPS[''expression'']
+    is None; if that knob is ever exposed, the wrapper must create ./out/ first. - Output
+    behaviour: --save_dir is passed to np.savetxt at line 240 as a FILE (it stores only the
+    elapsed runtime), while line 234 treats it as a directory via os.path.dirname. The aligned
+    slices returned by combine() at line 243 are never written to disk at all — the wrapper
+    has to capture them itself. Upstream comparison: the repo''s own example (linked in the
+    script''s comments, experiments/expression/st/st_alignment.py, and the README quickstart)
+    uses the same VariationalGPSA construction and lr=1e-2, but N_EPOCHS=3000 / PRINT_EVERY=100
+    rather than 5000 / 25 used here, and the library''s forward() default for S is 1 rather
+    than the 5 used here. Signatures were read from the library source at https://github.com/andrewcharlesjones/spatial-alignment/blob/main/gpsa/models/vgpsa.py
+    (and gpsa/models/gpsa.py for the inherited arguments); the project''s docs site returned
+    no content, so all defaults above come from the source signatures, not from prose docs.'
+  upstream_knobs:
+  - default: no default (required positional argument of VariationalGPSA.__init__)
+    effect: number of inducing locations per view in the warp GP layer, trading alignment
+      fidelity against time/memory
+    name: m_X_per_view
+  - default: no default (required positional argument of VariationalGPSA.__init__)
+    effect: number of inducing points on the common coordinate system shared across all views
+    name: m_G
+  - default: None
+    effect: per-modality dimension of the low-rank latent GP layer; when not None the model
+      learns a W matrix mapping latent GPs to observed genes instead of one GP per gene
+    name: n_latent_gps
+  - default: None
+    effect: which view(s) are treated as the fixed template whose coordinates are used as-is,
+      anchoring the common coordinate system
+    name: fixed_view_idx
+  - default: '1'
+    effect: number of Monte-Carlo samples drawn per step to estimate the variational objective;
+      higher reduces gradient noise at linear cost
+    name: S (argument of VariationalGPSA.forward)
+  - default: '"identity_fixed"'
+    effect: mean of the warp layer — 'identity_fixed' pins the warp mean to the identity map
+      rather than learning an affine/linear mean
+    name: mean_function
+  - default: '0.0'
+    effect: strength of the penalty pulling the learned warp mean toward the identity, i.e.
+      how much global deformation is allowed
+    name: mean_penalty_param
+  - default: None (all three)
+    effect: pin the RBF kernel lengthscales/variances instead of learning them, directly controlling
+      warp smoothness and the spatial scale of the data GP
+    name: fixed_warp_kernel_lengthscales / fixed_warp_kernel_variances / fixed_data_kernel_lengthscales
+  upstream_url: https://github.com/andrewcharlesjones/spatial-alignment/blob/main/gpsa/models/vgpsa.py
+MOFA2:
+  fixed_in_script:
+  - name: seed
+    source: tools_scripts/MOFA2/main_MOFA2.Rmd:37
+    value: '42'
+  - name: gpu_mode
+    source: tools_scripts/MOFA2/main_MOFA2.Rmd:38
+    value: 'TRUE'
+  - name: use_basilisk
+    source: tools_scripts/MOFA2/main_MOFA2.Rmd:45
+    value: 'FALSE'
+  notes: 'Two scripts exist in this directory; I read main_MOFA2.Rmd (no category suffix).
+    main_MOFA2_fs.Rmd is the feature-selection variant — I diffed them and the hyperparameter
+    block is byte-identical (same lines 37/38/45); it differs only in that it writes feature_score.RData
+    instead of embedding.h5. Note the file is a .Rmd but is plain R, invoked as `Rscript main_MOFA2.Rmd
+    ...` positionally: args are <modality files...> <batch_num> <n_modalities> <save_path>
+    (lines 50-53), all I/O. The script fixes almost nothing statistically: lines 34-36 take
+    data/model/training options straight from get_default_data_options / get_default_model_options
+    / get_default_training_options, so num_factors, likelihoods, maxiter, convergence_mode,
+    scale_views etc. are whatever MOFA2 defaults to for the given data — none of them are
+    reachable from the command line. Two caveats on the three hardcoded values: (a) seed <-
+    42 is a no-op, since the library''s own get_default_training_options already sets seed
+    = 42; (b) gpu_mode <- TRUE overrides the library default of FALSE and requires a working
+    cupy/GPU python backend in the reticulate env, and use_basilisk=FALSE (library default
+    is TRUE) means training runs against the ambient python mofapy2 rather than the isolated
+    basilisk env — both are environment-coupled choices a wrapper probably wants to expose
+    or override. Also worth flagging for the wrapper: line 32 builds the object with create_mofa_from_matrix(data,
+    groups) and line 33 immediately discards it by reassigning MOFAobject <- create_mofa(data,
+    groups=groups).'
+  upstream_knobs:
+  - default: '10 in the option list, then overwritten by a sample-size heuristic: 5 (N<=25),
+      15 (25<N<=1e3), 20 (1e3<N<=1e4), 25 (N>1e4)'
+    effect: number of latent factors in the joint embedding, i.e. the output dimensionality
+    name: num_factors
+  - default: inferred per view from the data (gaussian for continuous views)
+    effect: per-view noise model (gaussian / bernoulli / poisson), which matters for binary
+      ATAC or count views
+    name: likelihoods
+  - default: '''fast'''
+    effect: how strict the ELBO-based stopping criterion is ('fast' / 'medium' / 'slow')
+    name: convergence_mode
+  - default: '1000'
+    effect: maximum number of variational inference iterations
+    name: maxiter
+  - default: -1 (disabled)
+    effect: minimum variance explained below which a factor is pruned during training
+    name: drop_factor_threshold
+  - default: 'FALSE'
+    effect: whether each view is rescaled to unit variance, which rebalances modalities of
+      very different scale (e.g. RNA vs ADT)
+    name: scale_views
+  - default: 'FALSE'
+    effect: spike-and-slab sparsity prior on the loadings, controlling how sparse/interpretable
+      the factors are
+    name: spikeslab_weights
+  - default: 'FALSE'
+    effect: switches to stochastic variational inference for large datasets (and enables the
+      batch_size / learning-rate options)
+    name: stochastic
+  upstream_url: https://raw.githubusercontent.com/bioFAM/MOFA2/master/R/prepare_mofa.R
+MultiMAP:
+  fixed_in_script:
+  - name: strengths (per-dataset contribution to the embedding layout)
+    source: tools_scripts/MultiMAP/main_MultiMAP.py:48
+    value: '[0, 1] — RNA weighted 0, ATAC gene-activity weighted 1'
+  notes: 'Only one entrypoint (main_MultiMAP.py) and it is very thin, so the hardcoded list
+    is genuinely short: strengths=[0,1] at line 48 is the only literal hyperparameter value
+    in the body. Everything else is left at library defaults and is therefore fixed implicitly
+    rather than literally — MultiMAP.TFIDF_LSI(atac_peaks) at line 40 takes n_comps=50/binarize=True/random_state=0,
+    and MultiMAP.Integration at line 48 takes n_neighbors=None, seed=0, scale=True, n_components=2
+    with no way to override them from the CLI (--path1/2/3 and --save_path are I/O only).
+    Two related preprocessing choices are also unparameterised in the script: sc.pp.scale(rna_pca)
+    at line 44 and sc.pp.pca(rna_pca) at line 45 run at scanpy defaults, so the RNA PCA dimensionality
+    is not exposed. The strengths=[0,1] choice is a significant departure from the library
+    default of 0.5/0.5 and is the single highest-value knob for a wrapper to expose. Defaults
+    were read from MultiMAP/__init__.py (Integration/TFIDF_LSI signatures and docstrings)
+    and MultiMAP/matrix.py (the core MultiMAP() signature, https://github.com/Teichlab/MultiMAP/blob/master/MultiMAP/matrix.py),
+    since Integration forwards **kwargs down to MultiMAP().'
+  upstream_knobs:
+  - default: None -> 0.5 for every dataset
+    effect: relative contribution of each dataset to the layout of the joint embedding
+    name: strengths
+  - default: None -> 15 x number of input datasets
+    effect: neighbours per cell in the MultiGraph, setting how local the manifold is
+    name: n_neighbors
+  - default: None -> log2(n_neighbors)
+    effect: target cross-dataset neighbourhood cardinality used to calibrate the between-dataset
+      edge weights
+    name: cardinality
+  - default: '2'
+    effect: dimensionality of the returned X_multimap embedding
+    name: n_components
+  - default: None (derived from spread=1.0)
+    effect: minimum separation of points in the low-dimensional layout, i.e. cluster tightness
+    name: min_dist
+  - default: '0'
+    effect: RNG seed for the spectral initialisation and stochastic layout optimisation
+    name: seed / random_state
+  - default: 'True'
+    effect: whether each dataset is scaled to N(0,1) before the cross-dataset PCAs are computed
+    name: scale (Integration)
+  - default: '50'
+    effect: number of LSI components computed from the binarised, TF-IDF-transformed ATAC
+      peak matrix
+    name: n_comps (TFIDF_LSI)
+  upstream_url: https://github.com/Teichlab/MultiMAP/blob/master/MultiMAP/__init__.py
+MultiVI:
+  fixed_in_script:
+  - name: random.seed (python RNG seed)
+    source: tools_scripts/MultiVI/main_MultiVI.py:16
+    value: '1'
+  - name: n_epochs (max_epochs passed to model.train)
+    source: tools_scripts/MultiVI/main_MultiVI.py:71
+    value: '500'
+  - name: lr (learning rate passed to model.train)
+    source: tools_scripts/MultiVI/main_MultiVI.py:72
+    value: 1e-3
+  - name: n_epochs / lr as function defaults (same values, used when caller omits them)
+    source: tools_scripts/MultiVI/main_MultiVI.py:32
+    value: n_epochs=500, lr=1e-3
+  - name: min_cells_pct for feature filtering (feature must be seen in >= this % of cells)
+    source: tools_scripts/MultiVI/main_MultiVI.py:45
+    value: '1'
+  - name: batch_key for setup_anndata (batch == modality, so modality is the correction covariate)
+    source: tools_scripts/MultiVI/main_MultiVI.py:49
+    value: '"modality"'
+  notes: 'Script chosen: main_MultiVI.py (the only main_* in the directory; util.py is a helper
+    module it imports). Two things a wrapper author should know beyond the raw list: 1. The
+    module-level `lr = 1e-3` on line 72 is DEAD. Lines 73-75 call `run_MultiVI(\n file_paths,n_epochs\n)`
+    — only n_epochs is passed, so lr falls back to run_MultiVI''s own default. That default
+    happens to be the same 1e-3 (line 32), so behaviour is correct today, but the assignment
+    on line 72 has no effect and editing it alone would change nothing. The effective learning
+    rate is 1e-3, which is 10x the scvi-tools default of 1e-4. 2. More hyperparameters are
+    fixed one level down in the helper module, /private/tmp/claude-502/-Users-sdin3712-Documents-multitask-omics/be2bdaf3-2a80-434e-af99-9bee332d50d9/scratchpad/upstream/tools_scripts/MultiVI/util.py,
+    which main_MultiVI.py imports on line 14. I list them here rather than in `hardcoded`
+    so every line number in that array stays checkable against main_MultiVI.py itself: - util.py:186
+    `def train_multivi_model(model, adata, n_epochs=400, lr=1e-3, use_cuda=True):` — a DIFFERENT
+    epoch default (400) that is overridden to 500 by the caller; the two files disagree. -
+    util.py:188-192 ` model.train(\n max_epochs=n_epochs,\n lr=lr,\n #accelerator=accelerator\n
+    )` — accelerator is commented out, so the use_cuda argument is inert and device selection
+    falls back to scvi''s "auto"; batch_size, weight_decay, early_stopping, adversarial_mixing
+    and n_epochs_kl_warmup are all left at library defaults. - util.py:182 ` return scvi.model.MULTIVI(adata,
+    n_genes=n_rna, n_regions=n_atac)` — the entire architecture (n_latent, n_hidden, n_layers_encoder/decoder,
+    dropout_rate, modality_weights, modality_penalty, gene_likelihood) is library-default
+    and unreachable. CLI surface is I/O only: --path1, --path2, --pair_path1, --pair_path2,
+    --save_path (lines 18-22). Defaults cited from scvi-tools main branch source (scvi/model/_multivi.py);
+    the rendered page https://docs.scvi-tools.org/en/stable/api/reference/scvi.model.MULTIVI.html
+    carries the constructor defaults but truncates train(), and the .train.html sub-page 404s.
+    Same version caveat as totalVI: the env''s pinned scvi-tools may differ from main.'
+  upstream_knobs:
+  - default: None → int(sqrt(n_hidden))
+    effect: dimensionality of the joint latent space written out as the embedding
+    name: n_latent
+  - default: None → int(sqrt(n_regions))
+    effect: width of the hidden layers, and indirectly n_latent since n_latent derives from
+      it
+    name: n_hidden
+  - default: '''equal'''
+    effect: how the RNA and ATAC reconstruction losses are weighted against each other ('equal'
+      | 'cell' | 'universal')
+    name: modality_weights
+  - default: '''Jeffreys'''
+    effect: the penalty pulling the per-modality posteriors together in paired cells ('Jeffreys'
+      | 'MMD' | 'None')
+    name: modality_penalty
+  - default: '''zinb'''
+    effect: count distribution for the RNA decoder
+    name: gene_likelihood
+  - default: '500'
+    effect: training length
+    name: max_epochs
+  - default: 1e-4
+    effect: Adam learning rate
+    name: lr
+  - default: 'True'
+    effect: whether an adversarial classifier is trained to mix the modalities in latent space
+    name: adversarial_mixing
+  upstream_url: https://raw.githubusercontent.com/scverse/scvi-tools/main/src/scvi/model/_multivi.py
+PASTE:
+  fixed_in_script:
+  - name: use_gpu
+    source: tools_scripts/PASTE/main_PASTE_center.py:33
+    value: 'True'
+  - name: backend
+    source: tools_scripts/PASTE/main_PASTE_pairwise.py:35
+    value: ot.backend.TorchBackend() (library default is ot.backend.NumpyBackend())
+  - name: pairwise_align call site (alpha / dissimilarity / norm / numItermax all left implicit)
+    source: tools_scripts/PASTE/main_PASTE_pairwise.py:37
+    value: only backend and use_gpu are passed; every statistical argument falls through to
+      the library default
+  notes: 'This directory has two entrypoints and neither is un-suffixed: main_PASTE_pairwise.py
+    and main_PASTE_center.py. I picked main_PASTE_pairwise.py as the primary (plain pairwise
+    alignment, the canonical PASTE call); the center variant is reported here because a wrapper
+    likely registers both. Argparse exposes only --data_dir and --save_dir (lines 14-15),
+    i.e. pure I/O. Statistically this script fixes nothing: the pairwise_align call on line
+    37 passes no algorithmic argument at all, so alpha=0.1, dissimilarity=''kl'', norm=False
+    and numItermax=200 are the library''s defaults, not choices made here. The two things
+    it does fix are compute-backend rather than statistical: use_gpu=True (line 33, library
+    default False — note align_slices is invoked without arguments on line 42, so the True
+    default always wins) and a Torch POT backend (line 35, library default NumpyBackend).
+    There is no random seed anywhere in the pairwise script. For completeness, main_PASTE_center.py
+    additionally hardcodes uniform slice weights on line 36 — ` lmbda = len(slices)*[1/len(slices)]`
+    — and on line 41 ` center_slice, pis = pst.center_align(initial_slice, slices, lmbda,
+    random_seed = 5, backend = ot.backend.TorchBackend(), use_gpu=True) #pis_init = b,` i.e.
+    random_seed=5, use_gpu=True, Torch backend, with alpha/n_components/max_iter/threshold
+    left at library defaults; it also always uses slices[0] as the center initialisation (line
+    35).'
+  upstream_knobs:
+  - default: '0.1'
+    effect: trade-off between spatial-distance and gene-expression terms in the FGW objective
+      — the single most consequential PASTE knob
+    name: alpha
+  - default: '''kl'''
+    effect: expression dissimilarity metric between spots ('kl' or 'euclidean')
+    name: dissimilarity
+  - default: 'False'
+    effect: rescales spatial distances so neighbouring spots sit at distance 1, making alpha
+      comparable across platforms/resolutions
+    name: norm
+  - default: '200'
+    effect: maximum FGW-OT solver iterations, i.e. the convergence budget
+    name: numItermax
+  - default: None (uses slice.X)
+    effect: use slice.obsm[use_rep] (e.g. a PCA embedding) instead of raw expression for the
+      dissimilarity
+    name: use_rep
+  - default: None (uniform mapping)
+    effect: warm-start transport plan, e.g. from a spatial heuristic, which changes which
+      local optimum FGW lands in
+    name: G_init
+  - default: None (uniform over spots)
+    effect: per-spot mass distributions, useful when spots carry unequal cell counts
+    name: a_distribution / b_distribution
+  - default: n_components=15, max_iter=10, threshold=0.001
+    effect: NMF rank, outer center-alignment iteration cap, and NMF convergence tolerance
+      for the center-alignment mode
+    name: n_components / max_iter / threshold (center_align only)
+  upstream_url: https://raw.githubusercontent.com/raphael-group/paste/main/src/paste/PASTE.py
+PASTE2:
+  fixed_in_script:
+  - name: s (overlap fraction)
+    source: tools_scripts/PASTE2/main_PASTE2.py:44
+    value: '0.7'
+  - name: dissimilarity
+    source: tools_scripts/PASTE2/main_PASTE2.py:44
+    value: '''pca'' (library default is ''glmpca'')'
+  - name: n_top_genes (HVG selection)
+    source: tools_scripts/PASTE2/main_PASTE2.py:40
+    value: '2000'
+  - name: subset (HVG selection)
+    source: tools_scripts/PASTE2/main_PASTE2.py:40
+    value: True (slices are destructively subset to the 2000 HVGs)
+  - name: target_sum (library-size normalisation)
+    source: tools_scripts/PASTE2/main_PASTE2.py:38
+    value: 1e4
+  notes: 'Single entrypoint, no ambiguity. Argparse exposes only --data_dir and --save_dir
+    (lines 16-17). This is the most heavily hardcoded of the three: besides the alignment
+    arguments it bakes in a full preprocessing pipeline that mutates the input slices in place
+    — normalize_total(target_sum=1e4) on line 38, sc.pp.log1p (line 39, no parameters), and
+    highly_variable_genes(n_top_genes=2000, subset=True) on line 40, which permanently drops
+    all but 2000 genes before alignment. s=0.7 is the single most impactful fixed value: it
+    asserts that every consecutive pair of slices overlaps by exactly 70%, which is a dataset
+    property, not a universal constant, and PASTE2 has no default for it (s is a required
+    positional argument upstream). dissimilarity=''pca'' also departs from the library default
+    ''glmpca''; I verified ''pca'' is a genuine accepted branch in the upstream source, where
+    it dispatches to pca_distance(sliceA, sliceB, 2000, 20) — so a further 2000-gene / 20-component
+    choice is fixed inside the library, out of reach of this script. alpha, armijo and norm
+    are never passed, so they sit at library defaults. No random seed is set (`random` is
+    imported on line 7 but never used).'
+  upstream_knobs:
+  - default: '0.1'
+    effect: trade-off between the spatial-distance and expression terms in the partial-FGW
+      objective
+    name: alpha
+  - default: 'False'
+    effect: use approximate Armijo line search in the conditional-gradient solver (speed vs.
+      exactness)
+    name: armijo
+  - default: 'True'
+    effect: rescales spatial distances against the maximum expression dissimilarity, which
+      makes alpha comparable across datasets
+    name: norm
+  - default: None (uses slice.X)
+    effect: compute the dissimilarity from slice.obsm[use_rep] instead of the expression matrix
+    name: use_rep
+  - default: None (uniform mapping)
+    effect: warm-start partial transport plan, changing which local optimum the solver reaches
+    name: G_init
+  - default: None (uniform over spots)
+    effect: per-spot mass distributions for each slice
+    name: a_distribution / b_distribution
+  - default: '''glmpca'''
+    effect: 'selects the expression cost: ''euclidean''/''euc'', ''kl'', ''gkl'', ''selection_kl'',
+      ''pca'', ''glmpca'' — the script pins ''pca'''
+    name: dissimilarity (full option set)
+  upstream_url: https://raw.githubusercontent.com/raphael-group/paste2/main/src/paste2/PASTE2.py
+Portal:
+  fixed_in_script:
+  - name: training_steps
+    source: tools_scripts/Portal/main_Portal.py:53
+    value: 3000 (library default 2000)
+  - name: lambdacos
+    source: tools_scripts/Portal/main_Portal.py:53
+    value: 10.0 (library default 20.0)
+  notes: 'Two scripts exist in this directory; I picked main_Portal.py (the one with no category
+    suffix; main_Portal_classification.py is the classification variant). Only two hyperparameters
+    are literally written in the script body, both on line 53, and both deviate from the library
+    defaults (training_steps 3000 vs 2000, lambdacos 10.0 vs 20.0). Everything else is left
+    implicit at the library default: model.preprocess(adata_rna, adata_atac) on line 54 does
+    not pass hvg_num, so 4000 applies; n_latent=20, npcs=30, batch_size=500, seed=1234 come
+    from Model.__init__. Verified the vendored copy at tools_scripts/Portal/portal/model.py
+    has the same signature as upstream (batch_size=500, training_steps=2000, seed=1234, npcs=30,
+    n_latent=20, lambdacos=20.0; lambdaAE=10.0, lambdaLA=10.0, lambdaGAN=1.0, margin=5.0;
+    Adam lr=0.001 fixed inside train()). Model''s model_path/data_path/result_path default
+    to relative ''models''/''data''/''results'' - I/O, excluded from knobs, but note they
+    make the script cwd-dependent. Adam lr=0.001 (model.py line 268/270) is baked into train()
+    and is not exposed by the library at all.'
+  upstream_knobs:
+  - default: '2000'
+    effect: number of adversarial training iterations
+    name: training_steps
+  - default: '20.0'
+    effect: weight of the cosine-similarity consistency loss holding the shared latent aligned
+    name: lambdacos
+  - default: '20'
+    effect: dimensionality of the shared latent space that is written out as the embedding
+    name: n_latent
+  - default: '30'
+    effect: number of PCs the two modalities are reduced to before the network sees them
+    name: npcs
+  - default: '500'
+    effect: cells per minibatch during adversarial training
+    name: batch_size
+  - default: '4000'
+    effect: highly variable genes selected per dataset in preprocess() before intersection
+    name: hvg_num
+  - default: '1234'
+    effect: random seed for torch/numpy, controls run-to-run variability
+    name: seed
+  - default: 10.0 / 10.0 / 1.0
+    effect: weights of the autoencoder, latent-alignment and adversarial loss terms (set as
+      attributes in __init__, overridable after construction)
+    name: lambdaAE / lambdaLA / lambdaGAN
+  upstream_url: https://raw.githubusercontent.com/YangLabHKUST/Portal/main/portal/model.py
+SCALEX:
+  fixed_in_script:
+  - name: filter_genes.min_cells (scanpy prefilter)
+    source: tools_scripts/SCALEX/main_SCALEX.py:33
+    value: '0'
+  - name: normalize_total.target_sum
+    source: tools_scripts/SCALEX/main_SCALEX.py:34
+    value: None (default; inplace=True only)
+  - name: n_top_genes (HVG)
+    source: tools_scripts/SCALEX/main_SCALEX.py:36
+    value: '2000'
+  - name: scale.max_value
+    source: tools_scripts/SCALEX/main_SCALEX.py:39
+    value: '10'
+  - name: neighbors.n_pcs / n_neighbors
+    source: tools_scripts/SCALEX/main_SCALEX.py:41
+    value: 30 / 30
+  - name: umap.min_dist
+    source: tools_scripts/SCALEX/main_SCALEX.py:42
+    value: '0.1'
+  - name: SCALEX.min_features
+    source: tools_scripts/SCALEX/main_SCALEX.py:46
+    value: 0 (library default 600)
+  - name: SCALEX.min_cells
+    source: tools_scripts/SCALEX/main_SCALEX.py:47
+    value: 0 (library default 3)
+  - name: SCALEX.gpu
+    source: tools_scripts/SCALEX/main_SCALEX.py:50
+    value: '0'
+  notes: 'Entrypoint chosen: only one script exists (main_SCALEX.py). Command line exposes
+    ONLY --path1/--path2/--save_path, so every knob below is unreachable without editing the
+    script. Important caveat about the scanpy block: adata is written to ''RNA-ATAC.h5ad''
+    at line 32 (adata.write(''RNA-ATAC.h5ad'')) BEFORE the preprocessing at lines 33-42, and
+    SCALEX is then handed that same file path at line 45 (data_list = [wk_dir+''RNA-ATAC.h5ad'']).
+    The HVG/scale/PCA/neighbors/UMAP settings on lines 33-42 therefore only affect the in-memory
+    object that is discarded - SCALEX re-reads raw concatenated counts and does its own internal
+    preprocessing. So n_top_genes=2000, max_value=10, n_pcs=30, n_neighbors=30, min_dist=0.1
+    are hardcoded but effectively inert; min_features=0/min_cells=0 (which disable SCALEX''s
+    own cell/gene filtering, overriding library defaults 600/3) and gpu=0 are the ones that
+    actually reach the model. n_top_features is never passed, so SCALEX''s own default HVG
+    selection applies. show=False (line 49) is display-only, not counted as a knob. No latent-dimension
+    argument appears in the documented SCALEX() signature, so none is listed.'
+  upstream_knobs:
+  - default: None
+    effect: number of highly variable features SCALEX keeps before training
+    name: n_top_features
+  - default: '600'
+    effect: drops cells detected in fewer than this many features
+    name: min_features
+  - default: '3'
+    effect: drops genes detected in fewer than this many cells
+    name: min_cells
+  - default: '0.0002'
+    effect: learning rate of the VAE optimizer
+    name: lr
+  - default: '30000'
+    effect: maximum training iterations (upper bound on training length)
+    name: max_iteration
+  - default: '64'
+    effect: minibatch size for training
+    name: batch_size
+  - default: '124'
+    effect: random seed controlling reproducibility of the embedding
+    name: seed
+  - default: '''RNA'''
+    effect: selects the RNA vs ATAC preprocessing path
+    name: profile
+  upstream_url: https://scalex.readthedocs.io/en/latest/api/scalex.SCALEX.html
+SMILE:
+  fixed_in_script:
+  - name: atac_idf_percentile
+    source: tools_scripts/SMILE/main_SMILE.py:60
+    value: '90'
+  - name: atac_idf_percentile (query copy)
+    source: tools_scripts/SMILE/SMILE/SMILE.py:79
+    value: '90'
+  - name: target_sum (normalize_total, reference RNA)
+    source: tools_scripts/SMILE/main_SMILE.py:86
+    value: 1e4
+  - name: target_sum (normalize_total, query RNA)
+    source: tools_scripts/SMILE/main_SMILE.py:89
+    value: 1e4
+  - name: n_top_genes (highly_variable_genes)
+    source: tools_scripts/SMILE/main_SMILE.py:95
+    value: '5000'
+  - name: clf_out (latent embedding width)
+    source: tools_scripts/SMILE/main_SMILE.py:119
+    value: '20'
+  - name: train_epoch
+    source: tools_scripts/SMILE/main_SMILE.py:120
+    value: '1000'
+  notes: 'Entrypoint is the only main_*.py in the directory, so no ambiguity. The CLI exposes
+    ONLY five paths (--ref_path1/2, --query_path1/2, --save_path); every modelling knob is
+    fixed in the body. Note the vendored copy of the library ships with the script at tools_scripts/SMILE/SMILE/SMILE.py,
+    so library defaults were read from that source as well as the upstream README. Two knobs
+    are left at library defaults by omission rather than being written in the script: pretrain_epoch=10
+    and batch_size=1024/f_temp=0.2 (SMILE.py lines 203-205: ''def ReferenceSMILE_trainer(X_a_paired,
+    X_b_paired,X_a_unpaired,X_b_unpaired, model, / pretrain_epoch=10,train_epoch=1000, / batch_size
+    = 1024, f_temp = 0.2):''). Caveat for the wrapper author: the optimizer settings are hardcoded
+    INSIDE the library, not the script, and the library exposes no argument for them - SMILE.py
+    lines 209 and 267 both read ''opt = torch.optim.SGD(model.parameters(),lr=0.01, momentum=0.9,weight_decay=5e-4)'',
+    so learning rate cannot be changed without patching the package. Also worth flagging:
+    the script imports random and numpy but never seeds anything, and torch is unseeded too,
+    so SMILE runs are not reproducible run-to-run. Finally, batch_size=1024 interacts badly
+    with small datasets - the pretraining loop iterates ''for j in range(n//batch_size)'',
+    so fewer than 1024 unpaired cells means the pretraining stage silently does zero iterations.'
+  upstream_knobs:
+  - default: '1000'
+    effect: number of SimSiam-style cosine-similarity training epochs on the paired reference
+      data
+    name: train_epoch
+  - default: '10'
+    effect: number of contrastive pre-training epochs run on the unpaired query data before
+      the paired stage
+    name: pretrain_epoch
+  - default: '1024'
+    effect: minibatch size used during the contrastive pre-training stage
+    name: batch_size
+  - default: '0.2'
+    effect: temperature of the NT-Xent contrastive loss used to pair augmented views
+    name: f_temp
+  - default: '10'
+    effect: width of the shared latent space both modality encoders project into
+    name: clf_out
+  - default: n/a (user picks)
+    effect: 'depth of the encoder: littleSMILE is a single Linear+BatchNorm+LeakyReLU layer,
+      SMILE/Paired_SMILE are deeper MLPs'
+    name: encoder class (SMILE / Paired_SMILE / littleSMILE)
+  - default: '5'
+    effect: training epochs for the non-reference trainer entry points, if a different trainer
+      is chosen
+    name: num_epoch (SMILE_trainer / PairedSMILE_trainer)
+  upstream_url: https://github.com/rpmccordlab/SMILE
+Seurat_WNN:
+  fixed_in_script:
+  - name: NormalizeData normalization.method / margin (ADT)
+    source: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd:44
+    value: '''CLR'' / 2 (library default is "LogNormalize" / 1)'
+  - name: FindMultiModalNeighbors dims.list (RNA+ADT)
+    source: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd:54
+    value: list(1:30, 1:18) — 30 RNA PCs, 18 ADT PCs
+  - name: FindClusters algorithm / resolution (RNA+ADT)
+    source: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd:58
+    value: algorithm = 3 (SLM) / resolution = 2 (library defaults are 1 and 0.8)
+  - name: RunUMAP dims (RNA branch of RNA+ATAC)
+    source: tools_scripts/Seurat_v4/util.R:69
+    value: '1:50'
+  - name: FindTopFeatures min.cutoff (ATAC)
+    source: tools_scripts/Seurat_v4/util.R:75
+    value: '''q0'' (library default is "q5")'
+  - name: RunUMAP dims (ATAC, on LSI)
+    source: tools_scripts/Seurat_v4/util.R:77
+    value: '2:50'
+  - name: FindMultiModalNeighbors dims.list (RNA+ATAC)
+    source: tools_scripts/Seurat_v4/util.R:79
+    value: list(1:50, 2:50) — 50 RNA PCs, LSI components 2-50
+  - name: FindClusters algorithm (RNA+ATAC); resolution left at library default
+    source: tools_scripts/Seurat_v4/util.R:81
+    value: algorithm = 3 (SLM); resolution not passed, so 0.8
+  notes: 'There is no tools_scripts/Seurat_WNN directory. Both metadata/methods.yaml (lines
+    67-73, name: "Seurat WNN", category vertical) and README.md line 84 map Seurat WNN to
+    tools_scripts/Seurat_v4/main_Seurat_v4.Rmd and tools_scripts/Seurat_v5/main_Seurat_v5.Rmd;
+    I picked main_Seurat_v4.Rmd as the entrypoint because it is the vertical-integration WNN
+    script (the v5 one is the separate bridge-integration method already covered above). The
+    `util.R:NN` entries above cite tools_scripts/Seurat_v4/util.R, sourced at line 8 of the
+    entrypoint — that file, not the entrypoint, holds the code that actually runs. Two real
+    hazards found while reading, neither of which I changed: (1) the dispatch block at lines
+    27-30 of main_Seurat_v4.Rmd executes BEFORE the local redefinition of run_Seurat_RNA_ADT
+    at line 32, so the copy in util.R is what runs — the two copies are currently value-identical,
+    so anyone patching the entrypoint''s line 54 or 58 to expose dims or resolution would
+    see no effect. (2) run_Seurat_ADT_ATAC (line 29) and run_Seurat_RNA_ADT_ATAC (line 30)
+    are called but defined nowhere in either file, so those two modality combinations error
+    out. Also note the asymmetry between the two working paths: the RNA+ADT path fixes resolution
+    = 2, while the RNA+ATAC path (util.R line 81) omits resolution entirely and silently inherits
+    the library default 0.8 — the same method reports clusters at two different granularities
+    depending on modality pair. SCTransform at util.R line 69 and RunPCA at the same line
+    are bare, so variable.features.n = 3000 and npcs = 50 are library defaults rather than
+    script choices.'
+  upstream_knobs:
+  - default: '20'
+    effect: number of multimodal neighbours retained in the weighted-NN graph
+    name: k.nn (FindMultiModalNeighbors)
+  - default: no default — required argument
+    effect: per-modality dimensions fed into the weighted nearest-neighbour computation
+    name: dims.list
+  - default: '200'
+    effect: size of the approximate-neighbour candidate pool searched per cell
+    name: knn.range
+  - default: 1/15
+    effect: Jaccard cutoff below which SNN edges are dropped before clustering
+    name: prune.SNN
+  - default: '1'
+    effect: scaling of the kernel bandwidth used when computing per-cell modality weights
+    name: sd.scale
+  - default: 'FALSE'
+    effect: whether modality scores are smoothed across each modality's own neighbours
+    name: smooth
+  - default: '0.8'
+    effect: granularity of community detection — higher yields more clusters
+    name: resolution (FindClusters)
+  - default: '1'
+    effect: 'modularity optimiser: 1 Louvain, 2 Louvain with multilevel refinement, 3 SLM,
+      4 Leiden'
+    name: algorithm (FindClusters)
+  upstream_url: https://satijalab.org/seurat/reference/findmultimodalneighbors
+Seurat_v3:
+  fixed_in_script:
+  - name: RunUMAP dims (RNA)
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:55
+    value: '1:30'
+  - name: FindTopFeatures min.cutoff (ATAC)
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:58
+    value: '"q0" (library default is "q5")'
+  - name: RunUMAP dims (ATAC, on LSI)
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:60
+    value: '2:30'
+  - name: FindTransferAnchors reduction
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:72
+    value: '"cca" (library default is "pcaproject")'
+  - name: TransferData dims (label transfer, LSI weighting)
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:76
+    value: '2:30'
+  - name: TransferData dims (expression imputation)
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:83
+    value: '2:30'
+  - name: ScaleData do.scale (co-embedding)
+    source: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:87
+    value: FALSE (library default is TRUE)
+  notes: 'Only one script in the directory, so no choice of entrypoint. Reads six positional
+    commandArgs (rna, atac_peak, atac_gas, rna_cty, atac_cty, save_path) at lines 100-105;
+    those are excluded as I/O. Two implicit fixes are worth flagging even though they are
+    not literals in the body: FindVariableFeatures at line 52 is called bare, so the anchor
+    feature set is exactly the library default of 2000 HVGs, and RunPCA at line 88 is called
+    bare, so the returned joint embedding is 50-dimensional by library default — a benchmark
+    user changing embedding width has nothing to turn. The RunUMAP at line 55 is computed
+    but never consumed downstream (the output is the co-embedding PCA at line 89). `sep =
+    c(":", "-")` at line 48 is a peak-name parsing convention rather than a modelling knob,
+    so it is not listed.'
+  upstream_knobs:
+  - default: '"pcaproject"'
+    effect: selects the space anchors are found in — pcaproject, lsiproject, rpca or cca
+    name: reduction (FindTransferAnchors)
+  - default: '1:30'
+    effect: how many dimensions of the shared space are searched for anchor pairs
+    name: dims (FindTransferAnchors)
+  - default: '5'
+    effect: neighbourhood size used to call a mutual-nearest-neighbour anchor pair
+    name: k.anchor
+  - default: NA
+    effect: neighbourhood size used to discard low-confidence anchors
+    name: k.filter
+  - default: '30'
+    effect: neighbourhood size used to score each anchor's consistency
+    name: k.score
+  - default: '50'
+    effect: number of anchors weighted per query cell when transferring labels or expression
+    name: k.weight (TransferData)
+  - default: '2000'
+    effect: size of the HVG set that becomes the anchor feature space
+    name: nfeatures (FindVariableFeatures)
+  - default: '50'
+    effect: dimensionality of the co-embedding PCA that is written out as this method's result
+    name: npcs (RunPCA)
+  upstream_url: https://satijalab.org/seurat/reference/findtransferanchors
+Seurat_v5:
+  fixed_in_script:
+  - name: RunUMAP dims (reference RNA, model returned)
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:49
+    value: '1:50'
+  - name: FindTopFeatures min.cutoff (bridge ATAC)
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:61
+    value: '"q0" (library default is "q5")'
+  - name: dims.atac (ATAC/LSI dims, drops component 1)
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:65
+    value: '2:50'
+  - name: dims.rna (reference PCA dims)
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:66
+    value: '1:50'
+  - name: PrepareBridgeReference reference.reduction / reference.dims
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:72
+    value: '"pca" / dims.rna = 1:50'
+  - name: PrepareBridgeReference normalization.method
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:73
+    value: '"SCT"'
+  - name: FindBridgeTransferAnchors reduction / dims
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:77
+    value: '"lsiproject" / dims.atac = 2:50 (library default dims is 1:30)'
+  - name: MapQuery reduction.model
+    source: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd:82
+    value: '"umap"'
+  notes: 'Only one script in the directory. Takes five positional commandArgs at lines 91-95
+    (rna1, rna2, atac2, atac3, save_path); the argument names at lines 93-94 say `adt_path2`/`adt_path3`
+    but they carry ATAC peak matrices — a naming inconsistency, not a knob. Note that dims.atac/dims.rna
+    at lines 65-66 are named locals defined once and reused at lines 72 and 77, so a single
+    edit there moves both the reference and the anchor-finding dimensionality. Two implicit
+    fixes: SCTransform at lines 48 and 57 is called with no feature argument, so variable.features.n
+    stays at the library default 3000; and MapQuery/RunUMAP leave UMAP at defaults, so the
+    written embedding is 2-dimensional UMAP coordinates (lines 84-85) rather than a latent
+    space of user-chosen width — the single most consequential unexposed choice for anyone
+    benchmarking this method.'
+  upstream_knobs:
+  - default: '1:50'
+    effect: how many reference PCA dimensions define the extended reference space
+    name: reference.dims (PrepareBridgeReference)
+  - default: '1:50'
+    effect: dimensions retained in the bridge graph-Laplacian eigenspace that links the two
+      modalities
+    name: laplacian.reduction.dims
+  - default: c("slsi", "spca", NULL) — first value "slsi" is used
+    effect: supervised reduction used to harmonise the bridge with the query
+    name: supervised.reduction
+  - default: c("SCT", "LogNormalize") — first value "SCT" is used
+    effect: normalization applied to reference and bridge before dimensionality reduction
+    name: normalization.method (PrepareBridgeReference)
+  - default: '1:30'
+    effect: dimensions used for query-bridge anchor finding
+    name: dims (FindBridgeTransferAnchors)
+  - default: c("lsiproject", "pcaproject") — first value "lsiproject" is used
+    effect: projection used to place the query into the bridge space when finding anchors
+    name: reduction (FindBridgeTransferAnchors)
+  - default: c("direct", "cca") — first value "direct" is used
+    effect: whether bridge and query are compared directly on assay data or through CCA
+    name: bridge.reduction
+  - default: '3000'
+    effect: how many top-residual-variance genes SCT keeps, feeding the reference PCA
+    name: variable.features.n (SCTransform)
+  upstream_url: https://satijalab.org/seurat/reference/preparebridgereference
+StabMap:
+  fixed_in_script:
+  - name: random seed
+    source: tools_scripts/StabMap/main_StabMap.Rmd:10
+    value: '2021'
+  - name: maxFeatures
+    source: tools_scripts/StabMap/main_StabMap.Rmd:42
+    value: Inf
+  notes: 'Two main_*.Rmd files exist; I picked main_StabMap.Rmd (no category suffix) over
+    main_StabMap_imputation.Rmd. This file is not a command-line script - it defines run_StabMap(file_paths,
+    save_path, reference) and is meant to be source()d, with the call commented out at lines
+    14-24. reference_list IS user-controllable (line 41: '' reference_list = c(reference),'')
+    because it comes from the function''s third argument, so it is correctly NOT listed as
+    hardcoded. One further stabMap() argument is overridden but is diagnostic output rather
+    than a modelling knob, so I left it out of the hardcoded list: line 43 reads '' plot =
+    FALSE)'' (library default TRUE), which suppresses the UpSet plot and mosaic topology network.
+    IMPORTANT - the biggest fixed knobs for this method are NOT in the entrypoint but in the
+    helper sourced at line 9 (''source("util.R")''), file tools_scripts/StabMap/util.R, which
+    does all feature selection before stabMap() ever sees the data: line 31 '' hvgs <- rownames(decomp)[decomp$mean>0.01
+    & decomp$p.value <= 0.05]'' (RNA HVG selection via scran::modelGeneVar, mean threshold
+    0.01, p-value threshold 0.05), line 39 '' hvgs <- rownames(decomp)[decomp$mean>0.25& decomp$p.value
+    <= 0.05]'' (ATAC, mean threshold 0.25), and line 45 '' expr <- NormalizeData(expr, normalization.method
+    = ''CLR'')'' (ADT normalisation method fixed to CLR). If the wrapper wants to expose anything
+    for StabMap, those three thresholds matter more than maxFeatures. Also note maxFeatures
+    = Inf is a deliberate deviation from the library default of 1000 and can be slow/memory-hungry
+    on wide inputs; the StabMap docs mention low maxFeatures values triggering density errors
+    in scran::modelGeneVar, which is presumably why upstream set it to Inf.'
+  upstream_knobs:
+  - default: '50'
+    effect: number of principal components in the reference embedding that queries are mapped
+      onto
+    name: ncomponentsReference
+  - default: '50'
+    effect: number of principal components computed for each query dataset before projection
+      onto the reference
+    name: ncomponentsSubset
+  - default: '1000'
+    effect: cap on the number of features used to predict reference PC scores for a query
+      dataset
+    name: maxFeatures
+  - default: 'FALSE'
+    effect: restricts features to those used in the reference dimensionality reduction; docs
+      recommend TRUE for multi-hop and FALSE for single-hop integrations
+    name: restrictFeatures
+  - default: 'FALSE'
+    effect: whether reference cells are re-projected alongside query cells instead of keeping
+      their original scores
+    name: projectAll
+  - default: 'NULL'
+    effect: supplying cell labels switches the reference embedding from PCA to supervised
+      LDA
+    name: labels_list
+  - default: 'TRUE'
+    effect: re-centres each dataset to zero mean before projection
+    name: scale.center
+  - default: 'TRUE'
+    effect: re-scales each dataset to unit standard deviation before projection
+    name: scale.scale
+  upstream_url: https://marionilab.github.io/StabMap/reference/StabMap.html
+UINMF:
+  fixed_in_script:
+  - name: selectGenes thresh (shared variable-gene variance threshold)
+    source: tools_scripts/UINMF/main_UINMF_cross.Rmd:51
+    value: '0.1'
+  - name: selectGenes useDatasets (which dataset the shared variable genes are computed from)
+    source: tools_scripts/UINMF/main_UINMF_cross.Rmd:51
+    value: '"rna1" (dataset 1 only)'
+  - name: FindVariableFeatures nfeatures (number of unshared/ADT features kept)
+    source: tools_scripts/UINMF/main_UINMF_cross.Rmd:58
+    value: '2000'
+  - name: FindVariableFeatures selection.method (unshared feature selection method)
+    source: tools_scripts/UINMF/main_UINMF_cross.Rmd:58
+    value: '"vst"'
+  - name: k (inner dimension of the factorization / number of factors)
+    source: tools_scripts/UINMF/main_UINMF_cross.Rmd:72
+    value: '30'
+  - name: nIteration (block coordinate descent iterations)
+    source: tools_scripts/UINMF/main_UINMF_cross.Rmd:72
+    value: '30'
+  notes: 'Both scripts in this directory carry a category suffix, so neither is suffix-free;
+    I read main_UINMF_cross.Rmd as the entrypoint (cross integration, 4 inputs + save path).
+    main_UINMF_vertical.Rmd is the same code with one RNA/one ADT input and fixes the identical
+    values at different lines: thresh = 0.1 at line 50 ('' selectGenes(useDatasets = "rna",
+    thresh = 0.1) %>%''), nfeatures = 2000 at line 57, and ''lig <- runUINMF(lig, k = 30,
+    nIteration = 30)'' at line 63. Nothing is on the command line except paths (args[1..5],
+    lines 89-94) — every knob above is a literal in the body. Two deviations from library
+    defaults are worth flagging: k = 30 vs rliger''s documented default of 20, and lambda
+    never set at all, so it silently takes the library default of 5. nIteration = 30 happens
+    to equal the library default. The unshared-feature path bypasses rliger''s selectGenes(useUnsharedDatasets=,
+    unsharedThresh=) entirely and substitutes Seurat FindVariableFeatures, so a wrapper exposing
+    ''unshared feature count'' must target nfeatures, not unsharedThresh. Unrelated to hyperparameters
+    but relevant to reproducing runs: at line 67 the second ADT dataset reuses the first''s
+    feature list ('' adt2_top2000 <- VariableFeatures(se1)'' — se1, not a se2), so adt2 is
+    subset by adt1''s variable features. The header comment at lines 2-3 recommends liger
+    v1.0.1, but the code uses the rliger 2.x API (runUINMF, varUnsharedFeatures<-, useDatasets),
+    so that comment appears stale.'
+  upstream_knobs:
+  - default: '5'
+    effect: regularization strength penalizing dataset-specific factors; larger values force
+      tighter cross-dataset alignment
+    name: lambda
+  - default: '1'
+    effect: number of restarts of the non-convex factorization, guarding against a bad local
+      optimum
+    name: nRandomStarts
+  - default: '1'
+    effect: random seed for the factorization initialization, i.e. run-to-run reproducibility
+    name: seed
+  - default: 2L
+    effect: number of parallel tasks used by the solver
+    name: nCores
+  - default: '0.1'
+    effect: variance threshold used by rliger's own unshared-feature selection (the alternative
+      to the Seurat vst top-2000 path this script hardcodes)
+    name: selectGenes unsharedThresh
+  - default: 'NULL'
+    effect: target number of variable genes per dataset, auto-tuning the variance threshold
+      instead of fixing it
+    name: selectGenes nGenes
+  - default: '50'
+    effect: number of quantiles used when stretching each dataset's factor loadings onto the
+      reference
+    name: quantileNorm quantiles
+  - default: '20'
+    effect: size of the shared-factor kNN graph used to jointly cluster cells before quantile
+      alignment
+    name: quantileNorm nNeighbors
+  upstream_url: https://welch-lab.github.io/liger/reference/runUINMF.html
+VIMCCA:
+  fixed_in_script:
+  - name: min_cells (gene filter on RNA)
+    source: tools_scripts/VIMCCA/main_VIMCCA_RNA_ADT.py:30
+    value: '10'
+  - name: hidden_layers
+    source: tools_scripts/VIMCCA/main_VIMCCA_RNA_ADT.py:40
+    value: '[128, 64, 32, 8]'
+  - name: epochs
+    source: tools_scripts/VIMCCA/main_VIMCCA_RNA_ADT.py:41
+    value: '50'
+  notes: 'Two entrypoints exist and NEITHER has a suffix-free name: main_VIMCCA_RNA_ADT.py
+    and main_VIMCCA_RNA_ATAC.py. I picked main_VIMCCA_RNA_ADT.py (vertical RNA+ADT) as the
+    primary; all cited line numbers are from that file. The RNA+ATAC sibling pins a different
+    architecture and additionally pins `weight`: line 30 `sc.pp.filter_genes(adata_rna, min_cells=10)`,
+    line 31 `sc.pp.filter_genes(adata_atac, min_cells=10)`, line 41 ` hidden_layers=[128,
+    64, 16, 8],`, line 42 ` epochs=50,`, line 43 ` weight=5`. So a wrapper must key hidden_layers
+    (and whether ATAC is gene-filtered) off the modality pair. Excluded as plumbing rather
+    than knobs: sparse_x=False / sparse_y=False (lines 38-39 in the ADT script, 39-40 in the
+    ATAC script) declare the input matrix format, and the un-parameterised sc.pp.log1p / sc.pp.scale
+    calls carry no literal. argparse exposes only --path1/--path2/--save_path. Note fit_integration
+    is a thin convenience wrapper that does not forward the VIMCCA class''s patience / dropout_rate_big
+    / dropout_rate_small / validation_split / deterministic arguments, so those four library_knobs
+    entries are unreachable through the call the script actually makes — surfacing them would
+    require the wrapper to instantiate scbean.model.vimcca.VIMCCA directly. Defaults verified
+    against the fit_integration source at https://raw.githubusercontent.com/jhu99/scbean/main/scbean/model/vimcca.py,
+    which agrees with the readthedocs API page.'
+  upstream_knobs:
+  - default: '30'
+    effect: number of training passes over the data (script pins 50)
+    name: epochs
+  - default: '[128, 64, 32, 5]'
+    effect: encoder/decoder layer widths; last entry is the joint latent dimensionality (script
+      pins 8 latent dims)
+    name: hidden_layers
+  - default: '5'
+    effect: relative weight of the second modality's reconstruction loss in the shared-latent
+      objective
+    name: weight
+  - default: '128'
+    effect: minibatch size used during training
+    name: batch_size
+  - default: '60'
+    effect: early-stopping patience of the underlying VIMCCA class (not reachable through
+      fit_integration)
+    name: patience
+  - default: '0.05'
+    effect: dropout on the wide layers of the VIMCCA network (class-level only)
+    name: dropout_rate_big
+  - default: '0.0'
+    effect: dropout on the narrow/latent-side layers (class-level only)
+    name: dropout_rate_small
+  - default: '0.0'
+    effect: fraction of cells held out for validation / early-stopping monitoring (class-level
+      only)
+    name: validation_split
+  upstream_url: https://scbean.readthedocs.io/en/latest/api.html
+VIPCCA:
+  fixed_in_script:
+  - name: random seed
+    source: tools_scripts/VIPCCA/main_VIPCCA.py:12
+    value: '42'
+  - name: mode
+    source: tools_scripts/VIPCCA/main_VIPCCA.py:41
+    value: '''CVAE'''
+  - name: epochs
+    source: tools_scripts/VIPCCA/main_VIPCCA.py:43
+    value: '20'
+  - name: lambda_regulizer
+    source: tools_scripts/VIPCCA/main_VIPCCA.py:44
+    value: '2'
+  - name: batch_input_size
+    source: tools_scripts/VIPCCA/main_VIPCCA.py:45
+    value: '64'
+  - name: batch_input_size2
+    source: tools_scripts/VIPCCA/main_VIPCCA.py:46
+    value: '14'
+  notes: Only one entrypoint exists (main_VIPCCA.py); it is the diagonal-integration RNA +
+    ATAC-gene-activity script. argparse exposes only --path1/--path2/--save_path, so NOTHING
+    model-related reaches the command line. Line 42 (split_by="_batch") and line 40 (res_path='./atac_result/')
+    were excluded as I/O plumbing — split_by names an obs column the script itself creates
+    at lines 33/35, and res_path is an output dir (note it is a hardcoded relative path, not
+    args.save_path). Line 38, `adata_all= tl.preprocessing([adata_rna, adata_atac])`, calls
+    the library preprocessor with every default implicit — so n_top_genes=2000, hvg=True,
+    min_cells=1, min_genes=1, mt_ratio=0.8, lognorm=True are all silently fixed without appearing
+    as literals in the script; that is why n_top_genes is listed under library_knobs rather
+    than hardcoded. Of the pinned values, mode='CVAE' matches the library default while epochs
+    (20 vs 100), lambda_regulizer (2 vs 5.0), batch_input_size (64 vs 128) and batch_input_size2
+    (14 vs 16) all deviate from it. Upstream is the standalone `vipcca` package (jhu99/vipcca),
+    NOT the vimcca-hosting `scbean` package; defaults were cross-checked against https://raw.githubusercontent.com/jhu99/vipcca/master/vipcca/model/vipcca.py,
+    which matches the readthedocs signature exactly except that readthedocs' scbean-hosted
+    copy lists epochs=1000 — the standalone vipcca source and its own docs both say epochs=100.
+  upstream_knobs:
+  - default: '100'
+    effect: number of training passes for the CVAE (script pins 20, i.e. 5x shorter than the
+      library default)
+    name: epochs
+  - default: '5.0'
+    effect: weight on the KL/regularization term relative to reconstruction, i.e. how strongly
+      batches are mixed
+    name: lambda_regulizer
+  - default: '[128, 64, 32, 16]'
+    effect: encoder/decoder layer widths; the last entry is the latent embedding dimensionality
+    name: hidden_layers
+  - default: '128'
+    effect: width of the first conditional (batch) input layer fed to the CVAE
+    name: batch_input_size
+  - default: '16'
+    effect: width of the second conditional (batch) input layer
+    name: batch_input_size2
+  - default: '0.01'
+    effect: dropout applied inside the encoder/decoder
+    name: dropout_rate
+  - default: '50'
+    effect: early-stopping patience in epochs (paired with patience_lr=25 for LR reduction)
+    name: patience_es
+  - default: '2000'
+    effect: highly-variable-gene count selected by vipcca.tools.utils.preprocessing before
+      training
+    name: n_top_genes
+  upstream_url: https://vipcca.readthedocs.io/en/latest/api.html
+iNMF:
+  fixed_in_script:
+  - name: selectGenes datasets.use (which dataset the variable genes are computed from)
+    source: tools_scripts/iNMF/main_iNMF.Rmd:47
+    value: 1 (dataset 1 only)
+  - name: k (inner dimension of the factorization / number of factors)
+    source: tools_scripts/iNMF/main_iNMF.Rmd:50
+    value: '20'
+  notes: 'Only paths are on the command line (args[1..n], lines 57-63); k and the variable-gene
+    dataset selection are literals in runLIGER(). Line 51 ('' pbmcs = quantile_norm(pbmcs)'')
+    and line 46 (rliger::normalize) and line 48 (scaleNotCenter) are all-default calls fixing
+    no explicit value, so I did not list them as hardcoded — but that means quantiles, nNeighbors,
+    reference, minCells etc. all silently take library defaults. lambda and nIteration are
+    likewise never set, so they take the documented defaults 5 and 30. Argument-name caveat:
+    the script mixes rliger 1.x names (datasets.use, quantile_norm) with the 2.x entrypoint
+    runIntegration; the 2.0.0 release notes state old names remain available with deprecation
+    warnings, so both resolve, but the docs URL I cite is the 2.x reference where these are
+    useDatasets and quantileNorm. runIntegration with no method= argument defaults to method
+    = "iNMF", which dispatches to runINMF — hence the runINMF reference as upstream_url.'
+  upstream_knobs:
+  - default: '5'
+    effect: regularization strength penalizing dataset-specific factors; larger values force
+      tighter cross-dataset alignment
+    name: lambda
+  - default: '30'
+    effect: total block coordinate descent (ANLS) iterations, i.e. how far the factorization
+      is run toward convergence
+    name: nIteration
+  - default: '1'
+    effect: number of restarts of the non-convex factorization, guarding against a bad local
+      optimum
+    name: nRandomStarts
+  - default: '1'
+    effect: random seed for the factorization initialization, i.e. run-to-run reproducibility
+    name: seed
+  - default: 2L
+    effect: number of parallel tasks used by the solver
+    name: nCores
+  - default: '0.1'
+    effect: variance threshold deciding how many shared variable genes enter the factorization
+    name: 'selectGenes thresh (1.x name: var.thresh)'
+  - default: '50'
+    effect: number of quantiles used when stretching each dataset's factor loadings onto the
+      reference
+    name: quantileNorm quantiles
+  - default: 'NULL'
+    effect: which dataset the others are quantile-aligned to (NULL picks it automatically)
+    name: quantileNorm reference
+  upstream_url: https://welch-lab.github.io/liger/reference/runINMF.html
+iPOLNG:
+  fixed_in_script:
+  - name: normalize_total target_sum (both modalities)
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:28
+    value: 1e4
+  - name: n_top_genes (RNA HVG selection)
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:37
+    value: '5000'
+  - name: n_top_genes (ATAC HVF selection)
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:38
+    value: '20000'
+  - name: num_topics
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:42
+    value: '20'
+  - name: integrated_epochs
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:42
+    value: '3000'
+  - name: warmup_epochs
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:42
+    value: '3000'
+  - name: seed
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:42
+    value: '42'
+  - name: verbose
+    source: tools_scripts/iPOLNG/main_iPOLNG.py:42
+    value: 'True'
+  notes: 'Only one entrypoint exists (main_iPOLNG.py). The CLI exposes only --path1/--path2/--save_path.
+    Two things worth flagging for the wrapper: (1) the HVG counts are asymmetric and passed
+    positionally into the shared data_loader (5000 for RNA, 20000 for ATAC) via line 30, `
+    sc.pp.highly_variable_genes(adata, n_top_genes=top_number)` — a user changing modality
+    or dataset size has no way to adjust them; (2) `lr` is the one documented library knob
+    the script never mentions at all, so it silently takes the library default of 0.1 even
+    though the upstream README explicitly recommends 0.01/0.001 for sparse data — the most
+    likely cause of poor convergence on sparse ATAC. Defaults above are quoted from the upstream
+    README (cuhklinlab/iPoLNG), fetched both via the repo page and https://raw.githubusercontent.com/cuhklinlab/iPoLNG/main/README.md,
+    which agreed. Run() itself takes no documented arguments; it returns L_est / Ls_est /
+    Thetas_est / time / loss / alpha0s. The script also hard-selects the CUDA tensor type
+    at line 12, which is device plumbing rather than a hyperparameter, so it is excluded.'
+  upstream_knobs:
+  - default: none (required argument)
+    effect: number of latent factors/topics, i.e. the embedding dimensionality
+    name: num_topics
+  - default: '0.1'
+    effect: learning rate of the stochastic variational inference optimiser; the README advises
+      lowering it to 0.01 or 0.001 on sparser data
+    name: lr
+  - default: '3000'
+    effect: SVI epochs for the joint iPoLNG fit
+    name: integrated_epochs
+  - default: '3000'
+    effect: SVI epochs for the per-modality PoLNG warm-up that initialises the joint fit
+    name: warmup_epochs
+  - default: '1'
+    effect: shape parameter of the inverse-gamma prior on the factor scales
+    name: alpha_k
+  - default: '42'
+    effect: random seed for reproducibility
+    name: seed
+  - default: 'True'
+    effect: whether learning progress is printed
+    name: verbose
+  upstream_url: https://github.com/cuhklinlab/iPoLNG
+moETM:
+  fixed_in_script:
+  - name: normalize_total target_sum (RNA, HVG selection only)
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:67
+    value: 1e4
+  - name: HVG selection criteria (no n_top_genes given)
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:69
+    value: 'scanpy defaults (seurat flavor: min_mean=0.0125, max_mean=3, min_disp=0.5) — feature
+      count is data-dependent, not fixed'
+  - name: KL warm-up schedule (calc_weight cutoff_ratio, warmup_ratio, min_weight, max_weight)
+    source: tools_scripts/moETM/dataloader.py:106
+    value: 0, 1/3, 0, 1e-4
+  - name: embedding-extraction interval (epochs)
+    source: tools_scripts/moETM/dataloader.py:120
+    value: '10'
+  - name: Total_epoch
+    source: tools_scripts/moETM/dataloader.py:135
+    value: '500'
+  - name: num_topic (latent topic dimension)
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:177
+    value: '100'
+  - name: emd_dim (feature/topic embedding width)
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:178
+    value: '400'
+  - name: n_batches (batch labels generated)
+    source: tools_scripts/moETM/dataloader.py:191
+    value: '1'
+  - name: batch_size
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:192
+    value: '2000'
+  notes: 'ENTRYPOINT CHOICE: four main_* scripts exist and none is suffix-free — main_moETM_rna_adt.py,
+    main_moETM_rna_atac.py, and the two *_imputation.py variants. I audited main_moETM_rna_adt.py
+    (the vertical-integration RNA+ADT script) as the primary. I also read main_moETM_rna_atac.py:
+    its hyperparameters are identical (num_topic=100 line 192, emd_dim=400 line 193, Total_epoch=500/batch_size=2000
+    line 150, calc_weight(..., 0, 1/3, 0, 1e-4) line 121, epoch%10 line 135, target_sum=1e4
+    lines 67 and 79) — the only substantive difference is that the ATAC script runs highly_variable_genes
+    on BOTH modalities (lines 69 and 81) whereas the ADT script runs it on RNA only (line
+    69) and keeps all proteins, which is sensible for ADT. Note that batch_size=2000 is passed
+    explicitly at line 192 in the ADT script and left to the default at line 207 in the ATAC
+    script; the effective value is 2000 either way. CAVEATS: (a) Eval_kwargs at lines 144-149
+    fix clustering_method=''louvain'' and a 20-point resolution grid [0.1 ... 2.0], but the
+    evaluate() call that would consume them is commented out at line 127, so those values
+    are inert and I excluded them from the hardcoded list. (b) batch_names is built with range(1)
+    at line 191 even though --path1/--path2 accept nargs=''+'', so every input file pair is
+    labelled ''batch0'' and the batch-correction machinery (num_batch, the per-batch bias
+    terms) is effectively disabled regardless of how many files are passed. (c) Because the
+    training loop iterates train_num // batch_size times with batch_size=2000, any dataset
+    under 2000 cells performs zero gradient steps and any remainder under 2000 cells is dropped
+    each epoch — batch_size is therefore a correctness knob here, not just a speed knob. (d)
+    The local Train_moETM defined at line 80 shadows the identically named import from moETM.train
+    at line 22. UPSTREAM: moETM is a research repo, not a documented pip library — its README
+    documents no hyperparameters and tells the reader to edit the main scripts. The defaults
+    above therefore come from upstream source files I fetched directly: https://raw.githubusercontent.com/manqizhou/moETM/main/moETM/build_model.py
+    (build_moETM(..., num_topic=50, emd_dim=400), Adam lr=0.001, encoder hidden 128, dropout
+    p=0.1), https://raw.githubusercontent.com/manqizhou/moETM/main/utils.py (calc_weight defaults
+    cutoff_ratio=0., warmup_ratio=1/3, min_weight=0., max_weight=1e-7), https://raw.githubusercontent.com/manqizhou/moETM/main/moETM/train.py
+    (Trainer_moETM.__init__(encoder_mod1, encoder_mod2, decoder, optimizer) — it exposes no
+    hyperparameters of its own) and https://raw.githubusercontent.com/manqizhou/moETM/main/main_intergration_rna_protein.py
+    (Total_epoch=500, batch_size=2000, num_topic=100, emd_dim=400). The vendored tools_scripts/moETM/moETM/build_model.py
+    matches upstream byte-for-byte on these values.'
+  upstream_knobs:
+  - default: 50 (build_moETM signature); upstream main scripts override to 100
+    effect: number of topics = dimensionality of the shared cell embedding returned as result['delta']
+    name: num_topic
+  - default: '400'
+    effect: width of the feature/topic embedding matrices alpha and beta in the linear decoders
+    name: emd_dim
+  - default: '0.001'
+    effect: learning rate; fixed inside build_moETM, not a parameter of any function
+    name: lr (Adam)
+  - default: 500 in upstream main scripts
+    effect: number of training epochs
+    name: Total_epoch
+  - default: 2000 in upstream main scripts
+    effect: minibatch size; also determines how many cells are dropped, since the loop runs
+      train_num // batch_size iterations
+    name: batch_size
+  - default: '128'
+    effect: single hidden layer size of each modality encoder; fixed inside the encoder class,
+      not a constructor argument
+    name: encoder hidden width
+  - default: '0.1'
+    effect: dropout after the encoder hidden layer; also fixed inside the encoder class
+    name: encoder dropout p
+  - default: 1e-7 / (1/3)
+    effect: ceiling and ramp length of the KL annealing schedule — the benchmark script passes
+      1e-4, a 1000x larger ceiling than the library default
+    name: calc_weight max_weight / warmup_ratio
+  upstream_url: https://github.com/manqizhou/moETM
+online_iNMF:
+  fixed_in_script:
+  - name: selectGenes var.thresh (variable-gene variance threshold)
+    source: tools_scripts/online iNMF/main_online_iNMF.Rmd:46
+    value: '0.2'
+  - name: k (inner dimension of the factorization / number of metagenes)
+    source: tools_scripts/online iNMF/main_online_iNMF.Rmd:48
+    value: '20'
+  notes: 'The method directory is literally ''online iNMF'' with a space, not ''online_iNMF''
+    — quote the path. Only paths come from the command line (args[1..n], lines 56-62). Line
+    48 also fixes method = "online"; I treated that as the method''s identity rather than
+    a tunable knob, and note that R''s partial matching resolves "online" to runIntegration''s
+    "onlineINMF" choice. Important: line 49 is COMMENTED OUT — '' #pbmcs <- online_iNMF(pbmcs,
+    k = 20, miniBatch_size = 5000, max.epochs = 5)'' — so minibatchSize and maxEpochs are
+    NOT set by the script; they fall through to the library defaults (5000 and 5, which happen
+    to equal the commented values). I therefore did not list them as hardcoded, and they belong
+    in the exposure gap. lambda is likewise never set (library default 5). quantileNorm at
+    line 50 is an all-default call. Note the variable-gene selection differs from the iNMF
+    script: here var.thresh = 0.2 across all datasets, whereas main_iNMF.Rmd instead restricts
+    selection to dataset 1 at the default threshold — so the two scripts are not comparable
+    on preprocessing. Argument-name caveat: var.thresh is the rliger 1.x spelling of 2.x''s
+    thresh; per the 2.0.0 release notes old names still work with a deprecation warning.'
+  upstream_knobs:
+  - default: '5'
+    effect: regularization strength penalizing dataset-specific factors; larger values force
+      tighter cross-dataset alignment
+    name: lambda
+  - default: '5'
+    effect: number of passes over the full dataset, the main compute/convergence trade-off
+      for the online solver
+    name: maxEpochs
+  - default: '5000'
+    effect: cells per minibatch, setting the memory footprint and gradient noise of each update
+    name: minibatchSize
+  - default: '1'
+    effect: inner HALS block coordinate descent iterations per minibatch
+    name: HALSiter
+  - default: '1'
+    effect: random seed for initialization and minibatch sampling, i.e. run-to-run reproducibility
+    name: seed
+  - default: 2L
+    effect: number of parallel tasks used by the solver
+    name: nCores
+  - default: '0.1'
+    effect: variance threshold deciding how many shared variable genes enter the factorization
+      (this script raises it to 0.2)
+    name: 'selectGenes thresh (1.x name: var.thresh)'
+  - default: '50'
+    effect: number of quantiles used when stretching each dataset's factor loadings onto the
+      reference
+    name: quantileNorm quantiles
+  upstream_url: https://welch-lab.github.io/liger/reference/runOnlineINMF.html
+scMSI:
+  fixed_in_script:
+  - name: target_sum (normalize_total)
+    source: tools_scripts/scMSI/main_scMSI.py:56
+    value: 1e4
+  - name: n_latent
+    source: tools_scripts/scMSI/main_scMSI.py:62
+    value: '10'
+  - name: latent_distribution
+    source: tools_scripts/scMSI/main_scMSI.py:63
+    value: '"normal"'
+  - name: max_epochs
+    source: tools_scripts/scMSI/main_scMSI.py:65
+    value: '400'
+  - name: batch_size (training)
+    source: tools_scripts/scMSI/main_scMSI.py:66
+    value: '128'
+  - name: batch_size (inference)
+    source: tools_scripts/scMSI/main_scMSI.py:67
+    value: '128'
+  notes: 'Single entrypoint (main_scMSI.py, vertical RNA+ADT). argparse exposes only --path1/--path2/--save_path,
+    so every model setting is fixed in the body. Of the pinned values, n_latent=10, latent_distribution="normal"
+    and max_epochs=400 happen to coincide with the library defaults, so pinning them costs
+    nothing today but silently freezes them against any upstream change; batch_size=128 is
+    a real deviation from the library''s train(batch_size=256), and the inline comment on
+    line 66 says so explicitly ("may change the batch_size if there is nan error") — that
+    makes batch_size the single most valuable knob for the wrapper to surface. The returned
+    embedding is the concatenation of the RNA and protein latents (line 70), so n_latent=10
+    yields a 20-dimensional embedding, not 10. record_loss=True on line 66 is logging, not
+    a hyperparameter, so it is excluded. Note the library is VENDORED into the method directory
+    at tools_scripts/scMSI/scMSI/, and the vendored scMSI_main.py signatures are identical
+    to the upstream file at https://raw.githubusercontent.com/ChengmingZhang-CAS/scMSI-master/main/scMSI/scMSI_main.py
+    — I verified both, so the defaults above are read off real source rather than prose docs
+    (the upstream repo has a README/notebook but no API reference site). Also worth flagging
+    for the wrapper: the un-suppressible train/validation split (train_size=0.9) means 10%
+    of cells are held out by default.'
+  upstream_knobs:
+  - default: 4e-4
+    effect: Adam learning rate for the variational training loop
+    name: lr
+  - default: 256 (in train); None in get_latent_representation
+    effect: minibatch size; the script halves it to 128 and its own comment flags this as
+      the knob to tune when training goes NaN
+    name: batch_size
+  - default: '"nb"'
+    effect: count distribution for the RNA decoder, negative binomial vs zero-inflated NB
+    name: gene_likelihood
+  - default: '"nbm"'
+    effect: 'count distribution for the ADT decoder: NB-mixture (background/foreground), plain
+      NB, or Poisson'
+    name: protein_likelihood
+  - default: '"gene"'
+    effect: whether the NB dispersion is shared per gene or varies per batch/label/cell
+    name: gene_dispersion
+  - default: '0.9'
+    effect: fraction of cells used for training; the remaining 10% is silently held out for
+      validation
+    name: train_size
+  - default: 'False'
+    effect: whether to stop on validation ELBO instead of always running max_epochs
+    name: early_stopping
+  - default: 1e-6
+    effect: L2 penalty on the network weights during optimization
+    name: weight_decay
+  upstream_url: https://github.com/ChengmingZhang-CAS/scMSI-master
+scMVP:
+  fixed_in_script:
+  - name: torch_num_threads
+    source: tools_scripts/scMVP/main_scMVP.py:19
+    value: '40'
+  - name: normalize_total target_sum (RNA)
+    source: tools_scripts/scMVP/main_scMVP.py:35
+    value: 1e4
+  - name: n_top_genes (RNA HVG selection)
+    source: tools_scripts/scMVP/main_scMVP.py:37
+    value: '3000'
+  - name: atac_threshold (LoadData peak filter)
+    source: tools_scripts/scMVP/main_scMVP.py:97
+    value: '0.001'
+  - name: cell_threshold (LoadData cell filter)
+    source: tools_scripts/scMVP/main_scMVP.py:98
+    value: '1'
+  - name: n_epochs
+    source: tools_scripts/scMVP/main_scMVP.py:100
+    value: '10'
+  - name: lr
+    source: tools_scripts/scMVP/main_scMVP.py:101
+    value: 1e-3
+  - name: use_cuda
+    source: tools_scripts/scMVP/main_scMVP.py:103
+    value: 'True'
+  - name: n_centroids (GMM cluster prior components)
+    source: tools_scripts/scMVP/main_scMVP.py:104
+    value: '5'
+  - name: n_alfa (attention/loss weight)
+    source: tools_scripts/scMVP/main_scMVP.py:105
+    value: '1.0'
+  - name: n_latent
+    source: tools_scripts/scMVP/main_scMVP.py:106
+    value: '20'
+  - name: n_batch
+    source: tools_scripts/scMVP/main_scMVP.py:106
+    value: '0'
+  - name: mode
+    source: tools_scripts/scMVP/main_scMVP.py:106
+    value: '"mm-vae"'
+  - name: train_size
+    source: tools_scripts/scMVP/main_scMVP.py:110
+    value: '0.9'
+  - name: frequency (metric-monitoring interval, epochs)
+    source: tools_scripts/scMVP/main_scMVP.py:112
+    value: '5'
+  notes: 'Only one candidate entrypoint exists (main_scMVP.py); the sibling scMVP/ directory
+    is a vendored copy of the upstream package. The CLI exposes only --path1/--path2/--save_path,
+    so every modelling choice above is frozen in the body. Note n_epochs=10 is far below the
+    library''s own default of 20 and below what the upstream tutorial uses, so it is the single
+    most consequential fixed value. `use_batches = False` is set at line 102 (` use_batches
+    = False`) but never consumed anywhere in the script — batch handling is fixed by n_batch=0
+    at line 106 instead; I left it out of the hardcoded list because it has no effect. ATAC
+    preprocessing calls TfidfTransformer() and StandardScaler() with no arguments (lines 49
+    and 52), so their sklearn defaults apply — no literal value is fixed there. Upstream defaults
+    were verified against three files fetched from the upstream repo, not from the vendored
+    copy: multi_vae_attention.py (the upstream_url given), https://raw.githubusercontent.com/bm2-lab/scMVP/master/scMVP/inference/multi_inference.py
+    (MultiTrainer: train_size=0.90, test_size=0.05, pro_recons_weight=1.0, n_epochs_back_kl_warmup=50,
+    n_epochs_kl_warmup=200) and https://raw.githubusercontent.com/bm2-lab/scMVP/master/scMVP/inference/trainer.py
+    (Trainer.train(n_epochs=20, lr=1e-3, eps=0.01); Trainer.__init__ weight_decay=1e-6, seed=0,
+    frequency=None). Further knobs beyond the 8 listed, all untouched by the script: dispersion
+    ("gene"), log_variational (True), isLibrary (True), is_cluster (True), eps (0.01), weight_decay
+    (1e-6), test_size (0.05), n_epochs_back_kl_warmup (50), seed (0). The upstream README
+    itself documents no hyperparameters; it points to /demos/scMVP_tutorial.ipynb and the
+    source.'
+  upstream_knobs:
+  - default: '10'
+    effect: dimensionality of the joint RNA+ATAC latent embedding
+    name: n_latent
+  - default: '20'
+    effect: number of mixture components in the GMM cluster prior, i.e. the assumed number
+      of cell states
+    name: n_centroids
+  - default: '128'
+    effect: width of each encoder/decoder hidden layer
+    name: n_hidden
+  - default: '1'
+    effect: depth of the encoder/decoder networks
+    name: n_layers
+  - default: '0.1'
+    effect: dropout applied in the encoder/decoder
+    name: dropout_rate
+  - default: '"zinb"'
+    effect: likelihood for the RNA channel, zero-inflated vs plain negative binomial
+    name: reconstruction_loss
+  - default: '20'
+    effect: number of training epochs
+    name: n_epochs (Trainer.train)
+  - default: '200'
+    effect: epochs over which the KL term is annealed to full weight
+    name: n_epochs_kl_warmup (MultiTrainer)
+  upstream_url: https://raw.githubusercontent.com/bm2-lab/scMVP/master/scMVP/models/multi_vae_attention.py
+scMoMaT:
+  fixed_in_script:
+  - name: K (number of latent factors)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:71
+    value: '30'
+  - name: lamb (regularisation lambda)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:72
+    value: '0.001'
+  - name: T (training iterations)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:73
+    value: '4000'
+  - name: interval (print/checkpoint interval)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:74
+    value: '1000'
+  - name: batch_size (fraction of cells per iteration)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:75
+    value: '0.1'
+  - name: lr (learning rate)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:76
+    value: 1e-2
+  - name: seed
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:77
+    value: '0'
+  - name: n_neighbors (post-processing kNN graph size, reused as UMAP n_neighbors)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:87
+    value: '100'
+  - name: r (neighbourhood radius for post-graph)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:88
+    value: None
+  - name: njobs (parallel jobs for calc_post_graph)
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:89
+    value: '8'
+  - name: UMAP n_components / min_dist / random_state
+    source: tools_scripts/scMoMaT/main_scMoMaT.py:90
+    value: n_components=2, min_dist=0.20, random_state=0
+  notes: 'Two entrypoints exist: main_scMoMaT.py and main_scMoMaT_fs.py. I picked main_scMoMaT.py
+    — neither carries an integration-category suffix, and _fs is the feature-score variant
+    that additionally runs the second-stage scmomat.scmomat_retrain (its lines 89-91: T =
+    2000; scmomat.scmomat_retrain(...); model2.train(T = T)) to emit marker scores; that block
+    is present but commented out in main_scMoMaT.py (lines 93-97). The two files share identical
+    values for every hyperparameter above. Command line is I/O only (--path1/2/3, --cty_path,
+    --save_path). Note the benchmark''s chosen n_neighbors=100 is well above the upstream
+    README''s recommended 30~50, and njobs=8 differs from the library default of 1; every
+    other value coincides with the library default. One knob lives outside the entrypoint:
+    util.py calls scmomat.preprocess(..., modality="RNA"/"ADT"/"ATAC") on lines 47/56/65 leaving
+    log=True at the library default, so log-transform is not exposed either.'
+  upstream_knobs:
+  - default: 30 (README recommends 20~30)
+    effect: number of latent factors / dimensionality of the cell-factor embedding
+    name: K
+  - default: '0.001'
+    effect: weight of the scMoMaT regularisation term in the matrix-tri-factorisation objective
+    name: lamb
+  - default: 4000 (train_func default)
+    effect: number of optimisation iterations in the first training stage
+    name: T
+  - default: 1e-2
+    effect: Adam learning rate for factor updates
+    name: lr
+  - default: '0.1'
+    effect: fraction of cells sampled per training iteration
+    name: batch_size
+  - default: '0'
+    effect: random seed for factor initialisation and sampling
+    name: seed
+  - default: no default — required positional argument; README recommends 30~50
+    effect: neighbourhood size of the post-processed kNN graph that is the method's actual
+      output
+    name: n_neighbors (calc_post_graph)
+  - default: None
+    effect: radius parameter (0-1) bounding neighbourhood size as an alternative to a fixed
+      k
+    name: r (calc_post_graph)
+  upstream_url: https://github.com/PeterZZQ/scMoMaT/blob/main/scmomat/model.py
+sciCAN:
+  fixed_in_script:
+  - name: normalize_total.target_sum (RNA)
+    source: tools_scripts/sciCAN/Center_loss_pytorch.py:31
+    value: 1e4
+  - name: normalize_total.target_sum (ATAC gene-activity)
+    source: tools_scripts/sciCAN/main_sciCAN.py:40
+    value: 1e4
+  - name: epoch
+    source: tools_scripts/sciCAN/main_sciCAN.py:46
+    value: 200 (library default 50; upstream README example uses 100)
+  - name: batch_size
+    source: tools_scripts/sciCAN/main_sciCAN.py:46
+    value: 1024 (library default 512)
+  notes: 'Only one main script (main_sciCAN.py). sciCAN is not a pip library - the network/training
+    code is vendored beside the entrypoint (network.py, training.py, Center_loss_pytorch.py,
+    contrastive_loss_pytorch.py), so the ''upstream library'' is rpmccordlab/sciCAN. Cycle_train_wolabel
+    exposes only epoch, batch_size, the two data matrices and an optional encoder; the script
+    overrides both real knobs (epoch=200, batch_size=1024). Everything else that matters numerically
+    is baked into the vendored training.py, NOT the entrypoint, and therefore not listed under
+    hardcoded: SGD lr=5e-3, weight_decay=5e-4, momentum=0.9 (lines 173-174), inv LR schedule
+    lr=0.001/gamma=0.001/power=0.75 (line 168), contrastive temperatures 0.15 and 0.5 (lines
+    178-179), loss weights 2.0/0.5 on the feature and prototype contrastive terms (lines 209-212),
+    Wasserstein term weights 1.5 and 2.5 (lines 232-233), cycle-loss weight 3.0 (line 238),
+    scCluster clf_out=25 (line 162), and seed = 1 (training.py line 16). The vendored copy
+    matches upstream on the signature and on clf_out=25/lr=5e-3/temperatures, per the upstream
+    training.py I fetched. Two runnability caveats: training.py calls .cuda() unconditionally
+    (lines 162-166), so a GPU is mandatory even though main_sciCAN.py moves the trained model
+    to CPU at line 50 (FeatureExtractor.to(torch.device("cpu"))); and no HVG selection is
+    done at all - the full gene set is StandardScaler-scaled and fed in, so input_dim is whatever
+    the h5 provides.'
+  upstream_knobs:
+  - default: '50'
+    effect: number of passes over the paired minibatch stream during adversarial training
+    name: epoch
+  - default: '512'
+    effect: cells per minibatch; also sets the contrastive-loss batch dimension
+    name: batch_size
+  - default: None
+    effect: lets the caller pass a pre-built (or pretrained) scCluster network instead of
+      the one constructed internally
+    name: encoder
+  - default: '10'
+    effect: number of soft cluster/prototype heads in the encoder's classifier branch (Cycle_train_wolabel
+      builds it with clf_out=25 when encoder is None)
+    name: clf_out (via a caller-supplied scCluster)
+  upstream_url: https://raw.githubusercontent.com/rpmccordlab/sciCAN/main/sciCAN/training.py
+totalVI:
+  fixed_in_script:
+  - name: scvi.settings.seed (global RNG seed)
+    source: tools_scripts/totalVI/main_totalVI.py:28
+    value: '0'
+  - name: empirical_protein_background_prior
+    source: tools_scripts/totalVI/main_totalVI.py:77
+    value: 'False'
+  - name: latent_distribution
+    source: tools_scripts/totalVI/main_totalVI.py:77
+    value: '"normal"'
+  - name: protein_expression_obsm_key (setup_anndata)
+    source: tools_scripts/totalVI/main_totalVI.py:73
+    value: '"protein_expression"'
+  - name: batch_key (setup_anndata) — batch is synthesised as one batch per input file
+    source: tools_scripts/totalVI/main_totalVI.py:75
+    value: '"batch"'
+  notes: 'Script chosen: main_totalVI.py — the directory holds main_totalVI.py (the joint-embedding
+    entrypoint, no category suffix) and main_totalVI_imputation.py (imputation task). This
+    script fixes very little, but that is the finding: line 78 is simply ` vae.train()`, with
+    no arguments at all, so max_epochs, lr, batch_size, early_stopping, train_size and KL-warmup
+    all fall through to scvi-tools defaults, and n_latent/n_hidden/n_layers are never touched
+    either (n_latent=20, and via TOTALVAE **model_kwargs n_hidden=256, n_layers_encoder=2,
+    n_layers_decoder=1, dropout_rate_encoder/decoder=0.2). Only three CLI flags exist: --path1,
+    --path2, --save_path (lines 15-17). Consequence for the wrapper: the two genuinely fixed
+    model knobs, `empirical_protein_background_prior=False` and `latent_distribution="normal"`,
+    are both DEPARTURES from library behaviour — upstream would auto-enable the empirical
+    background prior for panels of more than 10 proteins — so exposing that one flag is the
+    highest-value change here. No preprocessing is done at all in this script: no HVG selection,
+    no normalization, raw counts go straight into `adata.layers["counts"]` (line 68). For
+    contrast (not the chosen entrypoint), the sibling main_totalVI_imputation.py DOES hardcode
+    more: line 128 ` adata, batch_key="batch", flavor="seurat_v3", n_top_genes=4000, subset=True`
+    (n_top_genes=4000), line 135 `model = scvi.model.TOTALVI(adata, empirical_protein_background_prior=False,
+    latent_distribution="normal", n_layers_decoder=2)` (n_layers_decoder=2), line 136 `model.train(batch_size=265)#`
+    (batch_size=265 — note the odd non-power-of-two value), and line 141 ` n_samples=25, return_mean=True,
+    transform_batch=transform_batch` (n_samples=25 posterior draws). That script does expose
+    --seed on the CLI. Defaults cited from scvi-tools main branch source (scvi/model/_totalvi.py
+    and scvi/module/_totalvae.py); the rendered API page https://docs.scvi-tools.org/en/stable/api/reference/scvi.model.TOTALVI.html
+    omits the train() defaults, and the .train.html sub-page 404s. Version caveat: scMultiBench
+    pins an older scvi-tools in its env, so a couple of these defaults (notably train_size
+    and lr history) may differ from the version actually installed.'
+  upstream_knobs:
+  - default: '20'
+    effect: dimensionality of the joint RNA+protein latent space that is written out as the
+      embedding
+    name: n_latent
+  - default: '''nb'''
+    effect: count distribution for the RNA decoder ('nb' vs 'zinb')
+    name: gene_likelihood
+  - default: None (auto-enabled when the panel has more than 10 proteins)
+    effect: whether the protein background component is initialized from a GMM fit to the
+      data instead of a fixed prior
+    name: empirical_protein_background_prior
+  - default: '''protein'''
+    effect: whether protein dispersion is shared globally or estimated per batch/label
+    name: protein_dispersion
+  - default: 'None (heuristic: min(round(20000/n_obs)*400, 400))'
+    effect: training length
+    name: max_epochs
+  - default: 4e-3
+    effect: Adam learning rate
+    name: lr
+  - default: '256'
+    effect: minibatch size for training
+    name: batch_size
+  - default: True (with reduce_lr_on_plateau=True)
+    effect: whether training halts on a stalled validation objective rather than running the
+      full epoch budget
+    name: early_stopping
+  upstream_url: https://raw.githubusercontent.com/scverse/scvi-tools/main/src/scvi/model/_totalvi.py
