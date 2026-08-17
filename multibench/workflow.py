@@ -280,6 +280,39 @@ _CAVEATS = {
 }
 
 
+def _missing_script(variant) -> str:
+    """Why this variant's script is unreachable here, or "" when it is fine.
+
+    A method whose script is absent must not be reported runnable: the run
+    would fail minutes later with a shell error instead of here, instantly.
+    Two cases are checked and no more:
+
+    * an ABSOLUTE entrypoint that does not exist - it names one machine's
+      filesystem, so no download can supply it;
+    * a repo-relative entrypoint missing from a reference checkout that IS
+      present. When no checkout exists at all, nothing is reported: `run` and
+      `run_all` fetch it on first use, and flagging every method as broken
+      before that first fetch would be wrong.
+    """
+    from pathlib import Path as _P
+
+    ep = _P(variant.entrypoint)
+    if ep.is_absolute():
+        if ep.exists():
+            return ""
+        return (f"method script not found at {ep} - this entrypoint is an "
+                f"absolute path on another machine; the script is not part of "
+                f"the public scMultiBench repository, so it cannot be fetched")
+    repo = _P(config.DEFAULT.repo_path)
+    for root in (repo, _P(config.__file__).resolve().parent.parent):
+        if (root / "tools_scripts").is_dir():
+            return "" if (root / ep).exists() else (
+                f"method script {ep} is missing from the reference checkout at "
+                f"{root} - update it (git pull) or delete it and let the next "
+                f"run fetch a fresh copy")
+    return ""            # no checkout yet: run()/run_all() fetch one
+
+
 def _caveat(method: str, dataset: str) -> str:
     return _CAVEATS.get((method, dataset), "")
 
@@ -341,6 +374,11 @@ def scan(dataset: str, category: str | None = None,
         if rec["env"] and rec["env"] not in _installed_envs():
             rec["reason"] = (f"conda env {rec['env']!r} is not installed - run "
                              "`multibench env install --run` (see mtb.env.doctor())")
+            rows.append(rec)
+            continue
+        why_script = _missing_script(v)
+        if why_script:
+            rec["reason"] = why_script
             rows.append(rec)
             continue
         try:
