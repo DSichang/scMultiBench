@@ -94,3 +94,83 @@ def test_find_methods_runnable_filter():
     # (Guard: adding a new declared-but-unwired method should wire it or update this.)
     assert stubs == []
     assert set(runnable) == set(all_ids)
+
+
+# --- P06: derived needs_labels / explicit atac reach discovery ---------------
+
+def test_method_info_needs_labels_matches_inputs_for(root):
+    from multibench.engine import resolve
+    from multibench.engine.schema import is_label_role
+    data = root / "data"
+    cases = [("scJoint", "D28", "diagonal", None),
+             ("SCALEX", "D28", "diagonal", None),
+             ("Matilda", "D11", "vertical", ["rna", "adt"])]
+    for m, ds, cat, mods in cases:
+        info = discover.method_info(m)
+        got = resolve.inputs_for(ds, m, cat, modalities=mods, data_path=data, check=False)
+        assert info["needs_labels"] == any(is_label_role(k) for k in got), (m, got)
+        assert all("needs_labels" in sup for sup in info["supports"])
+    assert discover.method_info("scJoint")["needs_labels"] is True
+    assert discover.method_info("Matilda")["needs_labels"] is True
+    # scBridge's labels are const filenames (not resolved roles) -> still True
+    assert discover.method_info("scBridge")["needs_labels"] is True
+    assert discover.find_methods(category="diagonal", needs_labels=True) >= ["scBridge"]
+    assert "scJoint" in discover.find_methods(category="diagonal", needs_labels=True)
+
+
+def test_find_methods_atac_vertical_nonempty():
+    peaks = discover.find_methods(category="vertical", atac="peak")
+    for m in ("moETM", "scMM", "MIRA", "scMVP", "Seurat_WNN"):
+        assert m in peaks, m
+    gas = discover.find_methods(atac="gene_activity")
+    for m in ("SCALEX", "scJoint", "Matilda"):
+        assert m in gas, m
+    assert set(peaks).isdisjoint(gas)
+    # alias spellings map onto the same answer
+    assert discover.find_methods(atac="peaks") == discover.find_methods(atac="peak")
+    assert discover.find_methods(atac="gas") == gas
+
+
+# --- P09: typos raise, aliases resolve ---------------------------------------
+
+def test_find_methods_rejects_bad_tokens():
+    import pytest
+    with pytest.raises(ValueError, match="unknown category 'spatial'"):
+        discover.find_methods(category="spatial")
+    with pytest.raises(ValueError, match="unknown category 'crosss'"):
+        discover.find_methods(category="crosss")
+    with pytest.raises(ValueError, match="unknown task 'xx'"):
+        discover.find_methods(task="xx")
+    with pytest.raises(ValueError, match="unknown atac representation 'binary'"):
+        discover.find_methods(atac="binary")
+    with pytest.raises(ValueError) as e:
+        discover.find_methods(modalities=["proteinx"])
+    assert "unknown modality 'proteinx'" in str(e.value) and "protein" in str(e.value)
+
+
+def test_find_methods_modalities_aliases():
+    prot = discover.find_methods(modalities=["rna", "protein"])
+    assert prot == discover.find_methods(modalities=["rna", "adt"])
+    assert "totalVI" in prot
+    # the tutorial cell: role tokens reduce to their base type
+    diag = discover.find_methods(category="diagonal", modalities=["rna", "atac_gas"])
+    assert diag == discover.find_methods(category="diagonal", modalities=["rna", "atac"])
+    assert diag and "SCALEX" in diag
+    assert discover.find_methods(modalities=["rna", "peak"]) == discover.find_methods(modalities=["rna", "atac"])
+
+
+def test_method_info_unknown_method_points_at_mtb_list_methods():
+    import pytest
+    with pytest.raises(KeyError) as e:
+        discover.method_info("Stabmap")
+    assert "did you mean 'StabMap'" in str(e.value) and "mtb.list_methods()" in str(e.value)
+
+
+def test_params_for_validates_and_aliases():
+    import pytest
+    p = discover.params_for("totalVI", "vertical", ["rna", "protein"])
+    assert p["variant"] == "vertical:rna+adt"
+    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+        discover.params_for("Stabmap")
+    with pytest.raises(ValueError, match="unknown category 'verticall'"):
+        discover.params_for("totalVI", "verticall")
