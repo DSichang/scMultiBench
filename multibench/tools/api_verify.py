@@ -120,6 +120,27 @@ def _():
     assert ad.shape == (5, 6), ad.shape
     return f"round-trip AnnData {ad.shape}"
 
+@check("io.to_canonical sparse AnnData (gzip, features x cells)")
+def _():
+    import anndata as ad, h5py, scipy.sparse as sp
+    a = ad.AnnData(sp.random(300, 200, density=0.08, format="csr", dtype=np.float64))
+    dst = mtb.io.to_canonical(a, os.path.join(OUT, "sparse.h5"))
+    with h5py.File(dst) as h:
+        d = h["matrix/data"]; assert d.shape == (200, 300) and d.compression == "gzip", (d.shape, d.compression)
+    return f"{d.shape} gzip, {os.path.getsize(dst)} bytes"
+
+@check("io.export_dataset + write_labels + scan on the folder")
+def _():
+    import anndata as ad
+    a = ad.AnnData(np.random.rand(40, 10)); a.obsm["protein"] = np.random.rand(40, 4)
+    a.obs["ct"] = ["A", "B"] * 20
+    d = mtb.io.export_dataset(a, os.path.join(OUT, "data", "MYCITE"), rna="X",
+                              adt="obsm:protein", labels="obs:ct")
+    files = sorted(os.listdir(d)); assert files == ["adt.h5", "cty.csv", "rna.h5"], files
+    got = mtb.inputs_for("MYCITE", "Matilda", "vertical", modalities=["rna", "adt"],
+                         data_path=os.path.join(OUT, "data"), check=True)
+    return f"{files} -> {sorted(got)}"
+
 @check("io.normalize_peak_names")
 def _():
     import h5py
