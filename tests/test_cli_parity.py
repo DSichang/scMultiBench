@@ -79,31 +79,31 @@ def test_cli_runtime_error_exit_1_and_debug_reraise(monkeypatch, capsys):
         raise ValueError("kaboom from the api")
     monkeypatch.setattr(multibench, "scan", boom)
     monkeypatch.delenv("MULTIBENCH_DEBUG", raising=False)
-    rc = cli.main(["scan", "D27", "--category", "diagonal"])
+    rc = cli.main(["scan", "D28", "--category", "diagonal"])
     err = capsys.readouterr().err
     assert rc == 1
     assert "error: kaboom from the api" in err
     assert "MULTIBENCH_DEBUG=1" in err
     monkeypatch.setenv("MULTIBENCH_DEBUG", "1")
     with pytest.raises(ValueError, match="kaboom"):
-        cli.main(["scan", "D27", "--category", "diagonal"])
+        cli.main(["scan", "D28", "--category", "diagonal"])
 
 
 # ----------------------------------------------------------------- scan / layout
 def test_cli_scan_prints_frame(capsys):
-    rc = cli.main(["scan", "D27", "--category", "diagonal", "--methods", "SCALEX"])
+    rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "SCALEX"])
     out = capsys.readouterr().out
     assert rc == 0
     assert "SCALEX" in out
     assert "runnable" in out
     # the table is printed as-is: every column scan() returns appears
-    for col in multibench.scan("D27", "diagonal").columns:
+    for col in multibench.scan("D28", "diagonal").columns:
         assert col in out
     assert "scBridge" not in out          # --methods filters rows
 
 
 def test_cli_scan_columns_and_format(capsys):
-    rc = cli.main(["scan", "D27", "--category", "diagonal", "--columns", "method,env",
+    rc = cli.main(["scan", "D28", "--category", "diagonal", "--columns", "method,env",
                    "--format", "csv"])
     out = capsys.readouterr().out
     assert rc == 0
@@ -112,17 +112,17 @@ def test_cli_scan_columns_and_format(capsys):
 
 
 def test_cli_scan_unknown_column_and_method_errors(capsys):
-    rc = cli.main(["scan", "D27", "--category", "diagonal", "--columns", "nope"])
+    rc = cli.main(["scan", "D28", "--category", "diagonal", "--columns", "nope"])
     err = capsys.readouterr().err
     assert rc == 1 and "unknown column(s) ['nope']" in err and "available:" in err
-    rc = cli.main(["scan", "D27", "--category", "diagonal", "--methods", "NotAMethod"])
+    rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "NotAMethod"])
     err = capsys.readouterr().err
     assert rc == 1 and "not in the scan table" in err
 
 
 def test_cli_scan_requires_category():
     with pytest.raises(SystemExit) as ei:
-        cli.main(["scan", "D27"])
+        cli.main(["scan", "D28"])
     assert ei.value.code == 2
 
 

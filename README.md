@@ -26,7 +26,8 @@ import multibench as mtb
 
 mtb.list_methods()                 # the 40-method registry
 mtb.method_info("Matilda")         # everything known about one method
-mtb.scan("D11", "vertical")        # what can run on a dataset, and why not
+mtb.scan("D11", "vertical")        # two-gate preflight: files_ok / env_ok per method, with reasons
+mtb.plan("D11", "vertical")        # the run plan (= run_all(dry_run=True)); blocked rows stay, with reasons
 res = mtb.run_all("D11", "vertical", out_dir="out/")   # run + score
 res.plot()                         # the paper-style bubble panel
 ```
@@ -38,6 +39,17 @@ Running methods needs their conda environments (Linux). The package itself is
 multibench env doctor                              # what exists / is missing
 multibench env install --methods Matilda --run     # one method (2-14 GB)
 multibench env install --category vertical --run   # one category (45-101 GB)
+```
+
+Everything is also available from the command line (`multibench --help`):
+
+```bash
+multibench scan D11 --category vertical               # preflight table: files_ok / env_ok / reason
+multibench find --category vertical --modalities rna,adt --needs-labels false
+multibench run-all D11 --category vertical --out-dir out/ --dry-run
+multibench evaluate --output out/Matilda/embedding.h5 --labels data/D11/cty.csv --only ARI,NMI
+multibench plot bubble --category vertical --dataset D11 --source rerun --out d11.pdf
+multibench cite Matilda MOFA2                          # BibTeX for the benchmark + each method
 ```
 
 The benchmark datasets are downloaded separately - see
