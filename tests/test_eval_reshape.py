@@ -38,3 +38,18 @@ def test_evaluate_to_plot_handoff_end_to_end(tmp_path):
     mtb.plot.bubble(long_df, metrics=["ARI", "NMI"], save=out)
     assert out.exists()
     assert out.stat().st_size > 0
+
+
+def test_to_long_rejects_colliding_metric_names():
+    import pytest
+    df = pd.DataFrame({"Value": [0.5, 0.4]}, index=["ari", "ARI"])
+    with pytest.raises(ValueError, match="collide after canonicalisation"):
+        to_long(df, method="M", dataset="D", category="vertical")
+    # blank / unknown-empty names are dropped, not kept as NaN rows
+    df = pd.DataFrame({"Value": [0.5, 0.1]}, index=["nmi", ""])
+    out = to_long(df, method="M", dataset="D", category="vertical")
+    assert out["metric"].tolist() == ["NMI"]
+    assert list(out.columns) == ["metric", "value", "method", "dataset", "category"]
+    # a named index (e.g. read back from CSV) still becomes 'metric'
+    df = pd.DataFrame({"Value": [0.5]}, index=pd.Index(["ARI"], name="Metric"))
+    assert to_long(df, "M", "D", "vertical")["metric"].tolist() == ["ARI"]
