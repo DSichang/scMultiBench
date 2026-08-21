@@ -161,8 +161,10 @@ tmp = tempfile.mkdtemp()
 folder = mtb.io.export_dataset(demo, os.path.join(tmp, "MYCITE"),
                                rna="X", adt="obsm:protein", labels="obs:celltype")
 print(sorted(os.listdir(folder)))
-# 10x multiome held as MuData (peaks in mdata["atac"]):
-#   mtb.io.from_mudata(mdata, ".../MYMULTIOME", rna="rna", atac="atac", atac_kind="peak", labels="rna:celltype")
+# 10x multiome held as MuData (peaks in mdata["atac"]) - category="vertical" writes the plain atac.h5
+# the vertical roles read (whatever the ATAC representation; check method_info(m)["atac"] for what each wants):
+#   mtb.io.from_mudata(mdata, ".../MYMULTIOME", rna="rna", atac="atac", atac_kind="peak",
+#                      labels="rna:celltype", category="vertical")
 sc = mtb.scan("MYCITE", CATEGORY, data_path=tmp)
 print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate (the rest want an ATAC matrix too)")""",
  "diagonal": """import anndata as ad, numpy as np, tempfile, os
@@ -364,8 +366,13 @@ CSV is a **single column** with one header line (typically `x`) and one label
 per cell, in the same order as `matrix/barcodes` of the matching modality file.
 For ATAC, check which representation a method wants - gene-activity scores or
 peaks - because the wrong one runs to completion and returns a plausible but
-wrong embedding. The shipped label files, as `evaluate` will read them:""")
-    code("""labels = mtb.labels_for(DATASET)            # {stem: path} - what the metrics are scored against
+wrong embedding. The shipped label files, as `evaluate` will read them - the
+dict comes back in the benchmark's **cell-stacking order** (`cty`; `cty1, cty2,
+...` numerically; `rna_cty` before `atac_cty`), so
+`mtb.evaluate(embedding, labels=mtb.labels_for(DATASET))` scores a multi-file
+dataset directly, with each cell's file of origin as its batch; a dict you
+built in any other order must say so with `label_order=[...]`:""")
+    code("""labels = mtb.labels_for(DATASET)            # {stem: path} in cell-stacking order - what the metrics are scored against
 print({k: Path(v).name for k, v in labels.items()})
 print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")""")
     md("""Writing that layout from AnnData objects, executed here on a synthetic
@@ -454,7 +461,12 @@ cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
 
 `scan` inspects a folder and reports every runnable method - and for the rest,
 the exact reason (missing file, missing environment, wrong layout). Nothing
-executes.""")
+executes. From the shell, `multibench scan DATASET --category CATEGORY` prints
+the compact table (method, modalities, runnable, files_ok, env_ok,
+runtime_tier, reason); `--columns all` or `--format csv|tsv|json` gives every
+column, and `multibench run-all ... --dry-run` prints the plan plus the exact
+command line per variant whose inputs resolve - the line to paste into a
+scheduler job.""")
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
 avail[avail.runnable][["method", "modalities", "env", "output_kind",
                        "n_tunable", "needs_labels", "runtime_tier"]]""")
@@ -465,8 +477,10 @@ not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
 
 `method_info(m)["supports"]` lists a method's variants with how many
 hyperparameters each exposes on its command line; `mtb.params_for(m, CATEGORY,
-modalities)` names them. An empty `tunable` is honest: many upstream scripts
-hardcode their hyperparameters, and this package never edits upstream code.""")
+modalities)` names them, `params={"Method": {"key": value}}` sets them in
+`run_all` (`--param METHOD:KEY=VALUE` on the command line). An empty `tunable`
+is honest: many upstream scripts hardcode their hyperparameters, and this
+package never edits upstream code.""")
     code("""rows = [{"method": m, "modalities": "+".join(v["modalities"]) or "(data_dir)",
          "n_tunable": v["n_tunable"], "needs_labels": v["needs_labels"],
          "output_kind": v["output_kind"]}
@@ -476,10 +490,15 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
     md(f"""### What the registry knows about a method, and how to cite it
 
 `method_info` carries the upstream reference, repository and version next to
-the run metadata (`verbose=True` adds the long audit notes); `mtb.cite` emits
-the benchmark entry plus one per method you ran.""")
-    code(f'''info = mtb.method_info("{fastm}")
-{{k: info[k] for k in ("id", "env", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
+the run metadata - `availability` says whether a public install can run it
+(`'public'`, or `'benchmark-host-only'` for the two methods whose scripts are
+not published), `needs_labels` is the any-variant flag (`supports[i]` has it
+per variant), and `verbose=True` adds the long audit notes plus
+`verification`, the recorded end-to-end run(s) behind `status='verified'`
+(`{{dataset, category, status, wall_s, ARI, baseline, verdict, note}}`);
+`mtb.cite` emits the benchmark entry plus one per method you ran.""")
+    code(f'''info = mtb.method_info("{fastm}", verbose=True)
+{{k: info[k] for k in ("id", "env", "availability", "needs_labels", "atac", "notes", "repo_url", "version", "reference", "verification")}}''')
     code(f'''print(mtb.cite({trio!r}, fmt="text"))   # fmt="bibtex" for the .bib entries''')
     md("""### The metrics
 
@@ -526,7 +545,10 @@ is **aligned spatial coordinates**, not an embedding - their status reports
 `RUN_OK_NO_EMBEDDING` and clustering metrics genuinely do not apply. They take
 a directory of per-slice `.h5ad` files (`.X` + `obsm['spatial']`); the SPATIAL
 REGISTRATION block of `describe_layout("cross")` above is the contract, and
-`scan` checks the directory for it."""
+`scan` checks the directory for it. `PASTE` and `PASTE2` are public; `SPIRAL`
+and `GPSA` are `availability="benchmark-host-only"` - their scripts are not
+published, so `scan` reports them `benchmark-host-only: script not published`
+and `mtb.find_methods(task="registration", available=True)` omits them."""
     if cat == "mosaic":
         trouble_extra = """
 ### Why is UINMF not in mosaic?
@@ -585,11 +607,13 @@ mtb.list_methods(category="vertical")""")
     md("""## Inspect a method
 
 `method_info` returns everything the registry knows - language, environment,
-label needs, the upstream reference and the entry-point variants; `find_methods`
-filters by what your data has; `cite` emits the benchmark entry plus one per
-method.""")
+availability, label needs, the upstream reference and the entry-point variants;
+`find_methods` filters by what your data has (the filters hold per variant: a
+method matches when one of its variants satisfies category, modalities,
+`needs_labels` and `atac` together); `cite` emits the benchmark entry plus one
+per method.""")
     code("""info = mtb.method_info("Matilda")
-{k: info[k] for k in ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
+{k: info[k] for k in ("id", "language", "env", "availability", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
     code("""print(mtb.cite(["Matilda"], fmt="text"))""")
     md("""## Load shipped results and draw the standard figures
