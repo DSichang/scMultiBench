@@ -1,12 +1,14 @@
 """Resolve a catalog dataset id + method to concrete input file paths."""
 from __future__ import annotations
 
+import functools
 import os
 import warnings
 from pathlib import Path
 
 from .. import config
 from . import registry
+from .schema import base_modality, is_label_role
 
 # A few variant roles name a modality *representation* whose on-disk filename
 # differs from the role token (e.g. the diagonal ATAC roles). Candidate bases
@@ -138,8 +140,15 @@ def inputs_for(dataset: str, method: str, category: str,
     check : what to do when a resolved path does not exist on disk.
         ``None`` (default) - return the best-effort paths but emit a
         ``UserWarning`` listing the missing ones; ``True`` - raise
-        ``FileNotFoundError`` and also run the matrix-orientation preflight
-        (rejects a cells x features file up front); ``False`` - fully silent.
+        ``FileNotFoundError`` and also run the content preflight: the
+        matrix-orientation check (``ValueError`` for a cells x features file),
+        the label-length check (``ValueError`` when a label CSV has a different
+        number of rows than the modality file it labels) and, for ``data_dir``
+        methods, the directory-content check (``FileNotFoundError`` when a
+        spatial-registration method finds fewer than two ``*.h5ad`` slices, or
+        a slice lacks ``obsm['spatial']``; when scBridge's bare filenames are
+        absent). This is what :func:`multibench.scan` reports per row as
+        ``files_ok`` / ``files_reason``; ``False`` - fully silent.
 
     Variant selection:
       * If ``modalities`` is given, the exact variant matching
@@ -193,6 +202,11 @@ def inputs_for(dataset: str, method: str, category: str,
                 f"{sorted(q.name for q in ds_dir.glob('*')) if ds_dir.is_dir() else '(dir missing)'}"
             )
         _check_orientation(method, dataset, category, out)
+        _check_label_lengths(method, dataset, category, out)
+        if "data_dir" in out:
+            ok, why = _check_data_dir(variant, out["data_dir"])
+            if not ok:
+                raise FileNotFoundError(f"{method}/{dataset}/{category}: {why}")
     elif check is None and missing:
         # The default used to hand back phantom paths in silence, so a typo in
         # the dataset folder only surfaced minutes later inside the method's
@@ -203,9 +217,6 @@ def inputs_for(dataset: str, method: str, category: str,
             UserWarning, stacklevel=2)
     return out
 
-
-
-import functools
 
 
 @functools.lru_cache(maxsize=512)
@@ -269,6 +280,155 @@ def _check_orientation(method, dataset, category, resolved):
             )
 
 
+@functools.lru_cache(maxsize=512)
+def _sniff_features(path: str, mtime_ns: int, n: int = 50) -> tuple:
+    """First ``n`` feature names of a canonical .h5 (cached by mtime), or ()."""
+    import h5py
+
+    try:
+        with h5py.File(path, "r") as f:
+            if "matrix/features" not in f:
+                return ()
+            raw = f["matrix/features"][:n]
+    except OSError:
+        return ()
+    return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
+
+
+@functools.lru_cache(maxsize=512)
+def _count_label_rows(path: str, mtime_ns: int):
+    """Number of label rows in a label CSV (header excluded), cached by mtime;
+    ``None`` when the file cannot be parsed."""
+    import pandas as pd
+
+    try:
+        return int(len(pd.read_csv(path, usecols=[0])))
+    except Exception:
+        return None
+
+
+def _label_partners(label_role: str, roles) -> list[str]:
+    """Which modality roles a label role labels (same-cell pairing rule).
+
+    * ``cty`` (one label set, paired data) -> every modality role;
+    * ``cty<N>`` (one label file per batch) -> the roles numbered ``<N>``;
+    * ``rna_cty`` / ``atac_cty`` / ``peak_cty`` -> the roles of that base
+      modality (``atac_cty`` covers ``atac``, ``atac_gas`` and ``atac_peak``);
+    * anything else (``source_cty`` ...) -> nothing (no safe pairing).
+    """
+    mods = [r for r in roles if not is_label_role(r) and r != "data_dir"]
+    if label_role == "cty":
+        return mods
+    digits = "".join(ch for ch in label_role if ch.isdigit())
+    if label_role.startswith("cty") and digits:
+        return [r for r in mods if r.endswith(digits)]
+    if label_role.endswith("_cty"):
+        prefix = label_role[:-4]
+        base = {"peak": "atac"}.get(prefix, prefix)
+        return [r for r in mods if base_modality(r) == base and not r[-1:].isdigit()]
+    return []
+
+
+def _check_label_lengths(method, dataset, category, resolved):
+    """Reject a label file whose row count differs from the cells it labels.
+
+    ``evaluate`` would refuse the pair later ("emb has N cells, celltype has
+    M") and the method itself may fail or, worse, silently mis-align. The
+    pairing follows the role names (see :func:`_label_partners`); a file that
+    cannot be parsed or a modality file without ``matrix/barcodes`` is left
+    alone - no verdict is invented.
+    """
+    for role, path in resolved.items():
+        if not is_label_role(role):
+            continue
+        p = Path(path)
+        if p.suffix != ".csv" or not p.is_file():
+            continue
+        n_lab = _count_label_rows(str(p), p.stat().st_mtime_ns)
+        if n_lab is None:
+            continue
+        for partner in _label_partners(role, resolved):
+            q = Path(resolved[partner])
+            if q.suffix != ".h5" or not q.is_file():
+                continue
+            sniff = _sniff_h5(str(q), q.stat().st_mtime_ns)
+            if sniff is None:
+                continue
+            shape, n_feat, n_cell = sniff
+            if n_feat == n_cell:          # orientation ambiguous: cannot tell cells
+                continue
+            if n_lab != n_cell:
+                raise ValueError(
+                    f"{method}/{dataset}/{category}: {p.name} has {n_lab} labels but "
+                    f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
+                    f"exactly one label, in the same order as the cells "
+                    f"(see mtb.describe_layout({category!r}))")
+
+
+def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
+    """Does a ``data_dir`` really hold what the method needs? -> (ok, why).
+
+    ``data_dir`` resolves to the dataset directory itself when there is no
+    ``processed/`` subdir, so the path ALWAYS exists and existence proves
+    nothing. Spatial-registration methods (``output.kind == 'coords'``) need
+    >= 2 ``*.h5ad`` slices, each carrying ``obsm['spatial']`` coordinates (the
+    upstream scripts glob ``data_dir + '*.h5ad'`` and align ``.obsm['spatial']``);
+    other ``data_dir`` methods (scBridge) name their files via ``const`` args.
+    """
+    d = Path(data_dir)
+    if not d.is_dir():
+        return False, f"no such directory: {d}"
+    if variant.output.kind == "coords":
+        slices = sorted(d.glob("*.h5ad"))
+        if len(slices) < 2:
+            return False, ("spatial registration needs >=2 .h5ad slice files; "
+                           f"found {len(slices)} in {d}")
+        import h5py
+        for sl in slices:
+            try:
+                with h5py.File(sl, "r") as f:
+                    has = "obsm" in f and "spatial" in f["obsm"]
+            except OSError:
+                return False, f"{sl.name} is not a readable .h5ad file"
+            if not has:
+                return False, (f"{sl.name} has no obsm['spatial'] coordinates; "
+                               f"registration needs .X plus obsm['spatial'] per slice")
+        return True, ""
+    # non-spatial data_dir methods (e.g. scBridge) name their files via `const`
+    needed = [a.const for a in variant.args if a.const and str(a.const).endswith((".h5", ".csv"))]
+    missing = [f for f in needed if not (d / f).exists()]
+    if missing:
+        return False, f"missing files in {d}: {missing}"
+    return True, ""
+
+
+#: Caveat text appended by scan() when an ``atac_gas`` role resolves to a peak matrix.
+PEAK_IN_GAS_CAVEAT = "atac_gas resolved to a PEAK matrix (features look like chr:start-end)"
+
+
+def _preflight_caveats(resolved) -> list[str]:
+    """Non-fatal content observations about resolved inputs (never raises).
+
+    Today one check: when the ``atac_gas`` role fell back to ``atac.h5`` (no
+    ``atac_gas.h5`` present) and >= 90% of the first 50 feature names look like
+    peaks (``chr1:1-200`` / ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`.
+    Methods that want peaks behind that role name (``atac: peak`` in the
+    registry) are fine; :func:`multibench.scan` applies the caveat only to the
+    ones that want gene activity.
+    """
+    from .ingest import _PEAK_RE
+
+    out: list[str] = []
+    p = Path(resolved.get("atac_gas", ""))
+    if p.name and p.stem != "atac_gas" and p.suffix == ".h5" and p.is_file():
+        feats = _sniff_features(str(p), p.stat().st_mtime_ns)
+        if feats:
+            frac = sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
+            if frac >= 0.9:
+                out.append(PEAK_IN_GAS_CAVEAT)
+    return out
+
+
 def labels_for(dataset: str, method: str | None = None, category: str | None = None,
                *, data_path: Path | str | None = None) -> dict:
     """Return ``{name: path}`` of the cell-type label CSVs for a dataset.
@@ -276,8 +436,11 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     The benchmark stores cell-type labels as ``*cty*.csv`` in the (flat) dataset
     dir, under dataset-specific names (``cty.csv``, ``rna_cty.csv``, ``cty1.csv``,
     ...). Returns the primary label files (excluding tool-specific ``*_scjoint*``
-    reformats), keyed by filename stem, for use as ``mtb.evaluate(labels=...)``.
-    Raises ``FileNotFoundError`` if the dataset dir is absent.
+    reformats), keyed by filename stem. Pass the single path - or, for a
+    multi-file dataset, ``list(labels_for(ds).values())`` in batch order - to
+    ``mtb.evaluate(labels=...)``: a one-entry dict is accepted directly, a
+    multi-entry dict raises with that hint. Raises ``FileNotFoundError`` if the
+    dataset dir is absent.
 
     Parameters
     ----------
