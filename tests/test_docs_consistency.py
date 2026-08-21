@@ -94,3 +94,24 @@ def test_tutorials_use_the_public_api_not_raw_csv_reads():
         assert 'source="rerun"' in src
         assert "read_csv(RESULTS" not in src
         assert "from multibench.engine import registry" not in src
+
+
+# ---- claims the docs make about the runtime (evaluate.md / plot.md) --------
+def test_evaluate_has_no_return_clustering_kwarg():
+    import numpy as np
+    import multibench as mtb
+    emb = np.zeros((10, 3))
+    with pytest.raises(TypeError):
+        mtb.evaluate(emb, labels=["a"] * 5 + ["b"] * 5, return_clustering=True)
+
+
+def test_clustering_variants_ship_per_category_as_documented():
+    """plot.md: diagonal ships louvain/kmeans for all 18 datasets; cross ships neither."""
+    import multibench as mtb
+    assert mtb.load_results("diagonal", clustering="louvain").dataset.nunique() == 18
+    assert mtb.load_results("diagonal", clustering="kmeans").dataset.nunique() == 18
+    for variant in ("louvain", "kmeans"):
+        with pytest.raises(FileNotFoundError):
+            mtb.load_results("cross", clustering=variant)
+    with pytest.raises(FileNotFoundError):
+        mtb.load_results("vertical", clustering="kmeans")
