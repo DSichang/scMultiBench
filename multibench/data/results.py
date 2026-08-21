@@ -4,7 +4,11 @@ Two sources ship with the package (``multibench/result/``):
 
 * ``published`` - the benchmark's own scIB metric tables, one
   ``<category>/<dataset>/<method>/metric*.csv`` per run
-  (``result/scib_metric/``; mosaic has none);
+  (``result/scib_metric/``; mosaic has none). A few cross runs keep the
+  table one level deeper, in a run-configuration subfolder
+  (``D56/MOFA2/filtered3/metric.csv``, ``D56/MOFA2/kmeans/metric_kmeans.csv``,
+  ``D53/MOFA2/8000HVG/metric.csv``); those are read too (``kbet/`` folders,
+  which hold raw kBET output, are not metric tables and are skipped);
 * ``rerun`` - the package's re-run sweeps behind the tutorial figures
   (``result/rerun/long_all_<dataset>.csv``; D11/D11s, D28/D28s, D45/D45s,
   D52/D52s), stamped with the package version they were produced by.
@@ -107,9 +111,43 @@ def _published_missing_msg(root: Path, base: Path, category: str) -> str:
 # --------------------------------------------------------------------------
 # published tree
 # --------------------------------------------------------------------------
+# sub-folders of a method result dir that are NOT run configurations holding a
+# metric table (raw kBET output lives in ``kbet/benchmark_results*.csv``)
+_NON_TABLE_SUBDIRS = {"kbet"}
+
+
+def _find_metric_file(m_dir: Path, fname: str) -> Path | None:
+    """``<m_dir>/<fname>`` or, when absent, the same file one level down in a
+    run-configuration subfolder (``MOFA2/filtered3/metric.csv``,
+    ``MOFA2/kmeans/metric_kmeans.csv``, ``MOFA2/8000HVG/metric.csv``).
+
+    Several nested candidates would be ambiguous: the first in sorted order is
+    used and a ``UserWarning`` names the rest, so a silent pick never goes
+    unnoticed. ``None`` when nothing matches.
+    """
+    direct = m_dir / fname
+    if direct.exists():
+        return direct
+    nested = sorted(p for p in m_dir.glob(f"*/{fname}")
+                    if p.parent.name not in _NON_TABLE_SUBDIRS and p.is_file())
+    if not nested:
+        return None
+    if len(nested) > 1:
+        warnings.warn(
+            f"{m_dir}: {len(nested)} nested {fname} tables "
+            f"({[q.parent.name for q in nested]}); using {nested[0].parent.name}",
+            UserWarning, stacklevel=3)
+    return nested[0]
+
+
 def _iter_published(root: Path, datasets: list | None, clustering: str):
     """Yield ``(ds_dir, m_dir, metric_file, method_id, row_clustering, coalesce)``
-    for every loadable (dataset, method) under a category root."""
+    for every loadable (dataset, method) under a category root.
+
+    ``m_dir`` is the folder the companion files (the ASW/iASW/iF1 correction
+    table) are looked up in: the method dir itself, or the nested
+    run-configuration folder the metric table was found in (see
+    :func:`_find_metric_file`)."""
     fname = _CLUSTERING_FILES[clustering]
     if datasets:
         ds_dirs = [root / d for d in datasets]
@@ -126,15 +164,15 @@ def _iter_published(root: Path, datasets: list | None, clustering: str):
                 # clustering is requested, under the method's canonical id
                 if m.group(2) != clustering:
                     continue
-                mfile = m_dir / "metric.csv"
-                if not mfile.exists():
+                mfile = _find_metric_file(m_dir, "metric.csv")
+                if mfile is None:
                     continue
-                yield ds_dir, m_dir, mfile, catalog.canonical_id(m.group(1)), m.group(2), False
+                yield ds_dir, mfile.parent, mfile, catalog.canonical_id(m.group(1)), m.group(2), False
                 continue
-            mfile = m_dir / fname
-            if not mfile.exists():
+            mfile = _find_metric_file(m_dir, fname)
+            if mfile is None:
                 continue
-            yield ds_dir, m_dir, mfile, catalog.canonical_id(m_dir.name), clustering, True
+            yield ds_dir, mfile.parent, mfile, catalog.canonical_id(m_dir.name), clustering, True
 
 
 def _load_published(category: str, datasets: list | None, clustering: str,

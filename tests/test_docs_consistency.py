@@ -106,12 +106,14 @@ def test_evaluate_has_no_return_clustering_kwarg():
 
 
 def test_clustering_variants_ship_per_category_as_documented():
-    """plot.md: diagonal ships louvain/kmeans for all 18 datasets; cross ships neither."""
+    """plot.md: diagonal ships louvain/kmeans for all 18 datasets; cross ships
+    them for D56 only (MOFA2's nested filtered3/metric_louvain.csv and
+    kmeans/metric_kmeans.csv, readable since the nested-layout loader)."""
     import multibench as mtb
     assert mtb.load_results("diagonal", clustering="louvain").dataset.nunique() == 18
     assert mtb.load_results("diagonal", clustering="kmeans").dataset.nunique() == 18
     for variant in ("louvain", "kmeans"):
-        with pytest.raises(FileNotFoundError):
-            mtb.load_results("cross", clustering=variant)
+        cross = mtb.load_results("cross", clustering=variant)
+        assert set(cross.dataset) == {"D56"} and set(cross.method) == {"MOFA2"}
     with pytest.raises(FileNotFoundError):
         mtb.load_results("vertical", clustering="kmeans")
