@@ -27,7 +27,7 @@ from . import registry
 
 __all__ = [
     # inspection
-    "recipe", "default_env_name", "group_for", "groups", "plan", "status",
+    "recipe", "default_env_name", "own_env_name", "group_for", "groups", "plan", "status",
     "doctor", "required_envs", "installed_envs", "lockfile",
     # recipe view (the declared, hand-written recipe — for transparency)
     "create_commands", "environment_yml", "group_create_commands",
@@ -50,15 +50,37 @@ def recipe(method: str) -> dict:
     return registry.get(method).env_spec or {}
 
 
-def default_env_name(method: str) -> str:
+def own_env_name(method: str) -> str:
     """The method's OWN (singleton) env name, ``scmb_<method>``.
 
-    This is only the env name used when a method is NOT a member of any shared
-    group (see :func:`group_for`). It is NOT necessarily the env ``run()``
-    executes in: that is always :func:`group_for`, which returns the shared
-    group env for grouped methods and falls back to this name otherwise.
+    Used only when a method is NOT a member of any shared group and has no
+    explicit ``method_env`` override in ``env_groups.yaml`` - then
+    :func:`group_for` falls back to it. It is the name the hand-written recipe
+    (:func:`create_commands` / :func:`environment_yml`) builds into when you
+    pass it explicitly; by default those use :func:`default_env_name`.
     """
     return f"scmb_{method.lower()}"
+
+
+def default_env_name(method: str) -> str:
+    """The conda env name EVERY entry point uses for ``method``.
+
+    Identical to :func:`group_for`: the explicit ``method_env`` override from
+    ``env_groups.yaml`` (``Matilda`` -> ``matilda``), else the shared group env
+    the method is a member of (``UINMF`` -> ``scmb_r``), else its own
+    ``scmb_<method>`` env (:func:`own_env_name`). This is the name
+    ``scan()['env']``, ``method_info(m)['env']``, ``run()``'s ``conda run -n``,
+    ``env doctor`` / ``env plan`` / ``env install`` / ``env create`` AND
+    ``env recipe`` / ``env yml`` all agree on - so a recipe pasted into a
+    build job produces an env the package recognises.
+
+    Earlier releases returned the own ``scmb_<method>`` name even for grouped
+    methods, so ``env recipe Matilda`` named ``scmb_matilda`` while everything
+    else expected ``matilda``. ``method`` must be a registry id (``KeyError``
+    with a did-you-mean hint otherwise).
+    """
+    registry.check_method(method)
+    return group_for(method)
 
 
 def _conda_bin(prefer: str = "mamba") -> str:
@@ -114,7 +136,14 @@ def _environment_yml(spec: dict, env_name: str) -> str:
 
 def create_commands(method: str, env_name: str | None = None,
                     conda: str | None = None) -> list[list[str]]:
-    """Build the create+install commands for a single method's env."""
+    """Build the create+install commands for a single method's env.
+
+    ``env_name`` defaults to :func:`default_env_name` - the env ``scan`` /
+    ``run`` / ``env doctor`` expect for ``method`` - so the commands build an
+    env the package recognises; pass :func:`own_env_name` (or any name) to
+    build somewhere else. The recipe is the hand-written ``env_spec``; the
+    reproducible path is the lockfile (:func:`create`).
+    """
     r = recipe(method)
     if not r:
         raise ValueError(f"no env_spec recipe declared for {method!r}")
@@ -122,7 +151,11 @@ def create_commands(method: str, env_name: str | None = None,
 
 
 def environment_yml(method: str, env_name: str | None = None) -> str:
-    """Render an ``environment.yml`` string for a single method's recipe."""
+    """Render an ``environment.yml`` string for a single method's recipe.
+
+    ``env_name`` (the ``name:`` line) defaults to :func:`default_env_name`,
+    the env ``scan`` / ``run`` / ``env doctor`` expect for ``method``.
+    """
     r = recipe(method)
     if not r:
         raise ValueError(f"no env_spec recipe declared for {method!r}")
@@ -167,7 +200,7 @@ def groups() -> dict:
         covered.add(method)
     for s in registry.load():
         if s.id not in covered:
-            out[default_env_name(s.id)] = {
+            out[own_env_name(s.id)] = {
                 **(s.env_spec or {}), "members": [s.id], "shared": False,
             }
     return out
@@ -175,14 +208,15 @@ def groups() -> dict:
 
 def group_for(method: str) -> str:
     """The env name that serves this method (an explicit override, a shared
-    group, or its own env)."""
+    group, or its own ``scmb_<method>`` env). :func:`default_env_name` is the
+    same answer after validating the method id."""
     override = _method_env()
     if method in override:
         return override[method]
     for name, g in _merged_groups().items():
         if method in g.get("members", []):
             return name
-    return default_env_name(method)
+    return own_env_name(method)
 
 
 def group_create_commands(group: str, env_name: str | None = None,
@@ -377,16 +411,22 @@ def installed_envs(conda: str | None = None) -> list[str]:
 
 
 def status(conda: str | None = None) -> list[dict]:
-    """Per-method install status: difficulty, default env name, group, exists."""
+    """Per-method install status: ``{method, env, group, own_env, exists,
+    difficulty, verified_working, has_recipe}``.
+
+    ``env`` and ``group`` are both the env the package uses for the method
+    (:func:`default_env_name` == :func:`group_for`); ``own_env`` is the
+    singleton ``scmb_<method>`` name, reported installed too when present.
+    """
     have = set(installed_envs(conda))
     out = []
     for s in registry.load():
         r = s.env_spec or {}
-        env = default_env_name(s.id)
         grp = group_for(s.id)
+        own = own_env_name(s.id)
         out.append({
-            "method": s.id, "env": env, "group": grp,
-            "exists": env in have or grp in have,
+            "method": s.id, "env": grp, "group": grp, "own_env": own,
+            "exists": grp in have or own in have,
             "difficulty": r.get("difficulty", "unknown"),
             "verified_working": bool(r.get("verified_working", False)),
             "has_recipe": bool(r),
