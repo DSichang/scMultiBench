@@ -259,7 +259,13 @@ def plan(category: str | None = None, methods: list[str] | None = None) -> list[
     for m in methods:
         buckets.setdefault(group_for(m), []).append(m)
     return [
-        {"env": env, "shared": env in shared, "methods": sorted(ms)}
+        {"env": env, "shared": env in shared, "methods": sorted(ms),
+         # 'benchmark-host-only' when every method the env serves needs a
+         # script that is not published (SPIRAL, GPSA): the env builds, the
+         # method still cannot run off the benchmark host
+         "availability": ("benchmark-host-only"
+                          if all(registry.get(m).availability != "public" for m in ms)
+                          else "public")}
         for env, ms in sorted(buckets.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     ]
 

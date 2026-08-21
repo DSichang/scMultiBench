@@ -733,7 +733,9 @@ def recommend(
                      if v.when.get("category") == category] or \
                     [v.output.kind for v in spec.variants]
             env = envs.group_for(spec.id)
-            needs = bool(spec.needs_labels)
+            # per-category: a method may be supervised in one category only
+            _vs = [v for v in spec.variants if v.when.get("category") == category]
+            needs = any(v.needs_labels for v in _vs) if _vs else bool(spec.needs_labels)
             okind = kinds[0] if kinds else None
         else:
             env, needs, okind = None, None, None

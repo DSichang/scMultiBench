@@ -329,10 +329,31 @@ def _method_language(name):
         return None
 
 
-def _method_needs_labels(name) -> bool:
+def _single_category(tbl) -> str | None:
+    """The one category a table was built from, or None when mixed/unknown."""
+    raw = getattr(tbl, "raw", None)
+    try:
+        cats = raw["category"].dropna().unique()
+        return str(cats[0]) if len(cats) == 1 else None
+    except Exception:
+        return None
+
+
+def _method_needs_labels(name, category=None) -> bool:
+    """Does this method consume cell-type labels - for ``category`` when given.
+
+    A method can be supervised in one category and not another (scMoMaT: mosaic
+    yes, vertical no), so the badge on a single-category figure must follow the
+    variants of THAT category; without a category it falls back to 'any'.
+    """
     try:
         from ..engine import registry
-        return bool(registry.get(name).needs_labels)
+        spec = registry.get(name)
+        if category:
+            vs = [v for v in spec.variants if v.when.get("category") == category]
+            if vs:
+                return any(v.needs_labels for v in vs)
+        return bool(spec.needs_labels)
     except Exception:
         return False
 
@@ -402,7 +423,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                                 edgecolor="none", zorder=3))
             ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
                     fontsize=6.4, fontweight="bold", color="white")
-            if _method_needs_labels(m):
+            if _method_needs_labels(m, _single_category(tbl)):
                 # supervised: the method consumed cell-type labels, so its
                 # clustering scores are not comparable with unsupervised rows
                 ax.add_patch(Circle((-0.38, y), 0.20, facecolor="#b8860b",

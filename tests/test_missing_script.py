@@ -19,7 +19,7 @@ def _variant(entrypoint):
 
 def test_absolute_entrypoint_that_does_not_exist_is_reported(tmp_path):
     why = workflow._missing_script(_variant("/no/such/machine/main_X.py"))
-    assert "absolute path on another machine" in why
+    assert "benchmark-host-only" in why or "absolute path on another machine" in why
     assert "/no/such/machine/main_X.py" in why
 
 

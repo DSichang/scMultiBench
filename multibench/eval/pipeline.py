@@ -206,7 +206,21 @@ def _labels_from_dict(d: dict, label_order) -> list:
     if label_order is None:
         if len(d) == 1:
             return [next(iter(d.values()))]
-        raise ValueError(io._multi_dict_message("labels", d, label_order_hint=True))
+        # Accept the dict when its insertion order IS the benchmark's stacking
+        # order (what labels_for returns); any other order must be explicit,
+        # because guessing here is exactly the silent wrong score the user
+        # study hit.
+        from ..engine.resolve import _label_sort_key
+        keys = list(d)
+        if keys == sorted(keys, key=_label_sort_key):
+            return [d[k] for k in keys]
+        raise ValueError(
+            f"labels: got a dict with {len(d)} label files {keys} whose order is "
+            f"not the method's stacking order (cty1, cty2, ... numerically; rna "
+            f"before adt before atac - NOT alphabetical); pass a list of paths "
+            f"in cell order, or label_order=[...] naming the keys in that order, "
+            f"or mtb.labels_for(dataset, method=<method>, category=<category>) "
+            f"which returns them already in stacking order")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
         raise TypeError(
             f"label_order= must be a list of keys of the labels dict, e.g. "
