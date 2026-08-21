@@ -61,12 +61,14 @@ _RERUN_GLOB = "long_all_*.csv"
 
 
 def _rerun_source() -> str:
-    """Provenance stamp for re-run frames that lack a ``source`` column."""
-    try:
-        from .. import __version__
-    except Exception:  # pragma: no cover - import-order edge case
-        __version__ = "unknown"
-    return f"rerun-{__version__}"
+    """Provenance stamp for re-run frames that lack a ``source`` column.
+
+    The shipped tables carry their own stamp (``rerun-<version that produced
+    them>``); this fallback is for a file without one. It deliberately does NOT
+    use the running package's version: that would claim the current release
+    produced numbers it merely read.
+    """
+    return "rerun"
 
 
 def _read_metric_csv(path: Path) -> pd.DataFrame:
