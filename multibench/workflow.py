@@ -39,7 +39,7 @@ from .eval import io as _eio, scib as _escib
 from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
 
 __all__ = ["scan", "plan", "run_all", "BatchResult", "list_categories", "describe_layout",
-           "load_batch", "runtime_hint", "sweep"]
+           "load_batch", "runtime_hint", "sweep", "command_preview", "plan_commands"]
 
 
 def load_batch(out_dir) -> "BatchResult":
@@ -559,6 +559,8 @@ def plan(dataset: str, category: str, *, methods: list[str] | None = None,
     the requested methods exists under ``category`` (a known id with no
     diagonal variant, say) - never an empty frame. ``verbose=True`` prints the
     ``[run_all] dry run: k of n requested variant(s) runnable ...`` summary.
+    :func:`plan_commands` is this frame plus the command line each variant
+    would run (``multibench run-all --dry-run`` prints that).
     """
     return run_all(dataset, category, out_dir=None, methods=methods,
                    modalities=modalities, data_path=data_path, dry_run=True,
@@ -1071,6 +1073,160 @@ class BatchResult:
 
 
 # ---------------------------------------------------------------------- run_all
+def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
+                              methods) -> str:
+    """The ``ValueError`` text for "not one requested variant can start".
+
+    Scoped to what the caller ASKED for: with ``methods=`` every requested
+    variant is listed with its own reason (one per line); without it the
+    first three blocked variants are shown and the message says how many
+    there are in total. Reasons for methods the user never asked for used to
+    be listed here (``methods=['Matilda']`` -> Concerto's missing env), which
+    sent people fixing the wrong thing.
+    """
+    def _line(r):
+        return f"  {r['method']} ({r['modalities']}): {r['reason']}"
+    head = f"nothing is runnable for dataset={dataset!r} category={category!r}"
+    if methods:
+        lines = [_line(r) for _, r in blocked.iterrows()]
+        return (f"{head} (methods={list(methods)}). Blocked - one line per requested "
+                f"variant:\n" + "\n".join(lines) +
+                f"\nfiles_ok / env_ok in mtb.scan({dataset!r}, {category!r}, "
+                f"methods={list(methods)}) say which gate failed; mtb.env.doctor() "
+                f"for envs.")
+    n, k = len(blocked), min(3, len(blocked))
+    lines = [_line(r) for _, r in blocked.head(k).iterrows()]
+    return (f"{head}. First {k} of {n} blocked variants:\n" + "\n".join(lines) +
+            f"\nInspect mtb.scan({dataset!r}, {category!r}) for the full table "
+            f"(files_ok / env_ok say which gate failed; mtb.env.doctor() for envs).")
+
+
+def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
+    """Raise ``KeyError`` when ``params`` names a key no planned variant of that
+    method accepts - the same check the run loop applies per method, pulled
+    forward so a dry run catches the typo before the sweep starts.
+
+    A method in ``params`` that has no row in the plan is left alone (it is
+    simply not run); unknown METHOD names are caught earlier by
+    ``registry.check_method``.
+    """
+    for m, overrides in (params or {}).items():
+        rows = plan_df[plan_df["method"] == m]
+        if rows.empty or not overrides:
+            continue
+        allowed: set = set()
+        for _, r in rows.iterrows():
+            mods = [] if r["modalities"] == "(data_dir)" else r["modalities"].split("+")
+            v = registry.get(m).select(r["category"], set(mods))
+            allowed |= set(v.tunable) | set(v.params)
+        unknown = [k for k in overrides if k not in allowed]
+        if unknown:
+            raise KeyError(
+                f"{m} does not accept {unknown}; it accepts {sorted(allowed)}. "
+                "An empty set means it hardcodes its hyperparameters upstream.")
+
+
+def _repo_root_no_fetch() -> Path:
+    """Where ``run()`` looks for ``tools_scripts/`` - WITHOUT cloning it.
+
+    Mirrors ``config.ensure_repo``'s lookup order (configured ``repo_path``,
+    then the package root) but never fetches: a preview must not touch the
+    network. When neither holds a checkout the configured path is returned,
+    which is where ``run()`` will put the scripts on first use.
+    """
+    p = Path(config.DEFAULT.repo_path)
+    if (p / "tools_scripts").is_dir():
+        return p
+    root = Path(config.__file__).resolve().parent.parent
+    if (root / "tools_scripts").is_dir():
+        return root
+    return p
+
+
+def command_preview(method: str, category: str, *, inputs: dict, out_dir,
+                    params: dict | None = None, cmd_template: str | None = None,
+                    repo_path=None) -> list[str]:
+    """The argv :func:`multibench.run` would execute for this call - built, not run.
+
+    Same signature as ``run`` (``inputs`` = ``{role: path}``), same pieces:
+    the variant is selected from ``category`` + the modality roles of
+    ``inputs``, the argv comes from ``engine.builder.build_command`` (the
+    function ``run`` calls), the package-side ``driver`` / ``pty`` wrapping is
+    applied as ``run`` applies it, and the default wrapper is ``conda run -n
+    <env>`` with ``mtb.env.group_for(method)``. Two deliberate differences:
+    the inputs are shown AS GIVEN (``run`` first copies non-canonical inputs
+    to ``<out_dir>/inputs/<role>.h5``; canonical ``.h5`` files pass through
+    unchanged, so for a laid-out dataset the preview is exact), and the
+    reference checkout is located but never fetched. Nothing is written.
+
+    Returns the argv list; ``shlex.join`` it for a shell line. Raises
+    ``KeyError`` (did-you-mean) on an unknown method, ``ValueError`` when no
+    variant of ``method`` matches ``category`` + the given roles.
+    """
+    import shlex
+    from .engine import builder
+    from .engine.runner import _AUX_ROLES, wrap_command
+    spec = registry.get(method)
+    modalities = {k for k in inputs
+                  if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
+    variant = spec.select(category, modalities)
+    values = {role: str(val) for role, val in inputs.items()}
+    cmd = builder.build_command(variant, values=values,
+                                out_dir=os.path.join(str(out_dir), ""), params=params)
+    repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
+    if getattr(variant, "driver", None):
+        pkg_root = Path(__file__).resolve().parent
+        cmd = [cmd[0], str(pkg_root / variant.driver), "--script_dir",
+               str((repo / variant.entrypoint).parent)] + cmd[2:]
+    else:
+        cmd[1] = str(repo / cmd[1])
+    if cmd_template is None:
+        conda = os.environ.get("CONDA_EXE", "conda")
+        cmd_template = f"{conda} run -n {envs.group_for(method)} {{cmd}}"
+    if getattr(variant, "pty", False):
+        cmd = ["script", "-q", "-e", "-c",
+               " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
+    return wrap_command(cmd, cmd_template)
+
+
+def plan_commands(dataset: str, category: str, *, out_dir, methods=None,
+                  modalities=None, data_path=None, params: dict | None = None,
+                  verbose: bool = False) -> pd.DataFrame:
+    """:func:`plan` plus a ``command`` column: the shell line ``run_all`` would
+    execute for each variant, or ``""`` when its inputs do not resolve.
+
+    The frame is :func:`plan` (= ``run_all(dry_run=True)``) with one extra
+    trailing column, so ``plan_commands(...)[plan.columns]`` is the plan. A
+    row whose ``files_ok`` is False has no command (there is nothing to pass
+    the script); a row blocked only by ``env_ok`` still shows its command -
+    that is the line to paste into a job script once the env is built. Each
+    command writes under ``<out_dir>/<method>_<dataset>/`` exactly like
+    ``run_all``. ``params`` are merged the way ``run_all(params=)`` merges
+    them (``KeyError`` on a key the method does not accept). Nothing runs.
+    """
+    df = run_all(dataset, category, out_dir=None, methods=methods,
+                 modalities=modalities, data_path=data_path, dry_run=True,
+                 params=params, verbose=verbose).copy()
+    cmds = []
+    for _, r in df.iterrows():
+        if not r["files_ok"]:
+            cmds.append("")
+            continue
+        mods = [] if r["modalities"] == "(data_dir)" else r["modalities"].split("+")
+        try:
+            inp = _resolve.inputs_for(dataset, r["method"], category,
+                                      modalities=mods or None, data_path=data_path)
+            argv = command_preview(r["method"], category, inputs=inp,
+                                   out_dir=Path(out_dir) / f"{r['method']}_{dataset}",
+                                   params=(params or {}).get(r["method"]))
+            import shlex
+            cmds.append(shlex.join(argv))
+        except Exception as e:  # noqa: BLE001 - a preview must never abort the plan
+            cmds.append(f"(no preview: {type(e).__name__}: {e})")
+    df["command"] = cmds
+    return df
+
+
 def _load_embedding(mdir: Path, variant):
     """Read the embedding a finished run left in ``mdir``, or ``None``.
 
@@ -1192,7 +1348,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         Never empty: ``ValueError`` if nothing matches. Free; do it first.
         Filter ``plan[plan.runnable]`` for what will actually be attempted -
         ``len(plan)`` is NOT the sweep size. :func:`plan` is the same call
-        without an ``out_dir``.
+        without an ``out_dir``; :func:`plan_commands` adds the command line
+        each variant would run. A dry run also validates ``params``: a key no
+        planned variant of that method accepts raises ``KeyError`` (naming the
+        accepted keys) instead of being discovered hours in.
     timeout : per-method wall-clock cap in SECONDS. Size it from the
         ``runtime_tier`` / ``observed_worst_sec`` columns of :func:`scan` (or
         :func:`runtime_hint`); the slowest methods observed here need >4 h. A method exceeding it is
@@ -1226,6 +1385,14 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     conda environment was found - a missing env is reported there rather than
     failing hours in (``multibench env doctor`` / ``env install --run``).
 
+    Raises ``KeyError`` (did-you-mean) for an unknown id in ``methods`` or
+    ``params`` BEFORE any file or env is looked at; ``ValueError`` when no
+    variant of the requested methods exists under ``category`` ("no 'cross'
+    variant matches ..."), and ``ValueError`` "nothing is runnable ..." when
+    variants exist but not one passes both gates - that message lists the
+    reason of EVERY requested variant (or the first 3 of N when ``methods`` was
+    not given), never the reasons of methods you did not ask for.
+
     Methods can take minutes to hours; a failure is recorded, never raised, so one
     bad method cannot abort the sweep.
     """
@@ -1234,6 +1401,8 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     # so a bad combination is reported as such instead of surfacing as an
     # unrelated I/O or "nothing is runnable" error
     params = params or {}
+    for _m in params:                      # KeyError (did-you-mean) before any I/O
+        registry.check_method(_m)
     if not dry_run and skip_existing and params:
         raise ValueError(
             "skip_existing=True with params=... would silently return results computed "
@@ -1243,12 +1412,17 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     # missing dataset folder both come from scan(); blocked rows are kept.
     plan_df = scan(dataset, category=category, data_path=data_path,
                    methods=methods, modalities=modalities)
+    if plan_df.empty:
+        # no variant of the requested methods exists under this category: a
+        # REQUEST problem (Matilda is not a cross method), reported as such on
+        # every path rather than as "nothing is runnable" with other methods'
+        # reasons attached
+        raise ValueError(
+            f"no {category!r} variant matches dataset={dataset!r} methods={methods} "
+            f"modalities={modalities}; see mtb.method_info(m)['supports'] and "
+            f"mtb.scan({dataset!r})")
     if dry_run:
-        if plan_df.empty:
-            raise ValueError(
-                f"no {category!r} variant matches dataset={dataset!r} methods={methods} "
-                f"modalities={modalities}; see mtb.method_info(m)['supports'] and "
-                f"mtb.scan({dataset!r})")
+        _check_param_keys(plan_df, params)   # a typo'd key must not start a sweep
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
             msg = (f"[run_all] dry run: {k} of {n} requested variant(s) runnable on "
@@ -1258,18 +1432,15 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
                         f"(files_ok / env_ok say which gate; mtb.env.doctor() for envs)")
             print(msg, flush=True)
         return plan_df                     # runnable rows first; blocked rows keep `reason`
+    blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
     if plan_df.empty:
         # A per-method failure is recorded, never raised - but "not one method could
         # even start" is a different class: the REQUEST is wrong (bad dataset name,
         # wrong category, missing files, missing env). Returning an empty result
-        # would report "0 failed", which reads as success and hides a typo.
-        why = scan(dataset, category=category, data_path=data_path)
-        reasons = [r for r in why["reason"].tolist() if r][:3]
-        raise ValueError(
-            f"nothing is runnable for dataset={dataset!r} category={category!r}. "
-            f"Inspect mtb.scan({dataset!r}, {category!r}) for the full table. "
-            f"First reasons: {reasons}")
+        # would report "0 failed", which reads as success and hides a typo. The
+        # reasons listed are those of the REQUESTED variants only.
+        raise ValueError(_nothing_runnable_message(dataset, category, blocked, methods))
 
     batch_vec = None if batch is None else _eio.as_vector(batch, what="batch")
     out_dir = Path(out_dir)
