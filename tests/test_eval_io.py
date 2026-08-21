@@ -260,8 +260,14 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     p = tmp_path / "cty.csv"; _write_cty(p, ct)
     # single-entry dict (labels_for() on a one-label dataset) plugs straight in
     assert _ari(output=emb, labels={"cty": str(p)}) == pytest.approx(1.0)
-    with pytest.raises(ValueError) as exc:
+    # a dict whose insertion order IS the stacking order (what labels_for
+    # returns) is accepted as-is: the two files are concatenated in that order
+    # (here both hold the same 90 cells, so the only complaint is the length)
+    with pytest.raises(ValueError, match="length mismatch"):
         evaluate(emb, labels={"cty1": str(p), "cty2": str(p)}, only={"ARI"})
+    # any other order must be explicit
+    with pytest.raises(ValueError) as exc:
+        evaluate(emb, labels={"cty2": str(p), "cty1": str(p)}, only={"ARI"})
     msg = str(exc.value)
     assert "2 label files" in msg and "cty1" in msg and "cty2" in msg
     assert "list of paths in cell order" in msg

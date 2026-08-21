@@ -231,7 +231,7 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     msg = str(exc.value)
     assert "got a dict with 2 label files ['atac_cty', 'rna_cty']" in msg
     assert "label_order=" in msg
-    assert "stacking order" in msg and "cty1, cty2" in msg and "rna before atac" in msg
+    assert "stacking order" in msg and "cty1, cty2" in msg and "rna before adt before atac" in msg
     assert "NOT alphabetical" in msg
     assert "mtb.labels_for(dataset, method=<method>, category=<category>)" in msg
     # the same rule reaches as_vector() directly (batch= given as a dict)

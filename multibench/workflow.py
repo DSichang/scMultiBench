@@ -346,7 +346,8 @@ def _missing_script(variant) -> str:
     if ep.is_absolute():
         if ep.exists():
             return ""
-        return (f"method script not found at {ep} - this entrypoint is an "
+        return _resolve.benchmark_host_only_reason(str(ep)) or (
+                f"method script not found at {ep} - this entrypoint is an "
                 f"absolute path on another machine; the script is not part of "
                 f"the public scMultiBench repository, so it cannot be fetched")
     repo = _P(config.DEFAULT.repo_path)
@@ -517,10 +518,9 @@ def scan(dataset: str, category: str | None = None,
         try:
             got = _resolve.inputs_for(dataset, spec.id, cat, modalities=mods or None,
                                       data_path=data_path, check=True)
-            if spec.atac != "peak":
-                extra = _resolve._preflight_caveats(got)
-                if extra:
-                    rec["caveat"] = "; ".join(x for x in [rec["caveat"], *extra] if x)
+            extra = _resolve._preflight_caveats(got, atac=spec.atac)
+            if extra:
+                rec["caveat"] = "; ".join(x for x in [rec["caveat"], *extra] if x)
         except Exception as e:  # missing files / no variant / bad layout
             file_problems.append(_truncate_tail(f"{type(e).__name__}: {e}"))
         if file_problems:
@@ -715,8 +715,11 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, only=None):
         names, lab, bat = cands[0]
         try:
             val = _full(lab, bat)
-        except Exception:
-            return None, None, []
+        except Exception as e:  # noqa: BLE001 - surfaced on the record, not swallowed
+            # the single-candidate path used to return nothing, so a bad
+            # only=/batch= combination looked like 'no label file matched'
+            return names, None, [{"order": names,
+                                  "error": f"{type(e).__name__}: {str(e)[:300]}"}]
         return names, val, [{"order": names,
                              "ARI": round(float(val["Value"]["ARI"]), 4)}]
 
@@ -1289,6 +1292,9 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     names, val, spread = _evaluate_best_order(emb, category, cands, batch=batch, only=only)
     if val is None:
         rec["status"] = "RUN_OK_EVAL_FAILED"
+        errs = [s["error"] for s in spread if isinstance(s, dict) and s.get("error")]
+        if errs:
+            rec["error"] = errs[0]
         return rec
     rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4))
                       for k, x in val["Value"].items()}
