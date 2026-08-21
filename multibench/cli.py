@@ -13,22 +13,31 @@ same parameter names where a flag exists (``--category``, ``--metrics``,
     multibench plot bubble --category vertical --dataset D11 --out fig.pdf
     multibench cite Matilda MOFA2
 
-Exit codes
-----------
+Exit codes and streams
+----------------------
 ``0`` success; ``1`` a runtime error raised by the API (the message is printed
 as ``error: ...`` on stderr; set ``MULTIBENCH_DEBUG=1`` to get the traceback);
 ``2`` a usage error (argparse: unknown flag, missing required flag, bad
 choice, or a flag combination the subcommand rejects).
+
+DATA goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
+lines); DIAGNOSTICS go to stderr (``error: ...``, ``warning: ...``, progress
+such as ``[run_all] ...`` and ``# dry run ...`` notes), so
+``multibench scan ... --format tsv > plan.tsv`` captures a clean table and
+``2>/dev/null`` silences the chatter. Tables default to a compact column set
+(``--columns all`` for everything, ``--format csv|tsv|json`` for scripts).
 
 ``multibench <command> --help`` documents every flag of every command.
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shlex
 import sys
+import warnings
 from pathlib import Path
 
 _EXIT_OK = 0
@@ -62,29 +71,160 @@ def _tri_state(value) -> bool | None:
     return _TRI[value]
 
 
-def _print_frame(df, columns=None, fmt: str = "table", file=None) -> None:
-    """Print a DataFrame as an aligned table (default), CSV or TSV.
+#: The columns ``scan`` / ``run-all --dry-run`` print by default in table
+#: mode: the verdict, the two gates and the (truncated) reason. The full
+#: 17-column frame is ~1450 characters wide - unreadable on a terminal; it is
+#: still there via ``--columns all`` or any machine format (csv/tsv/json).
+_COMPACT_PLAN_COLUMNS = ["method", "modalities", "runnable", "files_ok", "env_ok",
+                         "runtime_tier", "reason"]
+#: Free-text columns clipped to this many characters in TABLE mode (never in
+#: csv/tsv/json, never with an explicit ``--columns`` list).
+_TRUNCATE_WIDTH = 80
+_TRUNCATE_COLUMNS = ("reason", "files_reason", "env_reason", "caveat", "command", "error")
 
-    ``columns`` restricts (and orders) the printed columns; an unknown name is a
-    usage error naming the columns the frame actually has, so a concurrently
-    added column never needs a CLI change to be selectable.
+
+def _truncate(text, width: int = _TRUNCATE_WIDTH) -> str:
+    """Clip ``text`` to ``width`` characters with a trailing ``...``."""
+    t = "" if text is None else str(text)
+    return t if len(t) <= width else t[: width - 3] + "..."
+
+
+def _resolve_columns(df, columns, fmt: str, compact=None) -> list | None:
+    """Which columns to print: an explicit list, ``all``, or the default.
+
+    The default is the ``compact`` set in table mode (a readable terminal
+    width) and EVERY column for csv/tsv/json (a script wants the data, not a
+    pretty page). ``columns=["all"]`` is every column in any format. Compact
+    columns absent from the frame are skipped silently (a mocked or older
+    frame); an unknown explicit name is an error naming the available ones.
     """
-    file = sys.stdout if file is None else file
+    if columns and [c.lower() for c in columns] == ["all"]:
+        return None
     if columns:
         missing = [c for c in columns if c not in df.columns]
         if missing:
             raise ValueError(
-                f"unknown column(s) {missing}; available: {list(df.columns)}")
-        df = df[list(columns)]
+                f"unknown column(s) {missing}; available: {list(df.columns)} "
+                f"(or --columns all)")
+        return list(columns)
+    if compact and fmt == "table":
+        picked = [c for c in compact if c in df.columns]
+        return picked or None              # a frame with none of them: print it whole
+    return None
+
+
+def _print_frame(df, columns=None, fmt: str = "table", file=None, *,
+                 compact=None, truncate: bool | None = None) -> None:
+    """Print a DataFrame as an aligned table (default), CSV, TSV or JSON.
+
+    ``columns`` restricts (and orders) the printed columns (``["all"]`` = every
+    column); an unknown name is an error naming the columns the frame actually
+    has, so a concurrently added column never needs a CLI change to be
+    selectable. ``compact`` is the default column list for TABLE mode (csv/
+    tsv/json print everything unless ``columns`` is given). ``truncate``
+    clips the long free-text columns (:data:`_TRUNCATE_COLUMNS`) to
+    :data:`_TRUNCATE_WIDTH` characters with ``...`` - by default only in table
+    mode without an explicit ``columns`` list; machine formats are never
+    clipped. JSON is a list of row objects (``orient="records"``).
+    """
+    file = sys.stdout if file is None else file
+    picked = _resolve_columns(df, columns, fmt, compact)
+    if picked is not None:
+        df = df[picked]
     if fmt == "csv":
         print(df.to_csv(index=False), end="", file=file)
     elif fmt == "tsv":
         print(df.to_csv(index=False, sep="\t"), end="", file=file)
+    elif fmt == "json":
+        print(df.to_json(orient="records", indent=1, default_handler=str), file=file)
     else:
+        if truncate is None:
+            truncate = not columns
+        if truncate:
+            df = df.copy()
+            for c in _TRUNCATE_COLUMNS:
+                if c in df.columns:
+                    df[c] = df[c].map(_truncate)
         if len(df) == 0:
             print(f"(empty table; columns: {list(df.columns)})", file=file)
         else:
             print(df.to_string(index=False), file=file)
+
+
+def _quiet_stdout():
+    """Route a library call's stdout chatter (``[run_all] ...`` progress,
+    ``[env] unpacking ...``) to stderr so stdout stays data-only for pipes."""
+    return contextlib.redirect_stdout(sys.stderr)
+
+
+def _parse_scalar(text: str):
+    """``--param`` VALUE -> Python scalar: ``5`` -> int, ``0.1``/``1e-3`` ->
+    float, ``true``/``false`` -> bool, ``none``/``null`` -> None, a JSON
+    list/object (``[1,2]``) -> that object, anything else -> the string."""
+    t = text.strip()
+    low = t.lower()
+    if low in ("true", "yes"):
+        return True
+    if low in ("false", "no"):
+        return False
+    if low in ("none", "null"):
+        return None
+    try:
+        return int(t)
+    except ValueError:
+        pass
+    try:
+        return float(t)
+    except ValueError:
+        pass
+    if t[:1] in "[{":
+        try:
+            return json.loads(t)
+        except ValueError:
+            pass
+    return t
+
+
+def _parse_params(pairs, args=None, default_method: str | None = None) -> dict:
+    """Turn repeated ``--param [METHOD:]KEY=VALUE`` values into
+    ``{METHOD: {KEY: value}}`` (the ``params=`` shape of ``run`` / ``run_all``).
+
+    ``METHOD:`` is required for ``run-all`` (several methods) and optional for
+    ``run`` (``default_method`` = ``--method``; a METHOD that names another
+    method is a usage error). An unknown METHOD raises the did-you-mean
+    ``KeyError`` of the registry (exit 1); a value without ``=`` is a usage
+    error (exit 2). VALUE is parsed with :func:`_parse_scalar`.
+    """
+    from .engine import registry
+    out: dict = {}
+    for p in pairs or []:
+        if "=" not in p:
+            msg = (f"--param must be [METHOD:]KEY=VALUE, got {p!r} (e.g. "
+                   f"--param Matilda:epochs=5)")
+            if args is not None:
+                _usage_error(args, msg)
+            raise SystemExit(msg)
+        key, value = p.split("=", 1)
+        if ":" in key:
+            method, key = key.split(":", 1)
+        else:
+            method = default_method
+        method, key = (method or "").strip(), key.strip()
+        if not method or not key:
+            msg = (f"--param needs METHOD:KEY=VALUE with non-empty parts, got {p!r}"
+                   + ("" if default_method else " (METHOD: is required for run-all)"))
+            if args is not None:
+                _usage_error(args, msg)
+            raise SystemExit(msg)
+        if default_method is not None and method != default_method:
+            msg = (f"--param names method {method!r} but --method is "
+                   f"{default_method!r}; drop the METHOD: prefix or make them agree")
+            if args is not None:
+                _usage_error(args, msg)
+            raise SystemExit(msg)
+        registry.check_method(method)          # KeyError with a did-you-mean hint
+        out.setdefault(method, {})[key] = _parse_scalar(value)
+    return out
 
 
 def _packed_manifest() -> dict:
@@ -129,7 +269,8 @@ def _cmd_find(args) -> int:
                                    needs_labels=_tri_state(args.needs_labels),
                                    atac=args.atac,
                                    modalities=_csv_list(args.modalities),
-                                   runnable=args.runnable or None):
+                                   runnable=args.runnable or None,
+                                   tunable=_tri_state(getattr(args, "tunable", None))):
         print(m)
     return _EXIT_OK
 
@@ -141,8 +282,12 @@ def _cmd_scan(args) -> int:
     ``--columns`` to pick some and ``--format csv`` to pipe into other tools.
     """
     import multibench
-    df = multibench.scan(args.dataset, args.category, data_path=args.data_path)
+    from .engine import registry
     methods = _csv_list(args.methods)
+    for m in methods or []:
+        registry.check_method(m)               # did-you-mean KeyError before any I/O
+    df = multibench.scan(args.dataset, args.category, data_path=args.data_path,
+                         modalities=_csv_list(args.modalities))
     if methods:
         unknown = sorted(set(methods) - set(df["method"]))
         if unknown:
@@ -151,7 +296,8 @@ def _cmd_scan(args) -> int:
                 f"{args.dataset}/{args.category}; methods present: "
                 f"{sorted(df['method'])}")
         df = df[df["method"].isin(methods)]
-    _print_frame(df, columns=_csv_list(args.columns), fmt=args.format)
+    _print_frame(df, columns=_csv_list(args.columns), fmt=args.format,
+                 compact=_COMPACT_PLAN_COLUMNS)
     return _EXIT_OK
 
 
@@ -289,13 +435,15 @@ def _cmd_plot(args) -> int:
                   title=title, save=args.out, require_complete=args.require_complete)
         if args.overall is not None:
             kw["overall"] = args.overall
-        plot_ns.bubble(df, **kw)
+        with _quiet_stdout():
+            plot_ns.bubble(df, **kw)
     else:
         kw = dict(metrics=metrics, group=args.group, top=args.top, title=title,
                   save=args.out)
         if args.overall is not None:
             kw["overall"] = args.overall
-        plot_ns.bar(df, **kw)
+        with _quiet_stdout():
+            plot_ns.bar(df, **kw)
     print(f"wrote {args.out}")
     return _EXIT_OK
 
@@ -323,11 +471,29 @@ def _parse_inputs(pairs, args=None) -> dict:
 
 
 def _cmd_run(args) -> int:
-    """``multibench run``: :func:`multibench.run` one method on explicit inputs."""
+    """``multibench run``: :func:`multibench.run` one method on explicit inputs.
+
+    ``--param KEY=VALUE`` (repeatable; ``METHOD:KEY=VALUE`` is accepted when
+    METHOD is ``--method``) becomes ``params={KEY: value}``. ``--dry-run``
+    prints the command line ``run`` would execute (via
+    :func:`multibench.workflow.command_preview`) and executes nothing.
+    """
     import multibench
-    res = multibench.run(method=args.method, category=args.category, task=args.task,
-                       inputs=_parse_inputs(args.input, args), out_dir=args.out,
-                       cmd_template=args.runner)
+    from .workflow import command_preview
+    params = _parse_params(args.param, args, default_method=args.method) or {}
+    inputs = _parse_inputs(args.input, args)
+    if args.dry_run:
+        argv = command_preview(args.method, args.category, inputs=inputs,
+                               out_dir=args.out, params=params.get(args.method),
+                               cmd_template=args.runner)
+        print("# dry run - nothing was executed; run() would execute:", file=sys.stderr)
+        print(shlex.join(argv))
+        return _EXIT_OK
+    with _quiet_stdout():                     # library progress -> stderr
+        res = multibench.run(method=args.method, category=args.category, task=args.task,
+                           inputs=inputs, out_dir=args.out,
+                           params=params.get(args.method) or None,
+                           cmd_template=args.runner)
     print(f"ran {args.method} -> {res.out_dir}")
     return _EXIT_OK
 
@@ -335,25 +501,49 @@ def _cmd_run(args) -> int:
 def _cmd_run_all(args) -> int:
     """``multibench run-all``: :func:`multibench.run_all` on a laid-out dataset.
 
-    ``--dry-run`` prints the plan (one row per method with the reason it is or
-    is not runnable) and creates nothing; otherwise the summary table is printed
-    and everything is saved under ``--out-dir`` (reload with
-    ``multibench plot bubble --input OUT_DIR``).
+    ``--dry-run`` prints the plan (one row per method variant: runnable,
+    files_ok, env_ok, reason; compact columns - ``--columns all`` for every
+    column) and, in table mode, the command line each variant would run (via
+    :func:`multibench.workflow.plan_commands`; in csv/tsv/json it is the
+    ``command`` column); nothing is executed or created. Otherwise the
+    summary table is printed and everything is saved under ``--out-dir``
+    (reload with ``multibench plot bubble --input OUT_DIR``). Progress lines
+    go to stderr; tables to stdout. ``--param METHOD:KEY=VALUE`` (repeatable)
+    becomes ``params={METHOD: {KEY: value}}``.
     """
     import multibench
-    res = multibench.run_all(args.dataset, args.category, out_dir=args.out,
-                           methods=_csv_list(args.methods),
-                           modalities=_csv_list(args.modalities),
-                           data_path=args.data_path,
-                           evaluate=not args.no_evaluate, dry_run=args.dry_run,
-                           timeout=args.timeout, skip_existing=args.skip_existing)
+    from .workflow import plan_commands
+    params = _parse_params(args.param, args) or None
+    columns = _csv_list(args.columns)
     if args.dry_run:
-        df = res if hasattr(res, "columns") else res.plan
-        print("# dry run - nothing was executed")
-        _print_frame(df)
+        with _quiet_stdout():
+            df = plan_commands(args.dataset, args.category, out_dir=args.out,
+                               methods=_csv_list(args.methods),
+                               modalities=_csv_list(args.modalities),
+                               data_path=args.data_path, params=params, verbose=False)
+        k, n = int(df["runnable"].sum()), len(df)
+        print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
+              f"{args.dataset} ({args.category}); commands below are what run() "
+              f"would execute (rows without files_ok have none)", file=sys.stderr)
+        _print_frame(df, columns=columns, fmt=args.format, compact=_COMPACT_PLAN_COLUMNS)
+        if args.format == "table" and not columns:
+            have = df[df["command"].astype(str).str.len() > 0]
+            print()
+            print(f"# commands ({len(have)} variant(s) with resolvable inputs; "
+                  f"'[env missing]' = blocked by env_ok only)")
+            for _, r in have.iterrows():
+                tag = "" if r["env_ok"] else " [env missing]"
+                print(f"{r['method']} ({r['modalities']}){tag}: {r['command']}")
         return _EXIT_OK
-    _print_frame(res.summary)
-    print(f"saved under {args.out}")
+    with _quiet_stdout():                     # [run_all] progress -> stderr
+        res = multibench.run_all(args.dataset, args.category, out_dir=args.out,
+                               methods=_csv_list(args.methods),
+                               modalities=_csv_list(args.modalities),
+                               data_path=args.data_path, params=params,
+                               evaluate=not args.no_evaluate, dry_run=False,
+                               timeout=args.timeout, skip_existing=args.skip_existing)
+    _print_frame(res.summary, columns=columns, fmt=args.format)
+    print(f"saved under {args.out}", file=sys.stderr)
     return _EXIT_OK
 
 
@@ -382,7 +572,8 @@ def _cmd_evaluate(args) -> int:
         kw["obsm"] = args.obsm
     if args.column is not None:
         kw["column"] = args.column
-    df = multibench.evaluate(**kw)
+    with _quiet_stdout():                     # library progress -> stderr
+        df = multibench.evaluate(**kw)
     if long_mode:
         df = multibench.to_long(df, args.method, args.dataset, args.category)
         if args.out:
@@ -401,13 +592,22 @@ def _cmd_evaluate(args) -> int:
 
 def _cmd_env(args) -> int:
     """``multibench env ...``: environment recipes, preflight and installation."""
-    from .engine import envs
+    from .engine import envs, registry
     cmd = args.env_cmd
     if cmd == "status":
+        _mlist = _csv_list(getattr(args, "methods", None))
+        _cat = getattr(args, "category", None)
+        keep = None
+        if _mlist:
+            keep = set(registry.check_method(m) for m in _mlist)
+        elif _cat:
+            keep = set(registry.list_methods(category=_cat))
         for r in envs.status():
+            if keep is not None and r["method"] not in keep:
+                continue
             mark = "x" if r["exists"] else " "
             tag = r["difficulty"] + ("*" if r["verified_working"] else "")
-            print(f"[{mark}] {r['method']:16} {r['group']:16} {tag}")
+            print(f"[{mark}] {r['method']:16} {r['env']:16} {tag}")
         return _EXIT_OK
     if cmd == "groups":
         for name, spec in envs.groups().items():
@@ -445,14 +645,15 @@ def _cmd_env(args) -> int:
         if packed and do_run:
             for r in envs.doctor(category=getattr(args, "category", None),
                                  methods=_mlist):
-                if not r["exists"] and envs.install_packed(r["env"]):
+                with _quiet_stdout():           # "[env] unpacking ..." -> stderr
+                    got = (not r["exists"]) and envs.install_packed(r["env"])
+                if got:
                     print(f"{r['env']:18} [PACKED        ] <- {', '.join(r['methods'])}")
-        try:
+        # a RuntimeError (no conda here, a failed build) propagates to main():
+        # "error: ..." on stderr, exit 1 - never an error line on stdout
+        with _quiet_stdout():
             rows = envs.create_all(category=getattr(args, "category", None),
                                    methods=_mlist, dry_run=not do_run)
-        except RuntimeError as e:
-            print(f"error: {e}")
-            return _EXIT_ERROR
         manifest = _packed_manifest() if (packed and not do_run) else {}
         states = []
         for r in rows:
@@ -475,7 +676,7 @@ def _cmd_env(args) -> int:
         if not do_run:
             print("# dry-run - add --run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
-                     if packed else " from their lockfiles"))
+                     if packed else " from their lockfiles"), file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if getattr(args, "all", False):
@@ -486,27 +687,39 @@ def _cmd_env(args) -> int:
                     print(f"SKIP {env}: {str(e)[:120]}")
         else:
             if not getattr(args, "env", None):
-                print("error: name an env to freeze, or pass --all")
-                return _EXIT_USAGE
+                _usage_error(args, "name an env to freeze, or pass --all")
             print(f"froze {args.env} -> {envs.freeze(args.env)}")
         return _EXIT_OK
     if cmd == "create-group":
-        cmds = envs.create_group(args.group, dry_run=not getattr(args, "run", False))
+        with _quiet_stdout():
+            cmds = envs.create_group(args.group, dry_run=not getattr(args, "run", False))
         if not getattr(args, "run", False):
-            print("# dry-run - add --run to execute:")
+            print("# dry-run - add --run to execute:", file=sys.stderr)
             for c in cmds:
                 print(shlex.join(c))
         else:
             print(f"created group env {args.group}")
         return _EXIT_OK
     method = getattr(args, "method", None)
-    name = getattr(args, "name", None)
+    # ONE resolver for every per-method env command: the name scan()['env'],
+    # run(), env doctor/plan/install/create expect. A recipe that built
+    # scmb_matilda while everything else looked for matilda was the bug.
+    expected = envs.default_env_name(method)      # KeyError (did-you-mean) on a typo
+    name = getattr(args, "name", None) or expected
+    if name == expected:
+        banner = (f"# env {name!r} is the name scan/run/env doctor expect for {method} "
+                  f"(mtb.env.default_env_name({method!r})); `multibench env create "
+                  f"{method}` builds the same env from its lockfile")
+    else:
+        banner = (f"# env {name!r} is a custom --name: scan/run/env doctor expect "
+                  f"{expected!r} for {method} and will not find this one")
     if cmd == "recipe":
+        print(banner)
         for c in envs.create_commands(method, env_name=name):
             print(shlex.join(c))
         return _EXIT_OK
     if cmd == "yml":
-        y = envs.environment_yml(method, env_name=name)
+        y = banner + "\n" + envs.environment_yml(method, env_name=name)
         out = getattr(args, "out", None)
         if out:
             with open(out, "w") as f:
@@ -516,9 +729,10 @@ def _cmd_env(args) -> int:
             print(y, end="")
         return _EXIT_OK
     if cmd == "create":
-        cmds = envs.create(method, env_name=name, dry_run=not getattr(args, "run", False))
+        with _quiet_stdout():
+            cmds = envs.create(method, env_name=name, dry_run=not getattr(args, "run", False))
         if not getattr(args, "run", False):
-            print("# dry-run - add --run to execute:")
+            print("# dry-run - add --run to execute:", file=sys.stderr)
             for c in cmds:
                 print(shlex.join(c))
         else:
@@ -586,27 +800,43 @@ def build_parser() -> argparse.ArgumentParser:
                          "peak (chr:start-end matrix) or gene_activity (gene scores)")
     pf.add_argument("--runnable", action="store_true",
                     help="only methods with a declared variant (usable by run)")
+    pf.add_argument("--tunable", nargs="?", const="true", choices=["true", "false"],
+                    metavar="{true,false}",
+                    help="true (or the bare flag): only methods exposing hyperparameters "
+                         "to --param / mtb.params_for; false: only methods that hardcode "
+                         "them; absent: no filter")
     pf.set_defaults(func=_cmd_find, _parser=pf)
 
     # ---- scan
     ps = sub.add_parser(
         "scan", help="which methods can run on a dataset, and why not the rest (mtb.scan)",
-        description="Print the preflight table of mtb.scan: one row per method of the "
-                    "category with modalities, env, output kind, runtime tier, "
-                    "measured worst-case seconds, caveats and a runnable flag + reason. "
-                    "All columns the Python function returns are printed.")
+        description="Print the preflight table of mtb.scan: one row per method variant "
+                    "of the category with the two gates (files_ok, env_ok), the "
+                    "runnable verdict and the reason. The table shows a compact column "
+                    "set (" + ", ".join(_COMPACT_PLAN_COLUMNS) + "; long text clipped to "
+                    f"{_TRUNCATE_WIDTH} chars); --columns all (or any of --format "
+                    "csv/tsv/json) gives every column mtb.scan returns: category, env, "
+                    "output_kind, n_tunable, observed_worst_sec, caveat, files_reason, "
+                    "env_reason, needs_labels, atac ...")
     ps.add_argument("dataset", help="dataset id = the folder name under --data-path "
                                    "(e.g. D11, or MYCITE for your own data)")
     ps.add_argument("--category", required=True, help=_CATEGORY_HELP)
     ps.add_argument("--data-path", dest="data_path",
                     help="folder that CONTAINS the dataset folder (default: the "
                          "package data path, see mtb.config)")
-    ps.add_argument("--methods", help=_METHODS_HELP + "; only those rows")
-    ps.add_argument("--columns", help="comma-separated columns to print, in this order "
-                                      "(default: all; an unknown name lists the "
-                                      "available ones)")
-    ps.add_argument("--format", choices=["table", "csv", "tsv"], default="table",
-                    help="output format (default table = aligned text)")
+    ps.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown "
+                                                      "id -> did-you-mean error)")
+    ps.add_argument("--modalities", help="comma-separated modality roles to restrict the "
+                                         "variants to, e.g. rna,adt ('protein' is "
+                                         "accepted for adt)")
+    ps.add_argument("--columns", help="comma-separated columns to print, in this order, "
+                                      "or 'all' for every column (default: the compact "
+                                      "set in table mode, all columns for csv/tsv/json; "
+                                      "an unknown name lists the available ones)")
+    ps.add_argument("--format", choices=["table", "csv", "tsv", "json"], default="table",
+                    help="output format (default table = aligned text, compact and "
+                         "clipped; csv/tsv/json = every column, never clipped, for "
+                         "scripts; json = a list of row objects)")
     ps.set_defaults(func=_cmd_scan, _parser=ps)
 
     # ---- layout
@@ -746,6 +976,17 @@ def build_parser() -> argparse.ArgumentParser:
                          "log); --out is an alias")
     pr.add_argument("--runner", help="custom command template instead of `conda run "
                                      "-n <env> ...` (advanced; skips the env preflight)")
+    pr.add_argument("--param", "-p", action="append", metavar="KEY=VALUE",
+                    help="one hyperparameter override, repeatable: --param epochs=5 "
+                         "--param lr=0.001 (METHOD:KEY=VALUE is accepted when METHOD "
+                         "is --method). VALUE is parsed as a scalar: 5 -> int, 0.1 -> "
+                         "float, true/false -> bool, else string. Keys a method does "
+                         "not accept are rejected naming the accepted ones; see "
+                         "mtb.params_for(METHOD) or `multibench scan` n_tunable")
+    pr.add_argument("--dry-run", dest="dry_run", action="store_true",
+                    help="print the exact command line run() would execute (conda run "
+                         "-n <env> python <script> ...; inputs as given, params merged) "
+                         "and execute nothing")
     pr.set_defaults(func=_cmd_run, _parser=pr)
 
     # ---- run-all
@@ -768,8 +1009,28 @@ def build_parser() -> argparse.ArgumentParser:
                      help="folder that CONTAINS the dataset folder (default: the "
                           "package data path)")
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
-                     help="print the plan (method, runnable, reason, command) and "
-                          "execute nothing")
+                     help="print the plan (one row per method variant: runnable, "
+                          "files_ok, env_ok, reason; --columns all for every column) "
+                          "and, per variant whose inputs resolve, the exact command "
+                          "line run() would execute (a 'command' column in csv/tsv/"
+                          "json); execute and create nothing")
+    pra.add_argument("--param", "-p", action="append", metavar="METHOD:KEY=VALUE",
+                     help="one hyperparameter override, repeatable: --param "
+                          "Matilda:epochs=5 --param Matilda:lr=0.001 -> params="
+                          "{'Matilda': {'epochs': 5, 'lr': 0.001}}. VALUE is parsed "
+                          "as a scalar (5 -> int, 0.1 -> float, true/false -> bool, "
+                          "else string). Unknown METHOD -> did-you-mean error; a key "
+                          "the method does not accept is rejected naming the accepted "
+                          "ones (checked in --dry-run too); see mtb.params_for(METHOD). "
+                          "Not allowed with --skip-existing")
+    pra.add_argument("--columns", help="comma-separated columns of the printed table "
+                                       "(plan with --dry-run, summary otherwise), or "
+                                       "'all' (default: compact plan columns in table "
+                                       "mode; every column for csv/tsv/json)")
+    pra.add_argument("--format", choices=["table", "csv", "tsv", "json"], default="table",
+                     help="output format of the printed table (default table; csv/tsv/"
+                          "json never clip text and, for --dry-run, carry the command "
+                          "column)")
     pra.add_argument("--timeout", type=float,
                      help="per-method wall-clock limit in seconds (default: none)")
     pra.add_argument("--skip-existing", dest="skip_existing", action="store_true",
@@ -831,31 +1092,48 @@ def build_parser() -> argparse.ArgumentParser:
                     "--packed --run`.")
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
-    es = ev.add_parser("status", help="per method: env installed? group, difficulty",
+    es = ev.add_parser("status", help="per method: env installed? env name, difficulty",
                        description="One line per method: [x] installed / [ ] not, the "
-                                   "env group and a difficulty tag (* = verified working).")
+                                   "env the package uses for it (the same name scan/run/"
+                                   "doctor/recipe use) and a difficulty tag (* = verified "
+                                   "working).")
+    es.add_argument("--category", help=_CATEGORY_HELP + " (only its methods)")
+    es.add_argument("--methods", help=_METHODS_HELP + "; only those")
     es.set_defaults(func=_cmd_env, _parser=es)
     egr = ev.add_parser("groups", help="list the shared env groups and their members",
                         description="Shared conda envs (one env serving several methods) "
                                     "and the methods in each.")
     egr.set_defaults(func=_cmd_env, _parser=egr)
+    _NAME_HELP = ("environment name (default: the env the package uses for METHOD - "
+                  "mtb.env.default_env_name(METHOD), the same name `multibench scan` "
+                  "shows in its env column and run/env doctor/env create use; e.g. "
+                  "`multibench env recipe Matilda` -> matilda, "
+                  "`multibench env recipe UINMF` -> scmb_r)")
     er = ev.add_parser("recipe", help="print the conda/pip commands that build a method's env",
-                       description="Print, without running, the commands that create the "
-                                   "environment for METHOD.")
+                       description="Print, without running, the hand-written recipe "
+                                   "commands that create the environment for METHOD, "
+                                   "named as scan/run expect it (first line: a comment "
+                                   "naming that env). `env create METHOD` builds the same "
+                                   "env from its committed lockfile - the reproducible "
+                                   "path; the recipe is the transparent one.")
     er.add_argument("method", help="method id")
-    er.add_argument("--name", help="environment name to use (default: the method's own)")
+    er.add_argument("--name", help=_NAME_HELP)
     er.set_defaults(func=_cmd_env, _parser=er)
     ey = ev.add_parser("yml", help="print/write a conda environment.yml for a method",
-                       description="Emit an environment.yml for METHOD (stdout, or --out).")
+                       description="Emit an environment.yml for METHOD (stdout, or --out) "
+                                   "whose name: is the env scan/run expect "
+                                   "(mtb.env.default_env_name).")
     ey.add_argument("method", help="method id")
-    ey.add_argument("--name", help="environment name inside the yml")
+    ey.add_argument("--name", help=_NAME_HELP)
     ey.add_argument("--out", help="write the yml here instead of stdout")
     ey.set_defaults(func=_cmd_env, _parser=ey)
     ec = ev.add_parser("create", help="create ONE method's env (dry run unless --run)",
                        description="Create the conda environment for METHOD from its "
-                                   "recipe; without --run only the commands are printed.")
+                                   "committed lockfile (falling back to the recipe when "
+                                   "none is captured), under the name scan/run expect; "
+                                   "without --run only the commands are printed.")
     ec.add_argument("method", help="method id")
-    ec.add_argument("--name", help="environment name (default: the method's own)")
+    ec.add_argument("--name", help=_NAME_HELP)
     ec.add_argument("--run", action="store_true",
                     help="actually create the env; without it the command is a dry run")
     ec.set_defaults(func=_cmd_env, _parser=ec)
@@ -921,9 +1199,20 @@ def main(argv=None) -> int:
     raises ``SystemExit(2)`` for the latter). This is the CLI's single error
     boundary: any exception from the API is printed as ``error: <message>`` on
     stderr and mapped to 1, unless ``MULTIBENCH_DEBUG=1`` is set, in which case
-    it is re-raised with its traceback.
+    it is re-raised with its traceback. Python warnings raised while a command
+    runs are printed as ``warning: <message>`` on stderr (raw
+    ``<file>:<line>: UserWarning`` form only under ``MULTIBENCH_DEBUG``).
     """
     args = build_parser().parse_args(argv)
+    prev_show = warnings.showwarning
+
+    def _show(message, category, filename, lineno, file=None, line=None):
+        # library UserWarnings reach the terminal as 'warning: <text>' on
+        # stderr, like the CLI's own notes - not as '<path>:<line>: UserWarning'
+        print(f"warning: {message}", file=sys.stderr)
+
+    if not os.environ.get("MULTIBENCH_DEBUG"):
+        warnings.showwarning = _show
     try:
         return args.func(args)
     except KeyboardInterrupt:
@@ -936,6 +1225,8 @@ def main(argv=None) -> int:
         print(f"error: {msg}", file=sys.stderr)
         print("(set MULTIBENCH_DEBUG=1 for the full traceback)", file=sys.stderr)
         return _EXIT_ERROR
+    finally:
+        warnings.showwarning = prev_show
 
 
 if __name__ == "__main__":
