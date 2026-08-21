@@ -19,6 +19,7 @@ methods:
     language: python
     categories: [mosaic, vertical, cross]
     tasks: [clustering, batch]
+    atac: peak
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
@@ -85,7 +86,6 @@ methods:
     categories: [diagonal]
     tasks: [clustering, batch, classification]
     atac: gene_activity
-    needs_labels: true
     status: verified
     variants:
       # scBridge takes the dataset DIRECTORY plus BARE FILENAMES relative to it
@@ -138,6 +138,7 @@ methods:
     language: python
     categories: [mosaic]
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     variants:
       # Mosaic layout = 3 batches: RNA-only, paired (multiome) RNA+ATAC, ATAC-only.
@@ -160,6 +161,7 @@ methods:
     language: python
     categories: [mosaic]
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
@@ -177,6 +179,7 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
+    atac: peak
     status: verified
     variants:
       # scMVP's torch (1.9.1+cu102 in scmb_scmvp4) has no sm_89 kernels, so on this
@@ -197,6 +200,8 @@ methods:
     language: python
     categories: [vertical, cross]
     tasks: [batch, clustering]
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -230,6 +235,8 @@ methods:
     language: python
     categories: [vertical, cross]
     tasks: [batch, clustering]
+    # atac: upstream scMDC (ZINB on both views) was designed for gene-level ATAC; tools/atac_audit.py NEEDS_GENE_ACTIVITY
+    atac: gene_activity
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -262,6 +269,7 @@ methods:
     language: python
     categories: [vertical, mosaic, cross]
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -320,6 +328,8 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
+    atac: peak
     status: verified
     setup_hint: "runs in the `env_moETM` conda env. Verified end-to-end on D1 (rna+adt) -> (26169, 100) embedding."
     variants:
@@ -343,6 +353,7 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
@@ -381,7 +392,7 @@ methods:
     language: python
     categories: [vertical]
     tasks: [classification, clustering, dimension_reduction]
-    needs_labels: true
+    atac: gene_activity
     status: verified
     setup_hint: "Uses Matilda's supported object API (`matilda-sc`, import `matilda`) via the package driver engine/drivers/run_matilda.py, per https://pyanglab.github.io/Matilda/. The upstream main_matilda_train.py only ran the TRAIN stage and emitted no embedding; the driver trains once then runs dim_reduce + classification in ONE engine pass. Env `matilda` (matilda-sc 0.2.0, torch 2.1.2)."
     variants:
@@ -425,6 +436,7 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -462,6 +474,7 @@ methods:
     language: python
     categories: [mosaic]
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     variants:
       # SMILE mosaic = reference (paired multiome) + query (RNA-only, ATAC-only).
@@ -559,6 +572,7 @@ methods:
     language: python
     categories: [diagonal]
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     setup_hint: "runs in the `glue` env (scglue); GLUE_human.py reads a gencode GTF by RELATIVE name (gencode.v43.*.annotation.gtf.gz), so it must sit in the process cwd -> cwd_at_script:true runs in the GLUE script dir where the GTF is symlinked. Runner's PYTHONNOUSERSITE=1 is required (else the broken ~/.local torch egg shadows the env's torch 2.4.1 and libcudnn.so.8 is missing). RUN-VERIFIED on D28 (rna+atac_peak)."
     variants:
@@ -634,6 +648,8 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering, classification]
+    # atac: not in tools/atac_audit.py; inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
+    atac: gene_activity
     status: verified
     variants:
       # Supervised paired RNA+ATAC integration (needs matched cells + labels).
@@ -721,6 +737,8 @@ methods:
     language: python
     categories: [vertical]
     tasks: [clustering]
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, atac_gas]}
@@ -735,6 +753,7 @@ methods:
     language: R
     categories: [cross, mosaic]
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     variants:
       # Cross integration. main_StabMap.Rmd has NO top-level call (defines
@@ -927,6 +946,7 @@ methods:
     language: R
     categories: [vertical]
     tasks: [clustering]
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}

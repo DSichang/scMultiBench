@@ -1,0 +1,446 @@
+# Provenance per method: where the upstream code lives, the version the benchmark
+# ran, a one-line third-person summary, and the paper to cite.
+#
+#   repo_url / version  - from scMultiBench's README "Integration Tools" list
+#   summary             - <= 200 chars, third person (method_info()['notes'])
+#   reference           - {doi, title, authors, journal, year}; every DOI here
+#                         was resolved against the Crossref registry
+#                         (api.crossref.org/works/<doi>) and the returned title
+#                         checked against the method. NEVER add a DOI from memory.
+#   _benchmark          - the benchmark's own citation (scMultiBench CITATION.cff)
+#
+# A method without `reference:` has no DOI we could verify yet (see
+# tests/test_references.py::UNREFERENCED for the list) - add it with its
+# Crossref check, do not guess.
+
+_benchmark:
+  doi: 10.1038/s41592-025-02856-3
+  title: Multitask benchmarking of single-cell multimodal omics integration methods
+  authors: Liu C, Ding S, Kim HJ, Long S, Xiao D, Ghazanfar S, Yang P
+  journal: Nature Methods
+  year: 2025
+  volume: "22"
+  pages: 2449-2460
+  repo_url: https://github.com/PYangLab/scMultiBench
+
+SCALEX:
+  repo_url: https://github.com/jsxlei/SCALEX
+  version: "1.0.2"
+  summary: "Online integration of heterogeneous single-cell datasets (here RNA + ATAC gene activity) by projecting them into a common VAE embedding; no labels needed."
+  reference:
+    doi: 10.1038/s41467-022-33758-z
+    title: Online single-cell data integration through projecting heterogeneous datasets into a common cell-embedding space
+    authors: Xiong L, Tian K, Li Y, Ning W, Gao X, Zhang QC
+    journal: Nature Communications
+    year: 2022
+
+Multigrate:
+  repo_url: https://multigrate.readthedocs.io/en/latest/index.html
+  version: "0.0.2"
+  summary: "Product-of-experts VAE that integrates paired and unpaired multimodal batches (vertical, mosaic and cross) into one latent space; scvi-tools based."
+  reference:
+    doi: 10.1101/2022.03.16.484643
+    title: Integration and querying of multimodal single-cell data with PoE-VAE (Multigrate preprint)
+    authors: Litinetskaya A, Schulman M, Curion F, Szalata A, Omidi A, Lotfollahi M, Theis FJ
+    journal: bioRxiv
+    year: 2022
+
+Seurat_v5:
+  repo_url: https://satijalab.org/seurat/articles/seurat5_integration_bridge
+  version: "5.0.2"
+  summary: "Seurat v5 bridge integration: maps unpaired scATAC (peaks) cells onto scRNA reference via a multiome bridge dictionary; R."
+  reference:
+    doi: 10.1038/s41587-023-01767-y
+    title: Dictionary learning for integrative, multimodal and scalable single-cell analysis
+    authors: Hao Y, Stuart T, Kowalski MH, Choudhary S, Hoffman P, Hartman A, Srivastava A, Molla G, Madad S, Fernandez-Granda C, Satija R
+    journal: Nature Biotechnology
+    year: 2024
+
+scBridge:
+  repo_url: https://github.com/XLearning-SCU/scBridge
+  version: "ff17561"
+  summary: "Heterogeneity-aware diagonal integration of scRNA-seq and scATAC-seq (gene activity) with iterative reliable-cell transfer; supervised - needs RNA labels."
+  reference:
+    doi: 10.1038/s41467-023-41795-5
+    title: scBridge embraces cell heterogeneity in single-cell RNA-seq and ATAC-seq data integration
+    authors: Li Y, Zhang D, Yang M, Peng D, Yu J, Liu Y, Lv J, Chen L, Peng X
+    journal: Nature Communications
+    year: 2023
+
+totalVI:
+  repo_url: https://docs.scvi-tools.org/en/stable/tutorials/notebooks/multimodal/totalVI.html
+  version: "1.1.2"
+  summary: "Joint probabilistic model of CITE-seq RNA + protein counts (scvi-tools); yields a joint latent space and protein imputation; no labels needed."
+  reference:
+    doi: 10.1038/s41592-020-01050-x
+    title: Joint probabilistic modeling of single-cell multi-omic data with totalVI
+    authors: Gayoso A, Steier Z, Lopez R, Regier J, Nazor KL, Streets A, Yosef N
+    journal: Nature Methods
+    year: 2021
+
+MultiVI:
+  repo_url: https://docs.scvi-tools.org/en/stable/tutorials/notebooks/multimodal/MultiVI_tutorial.html
+  version: "1.1.2"
+  summary: "Deep generative model (scvi-tools) for paired and unpaired RNA + ATAC peak data; mosaic integration into one latent space."
+  reference:
+    doi: 10.1038/s41592-023-01909-9
+    title: "MultiVI: deep generative model for the integration of multimodal data"
+    authors: Ashuach T, Gabitto MI, Koodli RV, Saldi GA, Jordan MI, Yosef N
+    journal: Nature Methods
+    year: 2023
+
+Cobolt:
+  repo_url: https://github.com/epurdom/cobolt
+  version: "1.0.1"
+  summary: "Multimodal VAE for joint and single-modality (RNA / ATAC peak) datasets; mosaic integration via a shared latent space."
+  reference:
+    doi: 10.1186/s13059-021-02556-z
+    title: "Cobolt: integrative analysis of multimodal single-cell sequencing data"
+    authors: Gong B, Zhou Y, Purdom E
+    journal: Genome Biology
+    year: 2021
+
+scMVP:
+  repo_url: https://github.com/bm2-lab/scMVP
+  version: "fc61e4d"
+  summary: "Multi-view deep generative model for paired scRNA + scATAC (peaks) with attention-based cross-modal imputation; vertical integration."
+  reference:
+    doi: 10.1186/s13059-021-02595-6
+    title: A deep generative model for multi-view profiling of single-cell RNA-seq and ATAC-seq data
+    authors: Li G, Fu S, Wang S, Zhu C, Duan B, Tang C, Chen X, Chuai G, Wang P, Liu Q
+    journal: Genome Biology
+    year: 2022
+
+scMM:
+  repo_url: https://github.com/kodaim1115/scMM
+  version: "c5c8579"
+  summary: "Mixture-of-experts multimodal VAE for paired RNA + protein / RNA + ATAC; joint embedding and cross-modal generation; vertical and cross integration."
+  reference:
+    doi: 10.1016/j.crmeth.2021.100071
+    title: A mixture-of-experts deep generative model for integrated analysis of single-cell multiomics data
+    authors: Minoura K, Abe K, Nam H, Nishikawa H, Shimamura T
+    journal: Cell Reports Methods
+    year: 2021
+
+scMDC:
+  repo_url: https://github.com/xianglin226/scMDC/tree/v1.0.0
+  version: "43b0c3a"
+  summary: "Multimodal deep embedded clustering: ZINB autoencoders per modality (RNA + ADT / RNA + ATAC) with a joint clustering objective; vertical and cross."
+  reference:
+    doi: 10.1038/s41467-022-35031-9
+    title: Clustering of single-cell multi-omics data with a multimodal deep learning method
+    authors: Lin X, Tian T, Wei Z, Hakonarson H
+    journal: Nature Communications
+    year: 2022
+
+scMoMaT:
+  repo_url: https://github.com/PeterZZQ/scMoMaT
+  version: "0.2.2"
+  summary: "Matrix tri-factorisation for mosaic integration of RNA / ATAC (peak) / protein batches with bio-marker detection; outputs a KNN graph (+ UMAP)."
+  reference:
+    doi: 10.1038/s41467-023-36066-2
+    title: scMoMaT jointly performs single cell mosaic integration and multi-modal bio-marker detection
+    authors: Zhang Z, Sun H, Mariappan R, Chen X, Chen X, Jain MS, Efremova M, Teichmann SA, Rajan V, Zhang X
+    journal: Nature Communications
+    year: 2023
+
+moETM:
+  repo_url: https://github.com/manqizhou/moETM
+  version: "c2eaa97"
+  summary: "Multi-omics embedded topic model: product-of-experts encoders over RNA + ADT / RNA + ATAC (peaks) with interpretable topics; vertical integration."
+  reference:
+    doi: 10.1016/j.crmeth.2023.100563
+    title: Single-cell multi-omics topic embedding reveals cell-type-specific and COVID-19 severity-related immune signatures
+    authors: Zhou M, Zhang H, Bai Z, Mann-Krzisnik D, Wang F, Li Y
+    journal: Cell Reports Methods
+    year: 2023
+
+MIRA:
+  repo_url: https://github.com/cistrome/MIRA
+  version: "2.1.0"
+  summary: "Joint topic models of expression and chromatin accessibility (peaks) for paired multiome cells; outputs a joint KNN graph for clustering."
+  reference:
+    doi: 10.1038/s41592-022-01595-z
+    title: "MIRA: joint regulatory modeling of multimodal expression and chromatin accessibility in single cells"
+    authors: Lynch AW, Theodoris CV, Long HW, Brown M, Liu XS, Meyer CA
+    journal: Nature Methods
+    year: 2022
+
+Concerto:
+  repo_url: https://github.com/melobio/Concerto-reproducibility
+  version: "ab1fc7f"
+  summary: "Contrastive self-supervised learning over CITE-seq (RNA + protein) for embedding and reference mapping; vertical and cross integration."
+  reference:
+    doi: 10.1038/s42256-022-00518-z
+    title: Contrastive learning enables rapid mapping to multimodal single-cell atlas of multimillion scale
+    authors: Yang M, Yang Y, Xie C, Ni M, Liu J, Yang H, Mu F, Wang J
+    journal: Nature Machine Intelligence
+    year: 2022
+
+Matilda:
+  repo_url: https://github.com/PYangLab/Matilda
+  version: "7d71480"
+  summary: "Multi-task VAE for CITE-seq / SHARE-seq / TEA-seq: one latent space serves classification, dimension reduction and feature selection; supervised - needs labels."
+  reference:
+    doi: 10.1093/nar/gkad157
+    title: Multi-task learning from multimodal single-cell omics with Matilda
+    authors: Liu C, Huang H, Yang P
+    journal: Nucleic Acids Research
+    year: 2023
+
+VIMCCA:
+  repo_url: https://github.com/jhu99/scbean
+  version: "0.5.6"
+  summary: "Variational-inference multimodal CCA (scbean) for paired RNA + ADT / RNA + ATAC; vertical integration into a shared latent space."
+
+VIPCCA:
+  repo_url: https://github.com/jhu99/vipcca
+  version: "0.2.7"
+  summary: "Variational-inference probabilistic CCA for diagonal integration of scRNA-seq and scATAC-seq gene activity; no labels needed."
+
+SMILE:
+  repo_url: https://github.com/rpmccordlab/SMILE
+  version: "a2e2ca6"
+  summary: "Mutual-information learning for mosaic integration of RNA and ATAC (peak) batches into a shared low-dimensional space."
+  reference:
+    doi: 10.1093/bioinformatics/btab706
+    title: "SMILE: mutual information learning for integration of single-cell omics data"
+    authors: Xu Y, Das P, McCord RP
+    journal: Bioinformatics
+    year: 2022
+
+Portal:
+  repo_url: https://github.com/YangLabHKUST/Portal
+  version: "1.0.2"
+  summary: "Adversarial domain-translation networks for atlas-scale diagonal integration of scRNA-seq and scATAC-seq gene activity; no labels needed."
+  reference:
+    doi: 10.1038/s43588-022-00251-y
+    title: Adversarial domain translation networks for integrating large-scale atlas-level single-cell datasets
+    authors: Zhao J, Wang G, Ming J, Lin Z, Wang Y, The Tabula Microcebus Consortium, Wu AR, Yang C
+    journal: Nature Computational Science
+    year: 2022
+
+uniPort:
+  repo_url: https://uniport.readthedocs.io/en/latest/index.html
+  version: "1.2.2"
+  summary: "Optimal-transport coupled VAE for diagonal integration of scRNA-seq and scATAC-seq (gene activity); no labels needed."
+  reference:
+    doi: 10.1038/s41467-022-35094-8
+    title: A unified computational framework for single-cell data integration with optimal transport
+    authors: Cao K, Gong Q, Hong Y, Wan L
+    journal: Nature Communications
+    year: 2022
+
+sciCAN:
+  repo_url: https://github.com/rpmccordlab/sciCAN
+  version: "ad71bba"
+  summary: "Cycle-consistent adversarial network for diagonal integration of chromatin accessibility (gene activity) and gene expression; no labels needed."
+  reference:
+    doi: 10.1038/s41540-022-00245-6
+    title: "sciCAN: single-cell chromatin accessibility and gene expression data integration via cycle-consistent adversarial network"
+    authors: Xu Y, Begoli E, McCord RP
+    journal: npj Systems Biology and Applications
+    year: 2022
+
+scJoint:
+  repo_url: https://github.com/SydneyBioX/scJoint
+  version: "cbbfa5d"
+  summary: "Transfer-learning integration of scRNA-seq and scATAC-seq gene activity; semi-supervised - trains on RNA labels and predicts ATAC cell types."
+  reference:
+    doi: 10.1038/s41587-021-01161-6
+    title: scJoint integrates atlas-scale single-cell RNA-seq and ATAC-seq data with transfer learning
+    authors: Lin Y, Wu TY, Wan S, Yang JYH, Wong WH, Wang YXR
+    journal: Nature Biotechnology
+    year: 2022
+
+GLUE:
+  repo_url: https://github.com/gao-lab/GLUE
+  version: "0.3.2"
+  summary: "Graph-linked unified embedding: VAEs per omics layer linked by a gene-peak regulatory graph for diagonal RNA + ATAC (peak) integration; no labels needed."
+  reference:
+    doi: 10.1038/s41587-022-01284-4
+    title: Multi-omics single-cell data integration and regulatory inference with graph-linked embedding
+    authors: Cao ZJ, Gao G
+    journal: Nature Biotechnology
+    year: 2022
+
+MultiMAP:
+  repo_url: https://github.com/Teichlab/MultiMAP
+  version: "681e608"
+  summary: "Manifold-learning (UMAP-style) integration of datasets with partially shared features; diagonal RNA + ATAC using both peaks and gene activity."
+  reference:
+    doi: 10.1186/s13059-021-02565-y
+    title: "MultiMAP: dimensionality reduction and integration of multimodal data"
+    authors: Jain MS, Polanski K, Conde CD, Chen X, Park J, Mamanova L, Knights A, Botting RA, Stephenson E, Haniffa M, Lamacraft A, Efremova M, Teichmann SA
+    journal: Genome Biology
+    year: 2021
+
+sciPENN:
+  repo_url: https://github.com/jlakkis/sciPENN
+  version: "1.0.0"
+  summary: "Deep learning for CITE-seq / scRNA-seq integration with surface-protein prediction and imputation; vertical and cross integration."
+  reference:
+    doi: 10.1038/s42256-022-00545-w
+    title: A multi-use deep learning method for CITE-seq and single-cell RNA-seq data integration with cell surface protein prediction and imputation
+    authors: Lakkis J, Schroeder A, Su K, Lee MYY, Bashore AC, Reilly MP, Li M
+    journal: Nature Machine Intelligence
+    year: 2022
+
+scMSI:
+  repo_url: https://github.com/ChengmingZhang-CAS/scMSI-master
+  version: "dffcbb2"
+  summary: "Deep generative integration of CITE-seq RNA + protein into a joint latent space; vertical integration."
+
+UnitedNet:
+  repo_url: https://github.com/LiuLab-Bioelectronics-Harvard/UnitedNet
+  version: "3689da8"
+  summary: "Explainable multi-task network jointly trained for clustering and cross-modal prediction on paired RNA + ATAC; supervised - needs labels."
+  reference:
+    doi: 10.1038/s41467-023-37477-x
+    title: Explainable multi-task learning for multi-modality biological data analysis
+    authors: Tang X, Zhang J, He Y, Zhang X, Lin Z, Partarrieu S, Hanna EB, Ren Z, Shen H, Yang Y, Wang X, Li N, Ding J, Liu J
+    journal: Nature Communications
+    year: 2023
+
+SPIRAL:
+  repo_url: https://github.com/guott15/SPIRAL/tree/main
+  version: "1.0"
+  summary: "Graph-neural-network integration and alignment of spatially resolved transcriptomics slices across experiments and technologies; registration task."
+  reference:
+    doi: 10.1186/s13059-023-03078-6
+    title: "SPIRAL: integrating and aligning spatially resolved transcriptomics data across different experiments, conditions, and technologies"
+    authors: Guo T, Yuan Z, Pan Y, Wang J, Chen F, Zhang MQ, Li X
+    journal: Genome Biology
+    year: 2023
+
+GPSA:
+  repo_url: https://github.com/andrewcharlesjones/spatial-alignment
+  version: "0.8"
+  summary: "Gaussian-process spatial alignment: deep GP warps of spatial genomics slices into a common coordinate system; registration task."
+  reference:
+    doi: 10.1038/s41592-023-01972-2
+    title: Alignment of spatial genomics data using deep Gaussian processes
+    authors: Jones A, Townes FW, Li D, Engelhardt BE
+    journal: Nature Methods
+    year: 2023
+
+PASTE:
+  repo_url: https://github.com/raphael-group/paste
+  version: "1.4.0"
+  summary: "Probabilistic alignment of spatial transcriptomics slices with fused Gromov-Wasserstein optimal transport; pairwise and centre alignment."
+  reference:
+    doi: 10.1038/s41592-022-01459-6
+    title: Alignment and integration of spatial transcriptomics data
+    authors: Zeira R, Land M, Strzalkowski A, Raphael BJ
+    journal: Nature Methods
+    year: 2022
+
+PASTE2:
+  repo_url: https://github.com/raphael-group/paste2
+  version: "b71ec88"
+  summary: "Partial alignment of multislice spatial transcriptomics data: extends PASTE to partially overlapping slices via partial optimal transport."
+  reference:
+    doi: 10.1101/gr.277670.123
+    title: Partial alignment of multislice spatially resolved transcriptomics data
+    authors: Liu X, Zeira R, Raphael BJ
+    journal: Genome Research
+    year: 2023
+
+iPOLNG:
+  repo_url: https://github.com/cuhklinlab/iPoLNG
+  version: "0.0.2"
+  summary: "Unsupervised integrative Poisson log-normal topic model for paired RNA + ATAC (peak) count data; vertical integration."
+  reference:
+    doi: 10.3389/fgene.2023.998504
+    title: iPoLNG - An unsupervised model for the integrative analysis of single-cell multiomics data
+    authors: Zhang W, Lin Z
+    journal: Frontiers in Genetics
+    year: 2023
+
+StabMap:
+  repo_url: https://github.com/MarioniLab/StabMap
+  version: "0.1.8"
+  summary: "Mosaic integration by stabilised mapping onto a reference embedding using shared and unshared features; R, source()d through engine/drivers/run_stabmap.R."
+  reference:
+    doi: 10.1038/s41587-023-01766-z
+    title: Stabilized mosaic single-cell data integration using unshared features
+    authors: Ghazanfar S, Guibentif C, Marioni JC
+    journal: Nature Biotechnology
+    year: 2024
+
+UINMF:
+  repo_url: http://htmlpreview.github.io/?https://github.com/welch-lab/liger/blob/master/vignettes/UINMF_vignette.html
+  version: "2.0.1"
+  summary: "Unshared-feature integrative NMF (rliger) for mosaic / vertical / cross integration of datasets with shared and unshared features; R."
+  reference:
+    doi: 10.1038/s41467-022-28431-4
+    title: UINMF performs mosaic integration of single-cell multi-omic datasets using nonnegative matrix factorization
+    authors: Kriebel AR, Welch JD
+    journal: Nature Communications
+    year: 2022
+
+iNMF:
+  repo_url: https://github.com/welch-lab/liger
+  version: "2.0.1"
+  summary: "LIGER integrative NMF: shared and dataset-specific factors for diagonal integration of scRNA-seq and scATAC-seq gene activity; R."
+  reference:
+    doi: 10.1016/j.cell.2019.05.006
+    title: Single-Cell Multi-omic Integration Compares and Contrasts Features of Brain Cell Identity
+    authors: Welch JD, Kozareva V, Ferreira A, Vanderburg C, Martin C, Macosko EZ
+    journal: Cell
+    year: 2019
+
+online_iNMF:
+  repo_url: http://htmlpreview.github.io/?https://github.com/welch-lab/liger/blob/master/vignettes/UINMF_vignette.html
+  version: "2.0.1"
+  summary: "Online (mini-batch) iterative NMF in rliger for scalable diagonal integration of scRNA-seq and scATAC-seq gene activity; R."
+  reference:
+    doi: 10.1038/s41587-021-00867-x
+    title: Iterative single-cell multi-omic integration using online learning
+    authors: Gao C, Liu J, Kriebel AR, Preissl S, Luo C, Castanon R, Sandoval J, Rivkin A, Nery JR, Behrens MM, Ecker JR, Ren B, Welch JD
+    journal: Nature Biotechnology
+    year: 2021
+
+Conos:
+  repo_url: https://github.com/kharchenkolab/conos
+  version: "1.4.6"
+  summary: "Clustering on a network of samples: joint graph over pairwise-aligned datasets, used here for diagonal RNA + ATAC gene-activity integration; R."
+  reference:
+    doi: 10.1038/s41592-019-0466-z
+    title: Joint analysis of heterogeneous single-cell RNA-seq dataset collections
+    authors: Barkas N, Petukhov V, Nikolaeva D, Lozinsky Y, Demharter S, Khodosevich K, Kharchenko PV
+    journal: Nature Methods
+    year: 2019
+
+MOFA2:
+  repo_url: https://biofam.github.io/MOFA2/
+  version: "1.6.0"
+  summary: "Multi-omics factor analysis: sparse Bayesian factor model over RNA + ADT / ATAC views yielding factor embeddings and feature weights; R."
+  reference:
+    doi: 10.1186/s13059-020-02015-1
+    title: "MOFA+: a statistical framework for comprehensive integration of multi-modal single-cell data"
+    authors: Argelaguet R, Arnol D, Bredikhin D, Deloro Y, Velten B, Marioni JC, Stegle O
+    journal: Genome Biology
+    year: 2020
+
+Seurat_v3:
+  repo_url: https://satijalab.org/seurat/articles/seurat5_atacseq_integration_vignette
+  version: "5.0.2"
+  summary: "Seurat v3 anchor-based transfer: scATAC cells (gene activity for anchors, peaks for the assay) mapped onto scRNA; predicts ATAC labels from RNA labels; R."
+  reference:
+    doi: 10.1016/j.cell.2019.05.031
+    title: Comprehensive Integration of Single-Cell Data
+    authors: Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, Hao Y, Stoeckius M, Smibert P, Satija R
+    journal: Cell
+    year: 2019
+
+Seurat_WNN:
+  repo_url: https://satijalab.org/seurat/articles/weighted_nearest_neighbor_analysis
+  version: "5.0.2"
+  summary: "Seurat weighted-nearest-neighbour analysis: per-cell modality weights combine RNA + ADT / RNA + ATAC (peak) neighbourhoods into a joint KNN graph; R."
+  reference:
+    doi: 10.1016/j.cell.2021.04.048
+    title: Integrated analysis of multimodal single-cell data
+    authors: Hao Y, Hao S, Andersen-Nissen E, Mauck WM, Zheng S, Butler A, Lee MJ, Wilk AJ, Darby C, Zager M, Hoffman P, Stoeckius M, Papalexi E, Mimitou EP, Jain J, Srivastava A, Stuart T, Fleming LM, Yeung B, Rogers AJ, McElrath JM, Blish CA, Gottardo R, Smibert P, Satija R
+    journal: Cell
+    year: 2021
