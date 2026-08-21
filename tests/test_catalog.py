@@ -78,3 +78,21 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
     assert df[catalog.PAPER_COLUMNS].isna().all().all()
     # category filter
     assert set(catalog.datasets(files_dir, category="mosaic").dataset) == {"D45"}
+
+
+def test_catalog_columns_match_registry(files_dir):
+    """needs_labels / atac / categories / tasks are OVERLAID from the registry
+    (the CSV hand columns had drifted on 37 of 40 rows)."""
+    df = catalog.methods(files_dir).set_index("canonical_id")
+    specs = {s.id: s for s in registry.load()}
+    for cid, spec in specs.items():
+        row = df.loc[cid]
+        assert bool(row["needs_labels"]) == spec.needs_labels, cid
+        assert row["atac"] == spec.atac or (row["atac"] is None and spec.atac is None), cid
+        assert list(row["categories"]) == list(spec.categories), cid
+        assert list(row["tasks"]) == list(spec.tasks), cid
+    assert df.loc["Matilda", "needs_labels"] == True  # noqa: E712 - derived from its cty role
+    assert df.loc["moETM", "atac"] == "peak"
+    assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
+    # CSV-only columns survive
+    assert df["deep_learning"].notna().all() and df["output"].notna().all()
