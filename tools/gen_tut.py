@@ -1,14 +1,16 @@
-"""Generate the four integration tutorials (vertical / diagonal / mosaic / cross).
+"""Generate the four integration tutorials (vertical / diagonal / mosaic / cross)
+and the Colab quickstart.
 
 Order follows what a reader actually does: install, run the analysis and get a
 figure, run the same three calls on their own data, and only then read stored
 results back for the published figures. Reference material (scan, tunables,
-metric definitions, coverage) sits at the end, where it is looked up rather than
-read through.
+metric definitions, citations, coverage) sits at the end, where it is looked up
+rather than read through.
 
 Prose earns its place or it is cut: structured facts go in tables, every numeric
 claim is a measured value from the verification runs, and nothing is explained
-twice.
+twice. The notebooks are regenerated from this file - never hand-edited - and
+executed on the benchmark host afterwards.
 """
 import nbformat as nbf
 import os
@@ -39,6 +41,50 @@ CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
 DS_MB = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB", "D46": "97 MB",
          "D52": "179 MB"}
 
+# The ONE install sequence every notebook shares (tests/test_docs_consistency.py
+# pins it): conda (Colab restarts the kernel once), then the package WITH its
+# dependencies - evaluate() needs scib/scanpy, which pip brings in; no conda env
+# is needed for discovery, evaluation, stored results or figures.
+INSTALL_CELLS = [
+"""# Colab ships without conda; this provisions it (the kernel restarts ONCE).
+# On a machine that already has conda, this cell does nothing.
+import importlib.util, shutil
+
+def _has(mod):
+    try:
+        return importlib.util.find_spec(mod) is not None
+    except ModuleNotFoundError:
+        return False
+
+if shutil.which("conda") or shutil.which("mamba"):
+    print("conda available - nothing to do")
+elif _has("google.colab"):
+    !pip -q install condacolab
+    import condacolab
+    condacolab.install()   # restarts the kernel; afterwards, continue below
+else:
+    print("no conda found - install it first (mamba recommended); see the installation guide")""",
+"""import importlib.util, os
+if importlib.util.find_spec("multibench") is None:
+    !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
+    %cd scMultiBench
+    !pip -q install -e .
+elif os.path.isdir("/content/scMultiBench"):
+    # reused Colab runtime: refresh the editable install to the latest code,
+    # then drop the already-imported modules so the NEXT import sees it -
+    # a live kernel never re-reads changed files on its own
+    %cd /content/scMultiBench
+    !git pull -q
+    !pip -q install -e .
+    import importlib, sys
+    for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
+        del sys.modules[_m]
+    importlib.invalidate_caches()
+    print("multibench refreshed to the latest repository state")
+else:
+    print("multibench already installed")""",
+]
+
 SCEN = {
  "vertical": dict(
    ds="D11", cells="2,864",
@@ -46,7 +92,7 @@ SCEN = {
           "cells** (here CITE-seq: RNA + surface protein). Cells are already matched, "
           "so the task is combining modalities, not aligning cells."),
    live=("Matilda", '{"epochs": 5}', "Matilda at 5 epochs is quick - `run_sec` in the summary is the measured time on our host"),
-   live_ds=None,
+   live_ds=None, summary_note="",
    own_src="D11", own_trio=["Matilda", "sciPENN", "scMM"],
    own_note="When we ran this, Matilda scored ARI ~0.95 on the subsample - your "
             "numbers will differ slightly; the point is that they are computed "
@@ -61,7 +107,7 @@ SCEN = {
           "ArchR). If your RNA and ATAC come from the SAME cells (10x multiome), that "
           "is vertical integration - use that tutorial instead."),
    live=("online_iNMF", "None", "online_iNMF is among the fastest methods here - `run_sec` in the summary is the measured time on our host"),
-   live_ds=None,
+   live_ds=None, summary_note="",
    own_src="D28", own_trio=["online_iNMF", "iNMF", "scJoint"],
    own_note="All three reached CHAIN_OK with all nine metrics on this subsample "
             "when we ran them.",
@@ -73,7 +119,7 @@ SCEN = {
           "bridges them. Which methods apply depends on the exact per-batch pattern, "
           "so `scan()` is the source of truth for each dataset."),
    live=("StabMap", "None", "Both run in minutes to tens of minutes on D46 - `run_sec` in the summary is the measured time on our host"),
-   live_ds="D46",
+   live_ds="D46", summary_note="",
    own_src="D46", own_trio=["StabMap", "scMoMaT"],
    own_note="Both reached CHAIN_OK on this subsample when we ran them. Two methods "
             "rather than three because that is every wired mosaic method D46's "
@@ -88,9 +134,85 @@ SCEN = {
           "under `cross` - see the note at the end."),
    live=("StabMap", "None", "StabMap is among the fastest cross methods - `run_sec` in the summary is the measured time on our host"),
    live_ds=None,
+   summary_note=("UINMF's cross variant consumes batches 1-2 only (its registry "
+                 "modalities are `rna1+rna2+adt1+adt2`), so its `emb_shape` counts "
+                 "fewer cells than the three-batch methods and its metrics are "
+                 "computed on that subset."),
    own_src="D52", own_trio=["UINMF", "sciPENN", "StabMap"],
    own_note="All three reached CHAIN_OK on this subsample when we ran them.",
  ),
+}
+
+# ---------------------------------------------------------------- own data
+# One executed demo per category: an in-memory AnnData (or several) becomes a
+# dataset folder in the layout describe_layout(CATEGORY) prints. export_dataset
+# covers the one-AnnData layouts (vertical; cross via batch=); the two layouts
+# whose batches hold DIFFERENT cells or DIFFERENT modality sets (diagonal,
+# mosaic) are written file by file with to_canonical + write_labels.
+EXPORT_DEMO = {
+ "vertical": """import anndata as ad, numpy as np, scipy.sparse as sp, tempfile, os
+rng = np.random.default_rng(0)
+demo = ad.AnnData(X=sp.random(120, 40, density=0.2, random_state=0, format="csr"))  # RNA, cells x genes (sparse is fine)
+demo.obsm["protein"] = rng.poisson(3.0, size=(120, 12)).astype(float)             # ADT, cells x proteins
+demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 120)
+demo.obs_names = [f"cell{i}" for i in range(120)]; demo.var_names = [f"gene{i}" for i in range(40)]
+
+tmp = tempfile.mkdtemp()
+folder = mtb.io.export_dataset(demo, os.path.join(tmp, "MYCITE"),
+                               rna="X", adt="obsm:protein", labels="obs:celltype")
+print(sorted(os.listdir(folder)))
+# 10x multiome held as MuData (peaks in mdata["atac"]):
+#   mtb.io.from_mudata(mdata, ".../MYMULTIOME", rna="rna", atac="atac", atac_kind="peak", labels="rna:celltype")
+sc = mtb.scan("MYCITE", CATEGORY, data_path=tmp)
+print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate (the rest want an ATAC matrix too)")""",
+ "diagonal": """import anndata as ad, numpy as np, tempfile, os
+rng = np.random.default_rng(0)
+genes = [f"gene{i}" for i in range(40)]
+rna  = ad.AnnData(X=rng.poisson(1.0, size=(120, 40)).astype(float)); rna.var_names = genes
+atac = ad.AnnData(X=rng.poisson(0.5, size=(90, 40)).astype(float));  atac.var_names = genes   # gene-activity scores, DIFFERENT cells
+rna.obs["celltype"]  = rng.choice(["T", "B", "NK"], 120)
+atac.obs["celltype"] = rng.choice(["T", "B", "NK"], 90)
+
+folder = os.path.join(tempfile.mkdtemp(), "MYDIAG"); os.makedirs(folder)
+mtb.io.to_canonical(rna,  folder, modality="rna")        # -> rna.h5
+mtb.io.to_canonical(atac, folder, modality="atac_gas")   # -> atac_gas.h5 (never a plain atac.h5, which methods read as PEAKS)
+mtb.io.write_labels(rna.obs["celltype"],  os.path.join(folder, "rna_cty.csv"))
+mtb.io.write_labels(atac.obs["celltype"], os.path.join(folder, "atac_cty.csv"))
+print(sorted(os.listdir(folder)))
+sc = mtb.scan("MYDIAG", CATEGORY, data_path=os.path.dirname(folder))
+print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate (the rest want a peak matrix too)")""",
+ "mosaic": """import anndata as ad, numpy as np, tempfile, os
+rng = np.random.default_rng(0)
+def batch(n):
+    a = ad.AnnData(X=rng.poisson(1.0, size=(n, 40)).astype(float)); a.var_names = [f"gene{i}" for i in range(40)]
+    a.obs["celltype"] = rng.choice(["T", "B", "NK"], n); return a
+b1, b2, b3 = batch(100), batch(80), batch(60)                                  # three batches, D46's pattern:
+b1.obsm["protein"] = rng.poisson(3.0, size=(100, 12)).astype(float)           #   batch 1 = RNA + ADT
+b2.obsm["peaks"]   = rng.poisson(0.3, size=(80, 50)).astype(float)            #   batch 2 = RNA + ATAC, batch 3 = RNA only
+
+folder = os.path.join(tempfile.mkdtemp(), "MYMOSAIC"); os.makedirs(folder)
+for i, a in enumerate([b1, b2, b3], start=1):
+    mtb.io.to_canonical(a, os.path.join(folder, f"rna{i}.h5"))
+    mtb.io.write_labels(a.obs["celltype"], os.path.join(folder, f"cty{i}.csv"))
+mtb.io.to_canonical(b1, os.path.join(folder, "adt1.h5"),  modality="adt",  obsm="protein")
+mtb.io.to_canonical(b2, os.path.join(folder, "atac2.h5"), modality="atac", obsm="peaks")
+print(sorted(os.listdir(folder)))
+sc = mtb.scan("MYMOSAIC", CATEGORY, data_path=os.path.dirname(folder))
+print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate - the per-batch pattern decides which")""",
+ "cross": """import anndata as ad, numpy as np, tempfile, os
+rng = np.random.default_rng(0)
+demo = ad.AnnData(X=rng.poisson(1.0, size=(150, 40)).astype(float))            # RNA, cells x genes
+demo.var_names = [f"gene{i}" for i in range(40)]
+demo.obsm["protein"] = rng.poisson(3.0, size=(150, 12)).astype(float)          # ADT
+demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 150)
+demo.obs["batch"]    = rng.choice(["donor1", "donor2", "donor3"], 150)
+
+folder = mtb.io.export_dataset(demo, os.path.join(tempfile.mkdtemp(), "MYCROSS"),
+                               rna="X", adt="obsm:protein", labels="obs:celltype",
+                               batch="obs:batch")       # batch= -> one numbered file set per batch value
+print(sorted(os.listdir(folder)))
+sc = mtb.scan("MYCROSS", CATEGORY, data_path=folder.parent)
+print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate (the rest are spatial-registration methods)")""",
 }
 
 SUBSAMPLE_FN = '''import os, shutil
@@ -136,7 +258,15 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
     return dst_dir'''
 
 
-for cat, s in SCEN.items():
+def _notebook(cells):
+    return nbf.v4.new_notebook(cells=cells, metadata={
+        "kernelspec": {"display_name": "Python 3", "language": "python",
+                       "name": "python3"},
+        "language_info": {"name": "python", "version": "3.10"},
+    })
+
+
+def build_tutorial(cat, s):
     C = []
     md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
     code = lambda t: C.append(nbf.v4.new_code_cell(t))
@@ -160,49 +290,16 @@ reproduces.""")
 
 Two layers: the `multibench` package (~2 MB) and the conda environments of the
 methods you run. On **Colab**, run the first cell and let the kernel restart
-once - then keep running from the next cell.""")
-    code("""# Colab ships without conda; this provisions it (the kernel restarts ONCE).
-# On a machine that already has conda, this cell does nothing.
-import importlib.util, shutil
-
-def _has(mod):
-    try:
-        return importlib.util.find_spec(mod) is not None
-    except ModuleNotFoundError:
-        return False
-
-if shutil.which("conda") or shutil.which("mamba"):
-    print("conda available - nothing to do")
-elif _has("google.colab"):
-    !pip -q install condacolab
-    import condacolab
-    condacolab.install()   # restarts the kernel; afterwards, continue below
-else:
-    print("no conda found - install it first (mamba recommended); see the installation guide")""")
-    code("""import importlib.util, os
-if importlib.util.find_spec("multibench") is None:
-    !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
-    %cd scMultiBench
-    !pip -q install -e .
-elif os.path.isdir("/content/scMultiBench"):
-    # reused Colab runtime: refresh the editable install to the latest code,
-    # then drop the already-imported modules so the NEXT import sees it -
-    # a live kernel never re-reads changed files on its own
-    %cd /content/scMultiBench
-    !git pull -q
-    !pip -q install -e .
-    import importlib, sys
-    for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
-        del sys.modules[_m]
-    importlib.invalidate_caches()
-    print("multibench refreshed to the latest repository state")
-else:
-    print("multibench already installed")""")
+once - then keep running from the next cell. Sections 2-3 (running methods)
+need the environments and a Linux runtime with the disk for them; sections
+4-5 (stored results, reference) need only the package.""")
+    for cell in INSTALL_CELLS:
+        code(cell)
     md(f"""Now the environments for the methods this tutorial runs
-({', '.join(live_methods)}). `--packed` downloads a prebuilt archive instead of
-solving one from scratch, and `env install` skips anything already present.
-Other tiers are one flag away: `--category {cat}` ({CAT_GB[cat]}), or no flag
-for the whole benchmark (29 envs, ~167 GB).""")
+({', '.join(live_methods)}). `--packed` downloads a prebuilt archive (2-14 GB
+per environment) instead of solving one from scratch, and `env install` skips
+anything already present. Other tiers are one flag away: `--category {cat}`
+({CAT_GB[cat]}), or no flag for the whole benchmark (29 envs, ~167 GB).""")
     code(f"""import sys
 !{{sys.executable}} -m multibench env install --methods {mlist} --packed --run""")
 
@@ -217,7 +314,6 @@ import multibench as mtb
 
 DATASET  = "{s['ds']}"
 CATEGORY = "{cat}"
-RESULTS = Path("results") if Path("results").exists() else Path("notebooks/results")
 mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})   # reference data ({', '.join(DS_MB[d] for d in CAT_DATA[cat])}); no-op when present
 print("multibench", mtb.__version__)''')
 
@@ -235,7 +331,10 @@ conda env, load the embeddings, score them with scIB metrics. Here
                   methods={trio!r}{params_note},
                   out_dir="/tmp/tutorial_{cat}")
 res.summary''')
-    md("""The result object plots itself in the paper's layout:""")
+    md(f"""`summary` is sorted by method name, whatever order `methods=` listed;
+`emb_shape` is the embedding each method produced and `batch_source` says which
+batch vector the batch metrics used. {s['summary_note']} The result object plots
+itself in the paper's layout:""")
     code("""res.plot()""")
     md("""Each circle carries two encodings: its **size is the method's rank** in
 that column (largest = rank 1) and its **colour is the metric's value**, min-max
@@ -259,39 +358,37 @@ never seen. A dataset is a folder of flat files named by category:""")
 | `matrix/barcodes` | one id per cell | `(n_cells,)` |
 
 That is the **transpose** of the AnnData convention (`AnnData.X` is cells x
-genes); `mtb.io.to_canonical` converts an `.h5ad` correctly, and `scan()` rejects
-a transposed file at preflight rather than letting a method fail half an hour in.
-The label CSV is a **single column** with one header line (typically `x`) and one
-label per cell, in the same order as `matrix/barcodes` of the matching modality
-file. For ATAC, check which representation a method wants - gene-activity scores
-or peaks - because the wrong one runs to completion and returns a plausible but
-wrong embedding. A shipped label file, in full:""")
-    code("""cty = sorted((mtb.config.DEFAULT.data_path / DATASET).glob("*cty*.csv"))[0]
-print(cty.name)
-print(*cty.read_text().splitlines()[:4], sep="\\n")""")
-    md("""Converting an AnnData object to that layout, executed:""")
-    code("""import anndata as ad, numpy as np, h5py, tempfile, os
-tmp = tempfile.mkdtemp()
-demo = ad.AnnData(X=np.random.poisson(2.0, size=(120, 40)).astype(float))
-demo.obs_names = [f"cell{i}" for i in range(120)]
-demo.var_names = [f"gene{i}" for i in range(40)]
-src = os.path.join(tmp, "demo.h5ad"); demo.write_h5ad(src)
-
-dst = os.path.join(tmp, "rna.h5")
-mtb.io.to_canonical(src, dst)
-with h5py.File(dst) as f:
-    print("keys :", sorted(f["matrix"].keys()))
-    print("shape:", f["matrix/data"].shape, "(features x cells - transposed for you)")""")
+genes); the `mtb.io` writers below handle it, and `scan()` rejects a transposed
+file at preflight rather than letting a method fail half an hour in. The label
+CSV is a **single column** with one header line (typically `x`) and one label
+per cell, in the same order as `matrix/barcodes` of the matching modality file.
+For ATAC, check which representation a method wants - gene-activity scores or
+peaks - because the wrong one runs to completion and returns a plausible but
+wrong embedding. The shipped label files, as `evaluate` will read them:""")
+    code("""labels = mtb.labels_for(DATASET)            # {stem: path} - what the metrics are scored against
+print({k: Path(v).name for k, v in labels.items()})
+print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")""")
+    md("""Writing that layout from AnnData objects, executed here on a synthetic
+example - sparse matrices stream without densifying, and the folder passes the
+same file gate `scan` applies to the shipped datasets:""")
+    code(EXPORT_DEMO[cat])
     md(f"""Now a real dataset the package has never seen: a 60% cell subsample of
-`{s['own_src']}` under a new name, built with ordinary h5py/pandas code you can
-adapt to your own export pipeline.""")
+`{s['own_src']}` under a new name, built with ordinary h5py/pandas code so the
+per-file rule (matching files keep the same cell index) is visible.""")
     code(SUBSAMPLE_FN)
+    md("""`scan` checks two independent gates per method: `files_ok` - the folder
+itself (files present, features x cells orientation, one label per cell) - and
+`env_ok` - that method's conda environment exists on this machine. `runnable`
+is both; `reason` says which failed and how to fix it. The file gate runs
+anywhere, so a laptop without a single environment still tells you whether your
+layout is right.""")
     code(f'''DATA_ROOT = "/tmp/mydata"
 src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
 subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
 
 sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
-print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat}")''')
+print(f"files_ok {{int(sc.files_ok.sum())}}, env_ok {{int(sc.env_ok.sum())}}, runnable {{int(sc.runnable.sum())}} of {{len(sc)}} method variants")
+sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)''')
     code(f'''mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
                    methods={s['own_trio']!r},
                    out_dir=f"{{DATA_ROOT}}/out_{cat}",
@@ -299,8 +396,9 @@ print(f"{{int(sc.runnable.sum())}} of {{len(sc)}} methods can run on MYDATA_{cat
 mine.summary''')
     code("""mine.plot()""")
     md(f"""{s['own_note']} For your real data the only work is producing the
-canonical files - `mtb.io.to_canonical` from `.h5ad`, or the h5py pattern above,
-plus one label CSV - and these same three calls do the rest.""")
+canonical files - `mtb.io.export_dataset` from an AnnData / MuData, or
+`to_canonical` + `write_labels` file by file as above - and these same three
+calls do the rest.""")
 
     # ------------------------------------------------------------- figures
     batch_note = (
@@ -313,33 +411,41 @@ plus one label CSV - and these same three calls do the rest.""")
         len(trio), f"{len(trio)} methods")
     md(f"""## 4. Reading stored results
 
-Section 2 ran {n_word}; the repository ships the **full sweep** for `{ds}` -
+Section 2 ran {n_word}; the package ships the **full sweep** for `{ds}` -
 every wired method at default settings, hours of compute - so the paper's
-figures reproduce from stored results in seconds. Reading them back is a plain
-CSV read, and `mtb.plot.bubble` takes it from there:""")
-    code(f'''long = pd.read_csv(RESULTS / "long_all_{ds}.csv")
+figures reproduce from stored results in seconds. `load_results` reads them
+back as the tidy frame `mtb.plot.bubble` takes; `source="rerun"` selects the
+package's own re-execution (the tables behind this notebook), `"published"`
+the paper's tables, and every row says which it came from in its `source`
+column.""")
+    code(f'''long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")
+print(long.method.nunique(), "methods,", long.source.unique())
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
 fig''')
     md(f"""`run_all(DATASET, CATEGORY, out_dir=...)` without `methods=` writes the
-same `summary.csv` and `long.csv` for your own data.
+same `summary.csv` and `long.csv` for your own data; `mtb.load_batch(out_dir)`
+reads them back.
 
 **Across datasets.** A summary needs every method to have results on every
 dataset it averages over, or absence and performance blur into the same bar. Two
 {cat} datasets therefore ship swept identically - `{ds}` and `{ds2}` (a 60% cell
-subsample of `{ds}` under a new name) - and the code below keeps their method
-**intersection**, so the matrix is complete by construction. Each bar is the
-**grand rank**: the min-max scaled mean rank across the datasets, with length and
-colour both carrying it, and `Overall` is the same statistic over the grand ranks.
-{batch_note}""")
-    code(f'''a = pd.read_csv(RESULTS / "long_all_{ds}.csv").assign(dataset="{ds}")
-b = pd.read_csv(RESULTS / "long_all_{ds2}.csv").assign(dataset="{ds2}")
-both = sorted(set(a.method) & set(b.method))   # complete matrix, by construction
-pair = pd.concat([a, b], ignore_index=True)
-pair = pair[pair.method.isin(both)]
-print(f"{{len(both)}} methods with results on both datasets")
-mtb.plot.bubble(pair, aggregate="summary",
-                title=f"Summary of 2 {cat} datasets, {{len(both)}} methods")''')
+subsample of `{ds}` under a new name) - and `require_complete=True` keeps only
+the methods present on both, so the matrix is complete by construction. Each
+bar is the **grand rank**: the min-max scaled mean rank across the datasets,
+with length and colour both carrying it, and `Overall` is the same statistic
+over the grand ranks. {batch_note}""")
+    code(f'''pair = mtb.load_results(CATEGORY, dataset=[DATASET, DATASET + "s"], source="rerun")
+print(pair.groupby("dataset").method.nunique().to_dict())
+mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
+                title=f"Summary of 2 {cat} datasets")''')
+    md(f"""**Published vs re-run.** The paper's own tables (`source="published"`)
+and the package's re-runs can differ for a method - methods are stochastic and
+the published sweep ran on other hardware - so cite the published numbers and
+use the re-runs to check reproducibility; compare ranks, not decimals.
+`results_coverage` says what exists for this dataset and where it came from:""")
+    code('''cov = mtb.results_coverage(CATEGORY)
+cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
 
     # ----------------------------------------------------------- reference
     md("""## 5. Reference
@@ -351,36 +457,30 @@ the exact reason (missing file, missing environment, wrong layout). Nothing
 executes.""")
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
 avail[avail.runnable][["method", "modalities", "env", "output_kind",
-                       "n_tunable", "runtime_tier"]]""")
-    code("""not_ok = avail[~avail.runnable][["method", "modalities", "reason"]]
+                       "n_tunable", "needs_labels", "runtime_tier"]]""")
+    code("""not_ok = avail[~avail.runnable][["method", "modalities", "files_ok", "env_ok", "reason"]]
 not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
 """)
     md("""### What each method exposes for tuning
 
-An empty `tunable` is honest: many upstream scripts hardcode their
-hyperparameters, and this package never edits upstream code.""")
-    code("""from multibench.engine import registry
+`method_info(m)["supports"]` lists a method's variants with how many
+hyperparameters each exposes on its command line; `mtb.params_for(m, CATEGORY,
+modalities)` names them. An empty `tunable` is honest: many upstream scripts
+hardcode their hyperparameters, and this package never edits upstream code.""")
+    code("""rows = [{"method": m, "modalities": "+".join(v["modalities"]) or "(data_dir)",
+         "n_tunable": v["n_tunable"], "needs_labels": v["needs_labels"],
+         "output_kind": v["output_kind"]}
+        for m in sorted(mtb.list_methods(category=CATEGORY))
+        for v in mtb.method_info(m)["supports"] if v["category"] == CATEGORY]
+pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True]).reset_index(drop=True)""")
+    md(f"""### What the registry knows about a method, and how to cite it
 
-rows = []
-for m in sorted(mtb.list_methods(category=CATEGORY)):
-    p = None
-    try:
-        p = mtb.params_for(m, CATEGORY)
-    except Exception:                      # multi-variant: try each variant's modalities
-        for v in registry.get(m).variants:
-            if v.when.get("category") != CATEGORY:
-                continue
-            try:
-                p = mtb.params_for(m, CATEGORY, v.when.get("modalities"))
-                break
-            except Exception:
-                continue
-    if p is None:                          # variant selection needs a concrete dataset
-        rows.append({"method": m, "n_tunable": 0, "tunable": "(see scan() on your dataset)"})
-        continue
-    rows.append({"method": m, "n_tunable": len(p.get("tunable") or {}),
-                 "tunable": ", ".join(sorted((p.get("tunable") or {}))[:6])})
-pd.DataFrame(rows).sort_values("n_tunable", ascending=False).reset_index(drop=True)""")
+`method_info` carries the upstream reference, repository and version next to
+the run metadata (`verbose=True` adds the long audit notes); `mtb.cite` emits
+the benchmark entry plus one per method you ran.""")
+    code(f'''info = mtb.method_info("{fastm}")
+{{k: info[k] for k in ("id", "env", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
+    code(f'''print(mtb.cite({trio!r}, fmt="text"))   # fmt="bibtex" for the .bib entries''')
     md("""### The metrics
 
 Two families, matching the paper's grouping. All are **higher = better**, on
@@ -402,9 +502,8 @@ methods the paper benchmarks for **{cat}** the package wires at all.""")
 IMPUTATION_ONLY = {MOSAIC_IMPUTATION_ONLY!r}
 
 paper = PAPER[CATEGORY]
-wired = sorted({{m for m in mtb.list_methods()
-                if any(v.when.get("category") == CATEGORY
-                       for v in registry.get(m).variants)}})
+wired = sorted(m for m in mtb.list_methods()
+               if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
 missing = [m for m in paper if m not in wired]
 print(f"paper benchmarks {{len(paper)}} methods for {{CATEGORY}}; this package wires {{len(wired)}}")
 if missing:
@@ -424,8 +523,10 @@ else:
 
 `PASTE`, `PASTE2`, `SPIRAL` and `GPSA` are cross-integration methods whose output
 is **aligned spatial coordinates**, not an embedding - their status reports
-`RUN_OK_NO_EMBEDDING` and clustering metrics genuinely do not apply. Point them
-at a directory of spatial slices (see `mtb.scan("D63", category="cross")`)."""
+`RUN_OK_NO_EMBEDDING` and clustering metrics genuinely do not apply. They take
+a directory of per-slice `.h5ad` files (`.X` + `obsm['spatial']`); the SPATIAL
+REGISTRATION block of `describe_layout("cross")` above is the contract, and
+`scan` checks the directory for it."""
     if cat == "mosaic":
         trouble_extra = """
 ### Why is UINMF not in mosaic?
@@ -440,12 +541,13 @@ must actually run, so it is deliberately not offered."""
 
 | symptom | meaning | fix |
 |---|---|---|
-| `scan` says not runnable: input files not found | a required file is absent | the reason names the exact file and lists what IS in the folder |
-| `scan` says env missing | that method's conda env is not built | `multibench env install --run` |
-| `... looks like cells x features` | matrix stored transposed | re-export with `mtb.io.to_canonical` |
+| `files_ok` False: input files not found | a required file is absent | the reason names the exact file and lists what IS in the folder |
+| `env_ok` False | that method's conda env is not built | the reason carries the one-method `multibench env install ...` command |
+| `... looks like cells x features` | matrix stored transposed | re-export with `mtb.io.to_canonical` / `export_dataset` |
 | a method FAILs in seconds | wrong input representation or layout | read `res.failures.iloc[0]["error"]` - the full command line and stderr tail are there |
 | a method TIMEOUTs | slow, not broken | raise `timeout=`; runtime tiers in `scan` are measured, not guessed |
 | `label_order_confidence` low | several label files fit the cell count | check `label_order_candidates` in the record |
+| batch metrics scored against the wrong batches | `batch_source="file_of_origin"` is the label-file rule | `res.rescore(batch=my_vector)` re-scores the stored outputs without re-running |
 {trouble_extra}
 
 ## Next steps
@@ -453,14 +555,71 @@ must actually run, so it is deliberately not offered."""
 - the other three tutorials: {siblings}
 - the hosted interactive explorer: <https://shiny.maths.usyd.edu.au/scMultiBench/> -
   the full benchmark's rankings, browsable without installing anything
-- `mtb.method_info(name)` - everything the registry knows about one method
+- `mtb.recommend(CATEGORY, modalities=[...])` - stored-result ranking with coverage made explicit
 - `mtb.sweep(...)` - one method over a range of one hyperparameter""")
+    return C
 
-    nb = nbf.v4.new_notebook(cells=C, metadata={
-        "kernelspec": {"display_name": "Python 3", "language": "python",
-                       "name": "python3"},
-        "language_info": {"name": "python", "version": "3.10"},
-    })
-    path = os.path.join(OUT, f"tutorial_{cat}.ipynb")
-    nbf.write(nb, path)
+
+def build_colab_quickstart():
+    C = []
+    md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
+    code = lambda t: C.append(nbf.v4.new_code_cell(t))
+    md("""# scMultiBench API quickstart (Colab)
+
+This notebook runs **entirely in Colab**: it installs the `multibench` API,
+explores the method registry, loads the shipped benchmark results, and draws
+the standard figures. Run the first cell and let the kernel restart once -
+then keep running from the next cell.
+
+One scope note: *executing* an integration method needs that method's conda
+environment (2-14 GB each) and reference data, which this notebook does not
+provision - for that, follow a category tutorial on your own Linux machine.
+Everything below runs here, now.""")
+    for cell in INSTALL_CELLS:
+        code(cell)
+    code("""import multibench as mtb
+import pandas as pd
+
+print(len(mtb.list_methods()), "methods in the registry")
+mtb.list_methods(category="vertical")""")
+    md("""## Inspect a method
+
+`method_info` returns everything the registry knows - language, environment,
+label needs, the upstream reference and the entry-point variants; `find_methods`
+filters by what your data has; `cite` emits the benchmark entry plus one per
+method.""")
+    code("""info = mtb.method_info("Matilda")
+{k: info[k] for k in ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
+    code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
+    code("""print(mtb.cite(["Matilda"], fmt="text"))""")
+    md("""## Load shipped results and draw the standard figures
+
+The package ships the paper's tables (`source="published"`) and its own
+re-run sweeps (`source="rerun"`), one long table per dataset - so the figures
+reproduce here without running anything.""")
+    code("""long = mtb.load_results("vertical", dataset="D11", source="rerun")
+fig = mtb.plot.bubble(long)
+fig.set_dpi(110)
+fig""")
+    code("""pair = mtb.load_results("diagonal", dataset=["D28", "D28s"], source="rerun")
+mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
+                title="Summary of 2 diagonal datasets")""")
+    md("""## Next steps
+
+- the four integration tutorials (vertical / diagonal / mosaic / cross) in the
+  docs walk the full pipeline, including your own dataset
+- the hosted [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/)
+  has the complete published rankings""")
+    return C
+
+
+if __name__ == "__main__":
+    for cat, s in SCEN.items():
+        C = build_tutorial(cat, s)
+        path = os.path.join(OUT, f"tutorial_{cat}.ipynb")
+        nbf.write(_notebook(C), path)
+        print(f"wrote {path} {len(C)} cells")
+    C = build_colab_quickstart()
+    path = os.path.join(OUT, "colab_quickstart.ipynb")
+    nbf.write(_notebook(C), path)
     print(f"wrote {path} {len(C)} cells")
