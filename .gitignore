@@ -6,6 +6,8 @@
 multibench/engine/env_locks/.build/
 /multibench/result/*
 !/multibench/result/scib_metric/
+# the package re-run sweeps (load_results(source='rerun')) ship with the package
+!/multibench/result/rerun/
 __pycache__/
 *.py[cod]
 .pytest_cache/
