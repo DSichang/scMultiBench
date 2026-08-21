@@ -26,8 +26,11 @@ multibench env install --run # build everything from the committed lockfiles
 `env install` is a dry run until you add `--run`. `env doctor`'s legend distinguishes
 installed `[x]`, missing-but-buildable `[L]`, and missing-with-no-lockfile `[!]`.
 
-`scan()` marks a method NOT runnable when its environment is absent, so a sweep never
-starts something it cannot finish.
+`scan()` checks two gates per method - `files_ok` (the dataset folder itself; this
+gate runs on any machine, no environments needed) and `env_ok` (the method's conda
+env exists here) - and marks a method runnable only when both pass, so a sweep
+never starts something it cannot finish. `mtb.plan(dataset, category)` is the
+`run_all` plan with the blocked rows and their reasons kept.
 
 ## Things worth knowing before you start
 
@@ -62,18 +65,21 @@ producing a quietly broken environment.
 ## Verifying your install
 
 ```bash
-python -m pytest tests/ -q          # 217 tests on the benchmark host;
-                                    # without the reference data the
-                                    # data-dependent subset fails with
-                                    # FileNotFoundError - expected, not a
-                                    # broken install
+python -m pytest tests/ -q          # the full suite passes on the benchmark
+                                    # host; elsewhere the tests that need the
+                                    # conda environments or a subprocess
+                                    # (tests/test_run_all_dispatch.py,
+                                    # tests/test_runner.py, tests/test_workflow.py,
+                                    # tests/test_mplbackend.py) fail - expected,
+                                    # not a broken install
 ```
 
 Then the smallest real end-to-end check:
 
 ```python
 import multibench as mtb
-mtb.scan("D11", category="vertical")                       # 14 of 25 runnable
+mtb.data.fetch("D11")                                      # 11 MB reference dataset
+mtb.scan("D11", category="vertical")                       # files_ok 14 of 25 rows; env_ok per env built
 mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/check")
 ```
 

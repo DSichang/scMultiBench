@@ -11,6 +11,12 @@ license = {text = "Apache-2.0"}
 readme = "README.md"
 dependencies = ["pandas>=2.0,<3", "numpy>=1.24", "matplotlib>=3.7", "h5py>=3.8", "anndata>=0.9", "pyyaml>=6.0", "scanpy>=1.9", "scib>=1.1"]
 
+[project.urls]
+Homepage = "https://dsichang.github.io/scMultiBench/"
+Repository = "https://github.com/DSichang/scMultiBench"
+Upstream = "https://github.com/PYangLab/scMultiBench"
+Paper = "https://doi.org/10.1038/s41592-025-02856-3"
+
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
 eval = []  # kept for compatibility: evaluation now ships with the core install
