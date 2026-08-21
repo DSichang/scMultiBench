@@ -34,8 +34,9 @@ def _fake_run(calls, n_cells=2864, dims=20):
 
 def _plan_modalities(method, dataset, category):
     plan = mtb.run_all(dataset, category, methods=[method],
-                       out_dir="/tmp/unused", dry_run=True)
-    return str(plan.iloc[0]["modalities"]).split("+")
+                       out_dir="/tmp/unused", dry_run=True, verbose=False)
+    ok = plan[plan["runnable"]]               # dry_run keeps blocked rows too
+    return str((ok if len(ok) else plan).iloc[0]["modalities"]).split("+")
 
 
 def test_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):

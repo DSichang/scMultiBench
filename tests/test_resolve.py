@@ -118,3 +118,96 @@ def test_inputs_for_protein_alias_and_bad_category(tmp_path):
                            data_path=tmp_path)
     with pytest.raises(KeyError, match="did you mean 'StabMap'"):
         resolve.inputs_for("D11", "Stabmap", "cross", data_path=tmp_path)
+
+
+# --- P01 follow-up: content preflight in inputs_for(check=True) ---------------
+
+def _h5(path, n_feat, n_cells, feats=None):
+    import h5py
+    import numpy as np
+    with h5py.File(path, "w") as f:
+        g = f.create_group("matrix")
+        g.create_dataset("data", data=np.ones((n_feat, n_cells)))
+        g.create_dataset("features", data=np.array(
+            feats or [f"g{i}" for i in range(n_feat)], dtype="S24"))
+        g.create_dataset("barcodes", data=np.array([f"c{i}" for i in range(n_cells)], dtype="S8"))
+
+
+def test_label_length_mismatch_reported(tmp_path):
+    d = tmp_path / "D11"; d.mkdir()
+    _h5(d / "rna.h5", 30, 60); _h5(d / "adt.h5", 5, 60)
+    (d / "cty.csv").write_text("x\n" + "A\n" * 59)
+    with pytest.raises(ValueError) as e:
+        resolve.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"],
+                           data_path=tmp_path, check=True)
+    msg = str(e.value)
+    assert "cty.csv has 59 labels" in msg and "60 cells" in msg and "describe_layout" in msg
+    # check=None / False do not raise (best-effort paths)
+    resolve.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"],
+                       data_path=tmp_path, check=False)
+    (d / "cty.csv").write_text("x\n" + "A\n" * 60)
+    resolve.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"],
+                       data_path=tmp_path, check=True)     # now fine
+
+
+def test_label_partners_pairing_rule():
+    lp = resolve._label_partners
+    assert lp("cty", ["rna", "adt", "cty"]) == ["rna", "adt"]
+    assert lp("rna_cty", ["rna", "atac_gas", "atac_peak", "rna_cty", "atac_cty"]) == ["rna"]
+    assert lp("atac_cty", ["rna", "atac_gas", "atac_peak", "rna_cty", "atac_cty"]) == ["atac_gas", "atac_peak"]
+    assert lp("peak_cty", ["rna", "atac_peak"]) == ["atac_peak"]
+    assert lp("cty2", ["rna1", "rna2", "adt1", "atac2", "cty1", "cty2"]) == ["rna2", "atac2"]
+    assert lp("source_cty", ["data_dir", "source_data"]) == []
+
+
+def test_atac_gas_peak_caveat(tmp_path):
+    d = tmp_path / "PK"; d.mkdir()
+    _h5(d / "rna.h5", 30, 50)
+    _h5(d / "atac.h5", 40, 45, feats=[f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)])
+    got = resolve.inputs_for("PK", "Portal", "diagonal", data_path=tmp_path, check=True)
+    assert got["atac_gas"].endswith("atac.h5")
+    assert resolve._preflight_caveats(got) == [resolve.PEAK_IN_GAS_CAVEAT]
+    assert "chr:start-end" in resolve.PEAK_IN_GAS_CAVEAT
+    # a real atac_gas.h5 (gene names) -> no caveat; so does gene-named atac.h5
+    _h5(d / "atac_gas.h5", 40, 45)
+    assert resolve._preflight_caveats(resolve.inputs_for("PK", "Portal", "diagonal",
+                                                         data_path=tmp_path)) == []
+    (d / "atac_gas.h5").unlink()
+    _h5(d / "atac.h5", 40, 45)
+    assert resolve._preflight_caveats(resolve.inputs_for("PK", "Portal", "diagonal",
+                                                         data_path=tmp_path)) == []
+
+
+def test_inputs_for_check_true_rejects_data_dir_without_slices(tmp_path):
+    (tmp_path / "D11").mkdir()
+    with pytest.raises(FileNotFoundError, match=">=2 .h5ad"):
+        resolve.inputs_for("D11", "PASTE", "cross", data_path=tmp_path, check=True)
+    # default (warn-only) still hands back the directory
+    got = resolve.inputs_for("D11", "PASTE", "cross", data_path=tmp_path)
+    assert got["data_dir"].rstrip("/").endswith("D11")
+
+
+def test_check_data_dir_wants_obsm_spatial(tmp_path):
+    import anndata as ad
+    import numpy as np
+    from multibench.engine import registry
+    v = registry.get("PASTE").select("cross", set())
+    d = tmp_path / "S"; d.mkdir()
+    assert resolve._check_data_dir(v, d) == (False, f"spatial registration needs >=2 .h5ad slice files; found 0 in {d}")
+    for i in range(2):
+        ad.AnnData(np.ones((5, 3))).write_h5ad(d / f"s{i}.h5ad")
+    ok, why = resolve._check_data_dir(v, d)
+    assert not ok and "obsm['spatial']" in why
+    for i in range(2):
+        a = ad.AnnData(np.ones((5, 3))); a.obsm["spatial"] = np.zeros((5, 2))
+        a.write_h5ad(d / f"s{i}.h5ad")
+    assert resolve._check_data_dir(v, d) == (True, "")
+    # the workflow alias delegates here
+    from multibench import workflow as W
+    assert W._data_dir_usable(v, d) == (True, "")
+
+
+def test_labels_for_docstring_says_how_to_hand_to_evaluate():
+    import inspect
+    doc = inspect.getdoc(resolve.labels_for)
+    assert "list(labels_for(ds).values())" in doc and "evaluate(labels=" in doc

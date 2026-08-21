@@ -17,10 +17,25 @@ _SCIB_TASKS = {"clustering", "dimension_reduction", "batch", "all"}
 
 def to_long(value_df, method, dataset, category):
     """Convert an evaluate() wide frame (index=metric, column 'Value') to the
-    long frame used by load_results/plot.bubble: metric,value,method,dataset,category."""
+    long frame used by load_results/plot.bubble: metric,value,method,dataset,category.
+
+    Metric names are canonicalised (``ari`` -> ``ARI``, ``kbet`` -> ``kBET``);
+    rows whose name canonicalises to nothing (blank) are dropped, and two rows
+    that collapse onto the SAME canonical name (``ari`` and ``ARI`` both
+    present) raise ``ValueError`` - a silent duplicate would double-count that
+    metric in every downstream rank.
+    """
     out = value_df.rename(columns={"Value": "value"}).copy()
-    out = out.reset_index().rename(columns={"index": "metric"})
+    out = out.reset_index()                      # the index column comes first,
+    out = out.rename(columns={out.columns[0]: "metric"})   # whatever it was named
     out["metric"] = out["metric"].map(catalog.canonical_metric)
+    out = out.dropna(subset=["metric"])
+    dup = out["metric"].duplicated(keep=False)
+    if dup.any():
+        raise ValueError(
+            f"metric names collide after canonicalisation: "
+            f"{sorted(set(out.loc[dup, 'metric']))} - the input names two rows that "
+            f"map to the same canonical metric (e.g. 'ari' and 'ARI'); drop one")
     out["method"] = method
     out["dataset"] = dataset
     out["category"] = category

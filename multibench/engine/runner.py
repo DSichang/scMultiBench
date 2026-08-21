@@ -124,11 +124,18 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     inputs_dir = workdir / "inputs"
     inputs_dir.mkdir(parents=True, exist_ok=True)
 
-    # normalize modality inputs to canonical .h5 inside a dedicated inputs dir
+    # normalize modality inputs to canonical .h5 inside a dedicated inputs dir.
+    # For the two ATAC-representation roles the role token is passed as the
+    # modality hint so the conversion emits ingest's peak-name warning (an
+    # atac_gas role fed a chr:start-end matrix); other roles carry no hint -
+    # `modality='adt'` would refuse an AnnData that has obsm keys, and in-memory
+    # AnnData inputs must keep working unchanged.
     values: dict = {}
     for role, val in inputs.items():
         if convert and role not in _AUX_ROLES and "cty" not in role and "label" not in role:
-            values[role] = str(ingest.to_canonical(val, out=inputs_dir / f"{role}.h5"))
+            hint = role.rstrip("0123456789")
+            kw = {"modality": hint} if hint in ("atac_gas", "atac_peak") else {}
+            values[role] = str(ingest.to_canonical(val, out=inputs_dir / f"{role}.h5", **kw))
         else:
             values[role] = val
 

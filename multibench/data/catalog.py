@@ -91,7 +91,19 @@ def _split_multivalue(cell: object) -> list[str]:
 
 
 def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """Return the methods table with normalized columns and list-valued cats/tasks."""
+    """The methods table: ``method, canonical_id, language, deep_learning, atac,
+    output, needs_labels, categories, tasks`` (``categories``/``tasks`` are
+    lists).
+
+    ``deep_learning`` and ``output`` come from the shipped ``method.csv``.
+    ``needs_labels``, ``atac`` (``'peak'`` / ``'gene_activity'`` / ``None``),
+    ``categories`` and ``tasks`` are OVERLAID from the method registry
+    (``registry.get(canonical_id)``) for every row whose id is registered, so
+    the table cannot disagree with ``method_info`` / ``scan`` (the CSV's hand
+    columns had drifted on 37 of 40 rows). Rows without a registry entry keep
+    the CSV values. ``language`` is the CSV value (lower-cased), cross-checked
+    against the registry's.
+    """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "method.csv")
@@ -110,6 +122,20 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     )
     out["categories"] = raw["Integration Categories"].map(_split_multivalue)
     out["tasks"] = raw["Task Categories"].map(_split_multivalue)
+    # registry overlay: the derived / validated values win over the CSV prose
+    from ..engine import registry as _registry
+    specs = {s.id: s for s in _registry.load()}
+    atac_col = out["atac"].astype(object)
+    for i, cid in enumerate(out["canonical_id"]):
+        spec = specs.get(cid)
+        if spec is None:
+            continue
+        out.at[i, "needs_labels"] = bool(spec.needs_labels)
+        atac_col.at[i] = spec.atac
+        out.at[i, "categories"] = list(spec.categories)
+        out.at[i, "tasks"] = list(spec.tasks)
+    out["atac"] = atac_col
+    out["needs_labels"] = out["needs_labels"].astype(bool)
     return out
 
 
