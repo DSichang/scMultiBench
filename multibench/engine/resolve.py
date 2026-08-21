@@ -1,6 +1,8 @@
 """Resolve a catalog dataset id + method to concrete input file paths."""
 from __future__ import annotations
 
+import os
+import warnings
 from pathlib import Path
 
 from .. import config
@@ -113,16 +115,31 @@ def _stage_unique_leading_token(slice_dir: Path) -> str:
 def inputs_for(dataset: str, method: str, category: str,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
-               check: bool = False) -> dict:
+               check: bool | None = None) -> dict:
     """Return ``{modality_role: path}`` for a method's variant on a dataset.
 
     The dataset tree is **flat** (``<data_path>/<dataset>/<file>``). Each role is
     resolved to the actual file present in that dir (the role token, or a known
     alias such as ``atac_peak``->``peak.h5`` / ``atac_gas``->``atac.h5``),
-    falling back to ``<role>.h5`` when no candidate exists. Pass ``check=True`` to
-    raise ``FileNotFoundError`` if any resolved path is missing (instead of
-    returning a best-effort path that only fails later inside ``run``). Use
+    falling back to ``<role>.h5`` when no candidate exists. Use
     :func:`labels_for` to get the matching cell-type label CSVs.
+
+    Parameters
+    ----------
+    dataset : dataset folder name under ``data_path``.
+    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
+    category : ``vertical``/``diagonal``/``mosaic``/``cross`` (validated:
+        ``ValueError`` listing the valid tokens on a typo).
+    modalities : the variant's modality tokens (see
+        ``method_info(m)['supports']``); ``protein`` is accepted for ``adt``,
+        unknown tokens raise ``ValueError`` naming the vocabulary.
+    data_path : root that CONTAINS the dataset folder; default
+        ``config.DEFAULT.data_path``.
+    check : what to do when a resolved path does not exist on disk.
+        ``None`` (default) - return the best-effort paths but emit a
+        ``UserWarning`` listing the missing ones; ``True`` - raise
+        ``FileNotFoundError`` and also run the matrix-orientation preflight
+        (rejects a cells x features file up front); ``False`` - fully silent.
 
     Variant selection:
       * If ``modalities`` is given, the exact variant matching
@@ -137,6 +154,8 @@ def inputs_for(dataset: str, method: str, category: str,
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     ds_dir = base / dataset  # flat layout: data/<dataset>/<file>
     spec = registry.get(method)
+    registry.check_category(category)
+    modalities = registry.normalize_modalities(modalities)
 
     if modalities is not None:
         variant = spec.select(category, set(modalities))
@@ -165,8 +184,8 @@ def inputs_for(dataset: str, method: str, category: str,
     # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
     if any(a.role == "data_dir" for a in variant.args):
         out["data_dir"] = _resolve_data_dir(ds_dir, method)
+    missing = {r: p for r, p in out.items() if not Path(p).exists()}
     if check:
-        missing = {r: p for r, p in out.items() if not Path(p).exists()}
         if missing:
             raise FileNotFoundError(
                 f"{method}/{dataset}/{category}: input files not found on disk: "
@@ -174,6 +193,14 @@ def inputs_for(dataset: str, method: str, category: str,
                 f"{sorted(q.name for q in ds_dir.glob('*')) if ds_dir.is_dir() else '(dir missing)'}"
             )
         _check_orientation(method, dataset, category, out)
+    elif check is None and missing:
+        # The default used to hand back phantom paths in silence, so a typo in
+        # the dataset folder only surfaced minutes later inside the method's
+        # conda env. Warn here; check=True raises, check=False stays quiet.
+        warnings.warn(
+            f"{method}/{dataset}/{category}: {len(missing)} resolved input path(s) "
+            f"do not exist: {missing}; pass check=True to raise, check=False to silence",
+            UserWarning, stacklevel=2)
     return out
 
 
@@ -242,7 +269,8 @@ def _check_orientation(method, dataset, category, resolved):
             )
 
 
-def labels_for(dataset: str, data_path: Path | str | None = None) -> dict:
+def labels_for(dataset: str, method: str | None = None, category: str | None = None,
+               *, data_path: Path | str | None = None) -> dict:
     """Return ``{name: path}`` of the cell-type label CSVs for a dataset.
 
     The benchmark stores cell-type labels as ``*cty*.csv`` in the (flat) dataset
@@ -250,7 +278,27 @@ def labels_for(dataset: str, data_path: Path | str | None = None) -> dict:
     ...). Returns the primary label files (excluding tool-specific ``*_scjoint*``
     reformats), keyed by filename stem, for use as ``mtb.evaluate(labels=...)``.
     Raises ``FileNotFoundError`` if the dataset dir is absent.
+
+    Parameters
+    ----------
+    dataset : dataset folder name under ``data_path``.
+    method, category : accepted so the call mirrors
+        ``inputs_for(dataset, method, category, ...)``; labels are per DATASET,
+        so both are ignored (no per-method label selection exists).
+    data_path : keyword-only. Root that CONTAINS the dataset folder; default
+        ``config.DEFAULT.data_path``. For back-compat, a ``Path`` (or a string
+        containing a path separator / naming an existing directory) passed as
+        the 2nd positional argument is still treated as ``data_path`` - with a
+        ``DeprecationWarning``; a bare, non-existent relative name there is taken
+        as a method id and ignored.
     """
+    if method is not None and (
+            isinstance(method, Path)
+            or (isinstance(method, str) and (os.sep in method or Path(method).is_dir()))):
+        warnings.warn("labels_for: pass data_path= by keyword "
+                      "(the 2nd positional argument is now `method`)",
+                      DeprecationWarning, stacklevel=2)
+        data_path, method = method, None
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     ds_dir = base / dataset
     if not ds_dir.is_dir():

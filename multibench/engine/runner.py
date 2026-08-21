@@ -68,6 +68,25 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     The ``task`` parameter is reserved for future per-task dispatch; variant
     selection in v1 depends only on ``category`` and the supplied modalities.
 
+    Parameters
+    ----------
+    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
+    category : integration category of the variant to run.
+    task : reserved (see above).
+    inputs : ``{role: path-or-AnnData}``; the non-auxiliary, non-label roles
+        select the variant. See ``inputs_for`` / ``method_info(m)['supports']``.
+    out_dir : directory the method writes into (created; ``inputs/`` holds the
+        canonical .h5 copies when ``convert=True``).
+    params : overrides merged over the variant's default hyperparameters.
+    convert : convert modality inputs to the canonical .h5 layout (default True).
+    cmd_template : wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``.
+        Default: ``conda run -n <env>`` with the env ``mtb.env.group_for(method)``
+        would provision. When left as None the env is PREFLIGHTED: if conda lists
+        envs and the method's env is not among them, ``EnvironmentError`` is
+        raised before any file is written, naming the install command. Pass a
+        cmd_template to take over env control (no preflight).
+    repo_path : checkout holding ``tools_scripts/`` (default: auto-provisioned).
+
     Note on auxiliary-role coupling: for methods whose args reference auxiliary
     roles (e.g. scBridge's ``data_dir``/``source_data``/``target_data``/
     ``source_cty``/``target_cty``), the caller must ALSO pass the modality roles
@@ -81,6 +100,23 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     modalities = {k for k in inputs
                   if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
     variant = spec.select(category, modalities)
+
+    # Env preflight: the default cmd_template is `conda run -n <env> ...`, and
+    # conda's own "EnvironmentLocationNotFound" only arrives AFTER inputs were
+    # converted and the subprocess spawned, buried in a stderr tail with no
+    # install hint. Check up front (same probe scan() uses), before anything is
+    # written. Skipped when the caller controls the env via cmd_template, and
+    # when the probe returns nothing (conda absent/broken -> cannot evidence,
+    # let the subprocess report as before).
+    env_name = None
+    if cmd_template is None:
+        env_name = envs.group_for(method)
+        have = envs.installed_envs()
+        if have and env_name not in have:
+            raise EnvironmentError(
+                f"conda env {env_name!r} ({method}) is not installed - run "
+                f"`multibench env install --methods {method} --packed --run` "
+                f"(or mtb.env.create_env({env_name!r})); see mtb.env.doctor()")
 
     out = Path(out_dir)
     workdir = out
@@ -131,7 +167,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         # env you run". group_for() returns a method's shared group env, or its
         # own scmb_<method> env if it is not grouped. (The legacy per-method
         # methods.yaml `env:` field is no longer consulted here.)
-        env_name = envs.group_for(method)
+        env_name = env_name or envs.group_for(method)
         cmd_template = f"{conda} run -n {env_name} {{cmd}}"
     # Opt-in pseudo-tty: some upstream scripts read the terminal size
     # (os.popen('stty size')) to draw a progress bar and crash without a tty
