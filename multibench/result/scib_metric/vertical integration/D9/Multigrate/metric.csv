@@ -1,0 +1,7 @@
+,0
+NMI_cluster/label,0.8971687269645453
+ARI_cluster/label,0.9144827135229162
+ASW_label,0.6771407127380371
+isolated_label_F1,0.7866380345093338
+isolated_label_silhouette,0.6581187850657713
+cLISI,1.0
