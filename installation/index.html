@@ -1466,7 +1466,7 @@ resolves from <strong>any</strong> working directory (not only the repo root). P
 <code>pip install -e .</code> works too, but the compat flag avoids an empty-namespace
 import surprise when you later call the API from a script outside the clone.</p>
 </div>
-<p>This pulls in only the core data-handling stack:</p>
+<p>This pulls in the core data-handling stack and the evaluation stack:</p>
 <table>
 <thead>
 <tr>
@@ -1505,6 +1505,11 @@ import surprise when you later call the API from a script outside the clone.</p>
 <td><code>pyyaml</code></td>
 <td>6.0</td>
 <td>method registry / config parsing</td>
+</tr>
+<tr>
+<td><code>scanpy</code> / <code>scib</code></td>
+<td>1.9 / 1.1</td>
+<td>the scIB metrics behind <code>mtb.evaluate</code></td>
 </tr>
 </tbody>
 </table>
@@ -1548,18 +1553,19 @@ need R, scBridge / Portal / uniPort each pin their own PyTorch line, and these
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">},</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d35&quot;</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D28/rna.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D28/atac_gas.h5&quot;</span><span class="p">},</span>   <span class="c1"># mtb.data.fetch(&quot;D28&quot;) downloads it</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d28&quot;</span><span class="p">,</span>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span>
 </span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>    <span class="c1"># the joint embedding (ndarray)</span>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>       <span class="c1"># the exact command that was executed (list[str])</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Create the method's env first</p>
-<p><code>mtb.run(...)</code> will fail at the <code>conda run -n &lt;env&gt;</code> step if that env does
-not exist. Create the per-tool environment from the recipe shipped alongside
-that method in the scMultiBench repository <strong>before</strong> running it. The
-method scripts themselves are <strong>never modified</strong> by <code>multibench</code>.</p>
+<p><code>mtb.run(...)</code> preflights the env and raises <code>EnvironmentError</code> naming the
+install command if it does not exist; <code>scan()</code> reports the same per method
+in its <code>env_ok</code> column. Build it with <code>multibench env install --methods
+&lt;method&gt; --packed --run</code> (see below) <strong>before</strong> running. The method scripts
+themselves are <strong>never modified</strong> by <code>multibench</code>.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Custom orchestration</p>
@@ -1618,16 +1624,19 @@ and <code>scanpy</code> install with the package - no extra step. (<code>pip ins
 <div class="admonition question">
 <p class="admonition-title">Stuck on install?</p>
 <dl>
-<dt><strong><code>conda run -n &lt;env&gt;</code> fails with "EnvironmentNotFound"</strong> when calling <code>mtb.run</code></dt>
+<dt><strong><code>EnvironmentError: conda env '&lt;env&gt;' is not installed</code></strong> from <code>mtb.run</code>, or <code>env_ok</code> False in <code>scan()</code></dt>
 <dd>
-<p>The method's per-tool conda env does not exist. Create it from that
-method's recipe in the scMultiBench repo first, or pass a custom
-<code>cmd_template=</code> to <code>mtb.run(...)</code> that launches the command another way.</p>
+<p>The method's conda env does not exist here. <code>multibench env install
+--methods &lt;method&gt; --packed --run</code> builds it (the message carries the
+exact command), or pass a custom <code>cmd_template=</code> to <code>mtb.run(...)</code>
+that launches the command another way.</p>
 </dd>
 <dt><strong><code>ImportError: No module named scib</code></strong> when calling <code>mtb.evaluate</code></dt>
 <dd>
-<p>Install the eval extra: <code>pip install scib</code>. The core <code>multibench</code>
-install deliberately omits it.</p>
+<p><code>scib</code> and <code>scanpy</code> are dependencies since v0.2 and install with the
+package; this means <code>multibench</code> was installed with <code>--no-deps</code> or
+into a different interpreter. Re-run <code>pip install multibench-sc</code> (or
+<code>pip install -e .</code> in the clone) in the env you import from.</p>
 </dd>
 <dt><strong><code>cLISI</code> / <code>iLISI</code> / <code>kBET</code> come back as <code>NaN</code></strong></dt>
 <dd>
@@ -1643,10 +1652,11 @@ to use libmamba globally.</p>
 </dd>
 <dt><strong><code>unsupported input format</code> from <code>mtb.io.to_canonical</code></strong></dt>
 <dd>
-<p>The adapter accepts <code>.h5ad</code>, <code>.csv</code> / <code>.tsv</code>, <code>.loom</code>, and
-in-memory <code>AnnData</code>. Convert other formats to one of these first, or
-pass an already-canonical scMultiBench <code>.h5</code> (it is detected and passed
-through unchanged).</p>
+<p>The adapter accepts <code>.h5ad</code>, <code>.h5mu</code>, <code>.csv</code> / <code>.tsv</code>, <code>.loom</code>, and
+in-memory <code>AnnData</code> / <code>MuData</code>. Convert other formats to one of these
+first, or pass an already-canonical scMultiBench <code>.h5</code> (it is detected
+and passed through unchanged). For a whole dataset folder use
+<code>mtb.io.export_dataset</code> / <code>multibench convert --rna ... --labels ...</code>.</p>
 </dd>
 <dt><strong>Still broken?</strong></dt>
 <dd>

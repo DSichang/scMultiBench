@@ -710,6 +710,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#published-vs-re-run-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published vs re-run tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#clustering-variants" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -742,6 +753,28 @@
     <span class="md-ellipsis">
       
         Individual vs. summary panels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit-the-numbers-before-drawing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit the numbers before drawing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary bars
       
     </span>
   </a>
@@ -1243,6 +1276,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#published-vs-re-run-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published vs re-run tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#clustering-variants" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1275,6 +1319,28 @@
     <span class="md-ellipsis">
       
         Individual vs. summary panels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit-the-numbers-before-drawing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit the numbers before drawing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary bars
       
     </span>
   </a>
@@ -1388,54 +1454,56 @@
 
 <h1 id="load-plot-results">Load &amp; plot results<a class="headerlink" href="#load-plot-results" title="Anchor link to this section">&para;</a></h1>
 <p>scMultiBench ships the <strong>published benchmark metric tables</strong> from Liu, Ding
-<em>et al.</em> (Nature Methods 2025) alongside the code that drew the figures. This
-tutorial covers the two functions you need to turn those tables into a
-publication-ready panel: <a href="../../api/#mtbload_results"><code>mtb.load_results</code></a> reads the on-disk
-metric CSVs into one tidy long frame, and <a href="../../api/#mtbplotbubble"><code>mtb.plot.bubble</code></a>
+<em>et al.</em> (Nature Methods 2025) and the package's own <strong>re-run sweeps</strong>,
+alongside the code that drew the figures. This tutorial covers the two
+functions you need to turn those tables into a publication-ready panel:
+<a href="../../api/#mtbload_results"><code>mtb.load_results</code></a> reads the stored metric tables
+into one tidy long frame, and <a href="../../api/#mtbplotbubble"><code>mtb.plot.bubble</code></a>
 renders the scIB-style bubble table the paper uses.</p>
 <div class="admonition tip">
 <p class="admonition-title">TL;DR</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D12&quot;</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">)</span>                  <span class="c1"># the paper&#39;s table</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, D12&quot;</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;d12.pdf&quot;</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, D11&quot;</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;d11.pdf&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The same panel from the shell:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D12<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW,cLISI<span class="w"> </span>--out<span class="w"> </span>d12.pdf
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D11<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW,cLISI<span class="w"> </span>--out<span class="w"> </span>d11.pdf
 </span></code></pre></div>
 </div>
 <hr />
 <h2 id="step-1-load-a-tidy-results-frame">Step 1, Load a tidy results frame<a class="headerlink" href="#step-1-load-a-tidy-results-frame" title="Anchor link to this section">&para;</a></h2>
-<p><code>mtb.load_results</code> walks the benchmark result tree and returns a single
-<strong>long-format</strong> <code>pandas.DataFrame</code> with exactly five columns, 
-<code>metric</code>, <code>value</code>, <code>method</code>, <code>dataset</code>, <code>category</code>. One row per
-(method, dataset, metric) cell. This is the shape every downstream function
-(<code>plot.bubble</code>, your own <code>groupby</code>/<code>pivot</code>) expects.</p>
+<p><code>mtb.load_results</code> walks the stored result tree and returns a single
+<strong>long-format</strong> <code>pandas.DataFrame</code> with seven columns -
+<code>metric</code>, <code>value</code>, <code>method</code>, <code>dataset</code>, <code>category</code>, <code>clustering</code>, <code>source</code>.
+One row per (method, dataset, metric) cell. This is the shape every downstream
+function (<code>plot.bubble</code>, <code>plot.bar</code>, <code>recommend</code>, your own <code>groupby</code>/<code>pivot</code>)
+expects.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span>      <span class="c1"># vertical | diagonal | mosaic | cross</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>        <span class="c1"># which task&#39;s metric set to read</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span>      <span class="c1"># vertical | diagonal | mosaic | cross; None -&gt; every category</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">task</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># None/&quot;all&quot; -&gt; every metric; &quot;clustering&quot; / &quot;batch&quot; -&gt; one family</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">metric_set</span><span class="o">=</span><span class="s2">&quot;scib&quot;</span><span class="p">,</span>        <span class="c1"># only &quot;scib&quot; is wired in v1</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D12&quot;</span><span class="p">,</span>            <span class="c1"># None -&gt; every dataset in the category</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every method present</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span>            <span class="c1"># None -&gt; every dataset; a list -&gt; several</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every method present; a name or list (alias tolerant)</span>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">metric</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every metric; or [&quot;ARI&quot;, &quot;NMI&quot;]</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>     <span class="c1"># default | louvain | kmeans</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1">#   metric     value method dataset  category</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># 0    ARI  0.372622  MOFA2     D12  vertical</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># 1    NMI  0.620118  MOFA2     D12  vertical</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># 2    ASW  0.481119  MOFA2     D12  vertical</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="c1"># 3   iASW  0.445618  MOFA2     D12  vertical</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="c1"># 4    iF1  0.652439  MOFA2     D12  vertical</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;published&quot;</span><span class="p">,</span>       <span class="c1"># published | rerun | both</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">)</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1">#   metric     value      method dataset  category clustering     source</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># 0    NMI  0.792936  Multigrate     D11  vertical    default  published</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># 1    ARI  0.759446  Multigrate     D11  vertical    default  published</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="c1"># 2    ASW  0.656011  Multigrate     D11  vertical    default  published</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="c1"># ...</span>
 </span></code></pre></div>
 <h3 id="category-tokens">Category tokens<a class="headerlink" href="#category-tokens" title="Anchor link to this section">&para;</a></h3>
 <p>scMultiBench groups its 40 integration methods into four <strong>integration
 categories</strong>. Pass the clean token; the loader maps it to the (space-named)
-folder on disk for you.</p>
+folder on disk for you. A typo raises <code>ValueError</code> listing the valid ones.</p>
 <table>
 <thead>
 <tr>
@@ -1467,9 +1535,51 @@ folder on disk for you.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="published-vs-re-run-tables">Published vs re-run tables<a class="headerlink" href="#published-vs-re-run-tables" title="Anchor link to this section">&para;</a></h3>
+<p>Two sources ship in the package, and the <code>source</code> column of every frame says
+which one a row came from:</p>
+<table>
+<thead>
+<tr>
+<th><code>source=</code></th>
+<th>What it is</th>
+<th>Datasets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"published"</code> (default)</td>
+<td>the paper's scIB tables (<code>multibench/result/scib_metric/</code>)</td>
+<td>vertical 23, diagonal 18, cross 6; <strong>none for mosaic</strong> (<code>FileNotFoundError</code> pointing at <code>source="rerun"</code>)</td>
+</tr>
+<tr>
+<td><code>"rerun"</code></td>
+<td>the package's own sweeps - every wired method at default settings, the tables behind the category tutorials (<code>multibench/result/rerun/long_all_&lt;dataset&gt;.csv</code>, <code>source="rerun-0.2.1"</code>)</td>
+<td>vertical <code>D11</code>/<code>D11s</code>, diagonal <code>D28</code>/<code>D28s</code>, mosaic <code>D45</code>/<code>D45s</code>, cross <code>D52</code>/<code>D52s</code></td>
+</tr>
+<tr>
+<td><code>"both"</code></td>
+<td>the concatenation</td>
+<td>tell them apart by <code>source</code></td>
+</tr>
+</tbody>
+</table>
+<p>The two can differ for the same method and dataset: methods are stochastic,
+the published sweep ran on other hardware, and the published tables are
+<strong>partial</strong> (vertical ships 8 of the paper's methods; cross mostly one method
+per dataset) while the re-runs cover every wired method for their dataset.
+<strong>Cite the published numbers; use the re-runs to check reproducibility and to
+compare against your own run</strong>, and compare ranks rather than decimals
+(see <a href="../evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>).
+<code>mtb.results_coverage(category)</code> lists which (dataset, method, clustering,
+source) combinations exist; <code>mtb.available_datasets(category, source=...)</code>
+lists the loadable dataset ids.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">cov</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">results_coverage</span><span class="p">(</span><span class="s2">&quot;cross&quot;</span><span class="p">)</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">cov</span><span class="p">[</span><span class="n">cov</span><span class="o">.</span><span class="n">dataset</span> <span class="o">==</span> <span class="s2">&quot;D52&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>   <span class="c1"># published 1, rerun-0.2.1 8</span>
+</span></code></pre></div>
 <h3 id="clustering-variants">Clustering variants<a class="headerlink" href="#clustering-variants" title="Anchor link to this section">&para;</a></h3>
-<p>scIB clustering metrics depend on the upstream clustering. The benchmark
-stores three variants per (dataset, method); pick one with <code>clustering=</code>:</p>
+<p>scIB clustering metrics depend on the upstream clustering. The published tree
+stores up to three variants per (dataset, method); pick one with <code>clustering=</code>:</p>
 <table>
 <thead>
 <tr>
@@ -1497,139 +1607,189 @@ stores three variants per (dataset, method); pick one with <code>clustering=</co
 </tbody>
 </table>
 <div class="admonition note">
-<p class="admonition-title">Only the default variant ships with the bundled tables</p>
-<p>The vendored result tree carries the default <code>metric.csv</code> for every
-(dataset, method); the <code>metric_louvain.csv</code> / <code>metric_kmeans.csv</code> companions
-are not part of this distribution. <code>clustering="louvain"</code> (or <code>"kmeans"</code>)
-therefore raises <code>FileNotFoundError</code> unless you point <code>result_path=</code> at a
-tree that contains those files. Keep <code>clustering="default"</code> for the examples
-below.</p>
+<p class="admonition-title">Which variants ship, per category</p>
+<p><strong>diagonal</strong> ships all three variants for all 18 datasets. <strong>vertical</strong>
+ships <code>louvain</code> for a single (dataset, method) pair (D3 / Concerto) and no
+<code>kmeans</code>; <strong>cross</strong> ships neither. Asking for a variant that is not there
+raises <code>FileNotFoundError</code> naming the file it looked for; point
+<code>result_path=</code> at a tree that contains it, or keep <code>clustering="default"</code>.
+The re-run sweeps are <code>default</code> only. A result directory named
+<code>&lt;method&gt;_louvain</code> is reported under the method's canonical id with
+<code>clustering="louvain"</code> - no method id ever ends in <code>_louvain</code>.</p>
 </div>
 <div class="admonition note">
-<p class="admonition-title">Metric names are canonicalised</p>
+<p class="admonition-title">Metric names and method ids are canonicalised</p>
 <p>Both <code>metric=</code> and the returned <code>metric</code> column are passed through
-<code>catalog.canonical_metric</code>, so you can filter with the clean scIB names, 
+<code>catalog.canonical_metric</code>, so you can filter with the clean scIB names -
 <code>ARI</code>, <code>NMI</code>, <code>ASW</code>, <code>iASW</code>, <code>iF1</code>, <code>cLISI</code> (clustering) and
-<code>ASW_batch</code>, <code>GC</code>, <code>iLISI</code>, <code>kBET</code> (batch), regardless of how the
+<code>ASW_batch</code>, <code>GC</code>, <code>iLISI</code>, <code>kBET</code> (batch) - regardless of how the
 underlying CSV spelled them. Likewise <code>method=</code> accepts any alias of a
-method id.</p>
+method id (<code>"mofa+"</code> -&gt; <code>MOFA2</code>, <code>"Seurat(WNN)"</code> -&gt; <code>Seurat_WNN</code>). A
+filter that matches nothing returns an <strong>empty</strong> frame with a
+<code>UserWarning</code> listing what is present, so concatenating several calls
+never breaks on one typo.</p>
 </div>
 <div class="admonition note">
-<p class="admonition-title">These are the published tables, not a live run</p>
-<p>(The four category tutorials draw their figures from a different source:
-the package's own re-run sweeps shipped under <code>notebooks/results/</code>.)
-<code>load_results</code> reads the metric CSVs already present under
-<code>config.DEFAULT.result_path</code>. To score <em>your own</em> run instead, compute
-metrics with <a href="../../api/"><code>mtb.evaluate</code></a> and reshape the wide frame with
-<code>mtb.eval.to_long(value_df, method, dataset, category)</code>, it emits the same
-five-column long frame, so it drops straight into <code>plot.bubble</code>. (Note that
-cLISI/iLISI need a compiled LISI binary and kBET needs <code>rpy2</code>; where those
-are unavailable <code>evaluate</code> returns <code>NaN</code> for that metric rather than
-failing.) Point at a different tree with <code>result_path=</code>.</p>
+<p class="admonition-title">These are stored tables, not a live run</p>
+<p>To score <em>your own</em> run instead, compute metrics with
+<a href="../evaluate/"><code>mtb.evaluate</code></a> and reshape the wide frame with
+<code>mtb.to_long(value_df, method, dataset, category)</code> - it emits the same
+long frame, so it drops straight into <code>plot.bubble</code> next to a stored
+table. <code>result_path=</code> also accepts a single long CSV (one you saved with
+<code>to_csv</code>, or a <code>run_all</code> output's <code>long.csv</code>) and reads it back with
+<code>source="user"</code> unless the file carries its own.</p>
 </div>
 <hr />
 <h2 id="step-2-render-the-scib-bubble-table">Step 2, Render the scIB bubble table<a class="headerlink" href="#step-2-render-the-scib-bubble-table" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.plot.bubble</code> takes the long frame and draws the <strong>scIB-style bubble
-table</strong> — the grid of circles the paper uses to rank methods. It returns a
+table</strong> - the grid of circles the paper uses to rank methods. It returns a
 <code>matplotlib.Figure</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">df</span><span class="p">,</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>   <span class="c1"># column order, left to right</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                              <span class="c1"># None -&gt; every method in df</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                                <span class="c1"># None -&gt; sort by overall (best first)</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span>                       <span class="c1"># &quot;dataset&quot; | &quot;summary&quot;</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;Blues&quot;</span><span class="p">,</span>                              <span class="c1"># any matplotlib colormap name</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, D12&quot;</span><span class="p">,</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">save</span><span class="o">=</span><span class="s2">&quot;d12_bubble.pdf&quot;</span><span class="p">,</span>                     <span class="c1"># also returns the Figure</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">df</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>   <span class="c1"># column order, left to right (within each family)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                              <span class="c1"># None -&gt; every method in df; unknown names raise</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                                <span class="c1"># None -&gt; best first; a list pins those rows on top</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span>                       <span class="c1"># &quot;dataset&quot; | &quot;summary&quot;</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">cmap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                                 <span class="c1"># override the first family&#39;s colour ramp</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, D11&quot;</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">save</span><span class="o">=</span><span class="s2">&quot;d11_bubble.pdf&quot;</span><span class="p">,</span>                     <span class="c1"># also returns the Figure</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">show_language</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>                        <span class="c1"># Py / R chip per row, &#39;L&#39; badge for label-consuming methods</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">require_complete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>                    <span class="c1"># summary: keep only methods present in every dataset</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">overall</span><span class="o">=</span><span class="s2">&quot;rank&quot;</span><span class="p">,</span>                            <span class="c1"># how the across-dataset Overall is formed (see below)</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>How to read it:</p>
 <ul>
-<li><strong>Each row is a method, each column a metric.</strong> Methods are sorted by their
-  <strong>overall</strong> score, best at the top.</li>
-<li><strong>Circle fill ~ value</strong> — darker = better, on a per-metric min–max scale.</li>
-<li><strong>Circle radius ~ rank</strong> — bigger = higher-ranked for that metric (ties take
-  the maximum rank, matching the original R <code>ties.method="max"</code>).</li>
-<li><strong>An <code>"overall"</code> column</strong> is prepended on the left: the min–max of each
-  method's mean rank across the shown metrics, the single number the row
-  ordering is built on.</li>
+<li><strong>Each row is a method, each column a metric.</strong> Metrics are grouped into the
+  paper's task families - blues for DR &amp; clustering, greens for batch
+  correction - and each family is led by an <strong>Overall</strong> bar. Rows are ordered by
+  the mean of the family Overall scores, best at the top.</li>
+<li><strong>Circle fill ~ value</strong> - darker = higher, on a per-column min-max scale.</li>
+<li><strong>Circle radius ~ rank</strong> - bigger = better in that column
+  (<code>0.85 * sqrt(rank / n)</code>; ties take the maximum rank, matching the original
+  R <code>ties.method="max"</code>).</li>
+<li><strong>The family Overall bar</strong> - within one dataset, <code>minmax(mean over the
+  family's metrics of per-metric max-rank)</code>; length and fill both carry it.</li>
+<li><strong>Legend</strong> - a <em>Score</em> colour ramp per family always; the <em>Rank</em> circle-size
+  legend only under <code>aggregate="dataset"</code> (summary panels draw bars); a
+  dash marks a metric that was not computed for that method (<code>n/a</code>).</li>
+<li>A <strong><code>?</code> chip</strong> marks a method that is not in the registry (your own), an
+  <strong><code>L</code> badge</strong> a method that consumes cell-type labels - supervised, so its
+  scores are not comparable with the unsupervised rows.</li>
 </ul>
 <h3 id="individual-vs-summary-panels">Individual vs. summary panels<a class="headerlink" href="#individual-vs-summary-panels" title="Anchor link to this section">&para;</a></h3>
 <p>The <code>aggregate</code> argument decides what a row's numbers <em>mean</em>.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="aggregatedataset-individual" name="__tabbed_1" type="radio" /><input id="aggregatesummary-across-datasets" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="aggregatedataset-individual">aggregate=\"dataset\" (individual)</label><label for="aggregatesummary-across-datasets">aggregate=\"summary\" (across datasets)</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># one dataset -&gt; raw metric values are plotted directly</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D12&quot;</span><span class="p">)</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># one dataset -&gt; raw metric values are plotted directly</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">])</span>
 </span></code></pre></div>
 <p>The default. Fill encodes the actual metric value for that dataset. If the
 frame happens to hold several datasets, values are averaged per
-(method, metric) first.</p>
+(method, metric) first, a <code>UserWarning</code> says so, and the row labels carry
+the dataset ids.</p>
 </div>
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># all vertical datasets -&gt; rank within each, then average ranks</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>          <span class="c1"># no dataset= -&gt; all</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>                      <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;summary&quot;</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, summary&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># all vertical datasets -&gt; rank within each, then average ranks</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>          <span class="c1"># no dataset= -&gt; all</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>                      <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;summary&quot;</span><span class="p">,</span> <span class="n">require_complete</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, summary&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Ranks methods within each dataset per metric, then <strong>averages those ranks
-across datasets</strong> — the robust cross-dataset leaderboard, not a raw mean of
-incommensurable scores.</p>
+across datasets</strong> and draws them as bars - the cross-dataset leaderboard,
+not a raw mean of incommensurable scores. A method absent from a dataset
+scores rank 0 there (the paper's rule), which pulls it down; a
+<code>UserWarning</code> lists such methods, and <code>require_complete=True</code> restricts
+the panel to methods present in <strong>every</strong> dataset instead.</p>
 </div>
 </div>
 </div>
 <div class="admonition note">
-<p class="admonition-title">Pinning the row order</p>
-<p>Pass <code>order=[...]</code> (a list of method ids) to override the
-sorted-by-overall layout, handy when you want a fixed method order shared
-across several figures. Any methods not in <code>df</code> are silently dropped from
-the list, and <code>methods=[...]</code> subsets the frame before anything is ranked.</p>
+<p class="admonition-title">The across-dataset Overall: <code>overall=</code></p>
+<p>Two formulas exist and they can order methods differently on the same
+frame. <code>"rank"</code> (bubble's default, the paper's summary rule):
+<code>minmax(mean over metrics of max-rank(mean over datasets of within-dataset
+max-rank))</code> - absence counts as rank 0. <code>"mean_overall"</code> (bar's default):
+<code>mean over datasets of minmax(mean over metrics of within-dataset
+max-rank)</code> - each dataset gets its own min-max-scaled overall, averaged
+over the datasets the method was actually run on (absence skipped).
+Pass the same <code>overall=</code> to <code>plot.bubble</code> and <code>plot.bar</code> to get the same
+ordering; the formula in use is printed on the figure.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Pinning the row order</p>
+<p>Pass <code>order=[...]</code> (a list of method ids) to put those rows first, in that
+order - handy when you want a fixed method order shared across several
+figures; unlisted methods follow, best first. <code>order=</code> only reorders (an
+unknown name raises <code>ValueError</code>); <code>methods=[...]</code> subsets the frame
+before anything is ranked, and <code>metrics=</code> sets the column order within each
+family. Duplicate <code>(method[, dataset], metric)</code> rows raise rather than
+being silently averaged - name variants distinctly.</p>
+</div>
+<h3 id="audit-the-numbers-before-drawing">Audit the numbers before drawing<a class="headerlink" href="#audit-the-numbers-before-drawing" title="Anchor link to this section">&para;</a></h3>
+<p><code>mtb.plot.build_table(df, ...)</code> returns the <code>BubbleTable</code> behind the figure
+(<code>methods</code> in row order, <code>overall</code>, <code>matrix</code>, <code>raw</code>, <code>norm</code>, <code>ranks</code>,
+<code>blocks</code>), so ranks can be read programmatically - e.g. the position of your
+own method: <code>mtb.plot.build_table(allruns).methods.index("MyMethod") + 1</code>.
+<code>mtb.plot.render(table)</code> draws it.</p>
+<h3 id="summary-bars">Summary bars<a class="headerlink" href="#summary-bars" title="Anchor link to this section">&para;</a></h3>
+<p><code>mtb.plot.bar(df, group="clustering" | "batch", overall=..., top=N, save=...)</code>
+draws one bar per method with its across-dataset Overall - the benchmark's two
+summary panels - with one dot per dataset behind each bar (under
+<code>overall="mean_overall"</code>) so a uniformly good method is distinguishable from
+one that wins a single dataset.</p>
 <hr />
 <h2 id="a-concrete-example-a-vertical-panel">A concrete example, a vertical panel<a class="headerlink" href="#a-concrete-example-a-vertical-panel" title="Anchor link to this section">&para;</a></h2>
-<p>Reproduce one vertical-integration panel end to end:</p>
-<div class="language-python highlight"><span class="filename">reproduce_d12.py</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># 1. published scib clustering table for one dataset</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D12&quot;</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">)</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># 2. bubble table, four clustering metrics, saved to PDF</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">df</span><span class="p">,</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;Blues&quot;</span><span class="p">,</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, D12&quot;</span><span class="p">,</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="n">save</span><span class="o">=</span><span class="s2">&quot;d12_vertical.pdf&quot;</span><span class="p">,</span>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="p">)</span>
+<p>Reproduce one vertical-integration panel end to end, then add your own method:</p>
+<div class="language-python highlight"><span class="filename">reproduce_d11.py</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># 1. stored table for one dataset - the re-run sweep covers every wired method</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">bench</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;rerun&quot;</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># 2. your own run, scored with the same metrics (see Evaluate a run)</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">emb</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D11&quot;</span><span class="p">)[</span><span class="s2">&quot;cty&quot;</span><span class="p">]),</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>                   <span class="n">method</span><span class="o">=</span><span class="s2">&quot;MyMethod&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="c1"># 3. bubble table, four clustering metrics, saved to PDF</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">bench</span><span class="p">,</span> <span class="n">mine</span><span class="p">]),</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, D11 + MyMethod&quot;</span><span class="p">,</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">save</span><span class="o">=</span><span class="s2">&quot;d11_vertical.pdf&quot;</span><span class="p">,</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="p">)</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">bench</span><span class="p">,</span> <span class="n">mine</span><span class="p">]))</span><span class="o">.</span><span class="n">methods</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;MyMethod&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>   <span class="c1"># its rank</span>
 </span></code></pre></div>
 <p>The returned <code>fig</code> is a plain <code>matplotlib.Figure</code>, so you can keep tweaking it
 (<code>fig.axes[0]...</code>), embed it in a multi-panel layout, or re-save at another DPI.</p>
 <h3 id="cli-equivalent">CLI equivalent<a class="headerlink" href="#cli-equivalent" title="Anchor link to this section">&para;</a></h3>
 <p>The same figure without writing any Python:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>--category<span class="w"> </span>vertical<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>--dataset<span class="w"> </span>D12<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW,cLISI<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span>--out<span class="w"> </span>d12_vertical.pdf
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D11<span class="w"> </span>--source<span class="w"> </span>rerun<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW,cLISI<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>--out<span class="w"> </span>d11_vertical.pdf
 </span></code></pre></div>
-<p><code>multibench plot</code> accepts <code>--aggregate dataset|summary</code> and writes whatever
-format <code>--out</code>'s extension implies (<code>.pdf</code>, <code>.png</code>, …). It calls
-<code>load_results</code> and <code>plot.bubble</code> under the hood, so the result is identical to
-the script above.</p>
+<p><code>multibench plot</code> accepts <code>--aggregate dataset|summary</code>, <code>--overall
+rank|mean_overall</code>, <code>--require-complete</code>, <code>--methods</code>, <code>--title</code>, <code>--input
+long.csv</code> (your own long table, or a <code>run_all</code> output directory, instead of
+<code>--category</code>), <code>bar</code> with <code>--group clustering|batch</code>, and writes whatever
+format <code>--out</code>'s extension implies (<code>.pdf</code>, <code>.png</code>, ...). It calls
+<code>load_results</code> and <code>plot.bubble</code> / <code>plot.bar</code> under the hood, so the result is
+identical to the script above.</p>
 <div class="admonition note">
 <p class="admonition-title">Visual fidelity</p>
 <p>The bubble table is a <strong>matplotlib reproduction</strong> of scIB's original R
-tables (<code>helpers.R</code> / <code>scIB_knit_table.R</code>). The numeric encoding, 
-min–max fills, max-rank radii, the overall column, is ported verbatim, so
+tables (<code>helpers.R</code> / <code>scIB_knit_table.R</code>). The numeric encoding -
+min-max fills, max-rank radii, the overall bars - is ported verbatim, so
 rankings and shadings match; the rendering is <strong>visually faithful within
 tolerance</strong> rather than a pixel-exact clone of the R figure.</p>
 </div>
 <hr />
 <p>Next: see the <a href="../../api/">API reference</a> for the full <code>load_results</code>,
-<code>plot.bubble</code>, <code>evaluate</code>, and <code>eval.to_long</code> signatures.</p>
+<code>plot.bubble</code>, <code>evaluate</code>, and <code>to_long</code> signatures.</p>
 
 
 

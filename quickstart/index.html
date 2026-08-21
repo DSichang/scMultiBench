@@ -578,7 +578,7 @@
   <a href="#step-1-discover-methods-for-your-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1 — Discover methods for your data
+        Step 1 - Discover methods for your data
       
     </span>
   </a>
@@ -586,10 +586,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-plot-the-published-results" class="md-nav__link">
+  <a href="#step-2-plot-the-stored-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2 — Plot the published results
+        Step 2 - Plot the stored results
       
     </span>
   </a>
@@ -597,10 +597,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-3-run-a-method-on-your-data" class="md-nav__link">
+  <a href="#step-3-run-a-method" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3 — Run a method on your data
+        Step 3 - Run a method
       
     </span>
   </a>
@@ -611,7 +611,7 @@
   <a href="#step-4-evaluate-your-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4 — Evaluate your run
+        Step 4 - Evaluate your run
       
     </span>
   </a>
@@ -622,7 +622,7 @@
   <a href="#step-5-plot-your-own-result" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 5 — Plot your own result
+        Step 5 - Plot your own result
       
     </span>
   </a>
@@ -1194,7 +1194,7 @@
   <a href="#step-1-discover-methods-for-your-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1 — Discover methods for your data
+        Step 1 - Discover methods for your data
       
     </span>
   </a>
@@ -1202,10 +1202,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-plot-the-published-results" class="md-nav__link">
+  <a href="#step-2-plot-the-stored-results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2 — Plot the published results
+        Step 2 - Plot the stored results
       
     </span>
   </a>
@@ -1213,10 +1213,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-3-run-a-method-on-your-data" class="md-nav__link">
+  <a href="#step-3-run-a-method" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3 — Run a method on your data
+        Step 3 - Run a method
       
     </span>
   </a>
@@ -1227,7 +1227,7 @@
   <a href="#step-4-evaluate-your-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4 — Evaluate your run
+        Step 4 - Evaluate your run
       
     </span>
   </a>
@@ -1238,7 +1238,7 @@
   <a href="#step-5-plot-your-own-result" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 5 — Plot your own result
+        Step 5 - Plot your own result
       
     </span>
   </a>
@@ -1336,90 +1336,97 @@
 
 
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Anchor link to this section">&para;</a></h1>
-<p><a href="https://colab.research.google.com/github/PYangLab/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
+<p><a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
 <p>scMultiBench wraps the 40-method single-cell multimodal integration benchmark
 behind one clean Python surface, imported as <code>multibench</code> and
 aliased <code>mtb</code> by convention. This page walks the full loop in five steps:
-<strong>discover</strong> the methods that fit your data, <strong>plot</strong> the published benchmark,
-<strong>run</strong> a method on your own data, <strong>evaluate</strong> that run, and <strong>plot</strong> your own
-result alongside the rest.</p>
+<strong>discover</strong> the methods that fit your data, <strong>plot</strong> the stored benchmark,
+<strong>run</strong> a method, <strong>evaluate</strong> that run, and <strong>plot</strong> your own result
+alongside the rest. Everything but step 3 runs on a laptop with
+<code>pip install multibench-sc</code>; step 3 needs the method's conda environment.</p>
 <div class="admonition tip">
 <p class="admonition-title">TL;DR</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># 1. what can integrate paired RNA + ATAC, unpaired (diagonal)?</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># 1. what can integrate unpaired RNA + ATAC (diagonal)?</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="s2">&quot;atac&quot;</span><span class="p">])</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># 2. plot the published vertical benchmark for dataset D12</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D12&quot;</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># 2. plot the published diagonal benchmark for dataset D28</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">],</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;fig.pdf&quot;</span><span class="p">)</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 3. run a method on your own data (needs the method&#39;s conda env)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>              <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                      <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">},</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>              <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/&quot;</span><span class="p">,</span> <span class="n">convert</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 3. run a method on the fetchable D28 (needs the method&#39;s conda env)</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>              <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">),</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>              <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/out/scalex_d28&quot;</span><span class="p">)</span>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># 4. score it with scIB metrics</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                       <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;cty.csv&quot;</span><span class="p">)</span>   <span class="c1"># clustering derived automatically</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="c1"># 5. reshape and plot it next to the benchmark</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">long</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">eval</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;my_data&quot;</span><span class="p">,</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                        <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">long</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">])</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># 4. score it with scIB metrics (labels in the embedding&#39;s cell order)</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                       <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="n">labels</span><span class="p">[</span><span class="s2">&quot;rna_cty&quot;</span><span class="p">],</span> <span class="n">labels</span><span class="p">[</span><span class="s2">&quot;atac_cty&quot;</span><span class="p">]])</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="c1"># 5. reshape and plot it next to the benchmark</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX_rerun&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">df</span><span class="p">,</span> <span class="n">mine</span><span class="p">]),</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">])</span>
 </span></code></pre></div>
 </div>
 <hr />
-<h2 id="step-1-discover-methods-for-your-data">Step 1 — Discover methods for your data<a class="headerlink" href="#step-1-discover-methods-for-your-data" title="Anchor link to this section">&para;</a></h2>
-<p>The benchmark spans four integration <strong>categories</strong> — <code>vertical</code> (paired, same
+<h2 id="step-1-discover-methods-for-your-data">Step 1 - Discover methods for your data<a class="headerlink" href="#step-1-discover-methods-for-your-data" title="Anchor link to this section">&para;</a></h2>
+<p>The benchmark spans four integration <strong>categories</strong> - <code>vertical</code> (paired, same
 cells), <code>diagonal</code> (unpaired, bridged by features), <code>mosaic</code> (overlapping
 modalities with a bridge), and <code>cross</code> (fully-matched datasets). Start by
-filtering the catalog down to the methods that consume your modalities.</p>
+filtering the registry down to the methods that consume your modalities.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="s2">&quot;atac&quot;</span><span class="p">])</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># -&gt; [&#39;SCALEX&#39;, &#39;sciCAN&#39;, &#39;Portal&#39;, &#39;uniPort&#39;, &#39;MultiMAP&#39;, ...]</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># -&gt; [&#39;SCALEX&#39;, &#39;Seurat_v5&#39;, &#39;VIPCCA&#39;, &#39;Portal&#39;, &#39;uniPort&#39;, &#39;sciCAN&#39;, &#39;scJoint&#39;, &#39;GLUE&#39;, ...]</span>
 </span></code></pre></div>
 <p><code>find_methods</code> accepts any combination of <code>category</code>, <code>task</code>, <code>needs_labels</code>,
-<code>atac</code>, and <code>modalities</code> — every filter is ANDed, so you only get methods that
-satisfy all of them. Once you have a candidate, inspect its full spec:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># {&#39;id&#39;: &#39;SCALEX&#39;, &#39;language&#39;: &#39;python&#39;, &#39;categories&#39;: [&#39;diagonal&#39;],</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1">#  &#39;tasks&#39;: [&#39;clustering&#39;, &#39;batch&#39;], &#39;env&#39;: &#39;scmb_torch_v2&#39;,</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1">#  &#39;atac&#39;: &#39;gene_activity&#39;, &#39;needs_labels&#39;: False,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1">#  &#39;status&#39;: &#39;verified&#39;, &#39;variants&#39;: [&#39;tools_scripts/SCALEX/main_SCALEX.py&#39;]}</span>
+<code>atac</code>, <code>modalities</code>, <code>runnable</code> and <code>tunable</code> - every filter is ANDed, and a
+typo in any token raises <code>ValueError</code> naming the valid vocabulary. Once you
+have a candidate, inspect its spec and what it has been observed to cost:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">&quot;env&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;atac&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;needs_labels&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;reference&quot;</span><span class="p">][</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># (&#39;scmb_torch&#39;, &#39;gene_activity&#39;, False, &#39;10.1038/s41467-022-33758-z&#39;)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">runtime_hint</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># {&#39;tier&#39;: &#39;slow&#39;, &#39;worst_sec&#39;: 2233, &#39;observed&#39;: [{&#39;dataset&#39;: &#39;D28&#39;, &#39;cells&#39;: 11014, &#39;sec&#39;: 2233}]}</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="s2">&quot;atac&quot;</span><span class="p">])</span>   <span class="c1"># ranked from the stored tables, with coverage</span>
 </span></code></pre></div>
 <hr />
-<h2 id="step-2-plot-the-published-results">Step 2 — Plot the published results<a class="headerlink" href="#step-2-plot-the-published-results" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-2-plot-the-stored-results">Step 2 - Plot the stored results<a class="headerlink" href="#step-2-plot-the-stored-results" title="Anchor link to this section">&para;</a></h2>
 <p>Before running anything, you can reproduce the paper's scIB-style bubble tables
 straight from the shipped metric tables. <code>load_results</code> returns a tidy long
-frame (<code>metric, value, method, dataset, category</code>); <code>plot.bubble</code> turns it into
-a figure where each circle's radius tracks the method's rank and its fill tracks
-the metric value, with an "overall" summary column.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D12&quot;</span><span class="p">)</span>
+frame (<code>metric, value, method, dataset, category, clustering, source</code>);
+<code>plot.bubble</code> turns it into a figure where each circle's radius tracks the
+method's rank and its fill tracks the metric value, with an <em>Overall</em> bar per
+metric family.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>          <span class="c1"># the paper&#39;s table, 14 methods</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">],</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;fig.pdf&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p><code>load_results</code> also takes <code>task</code>, <code>method</code>, <code>metric</code>, and <code>clustering</code>
-(<code>"default"</code>, <code>"louvain"</code>, or <code>"kmeans"</code>). To rank methods <em>across</em> several
-datasets instead of within one, pass <code>aggregate="summary"</code> to <code>plot.bubble</code>,
-which averages each method's per-dataset ranks.</p>
+<p><code>load_results</code> also takes <code>task</code>, <code>method</code>, <code>metric</code>, <code>clustering</code>
+(<code>"default"</code>, <code>"louvain"</code>, or <code>"kmeans"</code>) and <code>source</code> - <code>"published"</code> (the
+paper's numbers, default) or <code>"rerun"</code> (the package's own sweep, the tables
+behind the category tutorials). To rank methods <em>across</em> several datasets
+instead of within one, pass <code>aggregate="summary"</code> to <code>plot.bubble</code>, which
+averages each method's per-dataset ranks.</p>
 <hr />
-<h2 id="step-3-run-a-method-on-your-data">Step 3 — Run a method on your data<a class="headerlink" href="#step-3-run-a-method-on-your-data" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-3-run-a-method">Step 3 - Run a method<a class="headerlink" href="#step-3-run-a-method" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.run</code> builds the method's real command line, executes it in the method's own
 conda environment, and loads the typed output back into Python. <code>inputs</code> is a
-dict mapping each modality role to a file path; non-canonical inputs are
-auto-converted to the canonical scMultiBench <code>.h5</code> first (pass <code>convert=False</code>
-to skip this). <strong>The method scripts themselves are never modified.</strong></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">},</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/&quot;</span><span class="p">,</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">convert</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+dict mapping each modality role to a file path; <code>inputs_for</code> resolves them for
+a benchmark dataset, and non-canonical inputs are auto-converted to the
+canonical scMultiBench <code>.h5</code> first (pass <code>convert=False</code> to skip this). <strong>The
+method scripts themselves are never modified.</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>                                      <span class="c1"># 137 MB; no-op when present</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">),</span>    <span class="c1"># {&#39;rna&#39;: .../D28/rna.h5, &#39;atac_gas&#39;: .../D28/atac_gas.h5}</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/out/scalex_d28&quot;</span><span class="p">,</span>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>      <span class="c1"># the loaded primary output (e.g. the joint embedding ndarray)</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>      <span class="c1"># the joint embedding, (11014, 10): 6,408 RNA + 4,606 ATAC cells x latent dims</span>
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>         <span class="c1"># the exact argv that was executed</span>
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">res</span><span class="o">.</span><span class="n">extra</span>       <span class="c1"># dict of any additional outputs</span>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">res</span><span class="o">.</span><span class="n">stdout</span>      <span class="c1"># captured stdout / stderr</span>
@@ -1430,62 +1437,85 @@ to skip this). <strong>The method scripts themselves are never modified.</strong
 <p class="admonition-title">Each method runs in its own conda env</p>
 <p><code>run</code> orchestrates per-tool environments via the default
 <code>cmd_template="conda run -n {env} {cmd}"</code>, so the target env (for SCALEX,
-<code>scmb_torch_v2</code>) must already exist on your machine. The env name comes from
-<code>method_info(...)["env"]</code>. To run inside the current interpreter instead,
-pass <code>cmd_template="{cmd}"</code>. Point <code>repo_path=</code> at your checkout of the
-scMultiBench method scripts. The relative <code>data/D35/...</code> paths above resolve
-from the repository root once the benchmark data has been downloaded
-into <code>data/</code> (see <a href="../installation/#get-the-data">Get the data</a>); use
-absolute paths from any other working directory.</p>
+<code>scmb_torch</code>, from <code>method_info(...)["env"]</code>) must exist: <code>multibench env
+install --methods SCALEX --packed --run</code> builds it, and <code>run</code> raises
+<code>EnvironmentError</code> with that command when it is missing. To run inside the
+current interpreter instead, pass <code>cmd_template="{cmd}"</code>. Use an absolute
+<code>out_dir</code> - the script runs with it as its working directory.</p>
 </div>
+<p><strong>Your own data.</strong> <code>mtb.run_all(dataset, category, out_dir=...)</code> runs every
+method that fits a dataset <em>folder</em> and scores the outputs - the category
+tutorials are built on it. One call writes the folder from an AnnData:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">&quot;data/MYCITE&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">&quot;obsm:protein&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;obs:celltype&quot;</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">&quot;MYCITE&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>     <span class="c1"># files_ok / env_ok per method, with reasons</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">&quot;MYCITE&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/&quot;</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="p">;</span> <span class="n">res</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</span></code></pre></div>
 <hr />
-<h2 id="step-4-evaluate-your-run">Step 4 — Evaluate your run<a class="headerlink" href="#step-4-evaluate-your-run" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-4-evaluate-your-run">Step 4 - Evaluate your run<a class="headerlink" href="#step-4-evaluate-your-run" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.evaluate</code> computes scIB metrics on a run output and returns a
 <code>metric.csv</code>-shaped frame (index = metric name, single <code>"Value"</code> column).
-Clustering metrics need both the ground-truth cell-type <code>labels</code> and a
-<code>clustering</code> assignment; for <code>task="batch"</code> or <code>task="all"</code> you also pass
-<code>batch</code> labels.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;cty.csv&quot;</span><span class="p">,</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="c1"># clustering= optional - derived from the embedding when omitted</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># index: ARI, NMI, ASW, iASW, iF1, cLISI ...   column: Value</span>
+Clustering metrics need the ground-truth cell-type <code>labels</code>; <code>clustering</code> is
+optional (omitted, scIB's optimal-resolution Leiden clustering is derived from
+the embedding). For <code>task="batch"</code> or <code>task="all"</code> you also pass <code>batch</code>
+labels - or a list of label files, one per batch.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>                   <span class="c1"># {&#39;atac_cty&#39;: ..., &#39;rna_cty&#39;: ...} - one file per modality</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="n">labels</span><span class="p">[</span><span class="s2">&quot;rna_cty&quot;</span><span class="p">],</span> <span class="n">labels</span><span class="p">[</span><span class="s2">&quot;atac_cty&quot;</span><span class="p">]],</span>   <span class="c1"># SCALEX stacks RNA cells, then ATAC cells</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># index: ARI, NMI, ASW, iASW, iF1, cLISI   column: Value</span>
 </span></code></pre></div>
+<p><code>labels</code> can equally be a <code>pandas.Series</code>, an array, or an <code>obs</code> column name
+when <code>output</code> is an AnnData; <code>only={"ARI", "NMI"}</code> restricts the computation.</p>
 <hr />
-<h2 id="step-5-plot-your-own-result">Step 5 — Plot your own result<a class="headerlink" href="#step-5-plot-your-own-result" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-5-plot-your-own-result">Step 5 - Plot your own result<a class="headerlink" href="#step-5-plot-your-own-result" title="Anchor link to this section">&para;</a></h2>
 <p>To compare your run against the benchmark, reshape <code>evaluate</code>'s wide frame into
 the same long format <code>load_results</code> produces, then hand it to <code>plot.bubble</code>,
-optionally concatenated with the published frame from Step 2.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">eval</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;my_data&quot;</span><span class="p">,</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>                        <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">combined</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">df</span><span class="p">,</span> <span class="n">mine</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">combined</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">],</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>                <span class="n">title</span><span class="o">=</span><span class="s2">&quot;SCALEX on my data vs. D12&quot;</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;compare.pdf&quot;</span><span class="p">)</span>
+concatenated with the stored frame from Step 2. Give your run a name of its
+own - the stored table already holds a <code>SCALEX</code> row, and duplicate
+(method, metric) rows raise rather than being silently averaged.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX_rerun&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">combined</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">df</span><span class="p">,</span> <span class="n">mine</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">combined</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">],</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>                <span class="n">title</span><span class="o">=</span><span class="s2">&quot;D28: published table + our SCALEX re-run&quot;</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;compare.pdf&quot;</span><span class="p">)</span>
 </span></code></pre></div>
+<p>Both frames are the same dataset, so the figure is a like-for-like comparison;
+a re-run does not reproduce the stored decimals exactly (methods are
+stochastic), so read ranks rather than digits - see
+<a href="../tutorials/evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>.
+When you concatenate <em>your</em> dataset with a benchmark dataset instead, the
+comparison is cross-dataset: <code>aggregate="dataset"</code> then averages each method's
+values across the datasets it appears in (with a warning and dataset-tagged
+row labels), and <code>aggregate="summary"</code> ranks within each dataset first.</p>
 <p>The same loop is available from the command line:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D12<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW<span class="w"> </span>--out<span class="w"> </span>fig.pdf
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span>--dataset<span class="w"> </span>D28<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW<span class="w"> </span>--out<span class="w"> </span>fig.pdf
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>multibench<span class="w"> </span>evaluate<span class="w"> </span>--output<span class="w"> </span>out/scalex_d28/embedding.h5<span class="w"> </span>--labels<span class="w"> </span>data/D28/rna_cty.csv<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>--method<span class="w"> </span>SCALEX_rerun<span class="w"> </span>--dataset<span class="w"> </span>D28<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span>--out<span class="w"> </span>mine.csv
 </span></code></pre></div>
-<p><code>multibench</code> also exposes <code>list</code>, <code>find</code>, <code>run</code>, <code>evaluate</code>, and <code>env</code> (doctor /
-install) subcommands that
-mirror the Python API.</p>
+<p><code>multibench</code> also exposes <code>list</code>, <code>find</code>, <code>scan</code>, <code>layout</code>, <code>convert</code>, <code>run</code>,
+<code>run-all</code>, <code>cite</code> and <code>env</code> (doctor / plan / install) subcommands that mirror
+the Python API - <code>multibench &lt;command&gt; --help</code> documents every flag.</p>
 <hr />
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Anchor link to this section">&para;</a></h2>
 <ul>
-<li><strong><a href="../tutorials/end_to_end/">End-to-end walkthrough</a></strong> — one executed
+<li><strong><a href="../tutorials/end_to_end/">End-to-end walkthrough</a></strong> - one executed
   notebook covering discovery, running a method, scIB evaluation, and
   reproducing the published bubble tables.</li>
-<li><strong><a href="../tutorials/run/">Run a method</a></strong> — drive any of the 40+ methods through
+<li><strong><a href="../tutorials/vertical/">Vertical</a> / <a href="../tutorials/diagonal/">diagonal</a> /
+  <a href="../tutorials/mosaic/">mosaic</a> / <a href="../tutorials/cross/">cross</a></strong> - one
+  executed notebook per category: <code>run_all</code> on the reference dataset, the same
+  calls on your own data, the stored sweeps.</li>
+<li><strong><a href="../tutorials/run/">Run a method</a></strong> - drive any of the 40 methods through
   <code>mtb.run</code>, each in its own conda environment.</li>
-<li><strong><a href="../installation/">Installation</a></strong> — set up scMultiBench and the per-method
+<li><strong><a href="../installation/">Installation</a></strong> - set up scMultiBench and the per-method
   conda environments.</li>
-<li><strong><a href="../api/">API Reference</a></strong> — every function, signature, and parameter.</li>
+<li><strong><a href="../api/">API Reference</a></strong> - every function, signature, and parameter.</li>
 </ul>
 
 

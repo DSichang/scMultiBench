@@ -670,13 +670,69 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#required-inputs" class="md-nav__link">
+  <a href="#inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Required inputs
+        Inputs
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#restricting-what-is-computed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restricting what is computed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#are-my-numbers-comparable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Are my numbers comparable?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Are my numbers comparable?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batch-vector-on-multi-batch-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch vector on multi-batch layouts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-runs-are-stochastic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-runs are stochastic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -706,7 +762,7 @@
   <a href="#closing-the-loop-tidy-bubble-plot" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Closing the loop: tidy → bubble plot
+        Closing the loop: tidy -&gt; bubble plot
       
     </span>
   </a>
@@ -1191,13 +1247,69 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#required-inputs" class="md-nav__link">
+  <a href="#inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Required inputs
+        Inputs
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#restricting-what-is-computed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restricting what is computed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#are-my-numbers-comparable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Are my numbers comparable?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Are my numbers comparable?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#batch-vector-on-multi-batch-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch vector on multi-batch layouts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-runs-are-stochastic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-runs are stochastic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1227,7 +1339,7 @@
   <a href="#closing-the-loop-tidy-bubble-plot" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Closing the loop: tidy → bubble plot
+        Closing the loop: tidy -&gt; bubble plot
       
     </span>
   </a>
@@ -1307,31 +1419,29 @@
 
 
 <h1 id="evaluate-a-run">Evaluate a run<a class="headerlink" href="#evaluate-a-run" title="Anchor link to this section">&para;</a></h1>
-<p>You have a run output, a joint embedding, a set of cell-type labels, a
-clustering. Now you want a number. <code>mtb.evaluate</code> takes that output and
-returns the scIB metrics that the scMultiBench paper reports, in a
-<code>metric.csv</code>-shaped frame you can read, save, or feed straight into a bubble
-plot.</p>
+<p>You have a run output - a joint embedding - and a set of cell-type labels. Now
+you want a number. <code>mtb.evaluate</code> takes that output and returns the scIB
+metrics that the scMultiBench paper reports, in a <code>metric.csv</code>-shaped frame
+you can read, save, or feed straight into a bubble plot.</p>
 <div class="admonition tip">
 <p class="admonition-title">TL;DR</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>          <span class="c1"># embedding (ndarray or .h5 path)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>      <span class="c1"># ARI, NMI, ASW, iASW, iF1, cLISI</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;cty.csv&quot;</span><span class="p">,</span>       <span class="c1"># cell-type labels (required)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="c1"># clustering= is optional - omitted, an optimal-resolution Leiden</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="c1"># clustering is derived from the embedding automatically</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="nb">print</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>              <span class="c1"># index = metric, column &quot;Value&quot;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>                        <span class="c1"># embedding: ndarray / DataFrame / AnnData / .h5 / .npy / .csv</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>                    <span class="c1"># ARI, NMI, ASW, iASW, iF1, cLISI</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D11&quot;</span><span class="p">)[</span><span class="s2">&quot;cty&quot;</span><span class="p">],</span>  <span class="c1"># one label per cell, in the embedding&#39;s row order</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="c1"># clustering= is optional - omitted, scIB&#39;s optimal-resolution Leiden</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="c1"># clustering is derived from the embedding</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>                            <span class="c1"># index = metric, column &quot;Value&quot;</span>
 </span></code></pre></div>
 </div>
 <hr />
 <h2 id="what-evaluate-does">What <code>evaluate</code> does<a class="headerlink" href="#what-evaluate-does" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>             <span class="n">clustering</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metric_set</span><span class="o">=</span><span class="s2">&quot;scib&quot;</span><span class="p">,</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>             <span class="n">slow_metrics</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>             <span class="n">slow_metrics</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">only</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">&quot;X_emb&quot;</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
 </span></code></pre></div>
 <p>Under the hood it assembles a small <code>AnnData</code> carrying your embedding in
 <code>obsm["X_emb"]</code>, with <code>celltype</code>, <code>cluster</code>, and <code>batch</code> as observation
@@ -1361,66 +1471,126 @@ shape as the <code>metric.csv</code> files the benchmark ships.</p>
 </tr>
 </tbody>
 </table>
-<p>The <code>category</code> argument (<code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>, <code>cross</code>) is accepted
-for API stability and future per-category metric dispatch, but is not yet used
-in v1, pass the category your run belongs to and it will keep working when
-dispatch lands.</p>
+<p><code>category</code> (<code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>, <code>cross</code>) is optional: it is
+validated when given (a typo raises <code>ValueError</code> listing the four), but the
+metrics do not depend on it in this version.</p>
 <hr />
-<h2 id="required-inputs">Required inputs<a class="headerlink" href="#required-inputs" title="Anchor link to this section">&para;</a></h2>
+<h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Anchor link to this section">&para;</a></h2>
 <p><code>evaluate</code> is honest about what each metric group needs, and raises early if
 something is missing.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="clustering-metrics" name="__tabbed_1" type="radio" /><input id="batch-metrics" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="clustering-metrics">Clustering metrics</label><label for="batch-metrics">Batch metrics</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p><code>labels</code> is <strong>required</strong>; <code>clustering</code> is optional — clustering quality is
-measured by comparing the predicted clusters against ground-truth
-cell types.</p>
+<p><code>labels</code> is <strong>required</strong>; <code>clustering</code> is optional - clustering quality is
+measured by comparing predicted clusters against the ground-truth cell
+types, and the clusters are derived for you when you do not pass any.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;cty.csv&quot;</span><span class="p">,</span>        <span class="c1"># single-column CSV, one header line, one label per cell</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="c1"># clustering=&quot;cluster.h5&quot; # optional: pass a precomputed clustering</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                             <span class="c1"># (h5 dataset /obs/cluster_leiden) to skip</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>                             <span class="c1"># the internal Leiden derivation</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;data/D11/cty.csv&quot;</span><span class="p">,</span>   <span class="c1"># single-column CSV, one header line, one label per cell</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="c1"># clustering=&quot;cluster.h5&quot;    # optional: a precomputed clustering (h5 dataset</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                                 <span class="c1"># /obs/cluster_leiden, or any label-like input)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                                 <span class="c1"># skips the internal Leiden sweep</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<p>Batch correction is scored against a <code>batch</code> label vector, so <code>task="batch"</code>
-(and <code>task="all"</code>) additionally require <code>batch</code>.</p>
+<p>Batch correction is scored against a <code>batch</code> vector, so <code>task="batch"</code>
+(and <code>task="all"</code>) additionally require <code>batch</code> - unless <code>labels</code> is a
+list of two or more files, in which case each cell's <strong>file of origin</strong>
+(1, 2, ...) is the batch, the rule <code>run_all</code> applies (see below).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;cty.csv&quot;</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;cluster.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">batch</span><span class="o">=</span><span class="s2">&quot;batch.csv&quot;</span><span class="p">,</span>       <span class="c1"># required for batch / all</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D52&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>   <span class="c1"># [cty1.csv, cty2.csv, cty3.csv], in order</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="c1"># batch=my_batch_vector                        # overrides the file-of-origin rule</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
 </span></code></pre></div>
 </div>
 </div>
 </div>
-<p>Every input can be passed either as a <strong>path</strong> or as an in-memory
-<strong><code>numpy.ndarray</code></strong>. Paths are read with the benchmark's own conventions:</p>
+<p>Every input can be a <strong>path</strong> or an in-memory object:</p>
 <ul>
-<li><code>output</code> / <code>clustering</code> → an HDF5 file (embedding from dataset <code>data</code>,
-  oriented as cells × dims; clustering from <code>/obs/cluster_leiden</code>).</li>
-<li><code>labels</code> / <code>batch</code> → a single-column CSV with one header line (typically <code>x</code>), one value per cell
-  factorised to integer codes.</li>
+<li><code>output</code> - a <code>numpy.ndarray</code> (cells x dims; a dims x cells array whose other
+  axis matches the label count is transposed for you, with a warning), a
+  <code>pandas.DataFrame</code>, an <code>AnnData</code> (<code>.obsm[obsm]</code>, default <code>"X_emb"</code>), a scipy
+  sparse matrix, or a path: <code>.h5</code> (dataset <code>data</code>, the benchmark's
+  <code>embedding.h5</code>), <code>.h5ad</code>, <code>.npy</code>, <code>.csv</code> / <code>.tsv</code>.</li>
+<li><code>labels</code> / <code>batch</code> / <code>clustering</code> - a CSV path (header row; column <code>x</code>, the
+  only column, or the last of two behind a barcode index - pass <code>column=</code> when
+  the file is ambiguous), a <strong>list</strong> of CSV paths concatenated in that order,
+  a one-entry dict as returned by <code>mtb.labels_for</code>, a 1-D array / <code>Series</code> /
+  <code>Categorical</code> / list, a single-column DataFrame, or - when <code>output</code> is an
+  AnnData - the name of an <code>obs</code> column. Values are compared as strings, so
+  integer codes and names score identically.</li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Missing labels raises</p>
-<p>Calling <code>evaluate</code> with <code>task="clustering"</code> and no <code>labels</code> raises
-<code>ValueError</code> (omitting <code>clustering</code> is fine - it is derived from the
-embedding). Calling <code>task="batch"</code> or <code>task="all"</code> without <code>batch</code>
-raises <code>ValueError</code> too. These are programmer errors, not missing
-<em>optional</em> metrics, see graceful degradation below for the latter.</p>
+<p><code>task="clustering"</code> without <code>labels</code> raises <code>ValueError</code>; <code>task="batch"</code> /
+<code>"all"</code> without <code>batch</code> (and without a multi-file <code>labels</code> list) raises
+<code>ValueError</code> too, and a length mismatch says exactly what it saw
+(<code>input length mismatch: emb has 2863 cells, celltype has 2864</code>). These are
+programmer errors, not missing <em>optional</em> metrics - see graceful
+degradation below for the latter.</p>
 </div>
+<h3 id="restricting-what-is-computed">Restricting what is computed<a class="headerlink" href="#restricting-what-is-computed" title="Anchor link to this section">&para;</a></h3>
+<p><code>only=</code> names the metrics you want (a collection, not a bare string - that
+raises <code>TypeError</code>; an unknown name raises <code>ValueError</code> listing the
+vocabulary, <code>mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS</code>).
+Everything else is skipped, including the Leiden sweep when no requested
+metric needs it:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">only</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">})</span>        <span class="c1"># no Leiden sweep, ~seconds</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">batch</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>             <span class="n">only</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW_batch&quot;</span><span class="p">,</span> <span class="s2">&quot;GC&quot;</span><span class="p">])</span>
+</span></code></pre></div>
+<p><code>slow_metrics=True</code> adds kBET (shells out to R; hours on large datasets).</p>
+<hr />
+<h2 id="are-my-numbers-comparable">Are my numbers comparable?<a class="headerlink" href="#are-my-numbers-comparable" title="Anchor link to this section">&para;</a></h2>
+<p>The metrics in the shipped tables and the metrics <code>evaluate</code> returns are
+computed the same way, so yes - provided you feed the same things:</p>
+<ul>
+<li><strong>labels</strong> - the dataset's <code>cty</code> CSV(s), one label per cell in the
+  embedding's cell order. <code>mtb.labels_for(ds)</code> returns them
+  (<code>{"cty": ...}</code> for single-label datasets, <code>{"rna_cty", "atac_cty"}</code> for
+  diagonal, <code>{"cty1", "cty2", ...}</code> per batch); pass the one path, or
+  <code>list(labels_for(ds).values())</code> in batch order.</li>
+<li><strong>clustering</strong> - omitted, scIB's optimal-resolution Leiden: ten resolutions
+  from 0.2 to 2.0 on the embedding's neighbour graph, keeping the one with the
+  highest NMI against the labels. Pass <code>clustering=</code> to score your own.</li>
+<li><strong>metrics</strong> - the <code>scib.metrics</code> functions; iASW / iF1 score <strong>every</strong> label
+  (the isolated-label threshold is set to the batch count + 1, so no label is
+  excluded).</li>
+<li><strong>cLISI / iLISI</strong> - need scib's compiled LISI helper (<code>knn_graph.o</code>); when it
+  cannot run, the metric is <code>NaN</code> and the warning contains the exact <code>g++</code>
+  command that rebuilds it.</li>
+</ul>
+<h3 id="batch-vector-on-multi-batch-layouts">Batch vector on multi-batch layouts<a class="headerlink" href="#batch-vector-on-multi-batch-layouts" title="Anchor link to this section">&para;</a></h3>
+<p><code>run_all</code> scores batch metrics against the <strong>label file each cell came from</strong>:
+<code>cty1.csv</code> -&gt; 1, <code>cty2.csv</code> -&gt; 2 (cross / mosaic), <code>rna_cty.csv</code> -&gt; 1,
+<code>atac_cty.csv</code> -&gt; 2 (diagonal) - the winning permutation is recorded in
+<code>summary.label_order</code>, and <code>summary.batch_source</code> says <code>file_of_origin</code>.
+Batches <em>within</em> one file (donors inside <code>rna.h5</code>, say) are therefore <strong>not
+represented</strong>. When your dataset has them, re-score with the vector it really
+has - nothing is re-run:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">&quot;MYDATA&quot;</span><span class="p">,</span> <span class="s2">&quot;cross&quot;</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/&quot;</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>   <span class="c1"># at run time, or</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">res2</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">rescore</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>          <span class="c1"># on the stored outputs; batch_source becomes &#39;user&#39;</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;out_dir&quot;</span><span class="p">])</span> <span class="o">/</span> <span class="s2">&quot;embedding.h5&quot;</span><span class="p">,</span>               <span class="c1"># one stored output</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             <span class="n">task</span><span class="o">=</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="re-runs-are-stochastic">Re-runs are stochastic<a class="headerlink" href="#re-runs-are-stochastic" title="Anchor link to this section">&para;</a></h3>
+<p>Most methods are non-deterministic, so a re-run does not reproduce the stored
+decimals. <code>notebooks/results/final_verification.tsv</code> records every
+verification run (columns <code>method, dataset, category, status, wall_s, ARI,
+baseline, verdict, note</code>; <code>baseline</code> is the ARI recorded when the method was
+first verified, <code>verdict</code> is <code>DRIFT</code> when the re-run leaves the tolerance): on
+<code>D11</code>, 11 of 13 methods re-scored within ~0.02 ARI of their baseline, while
+VIMCCA moved 0.599 -&gt; 0.695 and Concerto 0.408 -&gt; 0.498. Compare <strong>ranks</strong>,
+not decimals, and prefer <code>aggregate="summary"</code> over several datasets when
+ordering methods.</p>
 <hr />
 <h2 id="graceful-degradation">Graceful degradation<a class="headerlink" href="#graceful-degradation" title="Anchor link to this section">&para;</a></h2>
 <p>A few scIB metrics depend on external machinery that is not always present.
-Rather than failing the whole evaluation when one optional metric can't run,
+Rather than failing the whole evaluation when one optional metric cannot run,
 <code>evaluate</code> computes each metric defensively: if it raises, the metric is
 recorded as <code>NaN</code> with a warning, and every other metric still returns.</p>
 <table>
@@ -1434,12 +1604,12 @@ recorded as <code>NaN</code> with a warning, and every other metric still return
 <tbody>
 <tr>
 <td><code>cLISI</code>, <code>iLISI</code></td>
-<td>a compiled LISI binary</td>
-<td><code>NaN</code> + warning</td>
+<td>scib's compiled LISI helper</td>
+<td><code>NaN</code> + warning (with the rebuild command)</td>
 </tr>
 <tr>
 <td><code>kBET</code></td>
-<td><code>rpy2</code> (R bridge)</td>
+<td>R via <code>rpy2</code>, and <code>slow_metrics=True</code></td>
 <td><code>NaN</code> + warning</td>
 </tr>
 </tbody>
@@ -1448,57 +1618,48 @@ recorded as <code>NaN</code> with a warning, and every other metric still return
 you real ARI, NMI, ASW, iASW, and iF1, only <code>cLISI</code> comes back <code>NaN</code>.</p>
 <hr />
 <h2 id="reading-the-result">Reading the result<a class="headerlink" href="#reading-the-result" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">metrics</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>       <span class="n">Value</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">ARI</span>    <span class="mf">0.812</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">NMI</span>    <span class="mf">0.847</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">ASW</span>    <span class="mf">0.591</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">iASW</span>   <span class="mf">0.604</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">iF1</span>    <span class="mf">0.733</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="n">cLISI</span>    <span class="n">NaN</span>     <span class="c1"># LISI binary not available on this host</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">metrics</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>       <span class="n">Value</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">ARI</span>    <span class="mf">0.812</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">NMI</span>    <span class="mf">0.847</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">ASW</span>    <span class="mf">0.591</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">iASW</span>   <span class="mf">0.604</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">iF1</span>    <span class="mf">0.733</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">cLISI</span>    <span class="n">NaN</span>     <span class="c1"># LISI binary not available on this host</span>
 </span></code></pre></div>
-<p>It's a plain DataFrame, so you can save it as the benchmark's <code>metric.csv</code>
+<p>It is a plain DataFrame, so you can save it as the benchmark's <code>metric.csv</code>
 directly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">metrics</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s2">&quot;metric.csv&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">metrics</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s2">&quot;metric.csv&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <hr />
-<h2 id="closing-the-loop-tidy-bubble-plot">Closing the loop: tidy → bubble plot<a class="headerlink" href="#closing-the-loop-tidy-bubble-plot" title="Anchor link to this section">&para;</a></h2>
+<h2 id="closing-the-loop-tidy-bubble-plot">Closing the loop: tidy -&gt; bubble plot<a class="headerlink" href="#closing-the-loop-tidy-bubble-plot" title="Anchor link to this section">&para;</a></h2>
 <p>The wide <code>"Value"</code> frame is the right shape for one run. To compare across
-methods and datasets, and to draw the scIB-style bubble table from the paper, 
-reshape it to the <strong>long</strong> frame that <code>plot.bubble</code> and <code>load_results</code> use, with
-<code>mtb.eval.to_long</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">eval</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">value_df</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">category</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># columns: metric, value, method, dataset, category</span>
+methods and datasets, and to draw the scIB-style bubble table from the paper,
+reshape it to the <strong>long</strong> frame that <code>plot.bubble</code> and <code>load_results</code> use,
+with <code>mtb.to_long</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">value_df</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">category</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># columns: metric, value, method, dataset, category</span>
 </span></code></pre></div>
-<p><code>to_long</code> also maps each metric name to its canonical form, so the result lines
-up with <code>mtb.load_results</code> and can be concatenated with published tables.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># one run -&gt; one long frame</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">long_df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">eval</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">metrics</span><span class="p">,</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D35&quot;</span><span class="p">,</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="p">)</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="c1"># stack several runs, then draw the bubble table</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="n">all_runs</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">long_df</span><span class="p">,</span> <span class="n">other_long_df</span><span class="p">])</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">all_runs</span><span class="p">,</span>
-</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">],</span>
-</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span>   <span class="c1"># &quot;summary&quot; averages ranks across datasets</span>
-</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Diagonal integration&quot;</span><span class="p">,</span>
-</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="n">save</span><span class="o">=</span><span class="s2">&quot;bubble.pdf&quot;</span><span class="p">,</span>
-</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="p">)</span>
+<p><code>to_long</code> maps each metric name to its canonical form (and raises if two rows
+collapse onto the same name, so nothing is double-counted), so the result lines
+up with <code>mtb.load_results</code> and can be concatenated with the stored tables.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">bench</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;rerun&quot;</span><span class="p">)</span>   <span class="c1"># the package&#39;s re-run sweep</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">bench</span><span class="p">,</span> <span class="n">mine</span><span class="p">]),</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;GC&quot;</span><span class="p">],</span>   <span class="c1"># this column order, left to right</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Diagonal integration, D28 + SCALEX&quot;</span><span class="p">,</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="n">save</span><span class="o">=</span><span class="s2">&quot;bubble.pdf&quot;</span><span class="p">,</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><code>plot.bubble</code> returns a Matplotlib <code>Figure</code> (circle radius tracks rank, fill
-tracks value, with an "overall" column). See the
-<a href="../plot/">plotting tutorial</a> for the full set of options, and
-<a href="../../api/"><code>load_results</code></a> if you want to drop your run alongside the
-published benchmark tables.</p>
+tracks value, one <em>Overall</em> bar per metric family). See the
+<a href="../plot/">plotting tutorial</a> for the full set of options, including
+published vs re-run tables.</p>
 <div class="admonition note">
 <p class="admonition-title">v1 supports <code>metric_set="scib"</code> only</p>
 <p>Passing any other <code>metric_set</code>, or a <code>task</code> outside
@@ -1506,7 +1667,7 @@ published benchmark tables.</p>
 sets are planned but not yet wired.</p>
 </div>
 <hr />
-<p>Next: turn these numbers into a figure in <a href="../plot/">Plot a bubble table</a>.</p>
+<p>Next: turn these numbers into a figure in <a href="../plot/">Load &amp; plot results</a>.</p>
 
 
 

@@ -650,6 +650,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Inputs: roles and format flexibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#your-own-data-as-a-dataset-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own data as a dataset folder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -664,10 +681,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#validated-example-scalex-diagonal-integration-on-d35" class="md-nav__link">
+  <a href="#validated-example-scalex-diagonal-integration-on-d28" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Validated example: SCALEX diagonal integration on D35
+        Validated example: SCALEX diagonal integration on D28
       
     </span>
   </a>
@@ -690,6 +707,17 @@
     <span class="md-ellipsis">
       
         Reading other output kinds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spatial registration
       
     </span>
   </a>
@@ -1210,6 +1238,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Inputs: roles and format flexibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#your-own-data-as-a-dataset-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own data as a dataset folder
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1224,10 +1269,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#validated-example-scalex-diagonal-integration-on-d35" class="md-nav__link">
+  <a href="#validated-example-scalex-diagonal-integration-on-d28" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Validated example: SCALEX diagonal integration on D35
+        Validated example: SCALEX diagonal integration on D28
       
     </span>
   </a>
@@ -1250,6 +1295,17 @@
     <span class="md-ellipsis">
       
         Reading other output kinds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spatial registration
       
     </span>
   </a>
@@ -1330,23 +1386,23 @@
 
 <h1 id="run-a-method">Run a method<a class="headerlink" href="#run-a-method" title="Anchor link to this section">&para;</a></h1>
 <p>scMultiBench runs the <strong>original, unmodified method scripts</strong> from the reference
-repository, it never edits them. <code>mtb.run</code> reads a method's declaration from the
+repository - it never edits them. <code>mtb.run</code> reads a method's declaration from the
 registry, picks the right variant from the inputs you pass, builds the exact
 command line, runs it inside that method's own conda environment, and loads the
-typed output back into Python.</p>
+typed output back into Python. (<code>mtb.run_all</code> does this for every method that
+fits a dataset folder, and scores the outputs - the category tutorials are built
+on it; this page is the single-method call underneath.)</p>
 <div class="admonition tip">
 <p class="admonition-title">TL;DR</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="p">},</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d35&quot;</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span>   <span class="c1"># -&gt; (13914, 10)  joint embedding (n_cells x latent dims)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>                          <span class="c1"># 137 MB reference dataset; no-op when present</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">),</span>   <span class="c1"># {&#39;rna&#39;: .../D28/rna.h5, &#39;atac_gas&#39;: .../D28/atac_gas.h5}</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d28&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span>   <span class="c1"># -&gt; (11014, 10)  joint embedding: 6,408 RNA + 4,606 ATAC cells x latent dims</span>
 </span></code></pre></div>
 </div>
 <hr />
@@ -1359,11 +1415,14 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
 <li><strong>Look up the spec</strong> for <code>method</code> and collect the modality roles from your
    <code>inputs</code> (auxiliary roles like <code>data_dir</code> are ignored here).</li>
 <li><strong>Select the variant</strong> whose <code>when:</code> matches <code>(category, modalities)</code>. The
-   match is exact on the <em>set</em> of modality roles, <code>{"rna", "atac_gas"}</code> selects
+   match is exact on the <em>set</em> of modality roles - <code>{"rna", "atac_gas"}</code> selects
    the diagonal <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + gene-activity variant, not the vertical one.</li>
+<li><strong>Preflight the environment</strong>: with the default <code>cmd_template</code>, a missing
+   conda env raises <code>EnvironmentError</code> naming the install command <em>before</em>
+   anything is written.</li>
 <li><strong>Convert inputs</strong> to the canonical scMultiBench <code>.h5</code> (unless
    <code>convert=False</code>) into a per-run <code>inputs/</code> folder.</li>
-<li><strong>Build the command</strong> — <code>[interpreter, entrypoint, *args, *params]</code> — with the
+<li><strong>Build the command</strong> - <code>[interpreter, entrypoint, *args, *params]</code> - with the
    entrypoint resolved against the reference <code>repo_path</code>.</li>
 <li><strong>Wrap and execute</strong> via <code>cmd_template</code> (default <code>conda run -n &lt;env&gt; {cmd}</code>)
    in the per-run <code>out_dir</code> working directory.</li>
@@ -1372,23 +1431,28 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
 </ol>
 <div class="admonition note">
 <p class="admonition-title">Each method needs its own conda environment</p>
-<p>scMultiBench orchestrates per-tool environments, it does <strong>not</strong> install the
-methods for you. The env each method needs is declared in the registry, for
-<code>SCALEX</code> it is <code>scmb_torch_v2</code> (see <code>mtb.method_info("SCALEX")["env"]</code>), and
-it must exist on your machine (<code>conda env list</code> to check). <code>mtb.run</code> shells
-out with <code>conda run -n &lt;env&gt; ...</code>; if the env is missing, the subprocess
-fails and <code>mtb.run</code> raises a <code>RuntimeError</code> carrying the captured <code>stderr</code>
-tail.</p>
+<p>The env each method needs is declared in the registry - for <code>SCALEX</code> it is
+<code>scmb_torch</code> (see <code>mtb.method_info("SCALEX")["env"]</code>) - and it must exist
+on your machine. Build it from the committed lockfile (or a prebuilt
+archive) with <code>multibench env install --methods SCALEX --packed --run</code>;
+<code>multibench env doctor</code> lists what exists and what is missing. <code>mtb.run</code>
+shells out with <code>conda run -n &lt;env&gt; ...</code>; if the env is missing the
+preflight raises <code>EnvironmentError</code> with that install command.</p>
 </div>
 <hr />
 <h2 id="inputs-roles-and-format-flexibility">Inputs: roles and format flexibility<a class="headerlink" href="#inputs-roles-and-format-flexibility" title="Anchor link to this section">&para;</a></h2>
-<p><code>inputs</code> is a dict mapping each <strong>modality role</strong> to a file path. Roles are the
-method's own argument names from the registry, for SCALEX's diagonal variant
-they are <code>rna</code> and <code>atac_gas</code> (gene-activity scores derived from <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>).</p>
-<p>You don't have to pre-convert your data. By default <code>mtb.run</code> routes every
+<p><code>inputs</code> is a dict mapping each <strong>modality role</strong> to a file path (or an
+in-memory <code>AnnData</code>). Roles are the method's own argument names from the
+registry - for SCALEX's diagonal variant they are <code>rna</code> and <code>atac_gas</code>
+(gene-activity scores derived from <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>). For a benchmark dataset,
+<code>mtb.inputs_for(dataset, method, category)</code> resolves them for you (and
+<code>check=True</code> verifies the files exist, are oriented features x cells and have
+one label per cell).</p>
+<p>You do not have to pre-convert your data. By default <code>mtb.run</code> routes every
 modality input through <code>mtb.io.to_canonical</code>, which adapts common formats to the
-canonical scMultiBench <code>.h5</code> (HDF5 with <code>matrix/data</code> as features × cells,
-<code>matrix/features</code>, <code>matrix/barcodes</code>):</p>
+canonical scMultiBench <code>.h5</code> (HDF5 with <code>matrix/data</code> as features x cells,
+<code>matrix/features</code>, <code>matrix/barcodes</code>; sparse matrices are streamed, the file is
+gzip-compressed):</p>
 <table>
 <thead>
 <tr>
@@ -1398,12 +1462,12 @@ canonical scMultiBench <code>.h5</code> (HDF5 with <code>matrix/data</code> as f
 </thead>
 <tbody>
 <tr>
-<td><code>.h5ad</code></td>
-<td><code>anndata.read_h5ad</code></td>
+<td><code>.h5ad</code> / <code>.h5mu</code></td>
+<td><code>anndata</code> / <code>mudata</code> readers (<code>mod=</code> picks the MuData modality)</td>
 </tr>
 <tr>
 <td><code>.csv</code> / <code>.tsv</code></td>
-<td>parsed to a matrix</td>
+<td>parsed to a matrix (cells x features)</td>
 </tr>
 <tr>
 <td><code>.loom</code></td>
@@ -1411,7 +1475,7 @@ canonical scMultiBench <code>.h5</code> (HDF5 with <code>matrix/data</code> as f
 </tr>
 <tr>
 <td>in-memory <code>AnnData</code></td>
-<td>used directly</td>
+<td>used directly (<code>layer=</code> / <code>obsm=</code> select the matrix)</td>
 </tr>
 <tr>
 <td>already-canonical <code>.h5</code></td>
@@ -1419,85 +1483,90 @@ canonical scMultiBench <code>.h5</code> (HDF5 with <code>matrix/data</code> as f
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># both inputs become canonical .h5 before the method sees them; the demo D35</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># both inputs become canonical .h5 before the method sees them; the D28</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># files are already canonical, so to_canonical passes them through unchanged</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="p">},</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d35&quot;</span><span class="p">,</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D28/rna.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D28/atac_gas.h5&quot;</span><span class="p">},</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d28&quot;</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Pass <code>convert=False</code> when your inputs are <em>already</em> in the exact layout the
 method expects and you want scMultiBench to hand the paths through verbatim:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">convert</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>   <span class="c1"># no format adaptation; paths used as-is</span>
 </span></code></pre></div>
-<p>You can also convert by hand. <code>to_canonical</code> writes a fresh canonical <code>.h5</code> for
-formats that need adapting (e.g. <code>.h5ad</code>), and returns the input path unchanged
-when it is already canonical; <code>read_canonical</code> is the inverse, canonical <code>.h5</code>
--&gt; <code>AnnData</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># a real .h5ad would be written to out; a canonical .h5 is returned as-is</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">path</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">out</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;inputs/rna.h5&quot;</span><span class="p">),</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">)</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>   <span class="c1"># canonical .h5 -&gt; AnnData (cells x genes)</span>
+<h3 id="your-own-data-as-a-dataset-folder">Your own data as a dataset folder<a class="headerlink" href="#your-own-data-as-a-dataset-folder" title="Anchor link to this section">&para;</a></h3>
+<p>For <code>run_all</code> / <code>scan</code> (and for <code>inputs_for</code>) the inputs live in a <strong>dataset
+folder</strong> laid out by category - <code>mtb.describe_layout(category)</code> prints the
+contract. One call writes it from an AnnData or MuData:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ad</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">a</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">&quot;my_citeseq.h5ad&quot;</span><span class="p">)</span>                 <span class="c1"># X = RNA, obsm[&#39;protein&#39;] = ADT, obs[&#39;celltype&#39;]</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="s2">&quot;data/MYCITE&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">&quot;obsm:protein&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;obs:celltype&quot;</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1">#   -&gt; data/MYCITE/rna.h5, adt.h5, cty.csv; batch=&quot;obs:sample&quot; writes rna1.h5/cty1.csv ... per batch</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">from_mudata</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">&quot;MYCITE&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>    <span class="c1"># files_ok / env_ok per method, with reasons</span>
 </span></code></pre></div>
+<p>Or file by file - <code>to_canonical(src, "data/MYDIAG", modality="rna")</code> picks the
+canonical filename for the modality, <code>mtb.io.write_labels(labels, path)</code> writes
+the single-column <code>cty</code> CSV, and <code>read_canonical</code> is the inverse (canonical
+<code>.h5</code> -&gt; <code>AnnData</code>, cells x genes). The <code>modality</code> argument is validated, and
+for <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> it is the one place you say whether the matrix is peaks or gene
+activity - the two are <em>not</em> interchangeable, see the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> note printed by
+<code>describe_layout</code>.</p>
 <hr />
 <h2 id="inspecting-variants-before-you-run">Inspecting variants before you run<a class="headerlink" href="#inspecting-variants-before-you-run" title="Anchor link to this section">&para;</a></h2>
 <p>Use <code>mtb.method_info</code> to see which categories, tasks, environment, and variant
-entrypoints a method declares, this tells you the modality roles each variant
-expects.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># {&#39;id&#39;: &#39;SCALEX&#39;, &#39;language&#39;: &#39;python&#39;, &#39;categories&#39;: [&#39;diagonal&#39;],</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">#  &#39;tasks&#39;: [&#39;clustering&#39;, &#39;batch&#39;], &#39;env&#39;: &#39;scmb_torch_v2&#39;, &#39;atac&#39;: &#39;gene_activity&#39;,</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">#  &#39;needs_labels&#39;: False, &#39;status&#39;: &#39;verified&#39;, &#39;setup_hint&#39;: &#39;&#39;,</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">#  &#39;variants&#39;: [&#39;tools_scripts/SCALEX/main_SCALEX.py&#39;]}</span>
+entrypoints a method declares - <code>supports</code> lists, per variant, the modality
+roles it expects and whether it needs labels.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">&quot;env&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;atac&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;needs_labels&quot;</span><span class="p">]</span>   <span class="c1"># (&#39;scmb_torch&#39;, &#39;gene_activity&#39;, False)</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">info</span><span class="p">[</span><span class="s2">&quot;supports&quot;</span><span class="p">]</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># [{&#39;category&#39;: &#39;diagonal&#39;, &#39;modalities&#39;: [&#39;rna&#39;, &#39;atac_gas&#39;],</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">#   &#39;output_kind&#39;: &#39;embedding&#39;, &#39;n_tunable&#39;: 0, &#39;needs_labels&#39;: False}]</span>
 </span></code></pre></div>
 <p>If the <code>(category, modalities)</code> you pass has no matching variant, <code>mtb.run</code>
 raises a <code>KeyError</code> that lists every <code>(category, modality-set)</code> the method does
 support, so the fix is usually to adjust your <code>inputs</code> keys.</p>
 <div class="admonition note">
 <p class="admonition-title"><code>status</code> tells you what is wired</p>
-<p>In v1, methods with <code>status: "verified"</code> have had their commands</p>
+<p>Every registry method has <code>status: "verified"</code>: its command template was
+cross-checked against the real entrypoint and executed end to end on a
+reference dataset - <code>notebooks/results/final_verification.tsv</code> in the
+repository records each run with its ARI, the <code>baseline</code> ARI from first
+verification and a <code>verdict</code> (<code>DRIFT</code> when a stochastic re-run leaves the
+tolerance).</p>
 </div>
-<p>Every registry method is wired and run-verified: its command template has been cross-checked against the real entrypoint and executed end-to-end on a reference dataset.</p>
 <hr />
-<h2 id="validated-example-scalex-diagonal-integration-on-d35">Validated example: SCALEX diagonal integration on D35<a class="headerlink" href="#validated-example-scalex-diagonal-integration-on-d35" title="Anchor link to this section">&para;</a></h2>
-<p>This is a real, <abbr title="Graphics Processing Unit">GPU</abbr>-validated run. SCALEX performs <strong>diagonal</strong> integration
-(unpaired modalities bridged by shared features): an <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> batch (<code>rna1</code>) and an
-<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> batch summarised as gene-activity scores (<code>atac_gas1</code>) from dataset <strong>D35</strong>.</p>
-<div class="language-python highlight"><span class="filename">run_scalex_d35.py</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+<h2 id="validated-example-scalex-diagonal-integration-on-d28">Validated example: SCALEX diagonal integration on D28<a class="headerlink" href="#validated-example-scalex-diagonal-integration-on-d28" title="Anchor link to this section">&para;</a></h2>
+<p>This is a real, <abbr title="Graphics Processing Unit">GPU</abbr>-validated run (2,233 s on our host - <code>mtb.runtime_hint("SCALEX")</code>).
+SCALEX performs <strong>diagonal</strong> integration (unpaired modalities bridged by shared
+features): an <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> population (<code>rna</code>) and an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> population summarised as
+gene-activity scores (<code>atac_gas</code>) from dataset <strong>D28</strong>, which
+<code>mtb.data.fetch("D28")</code> downloads (137 MB).</p>
+<div class="language-python highlight"><span class="filename">run_scalex_d28.py</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>        <span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/rna1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D35/atac_gas1.h5&quot;</span><span class="p">,</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="p">},</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d35&quot;</span><span class="p">,</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="p">)</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>   <span class="c1"># -&gt; (13914, 10)   joint embedding (cells x latent dims)</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">)</span>            <span class="c1"># the exact argv that ran, including the conda wrapper</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/runs/scalex_d28&quot;</span><span class="p">,</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>   <span class="c1"># -&gt; (11014, 10)   joint embedding (RNA + ATAC cells x latent dims)</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">)</span>            <span class="c1"># the exact argv that ran, including the conda wrapper</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Use absolute paths for inputs and <code>out_dir</code></p>
-<p>The method script runs with <code>out_dir</code> as its working directory (step 5
+<p>The method script runs with <code>out_dir</code> as its working directory (step 6
 above), and <code>out_dir</code> is also passed to the script as its save path. So a
 <strong>relative</strong> <code>out_dir</code> (or relative inputs) is resolved against the
 subprocess cwd, not your shell's cwd, which makes the outputs land in the
-wrong place. Pass absolute paths for both the modality inputs and <code>out_dir</code>
-(as above) so everything resolves regardless of where the subprocess runs.
-No <code>cmd_template</code> is needed: the default <code>conda run -n {env} {cmd}</code> fills
-<code>{env}</code> from the spec (<code>scmb_torch_v2</code> for SCALEX), so the run lands in the
-right conda env automatically.</p>
+wrong place. <code>inputs_for</code> returns absolute paths; pass an absolute
+<code>out_dir</code> too. No <code>cmd_template</code> is needed: the default
+<code>conda run -n {env} {cmd}</code> fills <code>{env}</code> from the spec (<code>scmb_torch</code> for
+SCALEX), so the run lands in the right conda env automatically.</p>
 </div>
 <p><code>mtb.run</code> returns a <code>RunResult</code> dataclass:</p>
 <table>
@@ -1541,16 +1610,20 @@ right conda env automatically.</p>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># numpy ndarray, shape (13914, 10), the joint embedding</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># numpy ndarray, shape (11014, 10), the joint embedding</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">res</span><span class="o">.</span><span class="n">extra</span>             <span class="c1"># {} for SCALEX (no extra outputs)</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>           <span class="c1"># [&lt;conda&gt;, &#39;run&#39;, &#39;-n&#39;]  -&gt; the cmd_template wrapper</span>
 </span></code></pre></div>
-<p>The embedding flows straight into evaluation and plotting (<code>labels</code> and <code>batch</code>
-are the per-cell ground-truth and batch vectors for the dataset, see
-<a href="../evaluate/">Evaluate a run</a>):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>                       <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">batch</span><span class="p">)</span>
+<p>The embedding flows straight into evaluation and plotting. D28's labels are
+two files - one per modality, because the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells differ - and
+passing both as a list makes each cell's file of origin the batch for the
+batch metrics (see <a href="../evaluate/">Evaluate a run</a>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>                      <span class="c1"># {&#39;atac_cty&#39;: ..., &#39;rna_cty&#39;: ...}</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                       <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="n">labels</span><span class="p">[</span><span class="s2">&quot;rna_cty&quot;</span><span class="p">],</span> <span class="n">labels</span><span class="p">[</span><span class="s2">&quot;atac_cty&quot;</span><span class="p">]])</span>   <span class="c1"># SCALEX stacks RNA cells, then ATAC</span>
 </span></code></pre></div>
+<p>(<code>run_all</code> finds that order for you and records it as <code>summary.label_order</code>;
+for a single <code>mtb.run</code> you state it.)</p>
 <hr />
 <h2 id="choosing-a-cmd_template">Choosing a <code>cmd_template</code><a class="headerlink" href="#choosing-a-cmd_template" title="Anchor link to this section">&para;</a></h2>
 <p><code>cmd_template</code> decides <em>how</em> the built command is executed; <code>{cmd}</code> is the
@@ -1558,11 +1631,12 @@ placeholder for the argv. The default targets the method's declared env:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">cmd_template</span> <span class="o">=</span> <span class="s2">&quot;conda run -n </span><span class="si">{env}</span><span class="s2"> </span><span class="si">{cmd}</span><span class="s2">&quot;</span>   <span class="c1"># default; {env} filled from the spec</span>
 </span></code></pre></div>
 <p>Override it to run elsewhere, e.g. an explicit env name, a Singularity
-container, or an HPC scheduler wrapper:</p>
+container, or an HPC scheduler wrapper (the env preflight is skipped - you
+own the environment then):</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="explicit-conda-env" name="__tabbed_1" type="radio" /><input id="singularity--apptainer" name="__tabbed_1" type="radio" /><input id="run-in-the-current-env" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="explicit-conda-env">Explicit conda env</label><label for="singularity--apptainer">Singularity / Apptainer</label><label for="run-in-the-current-env">Run in the current env</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;conda run -n scmb_torch_v2 </span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -1576,8 +1650,9 @@ container, or an HPC scheduler wrapper:</p>
 </div>
 </div>
 <p><code>repo_path</code> points at the checkout of the reference scMultiBench method scripts;
-it defaults to <code>config.DEFAULT.repo_path</code>. The variant <code>entrypoint</code> (e.g.
-<code>tools_scripts/SCALEX/main_SCALEX.py</code>) is resolved relative to it.</p>
+it defaults to <code>config.DEFAULT.repo_path</code> (auto-provisioned on first run). The
+variant <code>entrypoint</code> (e.g. <code>tools_scripts/SCALEX/main_SCALEX.py</code>) is resolved
+relative to it.</p>
 <hr />
 <h2 id="reading-other-output-kinds">Reading other output kinds<a class="headerlink" href="#reading-other-output-kinds" title="Anchor link to this section">&para;</a></h2>
 <p>The primary output is loaded by its declared <code>kind</code>. <code>embedding</code> / <code>imputed</code> /
@@ -1586,13 +1661,39 @@ strings; <code>coords</code> as a path you handle yourself. Any additional files
 declares land in <code>res.extra</code>, keyed by filename.</p>
 <div class="admonition note">
 <p class="admonition-title">Graph-output methods do not return an embedding</p>
-<p>A few methods emit a <strong>cell-graph</strong> rather than a coordinate embedding, 
+<p>A few methods emit a <strong>cell-graph</strong> rather than a coordinate embedding -
 notably <code>scMoMaT</code>, <code>MIRA</code>, and <code>Seurat_WNN</code>. For these, <code>res.output</code> is the
-graph representation, not a <code>(cells × dims)</code> embedding, and downstream steps
+graph representation, not a <code>(cells x dims)</code> embedding, and downstream steps
 that assume an embedding (e.g. ASW-style metrics) will not apply directly.
-Check <code>mtb.method_info(method)["status"]</code> and the variant's output kind
-before wiring such a run into an embedding-based comparison.</p>
+<code>mtb.method_info(method)["supports"]</code> names each variant's <code>output_kind</code>;
+<code>run_all</code> scores scMoMaT through the <abbr title="Uniform Manifold Approximation and Projection">UMAP</abbr> it also writes
+(<code>CHAIN_OK_GRAPH_METHOD</code>) and reports Seurat_WNN as <code>RUN_OK_NO_EMBEDDING</code>.</p>
 </div>
+<hr />
+<h2 id="spatial-registration">Spatial registration<a class="headerlink" href="#spatial-registration" title="Anchor link to this section">&para;</a></h2>
+<p><code>PASTE</code>, <code>PASTE2</code>, <code>SPIRAL</code> and <code>GPSA</code> (task <code>registration</code>, category <code>cross</code>)
+align <strong>spatial slices</strong>; their output is aligned coordinates, not an
+embedding. They take a <strong>directory</strong> of slices instead of modality files - the
+role is <code>data_dir</code>, <code>scan()</code> shows their modalities as <code>(data_dir)</code>, and you
+pass no <code>modalities</code> to <code>run_all</code> / <code>inputs_for</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>&lt;data_path&gt;/MYVISIUM/            (or &lt;data_path&gt;/MYVISIUM/processed/)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, &gt;= 2
+</span></code></pre></div>
+<p>Each <code>.h5ad</code> needs <code>.X</code> (expression, spots x genes) and <code>.obsm['spatial']</code>
+(spot coordinates, spots x 2). The upstream scripts glob <code>data_dir + '*.h5ad'</code>
+<strong>without sorting</strong>, so the slice index in the output follows glob order, not
+your numbering; SPIRAL also wants a unique leading token per filename (the
+part before the first <code>_</code>) - the package stages symlinks for that when needed.
+Output: <code>aligned_slice_&lt;i&gt;.h5ad</code> per slice, so <code>run_all</code> records
+<code>RUN_OK_NO_EMBEDDING</code> - clustering metrics do not apply, and registration
+metrics are not wired into <code>mtb.evaluate</code> in this version. <code>scan()</code> checks the
+directory for &gt;= 2 <code>.h5ad</code> slices with <code>obsm['spatial']</code> (the <code>files_ok</code>
+gate), and <code>mtb.describe_layout("cross")</code> prints this contract in full
+(<code>describe_layout("spatial")</code> points there - it is a task, not a category).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;PASTE&quot;</span><span class="p">,</span> <span class="s2">&quot;cross&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;data_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;/abs/path/data/MYVISIUM&quot;</span><span class="p">},</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>              <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/runs/paste&quot;</span><span class="p">)</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># path to the aligned slices</span>
+</span></code></pre></div>
 <hr />
 <p>Next: turn a run's output into scIB metrics in
 <a href="../evaluate/">Evaluate a run</a>, then render the
