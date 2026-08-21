@@ -53,8 +53,8 @@ def test_notes_long_only_verbose():
     v = mtb.method_info("totalVI", verbose=True)
     assert len(v["notes_long"]) > 1000
     assert mtb.method_info("Multigrate", verbose=True)["notes_long"] is None   # unaudited
-    # the other keys are unchanged by verbose
-    assert {k: val for k, val in v.items() if k != "notes_long"} == info
+    # the other keys are unchanged by verbose (it adds notes_long + verification)
+    assert {k: val for k, val in v.items() if k not in ("notes_long", "verification")} == info
 
 
 def test_method_info_keeps_existing_keys():
