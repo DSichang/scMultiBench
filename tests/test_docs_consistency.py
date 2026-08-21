@@ -117,3 +117,33 @@ def test_clustering_variants_ship_per_category_as_documented():
         assert set(cross.dataset) == {"D56"} and set(cross.method) == {"MOFA2"}
     with pytest.raises(FileNotFoundError):
         mtb.load_results("vertical", clustering="kmeans")
+
+
+# ---- phrases wave 4 retired (ordered labels_for dict, per-variant scan text,
+# env names that agree with scan) must not come back in any doc surface -------
+BANNED_PHRASES = {
+    "in batch order": "labels_for() returns the files in stacking order; evaluate(labels=labels_for(ds)) needs no list-building",
+    "list(labels_for(ds).values())": "pass the labels_for dict itself (or label_order=) - the .values() recipe is retired from the docs",
+    "First reasons:": "run_all's 'nothing is runnable' error now lists one line per requested variant",
+    "scmb_matilda": "env recipe/yml name the env scan expects ('matilda'); own_env_name is the only place scmb_<method> survives",
+}
+
+
+def _docs_md_files():
+    """The docs site's .md pages when reachable: SCMULTIBENCH_DOCS=<docs dir>
+    (the mkdocs source lives in a separate repository), else none."""
+    import os
+    root = os.environ.get("SCMULTIBENCH_DOCS")
+    return sorted(Path(root).rglob("*.md")) if root and Path(root).is_dir() else []
+
+
+@pytest.mark.parametrize(
+    "path",
+    NOTEBOOKS + [ROOT / "README.md", ROOT / "SETUP.md"] + _docs_md_files(),
+    ids=lambda p: p.name)
+def test_retired_phrases_absent_from_docs_surfaces(path):
+    text = path.read_text()
+    if path.suffix == ".ipynb":
+        text = "\n".join("".join(c["source"]) for c in json.loads(text)["cells"])
+    for phrase, why in BANNED_PHRASES.items():
+        assert phrase not in text, f"{path.name} still says {phrase!r}: {why}"
