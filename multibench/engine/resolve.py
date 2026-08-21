@@ -194,12 +194,14 @@ def inputs_for(dataset: str, method: str, category: str,
     if any(a.role == "data_dir" for a in variant.args):
         out["data_dir"] = _resolve_data_dir(ds_dir, method)
     missing = {r: p for r, p in out.items() if not Path(p).exists()}
+    near = _near_miss_hints(ds_dir, missing, category)
     if check:
         if missing:
             raise FileNotFoundError(
                 f"{method}/{dataset}/{category}: input files not found on disk: "
                 f"{missing}. Available files in {ds_dir}: "
                 f"{sorted(q.name for q in ds_dir.glob('*')) if ds_dir.is_dir() else '(dir missing)'}"
+                + (" - " + "; ".join(near) if near else "")
             )
         _check_orientation(method, dataset, category, out)
         _check_label_lengths(method, dataset, category, out)
@@ -213,9 +215,73 @@ def inputs_for(dataset: str, method: str, category: str,
         # conda env. Warn here; check=True raises, check=False stays quiet.
         warnings.warn(
             f"{method}/{dataset}/{category}: {len(missing)} resolved input path(s) "
-            f"do not exist: {missing}; pass check=True to raise, check=False to silence",
+            f"do not exist: {missing}"
+            + (" (" + "; ".join(near) + ")" if near else "")
+            + "; pass check=True to raise, check=False to silence",
             UserWarning, stacklevel=2)
     return out
+
+
+# Every on-disk base name an ATAC-family role may be looked up under, so a
+# near miss can be named: the user exported peaks as atac_peak.h5 (what
+# describe_layout('diagonal') says) and a VERTICAL variant asks for atac.h5.
+_ATAC_FILE_BASES = ("atac", "atac_peak", "atac_gas", "peak")
+
+
+def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
+    """For each missing ATAC-family role, name the sibling file that IS there.
+
+    A vertical variant reads ``atac.h5``; the diagonal/mosaic roles read
+    ``atac_gas.h5`` (falling back to ``atac.h5``) / ``atac_peak.h5`` (falling
+    back to ``peak.h5``). A folder exported for the other layout therefore
+    fails with a bare "atac.h5 not found" although ``atac_peak.h5`` sits right
+    next to it. Return one hint per such role, e.g. ``"atac.h5 not found;
+    found atac_peak.h5 - vertical methods read atac.h5 (pass the representation
+    this method wants: see method_info(m)['atac'])"``; nothing for roles that
+    are not ATAC or have no sibling.
+    """
+    hints: list[str] = []
+    if not ds_dir.is_dir():
+        return hints
+    for role in missing:
+        if base_modality(role) != "atac" or is_label_role(role):
+            continue
+        bases = _ROLE_FILE_CANDIDATES.get(role, (role,))
+        digits = role[len(base_modality(role)):] if role[-1:].isdigit() else ""
+        accepted = [f"{b}{digits}.h5" for b in bases]
+        found = sorted(f"{b}{digits}.h5" for b in _ATAC_FILE_BASES
+                       if f"{b}{digits}.h5" not in accepted
+                       and (ds_dir / f"{b}{digits}.h5").is_file())
+        if not found:
+            continue
+        hints.append(
+            f"{accepted[0]} not found; found {', '.join(found)} - {category} methods "
+            f"read {' or '.join(accepted)} (pass the representation this method "
+            f"wants: see method_info(m)['atac'])")
+    return hints
+
+
+def benchmark_host_only_reason(entrypoint) -> str:
+    """Why a script whose entrypoint is an ABSOLUTE path cannot run here.
+
+    Such an entrypoint names one machine's filesystem - the benchmark host -
+    so no download can supply it (``MethodSpec.availability ==
+    'benchmark-host-only'``; SPIRAL, GPSA). This is the ``files_reason`` text
+    ``scan`` should report for those rows; it starts with the machine-readable
+    prefix :data:`BENCHMARK_HOST_ONLY`. Returns ``""`` when the path is
+    relative or actually exists (then the script IS reachable).
+    """
+    ep = Path(entrypoint)
+    if not ep.is_absolute() or ep.exists():
+        return ""
+    return (f"{BENCHMARK_HOST_ONLY}: method script not found at {ep} - this "
+            f"entrypoint is an absolute path on the benchmark host; the script is "
+            f"not part of the public scMultiBench repository, so it cannot be "
+            f"fetched (method_info(m)['availability'])")
+
+
+#: prefix of :func:`benchmark_host_only_reason`
+BENCHMARK_HOST_ONLY = "benchmark-host-only: script not published"
 
 
 
@@ -404,40 +470,152 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
 
 #: Caveat text appended by scan() when an ``atac_gas`` role resolves to a peak matrix.
 PEAK_IN_GAS_CAVEAT = "atac_gas resolved to a PEAK matrix (features look like chr:start-end)"
+#: ``.format(role=...)`` templates of the two representation-mismatch caveats
+#: reported when the method's wanted ATAC representation is known
+#: (``_preflight_caveats(resolved, atac=method_info(m)['atac'])``).
+PEAK_FED_TO_GAS_CAVEAT = ("{role} resolved to a PEAK matrix (features look like "
+                          "chr:start-end); this method expects GENE ACTIVITY")
+GAS_FED_TO_PEAK_CAVEAT = ("{role} resolved to a matrix whose features do not look "
+                          "like peaks (chr:start-end); this method expects PEAKS")
 
 
-def _preflight_caveats(resolved) -> list[str]:
-    """Non-fatal content observations about resolved inputs (never raises).
-
-    Today one check: when the ``atac_gas`` role fell back to ``atac.h5`` (no
-    ``atac_gas.h5`` present) and >= 90% of the first 50 feature names look like
-    peaks (``chr1:1-200`` / ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`.
-    Methods that want peaks behind that role name (``atac: peak`` in the
-    registry) are fine; :func:`multibench.scan` applies the caveat only to the
-    ones that want gene activity.
-    """
+def _peak_fraction_of(path: Path) -> float | None:
+    """Share of the first 50 feature names that look like ``chr:start-end``;
+    ``None`` when the file is not a readable canonical ``.h5``."""
     from .ingest import _PEAK_RE
 
+    if path.suffix != ".h5" or not path.is_file():
+        return None
+    feats = _sniff_features(str(path), path.stat().st_mtime_ns)
+    if not feats:
+        return None
+    return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
+
+
+def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
+    """Non-fatal content observations about resolved inputs (never raises).
+
+    Without ``atac`` (the legacy call) one check runs: when the ``atac_gas``
+    role fell back to ``atac.h5`` (no ``atac_gas.h5`` present) and >= 90% of
+    the first 50 feature names look like peaks (``chr1:1-200`` /
+    ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`. Methods that want peaks
+    behind that role name (``atac: peak`` in the registry) are fine;
+    :func:`multibench.scan` applies the caveat only to the ones that want gene
+    activity.
+
+    With ``atac=`` - the representation the method expects,
+    ``method_info(m)['atac']`` (``'peak'`` / ``'gene_activity'``) - EVERY
+    ATAC-family role (``atac``, ``atac_peak``, ``atac_gas``, ``atac1``...) is
+    judged against it, whatever the role name says:
+
+    * ``atac='gene_activity'`` and the file looks like peaks ->
+      :data:`PEAK_FED_TO_GAS_CAVEAT` (e.g. Matilda's ``atac`` role on a
+      peaks-only multiome folder);
+    * ``atac='peak'`` and <= 10% of the features look like peaks ->
+      :data:`GAS_FED_TO_PEAK_CAVEAT` (e.g. moETM/scMM/iPOLNG, whose ``atac_gas``
+      role resolved to a real gene-activity ``atac_gas.h5``).
+
+    The 10-90% band (mixed names) yields no verdict. The wrong representation
+    runs to completion and returns a plausible but WRONG embedding, which is
+    why these are surfaced at scan time.
+    """
     out: list[str] = []
-    p = Path(resolved.get("atac_gas", ""))
-    if p.name and p.stem != "atac_gas" and p.suffix == ".h5" and p.is_file():
-        feats = _sniff_features(str(p), p.stat().st_mtime_ns)
-        if feats:
-            frac = sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
-            if frac >= 0.9:
+    if atac is None:
+        p = Path(resolved.get("atac_gas", ""))
+        if p.name and p.stem != "atac_gas":
+            frac = _peak_fraction_of(p)
+            if frac is not None and frac >= 0.9:
                 out.append(PEAK_IN_GAS_CAVEAT)
+        return out
+    for role, path in resolved.items():
+        if is_label_role(role) or base_modality(role) != "atac":
+            continue
+        frac = _peak_fraction_of(Path(path))
+        if frac is None:
+            continue
+        if atac == "gene_activity" and frac >= 0.9:
+            out.append(PEAK_FED_TO_GAS_CAVEAT.format(role=role))
+        elif atac == "peak" and frac <= 0.1:
+            out.append(GAS_FED_TO_PEAK_CAVEAT.format(role=role))
     return out
 
 
+#: canonical stacking order of the modality-named label files (``rna_cty.csv``
+#: before ``adt_cty.csv`` before ``atac_cty.csv``; ``peak_cty`` counts as atac)
+_LABEL_MODALITY_ORDER = {"rna": 0, "adt": 1, "atac": 2}
+
+
+def _label_sort_key(stem: str):
+    """Sort key giving the benchmark's cell-stacking order of label files.
+
+    1. ``cty`` (one file, paired cells) first;
+    2. ``cty<N>`` numbered per batch, ascending NUMERICALLY (cty1, cty2, cty10);
+    3. ``<modality>_cty`` in the canonical modality order rna, adt, atac
+       (``peak_cty`` is treated as atac) - the order in which the diagonal /
+       vertical methods stack their cells in the embedding (RNA cells first,
+       then ATAC cells);
+    4. anything else (``source_cty`` ...) alphabetically, last.
+    """
+    if stem == "cty":
+        return (0, 0, "")
+    digits = "".join(ch for ch in stem if ch.isdigit())
+    if stem.startswith("cty") and digits and stem == f"cty{digits}":
+        return (1, int(digits), "")
+    if stem.endswith("_cty"):
+        base = {"peak": "atac"}.get(stem[:-4], base_modality(stem[:-4]))
+        return (2, _LABEL_MODALITY_ORDER.get(base, 9), stem)
+    return (3, 0, stem)
+
+
+def _variant_label_rank(stems: list[str], variant) -> dict[str, tuple] | None:
+    """Rank label stems by the position of the modality they label in
+    ``variant``'s argument order (the order the runner passes the files and
+    the method stacks the cells). ``None`` when no stem pairs with a role."""
+    roles = variant.roles()
+    mods = [r for r in roles if not is_label_role(r) and r != "data_dir"]
+    rank: dict[str, tuple] = {}
+    for stem in stems:
+        partners = _label_partners(stem, mods)
+        pos = [mods.index(r) for r in partners if r in mods]
+        if pos:
+            rank[stem] = (0, min(pos), stem)
+    if not rank:
+        return None
+    for stem in stems:
+        rank.setdefault(stem, (1,) + _label_sort_key(stem))
+    return rank
+
+
 def labels_for(dataset: str, method: str | None = None, category: str | None = None,
-               *, data_path: Path | str | None = None) -> dict:
-    """Return ``{name: path}`` of the cell-type label CSVs for a dataset.
+               *, data_path: Path | str | None = None,
+               modalities: list[str] | set[str] | None = None) -> dict:
+    """Return ``{name: path}`` of the cell-type label CSVs for a dataset, in
+    the benchmark's cell-stacking order.
 
     The benchmark stores cell-type labels as ``*cty*.csv`` in the (flat) dataset
     dir, under dataset-specific names (``cty.csv``, ``rna_cty.csv``, ``cty1.csv``,
     ...). Returns the primary label files (excluding tool-specific ``*_scjoint*``
-    reformats), keyed by filename stem. Pass the single path - or, for a
-    multi-file dataset, ``list(labels_for(ds).values())`` in batch order - to
+    reformats), keyed by filename stem.
+
+    **Order of the returned dict** (it is NOT alphabetical): the order in which
+    the methods stack the labelled cells in their output, so that
+    ``list(labels_for(ds).values())`` can be handed to ``mtb.evaluate(labels=...)``
+    for a multi-file dataset -
+
+    1. ``cty`` (one file, cells already paired) first;
+    2. numbered ``cty1, cty2, ..., cty10`` ascending NUMERICALLY (batch order);
+    3. modality-named files in the canonical modality order **rna, adt, atac**
+       (``rna_cty`` before ``atac_cty``; ``peak_cty`` counts as atac) - the
+       diagonal methods emit the RNA cells first, then the ATAC cells, so
+       ``D28`` returns ``{'rna_cty': ..., 'atac_cty': ...}``;
+    4. any other ``*cty*`` file alphabetically, last.
+
+    When ``method`` AND ``category`` are given the variant's OWN argument
+    order decides instead (``modalities=`` disambiguates a method with several
+    variants in that category; if it is still ambiguous the canonical order
+    above is used): a label file is placed where the modality it labels sits
+    in the variant's inputs. Pass the single path - or, for a multi-file
+    dataset, ``list(labels_for(ds).values())`` in that order - to
     ``mtb.evaluate(labels=...)``: a one-entry dict is accepted directly, a
     multi-entry dict raises with that hint. Raises ``FileNotFoundError`` if the
     dataset dir is absent.
@@ -445,15 +623,17 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     Parameters
     ----------
     dataset : dataset folder name under ``data_path``.
-    method, category : accepted so the call mirrors
-        ``inputs_for(dataset, method, category, ...)``; labels are per DATASET,
-        so both are ignored (no per-method label selection exists).
+    method, category : optional; when BOTH are given the files are ordered by
+        that variant's modality order (see above); labels are per DATASET, so
+        the SET of files never depends on them.
     data_path : keyword-only. Root that CONTAINS the dataset folder; default
         ``config.DEFAULT.data_path``. For back-compat, a ``Path`` (or a string
         containing a path separator / naming an existing directory) passed as
         the 2nd positional argument is still treated as ``data_path`` - with a
         ``DeprecationWarning``; a bare, non-existent relative name there is taken
         as a method id and ignored.
+    modalities : keyword-only; the variant's modality tokens, used only with
+        ``method`` + ``category`` to pick one of several variants.
     """
     if method is not None and (
             isinstance(method, Path)
@@ -466,9 +646,19 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         raise FileNotFoundError(f"no dataset dir at {ds_dir}")
-    out = {}
-    for p in sorted(ds_dir.glob("*cty*.csv")):
-        if "scjoint" in p.name.lower():
-            continue
-        out[p.stem] = str(p)
-    return out
+    files = {p.stem: str(p) for p in ds_dir.glob("*cty*.csv")
+             if "scjoint" not in p.name.lower()}
+    stems = sorted(files, key=_label_sort_key)
+    if method is not None and category is not None:
+        spec = registry.get(method)
+        registry.check_category(category)
+        mods = registry.normalize_modalities(modalities)
+        if mods is not None:
+            cands = [spec.select(category, set(mods))]
+        else:
+            cands = [v for v in spec.variants if v.when.get("category") == category]
+        if len(cands) == 1:
+            rank = _variant_label_rank(stems, cands[0])
+            if rank is not None:
+                stems = sorted(stems, key=lambda st: rank[st])
+    return {st: files[st] for st in stems}
