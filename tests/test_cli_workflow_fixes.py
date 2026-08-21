@@ -124,7 +124,11 @@ def test_cli_scan_columns_all_and_machine_formats_are_full(capsys):
     rc = cli.main(["scan", "D11", "--category", "vertical", "--columns", "method,reason",
                    "--methods", "Matilda"])
     out = capsys.readouterr().out
-    assert rc == 0 and "..." not in out and "see mtb.env.doctor()" in out
+    # the CLI must not clip in machine formats - but scan() itself tail-truncates
+    # a very long reason with " ... " (longer paths on the benchmark host), so
+    # compare against the frame instead of asserting the marker is absent
+    _reason = multibench.scan("D11", "vertical", methods=["Matilda"])["reason"].iloc[0]
+    assert rc == 0 and _reason in out and "see mtb.env.doctor()" in out
 
 
 def test_cli_scan_modalities_filter(capsys):
@@ -209,7 +213,9 @@ def test_cli_run_dry_run_prints_command(capsys):
                    "-p", "epochs=5"])
     cap = capsys.readouterr()
     assert rc == 0
-    assert cap.out.startswith("conda run -n matilda ") and "--epochs 5" in cap.out
+    # conda may be printed as a bare word or as the resolved absolute path
+    _first = cap.out.split()[0]
+    assert _first.endswith("conda") and " run -n matilda " in cap.out and "--epochs 5" in cap.out
     assert "dry run" in cap.err
 
 
