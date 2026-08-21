@@ -96,10 +96,18 @@ def test_cli_scan_prints_frame(capsys):
     assert rc == 0
     assert "SCALEX" in out
     assert "runnable" in out
-    # the table is printed as-is: every column scan() returns appears
+    # the default table is the COMPACT column set; --columns all prints every
+    # column scan() returns (the full frame is ~1450 chars wide)
+    for col in cli._COMPACT_PLAN_COLUMNS:
+        assert col in out
+    assert "env_reason" not in out and "files_reason" not in out
+    assert "scBridge" not in out          # --methods filters rows
+    rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "SCALEX",
+                   "--columns", "all"])
+    out = capsys.readouterr().out
+    assert rc == 0
     for col in multibench.scan("D28", "diagonal").columns:
         assert col in out
-    assert "scBridge" not in out          # --methods filters rows
 
 
 def test_cli_scan_columns_and_format(capsys):
@@ -116,6 +124,10 @@ def test_cli_scan_unknown_column_and_method_errors(capsys):
     err = capsys.readouterr().err
     assert rc == 1 and "unknown column(s) ['nope']" in err and "available:" in err
     rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "NotAMethod"])
+    err = capsys.readouterr().err
+    assert rc == 1 and "unknown method 'NotAMethod'" in err
+    # a KNOWN id with no variant in this category is still reported as absent
+    rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "Matilda"])
     err = capsys.readouterr().err
     assert rc == 1 and "not in the scan table" in err
 
@@ -490,27 +502,37 @@ def test_cli_run_bad_input_pair_is_usage_error(capsys):
 
 def test_cli_run_all_dry_run_and_summary(monkeypatch, tmp_path, capsys):
     captured = {}
-    plan = pd.DataFrame({"method": ["SCALEX"], "runnable": [False], "reason": ["no env"]})
+    plan = pd.DataFrame({"method": ["SCALEX"], "modalities": ["rna+atac_gas"],
+                         "runnable": [False], "files_ok": [True], "env_ok": [False],
+                         "reason": ["no env"], "command": ["conda run -n scmb_torch x"]})
 
     class FakeRes:
         summary = pd.DataFrame({"method": ["SCALEX"], "status": ["ok"]})
 
     def fake_run_all(dataset, category, **kw):
         captured.clear(); captured.update(kw, dataset=dataset, category=category)
-        return plan if kw["dry_run"] else FakeRes()
+        return FakeRes()
+
+    def fake_plan_commands(dataset, category, **kw):
+        captured.clear(); captured.update(kw, dataset=dataset, category=category)
+        return plan
     monkeypatch.setattr(multibench, "run_all", fake_run_all)
+    from multibench import workflow
+    monkeypatch.setattr(workflow, "plan_commands", fake_plan_commands)
     rc = cli.main(["run-all", "D27", "--category", "diagonal", "--out-dir", str(tmp_path),
                    "--dry-run", "--methods", "SCALEX,scBridge", "--timeout", "60",
                    "--skip-existing", "--no-evaluate", "--data-path", "d"])
-    out = capsys.readouterr().out
-    assert rc == 0 and "dry run" in out and "no env" in out
-    assert captured["methods"] == ["SCALEX", "scBridge"] and captured["timeout"] == 60.0
-    assert captured["skip_existing"] is True and captured["evaluate"] is False
+    cap = capsys.readouterr()
+    assert rc == 0 and "no env" in cap.out and "dry run" in cap.err
+    assert "conda run -n scmb_torch x" in cap.out       # the command preview
+    assert captured["methods"] == ["SCALEX", "scBridge"]
     assert captured["data_path"] == "d" and captured["out_dir"] == str(tmp_path)
-    rc = cli.main(["run-all", "D27", "--category", "diagonal", "--out", str(tmp_path)])
-    out = capsys.readouterr().out
-    assert rc == 0 and "status" in out and f"saved under {tmp_path}" in out
-    assert captured["dry_run"] is False and captured["evaluate"] is True
+    rc = cli.main(["run-all", "D27", "--category", "diagonal", "--out", str(tmp_path),
+                   "--timeout", "60", "--skip-existing", "--no-evaluate"])
+    cap = capsys.readouterr()
+    assert rc == 0 and "status" in cap.out and f"saved under {tmp_path}" in cap.err
+    assert captured["dry_run"] is False and captured["evaluate"] is False
+    assert captured["timeout"] == 60.0 and captured["skip_existing"] is True
 
 
 # ----------------------------------------------------------------- env
@@ -528,14 +550,17 @@ def test_cli_env_install_packed_dry_run_labels(monkeypatch, capsys):
     monkeypatch.setattr(envs, "install_packed", lambda env: pytest.fail("must not download"))
     monkeypatch.setattr(cli, "_packed_manifest", lambda: {"scmb_torch": "https://x/y.tar.gz"})
     rc = cli.main(["env", "install", "--packed"])
-    out = capsys.readouterr().out
+    cap = capsys.readouterr()
+    out = cap.out
     assert rc == 0
     lines = {l.split()[0]: l for l in out.splitlines() if l and not l.startswith("#")}
     assert "packed archive published" in lines["scmb_torch"]
     assert "no archive - lockfile build" in lines["lonely"]
     assert "no archive - NO-LOCK" in lines["nolock"]
     assert "[have" in lines["have_it"]
-    assert "dry-run" in out and "--run" in out
+    # the "add --run" hint is a diagnostic: stderr, so stdout is the table only
+    assert "dry-run" in cap.err and "--run" in cap.err
+    assert not any(l.startswith("#") for l in out.splitlines())
     # without --packed the wording is unchanged
     rc = cli.main(["env", "install"])
     out = capsys.readouterr().out
