@@ -39,7 +39,7 @@ mtb.scan("MYCITE", "vertical", data_path="data")
 
 # stored results, evaluation and figures need no conda environment
 df = mtb.load_results("vertical", dataset="D11", source="rerun")        # or source="published"
-m = mtb.evaluate(my_embedding, labels=mtb.labels_for("D11")["cty"])     # scIB metrics, ~seconds
+m = mtb.evaluate(my_embedding, labels=mtb.labels_for("D11"))            # scIB metrics; labels_for is in the cells' stacking order
 mtb.plot.bubble(pd.concat([df, mtb.to_long(m, "MyMethod", "D11", "vertical")]), save="d11.pdf")
 ```
 
@@ -57,9 +57,9 @@ Everything is also available from the command line (`multibench --help`):
 ```bash
 multibench layout vertical                             # how to lay out MY data
 multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:celltype
-multibench scan D11 --category vertical               # preflight table: files_ok / env_ok / reason
+multibench scan D11 --category vertical               # preflight table: files_ok / env_ok / reason (--columns all: every column)
 multibench find --category vertical --modalities rna,adt --needs-labels false
-multibench run-all D11 --category vertical --out-dir out/ --dry-run
+multibench run-all D11 --category vertical --out-dir out/ --dry-run   # the plan + the command per variant; nothing runs
 multibench evaluate --output out/Matilda/embedding.h5 --labels data/D11/cty.csv --only ARI,NMI
 multibench plot bubble --category vertical --dataset D11 --source rerun --out d11.pdf
 multibench cite Matilda MOFA2                          # BibTeX for the benchmark + each method
