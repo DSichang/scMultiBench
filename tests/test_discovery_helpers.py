@@ -120,14 +120,19 @@ def test_recommend_drops_singleton_datasets_and_warns(result_dir):
     from multibench.data.results import recommend
     with pytest.warns(UserWarning, match="fewer than 2 methods") as rec:
         r = recommend("cross", result_path=result_dir)
-    # the shipped cross tree has ONE method with a metric.csv in every dataset
-    # but D53: those datasets must be dropped, so scMoMaT (D52/D58/D59 alone)
+    # the shipped cross tree has ONE method with a metric table in every dataset
+    # but D53 (six methods) and D57 (UINMF + MOFA2's nested filtered5/metric.csv):
+    # the singleton datasets must be dropped, so scMoMaT (D52/D58/D59 alone)
     # cannot score 1.0 on the strength of singleton min-max
-    assert r.n_datasets_total.iloc[0] == 1       # only D53 holds >= 2 methods
+    assert (r.n_datasets_total == 2).all()       # D53 and D57 hold >= 2 methods
     assert "scMoMaT" not in set(r.method)
-    assert not ((r.n_datasets == 1) & (r.grand_score == 1.0)).sum() > 1
+    # a 1.0 is now only ever the best of >= 2 methods on a kept dataset (UINMF on
+    # D57, sciPENN on D53), never a singleton artefact: every scored method sits
+    # in a dataset that holds another method
+    assert {"UINMF", "MOFA2"} <= set(r.method)
+    assert (r[r.grand_score == 1.0].n_datasets == 1).all()
     msg = str(rec[0].message)
-    assert "D52" in msg and "D57" in msg and "1.0 by construction" in msg
+    assert "D52" in msg and "D56" in msg and "D57" not in msg and "1.0 by construction" in msg
     with pytest.raises(ValueError, match="single-method"):
         recommend("cross", min_methods=50, result_path=result_dir)
 
