@@ -131,15 +131,29 @@ def test_sweep_exported():
     assert hasattr(mtb, "sweep")
 
 
-def test_run_all_raises_when_nothing_can_run():
+def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
     """A per-method failure is recorded, but "not one method could start" means the
     REQUEST is wrong. Returning an empty result would report "0 failed", which reads
-    as success and hides a typo in the dataset name - the reviewer's top concern."""
+    as success and hides the problem - the reviewer's top concern. (A dataset whose
+    FOLDER is missing is the even earlier FileNotFoundError below.)"""
+    from multibench import workflow as W
+    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+    (tmp_path / "EMPTYDS").mkdir()
     with pytest.raises(ValueError) as e:
-        mtb.run_all("NO_SUCH_DATASET_XYZ", "vertical",
-                    out_dir="/tmp/mtb_empty_test", verbose=False)
+        mtb.run_all("EMPTYDS", "vertical", data_path=tmp_path,
+                    out_dir=tmp_path / "out", verbose=False)
     assert "nothing is runnable" in str(e.value)
     assert "mtb.scan" in str(e.value)          # tells you how to diagnose it
+
+
+def test_run_all_missing_dataset_folder_is_filenotfound():
+    """A typo'd dataset name used to surface as 'nothing is runnable'; now the
+    folder check fires first and lists the folders that DO exist."""
+    with pytest.raises(FileNotFoundError) as e:
+        mtb.run_all("NO_SUCH_DATASET_XYZ", "vertical",
+                    out_dir="/tmp/mtb_empty_test", verbose=False)
+    assert "NO_SUCH_DATASET_XYZ" in str(e.value) and "folders present" in str(e.value)
+    assert "D11" in str(e.value)
 
 
 def test_describe_layout_is_category_specific():
@@ -156,3 +170,75 @@ def test_describe_layout_is_category_specific():
     assert "atac_cty.csv" not in block
     diag_block = diag.split("LAYOUT FOR DIAGONAL")[1].split("Modality roles")[0]
     assert "atac_cty.csv" in diag_block
+
+
+# --- handover: registry-generated describe_layout lists, validated tokens -------
+
+def test_describe_layout_atac_lists_come_from_registry():
+    txt = mtb.describe_layout("diagonal")
+    gas_line = next(l for l in txt.splitlines() if "need GENE ACTIVITY" in l)
+    peak_line = next(l for l in txt.splitlines() if "need PEAKS" in l)
+    assert set(mtb.find_methods(atac="gene_activity")) == set(gas_line.split(":", 1)[1].strip().split("/"))
+    assert set(mtb.find_methods(atac="peak")) == set(peak_line.split(":", 1)[1].strip().split("/"))
+    # moETM and scMM declare role atac_gas yet consume PEAKS - registry, not prose
+    assert "moETM" in peak_line and "scMM" in peak_line
+    assert "Portal" in gas_line and "SCALEX" in gas_line
+    assert "WRONG" in txt
+
+
+def test_describe_layout_rejects_typo_and_redirects_spatial():
+    with pytest.raises(ValueError, match="unknown category 'crosss'"):
+        mtb.describe_layout("crosss")
+    with pytest.raises(ValueError) as e:
+        mtb.describe_layout("spatial")
+    assert "cross" in str(e.value) and "describe_layout('cross')" in str(e.value)
+    assert mtb.describe_layout(None)            # None still prints everything
+
+
+def test_describe_layout_spatial_block_and_export_route():
+    txt = mtb.describe_layout("cross")
+    assert "SPATIAL REGISTRATION" in txt
+    for m in ("PASTE", "PASTE2", "SPIRAL", "GPSA"):
+        assert m in txt
+    assert ".h5ad" in txt and "obsm['spatial']" in txt and "data_dir" in txt
+    assert "export_dataset" in txt and "float64" in txt and "gzip" in txt
+    # the vertical text has no spatial block, but keeps every praised sentence
+    vert = mtb.describe_layout("vertical")
+    assert "SPATIAL REGISTRATION" not in vert
+    for s_ in ("FEATURES x CELLS", "TRANSPOSE", "single-column CSV", "FALLS BACK",
+               "to_canonical"):
+        assert s_ in vert
+    assert "files_ok" in vert and "env_ok" in vert
+
+
+def test_runtime_hint_validates_method_id():
+    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+        mtb.runtime_hint("Stabmap")
+    h = mtb.runtime_hint("StabMap")
+    assert set(h) == {"tier", "worst_sec", "observed"}
+    unmeasured = [m for m in mtb.list_methods() if m not in __import__("multibench.workflow").workflow._runtimes()]
+    if unmeasured:
+        assert mtb.runtime_hint(unmeasured[0])["tier"] == "unknown"
+
+
+def test_sweep_validates_method_id():
+    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+        mtb.sweep("D11", "cross", "Stabmap", "k", [1, 2], out_dir="/tmp/unused")
+
+
+def test_read_cty_is_the_shared_label_reader(tmp_path):
+    from multibench import workflow as W
+    from multibench.eval import io
+    p = tmp_path / "cty.csv"
+    p.write_text("x\nA\nB\nA\n")
+    assert list(W._read_cty(p)) == list(io.read_labels(p)) == ["A", "B", "A"]
+    # the obs-style export (barcode index + label column) now also reads
+    q = tmp_path / "obs.csv"
+    q.write_text(",celltype\nc1,T\nc2,B\n")
+    assert list(W._read_cty(q)) == ["T", "B"]
+
+
+def test_batch_result_plot_docstring_mentions_order():
+    import inspect
+    doc = inspect.getdoc(mtb.BatchResult.plot)
+    assert "order=" in doc and "unknown names raise" in doc

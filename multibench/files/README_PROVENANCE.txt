@@ -1,5 +1,6 @@
 These catalog tables (method.csv, dataset.csv, metric_full.csv) are DERIVED from the scmbench registry (scmbench/run/methods.yaml) and the real dataset tree (data/dataset_final/) by api_verify/_gen_catalog.py.
 method.csv: one row per registry method (Matilda stub excluded) -> 40 rows; columns map id->Methods (MOFA2 shown as MOFA+, Seurat_WNN as Seurat(WNN)), language->Programming Language, atac->Peak/Gene Activity, needs_labels->CellType Information Required, categories/tasks joined with ';'.
+  catalog.methods() OVERLAYS needs_labels / atac ('peak'|'gene_activity'|None) / categories / tasks from the method registry (multibench/engine/methods.yaml via registry.get(canonical_id)) at call time for every registered id - the registry derives needs_labels from the variants' label roles and validates atac, so those CSV columns are informational only and may lag. deep_learning and output are CSV-only.
 dataset.csv: dataset ids present under data/dataset_final/ (SD* = simulated). Column provenance, per column:
   - dataset            TREE-DERIVED (data/dataset_final/ listing). The id. (Header was 'dataset name' before 0.3; catalog.datasets() still exposes a 'dataset name' duplicate column for one release.)
   - simulated          TREE-DERIVED (catalog.datasets() computes it: id starts with 'SD'). Not stored in the CSV.

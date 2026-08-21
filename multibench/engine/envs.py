@@ -199,14 +199,16 @@ def group_create_commands(group: str, env_name: str | None = None,
 
 
 def _check_methods(methods):
-    """Unknown names in methods= fabricated empty plans instead of failing."""
+    """Unknown names in methods= fabricated empty plans instead of failing.
+
+    Delegates to :func:`registry.check_method` so the KeyError carries the same
+    did-you-mean hint as every other entry point (``'Stabmap'`` -> ``'StabMap'``).
+    """
     if not methods:
         return
     from . import registry
-    known = set(registry.list_methods())
-    unknown = [m for m in methods if m not in known]
-    if unknown:
-        raise KeyError(f"unknown method(s) {unknown}; see `multibench list`")
+    for m in methods:
+        registry.check_method(m)
 
 
 def plan(category: str | None = None, methods: list[str] | None = None) -> list[dict]:
