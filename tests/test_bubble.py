@@ -117,3 +117,224 @@ def test_summary_bars_carry_no_error_bars():
     ax = fig.axes[0]
     whiskers = [l for l in ax.lines if l.get_gid() == "whisker"]
     assert whiskers == [], f"expected no whisker artists, got {len(whiskers)}"
+
+
+# ---------------------------------------------------------------------------
+# plain-function API, strict selectors, metrics order, honesty warnings
+# ---------------------------------------------------------------------------
+import inspect
+import pydoc
+import warnings
+
+import pytest
+
+
+def _three(datasets=("D1",)):
+    rows = []
+    for ds in datasets:
+        for i, m in enumerate(["A", "B", "C"]):
+            for k, met in enumerate(["ARI", "NMI", "iF1"]):
+                rows.append({"method": m, "metric": met, "value": 0.1 * (i + 1) + 0.05 * k,
+                             "dataset": ds, "category": "vertical"})
+    return pd.DataFrame(rows)
+
+
+def test_bubble_is_plain_function_with_signature_and_docstring():
+    import multibench as mtb
+    assert inspect.isfunction(mtb.plot.bubble)
+    params = list(inspect.signature(mtb.plot.bubble).parameters)
+    assert params[0] == "long_df"
+    for p in ("metrics", "methods", "order", "aggregate", "cmap", "title", "save",
+              "show_language", "require_complete", "overall"):
+        assert p in params
+    assert "Parameters" in mtb.plot.bubble.__doc__
+    assert "mean_overall" in mtb.plot.bubble.__doc__      # OVERALL_DOC spliced in
+    txt = pydoc.render_doc(mtb.plot.bubble)
+    assert "bubble(" in txt.replace("\b", "") and "long_df" in txt
+
+
+def test_bubble_attribute_aliases(tmp_path):
+    import matplotlib; matplotlib.use("Agg")
+    import multibench as mtb
+    assert mtb.plot.bubble.build_table is mtb.plot.build_table
+    assert mtb.plot.bubble.render is mtb.plot.render
+    assert mtb.plot.bubble.plot_bubble is mtb.plot.bubble
+    assert mtb.plot.plot_bubble is mtb.plot.bubble
+    from multibench.plot import bubble as b
+    tbl = b.build_table(_toy_long(), metrics=["ARI", "NMI"])
+    assert isinstance(tbl, b.BubbleTable)
+    b.render(tbl).savefig(tmp_path / "x.png")
+
+
+def test_metrics_order_is_honoured():
+    import matplotlib; matplotlib.use("Agg")
+    tbl = bubble.build_table(_three(), metrics=["NMI", "ARI", "iF1"])
+    assert list(tbl.raw.columns) == ["NMI", "ARI", "iF1"]
+    fig = bubble.render(tbl)
+    labels = [t.get_text() for t in fig.axes[0].texts if t.get_text() in {"NMI", "ARI", "iF1"}]
+    assert labels == ["NMI", "ARI", "iF1"]
+    # family block order still paper order: clustering block before batch block
+    long = _three()
+    extra = long[long.metric == "ARI"].assign(metric="GC")
+    tbl2 = bubble.build_table(pd.concat([long, extra]), metrics=["GC", "ARI"])
+    assert list(tbl2.raw.columns) == ["ARI", "GC"]
+
+
+def test_unknown_metric_raises_with_available():
+    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['F1'\]") as e:
+        bubble.build_table(_three(), metrics=["ARI", "NMI", "F1"])
+    assert "available in this frame" in str(e.value) and "ARI" in str(e.value)
+
+
+def test_unknown_method_raises_with_suggestion():
+    long = _three().replace({"method": {"A": "scJoint"}})
+    tbl = bubble.build_table(long, methods=["scjoint"])      # case-insensitive: ok
+    assert tbl.methods == ["scJoint"]
+    with pytest.raises(ValueError) as e:
+        bubble.build_table(long, methods=["scjiont"])
+    assert "did you mean" in str(e.value) and "scJoint" in str(e.value)
+
+
+def test_metric_alias_resolves():
+    tbl = bubble.build_table(_three(), metrics=["ari", "nmi"])
+    assert list(tbl.raw.columns) == ["ARI", "NMI"]
+    with pytest.raises(ValueError, match="more than once"):
+        bubble.build_table(_three(), metrics=["ARI", "ari"])
+
+
+def test_bad_aggregate_raises():
+    with pytest.raises(ValueError, match="aggregate must be 'dataset' or 'summary'"):
+        bubble.build_table(_three(), aggregate="mean")
+    with pytest.raises(ValueError, match="overall must be one of"):
+        bubble.build_table(_three(), overall="median")
+
+
+def test_order_reorders_without_filtering():
+    tbl = bubble.build_table(_three(), order=["A"])
+    assert tbl.methods == ["A", "C", "B"]          # A pinned first, rest best-first
+    assert tbl.overall["C"] > tbl.overall["B"]
+    with pytest.raises(ValueError, match=r"unknown method\(s\) \['nope'\]"):
+        bubble.build_table(_three(), order=["nope"])
+
+
+def test_duplicate_rows_raise():
+    long = _three()
+    with pytest.raises(ValueError, match="duplicate"):
+        bubble.build_table(pd.concat([long, long]))
+    nods = long.drop(columns=["dataset"])
+    with pytest.raises(ValueError, match="duplicate"):
+        bubble.build_table(pd.concat([nods, nods]))
+    # a plain frame without dataset still works
+    assert bubble.build_table(nods).methods == ["C", "B", "A"]
+
+
+def test_multi_dataset_under_aggregate_dataset_warns():
+    import matplotlib; matplotlib.use("Agg")
+    two = _three(datasets=("D1", "D2"))
+    with pytest.warns(UserWarning, match="summary"):
+        tbl = bubble.build_table(two)
+    assert tbl.methods == ["C", "B", "A"]             # bare names, unchanged
+    assert tbl.datasets == ("D1", "D2")
+    fig = bubble.render(tbl)
+    labels = [t.get_text() for t in fig.axes[0].get_yticklabels()]
+    assert all("2 ds" in lab for lab in labels)
+    # a method present in ONE of the two datasets is tagged with that dataset
+    mixed = pd.concat([two, two[(two.method == "A") & (two.dataset == "D1")].assign(method="X")])
+    with pytest.warns(UserWarning):
+        fig = bubble.render(bubble.build_table(mixed))
+    assert any(lab == "X · D1" for lab in [t.get_text() for t in fig.axes[0].get_yticklabels()])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        bubble.build_table(two, aggregate="summary")   # complete matrix: silent
+
+
+def test_summary_warns_on_incomplete_matrix():
+    long = _three(datasets=("DS1", "DS2"))
+    long = long[~((long.method == "C") & (long.dataset == "DS2"))]
+    with pytest.warns(UserWarning, match="C seen in 1/2"):
+        tbl = bubble.build_table(long, aggregate="summary")
+    assert set(tbl.methods) == {"A", "B", "C"}
+    assert tbl.coverage.to_dict() == {"A": 2, "B": 2, "C": 1}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        bubble.build_table(_three(datasets=("DS1", "DS2")), aggregate="summary")
+
+
+def test_summary_require_complete_restricts_and_raises():
+    long = _three(datasets=("DS1", "DS2"))
+    long = long[~((long.method == "C") & (long.dataset == "DS2"))]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        tbl = bubble.build_table(long, aggregate="summary", require_complete=True)
+    assert set(tbl.methods) == {"A", "B"}
+    only_partial = long[((long.method == "A") & (long.dataset == "DS1"))
+                        | ((long.method == "B") & (long.dataset == "DS2"))]
+    with pytest.raises(ValueError, match="no method has results on all 2 datasets"):
+        bubble.build_table(only_partial, aggregate="summary", require_complete=True)
+
+
+def _disagreeing():
+    # the D11/D11s pattern: the two Overall formulas order B and C differently
+    rows = []
+    vals = {"D1": {"A": [0.9, 0.9], "B": [0.5, 0.2], "C": [0.4, 0.3]},
+            "D2": {"A": [0.9, 0.9], "B": [0.1, 0.8], "C": [0.2, 0.7]},
+            "D3": {"A": [0.9, 0.9], "B": [0.3, 0.3], "C": [0.31, 0.29]}}
+    for ds, d in vals.items():
+        for m, (a, n) in d.items():
+            rows += [{"method": m, "metric": "ARI", "value": a, "dataset": ds},
+                     {"method": m, "metric": "NMI", "value": n, "dataset": ds}]
+    return pd.DataFrame(rows)
+
+
+def test_overall_basis_shared_with_bar():
+    import matplotlib; matplotlib.use("Agg")
+    import multibench as mtb
+    long = _disagreeing()
+
+    def bar_order(**kw):
+        fig = mtb.plot.bar(long, **kw)
+        return [t.get_text() for t in fig.axes[0].get_yticklabels()][::-1]
+    for basis in ("rank", "mean_overall"):
+        bb = bubble.build_table(long, aggregate="summary", overall=basis).methods
+        assert bb == bar_order(overall=basis), basis
+    # defaults pin today's behaviour: bubble == 'rank', bar == 'mean_overall'
+    assert bubble.build_table(long, aggregate="summary").methods == \
+        bubble.build_table(long, aggregate="summary", overall="rank").methods
+    assert bar_order() == bar_order(overall="mean_overall")
+    assert bubble.build_table(long, aggregate="summary").overall_basis == "rank"
+    tbl = bubble.build_table(long, aggregate="summary", overall="mean_overall")
+    assert tbl.overall_basis == "mean_overall"
+    fig = bubble.render(tbl)
+    assert any("mean_overall" in t.get_text() for t in fig.axes[0].texts)
+
+
+def test_nan_cell_drawn_as_dash_with_legend():
+    import matplotlib; matplotlib.use("Agg")
+    long = _three()
+    long = long[~((long.method == "B") & (long.metric == "NMI"))]
+    fig = bubble.render(bubble.build_table(long))
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert texts.count(bubble.NA_MARK) == 1
+    assert any("n/a" in t for t in texts)
+    fig0 = bubble.render(bubble.build_table(_three()))
+    assert not any("n/a" in t.get_text() for t in fig0.axes[0].texts)
+
+
+def test_badges_unknown_and_supervised(monkeypatch):
+    import matplotlib; matplotlib.use("Agg")
+    from matplotlib.patches import Circle
+    # unknown (non-registry) methods get a '?' chip
+    fig = bubble.render(bubble.build_table(_three()))
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert texts.count("?") == 3 and "L" not in texts
+    # a registry method that needs labels gets an 'L' badge next to the chip
+    from multibench.engine import registry
+
+    class _Spec:
+        language = "python"; needs_labels = True
+    monkeypatch.setattr(registry, "get", lambda name: _Spec())
+    fig = bubble.render(bubble.build_table(_three()))
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert texts.count("L") == 3 and texts.count("Py") == 3
+    badges = [p for p in fig.axes[0].patches if isinstance(p, Circle) and p.center[0] < 0]
+    assert all(p.center[0] < 0 for p in badges) and len(badges) == 6
