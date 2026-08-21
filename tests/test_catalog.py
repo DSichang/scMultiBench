@@ -56,3 +56,25 @@ def test_datasets_table_has_simulated_flag(files_dir):
     df = catalog.datasets(files_dir)
     assert "simulated" in df.columns
     assert df["simulated"].dtype == bool
+
+
+def test_datasets_table_columns_and_registry_derived_category(files_dir):
+    import multibench as mtb
+    df = catalog.datasets(files_dir)
+    for c in ["dataset", "dataset name", "simulated", "category", "has_results"]:
+        assert c in df.columns
+    assert (df["dataset"] == df["dataset name"]).all()
+    assert df["simulated"].dtype == bool and df["has_results"].dtype == bool
+    # every dataset with stored results gets its category from the result tree
+    with_res = df[df.has_results]
+    assert with_res.category.notna().all()
+    assert "D11" in set(with_res.dataset) and with_res.set_index("dataset").loc["D11", "category"] == "vertical"
+    for ds in mtb.available_datasets("diagonal"):
+        if ds in set(df.dataset):
+            assert "diagonal" in df.set_index("dataset").loc[ds, "category"]
+    # paper-derived columns exist and are nullable (empty until transcribed)
+    for c in catalog.PAPER_COLUMNS:
+        assert c in df.columns
+    assert df[catalog.PAPER_COLUMNS].isna().all().all()
+    # category filter
+    assert set(catalog.datasets(files_dir, category="mosaic").dataset) == {"D45"}

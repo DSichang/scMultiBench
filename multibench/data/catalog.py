@@ -8,7 +8,8 @@ import pandas as pd
 
 from .. import config
 
-__all__ = ["methods", "datasets", "metrics", "canonical_id", "canonical_metric"]
+__all__ = ["methods", "datasets", "metrics", "canonical_id", "canonical_metric",
+           "PAPER_COLUMNS"]
 
 # --- canonical method id + aliases -----------------------------------------
 # Canonical id = the registry token. Map known display / result-dir spellings.
@@ -112,16 +113,73 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     return out
 
 
-def datasets(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """Return the datasets table with a derived `simulated` flag."""
+#: columns of dataset.csv that must be transcribed from the paper's
+#: supplementary dataset table. They are NOT derivable from anything in this
+#: repository and are shipped EMPTY (nullable) until transcribed - see
+#: files/README_PROVENANCE.txt. Nothing in the package fabricates them.
+PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
+
+
+def datasets(files_dir: Path | str | None = None, *,
+             category: str | None = None) -> pd.DataFrame:
+    """The benchmark's dataset table, joined with what the result tree knows.
+
+    Parameters
+    ----------
+    files_dir : path-like, optional
+        Directory holding ``dataset.csv`` (default: the package's
+        ``files/``).
+    category : str, keyword-only, optional
+        Keep only datasets whose result tree places them in this integration
+        category (``"vertical"``, ``"diagonal"``, ``"mosaic"``, ``"cross"``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per dataset id with columns
+
+        * ``dataset`` - the id (``D11``, ``SD7``, ...); ``dataset name`` is
+          kept as a duplicate column for one release (old callers read it);
+        * ``simulated`` - ``bool``, ids starting with ``SD``;
+        * ``category`` - the integration category whose stored results
+          (published or re-run) contain the dataset, ``";"``-joined if
+          several, NaN when no stored results exist; derived at call time
+          from :func:`multibench.available_datasets` so it never goes stale;
+        * ``has_results`` - ``bool``, whether any stored metric table
+          (``load_results``) covers it;
+        * ``assay, tissue, n_cells, n_batches, source`` - the paper's
+          descriptive columns, nullable; empty until transcribed from the
+          supplementary table (see ``files/README_PROVENANCE.txt``).
+    """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "dataset.csv")
     raw = raw.rename(columns={c: c.strip() for c in raw.columns})
-    raw = raw.dropna(how="all", axis=1).dropna(how="all", axis=0)
-    name_col = "dataset name"
-    raw["simulated"] = raw[name_col].astype(str).str.strip().str.upper().str.startswith("SD")
-    return raw
+    raw = raw.dropna(how="all", axis=0)
+    name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
+    out = pd.DataFrame()
+    out["dataset"] = raw[name_col].astype(str).str.strip()
+    out["dataset name"] = out["dataset"]          # back-compat alias (one release)
+    out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
+
+    # registry-derived columns: filled from the result tree at call time
+    from . import results as _results
+    cat_of: dict[str, list[str]] = {}
+    for cat in ("cross", "diagonal", "mosaic", "vertical"):
+        try:
+            for ds in _results.available_datasets(cat, source="both"):
+                cat_of.setdefault(ds, []).append(cat)
+        except Exception:       # a broken/absent tree must not break the catalog
+            continue
+    out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
+    out["has_results"] = out["dataset"].isin(cat_of.keys())
+
+    for col in PAPER_COLUMNS:
+        out[col] = raw[col].values if col in raw.columns else pd.NA
+    if category is not None:
+        config.category_folder(category)
+        out = out[out["category"].fillna("").str.split(";").map(lambda cs: category in cs)]
+    return out.reset_index(drop=True)
 
 
 def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
