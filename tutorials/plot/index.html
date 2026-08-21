@@ -1550,7 +1550,7 @@ which one a row came from:</p>
 <tr>
 <td><code>"published"</code> (default)</td>
 <td>the paper's scIB tables (<code>multibench/result/scib_metric/</code>)</td>
-<td>vertical 23, diagonal 18, cross 6; <strong>none for mosaic</strong> (<code>FileNotFoundError</code> pointing at <code>source="rerun"</code>)</td>
+<td>vertical 23, diagonal 18, cross 7 (<code>D52</code>-<code>D54</code>, <code>D56</code>-<code>D59</code>; tables kept one level down in a run-configuration folder such as <code>MOFA2/filtered3/</code> are read too); <strong>none for mosaic</strong> (<code>FileNotFoundError</code> pointing at <code>source="rerun"</code>)</td>
 </tr>
 <tr>
 <td><code>"rerun"</code></td>
@@ -1610,7 +1610,9 @@ stores up to three variants per (dataset, method); pick one with <code>clusterin
 <p class="admonition-title">Which variants ship, per category</p>
 <p><strong>diagonal</strong> ships all three variants for all 18 datasets. <strong>vertical</strong>
 ships <code>louvain</code> for a single (dataset, method) pair (D3 / Concerto) and no
-<code>kmeans</code>; <strong>cross</strong> ships neither. Asking for a variant that is not there
+<code>kmeans</code>; <strong>cross</strong> ships <code>louvain</code> and <code>kmeans</code> for <code>D56</code> only (MOFA2,
+from its nested <code>filtered3/metric_louvain.csv</code> and
+<code>kmeans/metric_kmeans.csv</code>). Asking for a variant that is not there
 raises <code>FileNotFoundError</code> naming the file it looked for; point
 <code>result_path=</code> at a tree that contains it, or keep <code>clustering="default"</code>.
 The re-run sweeps are <code>default</code> only. A result directory named
@@ -1623,7 +1625,9 @@ The re-run sweeps are <code>default</code> only. A result directory named
 <code>catalog.canonical_metric</code>, so you can filter with the clean scIB names -
 <code>ARI</code>, <code>NMI</code>, <code>ASW</code>, <code>iASW</code>, <code>iF1</code>, <code>cLISI</code> (clustering) and
 <code>ASW_batch</code>, <code>GC</code>, <code>iLISI</code>, <code>kBET</code> (batch) - regardless of how the
-underlying CSV spelled them. Likewise <code>method=</code> accepts any alias of a
+underlying CSV spelled them; <code>mtb.evaluate</code> emits the same spelling, so a
+<code>to_long</code> frame concatenates with a stored table without duplicate metric
+columns. Likewise <code>method=</code> accepts any alias of a
 method id (<code>"mofa+"</code> -&gt; <code>MOFA2</code>, <code>"Seurat(WNN)"</code> -&gt; <code>Seurat_WNN</code>). A
 filter that matches nothing returns an <strong>empty</strong> frame with a
 <code>UserWarning</code> listing what is present, so concatenating several calls

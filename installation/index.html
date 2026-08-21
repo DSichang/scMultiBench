@@ -1524,8 +1524,8 @@ results, plot, and resolve inputs without any heavy stack present.</p>
 <h2 id="step-3-verify-the-install">Step 3, Verify the install<a class="headerlink" href="#step-3-verify-the-install" title="Anchor link to this section">&para;</a></h2>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import multibench as mtb; print(mtb.__version__)&quot;</span>
 </span></code></pre></div>
-<p>Expected output: the installed version string (e.g. <code>0.1.0</code>). If a version
-prints, the public API is reachable. A quick smoke test of the read-only surface:</p>
+<p>Expected output: the installed version string. If a version prints, the
+public API is reachable. A quick smoke test of the read-only surface:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">())</span>                 <span class="c1"># available tasks</span>
@@ -1598,7 +1598,15 @@ download fails, the install falls back to the lockfile build automatically.</p>
 (9), mosaic ~45 GB (7), cross ~71 GB (11) - categories share environments, so
 combinations cost less than their sum. <code>env doctor</code> is safe to run any time;
 <code>env install</code> skips environments that already exist, so it resumes after
-interruption.</p>
+interruption. <code>multibench env recipe &lt;method&gt;</code> / <code>env yml &lt;method&gt;</code> print the
+conda commands / an <code>environment.yml</code> for one method, naming the env exactly
+as <code>scan</code>'s <code>env</code> column, <code>method_info(m)["env"]</code> and <code>env doctor</code> do
+(<code>matilda</code> for Matilda, <code>scmb_r</code> for the R methods), so a recipe pasted into
+a build job yields an env the package recognises. Every command writes its
+table or commands to stdout and its progress / <code># dry run</code> notes to stderr.
+<code>mtb.env.plan()</code> rows carry <code>availability</code>: SPIRAL and GPSA need scripts that
+are not published (<code>benchmark-host-only</code>), so their envs build but the
+methods cannot run off the benchmark host.</p>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
 <p>The benchmark datasets are not part of the git clone, and for the tutorials
 you do not need to fetch anything by hand: <strong>each tutorial auto-downloads its

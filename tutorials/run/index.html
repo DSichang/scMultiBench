@@ -1432,12 +1432,16 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
 <div class="admonition note">
 <p class="admonition-title">Each method needs its own conda environment</p>
 <p>The env each method needs is declared in the registry - for <code>SCALEX</code> it is
-<code>scmb_torch</code> (see <code>mtb.method_info("SCALEX")["env"]</code>) - and it must exist
-on your machine. Build it from the committed lockfile (or a prebuilt
-archive) with <code>multibench env install --methods SCALEX --packed --run</code>;
-<code>multibench env doctor</code> lists what exists and what is missing. <code>mtb.run</code>
-shells out with <code>conda run -n &lt;env&gt; ...</code>; if the env is missing the
-preflight raises <code>EnvironmentError</code> with that install command.</p>
+<code>scmb_torch</code> (see <code>mtb.method_info("SCALEX")["env"]</code>, the same name
+<code>scan</code>'s <code>env</code> column, <code>mtb.env.default_env_name</code> and <code>multibench env
+recipe / yml</code> use) - and it must exist on your machine. Build it from the
+committed lockfile (or a prebuilt archive) with <code>multibench env install
+--methods SCALEX --packed --run</code>; <code>multibench env doctor</code> lists what
+exists and what is missing. <code>mtb.run</code> shells out with <code>conda run -n &lt;env&gt;
+...</code>; if the env is missing the preflight raises <code>EnvironmentError</code> with
+that install command. <code>multibench run ... --dry-run</code> prints the exact
+command line without executing it (<code>--param KEY=VALUE</code> merges
+hyperparameters into it), the line an HPC job can carry.</p>
 </div>
 <hr />
 <h2 id="inputs-roles-and-format-flexibility">Inputs: roles and format flexibility<a class="headerlink" href="#inputs-roles-and-format-flexibility" title="Anchor link to this section">&para;</a></h2>
@@ -1503,8 +1507,9 @@ contract. One call writes it from an AnnData or MuData:</p>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">a</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">&quot;my_citeseq.h5ad&quot;</span><span class="p">)</span>                 <span class="c1"># X = RNA, obsm[&#39;protein&#39;] = ADT, obs[&#39;celltype&#39;]</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="s2">&quot;data/MYCITE&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">&quot;obsm:protein&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;obs:celltype&quot;</span><span class="p">)</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1">#   -&gt; data/MYCITE/rna.h5, adt.h5, cty.csv; batch=&quot;obs:sample&quot; writes rna1.h5/cty1.csv ... per batch</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">from_mudata</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">)</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">&quot;MYCITE&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>    <span class="c1"># files_ok / env_ok per method, with reasons</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">from_mudata</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>                   <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>   <span class="c1"># -&gt; rna.h5, atac.h5, cty.csv</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">&quot;MYCITE&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>    <span class="c1"># files_ok / env_ok per method, with reasons</span>
 </span></code></pre></div>
 <p>Or file by file - <code>to_canonical(src, "data/MYDIAG", modality="rna")</code> picks the
 canonical filename for the modality, <code>mtb.io.write_labels(labels, path)</code> writes
@@ -1512,7 +1517,16 @@ the single-column <code>cty</code> CSV, and <code>read_canonical</code> is the i
 <code>.h5</code> -&gt; <code>AnnData</code>, cells x genes). The <code>modality</code> argument is validated, and
 for <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> it is the one place you say whether the matrix is peaks or gene
 activity - the two are <em>not</em> interchangeable, see the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> note printed by
-<code>describe_layout</code>.</p>
+<code>describe_layout</code>. Pass <code>category=</code> with an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> matrix: <code>category="vertical"</code>
+writes plain <code>atac.h5</code> whatever the representation, because the vertical
+(paired multiome) methods read the <code>atac</code> role and never open
+<code>atac_peak.h5</code> / <code>atac_gas.h5</code> (the representation is recorded nowhere on
+disk - feed the one <code>method_info(m)["atac"]</code> wants); <code>diagonal</code> / <code>mosaic</code> /
+<code>cross</code> keep <code>atac_peak.h5</code> / <code>atac_gas.h5</code>. <code>inputs_for</code> / <code>scan</code> name a
+near-miss when they find the other file (<code>atac.h5 not found; found
+atac_gas.h5 - vertical methods read atac.h5 ...</code>), and <code>scan</code>'s <code>caveat</code>
+column flags an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> role resolved to the wrong representation in either
+direction.</p>
 <hr />
 <h2 id="inspecting-variants-before-you-run">Inspecting variants before you run<a class="headerlink" href="#inspecting-variants-before-you-run" title="Anchor link to this section">&para;</a></h2>
 <p>Use <code>mtb.method_info</code> to see which categories, tasks, environment, and variant
@@ -1531,10 +1545,14 @@ support, so the fix is usually to adjust your <code>inputs</code> keys.</p>
 <p class="admonition-title"><code>status</code> tells you what is wired</p>
 <p>Every registry method has <code>status: "verified"</code>: its command template was
 cross-checked against the real entrypoint and executed end to end on a
-reference dataset - <code>notebooks/results/final_verification.tsv</code> in the
-repository records each run with its ARI, the <code>baseline</code> ARI from first
-verification and a <code>verdict</code> (<code>DRIFT</code> when a stochastic re-run leaves the
-tolerance).</p>
+reference dataset. <code>mtb.method_info(m, verbose=True)["verification"]</code>
+returns those runs (from the shipped
+<code>multibench/files/final_verification.tsv</code>) with their ARI, the
+<code>baseline</code> ARI from first verification and a <code>verdict</code> (<code>DRIFT</code> when a
+stochastic re-run leaves the tolerance). <code>status</code> says nothing about
+where the script lives: <code>method_info(m)["availability"]</code> is <code>public</code> for
+every method but SPIRAL and GPSA, whose scripts are
+<code>benchmark-host-only</code> (not published - <code>scan</code> reports them not runnable).</p>
 </div>
 <hr />
 <h2 id="validated-example-scalex-diagonal-integration-on-d28">Validated example: SCALEX diagonal integration on D28<a class="headerlink" href="#validated-example-scalex-diagonal-integration-on-d28" title="Anchor link to this section">&para;</a></h2>
@@ -1618,12 +1636,16 @@ SCALEX), so the run lands in the right conda env automatically.</p>
 two files - one per modality, because the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells differ - and
 passing both as a list makes each cell's file of origin the batch for the
 batch metrics (see <a href="../evaluate/">Evaluate a run</a>):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>                      <span class="c1"># {&#39;atac_cty&#39;: ..., &#39;rna_cty&#39;: ...}</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                       <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="n">labels</span><span class="p">[</span><span class="s2">&quot;rna_cty&quot;</span><span class="p">],</span> <span class="n">labels</span><span class="p">[</span><span class="s2">&quot;atac_cty&quot;</span><span class="p">]])</span>   <span class="c1"># SCALEX stacks RNA cells, then ATAC</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>                       <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">))</span>   <span class="c1"># {&#39;rna_cty&#39;: ..., &#39;atac_cty&#39;: ...} - RNA cells first, then ATAC</span>
 </span></code></pre></div>
-<p>(<code>run_all</code> finds that order for you and records it as <code>summary.label_order</code>;
-for a single <code>mtb.run</code> you state it.)</p>
+<p><code>labels_for</code> returns the files in the benchmark's cell-stacking order (<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>
+before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>; <code>cty1, cty2, ...</code> numerically), which is the order SCALEX
+stacks the cells, so the dict goes in directly; <code>labels_for("D28", "SCALEX",
+"diagonal")</code> follows that variant's own modality order. A dict you assembled
+in another order must pass <code>label_order=[...]</code> (or a list of paths in cell
+order). <code>run_all</code> finds that order for you and records it as
+<code>summary.label_order</code>.</p>
 <hr />
 <h2 id="choosing-a-cmd_template">Choosing a <code>cmd_template</code><a class="headerlink" href="#choosing-a-cmd_template" title="Anchor link to this section">&para;</a></h2>
 <p><code>cmd_template</code> decides <em>how</em> the built command is executed; <code>{cmd}</code> is the
@@ -1673,7 +1695,11 @@ that assume an embedding (e.g. ASW-style metrics) will not apply directly.
 <h2 id="spatial-registration">Spatial registration<a class="headerlink" href="#spatial-registration" title="Anchor link to this section">&para;</a></h2>
 <p><code>PASTE</code>, <code>PASTE2</code>, <code>SPIRAL</code> and <code>GPSA</code> (task <code>registration</code>, category <code>cross</code>)
 align <strong>spatial slices</strong>; their output is aligned coordinates, not an
-embedding. They take a <strong>directory</strong> of slices instead of modality files - the
+embedding. <code>PASTE</code> and <code>PASTE2</code> are public; <code>SPIRAL</code> and <code>GPSA</code> are
+<code>availability="benchmark-host-only"</code> - their scripts are not published, so a
+public install cannot fetch or run them (<code>scan</code> says <code>benchmark-host-only:
+script not published</code>, <code>find_methods(task="registration", available=True)</code>
+lists the two that run). They take a <strong>directory</strong> of slices instead of modality files - the
 role is <code>data_dir</code>, <code>scan()</code> shows their modalities as <code>(data_dir)</code>, and you
 pass no <code>modalities</code> to <code>run_all</code> / <code>inputs_for</code>:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>&lt;data_path&gt;/MYVISIUM/            (or &lt;data_path&gt;/MYVISIUM/processed/)
