@@ -25,14 +25,14 @@ from . import config
 from . import plot
 from . import eval
 from .data import catalog
-from .data.results import load_results, available_datasets
+from .data.results import load_results, available_datasets, results_coverage, recommend
 from .eval.pipeline import evaluate, to_long
 from .engine.runner import run
 from .engine.registry import list_methods, list_tasks
 from .engine.resolve import inputs_for, labels_for
 from .engine import ingest as io
 from .engine import envs as env
-from .discover import find_methods, method_info, params_for
+from .discover import find_methods, method_info, params_for, cite
 from .workflow import (scan, run_all, BatchResult, list_categories,
                        describe_layout, load_batch, runtime_hint, sweep)
 
@@ -43,4 +43,4 @@ __all__ = ["config", "plot", "eval", "catalog", "load_results", "available_datas
            "labels_for", "io", "env", "method_info", "find_methods", "params_for",
            "scan", "run_all", "BatchResult",
            "list_categories", "describe_layout", "load_batch",
-           "runtime_hint", "sweep", "__version__"]
+           "runtime_hint", "sweep", "__version__", "results_coverage", "recommend", "cite"]

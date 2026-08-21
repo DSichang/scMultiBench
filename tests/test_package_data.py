@@ -15,6 +15,8 @@ RUNTIME_READ = [
     "engine/methods.yaml",
     "engine/params.yaml",
     "engine/upstream_knobs.yaml",
+    "engine/references.yaml",
+    "result/rerun/long_all_D11.csv",
     "result/scib_metric/vertical integration/D11/scMoMaT/metric.csv",
     "engine/runtimes.yaml",
     "engine/env_specs.yaml",
