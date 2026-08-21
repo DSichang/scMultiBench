@@ -28,6 +28,12 @@ def test_scan_rejects_spatial_methods_on_non_spatial_data():
     assert spatial["reason"].str.contains("h5ad").all()
 
 
+def _has_dataset(name):
+    from multibench import config
+    return (config.DEFAULT.data_path / name).is_dir()
+
+
+@pytest.mark.skipif(not _has_dataset("D63"), reason="D63 slices not on this host")
 def test_scan_accepts_spatial_methods_on_spatial_data():
     df = mtb.scan("D63", category="cross")
     spatial = df[df["method"].isin(["PASTE", "PASTE2", "SPIRAL", "GPSA"])]
@@ -35,10 +41,14 @@ def test_scan_accepts_spatial_methods_on_spatial_data():
 
 
 def test_run_all_dry_run_lists_the_plan():
-    plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused", dry_run=True)
+    """dry_run returns the WHOLE plan (blocked rows kept with a reason); the
+    runnable subset is what will be attempted - 14 rows on the reference host."""
+    plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused", dry_run=True,
+                       verbose=False)
     assert isinstance(plan, pd.DataFrame)
-    assert len(plan) == 14
-    assert plan["runnable"].all()
+    ok = plan[plan["runnable"]]
+    assert (ok["reason"] == "").all()
+    assert len(ok) == 14
 
 
 def test_run_all_dry_run_respects_method_filter():
@@ -47,11 +57,24 @@ def test_run_all_dry_run_respects_method_filter():
     assert set(plan["method"]) == {"Matilda", "totalVI"}
 
 
+def test_run_all_dry_run_is_the_scan_frame():
+    """Holds on every host: dry_run == scan(dataset, category), row for row."""
+    for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D63", "cross"),
+                    ("D45", "mosaic")]:
+        if not _has_dataset(ds):
+            continue
+        plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
+        pd.testing.assert_frame_equal(plan, mtb.scan(ds, cat))
+
+
 def test_run_all_plans_match_scan():
+    """Runnable counts on the reference host (needs the method envs)."""
     for ds, cat, n in [("D11", "vertical", 14), ("D52", "cross", 8),
                        ("D63", "cross", 4), ("D45", "mosaic", 4)]:
-        plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True)
-        assert len(plan) == n, f"{ds}/{cat}: {len(plan)} != {n}"
+        if not _has_dataset(ds):
+            continue
+        plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
+        assert int(plan["runnable"].sum()) == n, f"{ds}/{cat}: {int(plan['runnable'].sum())} != {n}"
 
 
 def test_method_info_supports_multi_category_methods():
@@ -72,5 +95,13 @@ def test_batch_result_shape():
     assert len(r) == 1
     assert r.summary.loc[0, "ARI"] == 0.5
     assert r.failures.empty
+    # .long is DERIVED from the record's metrics when no tidy frame was attached
+    lng = r.long
+    assert list(lng.columns) == ["metric", "value", "method", "dataset", "category"]
+    assert lng.loc[0, "metric"] == "ARI" and lng.loc[0, "value"] == 0.5
+    assert lng.loc[0, "dataset"] == "D11" and lng.loc[0, "category"] == "vertical"
+    empty = BatchResult([{"method": "X", "status": "FAIL", "error": "boom", "_long": None}],
+                        "D11", "vertical")
+    assert empty.long.empty and list(empty.long.columns) == list(lng.columns)
     with pytest.raises(ValueError):
-        r.plot()          # no long frame -> must refuse rather than draw nothing
+        empty.plot()      # nothing scored -> must refuse rather than draw nothing
