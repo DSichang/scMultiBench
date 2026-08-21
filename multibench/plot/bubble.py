@@ -25,6 +25,9 @@ FAMILIES = [
     ("Batch correction", ["ASW_batch", "GC", "iLISI", "kBET"], "Greens"),
 ]
 
+#: glyph drawn in a cell whose metric was not computed for that method
+NA_MARK = "\u2013"
+
 
 @dataclass
 class FamilyBlock:
@@ -45,37 +48,124 @@ class BubbleTable:
     raw: pd.DataFrame
     overall: pd.Series        # combined overall used for the row order
     aggregate: str = "dataset"  # "dataset" -> circles; "summary" -> bars (paper c)
+    overall_basis: str = "rank"  # formula behind the Overall bars (style.OVERALL_DOC)
+    datasets: tuple = ()        # dataset ids present in the frame (sorted)
+    coverage: object = None     # Series: datasets per method (summary only)
+    method_datasets: object = None  # dict: method -> list of datasets it has rows in
 
 
 def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
+    """method x metric matrix: raw means (``"dataset"``) or the mean of the
+    within-dataset max-ranks (``"summary"``; absent method = rank 0, each
+    metric averaged over the datasets that computed it). The summary math
+    lives in :mod:`multibench.plot.style` and is shared with ``plot.bar``."""
     if aggregate == "summary":
-        # Rank methods within each dataset per metric, then average the ranks -
-        # but average each METRIC only over the datasets that computed it. A
-        # naive sum of the per-dataset frames aligns columns and turns a metric
-        # into all-NaN as soon as ONE dataset lacks it (a single-batch dataset
-        # has no batch metrics), which silently erased whole families.
-        parts = []
-        for _, g in df.groupby("dataset"):
-            piv = g.pivot_table(index="method", columns="metric", values="value",
-                                aggfunc="mean")
-            piv = piv.dropna(axis=1, how="all")   # a metric this dataset never computed
-            ranks = piv.apply(lambda col: style.rank_max(col.to_numpy()), axis=0)
-            parts.append(ranks)
-        idx = parts[0].index
-        for q in parts[1:]:
-            idx = idx.union(q.index)
-        # a method absent from a dataset scores 0 there (as in the paper's
-        # summary), but only for metrics that dataset actually computed
-        aligned = [q.reindex(idx).fillna(0) for q in parts]
-        stacked = pd.concat(aligned, keys=range(len(aligned)))
-        return stacked.groupby(level=1).mean()
+        return style.mean_rank_matrix(style.per_dataset_ranks(df))
     return df.pivot_table(index="method", columns="metric", values="value",
                           aggfunc="mean")
 
 
+def _resolve(requested, available, kind: str, canon) -> list:
+    """Map user-supplied selector names onto the frame's own spellings.
+
+    Resolution order per requested name: exact match -> same canonical form
+    (``catalog.canonical_metric`` / ``catalog.canonical_id``) -> case-
+    insensitive match. The FRAME's spelling is always returned, so a frame
+    built with ``to_long(method="Seurat v4")`` keeps its own label. Unknown
+    names raise ``ValueError`` with a did-you-mean hint and the list of values
+    present in the frame; a name listed twice (after canonicalisation) raises.
+    """
+    requested = [requested] if isinstance(requested, str) else list(requested)
+    available = list(available)
+    by_exact = set(available)
+    by_canon = {}
+    by_lower = {}
+    for a in available:
+        by_canon.setdefault(canon(a), a)          # frame spelling wins
+        by_lower.setdefault(str(a).lower(), a)
+    out, unknown = [], []
+    for r in requested:
+        if r in by_exact:
+            out.append(r)
+        elif canon(r) in by_canon:
+            out.append(by_canon[canon(r)])
+        elif str(r).lower() in by_lower:
+            out.append(by_lower[str(r).lower()])
+        else:
+            unknown.append(r)
+    if unknown:
+        import difflib
+        hints = {u: difflib.get_close_matches(str(u), [str(a) for a in available],
+                                             n=1, cutoff=0.6) for u in unknown}
+        did = "; ".join(f"{u!r}: did you mean {h[0]!r}?" for u, h in hints.items() if h)
+        raise ValueError(
+            f"unknown {kind}(s) {unknown}" + (f" ({did})" if did else "")
+            + f"; available in this frame: {sorted(map(str, available))}")
+    dup = sorted({x for x in out if out.count(x) > 1})
+    if dup:
+        raise ValueError(
+            f"{kind}s listed more than once after canonicalisation: {dup}")
+    return out
+
+
 def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
-                aggregate: str = "dataset") -> BubbleTable:
-    """Pivot tidy long results into per-family matrices plus a combined row order."""
+                aggregate: str = "dataset", *, require_complete: bool = False,
+                overall: str = "rank") -> BubbleTable:
+    """Pivot tidy long results into per-family matrices plus a combined row order.
+
+    Parameters
+    ----------
+    long_df : DataFrame
+        Tidy frame with at least ``method, metric, value``; an optional
+        ``dataset`` column is used by ``aggregate="summary"`` and for the
+        duplicate check. Rows whose ``metric`` is NaN are dropped.
+    metrics : list of str, optional
+        Metric codes to keep, drawn in THIS order within each family block
+        (family blocks themselves stay in paper order). Spellings are
+        canonicalised against the frame (``"ari"`` -> ``"ARI"``); an unknown
+        code raises ``ValueError`` listing the metrics present.
+    methods : list of str, optional
+        Methods to keep (case/alias tolerant, resolved against the frame's
+        own labels); unknown -> ``ValueError`` with a did-you-mean hint.
+    order : list of str, optional
+        Row order for the listed methods; every other method is appended
+        best-first. Reorders ONLY - it never filters (use ``methods=``);
+        unknown names raise ``ValueError``.
+    aggregate : {"dataset", "summary"}
+        ``"dataset"``: raw values (circles); several datasets in the frame
+        are averaged per method with a ``UserWarning``. ``"summary"``: the
+        paper's panel c - within-dataset max-ranks averaged across datasets
+        (bars). Anything else -> ``ValueError``.
+    require_complete : bool, keyword-only
+        With ``aggregate="summary"``: keep only methods present in EVERY
+        dataset of the frame (``ValueError`` if that leaves nothing). Default
+        ``False`` keeps all methods and warns when the matrix is incomplete.
+    overall : {"rank", "mean_overall"}, keyword-only
+        Formula for the per-family Overall under ``aggregate="summary"``
+        (see :data:`multibench.plot.style.OVERALL_DOC`). Default ``"rank"``
+        reproduces the paper; ``"mean_overall"`` is what ``plot.bar`` uses
+        by default.
+
+    Returns
+    -------
+    BubbleTable
+        ``methods`` (row order), ``blocks`` (one ``FamilyBlock`` per family
+        with ``raw / norm / ranks / overall``), ``matrix``, ``raw``,
+        ``overall`` (combined, drives the row order), ``aggregate``,
+        ``overall_basis``, ``datasets``, ``coverage`` (datasets per method,
+        summary only) and ``method_datasets``.
+
+    Raises
+    ------
+    ValueError
+        Missing columns, unknown selector names, duplicate
+        ``(method[, dataset], metric)`` rows (they would otherwise be
+        silently averaged), bad ``aggregate`` / ``overall``, or an empty
+        complete intersection.
+    """
+    import warnings
+    from ..data import catalog
+
     need = {"method", "metric", "value"}
     have = set(getattr(long_df, "columns", []))
     if not need.issubset(have):
@@ -88,46 +178,129 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         raise ValueError(
             f"bubble() needs a tidy long frame with columns "
             f"['method', 'metric', 'value']; missing {missing}.{hint}")
+    if aggregate not in ("dataset", "summary"):
+        raise ValueError(
+            f"aggregate must be 'dataset' or 'summary', got {aggregate!r}")
+    if overall not in style.OVERALL_BASES:
+        raise ValueError(
+            f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
+
     df = long_df.copy()
+    df = df.dropna(subset=["metric"])
     if methods is not None:
+        methods = _resolve(methods, df["method"].unique().tolist(), "method",
+                           catalog.canonical_id)
         df = df[df["method"].isin(methods)]
     if metrics is not None:
+        metrics = _resolve(metrics, df["metric"].unique().tolist(), "metric",
+                           catalog.canonical_metric)
         df = df[df["metric"].isin(metrics)]
-    raw_all = _pivot(df, aggregate)
+    if df.empty:
+        raise ValueError("no rows left after applying methods=/metrics= filters")
+
+    keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
+    dmask = df.duplicated(keys, keep=False)
+    if dmask.any():
+        raise ValueError(
+            f"{int(dmask.sum())} duplicate rows for the same {tuple(keys)} "
+            f"(e.g. {df[dmask][keys].drop_duplicates().head(3).to_dict('records')}); "
+            "bubble() would silently average them - deduplicate, or name the "
+            "variants distinctly (as sweep() does).")
+
+    datasets = (tuple(sorted(map(str, df["dataset"].dropna().unique())))
+                if "dataset" in df.columns else ())
+    method_datasets = None
+    if "dataset" in df.columns:
+        method_datasets = {m: sorted(map(str, g["dataset"].dropna().unique()))
+                           for m, g in df.groupby("method")}
+
+    cov = None
+    parts = None
+    if aggregate == "summary":
+        parts = style.per_dataset_ranks(df)
+        n = len(parts)
+        cov = style.coverage(parts)
+        if require_complete:
+            keep = cov[cov == n].index
+            if len(keep) == 0:
+                raise ValueError(
+                    f"no method has results on all {n} datasets "
+                    f"({', '.join(map(str, parts))}); coverage: "
+                    f"{cov.to_dict()}")
+            if len(keep) < len(cov):
+                df = df[df["method"].isin(keep)]
+                parts = style.per_dataset_ranks(df)
+                cov = style.coverage(parts)
+        elif n > 1 and (cov < n).any():
+            part = cov[cov < n].sort_values()
+            warnings.warn(
+                f"summary ranks an incomplete method x dataset matrix ({n} "
+                f"datasets): " + ", ".join(f"{m} seen in {c}/{n}" for m, c in part.items())
+                + "; a method absent from a dataset scores rank 0 there under "
+                "overall='rank' and is skipped under overall='mean_overall'. "
+                "Pass require_complete=True to restrict to the complete "
+                "intersection.", UserWarning, stacklevel=2)
+        raw_all = style.mean_rank_matrix(parts)
+    else:
+        if len(datasets) > 1:
+            warnings.warn(
+                f"aggregate='dataset' but the frame holds {len(datasets)} datasets "
+                f"({', '.join(datasets)}): values are averaged per method across "
+                "them and rows mix datasets. Pass aggregate='summary' for the "
+                "paper's rank-averaged panel, or filter to one dataset.",
+                UserWarning, stacklevel=2)
+        raw_all = df.pivot_table(index="method", columns="metric", values="value",
+                                 aggfunc="mean")
+
+    def _block(label, cmap, raw):
+        if aggregate == "summary" and overall == "mean_overall":
+            sub = {}
+            for ds, p in parts.items():
+                cols_p = [c for c in raw.columns if c in p.columns]
+                if cols_p:
+                    sub[ds] = p[cols_p]
+            ov = style.overall_by_basis(sub, "mean_overall").reindex(raw.index)
+        else:
+            ov = style.compute_overall(raw)
+        return FamilyBlock(
+            label=label, cmap=cmap, raw=raw,
+            norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
+            ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
+            overall=ov,
+        )
 
     blocks = []
+    known = {m for f in FAMILIES for m in f[1]}
     for label, fam_metrics, cmap in FAMILIES:
-        cols = [m for m in fam_metrics if m in raw_all.columns]
+        if metrics is not None:
+            cols = [m for m in metrics if m in fam_metrics and m in raw_all.columns]
+        else:
+            cols = [m for m in fam_metrics if m in raw_all.columns]
         if not cols:
             continue
         raw = raw_all[cols]
         if raw.notna().sum().sum() == 0:
             continue
-        blocks.append(FamilyBlock(
-            label=label, cmap=cmap, raw=raw,
-            norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
-            ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
-            overall=style.compute_overall(raw),
-        ))
+        blocks.append(_block(label, cmap, raw))
     # anything not in a known family still gets shown, neutrally coloured
-    leftover = [c for c in raw_all.columns
-                if not any(c in f[1] for f in FAMILIES)]
+    if metrics is not None:
+        leftover = [c for c in metrics if c not in known and c in raw_all.columns]
+    else:
+        leftover = [c for c in raw_all.columns if c not in known]
     if leftover:
-        raw = raw_all[leftover]
-        blocks.append(FamilyBlock(
-            label="Other", cmap="Purples", raw=raw,
-            norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
-            ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
-            overall=style.compute_overall(raw),
-        ))
+        blocks.append(_block("Other", "Purples", raw_all[leftover]))
     if not blocks:
         raise ValueError("no known metrics found in long_df")
 
     combined = pd.concat([b.overall for b in blocks], axis=1).mean(axis=1)
+    # stable sort: tied methods keep index (alphabetical) order, the same
+    # tie-break plot.bar uses, so the two figures agree under the same overall=
+    ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
     if order is not None:
-        idx = [m for m in order if m in raw_all.index]
+        order = _resolve(order, raw_all.index.tolist(), "method", catalog.canonical_id)
+        idx = order + [m for m in ranked if m not in order]
     else:
-        idx = combined.sort_values(ascending=False).index.tolist()
+        idx = ranked
 
     for b in blocks:
         b.raw = b.raw.reindex(idx)
@@ -141,6 +314,10 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         raw=pd.concat([b.raw for b in blocks], axis=1),
         overall=combined.loc[idx],
         aggregate=aggregate,
+        overall_basis=overall,
+        datasets=datasets,
+        coverage=cov,
+        method_datasets=method_datasets,
     )
 
 
@@ -150,6 +327,14 @@ def _method_language(name):
         return (registry.get(name).language or "python").lower()
     except Exception:
         return None
+
+
+def _method_needs_labels(name) -> bool:
+    try:
+        from ..engine import registry
+        return bool(registry.get(name).needs_labels)
+    except Exception:
+        return False
 
 
 def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
@@ -205,13 +390,25 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         for i, m in enumerate(methods):
             lang = _method_language(m)
             if not lang:
-                continue
-            label, colr = ("Py", "#3572A5") if lang.startswith("py") else ("R", "#777777")
+                # not a registry method (user's own method, a sweep variant,
+                # a result-dir token): say so with '?' rather than a blank
+                label, colr = "?", "#aaaaaa"
+            elif lang.startswith("py"):
+                label, colr = "Py", "#3572A5"
+            else:
+                label, colr = "R", "#777777"
             y = n_rows - i - 0.5
             ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colr,
                                 edgecolor="none", zorder=3))
             ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
                     fontsize=6.4, fontweight="bold", color="white")
+            if _method_needs_labels(m):
+                # supervised: the method consumed cell-type labels, so its
+                # clustering scores are not comparable with unsupervised rows
+                ax.add_patch(Circle((-0.38, y), 0.20, facecolor="#b8860b",
+                                    edgecolor="none", zorder=3))
+                ax.text(-0.38, y, "L", ha="center", va="center", zorder=4,
+                        fontsize=5.8, fontweight="bold", color="white")
 
     def rank_radius(colvals):
         """radius = 0.85 * sqrt(rank / n): area tracks the rank FRACTION.
@@ -230,6 +427,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         return pd.Series(0.15 + 0.70 * (r - lo) / (hi - lo), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
+    n_na = 0          # NaN metric cells drawn as a dash (legend added if any)
     for x, fi, kind, name in col_meta:
         b, mp = tbl.blocks[fi], mappers[fi]
         if kind == "overall":
@@ -251,6 +449,9 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             for i, m in enumerate(methods):
                 v = vals.loc[m]
                 if pd.isna(v):
+                    ax.text(x + 0.5, n_rows - i - 0.5, NA_MARK, color="#999999",
+                            ha="center", va="center", fontsize=7, zorder=3)
+                    n_na += 1
                     continue
                 y0 = n_rows - i - 1
                 # Adaptive floor: with n methods the shortest bar is at least
@@ -267,6 +468,9 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             for i, m in enumerate(methods):
                 v = vals.loc[m]
                 if pd.isna(v):
+                    ax.text(x + 0.55, n_rows - i - 0.5, NA_MARK, color="#999999",
+                            ha="center", va="center", fontsize=7, zorder=3)
+                    n_na += 1
                     continue
                 y = n_rows - i - 0.5
                 ax.add_patch(Circle((x + 0.55, y), R_MAX * float(rad.loc[m]) * 0.9,
@@ -325,10 +529,40 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         ax.text(xoff + (n_bub - 1) * 1.0, ly2 - 0.62, "1", fontsize=6.6,
                 ha="center")
 
+    # ---- how the rows were ordered (so bubble and bar can be reconciled) ---
+    y_bottom = -2.9 if tbl.aggregate != "summary" else -1.8
+    if tbl.aggregate == "summary":
+        basis = getattr(tbl, "overall_basis", "rank")
+        what = ("minmax of re-ranked mean ranks" if basis == "rank"
+                else "mean of per-dataset overall")
+        note = (f"Overall = overall='{basis}' ({what}); "
+                "rows ordered by mean of family Overall")
+    else:
+        note = ("Overall = minmax(mean metric rank); "
+                "rows ordered by mean of family Overall")
+    y_text = y_bottom - 0.55
+    ax.text(-0.9, y_text, note, fontsize=6.4, ha="left", va="center",
+            color="#666666")
+    if n_na:
+        y_text -= 0.45
+        ax.text(-0.9, y_text, f"{NA_MARK} = n/a (metric not computed for that method)",
+                fontsize=6.4, ha="left", va="center", color="#666666")
+    y_bottom = y_text - 0.35
+
+    # ---- row labels: add a dataset cue when one figure mixes datasets -----
+    labels = list(methods)
+    md = getattr(tbl, "method_datasets", None) or {}
+    if tbl.aggregate == "dataset" and len(getattr(tbl, "datasets", ())) > 1 and md:
+        labels = []
+        for m in methods:
+            ds = md.get(m, [])
+            labels.append(f"{m} \u00b7 {ds[0]}" if len(ds) == 1
+                          else f"{m} \u00b7 {len(ds)} ds")
+
     ax.set_xlim(-1.35, total_w + 0.45)
-    ax.set_ylim((-2.9 if tbl.aggregate != "summary" else -1.8), band_y + 1.0)
+    ax.set_ylim(y_bottom, band_y + 1.0)
     ax.set_yticks([n_rows - i - 0.5 for i in range(n_rows)])
-    ax.set_yticklabels(methods, fontsize=8.6)
+    ax.set_yticklabels(labels, fontsize=8.6)
     ax.set_xticks([])
     ax.set_aspect("equal")
     for spine in ax.spines.values():
@@ -340,12 +574,115 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     return fig
 
 
-def plot_bubble(long_df, *, metrics=None, methods=None, order=None,
-                aggregate="dataset", cmap=None, title=None, save=None):
-    """Build + render the Shiny-format table from a long results frame."""
+def bubble(long_df, *, metrics=None, methods=None, order=None,
+           aggregate="dataset", cmap=None, title=None, save=None,
+           show_language=True, require_complete=False, overall="rank"):
+    """Paper-style bubble table of a tidy long results frame (build + render).
+
+    Methods are rows (best first), metrics are columns grouped into the
+    benchmark's task families, each family preceded by an *Overall* bar.
+    ``mtb.plot.bubble(df)`` is the one call most users need; the two halves are
+    available as ``mtb.plot.build_table`` (numbers) and ``mtb.plot.render``
+    (figure) when you want to audit the ranks before drawing.
+
+    Parameters
+    ----------
+    long_df : pandas.DataFrame
+        Tidy frame with columns ``method, metric, value`` (what
+        :func:`multibench.to_long`, :func:`multibench.load_results` and
+        ``BatchResult.long()`` return); ``dataset`` and ``category`` columns
+        are optional - ``dataset`` is needed for ``aggregate="summary"``.
+        Rows whose ``metric`` is NaN are dropped. Concatenate frames
+        (``pd.concat([published, mine])``) to compare your method with the
+        benchmark's.
+    metrics : list of str, optional
+        Metric codes to show, drawn in THIS order within each family block
+        (the blocks themselves keep the paper's order: DR & clustering, then
+        batch correction, then "Other"). Case/alias tolerant (``"ari"`` ->
+        ``"ARI"``); an unknown code raises ``ValueError`` naming the metrics
+        present in the frame. Default: every metric in the frame.
+    methods : list of str, optional
+        Methods to show, resolved against the frame's own labels (exact,
+        canonical or case-insensitive match); unknown -> ``ValueError`` with
+        a did-you-mean hint. Default: all.
+    order : list of str, optional
+        Row order for the listed methods; any method not listed is appended
+        below them, best-first. This only REORDERS - it never filters rows
+        (use ``methods=``) - and ranks are still computed on the whole
+        (filtered) frame. Unknown names raise ``ValueError``.
+    aggregate : {"dataset", "summary"}
+        ``"dataset"`` (default): one dataset's raw values; metric markers are
+        circles. If the frame holds several datasets their values are averaged
+        per method and a ``UserWarning`` says so (row labels then carry the
+        dataset id). ``"summary"``: the paper's across-dataset panel -
+        within-dataset max-ranks averaged over datasets, drawn as bars; a
+        ``UserWarning`` lists methods missing from some datasets. Any other
+        value raises ``ValueError``.
+    cmap : str, optional
+        Matplotlib colormap name overriding the FIRST family's palette
+        (default blues / greens / purples per family).
+    title : str, optional
+        Figure title.
+    save : str or path-like, optional
+        If given, ``fig.savefig(save, bbox_inches="tight")`` - the suffix
+        picks the format (``.pdf``, ``.png``, ``.svg``).
+    show_language : bool
+        Draw the Py / R language chip left of each row (``?`` for methods not
+        in the registry, e.g. your own) and an ``L`` badge for methods that
+        consume cell-type labels (supervised; their scores are not comparable
+        with unsupervised rows). Default ``True``.
+    require_complete : bool
+        With ``aggregate="summary"``: restrict to methods present in EVERY
+        dataset instead of warning about the incomplete matrix; raises
+        ``ValueError`` if no method is complete. Default ``False``.
+{OVERALL_DOC}
+
+    Encoding
+    --------
+    * metric circle (``aggregate="dataset"``): RADIUS = within-column rank
+      fraction (largest = best, ``0.85 * sqrt(rank / n)``), FILL = min-max
+      scaled value along the family's colour ramp.
+    * metric bar (``aggregate="summary"``): LENGTH and fill = min-max scaled
+      mean rank.
+    * family *Overall* bar: length and fill = the family score (see
+      ``overall``), min-max scaled across the rows. Rows are ordered by the
+      MEAN of the family Overall scores. The *Rank* legend counts 1 = best,
+      whereas ``FamilyBlock.ranks`` stores max-ranks (``n`` = best).
+    * a cell whose metric was not computed for that method shows a dash
+      (``n/a`` in the legend) instead of a marker.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+
+    Raises
+    ------
+    ValueError
+        Missing columns (with a hint when the frame looks like
+        ``evaluate()``'s wide output), unknown ``metrics`` / ``methods`` /
+        ``order`` names, duplicate ``(method[, dataset], metric)`` rows (they
+        would be silently averaged - deduplicate or name variants distinctly),
+        bad ``aggregate`` / ``overall``, or an empty complete intersection.
+
+    Examples
+    --------
+    >>> pub = mtb.load_results("vertical", dataset="D11")
+    >>> mine = mtb.to_long(metrics, method="MyMethod", dataset="D11", category="vertical")
+    >>> fig = mtb.plot.bubble(pd.concat([pub, mine]), metrics=["ARI", "NMI", "ASW"],
+    ...                       title="D11 + MyMethod", save="d11.pdf")
+    """
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
-                      aggregate=aggregate)
-    fig = render(tbl, cmap=cmap, title=title)
+                      aggregate=aggregate, require_complete=require_complete,
+                      overall=overall)
+    fig = render(tbl, cmap=cmap, title=title, show_language=show_language)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")
     return fig
+
+
+# the `overall` parameter is documented once, in style.OVERALL_DOC, and
+# spliced into every docstring that accepts it (bubble, build_table, bar)
+bubble.__doc__ = bubble.__doc__.replace("{OVERALL_DOC}", style.OVERALL_DOC)
+
+#: back-compat name; ``mtb.plot.plot_bubble`` and ``bubble.plot_bubble`` keep working
+plot_bubble = bubble

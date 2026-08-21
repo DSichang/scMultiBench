@@ -42,3 +42,20 @@ def test_bar_group_batch_errors_clearly_without_batch_metrics():
 def test_bar_top_n():
     fig = mtb.plot.bar(_long(), top=2)
     assert len(fig.axes[0].get_yticklabels()) == 2
+
+
+def test_bar_xlabel_names_dataset_or_formula():
+    one = mtb.plot.bar(_long(datasets=("D1",)))
+    assert one.axes[0].get_xlabel() == "overall score (D1)"
+    two = mtb.plot.bar(_long())
+    assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
+    rk = mtb.plot.bar(_long(), overall="rank")
+    assert "rank of mean ranks" in rk.axes[0].get_xlabel()
+    with pytest.raises(ValueError, match="overall must be one of"):
+        mtb.plot.bar(_long(), overall="median")
+
+
+def test_bar_overall_doc_and_default_basis():
+    assert "mean_overall" in mtb.plot.bar.__doc__ and "rank" in mtb.plot.bar.__doc__
+    import inspect
+    assert inspect.signature(mtb.plot.bar).parameters["overall"].default == "mean_overall"
