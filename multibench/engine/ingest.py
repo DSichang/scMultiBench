@@ -44,6 +44,32 @@ _ALIASES = {"protein": "adt", "peak": "atac_peak", "gas": "atac_gas",
 _MOD_FILE = {"rna": "rna.h5", "adt": "adt.h5", "atac": "atac.h5",
              "atac_peak": "atac_peak.h5", "atac_gas": "atac_gas.h5"}
 _ATAC_KINDS = ("peak", "gene_activity")
+#: ``category=`` values accepted by to_canonical / export_dataset. Only
+#: ``vertical`` changes anything (its ATAC role reads plain ``atac.h5``).
+_CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
+
+
+def _check_category(category):
+    if category is None:
+        return None
+    if category not in _CATEGORIES:
+        raise ValueError(f"unknown category {category!r}; valid: {list(_CATEGORIES)}")
+    return category
+
+
+def _atac_filename(modality: str, category: str | None) -> str:
+    """On-disk name of an ATAC-family canonical file.
+
+    The VERTICAL (paired multiome) variants read the plain ``atac.h5`` role
+    whatever representation the method wants (peaks for most, gene activity
+    for Matilda/UnitedNet/scMDC - see ``method_info(m)['atac']``); the
+    diagonal/mosaic/cross roles read ``atac_peak.h5`` / ``atac_gas.h5``. So
+    ``category='vertical'`` maps every ATAC modality to ``atac.h5``; any other
+    category (or None) keeps the representation-named file.
+    """
+    if category == "vertical" and modality in ("atac", "atac_peak", "atac_gas"):
+        return "atac.h5"
+    return _MOD_FILE[modality]
 
 
 def _is_canonical_h5(path: Path) -> bool:
@@ -214,7 +240,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
                  convert: bool = True, *, layer: str | None = None,
                  obsm: str | None = None, mod: str | None = None,
                  dtype: str = "float64", compression: str | None = "gzip",
-                 block: int = 1024) -> Path:
+                 block: int = 1024, category: str | None = None) -> Path:
     """Convert ``src`` to a canonical ``.h5`` (``matrix/data`` FEATURES x CELLS,
     ``matrix/features``, ``matrix/barcodes``) and return its path.
 
@@ -233,9 +259,9 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     out
         Output file path, or a directory (existing) when ``modality`` is given -
         the canonical filename for that modality (``rna.h5``, ``adt.h5``,
-        ``atac_peak.h5``, ``atac_gas.h5``, ``atac.h5``) is appended. ``None``
-        with ``modality`` writes into the current directory; ``None`` without
-        ``modality`` raises.
+        ``atac_peak.h5``, ``atac_gas.h5``, ``atac.h5``; see ``category`` for
+        the ATAC names) is appended. ``None`` with ``modality`` writes into the
+        current directory; ``None`` without ``modality`` raises.
     modality
         ``'rna'`` | ``'adt'`` | ``'atac'`` | ``'atac_peak'`` | ``'atac_gas'``
         (aliases ``'protein'``->adt, ``'peak'``->atac_peak,
@@ -266,6 +292,22 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         compression enables chunking.
     block
         Number of features written per streaming step.
+    category
+        Keyword-only; which integration layout the file is for
+        (``'vertical'`` / ``'diagonal'`` / ``'mosaic'`` / ``'cross'``; default
+        ``None``). It only changes the FILENAME picked when ``out`` is a
+        directory (or None) and ``modality`` is an ATAC role:
+        ``category='vertical'`` writes ``atac.h5`` whatever the representation
+        (``'peak'``/``'atac_peak'`` and ``'gas'``/``'atac_gas'`` alike),
+        because the vertical (paired multiome) methods read the plain ``atac``
+        role and never look at ``atac_peak.h5``/``atac_gas.h5`` - without it
+        ``to_canonical(atac, d, modality='peak')`` writes ``atac_peak.h5`` and
+        ``mtb.scan(d, 'vertical')`` finds nothing runnable. The representation
+        is recorded NOWHERE on disk: ``atac.h5`` is just a matrix, and whether
+        a vertical method expects peaks or gene activity in it is
+        ``method_info(m)['atac']`` - feed the one it wants. The other three
+        categories (and ``None``) keep today's names ``atac_peak.h5`` /
+        ``atac_gas.h5`` / ``atac.h5``.
 
     Returns
     -------
@@ -280,16 +322,17 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         raise ValueError(
             f"src is not a canonical .h5 and convert=False: {src if isinstance(src, (str, Path)) else type(src).__name__}")
     modality = _norm_modality(modality)
+    category = _check_category(category)
     if out is None:
         if modality is None:
             raise ValueError("out path required to write a canonical .h5 "
                              "(or pass modality= to use the canonical filename)")
-        out = Path(".") / _MOD_FILE[modality]
+        out = Path(".") / _atac_filename(modality, category)
     else:
         is_dir_like = Path(out).is_dir() or str(out).endswith(("/", os.sep))
         out = Path(out)
         if modality is not None and is_dir_like:
-            out = out / _MOD_FILE[modality]
+            out = out / _atac_filename(modality, category)
 
     adata = _to_anndata(src)
     if _is_mudata(adata):
@@ -469,7 +512,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
                    adt: str | None = None, atac: str | None = None,
                    atac_kind: str | None = None, labels: str | None = None,
                    batch: str | None = None, dtype: str = "float64",
-                   compression: str | None = "gzip") -> Path:
+                   compression: str | None = "gzip",
+                   category: str | None = None) -> Path:
     """Write an AnnData / MuData as a canonical benchmark dataset folder.
 
     One call produces the flat layout ``describe_layout`` documents -
@@ -500,7 +544,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
         never silently falls back to a peak matrix). A warning is raised when
         the feature names contradict the declared kind. Because ``atac.h5`` is a
         hard link of ``atac_peak.h5`` (when the filesystem allows it), editing
-        one edits both.
+        one edits both. ``category`` changes these names - see below.
     labels
         Cell-type column: ``'obs:<col>'`` or ``'mod:<name>.obs:<col>'`` ->
         ``cty.csv`` (header ``x``).
@@ -511,6 +555,18 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
         (the layout of the shipped D52).
     dtype, compression
         Forwarded to :func:`to_canonical` (``float64`` + gzip by default).
+    category
+        Keyword-only; the integration layout the folder is for (default
+        ``None`` = today's behaviour above). ``'vertical'``: the ATAC matrix
+        is written as plain ``atac.h5`` ONLY, for BOTH ``atac_kind`` values -
+        the vertical (paired multiome) methods read the ``atac`` role and
+        never ``atac_peak.h5``/``atac_gas.h5``; the representation is recorded
+        nowhere on disk, so check ``method_info(m)['atac']`` says the kind you
+        exported (a gene-activity ``atac.h5`` fed to a peak method runs and
+        returns a WRONG embedding; ``scan`` flags the mismatch as a caveat).
+        ``'diagonal'`` / ``'mosaic'`` / ``'cross'``: ``atac_peak.h5`` or
+        ``atac_gas.h5`` exactly as named, and NO ``atac.h5`` link (so the
+        gene-activity role cannot fall back onto a peak matrix).
 
     Returns
     -------
@@ -519,6 +575,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
     """
     out = Path(dataset_dir)
     out.mkdir(parents=True, exist_ok=True)
+    category = _check_category(category)
     if atac is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(
             f"atac={atac!r} needs atac_kind= one of {list(_ATAC_KINDS)} "
@@ -564,9 +621,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
         suf = "" if idx is None else str(idx)
         for role, a, kw in mats:
             sub = a if mask is None else a[mask]
-            p = to_canonical(sub, out / f"{role}{suf}.h5", modality=role,
+            # vertical: the plain atac.h5 the `atac` role reads, nothing else;
+            # an explicit other category: the representation-named file only;
+            # no category: representation-named file (+ atac.h5 link for peaks)
+            fname = (f"atac{suf}.h5" if category == "vertical" and role.startswith("atac")
+                     else f"{role}{suf}.h5")
+            p = to_canonical(sub, out / fname, modality=role,
                              dtype=dtype, compression=compression, **kw)
-            if role == "atac_peak":
+            if role == "atac_peak" and category is None:
                 _link_or_copy(p, out / f"atac{suf}.h5")
         if lab is not None:
             write_labels(lab if mask is None else np.asarray(lab)[mask],
@@ -578,7 +640,8 @@ def from_mudata(mdata, dataset_dir: Path | str, *, rna: str | None = "rna",
                 adt: str | None = None, atac: str | None = None,
                 atac_kind: str | None = None, labels: str | None = None,
                 batch: str | None = None, dtype: str = "float64",
-                compression: str | None = "gzip") -> Path:
+                compression: str | None = "gzip",
+                category: str | None = None) -> Path:
     """MuData -> canonical dataset folder; thin alias of :func:`export_dataset`.
 
     Parameters
@@ -598,6 +661,9 @@ def from_mudata(mdata, dataset_dir: Path | str, *, rna: str | None = "rna",
         ``'mod:<mod>.obs:<col>'`` form.
     dtype, compression
         Forwarded to :func:`to_canonical`.
+    category
+        Forwarded to :func:`export_dataset` (``'vertical'`` -> the ATAC matrix
+        is written as plain ``atac.h5``).
     """
     if isinstance(mdata, (str, Path)):
         mdata = _to_anndata(mdata)
@@ -621,4 +687,4 @@ def from_mudata(mdata, dataset_dir: Path | str, *, rna: str | None = "rna",
     return export_dataset(mdata, dataset_dir, rna=_mod(rna), adt=_mod(adt),
                           atac=_mod(atac), atac_kind=atac_kind,
                           labels=_obs(labels), batch=_obs(batch),
-                          dtype=dtype, compression=compression)
+                          dtype=dtype, compression=compression, category=category)
