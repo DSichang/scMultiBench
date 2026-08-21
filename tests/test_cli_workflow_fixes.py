@@ -128,8 +128,10 @@ def test_cli_scan_columns_all_and_machine_formats_are_full(capsys):
     # the CLI must not clip in machine formats - but scan() itself tail-truncates
     # a very long reason with " ... " (longer paths on the benchmark host), so
     # compare against the frame instead of asserting the marker is absent
-    _reason = multibench.scan("D11", "vertical", methods=["Matilda"])["reason"].iloc[0]
-    assert rc == 0 and _reason in out and "see mtb.env.doctor()" in out
+    # (on a host with the envs installed the rna+adt row has no reason at all,
+    # so check every printed row's reason rather than one fixed phrase)
+    _frame = multibench.scan("D11", "vertical", methods=["Matilda"])
+    assert rc == 0 and all(str(r) in out for r in _frame["reason"] if r)
 
 
 def test_cli_scan_modalities_filter(capsys):
