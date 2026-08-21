@@ -9,6 +9,9 @@ Two layers:
   likely to hold in memory (ndarray, DataFrame, Series, Categorical, list,
   AnnData, a path of any supported suffix, a list of label files) and return
   plain numpy arrays. :func:`multibench.evaluate` is built on these.
+* ``align_vector`` - reorders an indexed Series/DataFrame to an output's cell
+  ids (AnnData ``obs_names`` / DataFrame index), so a label Series is matched
+  by barcode rather than by position whenever both sides carry ids.
 """
 from __future__ import annotations
 
@@ -130,7 +133,9 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
       ORDER, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
     * ``dict`` with ONE entry (what :func:`multibench.labels_for` returns for a
       single-label dataset) - that file; several entries raise, because a dict
-      has no cell order - pass ``list(d.values())`` in batch order instead;
+      has no cell order of its own - pass the paths as a list in the method's
+      stacking order (or, in :func:`multibench.evaluate`, the dict plus
+      ``label_order=``);
     * ``numpy.ndarray`` (1-D, or ``(n, 1)``), ``pandas.Series``,
       ``pandas.Categorical``, ``pandas.Index``, or a list/tuple of scalars;
     * a single-column ``pandas.DataFrame`` (or a wider one with ``column=``).
@@ -154,10 +159,7 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
     if isinstance(x, dict):
         if len(x) == 1:
             return np.asarray(read_labels(next(iter(x.values())), column=column))
-        raise ValueError(
-            f"{what}: got a dict with {len(x)} label files {sorted(map(str, x))}; "
-            f"pass a list of paths in cell order, e.g. "
-            f"[{', '.join(repr(str(k)) for k in x)}] -> list(d.values())")
+        raise ValueError(_multi_dict_message(what, x, label_order_hint=(what == "labels")))
     if isinstance(x, (list, tuple)) and len(x) > 0 and all(_is_label_file(e) for e in x):
         return np.concatenate([np.asarray(read_labels(p, column=column)) for p in x])
     if isinstance(x, pd.DataFrame):
@@ -186,6 +188,115 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
     raise TypeError(
         f"{what} must be a CSV path, list of paths, or 1-D array-like of length "
         f"n_cells; got {type(x).__name__}")
+
+
+def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
+    """The error for a ``{name: path}`` dict with several entries.
+
+    A dict fixes no cell order, and the order is the method's STACKING order -
+    the order in which the method concatenated its input cells - which is not
+    alphabetical: ``cty1 < cty2 < ...`` numerically, and ``rna`` before
+    ``atac``. The old hint (``list(d.values())``) recommended the alphabetical
+    order and scored a perfect D28 embedding at ARI 0.001 - hence this message
+    names the keys, states the rule and points at the helper that returns the
+    files in that order.
+    """
+    keys = [str(k) for k in d]
+    fix = (f"pass label_order=[...] with these keys in that order (label_order="
+           f"list(d) trusts the dict's order)" if label_order_hint
+           else "pass the paths as a list in that order")
+    return (
+        f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
+        f"fix the cell order, and the order MUST be the method's stacking order "
+        f"(the order the method concatenated its input cells: numbered files "
+        f"ascending, cty1, cty2, ...; rna before atac) - NOT alphabetical. "
+        f"{fix}, or a list of paths in cell order. "
+        f"mtb.labels_for(dataset, method=<method>, category=<category>) returns "
+        f"the files in that order.")
+
+
+def _first(ix, n: int = 5) -> list:
+    return [str(v) for v in list(ix[:n])]
+
+
+def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> np.ndarray:
+    """Align an indexed ``Series``/``DataFrame`` to the output's cell ids.
+
+    This is the pandas contract every scverse user expects: a Series indexed by
+    cell barcode is matched BY BARCODE, not by position. ``evaluate()`` calls
+    this when ``output`` carries ids (an AnnData's ``obs_names``, or a
+    DataFrame with a non-default index) and ``x`` carries a non-default index.
+
+    Parameters
+    ----------
+    x : pandas.Series or pandas.DataFrame
+        Labels indexed by cell id. A DataFrame must have one column, or
+        ``column=`` names the one to take.
+    ids : pandas.Index
+        The output's cell ids, in the output's row order.
+    what : str
+        Argument name for error messages (``'labels'``, ``'batch'``,
+        ``'clustering'``).
+    column : str, optional
+        Column of a multi-column DataFrame to take.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``x`` reordered to ``ids`` (a no-op when the indexes already agree
+        element-wise, which also covers duplicated ids in that case).
+
+    Raises
+    ------
+    ValueError
+        ``x`` (or ``ids``) has duplicate ids so the mapping is ambiguous; some
+        of the output's ids are missing from ``x``; ``x`` has ids the output
+        lacks. The message names the first few offenders and the positional
+        escape hatch (``{what}.to_numpy()``).
+    """
+    if isinstance(x, pd.DataFrame):
+        if column is not None:
+            if column not in x.columns:
+                raise ValueError(
+                    f"{what}: DataFrame has no column {column!r}; columns are "
+                    f"{[str(c) for c in x.columns]}")
+            x = x[column]
+        elif x.shape[1] == 1:
+            x = x.iloc[:, 0]
+        else:
+            raise ValueError(
+                f"{what}: DataFrame has {x.shape[1]} columns "
+                f"{[str(c) for c in x.columns]}; pass one column (e.g. "
+                f"df['celltype']) or column=<name>")
+    ids = pd.Index(ids)
+    if len(x.index) == len(ids) and x.index.equals(ids):
+        return np.asarray(pd.Series(x).to_numpy())       # same order already
+    if not x.index.is_unique:
+        dup = x.index[x.index.duplicated()]
+        raise ValueError(
+            f"{what}: the Series index has {len(dup)} duplicated id(s) (first: "
+            f"{_first(dup)}); cannot align by cell id - pass {what}.to_numpy() "
+            f"to match positionally")
+    if not ids.is_unique:
+        dup = ids[ids.duplicated()]
+        raise ValueError(
+            f"output carries {len(dup)} duplicated cell id(s) (first: "
+            f"{_first(dup)}); cannot align {what} by cell id - pass "
+            f"{what}.to_numpy() to match positionally")
+    missing = ids.difference(x.index, sort=False)
+    extra = x.index.difference(ids, sort=False)
+    if len(missing) or len(extra):
+        hint = ""
+        if len(missing) == len(ids):
+            hint = (" The two id sets are disjoint: is the output transposed "
+                    "(evaluate expects cells x dims), or indexed differently?")
+        raise ValueError(
+            f"{what}: cannot align by cell id - {len(missing)} of the output's "
+            f"{len(ids)} cells are missing from {what} (first: {_first(missing)}) "
+            f"and {what} has {len(extra)} id(s) the output lacks (first: "
+            f"{_first(extra)}). Pass {what} for exactly the output's cells, or "
+            f"{what}.to_numpy() to match positionally.{hint}")
+    return np.asarray(x.reindex(ids).to_numpy())
 
 
 def _anndata_matrix(adata, obsm: str) -> np.ndarray:
