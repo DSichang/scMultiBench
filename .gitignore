@@ -4,7 +4,8 @@
 *.egg-info/
 # external data symlinks (machine-specific, not part of the package source)
 multibench/engine/env_locks/.build/
-/multibench/result
+/multibench/result/*
+!/multibench/result/scib_metric/
 __pycache__/
 *.py[cod]
 .pytest_cache/

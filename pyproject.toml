@@ -23,7 +23,7 @@ multibench = "multibench.cli:main"
 packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.engine"]
 
 [tool.setuptools.package-data]
-multibench = ["engine/methods.yaml", "engine/env_specs.yaml", "engine/env_groups.yaml", "engine/params.yaml", "engine/upstream_knobs.yaml", "engine/runtimes.yaml", "engine/env_locks/*.yml", "engine/env_locks/*.sh", "engine/drivers/*", "engine/packed_urls.json", "files/*"]
+multibench = ["engine/methods.yaml", "engine/env_specs.yaml", "engine/env_groups.yaml", "engine/params.yaml", "engine/upstream_knobs.yaml", "engine/runtimes.yaml", "engine/env_locks/*.yml", "engine/env_locks/*.sh", "engine/drivers/*", "engine/packed_urls.json", "files/*", "result/scib_metric/*/*/*/*.csv", "result/scib_metric/*/*/*/*/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
