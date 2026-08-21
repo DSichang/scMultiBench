@@ -60,7 +60,11 @@ def test_export_dataset_vertical(tmp_path):
     import multibench as mtb
     sc = mtb.scan("MYCITE", "vertical", data_path=root)
     assert ((sc["method"] == "Matilda") & (sc["modalities"] == "rna+adt")).any()
-    assert not sc["reason"].str.contains("input files not found").any()
+    # Only the rna+adt variants must resolve: a CITE-seq folder legitimately
+    # lacks atac.h5 for the multiome variants (visible on a host where the
+    # env gate passes and the file gate actually runs).
+    citeseq = sc[sc["modalities"] == "rna+adt"]
+    assert not citeseq["reason"].str.contains("input files not found").any()
 
 
 def test_export_dataset_selectors_and_errors(tmp_path):
