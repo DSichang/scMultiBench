@@ -43,3 +43,37 @@ def test_namespace_all_hygiene():
     assert "recipe" in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
     assert "category_folder" in mtb.config.__all__ and "Path" not in mtb.config.__all__
     assert "to_canonical" in mtb.io.__all__
+
+
+# --- P12: inputs_for's default warns about phantom paths ---------------------
+
+def test_inputs_for_default_warns_on_missing(tmp_path):
+    d = tmp_path / "D27"; d.mkdir()
+    (d / "rna.h5").write_text("")   # peak.h5 deliberately missing
+    with pytest.warns(UserWarning, match="atac_peak") as rec:
+        got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path)
+    assert got["atac_peak"].endswith("/D27/atac_peak.h5")     # fallback path still returned
+    msg = str(rec[0].message)
+    assert "1 resolved input path(s) do not exist" in msg and "check=True to raise" in msg
+
+
+def test_inputs_for_check_false_is_silent(tmp_path):
+    import warnings
+    d = tmp_path / "D27"; d.mkdir()
+    (d / "rna.h5").write_text("")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path,
+                                 check=False)
+    assert "atac_peak" in got
+
+
+def test_inputs_for_default_no_warning_when_present(tmp_path):
+    import warnings
+    d = tmp_path / "D27"; d.mkdir()
+    for n in ["rna.h5", "peak.h5"]:
+        (d / n).write_text("")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path)
+    assert got["atac_peak"].endswith("/D27/peak.h5")

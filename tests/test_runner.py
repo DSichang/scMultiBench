@@ -109,3 +109,77 @@ def test_run_surfaces_stdout_and_stderr_on_failure(tmp_path, monkeypatch):
     msg = str(excinfo.value)
     assert "boom-err" in msg
     assert "boom-out" in msg
+
+
+# --- P12: run() preflights the conda env before touching the disk -----------
+
+def _fake_popen_factory(calls):
+    class FakePopen:
+        def __init__(self, cmd, cwd, stdout, stderr, text, env=None,
+                     start_new_session=False):
+            calls["cmd"] = cmd
+            self.pid = 4242
+            self.returncode = 0
+            with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
+                f.create_dataset("data", data=np.zeros((6, 3)))
+
+        def communicate(self):
+            return "", ""
+
+        def kill(self):
+            pass
+
+        def wait(self):
+            return self.returncode
+    return FakePopen
+
+
+def test_run_preflight_raises_when_env_missing(tmp_path, monkeypatch):
+    import pytest
+    import multibench as mtb
+    from multibench.engine import runner
+
+    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["base"])
+
+    def must_not_spawn(*a, **k):
+        raise AssertionError("Popen must not be reached when the env is missing")
+    monkeypatch.setattr(runner.subprocess, "Popen", must_not_spawn)
+
+    out = tmp_path / "out"
+    with pytest.raises(EnvironmentError) as e:
+        mtb.run(method="SCALEX", category="diagonal",
+                inputs={"rna": str(tmp_path / "a.h5"), "atac_gas": str(tmp_path / "b.h5")},
+                out_dir=str(out), convert=False)
+    msg = str(e.value)
+    assert "is not installed" in msg
+    assert "multibench env install --methods SCALEX" in msg
+    assert "mtb.env.doctor()" in msg
+    assert not out.exists(), "preflight must fail before anything is written"
+
+
+def test_run_preflight_skipped_with_cmd_template(tmp_path, monkeypatch):
+    import multibench as mtb
+    from multibench.engine import runner
+    calls = {}
+    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["base"])
+    monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen_factory(calls))
+    res = mtb.run(method="SCALEX", category="diagonal",
+                  inputs={"rna": str(tmp_path / "a.h5"), "atac_gas": str(tmp_path / "b.h5")},
+                  out_dir=str(tmp_path / "out"), convert=False,
+                  cmd_template="conda run -n scalex {cmd}")
+    assert calls["cmd"][:4] == ["conda", "run", "-n", "scalex"]
+    assert res.output.shape == (6, 3)
+
+
+def test_run_preflight_skipped_when_probe_empty(tmp_path, monkeypatch):
+    import multibench as mtb
+    from multibench.engine import runner
+    calls = {}
+    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: [])
+    monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen_factory(calls))
+    res = mtb.run(method="SCALEX", category="diagonal",
+                  inputs={"rna": str(tmp_path / "a.h5"), "atac_gas": str(tmp_path / "b.h5")},
+                  out_dir=str(tmp_path / "out"), convert=False)
+    # default template still targets the method's env; no false block
+    assert "run" in calls["cmd"] and runner.envs.group_for("SCALEX") in calls["cmd"]
+    assert res.output.shape == (6, 3)
