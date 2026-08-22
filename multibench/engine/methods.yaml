@@ -682,14 +682,14 @@ methods:
     tasks: [registration]
     variants:
       - when: {category: cross}
-        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/SPIRAL_latest/main_SPIRAL_ori.py
+        entrypoint: tools_scripts/SPIRAL/main_SPIRAL.py   # upstream dir supplies spiral/ + Process/; the script itself is the broken variant, so the package DRIVER below runs instead
+        driver: engine/drivers/run_spiral.py              # the benchmark's working SPIRAL script, shipped with the package (mclust shim + thread caps set inside)
         language: python
-        cwd_at_script: true            # needs cwd=SPIRAL_latest (local Process/spiral imports + ./txt_file/ intermediates); main_SPIRAL.py is broken, _ori is intact
+        cwd_at_script: true            # cwd = tools_scripts/SPIRAL (local Process/spiral imports + ./txt_file/ intermediates)
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}
         output: {kind: coords, file: ""}
-        run_env: {R_PROFILE_USER: /media/disk2/Sichang/scmbench_pkg/spiral_mclust_shim.Rprofile, OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # mclust dimnames fix: shim binds data to an R symbol before Mclust (rpy2 closure-call breaks mclust 6.x dimnames<-); thread caps for shared host
   - id: GPSA
     status: verified
     language: python
@@ -697,14 +697,14 @@ methods:
     tasks: [registration]
     variants:
       - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
-        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/GPSA/main_GPSA.py
+        entrypoint: tools_scripts/GPSA/main_GPSA.py      # upstream file writes only an elapsed time; the package DRIVER below writes the aligned slices
+        driver: engine/drivers/run_gpsa.py                # the benchmark's working GPSA script, shipped with the package
         language: python
         cwd_at_script: true            # globs *.h5ad from --data_dir; variational-GP spatial alignment (gpsa+gpytorch, torch CUDA), HVG=3000
         args:
           - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files (obs[Ground_Truth] + obsm[spatial])
-          - {role: out_dir,  flag: "--save_dir"}    # writes GPSA_aligned_slices/aligned_slice_*.h5ad (inline metric block buggy upstream, crashes AFTER writing slices)
+          - {role: out_dir,  flag: "--save_dir"}    # writes aligned_slice_*.h5ad into save_dir
         output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
-        run_env: {OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # thread caps for shared host
   - id: PASTE
     status: verified
     language: python

@@ -98,7 +98,8 @@ def test_availability_is_derived_from_absolute_entrypoints():
                  if registry.get(m).availability == "benchmark-host-only"}
     absolute = {m for m in mtb.list_methods()
                 for v in registry.get(m).variants if Path(v.entrypoint).is_absolute()}
-    assert host_only == absolute == {"SPIRAL", "GPSA"}
+    # every method ships a public entrypoint (SPIRAL/GPSA via package drivers)
+    assert host_only == absolute == set()
     for m in mtb.list_methods():
         assert discover.method_info(m)["availability"] == registry.get(m).availability
     assert discover.method_info("PASTE")["availability"] == "public"
@@ -107,7 +108,8 @@ def test_availability_is_derived_from_absolute_entrypoints():
 
 
 def test_find_methods_available_keyword():
-    assert set(discover.find_methods(available=False)) == {"SPIRAL", "GPSA"}
+    assert set(discover.find_methods(available=False)) == set()
+    assert {"SPIRAL", "GPSA"} <= set(discover.find_methods(available=True))
     assert set(discover.find_methods(task="registration", available=True)) == {"PASTE", "PASTE2"}
     assert set(discover.find_methods(available=True)) | {"SPIRAL", "GPSA"} == set(mtb.list_methods())
     assert discover.find_methods(available=None) == discover.find_methods()
