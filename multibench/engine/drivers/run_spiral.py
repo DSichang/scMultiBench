@@ -28,8 +28,9 @@ else:
 _sys.path.insert(0, _script_dir)                       # Process/ (and spiral/ as fallback)
 _sys.path.insert(0, str(_Path(__file__).with_name("spiral_support")))   # the verified spiral/ package, first
 _os.makedirs(_os.path.join(_os.getcwd(), "txt_file"), exist_ok=True)
-_os.environ.setdefault("R_PROFILE_USER",
-                       str(_Path(__file__).with_name("spiral_mclust_shim.Rprofile")))
+# hard override, as the benchmark's verified run_env did: the shim must win
+# over anything the env's activation scripts or the caller might have set
+_os.environ["R_PROFILE_USER"] = str(_Path(__file__).with_name("spiral_mclust_shim.Rprofile"))
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
     _os.environ.setdefault(_v, "8")
 
