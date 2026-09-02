@@ -682,14 +682,17 @@ methods:
     tasks: [registration]
     variants:
       - when: {category: cross}
-        entrypoint: tools_scripts/SPIRAL/main_SPIRAL.py   # upstream dir supplies spiral/ + Process/; the script itself is the broken variant, so the package DRIVER below runs instead
-        driver: engine/drivers/run_spiral.py              # the benchmark's working SPIRAL script, shipped with the package (mclust shim + thread caps set inside)
+        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/SPIRAL_latest/main_SPIRAL_ori.py
         language: python
-        cwd_at_script: true            # cwd = tools_scripts/SPIRAL (local Process/spiral imports + ./txt_file/ intermediates)
+        cwd_at_script: true            # needs cwd=SPIRAL_latest (local Process/spiral imports + ./txt_file/ intermediates); main_SPIRAL.py upstream is broken, _ori is intact.
+                                       # benchmark-host-only for now: a package-driver port (0.3.0 attempt) ran the full training but failed at the
+                                       # post-mclust stage on a CLEAN txt_file/ ("<slice-prefixed barcodes> not in index"), i.e. the verified run
+                                       # depends on intermediates cached in SPIRAL_latest/txt_file. Port again once that dependency is understood.
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}
         output: {kind: coords, file: ""}
+        run_env: {R_PROFILE_USER: /media/disk2/Sichang/scmbench_pkg/spiral_mclust_shim.Rprofile, OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # mclust dimnames fix: shim binds data to an R symbol before Mclust (rpy2 closure-call breaks mclust 6.x dimnames<-); thread caps for shared host
   - id: GPSA
     status: verified
     language: python
