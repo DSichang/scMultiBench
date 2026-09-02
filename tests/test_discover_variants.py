@@ -98,8 +98,8 @@ def test_availability_is_derived_from_absolute_entrypoints():
                  if registry.get(m).availability == "benchmark-host-only"}
     absolute = {m for m in mtb.list_methods()
                 for v in registry.get(m).variants if Path(v.entrypoint).is_absolute()}
-    # every method ships a public entrypoint (SPIRAL/GPSA via package drivers)
-    assert host_only == absolute == set()
+    # GPSA ships a package driver; SPIRAL is still benchmark-host-only
+    assert host_only == absolute == {"SPIRAL"}
     for m in mtb.list_methods():
         assert discover.method_info(m)["availability"] == registry.get(m).availability
     assert discover.method_info("PASTE")["availability"] == "public"
@@ -108,24 +108,23 @@ def test_availability_is_derived_from_absolute_entrypoints():
 
 
 def test_find_methods_available_keyword():
-    assert set(discover.find_methods(available=False)) == set()
-    assert {"SPIRAL", "GPSA"} <= set(discover.find_methods(available=True))
-    assert set(discover.find_methods(task="registration", available=True)) == {"PASTE", "PASTE2", "SPIRAL", "GPSA"}
+    assert set(discover.find_methods(available=False)) == {"SPIRAL"}
+    assert "GPSA" in discover.find_methods(available=True)
+    assert set(discover.find_methods(task="registration", available=True)) == {"PASTE", "PASTE2", "GPSA"}
     assert set(discover.find_methods(available=True)) | {"SPIRAL", "GPSA"} == set(mtb.list_methods())
     assert discover.find_methods(available=None) == discover.find_methods()
     # top-level alias takes the keyword too
     assert mtb.find_methods(available=False) == discover.find_methods(available=False)
 
 
-def test_no_method_carries_the_host_only_sentence_any_more():
-    """GPSA/SPIRAL run through package drivers since 0.3.0, so the availability
-    sentence that method_info(verbose=True) appends for host-only methods must
-    not appear for any method; the mechanism itself is covered by
-    test_benchmark_host_only_reason_text."""
-    for m in ("GPSA", "SPIRAL", "PASTE"):
-        info = discover.method_info(m, verbose=True)
-        assert info["availability"] == "public"
-        assert not info["notes_long"] or "benchmark-host-only" not in info["notes_long"]
+def test_host_only_sentence_only_for_spiral():
+    info = discover.method_info("SPIRAL", verbose=True)
+    assert info["availability"] == "benchmark-host-only"
+    assert "benchmark-host-only" in info["notes_long"]
+    for m in ("GPSA", "PASTE"):
+        pub = discover.method_info(m, verbose=True)
+        assert pub["availability"] == "public"
+        assert not pub["notes_long"] or "benchmark-host-only" not in pub["notes_long"]
 
 
 def test_benchmark_host_only_reason_text(tmp_path):

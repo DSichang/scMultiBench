@@ -65,8 +65,8 @@ def test_only_the_known_two_still_need_a_machine_specific_script():
     absolute = {m for m in mtb.list_methods()
                 for v in registry.get(m).variants
                 if Path(v.entrypoint).is_absolute()}
-    # 0.3.0: SPIRAL and GPSA run through package drivers (engine/drivers/
-    # run_spiral.py, run_gpsa.py) with repo-relative entrypoints, so no
-    # registry entry points at the benchmark host any more. If this set ever
-    # grows again, a method has become unrunnable off-host - fix that, not this.
-    assert absolute == set(), absolute
+    # 0.3.0: GPSA runs through a package driver (engine/drivers/run_gpsa.py).
+    # SPIRAL is the one method still tied to the benchmark host: its clean-run
+    # port failed after mclust (see methods.yaml). If this set grows, a method
+    # has become unrunnable off-host - fix that, not this assertion.
+    assert absolute == {"SPIRAL"}, absolute
