@@ -12,32 +12,38 @@ import pandas as pd
 # Metrics that shell out to scib's prebuilt LISI helper binary.
 _LISI_METRICS = ("cLISI", "iLISI")
 
+#: C++ compilers tried, in order, when the shipped LISI helper cannot execute
+_CXX_CANDIDATES = ("g++", "c++", "clang++")
 
-@functools.lru_cache(maxsize=1)
-def _lisi_helper_problem() -> str | None:
-    """Why scib's LISI helper cannot run here, or None when it can.
+#: the exact build line scib's own README gives for knn_graph.o
+_CXX_FLAGS = ("-std=c++11", "-O3")
 
-    scib runs a prebuilt C++ binary with neither ``check=True`` nor any capture
-    of its stderr, so a binary that fails to start is discovered much later - as
-    a FileNotFoundError on an output file that was never written, once per
-    metric, with the actual cause discarded. A loader failure (an older
-    libstdc++ ahead of the system one, a foreign architecture) is invisible that
-    way. Probing the binary once turns it into one message naming the cause.
+#: embeddings above this many cells announce the Leiden sweep on stderr when
+#: ``verbose`` is None (the sweep then takes long enough to look like a hang)
+_SWEEP_NOTICE_CELLS = 2000
 
-    Healthy behaviour, verified on Linux x86-64: exits 0 and prints its usage
-    line when called with no arguments.
+
+def _find_cxx() -> str | None:
+    """Path of the first C++ compiler on PATH, or None."""
+    import shutil
+    for name in _CXX_CANDIDATES:
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def _probe_lisi_binary(exe) -> str | None:
+    """Run scib's LISI helper once with no arguments; None when it starts.
+
+    Returns the problem as a string otherwise. ``"cannot be executed"`` is the
+    verdict for an ``OSError`` at exec time (``Exec format error``: the
+    shipped binary is Linux x86-64 and this is macOS or another architecture)
+    - the case a rebuild from source fixes.
     """
     import os
     import subprocess
-    from pathlib import Path
 
-    try:
-        import scib
-    except Exception as exc:  # noqa: BLE001 - absence is the caller's problem
-        return f"scib is not importable ({type(exc).__name__})"
-    exe = Path(scib.__file__).parent / "knn_graph" / "knn_graph.o"
-    if not exe.is_file():
-        return f"{exe} is missing from the scib installation"
     if not os.access(exe, os.X_OK):
         try:
             exe.chmod(exe.stat().st_mode | 0o111)
@@ -59,6 +65,93 @@ def _lisi_helper_problem() -> str | None:
         return None
     err = (p.stderr or "").strip().splitlines()
     return err[0] if err else f"{exe} exited {p.returncode} with no output"
+
+
+def _rebuild_lisi_binary(exe, cpp, cxx: str) -> str | None:
+    """Compile ``cpp`` to ``exe`` in place with ``cxx``; None on success, else why.
+
+    This is scib's own build line (``g++ -std=c++11 -O3 -o knn_graph.o
+    knn_graph.cpp``) run once, writing into scib's own ``knn_graph/`` folder
+    so scib finds the binary where it looks for it.
+    """
+    import subprocess
+    import sys
+
+    cmd = [cxx, *_CXX_FLAGS, "-o", str(exe), str(cpp)]
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"{' '.join(cmd)} failed ({type(exc).__name__}: {exc})"
+    if p.returncode != 0:
+        err = (p.stderr or p.stdout or "").strip().splitlines()
+        return f"{' '.join(cmd)} exited {p.returncode}" + (f": {err[-1]}" if err else "")
+    print(f"multibench: rebuilt scib's LISI helper {exe.name} from source with "
+          f"{cxx} (the shipped binary could not run here)", file=sys.stderr)
+    return None
+
+
+def _lisi_fallback_message(name: str, problem: str) -> str:
+    """The warning for a LISI metric recorded as NaN: the cause and the manual
+    build line (scib's own ``g++`` command), for when the automatic rebuild
+    could not run or failed."""
+    import pathlib as _pl
+    import scib as _scib
+    kg = _pl.Path(_scib.__file__).parent / "knn_graph"
+    return (f"scib metric {name!r} needs scib's LISI helper binary, which "
+            f"cannot run here: {problem}. Recording NaN. To fix it, rebuild the "
+            f"binary from the source scib ships (needs a C++ compiler):\n"
+            f"    g++ -std=c++11 -O3 -o {kg / 'knn_graph.o'} {kg / 'knn_graph.cpp'}")
+
+
+@functools.lru_cache(maxsize=1)
+def _lisi_helper_problem() -> str | None:
+    """Why scib's LISI helper cannot run here, or None when it can.
+
+    scib runs a prebuilt C++ binary with neither ``check=True`` nor any capture
+    of its stderr, so a binary that fails to start is discovered much later - as
+    a FileNotFoundError on an output file that was never written, once per
+    metric, with the actual cause discarded. A loader failure (an older
+    libstdc++ ahead of the system one, a foreign architecture) is invisible that
+    way. Probing the binary once turns it into one message naming the cause.
+
+    When the binary CANNOT BE EXECUTED at all (``Exec format error`` - scib
+    ships a Linux x86-64 executable, so this is every macOS install), a C++
+    compiler is on PATH (``g++`` / ``c++`` / ``clang++``) and scib ships
+    ``knn_graph.cpp`` next to it, the helper is rebuilt in place ONCE with
+    scib's own build line and probed again; cLISI/iLISI then compute instead
+    of recording NaN. If the rebuild fails, the original problem is returned
+    with the compiler's verdict appended, and the caller's warning still
+    prints the ``g++`` line for a manual fix.
+
+    Healthy behaviour, verified on Linux x86-64: exits 0 and prints its usage
+    line when called with no arguments.
+    """
+    from pathlib import Path
+
+    try:
+        import scib
+    except Exception as exc:  # noqa: BLE001 - absence is the caller's problem
+        return f"scib is not importable ({type(exc).__name__})"
+    kg = Path(scib.__file__).parent / "knn_graph"
+    exe = kg / "knn_graph.o"
+    if not exe.is_file():
+        return f"{exe} is missing from the scib installation"
+    problem = _probe_lisi_binary(exe)
+    if problem is None or "cannot be executed" not in problem:
+        return problem
+    cpp = kg / "knn_graph.cpp"
+    cxx = _find_cxx()
+    if not cpp.is_file():
+        return f"{problem}; {cpp} is not shipped, so it cannot be rebuilt here"
+    if cxx is None:
+        return (f"{problem}; no C++ compiler ({', '.join(_CXX_CANDIDATES)}) on "
+                f"PATH to rebuild it")
+    failed = _rebuild_lisi_binary(exe, cpp, cxx)
+    if failed:
+        return f"{problem}; rebuilding from source failed: {failed}"
+    return _probe_lisi_binary(exe)
+
+
 
 
 def _build_adata(emb, celltype, cluster, batch):
@@ -179,17 +272,42 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
     return float(np.mean(scores))
 
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
-            slow_metrics: bool = False, only=None) -> pd.DataFrame:
-    """Compute scib metrics. group in {'clustering','batch','all'}.
+            slow_metrics: bool = False, only=None, *,
+            verbose: bool | None = None) -> pd.DataFrame:
+    """Compute scib metrics for one embedding.
 
-    Returns a metric.csv-shaped DataFrame (index = metric, column 'Value').
+    Parameters
+    ----------
+    emb : array-like
+        Embedding, cells x dims.
+    celltype : array-like
+        Cell-type label per cell.
+    cluster : array-like or None
+        Precomputed cluster assignment; ``None`` derives one with the scIB
+        optimal-resolution Leiden sweep (10 resolutions, argmax NMI).
+    batch : array-like
+        Batch label per cell (a constant vector is fine for clustering-only).
+    group : {"clustering", "batch", "all"}
+        Metric family.
+    slow_metrics : bool
+        Also compute kBET (shells out to R).
+    only : collection of str, optional
+        Restrict the computation to the named metrics, e.g. ``only={"ARI"}``.
+        Everything not named is skipped rather than computed and discarded,
+        and the Leiden sweep is skipped too when no requested metric needs it
+        (ARI, NMI, iF1 do). This exists because ranking candidate label
+        orderings needs ARI alone, and paying for iF1/cLISI/iLISI once per
+        candidate made that ranking cost more than the entire rest of the
+        evaluation.
+    verbose : bool, keyword-only, optional
+        Print one stderr line when the Leiden sweep starts. ``None``
+        (default): only for embeddings with more than 2,000 cells; ``True``
+        always; ``False`` never.
 
-    ``only`` restricts the computation to the named metrics, e.g.
-    ``only={"ARI"}``. Everything not named is skipped rather than computed and
-    discarded, and the optimal-resolution Leiden sweep is skipped too when no
-    requested metric needs it. This exists because ranking candidate label
-    orderings needs ARI alone, and paying for iF1/cLISI/iLISI once per candidate
-    made that ranking cost more than the entire rest of the evaluation.
+    Returns
+    -------
+    pandas.DataFrame
+        ``metric.csv``-shaped: index = metric, one column ``Value``.
     """
     if only is not None:
         only = set(only)
@@ -244,6 +362,14 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         # independently used to double the whole evaluation. Quietly: scanpy
         # narrates each resolution otherwise.
         from scib.metrics.clustering import get_resolutions
+        if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
+            import sys
+            needs = [m for m in ("ARI", "NMI", "iF1") if only is None or m in only]
+            print(f"scIB clustering metrics: Leiden resolution sweep (10 "
+                  f"resolutions) over {n:,} cells for {', '.join(needs)} - "
+                  f"typically 30-60 s per 3,000 cells; pass clustering= or "
+                  f"only={{...}} without ARI/NMI/iF1 to skip it",
+                  file=sys.stderr, flush=True)
         with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
             warnings.simplefilter("ignore")
             for res in get_resolutions(n=10, max=2):
@@ -272,16 +398,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         if name in _LISI_METRICS:
             problem = _lisi_helper_problem()
             if problem:
-                import pathlib as _pl
-                import scib as _scib
-                _kg = _pl.Path(_scib.__file__).parent / "knn_graph"
-                warnings.warn(
-                    f"scib metric {name!r} needs scib's LISI helper binary, "
-                    f"which cannot run here: {problem}. Recording NaN. To fix "
-                    f"it, rebuild the binary from the source scib ships:\n"
-                    f"    g++ -std=c++11 -O3 -o {_kg / 'knn_graph.o'} "
-                    f"{_kg / 'knn_graph.cpp'}"
-                )
+                warnings.warn(_lisi_fallback_message(name, problem))
                 out[name] = float("nan")
                 return
         try:
