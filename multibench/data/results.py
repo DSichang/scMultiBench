@@ -18,8 +18,8 @@ Every frame returned here carries the same seven columns
 from either source (or your own, via :func:`multibench.to_long`) can be
 concatenated and handed to ``mtb.plot.bubble`` / ``mtb.plot.bar``.
 
-v1 implements the scib clustering + batch loader. Other metric sets raise a
-clear "not in v1" error (declared but not wired).
+Currently the scib clustering + batch loader is the only metric set; any
+other ``metric_set`` token raises ``ValueError`` listing the valid ones.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from .. import config
 from . import catalog
 
 __all__ = ["load_results", "available_datasets", "results_coverage", "recommend",
-           "COLUMNS", "SOURCES"]
+           "COLUMNS", "SOURCES", "FAMILIES", "DegenerateRerunWarning"]
 
 # clustering variant -> companion filename for the per-(dataset,method) dir
 _CLUSTERING_FILES = {
@@ -52,8 +52,28 @@ COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "so
 #: valid values of the ``source=`` knob
 SOURCES = ("published", "rerun", "both")
 
-#: ``task=`` values: None/"all" = no filter, else a metric family
-_TASKS = (None, "all", "clustering", "batch")
+#: ``family=`` (alias ``task=``) values: None/"all" = no filter, else a
+#: metric family
+FAMILIES = (None, "all", "clustering", "batch")
+_TASKS = FAMILIES          # old private name, kept for callers that imported it
+
+#: A re-run row is DEGENERATE when its ARI is below this ...
+_DEGENERATE_RERUN_ARI = 0.01
+#: ... while the published table scored the same (category, dataset, method)
+#: above this: the re-run almost certainly failed silently (wrong label order,
+#: a collapsed embedding) rather than the method being that bad.
+_DEGENERATE_PUBLISHED_ARI = 0.2
+
+
+class DegenerateRerunWarning(UserWarning):
+    """A re-run row scored ARI ~0 where the published table scored well.
+
+    Emitted by :func:`load_results` (``source="rerun"`` / ``"both"``) so a
+    silently failed re-run (Conos on D28: ARI 0.0004 vs published 0.27) can
+    never enter a ranking unnoticed. Filter with
+    ``warnings.simplefilter("ignore", mtb.data.results.DegenerateRerunWarning)``
+    once you have decided how to treat those rows.
+    """
 
 # a result directory like ``Concerto_louvain`` is the method's LOUVAIN variant:
 # split it into method id + clustering token instead of inventing a method id
@@ -276,28 +296,187 @@ def _load_long_csv(path: Path) -> pd.DataFrame:
         df["dataset"] = path.stem
     if "category" not in df.columns:
         df["category"] = "user"
-    if "clustering" not in df.columns:
-        df["clustering"] = "default"
-    if "source" not in df.columns:
-        df["source"] = "user"
+    # provenance defaults are filled PER ROW, not only for an absent column: a
+    # frame concatenated from load_results (7 columns) and an older 5-column
+    # to_long frame used to carry NaN clustering/source for the user's rows
+    # through to_csv -> load_results, and those NaNs then hid in every plot
+    for col, default in (("clustering", "default"), ("source", "user")):
+        if col not in df.columns:
+            df[col] = default
+        else:
+            df[col] = df[col].fillna(default)
     return df[COLUMNS]
 
 
 # --------------------------------------------------------------------------
 # public API
 # --------------------------------------------------------------------------
-def _task_metrics(task):
-    if task not in _TASKS:
+def _resolve_family(task, family):
+    """The one metric-family token from the ``task=`` / ``family=`` pair.
+
+    ``family`` is the documented name; ``task`` is the original name, kept as
+    an alias. Both given and different -> ``ValueError``.
+    """
+    if family is not None and task is not None and family != task:
         raise ValueError(
-            f"unknown task {task!r}; valid: None (all metrics), 'all', "
-            f"'clustering', 'batch'")
-    if task in (None, "all"):
+            f"pass either family= or task= (they are the same selector; got "
+            f"family={family!r}, task={task!r})")
+    return family if family is not None else task
+
+
+def _family_metrics(value, kw: str = "family"):
+    """Metric codes of a family token, or ``None`` for "every metric".
+
+    Parameters
+    ----------
+    value
+        ``None`` / ``"all"`` (no filter), ``"clustering"`` or ``"batch"``.
+    kw : str
+        The keyword the value arrived through (``"family"`` or ``"task"``),
+        named in the error.
+
+    Raises
+    ------
+    ValueError
+        ``"unknown family 'bogus' (given as task=); valid: None (all metrics),
+        'all', 'clustering', 'batch'"``. A :func:`multibench.list_tasks`
+        token (``'dimension_reduction'``) or a dataset id in that slot gets an
+        extra sentence saying what the slot means.
+    """
+    if value not in FAMILIES:
+        hint = ""
+        try:
+            from ..engine.registry import list_tasks
+            tasks = list_tasks()
+        except Exception:
+            tasks = []
+        if value in tasks:
+            hint = (f" - {kw}= here selects a METRIC FAMILY, not a "
+                    f"mtb.list_tasks() token; 'dimension_reduction' and "
+                    f"'clustering' share the 'clustering' family")
+        elif re.match(r"^S?D\d+", str(value)):
+            hint = (f" - the 2nd positional argument is {kw}, did you mean "
+                    f"dataset={value!r}?")
+        raise ValueError(
+            f"unknown family {value!r} (given as {kw}=); valid: None (all "
+            f"metrics), 'all', 'clustering', 'batch'{hint}")
+    if value in (None, "all"):
         return None
     # the family lists live in plot.bar and are pinned to eval by
     # tests/test_metric_groups.py; import lazily (plot imports nothing from
     # data at import time, but keep the dependency one-directional at load)
     from ..plot.bar import BATCH_METRICS, CLUSTERING_METRICS
-    return list(CLUSTERING_METRICS if task == "clustering" else BATCH_METRICS)
+    return list(CLUSTERING_METRICS if value == "clustering" else BATCH_METRICS)
+
+
+def _task_metrics(task):
+    """Back-compat alias of :func:`_family_metrics` (``task=`` spelling)."""
+    return _family_metrics(task, kw="task")
+
+
+def _check_metric_set(metric_set: str) -> None:
+    """``ValueError`` listing the valid tokens for an unknown ``metric_set``.
+
+    ``NotImplementedError`` is reserved for a token the config declares but
+    this loader does not read yet (none today - only ``"scib"`` exists).
+    """
+    config.metric_set_dir(metric_set)     # unknown -> ValueError with the list
+    if metric_set != "scib":
+        raise NotImplementedError(
+            f"metric_set={metric_set!r} is declared but its tables are not "
+            f"wired into load_results yet (only 'scib' is).")
+
+
+def _check_methods(wanted: list, present) -> None:
+    """Every requested method must be a registry id or a name in the frame.
+
+    Raises ``KeyError`` with a did-you-mean hint (the same shape ``scan`` /
+    ``method_info`` use) for anything else - a typo used to yield an empty
+    frame, indistinguishable from "no rows for that method".
+    """
+    present = list(present)
+    by_lower = {str(m).lower() for m in present}
+    for m in wanted:
+        cid = catalog.canonical_id(m)
+        if cid.lower() in by_lower:
+            continue
+        try:
+            catalog.canonical_id(m, strict=True)
+        except KeyError:
+            import difflib
+            pool = sorted(set(present) | set(catalog._registry_ids()))
+            hint = difflib.get_close_matches(str(m), pool, n=1, cutoff=0.6)
+            raise KeyError(
+                f"unknown method {m!r}"
+                + (f"; did you mean {hint[0]!r}?" if hint else "")
+                + "; see mtb.list_methods() (a method absent from the loaded "
+                "tables but known to the registry gives an empty frame plus a "
+                "UserWarning instead)") from None
+
+
+def _check_metrics(wanted: list, present) -> list:
+    """Canonicalise metric codes; unknown ones (not a known code, not in the
+    frame) raise ``ValueError`` listing both vocabularies."""
+    present = sorted(set(map(str, present)))
+    out, unknown = [], []
+    for m in wanted:
+        c = catalog.canonical_metric(m)
+        if c is None or (c not in catalog.known_metrics() and c not in present):
+            unknown.append(m)
+        else:
+            out.append(c)
+    if unknown:
+        raise ValueError(
+            f"unknown metric(s) {unknown}; valid codes: {catalog.known_metrics()}"
+            f"; present in this frame: {present}")
+    return out
+
+
+def _degenerate_rerun_rows(out: pd.DataFrame, base: Path) -> pd.DataFrame:
+    """Re-run rows whose ARI is ~0 while the published table scored well.
+
+    Returns a frame ``category, dataset, method, source, rerun_ARI,
+    published_ARI`` (empty when nothing is degenerate or no published table
+    exists for the re-run datasets).
+    """
+    cols = ["category", "dataset", "method", "source", "rerun_ARI", "published_ARI"]
+    rr = out[(out["source"] != "published") & (out["metric"] == "ARI")]
+    if rr.empty:
+        return pd.DataFrame(columns=cols)
+    rows = []
+    for cat, g in rr.groupby("category"):
+        try:
+            pub = _load_published(str(cat), sorted(g["dataset"].astype(str).unique()),
+                                  "default", base, "scib")
+        except (FileNotFoundError, ValueError):
+            continue
+        pub = pub[pub["metric"] == "ARI"].set_index(["dataset", "method"])["value"]
+        for r in g.itertuples(index=False):
+            key = (str(r.dataset), str(r.method))
+            if key not in pub.index:
+                continue
+            p = float(pub.loc[key]) if not isinstance(pub.loc[key], pd.Series) \
+                else float(pub.loc[key].iloc[0])
+            if float(r.value) < _DEGENERATE_RERUN_ARI and p > _DEGENERATE_PUBLISHED_ARI:
+                rows.append({"category": cat, "dataset": r.dataset, "method": r.method,
+                             "source": r.source, "rerun_ARI": float(r.value),
+                             "published_ARI": p})
+    return pd.DataFrame(rows, columns=cols)
+
+
+def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 3) -> None:
+    bad = _degenerate_rerun_rows(out, base)
+    if bad.empty:
+        return
+    items = ", ".join(f"{r.method}/{r.dataset} ({r.source} ARI {r.rerun_ARI:.4f} vs "
+                      f"published {r.published_ARI:.2f})" for r in bad.itertuples())
+    warnings.warn(
+        f"degenerate re-run row(s) - ARI < {_DEGENERATE_RERUN_ARI} where the "
+        f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. The "
+        f"re-run most likely failed silently (a collapsed embedding or a wrong "
+        f"label order), so the row says nothing about the method; drop it "
+        f"before ranking (df[df.method != {bad.method.iloc[0]!r}]) or compare "
+        f"with source='published'.", DegenerateRerunWarning, stacklevel=stacklevel)
 
 
 def load_results(
@@ -312,6 +491,7 @@ def load_results(
     *,
     source: str = "published",
     methods: list[str] | None = None,
+    family: str | None = None,
 ) -> pd.DataFrame:
     """Benchmark metric tables as a tidy long frame.
 
@@ -322,25 +502,38 @@ def load_results(
         has tables for the requested ``source`` (an unknown token raises
         ``ValueError`` listing the valid ones).
     task : {None, "all", "clustering", "batch"}, optional
-        Restrict to a metric family: ``"clustering"`` keeps
-        ``mtb.plot.CLUSTERING_METRICS`` (ARI, NMI, ASW, iASW, iF1, cLISI),
-        ``"batch"`` keeps ``mtb.plot.BATCH_METRICS`` (ASW_batch, GC, iLISI,
-        kBET). ``None``/``"all"`` (default) keeps every metric. Anything else
-        raises ``ValueError``.
+        Alias of ``family`` (the original name of the selector; NOT a
+        :func:`multibench.list_tasks` token - ``'dimension_reduction'`` here
+        raises and points at ``'clustering'``). Passing both with different
+        values raises ``ValueError``.
     metric_set : str
-        Only ``"scib"`` is wired (others raise ``NotImplementedError``).
+        Only ``"scib"`` exists; an unknown token raises ``ValueError``
+        listing the valid ones (``NotImplementedError`` is reserved for a
+        token the config declares but this loader cannot read).
     dataset : str or list of str, optional
         Dataset id(s), e.g. ``"D11"`` or ``["D11", "D11s"]``. Default: all
-        datasets of the category. A dataset with no table raises
-        ``FileNotFoundError`` naming the available ones.
+        datasets of the category. EVERY requested id must have a table:
+        ``["D11", "D99"]`` raises ``FileNotFoundError`` naming ``D99`` and the
+        datasets that are available, exactly like ``dataset="D99"`` (an
+        unknown id in a list used to be dropped silently).
     method : str or list of str, optional
-        Keep only these method(s); alias tolerant (``"mofa+"`` -> MOFA2). If
-        nothing matches, the frame is EMPTY and a ``UserWarning`` lists the
-        methods present (a typo is not an error here - concatenating several
-        calls would otherwise break).
+        Keep only these method(s); alias tolerant and case-insensitive
+        (``"mofa+"`` -> MOFA2, ``"totalvi"`` -> totalVI). Every name must be
+        a registry id or a method present in the loaded frame: a typo raises
+        ``KeyError`` with a did-you-mean hint (``"unknown method 'Matlida';
+        did you mean 'Matilda'?"``). A KNOWN method with no rows in the
+        loaded tables gives an EMPTY frame and a ``UserWarning`` (a typo is
+        not an error there - concatenating several calls would otherwise
+        break); under the default ``source="published"`` the warning also
+        says whether the re-run sweeps hold that method (``"rerun has 2
+        dataset(s) - pass source='rerun'"``), because the published tables
+        are partial (vertical: 7 of 18 methods).
     metric : str or list of str, optional
         Keep only these metric code(s); alias tolerant (``"ari"`` -> ARI).
-        Same empty-frame-plus-warning rule as ``method``.
+        Every code must be one of :func:`multibench.catalog.known_metrics`
+        or present in the frame: ``"ZZZ"`` raises ``ValueError`` listing
+        both. A known code the tables lack gives the empty-frame-plus-warning
+        of ``method``.
     clustering : {"default", "louvain", "kmeans"}
         Which clustering variant of the published tables to read
         (``metric.csv`` / ``metric_louvain.csv`` / ``metric_kmeans.csv``). A
@@ -354,18 +547,33 @@ def load_results(
         ``mtb.config.DEFAULT.result_path``, i.e. the tables shipped in the
         package) OR a single long CSV file (columns ``metric, value, method``
         at least, e.g. written by ``to_long(...).to_csv`` or
-        ``BatchResult.save()``). For a file, ``source`` is ignored and the
-        frame's ``source`` column is whatever the file carries (``"user"``
-        if none).
-    source : {"published", "rerun", "both"}, keyword-only
-        ``"published"`` (default): the benchmark's scIB tables under
-        ``result_path/scib_metric`` (none for mosaic). ``"rerun"``: the
-        package's re-run sweeps ``result_path/rerun/long_all_<dataset>.csv``
-        (vertical D11/D11s, diagonal D28/D28s, mosaic D45/D45s, cross
-        D52/D52s). ``"both"``: the concatenation - tell the two apart by the
-        ``source`` column (``"published"`` vs ``"rerun-<version>"``).
+        ``BatchResult.save()``). A file keeps whatever ``source`` /
+        ``clustering`` values it carries; a missing column or a blank cell is
+        filled with ``"user"`` / ``"default"`` per row.
+    source : str, keyword-only
+        For a results ROOT one of ``"published"`` (default: the benchmark's
+        scIB tables under ``result_path/scib_metric``; none for mosaic),
+        ``"rerun"`` (the package's re-run sweeps
+        ``result_path/rerun/long_all_<dataset>.csv``: vertical D11/D11s,
+        diagonal D28/D28s, mosaic D45/D45s, cross D52/D52s) or ``"both"``
+        (the concatenation - tell the two apart by the ``source`` column,
+        ``"published"`` vs ``"rerun-<version>"``); anything else raises
+        ``ValueError``. For a FILE, ``"published"`` and ``"both"`` keep every
+        row, while any other value filters on the file's own ``source``
+        column: ``"user"`` keeps the rows :func:`multibench.to_long` wrote,
+        ``"rerun"`` matches ``rerun-<version>`` by prefix, and a value the
+        file does not contain raises ``ValueError`` listing the ones present.
+        With ``"rerun"``/``"both"`` a re-run row whose ARI is ~0 while the
+        published table scored the same method/dataset well is reported by a
+        :class:`DegenerateRerunWarning` (Conos on D28) - never silently.
     methods : list of str, keyword-only
         Alias for ``method`` (a list); passing both raises ``ValueError``.
+    family : {None, "all", "clustering", "batch"}, keyword-only
+        Restrict to a metric family: ``"clustering"`` keeps
+        ``mtb.plot.CLUSTERING_METRICS`` (ARI, NMI, ASW, iASW, iF1, cLISI),
+        ``"batch"`` keeps ``mtb.plot.BATCH_METRICS`` (ASW_batch, GC, iLISI,
+        kBET). ``None``/``"all"`` (default) keeps every metric. Anything
+        else raises ``ValueError`` (``"unknown family ..."``).
 
     Returns
     -------
@@ -378,13 +586,14 @@ def load_results(
     Raises
     ------
     FileNotFoundError
-        No table for the requested category/dataset/source, with the path
-        looked at and what IS available.
+        No table for the requested category/dataset/source (any element of a
+        ``dataset`` list), with the path looked at and what IS available.
+    KeyError
+        An unknown method name in ``method``/``methods`` (did-you-mean hint).
     ValueError
-        Unknown ``category`` / ``task`` / ``clustering`` / ``source``, or a
-        ``result_path`` file without the long-format columns.
-    NotImplementedError
-        ``metric_set`` other than ``"scib"``.
+        Unknown ``category`` / ``family`` (``task``) / ``clustering`` /
+        ``source`` / ``metric_set`` / metric code, or a ``result_path`` file
+        without the long-format columns.
 
     Examples
     --------
@@ -392,19 +601,15 @@ def load_results(
     >>> rr = mtb.load_results("diagonal", dataset="D28", source="rerun")
     >>> both = mtb.load_results("cross", dataset="D52", source="both")
     >>> mtb.plot.bubble(both[both.source != "published"])
+    >>> mine = mtb.load_results(result_path="mine.csv", source="user")  # your rows only
     """
-    if metric_set != "scib":
-        raise NotImplementedError(
-            f"metric_set={metric_set!r} is declared but not wired in v1 "
-            "(only 'scib' is implemented)."
-        )
+    _check_metric_set(metric_set)
     if clustering not in _CLUSTERING_FILES:
         raise ValueError(
             f"unknown clustering {clustering!r}; valid: {sorted(_CLUSTERING_FILES)}"
         )
-    if source not in SOURCES:
-        raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
-    task_metrics = _task_metrics(task)
+    fam = _resolve_family(task, family)
+    fam_metrics = _family_metrics(fam, kw="family" if family is not None else "task")
     if category is not None:
         config.category_folder(category)      # raises "unknown category ... valid: [...]"
     if methods is not None:
@@ -418,11 +623,29 @@ def load_results(
 
     if base.is_file():
         out = _load_long_csv(base)
+        if source not in ("published", "both"):
+            # a file carries its own provenance: filter on it, loudly
+            col = out["source"].astype(str)
+            mask = col.str.startswith("rerun") if source == "rerun" else col == source
+            if not mask.any():
+                raise ValueError(
+                    f"source {source!r} not in {base}; present: "
+                    f"{sorted(col.unique())} (pass source='published' or "
+                    f"'both' to keep every row of a file)")
+            out = out[mask]
         if category is not None and (out["category"] == category).any():
             out = out[out["category"] == category]
         if datasets:
-            out = out[out["dataset"].isin(datasets)]
+            have = sorted(out["dataset"].astype(str).unique())
+            out = out[out["dataset"].astype(str).isin([str(d) for d in datasets])]
+            missing = [d for d in datasets if str(d) not in set(have)]
+            if missing:
+                raise FileNotFoundError(
+                    f"no rows for dataset {missing if len(missing) > 1 else missing[0]!r} "
+                    f"in {base}; datasets in the file: {have}")
     else:
+        if source not in SOURCES:
+            raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
         cats = [category] if category is not None else list(_CATEGORIES)
         frames: list[pd.DataFrame] = []
         errors: list[str] = []
@@ -448,30 +671,69 @@ def load_results(
                 f"no results for any category under {base} (source={source!r}): "
                 + " | ".join(errors))
         out = pd.concat(frames, ignore_index=True)
+        if datasets:
+            # every element of a list must resolve, like the scalar form does
+            have = set(out["dataset"].astype(str).unique())
+            missing = [d for d in datasets if str(d) not in have]
+            if missing:
+                avail = available_datasets(category, result_path=base, source=source,
+                                           clustering=clustering)
+                raise FileNotFoundError(
+                    f"no {source} results for {category or 'any category'}/"
+                    f"{missing if len(missing) > 1 else missing[0]}; datasets with "
+                    f"{source} tables: {avail}")
 
     # ---- filters ---------------------------------------------------------
     where = f"{category or 'any category'}/{datasets if datasets else 'any dataset'}"
-    if task_metrics is not None:
-        out = out[out["metric"].isin(task_metrics)]
+    if fam_metrics is not None:
+        out = out[out["metric"].isin(fam_metrics)]
     if wanted_methods is not None:
+        avail = sorted(out["method"].unique())
+        _check_methods(wanted_methods, avail)
         # alias tolerant AND case-insensitive: 'mofa+' -> MOFA2, 'scbridge' -> scBridge
         want = {catalog.canonical_id(m).lower() for m in wanted_methods}
-        avail = sorted(out["method"].unique())
         out = out[out["method"].map(lambda m: catalog.canonical_id(m).lower()).isin(want)]
         if out.empty:
+            shown = wanted_methods if len(wanted_methods) > 1 else wanted_methods[0]
+            hint = ""
+            if source == "published" and not base.is_file():
+                hint = _other_source_hint(category, datasets, wanted_methods, base)
             warnings.warn(
-                f"method {wanted_methods if len(wanted_methods) > 1 else wanted_methods[0]!r} "
-                f"not present in {where} (source={source!r}; available: {avail})",
-                UserWarning, stacklevel=2)
+                f"no {source} rows for method {shown!r} in {where} (available: "
+                f"{avail}){hint}", UserWarning, stacklevel=2)
     if metric is not None:
-        wanted = [catalog.canonical_metric(m) for m in _as_list(metric)]
         avail = sorted(out["metric"].unique())
+        wanted = _check_metrics(_as_list(metric), avail)
         out = out[out["metric"].isin(wanted)]
         if out.empty:
             warnings.warn(
                 f"metric {metric!r} not present in {where} (source={source!r}; "
                 f"available: {avail})", UserWarning, stacklevel=2)
-    return out[COLUMNS].reset_index(drop=True)
+    out = out[COLUMNS].reset_index(drop=True)
+    if source in ("rerun", "both") and not base.is_file():
+        _warn_degenerate(out, base)
+    return out
+
+
+def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
+    """'; rerun has N dataset(s) (...) - pass source="rerun"' when the re-run
+    sweeps hold rows for a method the published tables lack, else ''."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            cov = results_coverage(category, source="rerun", result_path=base)
+    except Exception:
+        return ""
+    want = {catalog.canonical_id(m).lower() for m in wanted_methods}
+    cov = cov[cov["method"].map(lambda m: catalog.canonical_id(m).lower()).isin(want)]
+    if datasets:
+        cov = cov[cov["dataset"].astype(str).isin([str(d) for d in datasets])]
+    if cov.empty:
+        return ("; results_coverage(source='both') lists no rows for it in any "
+                "source either")
+    ds = sorted(cov["dataset"].astype(str).unique())
+    return (f"; rerun has {len(ds)} dataset(s) ({', '.join(ds)}) - pass "
+            f"source='rerun' (or 'both')")
 
 
 def available_datasets(
@@ -492,7 +754,8 @@ def available_datasets(
         works". A category folder that does not exist (``mosaic`` has no
         published tables) contributes nothing - no error.
     metric_set : str
-        Only ``"scib"`` is wired (``NotImplementedError`` otherwise).
+        Only ``"scib"`` exists; an unknown token raises ``ValueError``
+        listing the valid ones.
     result_path : path-like, optional
         Results root (see :func:`load_results`). If the root itself does not
         exist a ``UserWarning`` is raised and ``[]`` returned, instead of a
@@ -509,10 +772,7 @@ def available_datasets(
     list of str
         Sorted dataset ids.
     """
-    if metric_set != "scib":
-        raise NotImplementedError(
-            f"metric_set={metric_set!r} is not wired in v1 (only 'scib')."
-        )
+    _check_metric_set(metric_set)
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
     if clustering not in _CLUSTERING_FILES:
@@ -593,7 +853,12 @@ def results_coverage(
                     pass
         if source in ("rerun", "both"):
             try:
-                frames.append(load_results(cat, result_path=result_path, source="rerun")[cols])
+                # a coverage scan asks WHERE rows are, not whether they are
+                # sound; the degenerate-row check belongs to load_results
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", DegenerateRerunWarning)
+                    frames.append(load_results(cat, result_path=result_path,
+                                               source="rerun")[cols])
             except FileNotFoundError:
                 pass
     if not frames:
@@ -612,20 +877,30 @@ def recommend(
     min_methods: int = 2,
     source: str = "published",
     result_path: Path | str | None = None,
+    family: str | None = None,
 ) -> pd.DataFrame:
     """Rank methods for a category from stored results, with coverage made explicit.
 
     The score is the benchmark's own rule applied per dataset
     (``overall="mean_overall"`` in :mod:`multibench.plot.style`: min-max
     scaled mean of per-metric max-ranks within each dataset, then averaged
-    over the datasets the method was run on). Two honesty rules apply:
+    over the datasets the method was run on). Three honesty rules apply:
 
     * a dataset holding fewer than ``min_methods`` methods is DROPPED - the
       min-max of a single method is 1.0 by construction, so a lone method
       would "win" such a dataset with authority it never earned;
     * the returned ``n_datasets`` / ``n_datasets_total`` / ``coverage``
-      columns say how much of the matrix each score rests on, and a
-      ``UserWarning`` summarises dropped datasets and partial coverage.
+      columns say how much of the matrix each score rests on;
+    * every method wired for the category (and ``modalities``) that has NO
+      rows in the chosen source is still listed - appended after the scored
+      rows with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0 -
+      so "not ranked" is never mistaken for "ranked last" (the published
+      tables are partial: vertical rna+adt scores 7 of 14 methods; the re-run
+      sweeps cover more - ``source="rerun"``). Their ids are also in
+      ``frame.attrs["not_scored"]``.
+
+    One ``UserWarning`` with one line per finding summarises dropped
+    datasets, partial coverage and the unscored methods.
 
     Parameters
     ----------
@@ -635,59 +910,76 @@ def recommend(
         Keep only methods that consume ALL of these base modalities
         (``["rna", "adt"]``), via :func:`multibench.find_methods`.
     task : {None, "all", "clustering", "batch"}, keyword-only
-        Metric family to score on (default ``"clustering"``); ignored when
-        ``metrics`` is given.
+        Alias of ``family`` (default ``"clustering"``); ``family`` wins when
+        both are given. Not a :func:`multibench.list_tasks` token.
     long_df : pandas.DataFrame, keyword-only
         Score THIS frame (``metric, value, method, dataset``) instead of
         loading stored results - e.g. ``pd.concat([published, mine])`` to
         place your own method.
     metrics : list of str, keyword-only
-        Explicit metric codes to score on (overrides ``task``).
+        Explicit metric codes to score on (overrides ``family``/``task``).
     min_methods : int, keyword-only
         Datasets with fewer methods than this are dropped (default 2).
     source : {"published", "rerun", "both"}, keyword-only
         Which stored tables to load when ``long_df`` is not given (default
-        ``"published"``; note the published tables are PARTIAL - vertical
-        ships 8 of the paper's methods, cross mostly one method per dataset -
-        so the ranking is over what shipped, not the paper's full matrix).
+        ``"published"``; the published tables are PARTIAL - see above - and
+        ``"both"`` averages the 34 method/dataset/metric triples present in
+        both sources).
     result_path : path-like, keyword-only
         Results root (see :func:`load_results`).
+    family : {None, "all", "clustering", "batch"}, keyword-only
+        Metric family to score on: ``"clustering"`` (ARI, NMI, ASW, iASW,
+        iF1, cLISI) or ``"batch"`` (ASW_batch, GC, iLISI, kBET); ``None`` /
+        ``"all"`` scores every metric present. The documented name of the
+        ``task`` selector.
 
     Returns
     -------
     pandas.DataFrame
-        Sorted best-first; columns ``method, grand_score, n_datasets,
-        n_datasets_total, coverage, needs_labels, runtime_tier, worst_sec,
-        env, output_kind``. The metadata columns are ``None`` for ids that are
-        not registry methods (your own method, a result-dir token).
+        Sorted best-first, unscored methods last; columns ``method,
+        grand_score, n_datasets, n_datasets_total, coverage, needs_labels,
+        runtime_tier, worst_sec, env, output_kind``. The metadata columns are
+        ``None`` for ids that are not registry methods (your own method, a
+        result-dir token). ``frame.attrs`` records the choices the ranking
+        was made under: ``"family"`` (and ``"task"``, the same value; ``None``
+        when ``metrics`` was given), ``"source"`` (``"published"`` /
+        ``"rerun"`` / ``"both"``, or ``"long_df"``) and ``"not_scored"`` (the
+        unscored method ids, also under ``"missing"``).
 
     Raises
     ------
     ValueError
-        No dataset has ``min_methods`` methods (nothing can be ranked), or
-        the frame has no usable metrics.
+        No dataset has ``min_methods`` methods (nothing can be ranked), the
+        frame has none of the family's metrics (the message lists the metrics
+        it does have), or an unknown ``family``/``task``.
     FileNotFoundError
         No stored results for the category/source.
 
     Examples
     --------
-    >>> mtb.recommend("vertical", modalities=["rna", "adt"])
-    >>> mtb.recommend("diagonal", source="rerun")[["method", "grand_score", "coverage", "needs_labels", "runtime_tier"]]
+    >>> r = mtb.recommend("vertical", modalities=["rna", "adt"])
+    >>> r[r.grand_score.notna()]                    # the scored rows
+    >>> r.attrs["not_scored"]                       # wired but no published rows
+    >>> mtb.recommend("diagonal", family="batch", source="rerun")[["method", "grand_score", "coverage"]]
     """
     from ..plot import style
 
     config.category_folder(category)
+    fam = family if family is not None else task
+    fam_kw = "family" if family is not None else "task"
+    long_df_was_none = long_df is None
     if long_df is None:
-        long_df = load_results(category, task=None if metrics else task,
-                               source=source, result_path=result_path)
+        # load EVERY metric and filter locally, so the "metrics present"
+        # error below can name what the frame really holds
+        long_df = load_results(category, source=source, result_path=result_path)
     df = long_df.copy()
     if metrics is None:
-        fam = _task_metrics(task)          # validates task; None = all metrics
-        if fam is not None:
-            df = df[df["metric"].isin(fam)]
+        fam_metrics = _family_metrics(fam, kw=fam_kw)   # validates; None = all metrics
+        if fam_metrics is not None:
+            df = df[df["metric"].isin(fam_metrics)]
             if df.empty:
                 raise ValueError(
-                    f"no {task!r} metrics ({fam}) in the frame; metrics present: "
+                    f"no {fam!r} metrics ({fam_metrics}) in the frame; metrics present: "
                     f"{sorted(long_df['metric'].unique())}")
     if "dataset" not in df.columns:
         df["dataset"] = "all"
@@ -708,9 +1000,10 @@ def recommend(
     n_ds = per_ds.notna().sum(axis=1)
     n_total = per_ds.shape[1]
 
+    from ..discover import find_methods
+
     keep_methods = list(grand.index)
     if modalities is not None:
-        from ..discover import find_methods
         allowed = set(find_methods(category=category, modalities=modalities))
         keep_methods = [m for m in keep_methods if catalog.canonical_id(m) in allowed]
         if not keep_methods:
@@ -719,11 +1012,28 @@ def recommend(
                 f"{list(modalities)}; methods with results: {sorted(grand.index)}; "
                 f"methods matching the modalities: {sorted(allowed)}")
 
+    # Methods wired for the category but absent from the source. The registry
+    # 'clustering' tag is complete in every category and excludes the
+    # registration-only cross methods (PASTE/PASTE2/SPIRAL/GPSA - coordinates,
+    # not an embedding, so scIB never applies); the 'batch' tag is NOT
+    # reliable (vertical: 8/18 tagged), so never gate on the requested family.
+    wired = find_methods(category=category, task="clustering", modalities=modalities,
+                         runnable=True)
+    scored_ids = {catalog.canonical_id(m) for m in keep_methods}
+    missing = sorted((m for m in wired if m not in scored_ids), key=str.lower)
+    # a method with rows ONLY in dropped (< min_methods) datasets is unscored
+    # for a different reason than "no rows at all" - say which
+    in_frame = {catalog.canonical_id(m) for m in df["method"].unique()}
+    only_dropped = [m for m in missing if m in in_frame]
+    no_rows = [m for m in missing if m not in in_frame]
+    label = f"source={source!r}" if long_df_was_none else "long_df"
+
     from ..engine import registry, envs
     from ..workflow import runtime_hint
 
     rows = []
-    for m in keep_methods:
+    for m in keep_methods + missing:
+        scored = m in grand.index
         try:
             spec = registry.get(catalog.canonical_id(m))
         except KeyError:
@@ -742,10 +1052,10 @@ def recommend(
         rt = runtime_hint(catalog.canonical_id(m)) if spec is not None else {}
         rows.append({
             "method": m,
-            "grand_score": float(grand.loc[m]),
-            "n_datasets": int(n_ds.loc[m]),
+            "grand_score": float(grand.loc[m]) if scored else float("nan"),
+            "n_datasets": int(n_ds.loc[m]) if scored else 0,
             "n_datasets_total": int(n_total),
-            "coverage": float(n_ds.loc[m]) / n_total,
+            "coverage": float(n_ds.loc[m]) / n_total if scored else 0.0,
             "needs_labels": needs,
             "runtime_tier": rt.get("tier") if spec is not None else None,
             "worst_sec": rt.get("worst_sec") if spec is not None else None,
@@ -753,7 +1063,13 @@ def recommend(
             "output_kind": okind,
         })
     out = pd.DataFrame(rows)
-    out = out.sort_values("grand_score", ascending=False, kind="mergesort").reset_index(drop=True)
+    out = out.sort_values("grand_score", ascending=False, kind="mergesort",
+                          na_position="last").reset_index(drop=True)
+    out.attrs["family"] = None if metrics is not None else fam
+    out.attrs["task"] = out.attrs["family"]
+    out.attrs["source"] = source if long_df_was_none else "long_df"
+    out.attrs["not_scored"] = list(missing)
+    out.attrs["missing"] = list(missing)
 
     notes = []
     if degenerate:
@@ -761,14 +1077,25 @@ def recommend(
             f"dropped {len(degenerate)} dataset(s) with fewer than {min_methods} "
             f"methods ({', '.join(map(str, degenerate))}) - a min-max score over "
             f"one method is 1.0 by construction")
-    partial = out[out["coverage"] < 1.0]
+    partial = out[(out["coverage"] < 1.0) & out["grand_score"].notna()]
     if not partial.empty:
         notes.append(
-            "grand_score averages over an incomplete method x dataset matrix: "
-            + ", ".join(f"{r.method} scored on {r.n_datasets}/{r.n_datasets_total}"
+            "grand_score averages over an incomplete method x dataset matrix "
+            "(partial coverage: "
+            + ", ".join(f"{r.method} {r.n_datasets}/{r.n_datasets_total}"
                         for r in partial.itertuples())
-            + " dataset(s); compare coverage before trusting the order")
+            + "); compare coverage before trusting the order")
+    if only_dropped:
+        notes.append(
+            f"rows only in dropped dataset(s) for: {', '.join(only_dropped)} - "
+            f"listed with grand_score NaN / coverage 0.0")
+    if no_rows:
+        notes.append(
+            f"no rows in {label} for: {', '.join(no_rows)} - listed with "
+            f"grand_score NaN / coverage 0.0"
+            + (' (try source="rerun")' if source == "published" and long_df_was_none
+               else ""))
     if notes:
-        warnings.warn(f"recommend({category!r}): " + "; ".join(notes),
+        warnings.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
                       UserWarning, stacklevel=2)
     return out

@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 import multibench as mtb
@@ -11,9 +12,13 @@ def test_available_datasets_lists_diagonal(result_dir):
     assert mtb.available_datasets("mosaic", result_path=result_dir) == []
 
 
-def test_available_datasets_rejects_unwired_metric_set(result_dir):
-    with pytest.raises(NotImplementedError):
+def test_available_datasets_rejects_unknown_metric_set(result_dir):
+    # a typo is a ValueError listing the valid tokens (the same message
+    # config.metric_set_dir gives), not a "declared but not wired" claim
+    with pytest.raises(ValueError, match=r"unknown metric_set 'classification'; valid: \['scib'\]"):
         mtb.available_datasets("vertical", metric_set="classification", result_path=result_dir)
+    with pytest.raises(ValueError, match="unknown metric_set 'scibb'"):
+        mtb.load_results("vertical", metric_set="scibb", result_path=result_dir)
 
 
 def test_inputs_for_check_raises_on_missing(tmp_path):
@@ -35,7 +40,8 @@ def test_to_long_exposed_top_level():
     import pandas as pd
     wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
     long = mtb.to_long(wide, method="M", dataset="D", category="vertical")
-    assert list(long.columns) == ["metric", "value", "method", "dataset", "category"]
+    assert list(long.columns) == ["metric", "value", "method", "dataset", "category",
+                                  "clustering", "source"]
 
 
 def test_namespace_all_hygiene():
@@ -110,7 +116,10 @@ def test_recommend_ranks_with_coverage(result_dir):
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
                                "env", "output_kind"]
     assert (r.n_datasets <= r.n_datasets_total).all()
-    assert r.grand_score.is_monotonic_decreasing
+    scored = r.grand_score.dropna()
+    assert scored.is_monotonic_decreasing
+    # scored rows precede the NaN (unscored) tail
+    assert r.grand_score.notna().tolist() == sorted(r.grand_score.notna().tolist(), reverse=True)
     sb = r[r.method == "scBridge"].iloc[0]
     assert sb.needs_labels is True or sb.needs_labels == True   # noqa: E712
     assert sb.runtime_tier in {"fast", "medium", "slow", "very_slow", "unknown"}
@@ -125,7 +134,12 @@ def test_recommend_drops_singleton_datasets_and_warns(result_dir):
     # the singleton datasets must be dropped, so scMoMaT (D52/D58/D59 alone)
     # cannot score 1.0 on the strength of singleton min-max
     assert (r.n_datasets_total == 2).all()       # D53 and D57 hold >= 2 methods
-    assert "scMoMaT" not in set(r.method)
+    # scMoMaT has rows only in the dropped singleton datasets: it is LISTED
+    # (wired for cross) but unscored, and the warning says why
+    smt = r[r.method == "scMoMaT"].iloc[0]
+    assert pd.isna(smt.grand_score) and smt.n_datasets == 0 and smt.coverage == 0.0
+    assert "scMoMaT" in r.attrs["not_scored"]
+    assert "rows only in dropped dataset(s) for: scMoMaT" in str(rec[0].message)
     # a 1.0 is now only ever the best of >= 2 methods on a kept dataset (UINMF on
     # D57, sciPENN on D53), never a singleton artefact: every scored method sits
     # in a dataset that holds another method
@@ -133,6 +147,10 @@ def test_recommend_drops_singleton_datasets_and_warns(result_dir):
     assert (r[r.grand_score == 1.0].n_datasets == 1).all()
     msg = str(rec[0].message)
     assert "D52" in msg and "D56" in msg and "D57" not in msg and "1.0 by construction" in msg
+    # ONE warning, one line per finding, the dropped-datasets line first
+    assert len([w for w in rec if issubclass(w.category, UserWarning)
+                and "recommend(" in str(w.message)]) == 1
+    assert msg.splitlines()[1].strip().startswith("- dropped")
     with pytest.raises(ValueError, match="single-method"):
         recommend("cross", min_methods=50, result_path=result_dir)
 
@@ -155,5 +173,84 @@ def test_recommend_unknown_result_id_and_modalities(result_dir):
     sub = long[long.method.isin(["sciPENN", "scMSI"])]
     with pytest.raises(ValueError, match="consumes modalities"):
         recommend("vertical", long_df=sub, modalities=["rna", "atac"])
-    with pytest.raises(ValueError, match="unknown task"):
+    with pytest.raises(ValueError, match=r"unknown family 'bogus' \(given as task=\)"):
         recommend("vertical", long_df=long, task="bogus")
+    with pytest.raises(ValueError, match=r"unknown family 'bogus' \(given as family=\)"):
+        recommend("vertical", long_df=long, family="bogus")
+
+
+# --- P04: unscored methods are named, source/family recorded on the frame ---
+
+def _rec(*a, **k):
+    import warnings
+    from multibench.data.results import recommend
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        r = recommend(*a, **k)
+    msgs = [str(w.message) for w in rec if "recommend(" in str(w.message)]
+    return r, (msgs[0] if msgs else "")
+
+
+def test_recommend_lists_unscored_methods(result_dir):
+    r, msg = _rec("vertical", modalities=["rna", "adt"], result_path=result_dir)
+    nan_rows = r[r.grand_score.isna()]
+    assert set(nan_rows.method) == {"Concerto", "Matilda", "Seurat_WNN", "UINMF",
+                                    "VIMCCA", "scMDC", "totalVI"}
+    assert (nan_rows.n_datasets == 0).all() and (nan_rows.coverage == 0.0).all()
+    assert (nan_rows.n_datasets_total == r.n_datasets_total.iloc[0]).all()
+    assert nan_rows.env.notna().all() and nan_rows.runtime_tier.notna().all()
+    # column list unchanged; scored rows first
+    assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
+                               "coverage", "needs_labels", "runtime_tier", "worst_sec",
+                               "env", "output_kind"]
+    assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
+    assert r.attrs["family"] == "clustering" and r.attrs["task"] == "clustering"
+    assert r.attrs["source"] == "published"
+    assert r.attrs["not_scored"] == r.attrs["missing"] == sorted(nan_rows.method, key=str.lower)
+    import re
+    assert re.search(r"no rows in source='published' for: .*totalVI", msg)
+    assert 'try source="rerun"' in msg and "listed with grand_score NaN" in msg
+    # the old load-bearing phrases survive
+    assert "incomplete" in msg and "partial coverage" in msg
+
+
+def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
+    r, msg = _rec("vertical", modalities=["rna", "adt"], source="rerun",
+                  result_path=result_dir)
+    assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
+    assert r.attrs["source"] == "rerun" and r.attrs["not_scored"] == ["Seurat_WNN"]
+    assert "no rows in source='rerun' for: Seurat_WNN" in msg
+    assert 'try source="rerun"' not in msg
+
+
+def test_recommend_long_df_records_source_and_family(result_dir):
+    long = mtb.load_results("vertical", dataset="D11", source="rerun", result_path=result_dir)
+    r, _ = _rec("vertical", long_df=long, family="clustering")
+    assert r.attrs["source"] == "long_df" and r.attrs["family"] == "clustering"
+    r2, _ = _rec("vertical", long_df=long, metrics=["ARI", "NMI"])
+    assert r2.attrs["family"] is None and r2.attrs["task"] is None
+
+
+def test_recommend_cross_skips_registration_methods(result_dir):
+    r, _ = _rec("cross", result_path=result_dir)
+    assert not ({"PASTE", "PASTE2", "SPIRAL", "GPSA"} & set(r.method))
+
+
+def test_recommend_task_error_names_real_metrics(result_dir):
+    from multibench.data.results import recommend
+    # vertical ships no batch metrics; the error must list what IS there,
+    # not "metrics present: []" (the loader used to pre-filter by task)
+    with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
+        recommend("vertical", family="batch", result_path=result_dir)
+    with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
+        recommend("vertical", task="batch", result_path=result_dir)
+
+
+def test_recommend_family_batch_on_diagonal_rerun(result_dir):
+    r, _ = _rec("diagonal", family="batch", source="rerun", result_path=result_dir)
+    assert r.attrs["family"] == "batch" and r.grand_score.notna().any()
+    # family wins over the task alias when both are given
+    r2, _ = _rec("diagonal", task="clustering", family="batch", source="rerun",
+                 result_path=result_dir)
+    assert r2.attrs["family"] == "batch"
+    pd.testing.assert_frame_equal(r, r2)
