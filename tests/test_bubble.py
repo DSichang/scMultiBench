@@ -338,3 +338,129 @@ def test_badges_unknown_and_supervised(monkeypatch):
     assert texts.count("L") == 3 and texts.count("Py") == 3
     badges = [p for p in fig.axes[0].patches if isinstance(p, Circle) and p.center[0] < 0]
     assert all(p.center[0] < 0 for p in badges) and len(badges) == 6
+
+
+# --- P10: BubbleTable.ranks / .norm as the concatenation over blocks -------
+import importlib
+B = importlib.import_module("multibench.plot.bubble")     # the module, not the function
+
+def test_table_ranks_concatenates_blocks_in_figure_order():
+    long = _three()
+    long = pd.concat([long, pd.DataFrame({"method": ["A", "B", "C"], "metric": "GC",
+                                          "value": [0.3, 0.9, 0.6], "dataset": "D1"})])
+    tbl = bubble.build_table(long, metrics=["NMI", "ARI", "GC"])
+    assert list(tbl.ranks.columns) == list(tbl.matrix.columns) == ["NMI", "ARI", "GC"]
+    assert tbl.ranks.index.tolist() == tbl.methods
+    for b in tbl.blocks:
+        for c in b.ranks.columns:
+            assert tbl.ranks[c].equals(b.ranks[c])
+
+
+def test_table_ranks_are_max_ranks():
+    tbl = bubble.build_table(_three())
+    n = len(tbl.methods)
+    for c in tbl.ranks.columns:
+        assert tbl.ranks[c].max() == n and tbl.ranks[c].min() == 1   # n = best
+    # the legend's 1 = best is the row position
+    assert tbl.methods.index(tbl.ranks["ARI"].idxmax()) + 1 == 1
+
+
+def test_table_norm_is_matrix():
+    tbl = bubble.build_table(_three())
+    assert tbl.norm.equals(tbl.matrix) and tbl.norm.index.tolist() == tbl.methods
+
+
+def test_table_ranks_summary_mode():
+    tbl = bubble.build_table(_three(datasets=("D1", "D2")), aggregate="summary")
+    assert tbl.ranks.index.tolist() == tbl.methods
+    assert list(tbl.ranks.columns) == list(tbl.matrix.columns)
+
+
+def test_bubble_table_properties_are_not_dataclass_fields():
+    import dataclasses
+    names = {f.name for f in dataclasses.fields(bubble.BubbleTable)}
+    assert "ranks" not in names and "norm" not in names
+    assert "ranks" in bubble.BubbleTable.__doc__ and "n" in bubble.BubbleTable.ranks.__doc__
+
+
+# --- P18: on-figure key for the chips ---------------------------------------
+
+def test_chip_key_drawn_with_language_chips():
+    import matplotlib; matplotlib.use("Agg")
+    fig = bubble.render(bubble.build_table(_three()))
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert B.CHIP_KEY in texts
+    assert B.CHIP_KEY.startswith("Py / R = language") and "L = consumes cell-type labels" in B.CHIP_KEY
+    assert "? = not a registry method" in B.CHIP_KEY
+    fig2 = bubble.render(bubble.build_table(_three()), show_language=False)
+    assert B.CHIP_KEY not in [t.get_text() for t in fig2.axes[0].texts]
+
+
+# --- P19: the missing-metric Overall rule is said out loud ------------------
+
+def _with_gap():
+    long = _three()
+    return long[~((long.method == "B") & (long.metric == "NMI"))]
+
+
+def test_na_warn_default_names_method_and_rule():
+    with pytest.warns(UserWarning, match=r"B: DR and clustering Overall over 2 of 3 metrics \(NMI n/a\)") as rec:
+        tbl = bubble.build_table(_with_gap())
+    msg = str([w for w in rec if "n/a cells" in str(w.message)][0].message)
+    assert "averages the ranks of the metrics a method HAS" in msg
+    assert "na='skip'" in msg and "na='raise'" in msg
+    assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
+    # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
+    b = tbl.blocks[0]
+    assert b.overall["B"] == pytest.approx(
+        bubble.style.minmax(b.ranks.mean(axis=1).to_numpy())[tbl.methods.index("B")])
+
+
+def test_na_skip_and_raise():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        tbl = bubble.build_table(_with_gap(), na="skip")
+    assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
+    with pytest.raises(ValueError, match=r"n/a cells: B: DR and clustering Overall over 2 of 3"):
+        bubble.build_table(_with_gap(), na="raise")
+    with pytest.raises(ValueError, match="na must be one of"):
+        bubble.build_table(_with_gap(), na="worst")
+    # a complete frame is silent under every policy
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert bubble.build_table(_three(), na="raise").na_cells == []
+
+
+def test_na_rule_in_summary_mode_is_rank_zero():
+    long = _three(datasets=("D1", "D2"))
+    long = long[~((long.method == "B") & (long.metric == "NMI") & (long.dataset == "D2"))]
+    with pytest.warns(UserWarning, match=r"B: NMI n/a in D2 -> rank 0 there"):
+        tbl = bubble.build_table(long, aggregate="summary")
+    assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
+
+
+def test_bubble_passes_na_through_and_legend_states_the_rule():
+    import matplotlib; matplotlib.use("Agg")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = bubble(_with_gap(), na="skip")
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert any("Overall averages the metrics the method has" in t for t in texts)
+    with pytest.raises(ValueError, match="n/a cells"):
+        bubble(_with_gap(), na="raise")
+
+
+def test_radius_uses_methods_scored_in_the_column():
+    import matplotlib; matplotlib.use("Agg")
+    from matplotlib.patches import Circle
+    long = _three()
+    long = long[~((long.method == "B") & (long.metric == "NMI"))]
+    tbl = bubble.build_table(long, na="skip")
+    fig = bubble.render(tbl)
+    ax = fig.axes[0]
+    circles = [c for c in ax.patches if isinstance(c, Circle) and c.get_zorder() == 3
+               and c.center[0] > 0]
+    # the best circle of the NMI column (2 of 3 scored) is still full size
+    best = max(c.radius for c in circles)
+    assert best == pytest.approx(0.5 * 0.85 * 0.9)
+    assert "methods SCORED in that column" in bubble.__doc__

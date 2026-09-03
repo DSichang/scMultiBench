@@ -8,28 +8,113 @@ import numpy as np
 import pandas as pd
 
 from . import io
+from .. import config
 from ..data import catalog
 
 # "DR and clustering" are ONE metric group in the benchmark paper, so a
 # dimension_reduction request is served by the clustering metrics.
 _SCIB_TASKS = {"clustering", "dimension_reduction", "batch", "all"}
 
+#: the seven columns of the tidy long frame (pinned to
+#: multibench.data.results.COLUMNS by tests/test_eval_reshape.py)
+LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
 
-def to_long(value_df, method, dataset, category):
-    """Convert an evaluate() wide frame (index=metric, column 'Value') to the
-    long frame used by load_results/plot.bubble: metric,value,method,dataset,category.
 
-    Metric names are canonicalised (``ari`` -> ``ARI``, ``kbet`` -> ``kBET``);
-    rows whose name canonicalises to nothing (blank) are dropped, and two rows
-    that collapse onto the SAME canonical name (``ari`` and ``ARI`` both
-    present) raise ``ValueError`` - a silent duplicate would double-count that
-    metric in every downstream rank.
+def to_long(value_df, method, dataset, category, *, clustering: str = "default",
+            source: str = "user", needs_labels: bool | None = None) -> pd.DataFrame:
+    """Reshape :func:`evaluate`'s wide frame into the tidy long results frame.
+
+    The long frame has the same seven columns :func:`multibench.load_results`
+    returns - ``metric, value, method, dataset, category, clustering, source``
+    - so ``pd.concat([mtb.load_results(...), to_long(...)])`` -> ``to_csv`` ->
+    ``load_results(result_path=<file>)`` keeps every row's provenance
+    (``source="user"`` selects your rows again).
+
+    Parameters
+    ----------
+    value_df : pandas.DataFrame or pandas.Series
+        What :func:`evaluate` returns: metric names as the index, one column
+        ``Value``. Also accepted: a Series indexed by metric, and the CSV
+        read-back of that frame (``pd.read_csv(out)`` with a ``metric``
+        column and a ``Value`` column). Metric names are canonicalised
+        (``ari`` -> ``ARI``, ``kbet`` -> ``kBET``); rows whose name is blank
+        are dropped.
+    method : str
+        Method id written into every row (your own name is fine; the bubble
+        figure shows ``?`` for a name the registry does not know).
+    dataset : str
+        Dataset id written into every row.
+    category : str
+        Integration category written into every row (``"vertical"``,
+        ``"diagonal"``, ``"mosaic"``, ``"cross"``).
+    clustering : str, keyword-only
+        Value of the ``clustering`` column (default ``"default"``; the
+        published tables use ``"louvain"`` / ``"kmeans"`` for their variants).
+    source : str, keyword-only
+        Value of the ``source`` column (default ``"user"``, which is what
+        ``load_results(result_path=file, source="user")`` filters on).
+    needs_labels : bool, keyword-only, optional
+        When given, an extra boolean ``needs_labels`` column is appended.
+        ``True`` marks the method as supervised for ``mtb.plot.bubble``'s
+        ``L`` badge - the only way to badge a method the registry does not
+        know. Absent (default) the frame has exactly the seven columns and
+        the badge follows the registry.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``metric, value, method, dataset, category, clustering,
+        source`` (plus ``needs_labels`` when requested).
+
+    Raises
+    ------
+    ValueError
+        ``value_df`` is already a long frame (columns ``metric, value,
+        method``: pass it to the plot / ``load_results`` consumers directly);
+        it has no ``Value`` column (the message names the expected shape and,
+        for a wide one-row frame, the ``df.T.set_axis(['Value'], axis=1)``
+        fix); no metric name canonicalises to anything; or two names collapse
+        onto the SAME canonical metric (``ari`` and ``ARI`` both present) - a
+        silent duplicate would double-count that metric in every downstream
+        rank.
+
+    Examples
+    --------
+    >>> wide = mtb.evaluate(emb, labels=labels, only={"ARI", "NMI"})
+    >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11", category="vertical")
+    >>> pd.concat([mtb.load_results("vertical", dataset="D11", source="rerun"), mine]).to_csv("all.csv", index=False)
+    >>> mtb.load_results(result_path="all.csv", source="user")      # your rows only
     """
+    if isinstance(value_df, pd.Series):
+        value_df = value_df.to_frame("Value")
+    cols = [str(c) for c in getattr(value_df, "columns", [])]
+    if {"metric", "value", "method"} <= set(cols):
+        raise ValueError(
+            "to_long() got an already long frame (columns metric, value, method"
+            f"{', ...' if len(cols) > 3 else ''}); pass it to mtb.plot.bubble / "
+            "pd.concat / load_results consumers directly - to_long reshapes "
+            "evaluate()'s WIDE frame (metrics as the index, one column 'Value')")
+    if "Value" not in cols:
+        idx = list(map(str, list(value_df.index)[:5]))
+        raise ValueError(
+            f"to_long expects evaluate()'s frame: metrics as index, one column "
+            f"'Value'; got columns {cols} (index {idx}) - for a wide one-row "
+            f"frame use df.T.set_axis(['Value'], axis=1)")
+    if "metric" in cols:
+        # the CSV read-back of evaluate's frame (pd.read_csv(out)): the metric
+        # names are a column, not the index - reset_index below would
+        # otherwise prepend the RangeIndex as a SECOND 'metric' column
+        value_df = value_df.set_index("metric")
     out = value_df.rename(columns={"Value": "value"}).copy()
     out = out.reset_index()                      # the index column comes first,
     out = out.rename(columns={out.columns[0]: "metric"})   # whatever it was named
     out["metric"] = out["metric"].map(catalog.canonical_metric)
     out = out.dropna(subset=["metric"])
+    if out.empty and len(value_df):
+        raise ValueError(
+            f"no metric name in the index canonicalises to a known code: "
+            f"{list(map(str, value_df.index))[:10]} - to_long expects "
+            f"evaluate()'s frame (metrics as index, one column 'Value')")
     dup = out["metric"].duplicated(keep=False)
     if dup.any():
         raise ValueError(
@@ -39,7 +124,13 @@ def to_long(value_df, method, dataset, category):
     out["method"] = method
     out["dataset"] = dataset
     out["category"] = category
-    return out[["metric", "value", "method", "dataset", "category"]]
+    out["clustering"] = clustering
+    out["source"] = source
+    cols_out = list(LONG_COLUMNS)
+    if needs_labels is not None:
+        out["needs_labels"] = bool(needs_labels)
+        cols_out.append("needs_labels")
+    return out[cols_out].reset_index(drop=True)
 
 
 def _metric_families() -> tuple[list, list]:
@@ -98,13 +189,16 @@ def _validate_only(only, task: str = "all", slow_metrics: bool = True):
         raise TypeError(
             f"only= must be a collection of metric names, e.g. only={{{only!r}}}; "
             f"got the string {only!r}")
-    only = set(only)
     clu, bat = _metric_families()
     known = clu + bat
+    # alias / case tolerant like every other metric argument in the package
+    # ('ari' -> ARI, 'kbet' -> kBET); an unknown name keeps its own spelling
+    # in the error so the caller recognises it
+    only = {catalog.canonical_metric(m) or m for m in only}
     unknown = only - set(known)
     if unknown:
         raise ValueError(
-            f"unknown metric(s) {sorted(unknown)}; choose from {known}")
+            f"unknown metric(s) {sorted(map(str, unknown))}; choose from {known}")
     group = "clustering" if task == "dimension_reduction" else task
     if group == "clustering":
         bad = [m for m in bat if m in only]
@@ -254,6 +348,8 @@ def evaluate(
     obsm: str = "X_emb",
     column: str | None = None,
     label_order=None,
+    family: str | None = None,
+    verbose: bool | None = None,
 ) -> pd.DataFrame:
     """Compute scIB metrics for a run output (an embedding) against cell-type labels.
 
@@ -262,6 +358,14 @@ def evaluate(
     cLISI, ASW_batch, GC, iLISI, kBET`` - one column ``Value``); reshape with
     :func:`multibench.to_long` for plotting. The frame is never empty: a
     request that would select no metric raises instead (see ``only``).
+
+    COST. ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
+    Leiden sweep (10 resolutions on a kNN graph of the embedding): tens of
+    seconds for a few thousand cells, minutes for ~10^4. Pass ``clustering=``
+    (a precomputed assignment) or ``only={...}`` naming metrics that do not
+    need it (``ASW``, ``iASW``, ``cLISI``, the batch family) to skip it. One
+    line on stderr announces the sweep when it starts on more than 2,000
+    cells (``verbose``).
 
     Parameters
     ----------
@@ -276,24 +380,32 @@ def evaluate(
         ``clustering`` given as an indexed Series are aligned against (below).
     category : str, optional
         One of :func:`multibench.list_categories` (``vertical``, ``diagonal``,
-        ``mosaic``, ``cross``). Validated when given; metrics do not depend on
-        it in v1, so it may be omitted.
+        ``mosaic``, ``cross``). Validated when given and otherwise unused -
+        the metrics do not depend on it - so it may be omitted; it is
+        accepted so a call can mirror ``run()``'s arguments.
     task : str
+        Metric FAMILY to compute (the documented spelling is ``family=``;
+        ``task`` is kept as an alias and ignored when ``family`` is given):
         ``'clustering'`` (default; also serves ``'dimension_reduction'`` - one
         metric group in the paper) computes ``ARI, NMI, ASW, iASW, iF1,
         cLISI``; ``'batch'`` computes ``ASW_batch, GC, iLISI`` (+ ``kBET``
-        with ``slow_metrics``); ``'all'`` both. A ``batch=`` given under
-        ``task='clustering'`` changes nothing and triggers a ``UserWarning``
-        pointing at ``task='all'``.
+        with ``slow_metrics``); ``'all'`` both. Anything else raises
+        ``ValueError`` (``"unknown family 'clusterin'; valid: ..."``). A
+        ``batch=`` given under ``task='clustering'`` changes nothing and
+        triggers a ``UserWarning`` pointing at ``task='all'``.
     labels
         Ground-truth cell types, one per cell. Any of: a CSV path (header row;
         column ``x`` / the only column / the last of two with a barcode index -
         see :func:`multibench.eval.io.read_labels`), a LIST of CSV paths
         concatenated in that order (multi-batch datasets: ``[cty1, cty2,
-        cty3]``), a dict as returned by :func:`multibench.labels_for` (one
-        entry plugs in directly; several entries need ``label_order=``), a 1-D
-        ``ndarray``/``Series``/``Categorical``/list, a single-column DataFrame,
-        or - when ``output`` is an AnnData - the name of an ``obs`` column.
+        cty3]``), a dict as returned by :func:`multibench.labels_for` - it
+        goes in AS IS when its insertion order is the method's stacking order
+        (``cty1, cty2, ...`` numerically; ``rna`` before ``adt`` before
+        ``atac``), which is the order ``labels_for`` returns; a dict in ANY
+        OTHER order needs ``label_order=`` (a one-entry dict has no order to
+        get wrong) - a 1-D ``ndarray``/``Series``/``Categorical``/list, a
+        single-column DataFrame, or - when ``output`` is an AnnData - the
+        name of an ``obs`` column.
 
         ORDER. Arrays/lists/files are matched POSITIONALLY to the rows of
         ``output``. A ``Series``/``DataFrame`` with a non-default index is
@@ -307,7 +419,9 @@ def evaluate(
         Optional precomputed cluster assignment (same forms and the same
         alignment rule as ``labels``; an ``.h5`` path is read from
         ``/obs/cluster_leiden``). When omitted the scIB optimal-resolution
-        Leiden sweep derives one from the embedding.
+        Leiden sweep derives one from the embedding - the expensive step (10
+        resolutions; minutes for ~10^4 cells); passing one skips it for
+        ``ARI``/``NMI`` (``iF1`` still sweeps unless excluded via ``only``).
     batch
         Batch labels, one per cell (same forms and the same alignment rule as
         ``labels``; obs column name for AnnData). Required for
@@ -316,13 +430,16 @@ def evaluate(
         origin (1, 2, ...) is used as the batch - the same rule
         :func:`multibench.run_all` applies.
     metric_set : str
-        Only ``'scib'`` is wired in v1.
+        Only ``'scib'`` exists; an unknown token raises ``ValueError``
+        listing the valid ones.
     slow_metrics : bool
         Also compute kBET (shells out to R; hours on large datasets).
     only
-        Collection of metric names to compute (e.g. ``{'ARI', 'NMI'}``);
-        everything else is skipped, including the Leiden sweep when no
-        requested metric needs it. Validated against what ``task`` can
+        Collection of metric names to compute (e.g. ``{'ARI', 'NMI'}``;
+        case/alias tolerant, ``{'ari'}`` works); everything else is skipped,
+        including the Leiden sweep when no requested metric needs it (ARI,
+        NMI and iF1 do - ``only={'ASW'}`` on 10^4 cells returns in seconds,
+        ``only={'ARI'}`` takes minutes). Validated against what ``task`` can
         produce: an unknown name raises listing the valid ones; a batch metric
         under ``task='clustering'`` raises (``'GC is a batch metric: pass
         task="all" (or "batch") and batch=<vector>'``); a clustering metric
@@ -343,24 +460,63 @@ def evaluate(
         it). A subset of the keys selects those files only. Unknown or
         repeated keys raise; ``label_order`` with a non-dict ``labels`` raises
         ``TypeError``.
+    family : str, keyword-only
+        The documented name of ``task``: ``'clustering'`` (=
+        ``'dimension_reduction'``), ``'batch'`` or ``'all'``. Wins over
+        ``task`` when both are given.
+    verbose : bool, keyword-only, optional
+        Whether to print one line on stderr when the Leiden resolution sweep
+        starts (``"scIB clustering metrics: Leiden resolution sweep over
+        11,014 cells ..."``). ``None`` (default) prints it only when the
+        embedding has more than 2,000 cells - the point at which the sweep
+        takes long enough to look like a hang - ``True`` always, ``False``
+        never.
 
     Raises
     ------
     ValueError
-        missing labels/batch, unknown category or metric name, a metric the
-        task cannot produce, length mismatches (``'input length mismatch: emb
-        has N cells, celltype has M'``), cell-id mismatches when aligning,
-        ambiguous label files, a multi-entry labels dict without
-        ``label_order``.
+        missing labels/batch, unknown category, family, metric_set or metric
+        name, a metric the family cannot produce, length mismatches
+        (``'input length mismatch: emb has N cells, celltype has M'``),
+        cell-id mismatches when aligning, ambiguous label files, a
+        multi-entry labels dict in a non-stacking order without
+        ``label_order``, an ``.h5`` output without dataset ``data``.
+    FileNotFoundError
+        an ``output`` / label path that does not exist (the message names
+        the path and the working directory).
     TypeError
         unsupported input types (``only='ARI'``, non-array ``labels``,
         ``label_order`` with non-dict labels, ...).
     """
-    if metric_set != "scib" or task not in _SCIB_TASKS:
+    # metric_set: config owns the vocabulary, so a typo gets the same
+    # "unknown metric_set 'scibb'; valid: ['scib']" everywhere; the
+    # NotImplementedError is reserved for a token config declares but this
+    # evaluator does not compute (none today)
+    config.metric_set_dir(metric_set)
+    if metric_set != "scib":
         raise NotImplementedError(
-            f"evaluate(task={task!r}, metric_set={metric_set!r}) is not wired in v1; "
-            f"only scib clustering/batch are supported."
-        )
+            f"metric_set={metric_set!r} is declared but evaluate() computes "
+            f"only 'scib' metrics.")
+    if family is not None:
+        task = family
+    if task not in _SCIB_TASKS:
+        kw = "family" if family is not None else "task"
+        try:
+            from ..engine.registry import list_tasks
+            declared = list_tasks()
+        except Exception:
+            declared = []
+        if task in declared:
+            # a real benchmark task (imputation, classification, registration)
+            # whose metrics evaluate() does not compute: not a typo
+            raise NotImplementedError(
+                f"evaluate({kw}={task!r}): metrics for the {task!r} task are "
+                f"not wired; evaluate() computes the scIB families "
+                f"{sorted(_SCIB_TASKS)} only")
+        raise ValueError(
+            f"unknown family {task!r} (given as {kw}=); valid: "
+            f"{sorted(_SCIB_TASKS)} ('dimension_reduction' computes the "
+            f"'clustering' family)")
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
     # a labels_for() dict becomes the list of paths in cell order FIRST, so the
@@ -432,7 +588,7 @@ def evaluate(
     # so dimension_reduction is evaluated with the clustering metrics.
     group = "clustering" if task == "dimension_reduction" else task
     out = escib.compute(emb, ct, cl, ba, group=group,
-                        slow_metrics=slow_metrics, only=only)
+                        slow_metrics=slow_metrics, only=only, verbose=verbose)
     # The names compute() emits ARE the canonical ones, but make that a
     # property of evaluate() rather than a coincidence: a frame that reaches
     # to_long()/pd.concat with the published tables must never carry a second
