@@ -7,7 +7,10 @@ chain therefore shipped: ``mp`` was bound only in the ``else`` branch, and an
 unconditional tail call dispatched every method a second time.
 
 These tests fake ``_run`` so they assert dispatch behaviour without launching a
-real method.
+real method - and they fake the ENV gate too: they are dispatch tests, not env
+tests, so they must pass on a laptop without a single method env (they used
+to fail there with "nothing is runnable ... conda env 'matilda' is not
+installed", which is scan's verdict, not the dispatcher's).
 """
 
 import time
@@ -17,7 +20,21 @@ import pytest
 
 import multibench as mtb
 from multibench import workflow as W
-from multibench.engine import registry
+from multibench.engine import envs, registry
+
+#: every env the registry can route to - what scan's env gate sees on a host
+#: that has them all (mirrors tests/test_scan_gates.py::ALL_ENVS)
+ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
+
+
+@pytest.fixture(autouse=True)
+def fake_env_gate(monkeypatch):
+    """Pretend every method env is installed, so only the file gate decides.
+
+    ``_run`` is faked in every test below, so no env is ever entered; the
+    gate is faked at the one cached probe scan() consults.
+    """
+    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
 
 
 class _FakeRes:
