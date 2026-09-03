@@ -52,6 +52,7 @@ class BubbleTable:
     datasets: tuple = ()        # dataset ids present in the frame (sorted)
     coverage: object = None     # Series: datasets per method (summary only)
     method_datasets: object = None  # dict: method -> list of datasets it has rows in
+    category: object = None     # the one category the frame came from, else None (drives the supervised badge)
 
 
 def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
@@ -316,6 +317,7 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         aggregate=aggregate,
         overall_basis=overall,
         datasets=datasets,
+        category=_frame_category(long_df),
         coverage=cov,
         method_datasets=method_datasets,
     )
@@ -329,14 +331,22 @@ def _method_language(name):
         return None
 
 
-def _single_category(tbl) -> str | None:
-    """The one category a table was built from, or None when mixed/unknown."""
-    raw = getattr(tbl, "raw", None)
+def _frame_category(long_df) -> str | None:
+    """The one category a long frame holds, else None (mixed or absent)."""
     try:
-        cats = raw["category"].dropna().unique()
+        cats = long_df["category"].dropna().unique()
         return str(cats[0]) if len(cats) == 1 else None
     except Exception:
         return None
+
+
+def _single_category(tbl) -> str | None:
+    """The one category a table was built from, or None when mixed/unknown.
+
+    Recorded on the table at build time: ``tbl.raw`` is the pivoted
+    method x metric matrix and carries no category column.
+    """
+    return getattr(tbl, "category", None)
 
 
 def _method_needs_labels(name, category=None) -> bool:
@@ -349,8 +359,9 @@ def _method_needs_labels(name, category=None) -> bool:
     try:
         from ..engine import registry
         spec = registry.get(name)
-        if category:
-            vs = [v for v in spec.variants if v.when.get("category") == category]
+        variants = getattr(spec, "variants", None) or []
+        if category and variants:
+            vs = [v for v in variants if v.when.get("category") == category]
             if vs:
                 return any(v.needs_labels for v in vs)
         return bool(spec.needs_labels)
