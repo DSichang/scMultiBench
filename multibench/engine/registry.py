@@ -15,7 +15,8 @@ from pathlib import Path
 import yaml
 
 from .. import config
-from .schema import ArgSpec, MethodSpec, OutputSpec, Variant, base_modality, is_label_role
+from .schema import (AmbiguousVariantError, ArgSpec, MethodSpec, OutputSpec,  # noqa: F401
+                     Variant, base_modality, is_label_role)
 
 _YAML = Path(__file__).resolve().parent / "methods.yaml"
 # doc-only tunable hyperparams, auto-generated from upstream argparse
@@ -81,9 +82,17 @@ def _parse_method(d: dict) -> MethodSpec:
         raise ValueError(
             f"methods.yaml: {d.get('id')!r} declares needs_labels, but needs_labels "
             f"is derived from the variants' label roles (cty/label) - remove the key")
+    if "categories" in d:
+        # Same story: the hand key drifted (Multigrate declared cross, totalVI
+        # and sciPENN mosaic, with no such variant), so list_methods(category=)
+        # and `env ... --category` disagreed with scan/find_methods/run_all,
+        # which all derive from the variants. MethodSpec derives it now.
+        raise ValueError(
+            f"methods.yaml: {d.get('id')!r} declares categories, but categories is "
+            f"derived from the variants' when.category - remove the key")
     spec = MethodSpec(
         id=d["id"], language=d.get("language", "python"),
-        categories=d.get("categories", []), tasks=d.get("tasks", []),
+        tasks=d.get("tasks", []),
         atac=d.get("atac"),
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
         variants=[_parse_variant(v, d["id"]) for v in d.get("variants", [])],
@@ -166,6 +175,44 @@ def check_method(method_id: str) -> str:
         f"unknown method {method_id!r}"
         + (f"; did you mean {hint[0]!r}?" if hint else "")
         + "; see mtb.list_methods()")
+
+
+def resolve_method_id(name: str) -> str:
+    """Return the registry id for ``name``, accepting any letter case.
+
+    Parameters
+    ----------
+    name : a method id as the user typed it (``'scipenn'``, ``'MOFA2'``,
+        ``'totalvi'``).
+
+    Returns
+    -------
+    str
+        The canonical registry id (``'sciPENN'``) - an exact id is returned as
+        is; otherwise the unique id that matches case-insensitively.
+
+    Raises
+    ------
+    KeyError
+        Nothing matches, with the same did-you-mean message as
+        :func:`check_method` (``"unknown method 'Matlida'; did you mean
+        'Matilda'?; see mtb.list_methods()"``).
+
+    Notes
+    -----
+    This is the resolver ``catalog.canonical_id`` / ``load_results`` should
+    share, so a lower-case spelling is accepted everywhere or nowhere.
+    ``check_method`` stays strict on purpose (it validates ids at the entry
+    points); use this where a spelling from a file or a table is normalised.
+    """
+    ids = [s.id for s in load()]
+    key = str(name).strip()
+    if key in ids:
+        return key
+    lower = [i for i in ids if i.lower() == key.lower()]
+    if len(lower) == 1:
+        return lower[0]
+    return check_method(key)            # raises KeyError with a did-you-mean
 
 
 def check_category(category: str | None) -> str | None:
@@ -266,10 +313,22 @@ def list_methods(category: str | None = None, task: str | None = None,
                  runnable: bool | None = None) -> list[str]:
     """Registry method ids, optionally filtered.
 
-    ``category``/``task`` are validated (``ValueError`` listing the valid tokens
-    on a typo). ``runnable=True`` keeps only methods with at least one declared
-    variant (i.e. usable by ``inputs_for``/``run``); ``runnable=False`` keeps only
-    the declared-but-unwired stubs. ``None`` (default) returns all.
+    Parameters
+    ----------
+    category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross`` or None.
+        Keeps the methods that have a VARIANT wired for that category - the
+        same set ``scan`` / ``run_all`` / ``find_methods(category=)`` dispatch
+        (``MethodSpec.categories`` is derived from the variants, never
+        declared). Validated: ``ValueError`` listing the valid tokens on a typo.
+    task : one of :func:`list_tasks` or None; validated the same way.
+    runnable : ``True`` keeps only methods with at least one declared variant
+        (usable by ``inputs_for``/``run``); ``False`` keeps only the
+        declared-but-unwired stubs; ``None`` (default) returns all.
+
+    Returns
+    -------
+    list[str]
+        Method ids in registry order.
     """
     check_category(category)
     check_task(task)

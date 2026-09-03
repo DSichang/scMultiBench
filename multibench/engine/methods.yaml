@@ -1,7 +1,6 @@
 methods:
   - id: SCALEX
     language: python
-    categories: [diagonal]
     tasks: [clustering, batch]
     atac: gene_activity
     status: verified
@@ -17,7 +16,6 @@ methods:
 
   - id: Multigrate
     language: python
-    categories: [mosaic, vertical, cross]
     tasks: [clustering, batch]
     atac: peak
     status: verified
@@ -56,7 +54,6 @@ methods:
 
   - id: Seurat_v5
     language: R
-    categories: [diagonal]
     tasks: [clustering, batch]
     atac: peak
     status: verified
@@ -83,7 +80,6 @@ methods:
 
   - id: scBridge
     language: python
-    categories: [diagonal]
     tasks: [clustering, batch, classification]
     atac: gene_activity
     status: verified
@@ -114,7 +110,6 @@ methods:
   # ---- declared stubs (discoverable; not yet wired) ----
   - id: totalVI
     language: python
-    categories: [vertical, mosaic, cross]
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -136,7 +131,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MultiVI
     language: python
-    categories: [mosaic]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -159,7 +153,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Cobolt
     language: python
-    categories: [mosaic]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -177,7 +170,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMVP
     language: python
-    categories: [vertical]
     tasks: [clustering]
     atac: peak
     status: verified
@@ -198,7 +190,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMM
     language: python
-    categories: [vertical, cross]
     tasks: [batch, clustering]
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
@@ -233,7 +224,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMDC
     language: python
-    categories: [vertical, cross]
     tasks: [batch, clustering]
     # atac: upstream scMDC (ZINB on both views) was designed for gene-level ATAC; tools/atac_audit.py NEEDS_GENE_ACTIVITY
     atac: gene_activity
@@ -267,7 +257,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMoMaT
     language: python
-    categories: [vertical, mosaic, cross]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -326,7 +315,6 @@ methods:
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
   - id: moETM
     language: python
-    categories: [vertical]
     tasks: [clustering]
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
@@ -351,7 +339,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MIRA
     language: python
-    categories: [vertical]
     tasks: [clustering]
     atac: peak
     status: verified
@@ -368,7 +355,6 @@ methods:
           - {kind: graph, file: connectivities.h5, dataset: data}
   - id: Concerto
     language: python
-    categories: [vertical, cross]
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -390,7 +376,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Matilda
     language: python
-    categories: [vertical]
     tasks: [classification, clustering, dimension_reduction]
     atac: gene_activity
     status: verified
@@ -434,7 +419,6 @@ methods:
           - {kind: labels, file: predict.csv}
   - id: VIMCCA
     language: python
-    categories: [vertical]
     tasks: [clustering]
     atac: peak
     status: verified
@@ -457,7 +441,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: VIPCCA
     language: python
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -472,7 +455,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: SMILE
     language: python
-    categories: [mosaic]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -495,7 +477,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Portal
     language: python
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -510,7 +491,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: uniPort
     language: python
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -526,7 +506,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: sciCAN
     language: python
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -541,7 +520,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scJoint
     language: python
-    categories: [diagonal]
     tasks: [batch, classification, clustering]
     atac: gene_activity
     status: verified
@@ -570,7 +548,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: GLUE
     language: python
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -587,7 +564,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MultiMAP
     language: python
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -603,7 +579,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: sciPENN
     language: python
-    categories: [vertical, mosaic, cross]
     tasks: [batch, clustering, dimension_reduction, imputation]
     status: verified
     variants:
@@ -625,7 +600,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMSI
     language: python
-    categories: [vertical]
     tasks: [clustering]
     status: verified
     variants:
@@ -646,7 +620,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: UnitedNet
     language: python
-    categories: [vertical]
     tasks: [clustering, classification]
     # atac: not in tools/atac_audit.py; inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
     atac: gene_activity
@@ -678,7 +651,6 @@ methods:
   - id: SPIRAL
     status: verified
     language: python
-    categories: [cross]
     tasks: [registration]
     variants:
       - when: {category: cross}
@@ -696,7 +668,6 @@ methods:
   - id: GPSA
     status: verified
     language: python
-    categories: [cross]
     tasks: [registration]
     variants:
       - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
@@ -711,7 +682,6 @@ methods:
   - id: PASTE
     status: verified
     language: python
-    categories: [cross]
     tasks: [registration]
     variants:
       - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
@@ -725,7 +695,6 @@ methods:
   - id: PASTE2
     status: verified
     language: python
-    categories: [cross]
     tasks: [registration]
     variants:
       - when: {category: cross}
@@ -738,7 +707,6 @@ methods:
         output: {kind: coords, file: ""}
   - id: iPOLNG
     language: python
-    categories: [vertical]
     tasks: [clustering]
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
@@ -754,7 +722,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: StabMap
     language: R
-    categories: [cross, mosaic]
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -806,7 +773,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: UINMF
     language: R
-    categories: [vertical, cross]
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -845,7 +811,6 @@ methods:
 
   - id: iNMF
     language: R
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -861,7 +826,6 @@ methods:
         run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: online_iNMF
     language: R
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -877,7 +841,6 @@ methods:
         run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: Conos
     language: R
-    categories: [diagonal]
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -892,7 +855,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MOFA2
     language: R
-    categories: [vertical]
     tasks: [clustering]
     status: verified
     variants:
@@ -919,7 +881,6 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Seurat_v3
     language: R
-    categories: [diagonal]
     tasks: [batch, classification, clustering]
     atac: peak
     status: verified
@@ -947,7 +908,6 @@ methods:
           - {kind: labels, file: predict.csv}
   - id: Seurat_WNN
     language: R
-    categories: [vertical]
     tasks: [clustering]
     atac: peak
     status: verified
