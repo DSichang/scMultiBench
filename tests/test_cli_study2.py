@@ -277,7 +277,9 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
     assert "https://x/t.tar.gz" in lines["scmb_torch"]
     assert "? dl" in lines["mystery"] and "? disk" in lines["mystery"]
     assert "dl" not in lines["have_it"]
-    assert "# total at least: 0.9 GB to download, 3.1 GB on disk (2 archives, 1 of unknown size)" in cap.err
+    # unknowns are counted PER COLUMN: the row printing '? disk' is a disk unknown
+    assert ("# total at least: 0.9 GB to download, 3.1 GB on disk (2 archives; "
+            "download size unknown for 1, disk size unknown for 1)") in cap.err
     assert not any(l.startswith("#") for l in cap.out.splitlines())
 
 
@@ -292,7 +294,11 @@ def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     # "# total: X download" when every size is known, "# total at least: ..."
     # when some are still null in the shipped snapshot
     assert cap.err.startswith("# total") and "GB download" in cap.err
-    assert re.search(r"\d+ of unknown size", cap.err)   # count depends on the shipped snapshot
+    # counts depend on the shipped snapshot; the disk count must equal the '? disk' rows
+    m = re.search(r"download size unknown for (\d+), disk size unknown for (\d+)", cap.err)
+    assert m, cap.err
+    assert int(m.group(2)) == sum("? disk" in l for l in cap.out.splitlines())
+    assert int(m.group(1)) == sum("? dl" in l for l in cap.out.splitlines())
     assert lines["scmb_r"].endswith("<- UINMF")
 
 

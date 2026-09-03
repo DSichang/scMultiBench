@@ -188,8 +188,12 @@ def test_run_all_dry_run_help_matches_behaviour():
 def test_plan_commands_is_plan_plus_command_column():
     df = workflow.plan_commands("D11", "vertical", out_dir="runs", methods=["Matilda"])
     plan = mtb.plan("D11", "vertical", methods=["Matilda"])
-    assert list(df.columns) == list(plan.columns) + ["command"]
-    pd.testing.assert_frame_equal(df[plan.columns], plan)
+    # plan (= run_all(dry_run=True)) now carries `command` itself, rendered for
+    # the '<out_dir>' placeholder; plan_commands renders it for a real out_dir
+    assert list(df.columns) == list(plan.columns) == workflow.SCAN_COLUMNS + ["command"]
+    pd.testing.assert_frame_equal(df.drop(columns="command"), plan.drop(columns="command"))
+    assert (plan[plan["files_ok"]]["command"].str.contains("<out_dir>/Matilda_D11")).all()
+    assert (df[df["files_ok"]]["command"].str.contains("runs/Matilda_D11")).all()
     ok = df[df["files_ok"]]
     assert (ok["command"].str.contains("conda run -n matilda")).all()
     assert (df[~df["files_ok"]]["command"] == "").all()

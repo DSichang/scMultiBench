@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import functools
 import os
+import re
 import warnings
 from pathlib import Path
 
@@ -199,6 +200,77 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
     )
 
 
+def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
+    """The on-disk spelling of a dataset folder name under ``base``.
+
+    On a case-insensitive filesystem (macOS, Windows) ``data/d52`` opens the
+    ``D52`` folder, so a lower-case id used to pass every check and then
+    travel into frames, ``out_dir`` names and saved records as ``'d52'`` - a
+    second dataset once concatenated with rows keyed ``'D52'``, and a name
+    that fails on Linux. The folder listing is the authority: when no entry
+    is spelled exactly ``dataset`` but exactly one differs only in case, that
+    entry's spelling is returned (with a ``UserWarning`` saying so).
+
+    Parameters
+    ----------
+    base : path
+        The folder that CONTAINS the dataset folders.
+    dataset : str
+        The id as the caller wrote it.
+    stacklevel : int, keyword-only
+        ``warnings.warn`` stacklevel, so the warning points at the caller's
+        caller (the public entry point) by default.
+
+    Returns
+    -------
+    str
+        ``dataset`` unchanged when it is listed as written (or nothing
+        matches, so the caller's own missing-folder error fires); otherwise
+        the listed spelling.
+    """
+    base = Path(base)
+    name = str(dataset)
+    try:
+        listing = os.listdir(base)
+    except OSError:
+        return name
+    if name in listing:
+        return name
+    same = [n for n in listing if n.lower() == name.lower() and (base / n).is_dir()]
+    if len(same) != 1:
+        return name
+    warnings.warn(
+        f"dataset {name!r} is not a folder under {base}, but {same[0]!r} is - using "
+        f"that on-disk spelling (this filesystem matched the two case-insensitively; "
+        f"frames, out_dir names and saved records carry {same[0]!r} so they line up "
+        f"with the stored results and with Linux, where {name!r} would not exist)",
+        UserWarning, stacklevel=stacklevel)
+    return same[0]
+
+
+def _is_category_token(token) -> bool:
+    """``True`` when ``token`` is one of the four category names."""
+    try:
+        registry.check_category(str(token))
+    except ValueError:
+        return False
+    return True
+
+
+def _is_method_id(token) -> bool:
+    """``True`` when ``token`` is a registry method id (exact spelling)."""
+    try:
+        registry.check_method(str(token))
+    except KeyError:
+        return False
+    return True
+
+
+#: appended to the error when inputs_for's 2nd and 3rd arguments look swapped
+SWAPPED_ARGS_HINT = ("inputs_for's argument order is (dataset, method, category) - "
+                     "unlike scan/plan/run_all(dataset, category, ...)")
+
+
 def inputs_for(dataset: str, method: str, category: str,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
@@ -217,10 +289,18 @@ def inputs_for(dataset: str, method: str, category: str,
 
     Parameters
     ----------
-    dataset : dataset folder name under ``data_path``.
+    dataset : dataset folder name under ``data_path``. A spelling that
+        differs from the folder only in case (``'d52'`` for ``D52`` on a
+        case-insensitive filesystem) is replaced by the on-disk spelling with
+        a ``UserWarning`` (:func:`canonical_dataset`).
     method : registry id (``KeyError`` with a did-you-mean hint otherwise).
+        When the id given here is a CATEGORY token and ``category`` is a
+        method id - the 2nd and 3rd arguments swapped, which the
+        ``scan``/``plan``/``run_all`` order ``(dataset, category, ...)``
+        invites - the ``KeyError`` says so and shows the corrected call.
     category : ``vertical``/``diagonal``/``mosaic``/``cross`` (validated:
-        ``ValueError`` listing the valid tokens on a typo).
+        ``ValueError`` listing the valid tokens on a typo; the same
+        swapped-arguments hint when the token is a method id).
     modalities : the variant's modality tokens (see
         ``method_info(m)['supports']``); ``protein`` is accepted for ``adt``,
         and ``atac`` for ANY ATAC representation role (``atac_gas`` /
@@ -236,12 +316,16 @@ def inputs_for(dataset: str, method: str, category: str,
         ``FileNotFoundError`` and also run the content preflight: the
         matrix-orientation check (``ValueError`` for a cells x features file),
         the label-length check (``ValueError`` when a label CSV has a different
-        number of rows than the modality file it labels) and, for ``data_dir``
+        number of rows than the modality file it labels - including the
+        numbered ``cty<i>.csv`` of a cross/mosaic batch, which no method takes
+        as an input role but every evaluation reads) and, for ``data_dir``
         methods, the directory-content check (``FileNotFoundError`` when a
-        spatial-registration method finds fewer than two ``*.h5ad`` slices, or
-        a slice lacks ``obsm['spatial']``; when scBridge's bare filenames are
-        absent). This is what :func:`multibench.scan` reports per row as
-        ``files_ok`` / ``files_reason``; ``False`` - fully silent.
+        spatial-registration method finds fewer than two ``*.h5ad`` slices, a
+        slice lacks ``obsm['spatial']``, or a slice lacks an ``obs`` column the
+        variant declares in ``slice_obs`` - GPSA's ``Ground_Truth``; when
+        scBridge's bare filenames are absent). This is what
+        :func:`multibench.scan` reports per row as ``files_ok`` /
+        ``files_reason``; ``False`` - fully silent.
 
     Variant selection:
       * If ``modalities`` is given, the variant matching
@@ -267,9 +351,26 @@ def inputs_for(dataset: str, method: str, category: str,
     """
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
+    try:
+        spec = registry.get(method)
+    except KeyError as e:
+        if _is_category_token(method) and _is_method_id(category):
+            raise KeyError(
+                f"unknown method {method!r}: that is a category token and "
+                f"{category!r} is a method id - {SWAPPED_ARGS_HINT}; did you mean "
+                f"inputs_for({dataset!r}, {category!r}, {method!r})?") from None
+        raise e
+    try:
+        registry.check_category(category)
+    except ValueError:
+        if _is_method_id(category):
+            raise ValueError(
+                f"unknown category {category!r}: that is a method id - "
+                f"{SWAPPED_ARGS_HINT}; did you mean "
+                f"inputs_for({dataset!r}, {category!r}, {method!r})?") from None
+        raise
+    dataset = canonical_dataset(base, dataset)
     ds_dir = base / dataset  # flat layout: data/<dataset>/<file>
-    spec = registry.get(method)
-    registry.check_category(category)
     modalities = registry.normalize_modalities(modalities)
     variant = select_variant(spec, category, modalities, ds_dir=ds_dir)
     out = _resolve_variant_inputs(variant, ds_dir, method)
@@ -475,6 +576,28 @@ def _label_partners(label_role: str, roles) -> list[str]:
     return []
 
 
+_BATCH_DIGITS_RE = re.compile(r"(\d+)$")
+
+
+def _batch_label_file(role: str, path) -> tuple[str, Path] | None:
+    """``(batch_index, <dir>/cty<i>.csv)`` for a numbered modality role, else ``None``.
+
+    Cross and mosaic datasets label each batch in ``cty<i>.csv`` next to
+    ``rna<i>.h5`` / ``adt<i>.h5`` / ``atac<i>.h5``. No cross method takes
+    that file as an INPUT role - only the evaluator reads it - so the
+    role-driven pairing never sees it; the sibling is looked up on disk.
+    """
+    if is_label_role(role) or role == "data_dir":
+        return None
+    m = _BATCH_DIGITS_RE.search(role)
+    if not m:
+        return None
+    p = Path(path)
+    if p.suffix != ".h5":
+        return None
+    return m.group(1), p.parent / f"cty{m.group(1)}.csv"
+
+
 def _check_label_lengths(method, dataset, category, resolved):
     """Reject a label file whose row count differs from the cells it labels.
 
@@ -483,7 +606,37 @@ def _check_label_lengths(method, dataset, category, resolved):
     pairing follows the role names (see :func:`_label_partners`); a file that
     cannot be parsed or a modality file without ``matrix/barcodes`` is left
     alone - no verdict is invented.
+
+    Numbered batch files are checked too: ``cty<i>.csv`` (when present next
+    to the modality file) against ``rna<i>.h5`` / ``adt<i>.h5`` /
+    ``atac<i>.h5`` of the same batch ``i`` - the layout every cross and mosaic
+    method reads, although none of them lists ``cty<i>`` as an input role, so
+    a truncated ``cty1.csv`` used to pass :func:`multibench.scan` with
+    ``files_ok=True`` and only fail inside ``evaluate`` after the run.
     """
+    for role, path in resolved.items():
+        pair = _batch_label_file(role, path)
+        if pair is None:
+            continue
+        batch, lab = pair
+        if f"cty{batch}" in resolved:      # an input role: the loop below checks it
+            continue
+        q = Path(path)
+        if not lab.is_file() or not q.is_file():
+            continue
+        n_lab = _count_label_rows(str(lab), lab.stat().st_mtime_ns)
+        sniff = _sniff_h5(str(q), q.stat().st_mtime_ns)
+        if n_lab is None or sniff is None:
+            continue
+        shape, n_feat, n_cell = sniff
+        if n_feat == n_cell:              # orientation ambiguous: cannot tell cells
+            continue
+        if n_lab != n_cell:
+            raise ValueError(
+                f"{method}/{dataset}/{category}: {lab.name} has {n_lab} labels but "
+                f"{q.name} has {n_cell} cells (matrix/barcodes) - batch {batch}: "
+                f"every cell of a batch needs exactly one label in cty{batch}.csv, "
+                f"in the same order as the cells (see mtb.describe_layout({category!r}))")
     for role, path in resolved.items():
         if not is_label_role(role):
             continue
@@ -518,8 +671,11 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
     ``processed/`` subdir, so the path ALWAYS exists and existence proves
     nothing. Spatial-registration methods (``output.kind == 'coords'``) need
     >= 2 ``*.h5ad`` slices, each carrying ``obsm['spatial']`` coordinates (the
-    upstream scripts glob ``data_dir + '*.h5ad'`` and align ``.obsm['spatial']``);
-    other ``data_dir`` methods (scBridge) name their files via ``const`` args.
+    upstream scripts glob ``data_dir + '*.h5ad'`` and align ``.obsm['spatial']``)
+    and every ``obs`` column the variant declares in ``slice_obs`` (GPSA's
+    driver reads ``obs['Ground_Truth']`` from each slice at load, so a folder
+    without it used to pass scan and die after the env build); other
+    ``data_dir`` methods (scBridge) name their files via ``const`` args.
     """
     d = Path(data_dir)
     if not d.is_dir():
@@ -534,11 +690,18 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
             try:
                 with h5py.File(sl, "r") as f:
                     has = "obsm" in f and "spatial" in f["obsm"]
+                    obs_cols = set(f["obs"].keys()) if "obs" in f else set()
             except OSError:
                 return False, f"{sl.name} is not a readable .h5ad file"
             if not has:
                 return False, (f"{sl.name} has no obsm['spatial'] coordinates; "
                                f"registration needs .X plus obsm['spatial'] per slice")
+            for col in (getattr(variant, "slice_obs", None) or []):
+                if col not in obs_cols:
+                    return False, (f"{sl.name} has no obs[{col!r}] column; this method "
+                                   f"reads obs[{col!r}] (a region/layer label per spot) "
+                                   f"from EVERY slice - add the column to each .h5ad "
+                                   f"(see mtb.describe_layout('cross'))")
         return True, ""
     # non-spatial data_dir methods (e.g. scBridge) name their files via `const`
     needed = [a.const for a in variant.args if a.const and str(a.const).endswith((".h5", ".csv"))]
@@ -731,6 +894,7 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
         registry.check_method(method)
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
+    dataset = canonical_dataset(base, dataset)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         raise FileNotFoundError(f"no dataset dir at {ds_dir}")
