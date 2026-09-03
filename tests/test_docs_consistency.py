@@ -45,15 +45,20 @@ def test_readme_and_pyproject_share_one_paper_title_and_doi():
 
 
 def test_notebook_install_cells_identical():
+    """ONE canonical install path: the pip wheel (>=0.3 ships the stored
+    tables); no notebook clones the repository or installs editable."""
     gen = _load_gen_tut()
     install = [c.strip() for c in gen.INSTALL_CELLS]
-    assert len(install) == 2
+    assert len(install) == 1
+    assert 'multibench-sc>=0.3' in install[0]
     seen = 0
     for nb in NOTEBOOKS:
         cells = _code_cells(nb)
         for c in cells:
             assert "--no-deps" not in c, f"{nb.name}: --no-deps install breaks evaluate()"
             assert "requires the conda environments" not in c, nb.name
+            assert "git clone" not in c and "pip -q install -e" not in c, \
+                f"{nb.name}: the tutorials install the wheel, never a clone"
         pip_cells = [c for c in cells if "pip -q install" in c or "pip install" in c]
         if not pip_cells:
             continue                     # executed on the host; no install cell
@@ -62,6 +67,43 @@ def test_notebook_install_cells_identical():
         for cell in install:
             assert cell in stripped, f"{nb.name}: install cell differs from gen_tut.INSTALL_CELLS"
     assert seen >= 5                     # four tutorials + colab quickstart
+
+
+def test_conda_cell_is_opt_in_after_pip():
+    """condacolab is an opt-in for running methods: it follows the pip cell,
+    its markdown says so, and the quickstart (which runs no method) has none."""
+    gen = _load_gen_tut()
+    conda = gen.CONDA_OPTIN_CELL.strip()
+    pip = gen.INSTALL_CELLS[0].strip()
+    for cat in gen.SCEN:
+        nb = json.loads((ROOT / "notebooks" / f"tutorial_{cat}.ipynb").read_text())
+        cells = nb["cells"]
+        src = ["".join(c["source"]).strip() for c in cells]
+        i_pip, i_conda = src.index(pip), src.index(conda)
+        assert i_conda > i_pip, f"tutorial_{cat}: conda cell must come after the pip cell"
+        assert cells[i_conda - 1]["cell_type"] == "markdown"
+        assert "only if you will run methods" in src[i_conda - 1].lower(), f"tutorial_{cat}"
+        env_install = [c for c in src if "multibench env install" in c and "sys.platform" in c]
+        assert env_install, f"tutorial_{cat}: env-install cell must be guarded by a linux check"
+    quick = "\n".join(_code_cells(ROOT / "notebooks" / "colab_quickstart.ipynb"))
+    assert "condacolab" not in quick
+
+
+def test_readme_single_install_path():
+    """README: exactly one `pip install multibench-sc` before the first python
+    fence, no 'clone instead'; installation.md (when reachable): one PyPI
+    block, no stale size claim."""
+    readme = (ROOT / "README.md").read_text()
+    head = readme.split("```python", 1)[0]
+    assert head.count("pip install multibench-sc") == 1
+    assert "clone instead" not in readme
+    for path in _docs_md_files():
+        if path.name == "installation.md":
+            text = path.read_text()
+            assert '=== "PyPI' not in text and '=== "Repository' not in text, \
+                "installation.md: one install path; the clone is a developer note, not an alternative"
+            assert "Developer install" in text
+            assert "184 KB" not in text
 
 
 @pytest.mark.parametrize("nb", NOTEBOOKS, ids=lambda p: p.name)
@@ -126,6 +168,10 @@ BANNED_PHRASES = {
     "list(labels_for(ds).values())": "pass the labels_for dict itself (or label_order=) - the .values() recipe is retired from the docs",
     "First reasons:": "run_all's 'nothing is runnable' error now lists one line per requested variant",
     "scmb_matilda": "env recipe/yml name the env scan expects ('matilda'); own_env_name is the only place scmb_<method> survives",
+    "in v1": "no release-numbered wording: say 'currently' / name the one wired value (polish round 2)",
+    "184 KB": "the wheel is ~1.3 MB and ships the stored tables; state the measured number",
+    "2-14 GB": "per-env sizes come from `multibench env plan` (engine/packed_sizes.json), not a hand-written range",
+    "45-101 GB": "per-category sizes come from `multibench env plan --category C`, not a hand-written range",
 }
 
 
@@ -147,3 +193,18 @@ def test_retired_phrases_absent_from_docs_surfaces(path):
         text = "\n".join("".join(c["source"]) for c in json.loads(text)["cells"])
     for phrase, why in BANNED_PHRASES.items():
         assert phrase not in text, f"{path.name} still says {phrase!r}: {why}"
+    # GPSA is public (it runs through the package driver); only SPIRAL is
+    # benchmark-host-only. No sentence may pair GPSA with that token.
+    for sentence in re.split(r"[.;]\s|\n\n", text):
+        if "benchmark-host-only" in sentence:
+            assert "GPSA" not in sentence, \
+                f"{path.name} pairs GPSA with benchmark-host-only: {sentence.strip()[:160]!r}"
+
+
+def test_host_only_method_set_behind_the_docs_rule():
+    """The GPSA/SPIRAL sentence rule above encodes the live registry; if the
+    availability table changes, this test says the docs rule must move too."""
+    import multibench as mtb
+    assert mtb.find_methods(available=False) == ["SPIRAL"]
+    assert mtb.method_info("GPSA")["availability"] == "public"
+    assert mtb.method_info("GPSA")["driver"]
