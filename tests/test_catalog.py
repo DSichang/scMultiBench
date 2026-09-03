@@ -76,8 +76,8 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
     for c in catalog.PAPER_COLUMNS:
         assert c in df.columns
     assert df[catalog.PAPER_COLUMNS].isna().all().all()
-    # category filter
-    assert set(catalog.datasets(files_dir, category="mosaic").dataset) == {"D45"}
+    # category filter; D45s (the re-run subsample) ships mosaic results too
+    assert set(catalog.datasets(files_dir, category="mosaic").dataset) == {"D45", "D45s"}
 
 
 def test_catalog_columns_match_registry(files_dir):
@@ -96,3 +96,42 @@ def test_catalog_columns_match_registry(files_dir):
     assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
     # CSV-only columns survive
     assert df["deep_learning"].notna().all() and df["output"].notna().all()
+
+
+# --- Rin: canonical_id folds case and can insist; canonical_metric can insist
+
+def test_canonical_id_case_folds_against_the_registry():
+    import pytest
+    assert catalog.canonical_id("totalvi") == "totalVI"
+    assert catalog.canonical_id("SCMOMAT") == "scMoMaT"
+    assert catalog.canonical_id("Seurat WNN") == "Seurat_WNN"
+    # a name the registry does not know is kept (result-dir tokens, user methods)
+    assert catalog.canonical_id("Concerto_louvain") == "Concerto_louvain"
+    assert catalog.canonical_id("MyMethod") == "MyMethod"
+    with pytest.raises(KeyError, match="unknown method 'Matlida'; did you mean 'Matilda'"):
+        catalog.canonical_id("Matlida", strict=True)
+    with pytest.raises(KeyError, match="see mtb.list_methods"):
+        catalog.canonical_id("zzz", strict=True)
+    assert catalog.canonical_id("matilda", strict=True) == "Matilda"
+
+
+def test_canonical_metric_strict_and_known_metrics():
+    import pytest
+    assert catalog.canonical_metric("nope") == "nope"          # lenient by default
+    with pytest.raises(ValueError, match=r"unknown metric 'nope'; valid: \['ARI', 'NMI'"):
+        catalog.canonical_metric("nope", strict=True)
+    assert catalog.canonical_metric("ari", strict=True) == "ARI"
+    km = catalog.known_metrics()
+    assert km[:10] == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
+                       "ASW_batch", "GC", "iLISI", "kBET"] and "PCR" in km
+    # the docstring no longer promises None for an UNKNOWN code
+    assert "``None`` for ``None``, an empty string" in catalog.canonical_metric.__doc__
+
+
+def test_datasets_lists_every_id_with_results(files_dir):
+    import multibench as mtb
+    df = catalog.datasets(files_dir)
+    assert set(mtb.available_datasets(source="both")) <= set(df.dataset)
+    assert {"D11s", "D28s", "D45s", "D52s", "SD7", "SD10", "D24"} <= set(df.dataset)
+    assert df[df.dataset == "D52s"].category.iloc[0] == "cross"
+    assert not df.dataset.duplicated().any()
