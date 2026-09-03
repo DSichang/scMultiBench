@@ -292,7 +292,7 @@ def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     # "# total: X download" when every size is known, "# total at least: ..."
     # when some are still null in the shipped snapshot
     assert cap.err.startswith("# total") and "GB download" in cap.err
-    assert "1 of unknown size" in cap.err
+    assert re.search(r"\d+ of unknown size", cap.err)   # count depends on the shipped snapshot
     assert lines["scmb_r"].endswith("<- UINMF")
 
 
