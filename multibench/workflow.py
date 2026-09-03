@@ -25,8 +25,10 @@ import glob
 import itertools
 import json
 import os
+import re
 import time
 import traceback
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -396,6 +398,59 @@ def _truncate_tail(msg: str, limit: int = 500) -> str:
     return msg if len(msg) <= limit else msg[:100] + " ... " + msg[-(limit - 120):]
 
 
+_ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}(),:;]*")
+_EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
+_HOST_ONLY_SHORT = ("benchmark-host-only: script not published "
+                    "(see method_info(m)['availability'])")
+# the full host-only text (resolve.benchmark_host_only_reason) ends with this
+# marker and contains '; ' itself, so it is collapsed BEFORE splitting on '; '
+_HOST_ONLY_RE = re.compile(r"benchmark-host-only:.*?\(method_info\(m\)\['availability'\]\)",
+                           re.S)
+
+
+def _short_reason(text: str, method: str, dataset: str, category: str | None) -> str:
+    """The ``reason`` column form of a ``files_reason``: what is missing, no noise.
+
+    ``files_reason`` keeps the verbatim exception text (``FileNotFoundError:
+    UnitedNet/D11/vertical: input files not found on disk: {'atac_gas':
+    '/home/wen/data/D11/atac_gas.h5', ...}``) because the full path is what a
+    user greps for. ``reason`` is what the 17-column frame, the CLI table
+    and the "nothing is runnable" error show, so it drops what every row
+    repeats: the exception class, the ``method/dataset/category:`` prefix and
+    the absolute directory (each path becomes its basename). A
+    benchmark-host-only row collapses to one sentence. The env half of
+    ``reason`` is untouched - it carries the copy-pasteable install command.
+    """
+    if not text:
+        return text
+    text = _HOST_ONLY_RE.sub(_HOST_ONLY_SHORT, text)
+    parts = []
+    for part in text.split("; "):
+        if part.startswith("benchmark-host-only:"):
+            parts.append(_HOST_ONLY_SHORT)
+            continue
+        part = _EXC_PREFIX_RE.sub("", part)
+        prefix = f"{method}/{dataset}/{category}: "
+        if part.startswith(prefix):
+            part = part[len(prefix):]
+        part = _ABS_PATH_RE.sub(lambda m: m.group(0).rstrip("/").rsplit("/", 1)[-1], part)
+        parts.append(part)
+    return "; ".join(parts)
+
+
+def _list_of_ids(value, name: str):
+    """Reject a bare string where a list of ids is expected.
+
+    ``methods='StabMap'`` iterates the CHARACTERS and used to die with
+    ``KeyError: unknown method 'S'``; say what was meant instead.
+    """
+    if isinstance(value, str):
+        raise TypeError(
+            f"{name} must be a list of ids, got the string {value!r} - did you "
+            f"mean {name}=[{value!r}]?")
+    return value
+
+
 def _variant_consumes_atac(variant) -> bool:
     """Does THIS variant take an ATAC input (role or const filename)?"""
     if "atac" in variant.modality_types:
@@ -427,19 +482,32 @@ def scan(dataset: str, category: str | None = None,
 
     ``runnable = files_ok & env_ok`` and ``reason`` joins the non-empty reasons
     with ``"; "`` (empty iff runnable) - the two columns every older caller
-    reads. Further columns: ``modalities`` is a ``+``-joined STRING here (e.g.
-    ``"rna+adt"``); ``run_all``/``inputs_for`` take it as a LIST
-    (``["rna", "adt"]``), so split on ``"+"``. The sentinel ``"(data_dir)"``
-    marks a method that consumes a whole DIRECTORY rather than named modality
-    files (the spatial-registration methods, and scBridge) - for those, pass no
-    ``modalities`` at all. ``needs_labels`` says whether THIS variant demands a
-    label file (``cty.csv`` ...) as an input; ``atac`` is the ATAC
+    reads. ``reason`` is the SHORT form: the file half drops the exception
+    class, the ``method/dataset/category:`` prefix and the absolute directory
+    (``input files not found on disk: {'atac': 'atac.h5'}. Available files
+    in D11: [...]``), while ``files_reason`` / ``env_reason`` keep the
+    verbatim text with full paths. Further columns: ``modalities`` is a
+    ``+``-joined STRING here (e.g. ``"rna+adt"``); ``run_all``/``inputs_for``
+    take it as a LIST (``["rna", "adt"]``), so split on ``"+"``. The sentinel
+    ``"(data_dir)"`` marks a method that consumes a whole DIRECTORY rather
+    than named modality files (the spatial-registration methods, and
+    scBridge) - for those, pass no ``modalities`` at all (``modalities=[]``
+    selects exactly them). ``needs_labels`` says whether THIS variant demands
+    a label file (``cty.csv`` ...) as an input; ``atac`` is the ATAC
     representation the method expects (``'peak'`` / ``'gene_activity'`` /
     ``None`` when the variant takes no ATAC); ``runtime_tier`` /
     ``observed_worst_sec`` (see :func:`runtime_hint`) let you size a sweep
     BEFORE launching it; ``caveat`` carries known content traps (e.g. an
     ``atac_gas`` role that fell back to a PEAK matrix). Nothing is executed.
     This is the first call to make when pointing the benchmark at a NEW dataset.
+
+    The full frame is 17 columns wide (``SCAN_COLUMNS``). At the REPL select
+    the four that answer "what can I run and why not the rest"::
+
+        df[["method", "modalities", "runnable", "reason"]]
+
+    and go to ``files_reason`` / ``env_reason`` only for a row you are
+    debugging (``multibench scan`` prints that compact view by default).
 
     Parameters
     ----------
@@ -449,15 +517,25 @@ def scan(dataset: str, category: str | None = None,
         valid ones on a typo); default: all four.
     data_path : the folder that CONTAINS ``dataset``; default the configured
         data root.
-    methods : keyword-only; restrict to these registry ids (``KeyError`` with a
-        did-you-mean hint on a typo). Blocked rows are KEPT with their reason -
-        this is the frame :func:`run_all` ``dry_run=True`` / :func:`plan`
-        return.
+    methods : keyword-only; restrict to these registry ids, as a LIST
+        (``KeyError`` with a did-you-mean hint on a typo; a bare string such
+        as ``methods="StabMap"`` raises ``TypeError`` saying to pass a list).
+        Blocked rows are KEPT with their reason - this is the frame
+        :func:`run_all` ``dry_run=True`` / :func:`plan` return.
     modalities : keyword-only; restrict to ONE modality combination, given as a
         list of role names (``["rna", "adt"]``; ``protein`` is accepted for
-        ``adt``).
+        ``adt``; a bare string raises ``TypeError``). It is an exact selector,
+        so directory-input variants (``"(data_dir)"``: scBridge, the
+        registration methods) are excluded by any non-empty list; when that
+        happens a ``UserWarning`` names them and says ``modalities=[]``
+        selects them.
     verbose : keyword-only; print one line ``[scan] files OK for k/n method
         rows; e/n envs installed``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per variant, columns ``SCAN_COLUMNS``, runnable rows first.
 
     ::
 
@@ -477,6 +555,8 @@ def scan(dataset: str, category: str | None = None,
     doctor``; build them with ``multibench env install --run``.
     """
     registry.check_category(category)       # raises with the valid list on a typo
+    _list_of_ids(methods, "methods")        # TypeError before iterating characters
+    _list_of_ids(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]   # did-you-mean KeyError
     want_mods = None
@@ -492,11 +572,14 @@ def scan(dataset: str, category: str | None = None,
             f"CONTAINS it (see mtb.describe_layout())")
     installed = _installed_envs()
     rows = []
+    dropped_dirs: list[str] = []
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
             continue
         mod_str = "+".join(mods) or "(data_dir)"
         if want_mods is not None and mod_str != want_mods:
+            if mod_str == "(data_dir)" and spec.id not in dropped_dirs:
+                dropped_dirs.append(spec.id)
             continue
         rt = _runtimes().get(spec.id, {})
         rec = {"method": spec.id, "category": cat, "modalities": mod_str,
@@ -530,11 +613,22 @@ def scan(dataset: str, category: str | None = None,
             rec["env_ok"] = False
             rec["env_reason"] = _env_hint(rec["env"], spec.id, cat)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"])
-        rec["reason"] = "; ".join(r for r in (rec["files_reason"], rec["env_reason"]) if r)
+        rec["reason"] = "; ".join(
+            r for r in (_short_reason(rec["files_reason"], spec.id, dataset, cat),
+                        rec["env_reason"]) if r)
         rows.append(rec)
     df = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     df = df.sort_values(["runnable", "category", "method"],
                         ascending=[False, True, True]).reset_index(drop=True)
+    if dropped_dirs:
+        # the selector is exact by design (a sweep must not silently grow);
+        # say what it excluded rather than dropping the rows in silence
+        warnings.warn(
+            f"scan: modalities={list(modalities)} excludes {len(dropped_dirs)} "
+            f"directory-input method(s) ({', '.join(dropped_dirs)}: they take a "
+            f"data_dir, shown as '(data_dir)', not modality files); pass "
+            f"modalities=[] to select them, or no modalities for every variant",
+            UserWarning, stacklevel=2)
     if verbose:
         n = len(df)
         print(f"[scan] files OK for {int(df['files_ok'].sum())}/{n} method rows; "
@@ -552,15 +646,40 @@ def plan(dataset: str, category: str, *, methods: list[str] | None = None,
     frame ``run_all(..., dry_run=True)`` returns, i.e. :func:`scan` restricted
     to ``methods`` / ``modalities`` - runnable rows first, blocked rows kept
     with ``reason`` (and the ``files_ok`` / ``env_ok`` gate columns). Filter
-    ``plan[plan.runnable]`` for what will actually run.
+    ``plan[plan.runnable]`` for what will actually run. The frame has the 17
+    :func:`scan` columns; the readable view at the REPL is
+    ``plan[["method", "modalities", "runnable", "reason"]]``
+    (``files_reason`` / ``env_reason`` hold the verbatim, full-path text).
 
-    Raises ``FileNotFoundError`` when the dataset folder is absent, ``KeyError``
-    (did-you-mean) on an unknown method id, ``ValueError`` when no variant of
-    the requested methods exists under ``category`` (a known id with no
-    diagonal variant, say) - never an empty frame. ``verbose=True`` prints the
-    ``[run_all] dry run: k of n requested variant(s) runnable ...`` summary.
-    :func:`plan_commands` is this frame plus the command line each variant
-    would run (``multibench run-all --dry-run`` prints that).
+    Parameters
+    ----------
+    dataset : str
+        Folder NAME under ``data_path`` (``FileNotFoundError`` listing the
+        folders present when absent).
+    category : str
+        Integration category (``ValueError`` listing the four on a typo).
+    methods : list of str, keyword-only, optional
+        Registry ids to restrict to (``KeyError`` with a did-you-mean hint;
+        a bare string raises ``TypeError``).
+    modalities : list of str, keyword-only, optional
+        ONE modality combination, e.g. ``["rna", "adt"]``.
+    data_path : path, keyword-only, optional
+        The folder that CONTAINS ``dataset``; default the configured root.
+    verbose : bool, keyword-only
+        Print the ``[run_all] dry run: k of n requested variant(s) runnable
+        ...`` summary.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The plan; never empty - ``ValueError`` when no variant of the
+        requested methods exists under ``category`` (a known id with no
+        diagonal variant, say).
+
+    See also ``mtb.workflow.plan_commands(dataset, category, data_path=...,
+    out_dir=...)``: this frame plus a ``command`` column with the exact shell
+    line each variant would run (``out_dir`` defaults to the placeholder
+    ``'<out_dir>'``; ``multibench run-all --dry-run`` prints the same).
     """
     return run_all(dataset, category, out_dir=None, methods=methods,
                    modalities=modalities, data_path=data_path, dry_run=True,
@@ -1096,12 +1215,26 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                 f"variant:\n" + "\n".join(lines) +
                 f"\nfiles_ok / env_ok in mtb.scan({dataset!r}, {category!r}, "
                 f"methods={list(methods)}) say which gate failed; mtb.env.doctor() "
-                f"for envs.")
+                f"for envs." + _platform_suffix(blocked))
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
     return (f"{head}. First {k} of {n} blocked variants:\n" + "\n".join(lines) +
             f"\nInspect mtb.scan({dataset!r}, {category!r}) for the full table "
-            f"(files_ok / env_ok say which gate failed; mtb.env.doctor() for envs).")
+            f"(files_ok / env_ok say which gate failed; mtb.env.doctor() for envs)."
+            + _platform_suffix(blocked))
+
+
+def _platform_suffix(blocked: pd.DataFrame) -> str:
+    """One extra sentence for the "nothing is runnable" error on a non-Linux
+    host whose rows are blocked by the env gate: the install command every
+    reason quotes will refuse here, so say where to run instead of sending
+    the user to a download that fails."""
+    problem = envs.host_platform_problem()
+    if not problem or "env_ok" not in blocked or blocked["env_ok"].all():
+        return ""
+    return (f"\nNote: {problem} - the `multibench env install` commands above "
+            f"refuse on this host; run methods on a Linux host (plan / scan / "
+            f"evaluate / plot work here).")
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
@@ -1192,20 +1325,48 @@ def command_preview(method: str, category: str, *, inputs: dict, out_dir,
     return wrap_command(cmd, cmd_template)
 
 
-def plan_commands(dataset: str, category: str, *, out_dir, methods=None,
-                  modalities=None, data_path=None, params: dict | None = None,
-                  verbose: bool = False) -> pd.DataFrame:
-    """:func:`plan` plus a ``command`` column: the shell line ``run_all`` would
-    execute for each variant, or ``""`` when its inputs do not resolve.
+#: Default ``out_dir`` of :func:`plan_commands` - a literal placeholder so a
+#: preview needs no real directory; the printed commands then read
+#: ``--save_path <out_dir>/Matilda_D11/``.
+OUT_DIR_PLACEHOLDER = "<out_dir>"
 
-    The frame is :func:`plan` (= ``run_all(dry_run=True)``) with one extra
-    trailing column, so ``plan_commands(...)[plan.columns]`` is the plan. A
-    row whose ``files_ok`` is False has no command (there is nothing to pass
-    the script); a row blocked only by ``env_ok`` still shows its command -
-    that is the line to paste into a job script once the env is built. Each
-    command writes under ``<out_dir>/<method>_<dataset>/`` exactly like
-    ``run_all``. ``params`` are merged the way ``run_all(params=)`` merges
-    them (``KeyError`` on a key the method does not accept). Nothing runs.
+
+def plan_commands(dataset: str, category: str, *, out_dir=OUT_DIR_PLACEHOLDER,
+                  methods=None, modalities=None, data_path=None,
+                  params: dict | None = None, verbose: bool = False) -> pd.DataFrame:
+    """:func:`plan` plus a ``command`` column: the shell line ``run_all`` would execute for each variant.
+
+    Reach it as ``mtb.workflow.plan_commands(dataset, category, data_path=...,
+    out_dir=...)``. The frame is :func:`plan` (= ``run_all(dry_run=True)``)
+    with one extra trailing column, so ``plan_commands(...)[plan.columns]`` is
+    the plan. A row whose ``files_ok`` is False has an empty command (there
+    is nothing to pass the script); a row blocked only by ``env_ok`` still
+    shows its command - that is the line to paste into a job script once the
+    env is built. Nothing runs.
+
+    Parameters
+    ----------
+    dataset, category : str
+        As for :func:`plan`.
+    out_dir : path or str, keyword-only
+        Where each command writes (``<out_dir>/<method>_<dataset>/``, exactly
+        like ``run_all``). Defaults to the literal placeholder
+        ``'<out_dir>'`` so a preview needs no directory; pass the real one
+        for paste-ready lines.
+    methods, modalities, data_path : keyword-only, optional
+        As for :func:`plan`.
+    params : dict, keyword-only, optional
+        ``{method: {key: value}}``, merged the way ``run_all(params=)``
+        merges them (``KeyError`` on a key the method does not accept).
+    verbose : bool, keyword-only
+        Print the dry-run summary line.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The plan plus ``command`` (a ``shlex``-joined shell line, ``""`` when
+        the inputs do not resolve, ``(no preview: ...)`` when building it
+        failed).
     """
     df = run_all(dataset, category, out_dir=None, methods=methods,
                  modalities=modalities, data_path=data_path, dry_run=True,
@@ -1326,15 +1487,18 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     ----------
     dataset : the DIRECTORY NAME of your data, e.g. ``"MYCITE"`` - not a full path.
         A folder that does not exist raises ``FileNotFoundError`` (listing the
-        folders that do) before anything else happens.
+        folders that do) before anything else happens - on the dry run and
+        the real run alike, so a typo never reaches the per-method loop (where
+        ``inputs_for``'s missing-file warning would be the only signal).
     data_path : the folder that CONTAINS ``dataset``, e.g. ``"/home/wen/data"``
         (so the files live in ``/home/wen/data/MYCITE/``). Defaults to the
         package's configured data root.
     out_dir : where each method's output goes (one sub-directory per method).
         Ignored (may be ``None``) when ``dry_run=True``.
-    methods : restrict to these method ids, e.g. ``["Matilda", "totalVI"]``
-        (default: everything runnable). An unknown id raises ``KeyError`` with a
-        did-you-mean hint.
+    methods : restrict to these method ids, as a LIST, e.g. ``["Matilda",
+        "totalVI"]`` (default: everything runnable). An unknown id raises
+        ``KeyError`` with a did-you-mean hint; a bare string
+        (``methods="StabMap"``) raises ``TypeError`` saying to pass a list.
     modalities : restrict to ONE modality combination, given as a list of role
         names, e.g. ``["rna", "adt"]`` for CITE-seq, ``["rna", "atac_gas"]`` for
         RNA + ATAC gene-activity, or ``["rna", "atac_peak"]`` for RNA + ATAC peaks.
@@ -1353,11 +1517,15 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         with their ``reason`` (and the ``files_ok`` / ``env_ok`` gate columns).
         Never empty: ``ValueError`` if nothing matches. Free; do it first.
         Filter ``plan[plan.runnable]`` for what will actually be attempted -
-        ``len(plan)`` is NOT the sweep size. :func:`plan` is the same call
-        without an ``out_dir``; :func:`plan_commands` adds the command line
-        each variant would run. A dry run also validates ``params``: a key no
-        planned variant of that method accepts raises ``KeyError`` (naming the
-        accepted keys) instead of being discovered hours in.
+        ``len(plan)`` is NOT the sweep size; the readable view is
+        ``plan[["method", "modalities", "runnable", "reason"]]``.
+        :func:`plan` is the same call without an ``out_dir``;
+        ``mtb.workflow.plan_commands(dataset, category, data_path=...,
+        out_dir=...)`` adds the exact command line each variant would run
+        (``out_dir`` defaults to the placeholder ``'<out_dir>'``). A dry run
+        also validates ``params``: a key no planned variant of that method
+        accepts raises ``KeyError`` (naming the accepted keys) instead of
+        being discovered hours in.
     timeout : per-method wall-clock cap in SECONDS. Size it from the
         ``runtime_tier`` / ``observed_worst_sec`` columns of :func:`scan` (or
         :func:`runtime_hint`); the slowest methods observed here need >4 h. A method exceeding it is
@@ -1403,6 +1571,8 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     bad method cannot abort the sweep.
     """
     registry.check_category(category)      # raises with the valid list on a typo
+    _list_of_ids(methods, "methods")       # 'StabMap' is not ['S','t',...]
+    _list_of_ids(modalities, "modalities")
     # validate the ARGUMENT COMBINATION before anything is resolved or touched,
     # so a bad combination is reported as such instead of surfacing as an
     # unrelated I/O or "nothing is runnable" error

@@ -1,10 +1,29 @@
-"""Tests for the high-level workflow API (scan / run_all / BatchResult)."""
+"""Tests for the high-level workflow API (scan / run_all / BatchResult).
+
+The runnable COUNTS below are reference-host values (every method env
+installed). They are skipped, not failed, on a host without the envs; the
+host-independent contracts live in tests/test_scan_gates.py and
+tests/test_workflow_study2.py.
+"""
 import pandas as pd
 import pytest
 
 import multibench as mtb
 
 
+def _envs_installed(category=None) -> bool:
+    """Every env the category's methods need exists on this host."""
+    try:
+        rows = mtb.env.doctor(category=category)
+    except Exception:  # noqa: BLE001 - no conda at all
+        return False
+    return bool(rows) and all(r["exists"] for r in rows)
+
+
+_NO_ENVS = "reference-host runnable counts need the method conda envs (none here)"
+
+
+@pytest.mark.skipif(not _envs_installed(), reason=_NO_ENVS)
 def test_scan_returns_runnable_and_reasons():
     df = mtb.scan("D11")
     assert {"method", "category", "modalities", "runnable", "reason"} <= set(df.columns)
@@ -40,6 +59,7 @@ def test_scan_accepts_spatial_methods_on_spatial_data():
     assert spatial["runnable"].all()
 
 
+@pytest.mark.skipif(not _envs_installed("vertical"), reason=_NO_ENVS)
 def test_run_all_dry_run_lists_the_plan():
     """dry_run returns the WHOLE plan (blocked rows kept with a reason); the
     runnable subset is what will be attempted - 14 rows on the reference host."""
@@ -67,6 +87,8 @@ def test_run_all_dry_run_is_the_scan_frame():
         pd.testing.assert_frame_equal(plan, mtb.scan(ds, cat))
 
 
+@pytest.mark.skipif(not (_envs_installed("vertical") and _envs_installed("cross")
+                         and _envs_installed("mosaic")), reason=_NO_ENVS)
 def test_run_all_plans_match_scan():
     """Runnable counts on the reference host (needs the method envs)."""
     for ds, cat, n in [("D11", "vertical", 14), ("D52", "cross", 8),
