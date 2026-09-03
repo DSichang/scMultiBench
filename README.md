@@ -14,12 +14,14 @@ with scIB metrics, and draws the paper's figures.
 ## Quick start
 
 ```bash
-pip install multibench-sc          # the API (import name: multibench)
+pip install multibench-sc          # the API (import name: multibench) - a 1.3 MB wheel that ships the method
+                                   # registry, the stored result tables, the env lockfiles and the references
 ```
 
-For the tutorials (they also use the stored benchmark tables shipped in this
-repository), clone instead: `git clone https://github.com/DSichang/scMultiBench.git
-&& cd scMultiBench && pip install -e .`
+That is the whole install; the tutorials and the stored benchmark tables need
+no clone. Clone only to work on the package itself (edit the notebooks, run
+the test suite): `git clone https://github.com/DSichang/scMultiBench.git &&
+cd scMultiBench && pip install -e .`
 
 ```python
 import multibench as mtb, pandas as pd
@@ -27,7 +29,7 @@ import multibench as mtb, pandas as pd
 mtb.list_methods()                 # the 40-method registry
 mtb.method_info("Matilda")         # everything known about one method (env, labels, reference, variants)
 mtb.recommend("vertical", modalities=["rna", "adt"])   # ranked from the stored tables, with coverage
-mtb.data.fetch("D11")              # reference CITE-seq dataset, 11 MB
+mtb.data.fetch("D11")              # reference CITE-seq dataset, 11 MB -> mtb.config.DEFAULT.data_path
 mtb.scan("D11", "vertical")        # two-gate preflight: files_ok / env_ok per method, with reasons
 mtb.plan("D11", "vertical")        # the run plan (= run_all(dry_run=True)); blocked rows stay, with reasons
 res = mtb.run_all("D11", "vertical", out_dir="out/")   # run + score
@@ -35,6 +37,7 @@ res.plot()                         # the paper-style bubble panel
 
 # your own data: one call writes the dataset folder, then the same three calls
 mtb.io.export_dataset(adata, "data/MYCITE", rna="X", adt="obsm:protein", labels="obs:celltype")
+#   selectors as above, or objects: adt=<DataFrame / AnnData / array> (adt_names=[...]), labels=<Series>
 mtb.scan("MYCITE", "vertical", data_path="data")
 
 # stored results, evaluation and figures need no conda environment
@@ -43,29 +46,35 @@ m = mtb.evaluate(my_embedding, labels=mtb.labels_for("D11"))            # scIB m
 mtb.plot.bubble(pd.concat([df, mtb.to_long(m, "MyMethod", "D11", "vertical")]), save="d11.pdf")
 ```
 
-Running methods needs their conda environments (Linux). The package itself is
-~2 MB - install only the environments you need:
+Running methods needs their conda environments, which are linux-64 only
+(`env install --run` refuses on macOS / Windows unless `--force`); everything
+else - the registry, the stored results, `scan`'s file gate, `evaluate`, the
+figures - works on any machine. Install only the environments you need:
 
 ```bash
-multibench env doctor                              # what exists / is missing
-multibench env install --methods Matilda --run     # one method (2-14 GB)
-multibench env install --category vertical --run   # one category (45-101 GB)
+multibench env doctor                                      # what exists / is missing, with the install line
+multibench env plan --category vertical                    # the envs a category needs, with download / disk sizes
+multibench env install --methods Matilda --packed --run    # one method's env (prebuilt archive, lockfile fallback)
+multibench env install --category vertical --packed --run  # one category
 ```
 
 Everything is also available from the command line (`multibench --help`):
 
 ```bash
 multibench layout vertical                             # how to lay out MY data
-multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:celltype
+multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:celltype --category vertical
 multibench scan D11 --category vertical               # preflight table: files_ok / env_ok / reason (--columns all: every column)
 multibench find --category vertical --modalities rna,adt --needs-labels false
+multibench params Matilda                              # the hyperparameters --param accepts, per variant
 multibench run-all D11 --category vertical --out-dir out/ --dry-run   # the plan + the command per variant; nothing runs
-multibench evaluate --output out/Matilda/embedding.h5 --labels data/D11/cty.csv --only ARI,NMI
+multibench evaluate --output out/Matilda/embedding.h5 --labels <data_path>/D11/cty.csv --only ARI,NMI   # mtb.labels_for("D11") prints the path
 multibench plot bubble --category vertical --dataset D11 --source rerun --out d11.pdf
+multibench plot bubble --input mine.csv --category vertical --dataset D11 --source rerun --out d11.pdf   # your rows next to the stored table
 multibench cite Matilda MOFA2                          # BibTeX for the benchmark + each method
 ```
 
-The benchmark datasets are downloaded separately - see
+`mtb.data.fetch` puts the reference datasets under `mtb.config.DEFAULT.data_path`
+(`~/.cache/multibench/data` after a pip install, `<repo>/data` in a checkout) - see
 [Get the data](https://dsichang.github.io/scMultiBench/installation/#get-the-data).
 
 ## Try it without installing anything
@@ -83,10 +92,11 @@ Multitask benchmarking of single-cell multimodal omics integration methods.
 *Nature Methods* 22, 2449-2460 (2025). <https://doi.org/10.1038/s41592-025-02856-3>
 
 Every method you run is third-party software with its own paper - please cite
-it alongside the benchmark. `print(mtb.cite(res.summary.method))` (or
-`multibench cite <method> ...`) prints the benchmark's BibTeX entry followed by
-one entry per method; `mtb.method_info(name)` carries the same reference,
-repository and version.
+it alongside the benchmark. `print(mtb.cite("Matilda", "MOFA2"))` - or
+`print(mtb.cite(res.summary.method))` after a sweep, or `multibench cite
+Matilda MOFA2` - prints the benchmark's BibTeX entry followed by one entry per
+method; `mtb.method_info(name)` carries the same reference, repository and
+version.
 
 This repository (`DSichang/scMultiBench`) is the API fork of
 [PYangLab/scMultiBench](https://github.com/PYangLab/scMultiBench), which holds

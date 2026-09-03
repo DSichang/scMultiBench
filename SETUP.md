@@ -25,6 +25,21 @@ multibench env install --run # build everything from the committed lockfiles
 
 `env install` is a dry run until you add `--run`. `env doctor`'s legend distinguishes
 installed `[x]`, missing-but-buildable `[L]`, and missing-with-no-lockfile `[!]`.
+`multibench env plan [--category C | --methods M,...]` collapses the methods into the
+envs they need and prints, per env, the packed-archive download size (`dl`) and the
+unpacked size (`disk`) from the shipped snapshot `multibench/engine/packed_sizes.json`
+(`?` = not measured yet; `python tools/packed_sizes.py` on a host with network fills
+it) plus a `# total` line; `env install --packed` shows the same per archive. `env
+status` tags each method's env with a build-difficulty word (`easy`, `old-scvi`,
+`old-tensorflow`, `R`, `verified`, `blocked-script`; the legend is printed on stderr
+and `mtb.env.DIFFICULTY` holds the definitions).
+
+**The environments are linux-64 conda envs** - the lockfiles and the packed archives
+both. On macOS / Windows `env status`, `plan`, `doctor` and `install` print one
+`warning: ... linux-64 ...` line first and `env install --run` refuses (exit 1) unless
+`--force`; dry runs work everywhere. Everything that does not run a method - the
+registry, the stored results, `scan`'s file gate, `evaluate`, the figures - works on
+any machine.
 
 `scan()` checks two gates per method - `files_ok` (the dataset folder itself; this
 gate runs on any machine, no environments needed) and `env_ok` (the method's conda
@@ -65,13 +80,12 @@ producing a quietly broken environment.
 ## Verifying your install
 
 ```bash
-python -m pytest tests/ -q          # the full suite passes on the benchmark
-                                    # host; elsewhere the tests that need the
-                                    # conda environments or a subprocess
-                                    # (tests/test_run_all_dispatch.py,
-                                    # tests/test_runner.py, tests/test_workflow.py,
-                                    # tests/test_mplbackend.py) fail - expected,
-                                    # not a broken install
+python -m pytest tests/ -q          # green on a laptop with NO conda environments
+                                    # (the dispatch tests fake the env gate; the
+                                    # three host-count tests in tests/test_workflow.py
+                                    # skip when no env is installed). It needs the
+                                    # reference checkout the runner clones on first
+                                    # use (scMultiBench_ref/, auto-provisioned).
 ```
 
 Then the smallest real end-to-end check:
