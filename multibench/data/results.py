@@ -11,12 +11,16 @@ Two sources ship with the package (``multibench/result/``):
   which hold raw kBET output, are not metric tables and are skipped);
 * ``rerun`` - the package's re-run sweeps behind the tutorial figures
   (``result/rerun/long_all_<dataset>.csv``; D11/D11s, D28/D28s, D45/D45s,
-  D52/D52s), stamped with the package version they were produced by.
+  D52/D52s). The files are stamped ``rerun-<package version that produced
+  them>``; the loader reports those rows as plain ``source == "rerun"`` and
+  keeps the stamp in ``frame.attrs["rerun_version"]``.
 
 Every frame returned here carries the same seven columns
 ``metric, value, method, dataset, category, clustering, source`` so frames
 from either source (or your own, via :func:`multibench.to_long`) can be
-concatenated and handed to ``mtb.plot.bubble`` / ``mtb.plot.bar``.
+concatenated and handed to ``mtb.plot.bubble`` / ``mtb.plot.bar``. The
+``source`` column holds ``"published"``, ``"rerun"`` or ``"user"`` (a long
+file of your own keeps whatever it carries).
 
 Currently the scib clustering + batch loader is the only metric set; any
 other ``metric_set`` token raises ``ValueError`` listing the valid ones.
@@ -32,8 +36,8 @@ import pandas as pd
 from .. import config
 from . import catalog
 
-__all__ = ["load_results", "available_datasets", "results_coverage", "recommend",
-           "COLUMNS", "SOURCES", "FAMILIES", "DegenerateRerunWarning"]
+__all__ = ["load_results", "available_datasets", "fetchable", "results_coverage",
+           "recommend", "COLUMNS", "SOURCES", "FAMILIES", "DegenerateRerunWarning"]
 
 # clustering variant -> companion filename for the per-(dataset,method) dir
 _CLUSTERING_FILES = {
@@ -85,14 +89,54 @@ _RERUN_GLOB = "long_all_*.csv"
 
 
 def _rerun_source() -> str:
-    """Provenance stamp for re-run frames that lack a ``source`` column.
+    """Provenance value of every re-run row: the plain token ``"rerun"``.
 
-    The shipped tables carry their own stamp (``rerun-<version that produced
-    them>``); this fallback is for a file without one. It deliberately does NOT
-    use the running package's version: that would claim the current release
-    produced numbers it merely read.
+    The shipped sweep files stamp their rows ``rerun-<version that produced
+    them>``; :func:`_split_rerun_tag` folds that to ``"rerun"`` (so
+    ``df[df.source == "rerun"]`` works, as every doc says) and keeps the
+    version in ``frame.attrs["rerun_version"]``. A file without a stamp gets
+    this token and no version - deliberately NOT the running package's
+    version, which would claim the current release produced numbers it merely
+    read.
     """
     return "rerun"
+
+
+#: a stamped re-run provenance value: ``rerun-<version>``
+_RERUN_TAG_RE = re.compile(r"^rerun-(.+)$")
+
+
+def _split_rerun_tag(source: pd.Series) -> tuple[pd.Series, set[str]]:
+    """Fold ``rerun-<version>`` values to ``"rerun"``; return the versions seen.
+
+    Any other value (``published``, ``user``, a plain ``rerun``) is returned
+    unchanged.
+    """
+    col = source.astype(str)
+    m = col.str.extract(_RERUN_TAG_RE, expand=False)
+    versions = set(m.dropna().unique())
+    out = source.where(m.isna(), _rerun_source())
+    return out, versions
+
+
+def _version_attr(versions: set[str]):
+    """``attrs["rerun_version"]`` value: ``None`` (no stamped rows), the one
+    version string, or a sorted tuple when files from several versions were
+    loaded together."""
+    if not versions:
+        return None
+    if len(versions) == 1:
+        return next(iter(versions))
+    return tuple(sorted(versions))
+
+
+def _rerun_tag(version) -> str:
+    """The full stamp for messages: ``rerun-0.2.1`` (``rerun`` when unknown)."""
+    if version is None:
+        return _rerun_source()
+    if isinstance(version, tuple):
+        return f"{_rerun_source()}-" + "/".join(version)
+    return f"{_rerun_source()}-{version}"
 
 
 def _read_metric_csv(path: Path) -> pd.DataFrame:
@@ -241,15 +285,23 @@ def _read_rerun_files(base: Path) -> list[tuple[Path, pd.DataFrame]]:
         df = pd.read_csv(f)
         if not {"metric", "value", "method", "dataset", "category"}.issubset(df.columns):
             continue
+        versions: set[str] = set()
         if "source" not in df.columns:
             df["source"] = _rerun_source()
+        else:
+            df["source"], versions = _split_rerun_tag(df["source"])
         if "clustering" not in df.columns:
             df["clustering"] = "default"
-        out.append((f, df[COLUMNS]))
+        df = df[COLUMNS]
+        df.attrs["rerun_version"] = _version_attr(versions)
+        out.append((f, df))
     return out
 
 
 def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.DataFrame:
+    """The re-run rows for a category / dataset selection; the frame's
+    ``attrs["rerun_version"]`` records the stamp(s) of the files that
+    contributed rows."""
     files = _read_rerun_files(base)
     root = base / _RERUN_DIR
     if not files:
@@ -257,22 +309,31 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
             f"no re-run sweeps ({_RERUN_GLOB}) under {root}. They ship inside the "
             f"multibench wheel at multibench/result/rerun; check result_path= / "
             f"mtb.config.DEFAULT.result_path (currently {base}).")
-    frames = [df for _, df in files]
-    allf = pd.concat(frames, ignore_index=True)
-    avail = (allf[["category", "dataset"]].drop_duplicates()
-             .sort_values(["category", "dataset"]))
-    sel = allf
-    if category is not None:
-        sel = sel[sel["category"] == category]
-    if datasets:
-        sel = sel[sel["dataset"].isin(datasets)]
-    if sel.empty:
+    frames = []
+    versions: set[str] = set()
+    for _, df in files:
+        sel = df
+        if category is not None:
+            sel = sel[sel["category"] == category]
+        if datasets:
+            sel = sel[sel["dataset"].isin(datasets)]
+        if sel.empty:
+            continue
+        frames.append(sel)
+        v = df.attrs.get("rerun_version")
+        versions.update(v if isinstance(v, tuple) else ([v] if v else []))
+    if not frames:
+        allf = pd.concat([df for _, df in files], ignore_index=True)
+        avail = (allf[["category", "dataset"]].drop_duplicates()
+                 .sort_values(["category", "dataset"]))
         pairs = [f"{c}/{d}" for c, d in avail.itertuples(index=False)]
         raise FileNotFoundError(
             f"no re-run sweep for {category or 'any category'}/"
             f"{(datasets if len(datasets) > 1 else datasets[0]) if datasets else 'any dataset'}; "
             f"available: {pairs}")
-    return sel.reset_index(drop=True)
+    out = pd.concat(frames, ignore_index=True)
+    out.attrs["rerun_version"] = _version_attr(versions)
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -464,11 +525,20 @@ def _degenerate_rerun_rows(out: pd.DataFrame, base: Path) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
-def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 3) -> None:
+def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 3,
+                     rerun_version=None) -> None:
+    """Emit :class:`DegenerateRerunWarning` for the rows
+    :func:`_degenerate_rerun_rows` finds; ``rerun_version`` (the frame's
+    ``attrs["rerun_version"]``) restores the full ``rerun-<version>`` stamp
+    in the message, since the ``source`` column now reads plain ``rerun``."""
     bad = _degenerate_rerun_rows(out, base)
     if bad.empty:
         return
-    items = ", ".join(f"{r.method}/{r.dataset} ({r.source} ARI {r.rerun_ARI:.4f} vs "
+
+    def _stamp(src) -> str:
+        return _rerun_tag(rerun_version) if src == _rerun_source() else str(src)
+
+    items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)} ARI {r.rerun_ARI:.4f} vs "
                       f"published {r.published_ARI:.2f})" for r in bad.itertuples())
     warnings.warn(
         f"degenerate re-run row(s) - ARI < {_DEGENERATE_RERUN_ARI} where the "
@@ -557,15 +627,24 @@ def load_results(
         ``result_path/rerun/long_all_<dataset>.csv``: vertical D11/D11s,
         diagonal D28/D28s, mosaic D45/D45s, cross D52/D52s) or ``"both"``
         (the concatenation - tell the two apart by the ``source`` column,
-        ``"published"`` vs ``"rerun-<version>"``); anything else raises
-        ``ValueError``. For a FILE, ``"published"`` and ``"both"`` keep every
-        row, while any other value filters on the file's own ``source``
-        column: ``"user"`` keeps the rows :func:`multibench.to_long` wrote,
-        ``"rerun"`` matches ``rerun-<version>`` by prefix, and a value the
+        ``"published"`` vs ``"rerun"``; the sweep's package version is in
+        ``frame.attrs["rerun_version"]``, e.g. ``"0.2.1"``); anything else
+        raises ``ValueError``. For a FILE, ``"published"`` and ``"both"``
+        keep every row, while any other value filters on the file's own
+        ``source`` column: ``"user"`` keeps the rows
+        :func:`multibench.to_long` wrote, ``"rerun"`` matches both ``rerun``
+        and an older ``rerun-<version>`` stamp by prefix, and a value the
         file does not contain raises ``ValueError`` listing the ones present.
         With ``"rerun"``/``"both"`` a re-run row whose ARI is ~0 while the
         published table scored the same method/dataset well is reported by a
         :class:`DegenerateRerunWarning` (Conos on D28) - never silently.
+        When the selected category/dataset(s) hold only ONE method in the
+        chosen source while the other source holds more, a ``UserWarning``
+        says so (``"only one method (scMoMaT) in the published table for
+        cross/D52 ... pass source='rerun' (or 'both')"``): the default
+        ``"published"`` cross tables are that sparse, and a one-method table
+        yields meaningless ranks. No warning when the other source has
+        nothing more.
     methods : list of str, keyword-only
         Alias for ``method`` (a list); passing both raises ``ValueError``.
     family : {None, "all", "clustering", "batch"}, keyword-only
@@ -581,7 +660,13 @@ def load_results(
         Columns, in this order: ``metric, value, method, dataset, category,
         clustering, source``. Method ids are canonical registry tokens
         (``MOFA+`` -> ``MOFA2``, ``Seurat(WNN)`` -> ``Seurat_WNN``); metric
-        codes are canonical (``iFI`` -> ``iF1``).
+        codes are canonical (``iFI`` -> ``iF1``). ``source`` is
+        ``"published"``, ``"rerun"`` or ``"user"`` (a file keeps its own
+        values); ``frame.attrs["rerun_version"]`` holds the package version
+        stamped on the re-run rows (``"0.2.1"``; a sorted tuple when files
+        from several versions were loaded; ``None`` when no stamped row is
+        present). ``attrs`` do not survive ``pd.concat`` - read it before
+        concatenating.
 
     Raises
     ------
@@ -620,9 +705,12 @@ def load_results(
     wanted_methods = _as_list(method)
 
     base = _base_path(result_path)
+    rerun_versions: set[str] = set()
 
     if base.is_file():
         out = _load_long_csv(base)
+        # a file keeps its own provenance values; only the stamp is parsed
+        _, rerun_versions = _split_rerun_tag(out["source"])
         if source not in ("published", "both"):
             # a file carries its own provenance: filter on it, loudly
             col = out["source"].astype(str)
@@ -659,7 +747,10 @@ def load_results(
                     errors.append(str(e))
             if source in ("rerun", "both"):
                 try:
-                    frames.append(_load_rerun(cat, datasets, base))
+                    rr = _load_rerun(cat, datasets, base)
+                    v = rr.attrs.get("rerun_version")
+                    rerun_versions.update(v if isinstance(v, tuple) else ([v] if v else []))
+                    frames.append(rr)
                     got_any = True
                 except FileNotFoundError as e:
                     errors.append(str(e))
@@ -682,6 +773,11 @@ def load_results(
                     f"no {source} results for {category or 'any category'}/"
                     f"{missing if len(missing) > 1 else missing[0]}; datasets with "
                     f"{source} tables: {avail}")
+        if source != "both":
+            # a one-method table ranks nothing; say so when the OTHER source
+            # would have given the user a real table for the same selection
+            _warn_single_method(out, source, category, datasets, clustering,
+                                base, metric_set)
 
     # ---- filters ---------------------------------------------------------
     where = f"{category or 'any category'}/{datasets if datasets else 'any dataset'}"
@@ -710,9 +806,57 @@ def load_results(
                 f"metric {metric!r} not present in {where} (source={source!r}; "
                 f"available: {avail})", UserWarning, stacklevel=2)
     out = out[COLUMNS].reset_index(drop=True)
+    out.attrs["rerun_version"] = _version_attr(rerun_versions)
     if source in ("rerun", "both") and not base.is_file():
-        _warn_degenerate(out, base)
+        _warn_degenerate(out, base, rerun_version=out.attrs["rerun_version"])
     return out
+
+
+def _other_source_methods(source: str, cats: list, datasets, clustering: str,
+                          base: Path, metric_set: str) -> set[str]:
+    """Method ids the OTHER stored source holds for the same selection
+    (``published`` <-> ``rerun``); empty when it has none. Never raises."""
+    other = "rerun" if source == "published" else "published"
+    have: set[str] = set()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for cat in cats:
+            try:
+                if other == "rerun":
+                    df = _load_rerun(cat, datasets, base)
+                else:
+                    df = _load_published(cat, datasets, clustering, base, metric_set)
+            except (FileNotFoundError, ValueError):
+                continue
+            have.update(df["method"].astype(str).unique())
+    return have
+
+
+def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
+                        clustering: str, base: Path, metric_set: str,
+                        stacklevel: int = 3) -> None:
+    """One ``UserWarning`` (the CLI's "only one method in this table" text)
+    when the loaded selection holds a single method while the other stored
+    source holds more methods for the same category/dataset(s). Silent when
+    the other source has nothing more - a source the user asked for that is
+    the only one with rows is not a mistake."""
+    n = out["method"].nunique()
+    if n >= 2:
+        return
+    cats = sorted(out["category"].astype(str).unique()) or (
+        [category] if category is not None else list(_CATEGORIES))
+    have = _other_source_methods(source, cats, datasets, clustering, base, metric_set)
+    if len(have) <= n:
+        return
+    other = "rerun" if source == "published" else "published"
+    sel = (datasets[0] if len(datasets) == 1 else list(datasets)) if datasets else "any dataset"
+    where = f"{category or '/'.join(cats)}/{sel}"
+    warnings.warn(
+        f"only one method ({out['method'].iloc[0]}) in the {source} table for "
+        f"{where}; ranks and Overall bars are not meaningful with a single "
+        f"method - the {other} tables hold {len(have)} methods for it "
+        f"({', '.join(sorted(have, key=str.lower))}): pass source={other!r} "
+        f"(or 'both')", UserWarning, stacklevel=stacklevel)
 
 
 def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
@@ -744,7 +888,14 @@ def available_datasets(
     source: str = "published",
     clustering: str = "default",
 ) -> list[str]:
-    """Dataset ids that have loadable ``metric_set`` results.
+    """Dataset ids that SHIP STORED RESULTS (metric tables ``load_results``
+    can read) - NOT the datasets that can be downloaded.
+
+    Only a handful of the benchmark's datasets are downloadable; those are
+    the release assets of :func:`multibench.data.fetch`, listed by
+    :func:`fetchable` (``mtb.data.results.fetchable()``). An id returned here
+    but not by ``fetchable()`` has metric tables you can plot and rank
+    against, and no data file this package can obtain for you.
 
     Parameters
     ----------
@@ -770,7 +921,12 @@ def available_datasets(
     Returns
     -------
     list of str
-        Sorted dataset ids.
+        Sorted dataset ids (result-table ids; see :func:`fetchable` for the
+        downloadable ones).
+
+    See Also
+    --------
+    fetchable : the ids :func:`multibench.data.fetch` can download.
     """
     _check_metric_set(metric_set)
     if source not in SOURCES:
@@ -802,6 +958,31 @@ def available_datasets(
     return sorted(found)
 
 
+def fetchable() -> list[str]:
+    """Dataset ids :func:`multibench.data.fetch` can download.
+
+    The companion of :func:`available_datasets`, which lists the ids that
+    ship STORED RESULTS: the two vocabularies overlap but are not the same
+    (``D12`` has published metric tables and no downloadable file; ``D46``
+    downloads and has no stored table). Read
+    from the fetcher's own asset table, so it cannot drift from what
+    ``fetch()`` accepts.
+
+    Returns
+    -------
+    list of str
+        Dataset ids in natural order (``D11 < D28 < ...``).
+
+    Examples
+    --------
+    >>> mtb.data.results.fetchable()
+    ['D11', 'D28', 'D45', 'D46', 'D52']
+    >>> set(mtb.data.results.fetchable()) <= set(mtb.available_datasets(source="both"))
+    """
+    from .fetch import AVAILABLE
+    return sorted(AVAILABLE, key=catalog._dataset_sort_key)
+
+
 def results_coverage(
     category: str | None = None,
     *,
@@ -828,12 +1009,16 @@ def results_coverage(
     Returns
     -------
     pandas.DataFrame
-        Columns ``category, dataset, method, clustering, source``, sorted.
+        Columns ``category, dataset, method, clustering, source``, sorted;
+        ``source`` is ``"published"`` or ``"rerun"``, and
+        ``frame.attrs["rerun_version"]`` holds the package version stamped
+        on the re-run sweeps (as in :func:`load_results`).
 
     Examples
     --------
     >>> cov = mtb.results_coverage("cross")
-    >>> cov[cov.dataset == "D52"]           # scMoMaT (published) + 8 methods (rerun-0.2.1)
+    >>> cov[cov.dataset == "D52"]           # scMoMaT (published) + 8 methods (rerun)
+    >>> cov.attrs["rerun_version"]          # '0.2.1'
     >>> cov.groupby(["category", "source"]).method.nunique()
     """
     if source not in SOURCES:
@@ -843,28 +1028,36 @@ def results_coverage(
     if category is not None:
         config.category_folder(category)
     frames = []
-    for cat in cats:
-        if source in ("published", "both"):
-            for clus in _CLUSTERING_FILES:
+    versions: set[str] = set()
+    # a coverage scan asks WHERE rows are, not whether they are sound or
+    # rankable: the degenerate-row and one-method checks belong to
+    # load_results, not to every per-variant probe made here
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DegenerateRerunWarning)
+        warnings.filterwarnings("ignore", message="only one method", category=UserWarning)
+        for cat in cats:
+            if source in ("published", "both"):
+                for clus in _CLUSTERING_FILES:
+                    try:
+                        frames.append(load_results(cat, clustering=clus, result_path=result_path,
+                                                   source="published")[cols])
+                    except FileNotFoundError:
+                        pass
+            if source in ("rerun", "both"):
                 try:
-                    frames.append(load_results(cat, clustering=clus, result_path=result_path,
-                                               source="published")[cols])
+                    rr = load_results(cat, result_path=result_path, source="rerun")
+                    v = rr.attrs.get("rerun_version")
+                    versions.update(v if isinstance(v, tuple) else ([v] if v else []))
+                    frames.append(rr[cols])
                 except FileNotFoundError:
                     pass
-        if source in ("rerun", "both"):
-            try:
-                # a coverage scan asks WHERE rows are, not whether they are
-                # sound; the degenerate-row check belongs to load_results
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", DegenerateRerunWarning)
-                    frames.append(load_results(cat, result_path=result_path,
-                                               source="rerun")[cols])
-            except FileNotFoundError:
-                pass
     if not frames:
-        return pd.DataFrame(columns=cols)
-    out = pd.concat(frames, ignore_index=True).drop_duplicates()
-    return out.sort_values(cols).reset_index(drop=True)
+        out = pd.DataFrame(columns=cols)
+    else:
+        out = pd.concat(frames, ignore_index=True).drop_duplicates()
+        out = out.sort_values(cols).reset_index(drop=True)
+    out.attrs["rerun_version"] = _version_attr(versions)
+    return out
 
 
 def recommend(
@@ -878,14 +1071,24 @@ def recommend(
     source: str = "published",
     result_path: Path | str | None = None,
     family: str | None = None,
+    methods: list[str] | None = None,
 ) -> pd.DataFrame:
     """Rank methods for a category from stored results, with coverage made explicit.
 
     The score is the benchmark's own rule applied per dataset
     (``overall="mean_overall"`` in :mod:`multibench.plot.style`: min-max
     scaled mean of per-metric max-ranks within each dataset, then averaged
-    over the datasets the method was run on). Three honesty rules apply:
+    over the datasets the method was run on). Five honesty rules apply:
 
+    * only methods this package runs for the category are ranked - the set
+      ``mtb.list_methods(category=...)`` lists. The published cross table
+      also scores MOFA2 and Multigrate, which the package wires for other
+      categories only; such rows are dropped before ranking (they would
+      otherwise shape every other method's within-dataset rank) and named
+      in the warning (``"also scored in the published table but not run by
+      this package for cross: MOFA2, Multigrate"``) and in
+      ``frame.attrs["dropped_methods"]``. A name the registry does not know
+      at all (your own method in ``long_df``) is kept;
     * a dataset holding fewer than ``min_methods`` methods is DROPPED - the
       min-max of a single method is 1.0 by construction, so a lone method
       would "win" such a dataset with authority it never earned;
@@ -897,10 +1100,16 @@ def recommend(
       so "not ranked" is never mistaken for "ranked last" (the published
       tables are partial: vertical rna+adt scores 7 of 14 methods; the re-run
       sweeps cover more - ``source="rerun"``). Their ids are also in
-      ``frame.attrs["not_scored"]``.
+      ``frame.attrs["not_scored"]``;
+    * registration methods (``output_kind == "coords"``: GPSA, PASTE,
+      PASTE2, SPIRAL in cross) produce aligned coordinates, not an
+      embedding, so no scIB metric applies and they are NOT rows of the
+      table; the warning names them with that reason and
+      ``frame.attrs["unranked_registration"]`` lists them.
 
     One ``UserWarning`` with one line per finding summarises dropped
-    datasets, partial coverage and the unscored methods.
+    methods and datasets, partial coverage, the unscored methods and the
+    unranked registration methods.
 
     Parameters
     ----------
@@ -932,6 +1141,15 @@ def recommend(
         iF1, cLISI) or ``"batch"`` (ASW_batch, GC, iLISI, kBET); ``None`` /
         ``"all"`` scores every metric present. The documented name of the
         ``task`` selector.
+    methods : list of str, keyword-only
+        Rank only these methods (alias tolerant and case-insensitive, as in
+        :func:`load_results` - ``"mofa+"`` -> MOFA2, ``"totalvi"`` ->
+        totalVI); a name that is neither a registry id nor in the frame
+        raises ``KeyError`` with a did-you-mean hint. The unscored and
+        registration lines of the warning are restricted to the same set,
+        so asking for a method without rows still tells you it has none.
+        Default: every method. Note that the within-dataset ranks are
+        computed among the requested methods only.
 
     Returns
     -------
@@ -943,15 +1161,22 @@ def recommend(
         result-dir token). ``frame.attrs`` records the choices the ranking
         was made under: ``"family"`` (and ``"task"``, the same value; ``None``
         when ``metrics`` was given), ``"source"`` (``"published"`` /
-        ``"rerun"`` / ``"both"``, or ``"long_df"``) and ``"not_scored"`` (the
-        unscored method ids, also under ``"missing"``).
+        ``"rerun"`` / ``"both"``, or ``"long_df"``), ``"not_scored"`` (the
+        unscored method ids, also under ``"missing"``), ``"dropped_methods"``
+        (registry methods present in the table but not run by this package
+        for the category) and ``"unranked_registration"`` (the coords-output
+        methods of the category, never scored).
 
     Raises
     ------
     ValueError
         No dataset has ``min_methods`` methods (nothing can be ranked), the
         frame has none of the family's metrics (the message lists the metrics
-        it does have), or an unknown ``family``/``task``.
+        it does have), every row belongs to a method the package does not
+        run for the category, ``methods=`` leaves no rows, or an unknown
+        ``family``/``task``.
+    KeyError
+        An unknown name in ``methods``.
     FileNotFoundError
         No stored results for the category/source.
 
@@ -973,6 +1198,43 @@ def recommend(
         # error below can name what the frame really holds
         long_df = load_results(category, source=source, result_path=result_path)
     df = long_df.copy()
+    label = f"source={source!r}" if long_df_was_none else "long_df"
+    table_noun = {"published": "published table", "rerun": "re-run sweeps",
+                  "both": "stored tables"}.get(source, "stored tables") \
+        if long_df_was_none else "long_df frame"
+
+    from ..engine.registry import list_methods
+
+    # Only methods this package runs for the category are ranked. A registry
+    # method the registry does NOT list for it (MOFA2 / Multigrate in the
+    # published cross table) is dropped BEFORE the per-dataset ranks are
+    # taken, so it cannot shape the ranks of the methods that are; a name the
+    # registry does not know at all (the user's own method) is kept.
+    listed = set(list_methods(category=category))
+    registry_ids = set(catalog._registry_ids())
+    canon = df["method"].map(catalog.canonical_id)
+    foreign = sorted({m for m, c in zip(df["method"], canon)
+                      if c in registry_ids and c not in listed}, key=str.lower)
+    if foreign:
+        df = df[~canon.isin({catalog.canonical_id(m) for m in foreign})]
+        if df.empty:
+            raise ValueError(
+                f"every row in {label} belongs to a method this package does "
+                f"not run for {category} ({', '.join(foreign)}); "
+                f"mtb.list_methods(category={category!r}) lists the rankable "
+                f"ones")
+    want_ids: set[str] | None = None
+    if methods is not None:
+        wanted = _as_list(methods)
+        _check_methods(wanted, sorted(df["method"].astype(str).unique()))
+        want_ids = {catalog.canonical_id(m) for m in wanted}
+        want_lower = {w.lower() for w in want_ids}
+        df = df[df["method"].map(lambda m: catalog.canonical_id(m).lower()).isin(want_lower)]
+        if df.empty:
+            raise ValueError(
+                f"none of methods={list(wanted)} has rows in {label} for "
+                f"{category}; methods with rows: "
+                f"{sorted(long_df['method'].astype(str).unique())}")
     if metrics is None:
         fam_metrics = _family_metrics(fam, kw=fam_kw)   # validates; None = all metrics
         if fam_metrics is not None:
@@ -1019,6 +1281,8 @@ def recommend(
     # reliable (vertical: 8/18 tagged), so never gate on the requested family.
     wired = find_methods(category=category, task="clustering", modalities=modalities,
                          runnable=True)
+    if want_ids is not None:
+        wired = [m for m in wired if m in want_ids]
     scored_ids = {catalog.canonical_id(m) for m in keep_methods}
     missing = sorted((m for m in wired if m not in scored_ids), key=str.lower)
     # a method with rows ONLY in dropped (< min_methods) datasets is unscored
@@ -1026,10 +1290,22 @@ def recommend(
     in_frame = {catalog.canonical_id(m) for m in df["method"].unique()}
     only_dropped = [m for m in missing if m in in_frame]
     no_rows = [m for m in missing if m not in in_frame]
-    label = f"source={source!r}" if long_df_was_none else "long_df"
 
     from ..engine import registry, envs
     from ..workflow import runtime_hint
+
+    # registration (coords-output) methods of the category: aligned
+    # coordinates, not an embedding - no scIB metric applies, never ranked
+    registration = []
+    for m in list_methods(category=category, runnable=True):
+        vs = [v for v in registry.get(m).variants if v.when.get("category") == category]
+        if vs and all(v.output.kind == "coords" for v in vs):
+            registration.append(m)
+    if modalities is not None:
+        registration = [m for m in registration if m in allowed]
+    if want_ids is not None:
+        registration = [m for m in registration if m in want_ids]
+    registration = sorted(registration, key=str.lower)
 
     rows = []
     for m in keep_methods + missing:
@@ -1070,6 +1346,8 @@ def recommend(
     out.attrs["source"] = source if long_df_was_none else "long_df"
     out.attrs["not_scored"] = list(missing)
     out.attrs["missing"] = list(missing)
+    out.attrs["dropped_methods"] = list(foreign)
+    out.attrs["unranked_registration"] = list(registration)
 
     notes = []
     if degenerate:
@@ -1077,6 +1355,11 @@ def recommend(
             f"dropped {len(degenerate)} dataset(s) with fewer than {min_methods} "
             f"methods ({', '.join(map(str, degenerate))}) - a min-max score over "
             f"one method is 1.0 by construction")
+    if foreign:
+        notes.append(
+            f"also scored in the {table_noun} but not run by this package for "
+            f"{category}: {', '.join(foreign)} - dropped before ranking "
+            f"(mtb.list_methods(category={category!r}) does not list them)")
     partial = out[(out["coverage"] < 1.0) & out["grand_score"].notna()]
     if not partial.empty:
         notes.append(
@@ -1095,6 +1378,11 @@ def recommend(
             f"grand_score NaN / coverage 0.0"
             + (' (try source="rerun")' if source == "published" and long_df_was_none
                else ""))
+    if registration:
+        notes.append(
+            f"registration methods (coords output: {', '.join(registration)}) "
+            f"produce aligned coordinates, not an embedding - no scIB metric "
+            f"applies, so they have no rows and are not ranked")
     if notes:
         warnings.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
                       UserWarning, stacklevel=2)

@@ -100,7 +100,7 @@ def test_results_coverage(result_dir):
     assert list(cov.columns) == ["category", "dataset", "method", "clustering", "source"]
     d52 = cov[cov.dataset == "D52"]
     assert set(d52[d52.source == "published"].method) == {"scMoMaT"}
-    assert d52[d52.source == "rerun-0.2.1"].method.nunique() == 8
+    assert d52[d52.source == "rerun"].method.nunique() == 8
     # clustering variants surface: Concerto's louvain-only D3 directory
     allc = results_coverage(result_path=result_dir)
     row = allc[(allc.dataset == "D3") & (allc.method == "Concerto")]
@@ -129,24 +129,29 @@ def test_recommend_drops_singleton_datasets_and_warns(result_dir):
     from multibench.data.results import recommend
     with pytest.warns(UserWarning, match="fewer than 2 methods") as rec:
         r = recommend("cross", result_path=result_dir)
-    # the shipped cross tree has ONE method with a metric table in every dataset
-    # but D53 (six methods) and D57 (UINMF + MOFA2's nested filtered5/metric.csv):
-    # the singleton datasets must be dropped, so scMoMaT (D52/D58/D59 alone)
-    # cannot score 1.0 on the strength of singleton min-max
-    assert (r.n_datasets_total == 2).all()       # D53 and D57 hold >= 2 methods
-    # scMoMaT has rows only in the dropped singleton datasets: it is LISTED
-    # (wired for cross) but unscored, and the warning says why
+    # the shipped cross tree has ONE rankable method with a metric table in
+    # every dataset but D53 (six methods, four of them wired for cross). D57
+    # holds UINMF + MOFA2's nested filtered5/metric.csv, but MOFA2 is not a
+    # cross method of this package (list_methods('cross') does not list it),
+    # so once its rows are dropped D57 is a singleton too. The singleton
+    # datasets must be dropped, so scMoMaT (D52/D58/D59 alone) and UINMF (D57
+    # alone) cannot score 1.0 on the strength of singleton min-max
+    assert (r.n_datasets_total == 1).all()       # only D53 holds >= 2 rankable methods
+    # scMoMaT / UINMF have rows only in the dropped singleton datasets: they
+    # are LISTED (wired for cross) but unscored, and the warning says why
     smt = r[r.method == "scMoMaT"].iloc[0]
     assert pd.isna(smt.grand_score) and smt.n_datasets == 0 and smt.coverage == 0.0
-    assert "scMoMaT" in r.attrs["not_scored"]
-    assert "rows only in dropped dataset(s) for: scMoMaT" in str(rec[0].message)
-    # a 1.0 is now only ever the best of >= 2 methods on a kept dataset (UINMF on
-    # D57, sciPENN on D53), never a singleton artefact: every scored method sits
+    assert {"scMoMaT", "UINMF"} <= set(r.attrs["not_scored"])
+    assert "rows only in dropped dataset(s) for: scMoMaT, UINMF" in str(rec[0].message)
+    # a 1.0 is now only ever the best of >= 2 methods on a kept dataset
+    # (sciPENN on D53), never a singleton artefact: every scored method sits
     # in a dataset that holds another method
-    assert {"UINMF", "MOFA2"} <= set(r.method)
+    assert "UINMF" in set(r.method) and "MOFA2" not in set(r.method)
     assert (r[r.grand_score == 1.0].n_datasets == 1).all()
     msg = str(rec[0].message)
-    assert "D52" in msg and "D56" in msg and "D57" not in msg and "1.0 by construction" in msg
+    # D56's only published table is MOFA2's (dropped): it has no rankable rows
+    # at all, so it is neither ranked nor listed as a singleton
+    assert "D52" in msg and "D57" in msg and "D56" not in msg and "1.0 by construction" in msg
     # ONE warning, one line per finding, the dropped-datasets line first
     assert len([w for w in rec if issubclass(w.category, UserWarning)
                 and "recommend(" in str(w.message)]) == 1
@@ -232,8 +237,74 @@ def test_recommend_long_df_records_source_and_family(result_dir):
 
 
 def test_recommend_cross_skips_registration_methods(result_dir):
-    r, _ = _rec("cross", result_path=result_dir)
+    """The registration (coords-output) methods are never rows of the table,
+    but they are no longer silently absent: the warning names them with the
+    reason and attrs lists them (re-test round 3, spatial user)."""
+    r, msg = _rec("cross", result_path=result_dir)
     assert not ({"PASTE", "PASTE2", "SPIRAL", "GPSA"} & set(r.method))
+    assert r.attrs["unranked_registration"] == ["GPSA", "PASTE", "PASTE2", "SPIRAL"]
+    assert ("registration methods (coords output: GPSA, PASTE, PASTE2, SPIRAL) produce "
+            "aligned coordinates, not an embedding - no scIB metric applies") in msg
+    assert "are not ranked" in msg
+    # a category without registration methods has neither the line nor the ids
+    r2, msg2 = _rec("vertical", result_path=result_dir)
+    assert r2.attrs["unranked_registration"] == [] and "registration methods" not in msg2
+
+
+def test_recommend_scores_only_methods_the_registry_lists_for_the_category(result_dir):
+    """recommend('cross') used to rank MOFA2 and Multigrate (rows in the
+    published cross table) although list_methods('cross') does not list them
+    - and their rows shaped every other method's within-dataset rank."""
+    r, msg = _rec("cross", result_path=result_dir)
+    listed = set(mtb.list_methods(category="cross"))
+    assert set(r.method) <= listed
+    assert not ({"MOFA2", "Multigrate"} & set(r.method))
+    assert r.attrs["dropped_methods"] == ["MOFA2", "Multigrate"]
+    assert ("also scored in the published table but not run by this package for "
+            "cross: MOFA2, Multigrate") in msg
+    assert "mtb.list_methods(category='cross') does not list them" in msg
+    # the dropped-datasets line stays first; the drop line follows it
+    lines = [ln.strip() for ln in msg.splitlines()[1:]]
+    assert lines[0].startswith("- dropped") and lines[1].startswith("- also scored")
+    # the same rule on a user frame: registry methods foreign to the category
+    # are dropped and named ("long_df frame"), an unknown name (yours) is kept
+    long = mtb.load_results("cross", dataset="D53", result_path=result_dir)
+    mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]),
+                       "MyMethod", "D53", "cross")
+    r2, msg2 = _rec("cross", long_df=pd.concat([long, mine]))
+    assert "MyMethod" in set(r2.method) and "MOFA2" not in set(r2.method)
+    assert "also scored in the long_df frame but not run by this package for cross: MOFA2, Multigrate" in msg2
+    # a category where every stored method is listed: nothing dropped, no line
+    r3, msg3 = _rec("vertical", result_path=result_dir)
+    assert r3.attrs["dropped_methods"] == [] and "also scored" not in msg3
+    # nothing rankable left -> ValueError naming the culprits
+    with pytest.raises(ValueError, match=r"every row in long_df belongs to a method this package does not run for cross \(MOFA2"):
+        mtb.recommend("cross", long_df=long[long.method == "MOFA2"])
+
+
+def test_recommend_methods_keyword(result_dir):
+    """methods= for parity with load_results / scan / run_all (the instructor
+    reached for it and got a TypeError)."""
+    from multibench.data.results import recommend
+    r, msg = _rec("cross", methods=["scmdc", "sciPENN", "scMoMaT", "paste"], result_path=result_dir)
+    assert r.method.tolist() == ["sciPENN", "scMDC", "scMoMaT"]        # alias/case tolerant
+    assert r.attrs["not_scored"] == ["scMoMaT"]                        # restricted to the request
+    assert r.attrs["unranked_registration"] == ["PASTE"]
+    assert "registration methods (coords output: PASTE)" in msg
+    assert "StabMap" not in msg and "totalVI" not in msg
+    # a requested method without rows is still listed as unscored
+    r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], result_path=result_dir)
+    assert r2.method.tolist() == ["sciPENN", "scMDC", "totalVI"]
+    assert "no rows in source='published' for: totalVI" in msg2
+    with pytest.raises(KeyError, match=r"unknown method 'Matlida'; did you mean 'Matilda'\?"):
+        recommend("cross", methods=["Matlida"], result_path=result_dir)
+    with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in source='published' for cross"):
+        recommend("cross", methods=["totalVI"], result_path=result_dir)
+    # positional order and the old keywords are untouched
+    import inspect
+    params = list(inspect.signature(recommend).parameters)
+    assert params[0] == "category" and params[-1] == "methods"
+    assert inspect.signature(recommend).parameters["methods"].kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_recommend_task_error_names_real_metrics(result_dir):
