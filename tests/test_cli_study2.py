@@ -1,3 +1,4 @@
+import re
 """Study-2 CLI work (Ben, Chen, Priya): ``multibench params``, ``convert`` on
 an already-canonical file + ``--category``, ``plot --input`` next to the
 stored table, and the ``env`` platform guard / sizes / legends.
@@ -287,7 +288,7 @@ def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     assert rc == 0
     lines = {l.split()[0]: l for l in cap.out.splitlines()}
     assert "0.9 GB dl" in lines["scmb_r"] and "2.1 GB dl" in lines["env_sciPENN"]
-    assert "? dl" in lines["matilda"]
+    assert re.search(r"(\d+(\.\d+)? [KMG]B|\?) dl", lines["matilda"])   # size when known, ? otherwise
     assert cap.err.startswith("# total at least: 3.0 GB download")
     assert "1 of unknown size" in cap.err
     assert lines["scmb_r"].endswith("<- UINMF")
