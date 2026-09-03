@@ -29,12 +29,15 @@ from .data.results import load_results, available_datasets, results_coverage, re
 from .eval.pipeline import evaluate, to_long
 from .engine.runner import run
 from .engine.registry import list_methods, list_tasks
+from .engine.schema import AmbiguousVariantError
+from .data.results import DegenerateRerunWarning
 from .engine.resolve import inputs_for, labels_for
 from .engine import ingest as io
 from .engine import envs as env
 from .discover import find_methods, method_info, params_for, cite
 from .workflow import (scan, run_all, BatchResult, list_categories,
-                       describe_layout, load_batch, runtime_hint, sweep, plan)
+                       describe_layout, load_batch, runtime_hint, sweep, plan,
+                       plan_commands, command_preview)
 
 __version__ = "0.3.0"
 
@@ -43,4 +46,4 @@ __all__ = ["config", "plot", "eval", "catalog", "load_results", "available_datas
            "labels_for", "io", "env", "method_info", "find_methods", "params_for",
            "scan", "run_all", "BatchResult",
            "list_categories", "describe_layout", "load_batch",
-           "runtime_hint", "sweep", "__version__", "results_coverage", "recommend", "cite", "plan"]
+           "runtime_hint", "sweep", "__version__", "results_coverage", "recommend", "cite", "plan", "plan_commands", "command_preview", "AmbiguousVariantError", "DegenerateRerunWarning"]

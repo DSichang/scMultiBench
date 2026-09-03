@@ -125,10 +125,6 @@ def test_packed_sizes_cover_every_packed_url():
     assert "_meta" not in sizes
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "pyproject.toml is owned by another work package: add \"engine/packed_sizes.json\" "
-    "to [tool.setuptools.package-data] multibench (next to engine/packed_urls.json) and "
-    "to tests/test_package_data.py::RUNTIME_READ, then drop this marker"))
 def test_packed_sizes_json_is_package_data():
     """The snapshot is read at runtime, so the wheel must ship it."""
     import fnmatch

@@ -106,6 +106,10 @@ def find_methods(category: str | None = None, task: str | None = None,
     benchmark host and is not published (SPIRAL, GPSA) - they are wired and
     verified there, but ``scan`` reports them not runnable elsewhere.
     """
+    if isinstance(modalities, str):
+        raise TypeError(
+            f"modalities must be a list of modality tokens, got the string "
+            f"{modalities!r} - did you mean modalities=[{modalities!r}]?")
     registry.check_category(category)
     registry.check_task(task)
     atac = registry.check_atac(atac)

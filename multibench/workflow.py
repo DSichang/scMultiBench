@@ -276,7 +276,10 @@ def runtime_hint(method: str) -> dict:
 
     Returns ``{"tier", "worst_sec", "observed"}`` - ``tier`` is one of ``fast``
     (<5 min), ``medium`` (5-30 min), ``slow`` (30 min-2 h), ``very_slow`` (>2 h),
-    and ``observed`` lists the actual (dataset, cells, seconds) measurements.
+    and ``observed`` lists the actual measurements as ``{dataset, cells, sec,
+    source}`` - ``source`` says where the number came from (``manual``,
+    ``summary_csv`` = the shipped re-run sweeps, ``verification`` = the
+    shipped verification table); ``cells`` is null when not recorded.
 
     .. note::
        These are MEASUREMENTS on one shared machine, not predictions. Your runtime
@@ -1015,19 +1018,21 @@ class BatchResult:
         each record: the unrounded frame ``run_all`` attached (or ``long.csv``
         via :func:`load_batch`) when present, otherwise the record's ``metrics``
         dict - so a result built or reloaded without ``long.csv`` still plots.
-        Empty (with the five columns) if no method produced metrics.
+        Empty (with the seven columns) if no method produced metrics.
         """
-        cols = ["metric", "value", "method", "dataset", "category"]
+        cols = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
         frames = []
         for r in self.records:
             if r.get("_long") is not None:
                 frames.append(r["_long"])
             elif r.get("metrics"):
-                frames.append(pd.DataFrame({
-                    "metric": list(r["metrics"]), "value": list(r["metrics"].values()),
-                    "method": r.get("method"),
-                    "dataset": r.get("dataset", self.dataset),
-                    "category": r.get("category", self.category)}))
+                # rebuild through to_long so the derived frame carries the same
+                # seven columns (clustering/source) as an attached one
+                wide = pd.DataFrame({"Value": list(r["metrics"].values())},
+                                    index=list(r["metrics"]))
+                frames.append(_to_long(wide, method=r.get("method"),
+                                       dataset=r.get("dataset", self.dataset),
+                                       category=r.get("category", self.category)))
         if not frames:
             return pd.DataFrame(columns=cols)
         return pd.concat(frames, ignore_index=True)
@@ -1290,7 +1295,7 @@ def command_preview(method: str, category: str, *, inputs: dict, out_dir,
     function ``run`` calls), the package-side ``driver`` / ``pty`` wrapping is
     applied as ``run`` applies it, and the default wrapper is ``conda run -n
     <env>`` with ``mtb.env.group_for(method)``. Two deliberate differences:
-    the inputs are shown AS GIVEN (``run`` first copies non-canonical inputs
+    the inputs are shown absolutized, exactly as ``run`` passes them (``run`` first copies non-canonical inputs
     to ``<out_dir>/inputs/<role>.h5``; canonical ``.h5`` files pass through
     unchanged, so for a laid-out dataset the preview is exact), and the
     reference checkout is located but never fetched. Nothing is written.
@@ -1306,9 +1311,9 @@ def command_preview(method: str, category: str, *, inputs: dict, out_dir,
     modalities = {k for k in inputs
                   if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
     variant = spec.select(category, modalities)
-    values = {role: str(val) for role, val in inputs.items()}
-    cmd = builder.build_command(variant, values=values,
-                                out_dir=os.path.join(str(out_dir), ""), params=params)
+    from .engine.runner import normalize_paths
+    values, out_str = normalize_paths(inputs, out_dir)
+    cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
     repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
     if getattr(variant, "driver", None):
         pkg_root = Path(__file__).resolve().parent

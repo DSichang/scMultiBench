@@ -119,7 +119,8 @@ def test_batch_result_shape():
     assert r.failures.empty
     # .long is DERIVED from the record's metrics when no tidy frame was attached
     lng = r.long
-    assert list(lng.columns) == ["metric", "value", "method", "dataset", "category"]
+    assert list(lng.columns) == ["metric", "value", "method", "dataset", "category",
+                                  "clustering", "source"]
     assert lng.loc[0, "metric"] == "ARI" and lng.loc[0, "value"] == 0.5
     assert lng.loc[0, "dataset"] == "D11" and lng.loc[0, "category"] == "vertical"
     empty = BatchResult([{"method": "X", "status": "FAIL", "error": "boom", "_long": None}],
