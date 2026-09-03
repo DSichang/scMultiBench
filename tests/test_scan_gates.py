@@ -240,7 +240,10 @@ def test_run_all_dry_run_never_returns_empty():
 def test_run_all_dry_run_equals_scan_with_methods():
     plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
                        methods=["Matilda", "totalVI"], dry_run=True, verbose=False)
-    pd.testing.assert_frame_equal(plan, mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"]))
+    # the plan is the scan frame plus the `command` column the CLI csv carries
+    assert list(plan.columns) == W.SCAN_COLUMNS + ["command"]
+    pd.testing.assert_frame_equal(plan.drop(columns="command"),
+                                  mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"]))
 
 
 def test_run_all_dry_run_unknown_method_still_keyerror():
