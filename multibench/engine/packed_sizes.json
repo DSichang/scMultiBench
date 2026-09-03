@@ -1,0 +1,123 @@
+{
+ "_meta": {
+  "written_by": "tools/packed_sizes.py",
+  "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json (a HEAD request); unpacked_bytes = size on disk after conda-unpack. null = not measured yet; rerun the tool after republishing an archive.",
+  "measured": "2026-09-03 (archive: HEAD on scmb_r, env_sciPENN, scmb_scvi; unpacked: SETUP.md du -sh figures for MOFA2_env, unitednet, scmb_torch_v2)"
+ },
+ "MOFA2_env": {
+  "archive_bytes": null,
+  "unpacked_bytes": 18000000000
+ },
+ "env_moETM": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "env_sciPENN": {
+  "archive_bytes": 2077412003,
+  "unpacked_bytes": null
+ },
+ "glue": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "matilda": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "paste_envi": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_cobolt3": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_concerto": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_gpsa2": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_ipolng2": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_mira": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_multigrate2": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_multivi": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_r": {
+  "archive_bytes": 916953088,
+  "unpacked_bytes": null
+ },
+ "scmb_scican": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_scjoint": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_scmdc": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_scmm2": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_scmsi": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_scmvp4": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_scvi": {
+  "archive_bytes": 3215645570,
+  "unpacked_bytes": null
+ },
+ "scmb_seurat4b": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_seurat5": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_torch": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_torch_v2": {
+  "archive_bytes": null,
+  "unpacked_bytes": 9800000000
+ },
+ "scmb_vimcca": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "scmb_vipcca27": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "spiral_environment": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
+ "unitednet": {
+  "archive_bytes": null,
+  "unpacked_bytes": 12000000000
+ }
+}

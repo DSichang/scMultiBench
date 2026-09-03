@@ -7,6 +7,7 @@ same parameter names where a flag exists (``--category``, ``--metrics``,
     multibench layout vertical                         # how to lay out MY data
     multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:celltype
     multibench scan MYCITE --category vertical --data-path data
+    multibench params Matilda                          # what --param accepts
     multibench run --method Matilda --category vertical --input rna=... --out-dir runs/Matilda
     multibench evaluate --output runs/Matilda/embedding.h5 --labels data/MYCITE/cty.csv \\
         --method Matilda --dataset MYCITE --category vertical --out runs/Matilda/long.csv
@@ -230,8 +231,10 @@ def _parse_params(pairs, args=None, default_method: str | None = None) -> dict:
 def _packed_manifest() -> dict:
     """The ``{env: archive_url}`` map shipped as ``engine/packed_urls.json`` (``{}`` if absent).
 
-    Only the KEYS are used by the CLI (is an archive published for this env?);
-    the file carries no sizes, so no download size is ever printed.
+    The KEYS say whether an archive is published for an env; the URL is
+    printed by ``env install --packed`` (dry run) so a cluster user can check
+    it against an egress proxy. Sizes come from the sibling snapshot
+    ``engine/packed_sizes.json`` (:func:`multibench.env.packed_sizes`).
     """
     from .engine import envs
     mf = Path(envs.__file__).parent / "packed_urls.json"
@@ -250,6 +253,24 @@ def _usage_error(args, message: str) -> None:
     if parser is not None:
         parser.error(message)          # prints usage + "error: ..." and exits 2
     raise SystemExit(_EXIT_USAGE)
+
+
+def _platform_note() -> str | None:
+    """Print ``warning: ...`` on stderr when method envs cannot be built here.
+
+    The method envs are linux-64 conda envs; on macOS/Windows ``env install
+    --run`` refuses (``--force`` overrides). Said ONCE, first, on stderr - so
+    stdout stays the table and a user reads it before, not after, a 3 GB
+    download would have started. Returns the problem text (or ``None``).
+    """
+    from .engine import envs
+    problem = envs.host_platform_problem()
+    if problem:
+        print(f"warning: {problem}; `multibench env install --run` refuses on this "
+              f"host (--force overrides) - run methods on a Linux host; everything "
+              f"else (registry, stored results, scan's file gate, evaluate, plot) "
+              f"works here", file=sys.stderr)
+    return problem
 
 
 # ----------------------------------------------------------------- commands
@@ -311,22 +332,69 @@ def _cmd_layout(args) -> int:
 _EXPORT_FLAGS = ("rna", "adt", "atac", "atac_kind", "labels", "batch")
 
 
+def _rewrite_canonical(src, out, dtype: str) -> bool:
+    """Copy the canonical ``.h5`` ``src`` to ``out``, storing ``matrix/data`` as ``dtype``.
+
+    ``to_canonical`` passes an already-canonical file through untouched
+    (correct for ``run()``, which only needs a readable path), so ``multibench
+    convert data/D11/adt.h5 scratch/adt.h5`` used to print ``wrote
+    data/D11/adt.h5`` and write nothing. Here the file IS written to ``out``:
+    a byte copy when the stored dtype already matches (fast, exact), else a
+    block-wise rewrite that casts ``matrix/data`` (features x cells stays as
+    is) and copies ``matrix/features`` / ``matrix/barcodes`` verbatim.
+
+    Returns ``True`` when the matrix was re-encoded, ``False`` for a byte copy.
+    """
+    import shutil
+
+    import h5py
+    import numpy as np
+    src, out = Path(src), Path(out)
+    with h5py.File(src, "r") as f:
+        same = f["matrix/data"].dtype == np.dtype(dtype)
+    if same:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, out)
+        return False
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(src, "r") as f, h5py.File(out, "w") as g:
+        d = f["matrix/data"]
+        comp = d.compression
+        o = g.create_dataset("matrix/data", shape=d.shape, dtype=dtype,
+                             chunks=True if comp else None, compression=comp)
+        step = max(1, 1024)
+        for i in range(0, d.shape[0], step):
+            o[i:i + step] = np.asarray(d[i:i + step]).astype(dtype, copy=False)
+        for k in ("matrix/features", "matrix/barcodes"):
+            if k in f:
+                f.copy(k, g["matrix"], name=k.split("/")[-1])
+    return True
+
+
 def _cmd_convert(args) -> int:
     """``multibench convert``: one canonical ``.h5`` (``to_canonical``) or a whole
     dataset folder (``export_dataset``), chosen by the flags given.
 
     * No ``--rna/--adt/--atac/--labels/--batch`` flag: ``SRC`` -> ``OUT`` via
       :func:`multibench.io.to_canonical` (``--modality`` picks the filename when
-      ``OUT`` is a directory; ``--layer/--obsm/--mod`` select the matrix).
+      ``OUT`` is a directory; ``--layer/--obsm/--mod`` select the matrix). A
+      ``SRC`` that is ALREADY canonical is copied to ``OUT`` (``--dtype``
+      honoured by re-encoding ``matrix/data``) and reported as ``copied``;
+      when ``OUT`` is ``SRC`` itself nothing is written and the line says so.
+      The word ``wrote`` is printed only for a file this command produced.
     * Any of those flags: ``SRC`` is read (``.h5ad``/``.h5mu``) and
       :func:`multibench.io.export_dataset` writes ``OUT/`` as a dataset folder
       (``rna.h5``, ``adt.h5``, ``atac_*.h5``, ``cty.csv`` ...). ``--modality``,
       ``--layer``, ``--obsm`` and ``--mod`` are then usage errors: the selector
       grammar (``X``, ``obsm:<key>``, ``layer:<key>``, ``mod:<name>``) carries
       that information per modality.
+
+    ``--category`` is forwarded to both (``category=``): ``vertical`` writes
+    the paired-multiome ``atac.h5`` instead of ``atac_gas.h5``/``atac_peak.h5``.
     """
     from .engine import ingest
     export_mode = any(getattr(args, f) is not None for f in _EXPORT_FLAGS)
+    category = getattr(args, "category", None)
     if export_mode:
         clash = [f"--{f}" for f in ("modality", "layer", "obsm", "mod")
                  if getattr(args, f) is not None]
@@ -344,16 +412,131 @@ def _cmd_convert(args) -> int:
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
                                   atac=args.atac, atac_kind=args.atac_kind,
                                   labels=args.labels, batch=args.batch,
-                                  dtype=args.dtype)
+                                  dtype=args.dtype, category=category)
         print(f"wrote dataset folder {p} (files: "
               f"{', '.join(sorted(q.name for q in Path(p).iterdir()))})")
         return _EXIT_OK
     if args.layer is not None and args.obsm is not None:
         _usage_error(args, "--layer and --obsm are mutually exclusive")
+    src = Path(args.src)
+    if src.is_file() and ingest._is_canonical_h5(src):
+        # to_canonical() passes a canonical file through and returns SRC; the
+        # CLI's job is to put a file at OUT, so copy (re-encoding for --dtype)
+        # and never say 'wrote' for a path this command did not write.
+        out = Path(args.out)
+        dir_like = out.is_dir() or str(args.out).endswith(("/", os.sep))
+        if dir_like:
+            if args.modality is None:
+                _usage_error(args, f"OUT {args.out} is a directory; pass --modality "
+                             "so the canonical filename (rna.h5, adt.h5, ...) can be "
+                             "chosen, or give OUT as a file path")
+            out = out / ingest._atac_filename(ingest._norm_modality(args.modality),
+                                              ingest._check_category(category))
+        if out.exists() and out.resolve() == src.resolve():
+            print(f"already canonical - nothing written; use {src} in place")
+            return _EXIT_OK
+        recoded = _rewrite_canonical(src, out, args.dtype)
+        how = (f"matrix/data re-encoded as {args.dtype}" if recoded
+               else "byte copy, dtype unchanged")
+        print(f"copied {src} -> {out} (already canonical; {how})")
+        return _EXIT_OK
     p = ingest.to_canonical(args.src, args.out, modality=args.modality,
                             layer=args.layer, obsm=args.obsm, mod=args.mod,
-                            dtype=args.dtype)
+                            dtype=args.dtype, category=category)
     print(f"wrote {p}")
+    return _EXIT_OK
+
+
+def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
+    """The :func:`multibench.params_for` dict of every variant of ``method``
+    that matches ``category`` / ``modalities`` (both optional).
+
+    The Python function needs the variant pinned down and raises ``KeyError``
+    for a multi-variant method called without ``category``; on the command
+    line that meant three round trips (Ben, study 2). Here an unspecified
+    selector simply means "every matching variant", one block each.
+    """
+    from . import discover
+    from .engine import registry, upstream
+    spec = registry.get(method)                       # KeyError (did-you-mean)
+    registry.check_category(category)                 # ValueError listing the four
+    want = registry.normalize_modalities(modalities) if modalities else None
+    picked = [v for v in spec.variants
+              if (category is None or v.when.get("category") == category)
+              and (want is None or set(v.when.get("modalities", [])) == set(want))]
+    if not picked:
+        avail = [f"{v.when.get('category')}:{'+'.join(v.when.get('modalities', [])) or '(data_dir)'}"
+                 for v in spec.variants]
+        raise ValueError(f"{method}: no variant for category={category!r} "
+                         f"modalities={list(want) if want else None}; available: {avail}")
+    rows = []
+    for v in picked:
+        cat, mods = v.when.get("category"), list(v.when.get("modalities", []))
+        try:
+            rows.append(discover.params_for(method, cat, mods or None))
+        except KeyError:
+            # a category holding both a data_dir and a modality variant: build
+            # the same dict straight from the variant
+            up = upstream.knobs_for(spec.id)
+            eff = {k: t.get("default") for k, t in v.tunable.items()} | dict(v.params)
+            rows.append({"method": spec.id,
+                         "variant": f"{cat}:{'+'.join(mods) or '(data_dir)'}",
+                         "defaults": dict(v.params), "tunable": dict(v.tunable),
+                         "effective": eff, "fixed_in_script": up["fixed_in_script"],
+                         "upstream_knobs": up["upstream_knobs"],
+                         "upstream_url": up["upstream_url"]})
+    return rows
+
+
+def _cmd_params(args) -> int:
+    """``multibench params METHOD``: the hyperparameters of a method, per variant.
+
+    Prints, for every variant matching ``--category`` / ``--modalities``
+    (all variants when neither is given), the ``tunable`` table of
+    :func:`multibench.params_for` - ``key``, ``type``, upstream ``default`` and
+    the ``effective`` value a wrapper run uses - then the ``fixed_in_script``
+    values (pinned upstream, with ``file:line``) and the names of the
+    ``upstream_knobs`` the script never exposes. ``--format json`` dumps the
+    full ``params_for`` dicts.
+    """
+    import pandas as pd
+    rows = _params_rows(args.method, args.category, _csv_list(args.modalities))
+    fmt = args.format
+    if fmt == "json":
+        print(json.dumps(rows, indent=1, default=str))
+        return _EXIT_OK
+    frames = []
+    for p in rows:
+        tun = p["tunable"] or {}
+        eff = p["effective"] or {}
+        tbl = pd.DataFrame([{"variant": p["variant"], "key": k,
+                             "type": (t or {}).get("type"),
+                             "default": (t or {}).get("default"),
+                             "effective": eff.get(k)}
+                            for k, t in sorted(tun.items())],
+                           columns=["variant", "key", "type", "default", "effective"])
+        if fmt in ("csv", "tsv"):
+            frames.append(tbl)
+            continue
+        print(f"# {p['method']} {p['variant']}: {len(tun)} tunable parameter(s) "
+              f"(--param KEY=VALUE / run(params={{...}}); mtb.params_for)")
+        if len(tun):
+            _print_frame(tbl.drop(columns=["variant"]), fmt="table")
+        else:
+            print("  (none: the upstream script exposes no hyperparameter on its "
+                  "command line; the wrapper never edits scripts)")
+        fixed = p.get("fixed_in_script") or []
+        if fixed:
+            print("# fixed in the script (not tunable through the wrapper):")
+            for f in fixed:
+                print(f"  {f.get('name')} = {f.get('value')}   ({f.get('source')})")
+        knobs = p.get("upstream_knobs") or []
+        if knobs:
+            print("# upstream library knobs the script never exposes: "
+                  + ", ".join(str(k.get("name")) for k in knobs)
+                  + (f"  (see {p['upstream_url']})" if p.get("upstream_url") else ""))
+    if frames:
+        _print_frame(pd.concat(frames, ignore_index=True), fmt=fmt)
     return _EXIT_OK
 
 
@@ -379,7 +562,9 @@ def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported la
     p = Path(path)
     if p.is_dir():
         from .workflow import load_batch
-        return load_batch(p).long()
+        # BatchResult.long is a PROPERTY; the old ``.long()`` call raised
+        # "'DataFrame' object is not callable" on every real run_all directory
+        return load_batch(p).long
     if not p.is_file():
         raise FileNotFoundError(
             f"--input {p}: not a file or a run_all output directory")
@@ -396,21 +581,43 @@ def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported la
 def _cmd_plot(args) -> int:
     """``multibench plot {bubble,bar}``: draw a results table to ``--out``.
 
-    The frame comes from ``--input`` (a long.csv / run_all dir) or from
-    :func:`multibench.load_results` (``--category``, ``--dataset``,
-    ``--source``); ``--methods`` restricts the rows in both cases.
+    The frame comes from ``--input`` (a long.csv / run_all dir; repeatable)
+    and/or from :func:`multibench.load_results` (``--category``,
+    ``--dataset``, ``--source``). Given BOTH, the own rows are concatenated
+    onto the stored table - the shell equivalent of ``pd.concat`` - so a
+    method evaluated with ``multibench evaluate --method/--dataset`` is drawn
+    next to the benchmark's; a ``# overlay: ...`` note on stderr says how
+    many rows came from where. ``--methods`` restricts the rows in every
+    case; ``--dataset`` selects the stored table(s) and filters the inputs.
     """
+    import pandas as pd
     from . import plot as plot_ns
-    if args.input is None and args.category is None:
+    inputs = _csv_list(args.input) if isinstance(args.input, (list, tuple)) else (
+        [args.input] if args.input else [])
+    if not inputs and args.category is None:
         _usage_error(args, "need --category (stored results) or --input LONG_CSV")
-    if args.input is not None:
-        df = _load_long_input(args.input)
-        if args.dataset:
-            df = df[df["dataset"].astype(str).isin(_csv_list(args.dataset))]
-    else:
+    frames = []
+    if args.category is not None:
         from . import load_results
-        df = load_results(category=args.category, dataset=_csv_list(args.dataset),
-                          source=args.source)
+        frames.append(load_results(category=args.category, dataset=_csv_list(args.dataset),
+                                   source=args.source))
+    own_rows = 0
+    for path in inputs:
+        own = _load_long_input(path)
+        if args.dataset and "dataset" in own.columns:
+            own = own[own["dataset"].astype(str).isin(_csv_list(args.dataset))]
+        own_rows += len(own)
+        frames.append(own)
+    if len(frames) == 1:
+        df = frames[0]
+    else:
+        df = pd.concat(frames, ignore_index=True, sort=False)
+        if args.category is not None and inputs:
+            own_methods = sorted(set().union(*[set(f["method"].astype(str)) for f in frames[1:]]))
+            print(f"# overlay: {own_rows} row(s) from --input (methods: "
+                  f"{', '.join(own_methods)}) concatenated onto the stored "
+                  f"{args.category} table ({len(frames[0])} rows, source={args.source})",
+                  file=sys.stderr)
     methods = _csv_list(args.methods)
     if methods and args.kind == "bar":
         # plot.bar has no methods=; filter here with the same "unknown name"
@@ -590,10 +797,47 @@ def _cmd_evaluate(args) -> int:
     return _EXIT_OK
 
 
+def _size_total_line(rows, sizes: dict, what: str = "download") -> str:
+    """``# total: X GB download, Y GB on disk (N archives, M unknown)`` for ``rows``.
+
+    ``rows`` carry an ``env`` key; ``sizes`` is :func:`multibench.env.packed_sizes`.
+    Envs without a measured size are counted as unknown, never as zero, so
+    the total is a floor and says so.
+    """
+    from .engine import envs
+    dl = disk = 0
+    n = unknown = n_dl = n_disk = 0
+    for r in rows:
+        n += 1
+        sz = sizes.get(r["env"], {})
+        a, u = sz.get("archive_bytes"), sz.get("unpacked_bytes")
+        if a is None and u is None:
+            unknown += 1
+        if a is not None:
+            n_dl += 1
+            dl += a
+        if u is not None:
+            n_disk += 1
+            disk += u
+    tail = f" ({n} archive{'s' if n != 1 else ''}, {unknown} of unknown size)" if n else ""
+    floor = " at least" if unknown else ""
+    return (f"# total{floor}: {envs._gb(dl) if n_dl else '?'} {what}, "
+            f"{envs._gb(disk) if n_disk else '?'} on disk{tail}; "
+            f"sizes are the shipped snapshot engine/packed_sizes.json")
+
+
 def _cmd_env(args) -> int:
-    """``multibench env ...``: environment recipes, preflight and installation."""
+    """``multibench env ...``: environment recipes, preflight and installation.
+
+    ``status`` / ``plan`` / ``doctor`` / ``install`` first print a
+    ``warning:`` on stderr when this host cannot build method envs
+    (non-Linux; see :func:`multibench.env.host_platform_problem`); ``install
+    --run`` then refuses unless ``--force``.
+    """
     from .engine import envs, registry
     cmd = args.env_cmd
+    if cmd in ("status", "plan", "doctor", "install"):
+        _platform_note()                     # once, first, on stderr
     if cmd == "status":
         _mlist = _csv_list(getattr(args, "methods", None))
         _cat = getattr(args, "category", None)
@@ -602,12 +846,20 @@ def _cmd_env(args) -> int:
             keep = set(registry.check_method(m) for m in _mlist)
         elif _cat:
             keep = set(registry.list_methods(category=_cat))
+        seen_tags = []
         for r in envs.status():
             if keep is not None and r["method"] not in keep:
                 continue
             mark = "x" if r["exists"] else " "
             tag = r["difficulty"] + ("*" if r["verified_working"] else "")
-            print(f"[{mark}] {r['method']:16} {r['env']:16} {tag}")
+            if r["difficulty"] not in seen_tags:
+                seen_tags.append(r["difficulty"])
+            print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}")
+        # the legend is a note, so stderr: stdout stays one line per method
+        print("# legend: [x]=installed  [ ]=missing;  tag = difficulty of BUILDING "
+              "the env: " + "; ".join(f"{t} = {envs.DIFFICULTY.get(t, '?')}"
+                                       for t in seen_tags)
+              + f";  {envs.VERIFIED_STAR}", file=sys.stderr)
         return _EXIT_OK
     if cmd == "groups":
         for name, spec in envs.groups().items():
@@ -616,9 +868,14 @@ def _cmd_env(args) -> int:
         return _EXIT_OK
     if cmd == "plan":
         _mlist = _csv_list(getattr(args, "methods", None))
-        for p in envs.plan(category=getattr(args, "category", None), methods=_mlist):
+        sizes = envs.packed_sizes()
+        rows = envs.plan(category=getattr(args, "category", None), methods=_mlist)
+        for p in rows:
             tag = "shared" if p["shared"] else "own"
-            print(f"{p['env']:16} [{tag:6}] <- {', '.join(p['methods'])}")
+            sz = sizes.get(p["env"], {})
+            print(f"{p['env']:18} [{tag:6}] {envs._gb(sz.get('archive_bytes')):>8} dl "
+                  f"{envs._gb(sz.get('unpacked_bytes')):>8} disk <- {', '.join(p['methods'])}")
+        print(_size_total_line(rows, sizes), file=sys.stderr)
         return _EXIT_OK
     if cmd == "doctor":
         _mlist = _csv_list(getattr(args, "methods", None))
@@ -642,41 +899,52 @@ def _cmd_env(args) -> int:
         _mlist = _csv_list(getattr(args, "methods", None))
         do_run = getattr(args, "run", False)
         packed = getattr(args, "packed", False)
+        force = getattr(args, "force", False)
         if packed and do_run:
             for r in envs.doctor(category=getattr(args, "category", None),
                                  methods=_mlist):
                 with _quiet_stdout():           # "[env] unpacking ..." -> stderr
-                    got = (not r["exists"]) and envs.install_packed(r["env"])
+                    got = (not r["exists"]) and envs.install_packed(r["env"], force=force)
                 if got:
                     print(f"{r['env']:18} [PACKED        ] <- {', '.join(r['methods'])}")
-        # a RuntimeError (no conda here, a failed build) propagates to main():
-        # "error: ..." on stderr, exit 1 - never an error line on stdout
+        # a RuntimeError (no conda here, a failed build, a non-Linux host)
+        # propagates to main(): "error: ..." on stderr, exit 1 - never an
+        # error line on stdout
         with _quiet_stdout():
             rows = envs.create_all(category=getattr(args, "category", None),
-                                   methods=_mlist, dry_run=not do_run)
+                                   methods=_mlist, dry_run=not do_run, force=force)
         manifest = _packed_manifest() if (packed and not do_run) else {}
-        states = []
+        sizes = envs.packed_sizes() if (packed and not do_run) else {}
+        states, extras = [], []
         for r in rows:
+            extra = ""
             if r["exists"]:
                 state = "have"
             elif do_run:
                 state = "BUILD" if r["has_lock"] else "NO-LOCK"
             elif packed:
-                # packed_urls.json carries URLs only (no sizes), so the dry run
-                # can only say whether an archive is published, never how big
-                state = ("packed archive published" if r["env"] in manifest
-                         else ("no archive - lockfile build" if r["has_lock"]
-                               else "no archive - NO-LOCK"))
+                if r["env"] in manifest:
+                    state = "packed archive published"
+                    sz = sizes.get(r["env"], {})
+                    extra = (f" {envs._gb(sz.get('archive_bytes')):>8} dl "
+                             f"{envs._gb(sz.get('unpacked_bytes')):>8} disk  {manifest[r['env']]}")
+                else:
+                    state = ("no archive - lockfile build" if r["has_lock"]
+                             else "no archive - NO-LOCK")
             else:
                 state = "build(dry-run)" if r["has_lock"] else "NO-LOCK"
             states.append(state)
+            extras.append(extra)
         width = max([14] + [len(s) for s in states])
-        for r, state in zip(rows, states):
-            print(f"{r['env']:18} [{state:{width}}] <- {', '.join(r['methods'])}")
+        for r, state, extra in zip(rows, states, extras):
+            print(f"{r['env']:18} [{state:{width}}] <- {', '.join(r['methods'])}{extra}")
         if not do_run:
             print("# dry-run - add --run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
                      if packed else " from their lockfiles"), file=sys.stderr)
+            if packed:
+                todo = [r for r in rows if not r["exists"] and r["env"] in manifest]
+                print(_size_total_line(todo, sizes, what="to download"), file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if getattr(args, "all", False):
@@ -692,7 +960,8 @@ def _cmd_env(args) -> int:
         return _EXIT_OK
     if cmd == "create-group":
         with _quiet_stdout():
-            cmds = envs.create_group(args.group, dry_run=not getattr(args, "run", False))
+            cmds = envs.create_group(args.group, dry_run=not getattr(args, "run", False),
+                                     force=getattr(args, "force", False))
         if not getattr(args, "run", False):
             print("# dry-run - add --run to execute:", file=sys.stderr)
             for c in cmds:
@@ -730,7 +999,8 @@ def _cmd_env(args) -> int:
         return _EXIT_OK
     if cmd == "create":
         with _quiet_stdout():
-            cmds = envs.create(method, env_name=name, dry_run=not getattr(args, "run", False))
+            cmds = envs.create(method, env_name=name, dry_run=not getattr(args, "run", False),
+                               force=getattr(args, "force", False))
         if not getattr(args, "run", False):
             print("# dry-run - add --run to execute:", file=sys.stderr)
             for c in cmds:
@@ -752,6 +1022,9 @@ _TASK_HELP = ("task within the category: clustering (default), batch, "
               "dimension_reduction, classification, imputation, registration "
               "(mtb.list_tasks())")
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
+_FORCE_HELP = ("build even though this host is not linux-64 (the packed archives and "
+               "lockfiles are; without --force a non-Linux host refuses before any "
+               "download)")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -803,9 +1076,32 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--tunable", nargs="?", const="true", choices=["true", "false"],
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods exposing hyperparameters "
-                         "to --param / mtb.params_for; false: only methods that hardcode "
-                         "them; absent: no filter")
+                         "to --param (`multibench params METHOD` lists them); false: "
+                         "only methods that hardcode them; absent: no filter")
     pf.set_defaults(func=_cmd_find, _parser=pf)
+
+    # ---- params
+    ppa = sub.add_parser(
+        "params", help="the hyperparameters a method accepts (mtb.params_for)",
+        description="Print, per variant of METHOD, the tunable hyperparameters "
+                    "(key, type, upstream default, effective value in a wrapper run) "
+                    "that --param / run(params=) accept, then the values the script "
+                    "pins (fixed_in_script, with file:line) and the upstream library "
+                    "knobs it never exposes. Without --category/--modalities every "
+                    "variant is printed, so a multi-variant method needs no second "
+                    "call. An empty tunable table means the script hardcodes its "
+                    "hyperparameters - the wrapper never edits method scripts.")
+    ppa.add_argument("method", help="method id (see `multibench list`; unknown id -> "
+                                    "did-you-mean error)")
+    ppa.add_argument("--category", help=_CATEGORY_HELP + " (only that category's variants)")
+    ppa.add_argument("--modalities", help="comma-separated modality roles selecting one "
+                                          "variant, e.g. rna,adt ('protein' is accepted "
+                                          "for adt)")
+    ppa.add_argument("--format", choices=["table", "csv", "tsv", "json"], default="table",
+                     help="table (default: one block per variant) | csv/tsv (one row per "
+                          "tunable key with a variant column) | json (the full "
+                          "mtb.params_for dicts, one per variant)")
+    ppa.set_defaults(func=_cmd_params, _parser=ppa)
 
     # ---- scan
     ps = sub.add_parser(
@@ -862,9 +1158,16 @@ def build_parser() -> argparse.ArgumentParser:
                     "ready for `multibench scan OUT_NAME --data-path <parent>`.")
     pc.add_argument("src", help="input: .h5ad, .h5mu (then --mod or mod: selectors), "
                                ".csv/.tsv (cells x features), .loom, or an already "
-                               "canonical .h5 (passed through)")
-    pc.add_argument("out", help="output .h5 file (mode 1; or a directory with --modality) "
-                               "or the dataset folder to create (mode 2)")
+                               "canonical .h5 (copied to OUT, --dtype honoured; "
+                               "'already canonical - nothing written' when OUT is SRC)")
+    pc.add_argument("out", help="output .h5 file (mode 1; or an existing directory - or a "
+                               "path ending in / - with --modality) or the dataset "
+                               "folder to create (mode 2)")
+    pc.add_argument("--category", help=_CATEGORY_HELP + ". Changes only the ATAC "
+                    "filename: vertical writes atac.h5 (the paired-multiome role) "
+                    "whatever --atac-kind/--modality say; diagonal/mosaic/cross (or "
+                    "no --category) write atac_gas.h5 / atac_peak.h5 (mtb.io.to_canonical "
+                    "/ export_dataset category=)")
     pc.add_argument("--modality", help="mode 1: rna | adt | atac | atac_peak | atac_gas "
                                        "(aliases protein, peak, gas/gene_activity); "
                                        "validated, picks the filename when OUT is a "
@@ -882,7 +1185,7 @@ def build_parser() -> argparse.ArgumentParser:
                                    "requires --atac-kind")
     pc.add_argument("--atac-kind", dest="atac_kind", choices=["peak", "gene_activity"],
                     help="mode 2: peak -> atac_peak.h5 (+ atac.h5); gene_activity -> "
-                         "atac_gas.h5")
+                         "atac_gas.h5; with --category vertical both write atac.h5")
     pc.add_argument("--labels", help="mode 2: cell-type column, obs:<col> (or "
                                      "mod:<name>.obs:<col>) -> cty.csv")
     pc.add_argument("--batch", help="mode 2: batch column (same grammar); cells are "
@@ -913,11 +1216,12 @@ def build_parser() -> argparse.ArgumentParser:
     pp = sub.add_parser(
         "plot", help="draw the bubble table or summary bars of a results frame "
                      "(mtb.plot.bubble / mtb.plot.bar)",
-        description="Plot stored benchmark results (--category [--dataset] [--source]) "
-                    "or your own long table (--input long.csv or a run_all output "
+        description="Plot stored benchmark results (--category [--dataset] [--source]), "
+                    "your own long table (--input long.csv or a run_all output "
                     "dir, as written by `multibench evaluate --method/--dataset` "
-                    "and `multibench run-all`). Concatenate the two in Python "
-                    "(pd.concat) to compare your method with the benchmark's.")
+                    "and `multibench run-all`), or BOTH: --input together with "
+                    "--category concatenates your rows onto the stored table, so "
+                    "your method is drawn next to the benchmark's.")
     pp.add_argument("kind", choices=["bubble", "bar"],
                     help="bubble: paper-style bubble table (methods x metrics, best "
                          "first, Overall bars per family) | bar: one bar per method "
@@ -930,9 +1234,12 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--source", choices=["published", "rerun"], default="published",
                     help="stored table to load: published (the paper's numbers, "
                          "default) or rerun (the package's own re-execution)")
-    pp.add_argument("--input", help="a long results CSV (metric,value,method,dataset,"
-                                    "category) or a run_all output directory; replaces "
-                                    "--category/--source")
+    pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
+                    help="a long results CSV (metric,value,method,dataset,category) or "
+                         "a run_all output directory; repeatable. Alone: the table to "
+                         "plot. With --category: concatenated onto the stored table "
+                         "(a '# overlay: ...' note on stderr says how many rows came "
+                         "from where); --dataset then filters these rows too")
     pp.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown name "
                                                       "-> error)")
     pp.add_argument("--metrics", help="comma-separated metric codes to draw, in this "
@@ -981,8 +1288,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "--param lr=0.001 (METHOD:KEY=VALUE is accepted when METHOD "
                          "is --method). VALUE is parsed as a scalar: 5 -> int, 0.1 -> "
                          "float, true/false -> bool, else string. Keys a method does "
-                         "not accept are rejected naming the accepted ones; see "
-                         "mtb.params_for(METHOD) or `multibench scan` n_tunable")
+                         "not accept are rejected naming the accepted ones; `multibench "
+                         "params METHOD` lists them (mtb.params_for(METHOD, category, "
+                         "modalities))")
     pr.add_argument("--dry-run", dest="dry_run", action="store_true",
                     help="print the exact command line run() would execute (conda run "
                          "-n <env> python <script> ...; inputs as given, params merged) "
@@ -1021,8 +1329,8 @@ def build_parser() -> argparse.ArgumentParser:
                           "as a scalar (5 -> int, 0.1 -> float, true/false -> bool, "
                           "else string). Unknown METHOD -> did-you-mean error; a key "
                           "the method does not accept is rejected naming the accepted "
-                          "ones (checked in --dry-run too); see mtb.params_for(METHOD). "
-                          "Not allowed with --skip-existing")
+                          "ones (checked in --dry-run too); `multibench params METHOD` "
+                          "lists them (mtb.params_for). Not allowed with --skip-existing")
     pra.add_argument("--columns", help="comma-separated columns of the printed table "
                                        "(plan with --dry-run, summary otherwise), or "
                                        "'all' (default: compact plan columns in table "
@@ -1092,11 +1400,14 @@ def build_parser() -> argparse.ArgumentParser:
                     "--packed --run`.")
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
+    from .engine.envs import DIFFICULTY as _DIFF, VERIFIED_STAR as _STAR
     es = ev.add_parser("status", help="per method: env installed? env name, difficulty",
                        description="One line per method: [x] installed / [ ] not, the "
                                    "env the package uses for it (the same name scan/run/"
-                                   "doctor/recipe use) and a difficulty tag (* = verified "
-                                   "working).")
+                                   "doctor/recipe use) and a difficulty tag saying how "
+                                   "hard the env is to BUILD from its recipe - "
+                                   + "; ".join(f"{k} = {v}" for k, v in _DIFF.items())
+                                   + f". {_STAR}. A legend line is printed on stderr.")
     es.add_argument("--category", help=_CATEGORY_HELP + " (only its methods)")
     es.add_argument("--methods", help=_METHODS_HELP + "; only those")
     es.set_defaults(func=_cmd_env, _parser=es)
@@ -1136,10 +1447,15 @@ def build_parser() -> argparse.ArgumentParser:
     ec.add_argument("--name", help=_NAME_HELP)
     ec.add_argument("--run", action="store_true",
                     help="actually create the env; without it the command is a dry run")
+    ec.add_argument("--force", action="store_true", help=_FORCE_HELP)
     ec.set_defaults(func=_cmd_env, _parser=ec)
     ep = ev.add_parser("plan", help="which envs a set of methods needs (collapsed per env)",
                        description="Collapse methods into the conda envs they need, "
-                                   "marking shared vs own envs.")
+                                   "marking shared vs own envs, with the packed-archive "
+                                   "download size ('dl') and unpacked size on disk "
+                                   "('disk') from the shipped snapshot "
+                                   "engine/packed_sizes.json ('?' = not measured); a "
+                                   "'# total' line on stderr sums them.")
     ep.add_argument("--category", help=_CATEGORY_HELP)
     ep.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ep.set_defaults(func=_cmd_env, _parser=ep)
@@ -1149,12 +1465,14 @@ def build_parser() -> argparse.ArgumentParser:
     eg.add_argument("group", help="group name (see `multibench env groups`)")
     eg.add_argument("--run", action="store_true",
                     help="actually create the env; without it the command is a dry run")
+    eg.add_argument("--force", action="store_true", help=_FORCE_HELP)
     eg.set_defaults(func=_cmd_env, _parser=eg)
     edoc = ev.add_parser(
         "doctor", help="preflight: which envs are present / need building",
         description="One line per env needed by the selected methods: [x] installed, "
                     "[L] missing but a lockfile is ready, [!] missing and no "
-                    "lockfile; then the install command for the missing ones.")
+                    "lockfile; then the install command for the missing ones. Method "
+                    "envs are Linux-only: on another host a warning says so first.")
     edoc.add_argument("--category", help=_CATEGORY_HELP)
     edoc.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     edoc.add_argument("--strict", action="store_true",
@@ -1165,15 +1483,21 @@ def build_parser() -> argparse.ArgumentParser:
         "install", help="build every needed env from its lockfile or packed archive",
         description="Install the envs the selected methods need. Dry run by default: "
                     "prints per env 'have' / 'build(dry-run)' / 'NO-LOCK', or with "
-                    "--packed 'packed archive published' / 'no archive - lockfile "
-                    "build'. Add --run to do it.")
+                    "--packed 'packed archive published' plus the archive's download "
+                    "size, unpacked size and URL (from engine/packed_sizes.json and "
+                    "packed_urls.json; '?' = not measured) / 'no archive - lockfile "
+                    "build', and a '# total' line on stderr. Add --run to do it. "
+                    "Method envs are linux-64 conda envs: on macOS/Windows a warning "
+                    "is printed first and --run refuses (--force overrides).")
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ei.add_argument("--packed", action="store_true",
-                    help="use prebuilt archives when published; fall back to the "
-                         "lockfile build")
+                    help="use prebuilt archives when published (URLs from "
+                         "engine/packed_urls.json, default base mtb.env.PACKED_URL); "
+                         "fall back to the lockfile build")
     ei.add_argument("--run", action="store_true",
                     help="actually create the envs; without it the command is a dry run")
+    ei.add_argument("--force", action="store_true", help=_FORCE_HELP)
     ei.set_defaults(func=_cmd_env, _parser=ei)
     ef = ev.add_parser("freeze", help="capture an env (or --all) to a committed lockfile",
                        description="Write the lockfile of an installed env (maintainers).")

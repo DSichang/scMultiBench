@@ -60,10 +60,15 @@ def test_scan_file_gate_runs_without_envs(tmp_path, no_envs):
     assert not rows["env_ok"].any()
     assert not rows["runnable"].any()
     # reason joins BOTH parts with '; ' - the file problem is visible even though
-    # the env is also missing
+    # the env is also missing. The file half is the SHORT form (no exception
+    # class, no absolute paths); the env half is verbatim (it carries the
+    # install command).
     for _, r in rows.iterrows():
-        assert r["reason"] == f"{r['files_reason']}; {r['env_reason']}"
+        assert r["reason"] == f"{W._short_reason(r['files_reason'], r['method'], 'ONLYRNA', 'vertical')}; {r['env_reason']}"
+        assert r["reason"].endswith("; " + r["env_reason"])
         assert "adt.h5" in r["reason"] and "not installed" in r["reason"]
+        assert "FileNotFoundError" in r["files_reason"] and str(tmp_path) in r["files_reason"]
+        assert "FileNotFoundError" not in r["reason"] and str(tmp_path) not in r["reason"]
 
 
 def test_scan_missing_dataset_folder_raises(tmp_path):
@@ -83,9 +88,12 @@ def test_scan_empty_folder_flags_data_dir_methods(tmp_path, all_envs):
     assert not paste["files_ok"].any()
     assert paste["files_reason"].str.contains(".h5ad").all()
     assert not paste["runnable"].any()
-    # env gate passed (mocked), so the ONLY reason is the file problem
+    # env gate passed (mocked), so the ONLY reason is the file problem - in
+    # its short form: the exception class and the absolute dir are gone
     assert paste["env_ok"].all()
-    assert (paste["reason"] == paste["files_reason"]).all()
+    assert paste["reason"].str.contains(r"needs >=2 \.h5ad slice files; found 0 in EMPTY$").all()
+    assert paste["files_reason"].str.startswith("FileNotFoundError: ").all()
+    assert not paste["reason"].str.contains("FileNotFoundError").any()
 
 
 def test_scan_runnable_equals_files_ok_and_env_ok(all_envs):
