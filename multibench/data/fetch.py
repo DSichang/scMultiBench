@@ -10,7 +10,12 @@ def safe_extract(tar: tarfile.TarFile, dest) -> None:
     """extractall with a path-traversal guard (absolute paths, .., links out).
 
     A crafted archive could otherwise write outside ``dest``; every tarball we
-    open (datasets, packed envs) goes through here.
+    open (datasets, packed envs) goes through here. On a Python whose
+    ``tarfile`` has the extraction filters (3.8.17+/3.9.17+/3.12+) the
+    ``'data'`` filter is passed as well - the archives are plain data, and
+    the bare call raises ``DeprecationWarning`` on 3.12/3.13 and changes
+    behaviour on 3.14; older interpreters keep the bare call (the guard
+    above is what they have).
     """
     import os
     dest = Path(dest).resolve()
@@ -22,7 +27,10 @@ def safe_extract(tar: tarfile.TarFile, dest) -> None:
             link = (target.parent / m.linkname).resolve() if not m.linkname.startswith("/") else Path(m.linkname)
             if not str(link).startswith(str(dest) + os.sep):
                 raise RuntimeError(f"archive link escapes target dir: {m.name!r}")
-    tar.extractall(dest)
+    if hasattr(tarfile, "data_filter"):
+        tar.extractall(dest, filter="data")
+    else:                                 # pragma: no cover - pre-filter Pythons
+        tar.extractall(dest)
 
 from .. import config
 
