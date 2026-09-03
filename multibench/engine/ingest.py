@@ -44,6 +44,9 @@ _ALIASES = {"protein": "adt", "peak": "atac_peak", "gas": "atac_gas",
 _MOD_FILE = {"rna": "rna.h5", "adt": "adt.h5", "atac": "atac.h5",
              "atac_peak": "atac_peak.h5", "atac_gas": "atac_gas.h5"}
 _ATAC_KINDS = ("peak", "gene_activity")
+#: :func:`to_canonical` warns when ``matrix/data`` (stored DENSE, features x
+#: cells) would exceed this many bytes uncompressed on disk.
+DENSE_WARN_BYTES = 10 ** 9
 #: ``category=`` values accepted by to_canonical / export_dataset. Only
 #: ``vertical`` changes anything (its ATAC role reads plain ``atac.h5``).
 _CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
@@ -95,7 +98,28 @@ def _to_anndata(src):
     if hasattr(src, "X") and hasattr(src, "obs"):     # already AnnData / MuData
         return src
     p = Path(src)
+    if not p.exists():
+        # h5py's own text ("Unable to synchronously open file ... errno = 2")
+        # neither names the cwd a relative path was tried against nor reads
+        # like a missing file to a newcomer.
+        raise FileNotFoundError(
+            f"input file does not exist: {p} (cwd {os.getcwd()})")
     suf = p.suffix.lower()
+    if suf == ".h5":
+        # exists but is not canonical (to_canonical passes canonical files
+        # through before reaching here): say what IS inside
+        try:
+            with h5py.File(p, "r") as f:
+                keys = sorted(f.keys())
+        except OSError as exc:
+            raise ValueError(f"{p} is not a readable HDF5 file: {exc}") from exc
+        raise ValueError(
+            f"{p} has no dataset 'matrix/data'; found keys {keys} - a canonical "
+            f"input .h5 holds matrix/data (features x cells), matrix/features and "
+            f"matrix/barcodes"
+            + (" (a top-level 'data' dataset is a method OUTPUT such as "
+               "out/<method>/embedding.h5, which mtb.evaluate reads)" if "data" in keys else "")
+            + "; pass an AnnData / .h5ad / .csv to convert instead")
     if suf == ".h5ad":
         return ad.read_h5ad(p)
     if suf == ".h5mu":
@@ -146,12 +170,15 @@ def _norm_modality(modality):
     return m
 
 
-def _pick_matrix(adata, *, layer=None, obsm=None):
+def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None):
     """Return ``(X, feature_names)`` for the requested slot of ``adata``.
 
     ``obsm`` matrices carry no var axis in AnnData, so feature names come from
-    ``adata.uns[f"{obsm}_names"]`` (when its length matches), from the columns of
-    a DataFrame-valued obsm, else ``feature_0..``.
+    ``feature_names`` when given, else ``adata.uns[f"{obsm}_names"]`` (when its
+    length matches), else the columns of a DataFrame-valued obsm, else
+    ``feature_0..`` - with a ``UserWarning`` naming the fallback, because a
+    protein panel written as ``feature_0..feature_29`` loses its marker names
+    in every downstream readout. ``what`` labels the warning (``'adt'``).
     """
     if layer is not None and obsm is not None:
         raise ValueError("pass at most one of layer= / obsm=")
@@ -164,12 +191,24 @@ def _pick_matrix(adata, *, layer=None, obsm=None):
             names = [str(c) for c in X.columns]
             X = X.to_numpy()
         n_feat = X.shape[1] if getattr(X, "ndim", 0) == 2 else None
+        if feature_names is not None:
+            names = [str(v) for v in feature_names]
+            if n_feat is not None and len(names) != n_feat:
+                raise ValueError(f"{len(names)} feature names for {n_feat} features "
+                                 f"in obsm[{obsm!r}]")
+            return X, names
         uns_names = adata.uns.get(f"{obsm}_names") if hasattr(adata, "uns") else None
         if names is None and uns_names is not None and n_feat is not None \
                 and len(uns_names) == n_feat:
             names = [str(v) for v in uns_names]
         if names is None and n_feat is not None:
             names = [f"feature_{i}" for i in range(n_feat)]
+            warnings.warn(
+                f"{what or 'obsm:' + obsm}: no feature names found (obsm[{obsm!r}] is a "
+                f"bare array and adata.uns[{obsm + '_names'!r}] is absent); writing "
+                f"feature_0..feature_{n_feat - 1} - pass feature_names=[...] "
+                f"(export_dataset: adt_names=) or store a DataFrame in obsm",
+                UserWarning, stacklevel=3)
         return X, names
     if layer is not None:
         if layer not in adata.layers:
@@ -177,7 +216,31 @@ def _pick_matrix(adata, *, layer=None, obsm=None):
         X = adata.layers[layer]
     else:
         X = adata.X
+    if feature_names is not None:
+        names = [str(v) for v in feature_names]
+        if len(names) != X.shape[1]:
+            raise ValueError(f"{len(names)} feature names for {X.shape[1]} features")
+        return X, names
     return X, [str(v) for v in adata.var_names]
+
+
+def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
+    """Warn when the DENSE ``matrix/data`` will exceed :data:`DENSE_WARN_BYTES`.
+
+    The canonical layout stores the matrix dense (features x cells x
+    itemsize); gzip shrinks a sparse matrix on disk but every reader
+    densifies it, and a 100k-cell x 200k-peak multiome is 160 GB.
+    """
+    itemsize = int(np.dtype(dtype).itemsize)
+    size = int(n_feat) * int(n_cell) * itemsize
+    if size > DENSE_WARN_BYTES:
+        warnings.warn(
+            f"{out.name}: matrix/data is stored DENSE (features x cells): "
+            f"{n_feat} x {n_cell} x {itemsize} B = {size / 1e9:.1f} GB uncompressed "
+            f"on disk (limit for this warning: {DENSE_WARN_BYTES / 1e9:.0f} GB); "
+            f"filter to highly-variable genes / informative peaks before export, "
+            f"or pass dtype='float32' to halve it",
+            UserWarning, stacklevel=3)
 
 
 def _peak_fraction(feats) -> float:
@@ -240,7 +303,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
                  convert: bool = True, *, layer: str | None = None,
                  obsm: str | None = None, mod: str | None = None,
                  dtype: str = "float64", compression: str | None = "gzip",
-                 block: int = 1024, category: str | None = None) -> Path:
+                 block: int = 1024, category: str | None = None,
+                 feature_names: list | None = None) -> Path:
     """Convert ``src`` to a canonical ``.h5`` (``matrix/data`` FEATURES x CELLS,
     ``matrix/features``, ``matrix/barcodes``) and return its path.
 
@@ -255,7 +319,10 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     src
         AnnData, MuData (then ``mod=`` is required), or a path to ``.h5ad`` /
         ``.h5mu`` / ``.csv`` / ``.tsv`` (cells x features) / ``.loom`` / a
-        canonical ``.h5``.
+        canonical ``.h5``. A path that does not exist raises
+        ``FileNotFoundError`` naming it and the current directory; an ``.h5``
+        without ``matrix/data`` raises ``ValueError`` listing the keys it does
+        hold (a top-level ``data`` dataset is a method OUTPUT, not an input).
     out
         Output file path, or a directory (existing) when ``modality`` is given -
         the canonical filename for that modality (``rna.h5``, ``adt.h5``,
@@ -278,15 +345,21 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         Take the matrix from ``adata.layers[layer]`` instead of ``adata.X``.
     obsm
         Take the matrix from ``adata.obsm[obsm]`` (e.g. ``'protein'`` for
-        CITE-seq). Feature names come from ``adata.uns[f'{obsm}_names']`` when
-        present with the right length, from the columns if the obsm entry is a
-        DataFrame, else ``feature_0..``. Mutually exclusive with ``layer``.
+        CITE-seq). Feature names come from ``feature_names`` when given, else
+        ``adata.uns[f'{obsm}_names']`` when present with the right length,
+        else the columns if the obsm entry is a DataFrame, else
+        ``feature_0..`` with a ``UserWarning`` (the protein names would be
+        lost in every downstream readout). Mutually exclusive with ``layer``.
     mod
         For MuData input, the modality to export (``mdata.mod[mod]``).
     dtype
         Stored dtype of ``matrix/data``; default ``'float64'`` matches the
         shipped benchmark files. ``'float32'`` halves the uncompressed size and
         is read fine by h5py / rhdf5 / hdf5r (returned as double in R).
+        ``matrix/data`` is DENSE on disk (cells x features x itemsize, gzip
+        notwithstanding for the readers, which densify); a ``UserWarning``
+        states the size when it exceeds :data:`DENSE_WARN_BYTES` (1 GB) and
+        suggests filtering features or ``dtype='float32'``.
     compression
         h5py compression filter (``'gzip'`` default, ``None`` for none). Any
         compression enables chunking.
@@ -308,6 +381,10 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         ``method_info(m)['atac']`` - feed the one it wants. The other three
         categories (and ``None``) keep today's names ``atac_peak.h5`` /
         ``atac_gas.h5`` / ``atac.h5``.
+    feature_names
+        Keyword-only; explicit feature names for the matrix (length must match
+        its feature count). Overrides ``var_names`` / ``uns`` / DataFrame
+        columns; the way to name a bare ``obsm`` protein array.
 
     Returns
     -------
@@ -351,9 +428,12 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
             "pass obsm='<key>' (or layer=) to select the protein matrix, otherwise "
             "adata.X (usually the RNA) would be written as adt.h5")
 
-    X, feats = _pick_matrix(adata, layer=layer, obsm=obsm)
+    X, feats = _pick_matrix(adata, layer=layer, obsm=obsm,
+                            feature_names=feature_names, what=modality)
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
+    if getattr(X, "ndim", 0) == 2:
+        _warn_dense_size(out, X.shape[1], X.shape[0], dtype)
     return _write_canonical(out, X, feats, bars, dtype=dtype,
                             compression=compression, block=block)
 
@@ -508,13 +588,152 @@ def _link_or_copy(src: Path, dst: Path):
         shutil.copyfile(src, dst)
 
 
-def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
-                   adt: str | None = None, atac: str | None = None,
-                   atac_kind: str | None = None, labels: str | None = None,
-                   batch: str | None = None, dtype: str = "float64",
+def _is_anndata(obj) -> bool:
+    return hasattr(obj, "X") and hasattr(obj, "obs") and hasattr(obj, "obs_names")
+
+
+def _as_modality(data, spec, *, what, master, feature_names=None):
+    """Turn a modality argument of :func:`export_dataset` into ``(adata, kw)``.
+
+    ``spec`` is a selector string (resolved against ``data``), an AnnData, a
+    DataFrame (index = cell barcodes, columns = features) or a 2-D array /
+    sparse matrix in ``master`` order (no barcodes to check - pass a DataFrame
+    or AnnData when the order is not known to be right).
+    """
+    import anndata as ad
+    import scipy.sparse as sp
+
+    if isinstance(spec, str):
+        if data is None:
+            raise ValueError(
+                f"{what}={spec!r} is a selector but data is None; pass the AnnData/"
+                f"MuData as the first argument, or give {what}= an AnnData / DataFrame")
+        return _select(data, spec, what=what)
+    if _is_anndata(spec):
+        return spec, {}
+    if hasattr(spec, "columns") and hasattr(spec, "index"):        # DataFrame
+        a = ad.AnnData(spec.to_numpy(dtype=float))
+        a.obs_names = [str(x) for x in spec.index]
+        a.var_names = [str(c) for c in spec.columns]
+        return a, {}
+    if sp.issparse(spec) or isinstance(spec, np.ndarray):
+        if getattr(spec, "ndim", 0) != 2:
+            raise ValueError(f"{what}= array must be 2-D (cells x features), got shape "
+                             f"{getattr(spec, 'shape', None)}")
+        if master is None:
+            raise ValueError(
+                f"{what}= is a bare array, so the cell barcodes are unknown; pass an "
+                f"AnnData/DataFrame for {what}= or give data= / another modality as "
+                f"an AnnData first")
+        if spec.shape[0] != len(master):
+            raise ValueError(f"{what}= array has {spec.shape[0]} rows for {len(master)} "
+                             f"cells (the master cell order)")
+        a = ad.AnnData(spec if sp.issparse(spec) else np.asarray(spec, dtype=float))
+        a.obs_names = list(master)
+        if feature_names is None:
+            n_feat = spec.shape[1]
+            warnings.warn(
+                f"{what}: no feature names found (bare array); writing "
+                f"feature_0..feature_{n_feat - 1} - pass {'adt_names' if what == 'adt' else 'a DataFrame'}"
+                f"=[...] or a DataFrame / AnnData with named features",
+                UserWarning, stacklevel=3)
+            feature_names = [f"feature_{i}" for i in range(n_feat)]
+        a.var_names = [str(x) for x in feature_names]
+        return a, {}
+    raise ValueError(
+        f"{what}= must be a selector string like 'X', 'obsm:<key>', 'layer:<key>' or "
+        f"'mod:<name>', an AnnData, a DataFrame (cells x features) or a 2-D array, "
+        f"got {type(spec).__name__}")
+
+
+def _align_cells(a, *, master, master_name, role):
+    """Return ``a`` re-indexed to the master cell order.
+
+    Same barcodes in another order -> reordered (this is the silent
+    mis-pairing ``rna.h5`` / ``atac.h5`` used to ship with). A barcode set that
+    differs raises ``ValueError`` naming the strays. Non-unique barcodes on
+    either side cannot be matched by name: the cells are paired positionally
+    and a ``UserWarning`` says so (a different cell count still raises).
+    """
+    names = [str(x) for x in a.obs_names]
+    master = [str(x) for x in master]
+    if names == master:
+        return a
+    unique = len(set(names)) == len(names) and len(set(master)) == len(master)
+    if unique and set(names) == set(master):
+        return a[master]
+    if unique:
+        stray = [x for x in names if x not in set(master)]
+        lack = [x for x in master if x not in set(names)]
+        raise ValueError(
+            f"{role} has {len(names)} cells but {len(stray)} barcodes are not in "
+            f"{master_name} ({stray[:5]}{'...' if len(stray) > 5 else ''}"
+            f"{'; ' + str(len(lack)) + ' of ' + master_name + ' missing from ' + role if lack else ''}); "
+            f"all modalities of one dataset must cover the same cells, in one order - "
+            f"subset every modality to the shared barcodes first")
+    if len(names) != len(master):
+        raise ValueError(
+            f"{role}: {len(names)} cells but {master_name} has {len(master)}; "
+            f"all modalities of one dataset must cover the same cells")
+    warnings.warn(
+        f"{role}: obs_names are not unique, so the cells cannot be matched to "
+        f"{master_name} by barcode; pairing them positionally", UserWarning, stacklevel=4)
+    return a
+
+
+def _as_obs_vector(data, spec, *, what, master):
+    """Labels / batch as a 1-D array in master order.
+
+    ``spec``: an ``'obs:<col>'`` selector against ``data``, a pandas Series
+    (aligned by index to the master barcodes; a plain RangeIndex of the right
+    length is taken positionally) or any 1-D sequence of the right length.
+    """
+    import pandas as pd
+
+    if isinstance(spec, str):
+        if data is None:
+            raise ValueError(f"{what}={spec!r} is a selector but data is None; pass a "
+                             f"Series/array instead")
+        ser = _select_obs(data, spec, what=what)
+        src_names = [str(x) for x in ser.index]
+        if master is not None and src_names != [str(x) for x in master] \
+                and set(src_names) == set(master) and len(set(src_names)) == len(src_names):
+            ser = ser.reindex([str(x) for x in master]) if ser.index.dtype == object \
+                else ser.iloc[[src_names.index(str(x)) for x in master]]
+        return np.asarray(ser)
+    if isinstance(spec, pd.Series):
+        if master is None:
+            return np.asarray(spec)
+        idx = [str(x) for x in spec.index]
+        m = [str(x) for x in master]
+        if idx == m:
+            return np.asarray(spec)
+        if len(set(idx)) == len(idx) and set(m) <= set(idx):
+            pos = {k: i for i, k in enumerate(idx)}
+            return np.asarray(spec)[[pos[x] for x in m]]
+        if isinstance(spec.index, pd.RangeIndex) and len(spec) == len(m):
+            return np.asarray(spec)             # unlabeled: positional
+        lack = [x for x in m if x not in set(idx)]
+        raise ValueError(
+            f"{what}= Series index does not match the cell barcodes: {len(lack)} of "
+            f"{len(m)} cells have no entry ({lack[:5]}{'...' if len(lack) > 5 else ''}); "
+            f"index it by obs_names (or pass a plain list in cell order)")
+    vals = np.asarray(spec)
+    if vals.ndim != 1:
+        raise ValueError(f"{what}= must be 1-D, got shape {vals.shape}")
+    if master is not None and len(vals) != len(master):
+        raise ValueError(f"{what} has {len(vals)} entries for {len(master)} cells")
+    return vals
+
+
+def export_dataset(data, dataset_dir: Path | str, *, rna="X",
+                   adt=None, atac=None,
+                   atac_kind: str | None = None, labels=None,
+                   batch=None, dtype: str = "float64",
                    compression: str | None = "gzip",
-                   category: str | None = None) -> Path:
-    """Write an AnnData / MuData as a canonical benchmark dataset folder.
+                   category: str | None = None,
+                   adt_names: list | None = None) -> Path:
+    """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
     One call produces the flat layout ``describe_layout`` documents -
     ``rna.h5``, ``adt.h5``, ``atac_peak.h5`` (+ ``atac.h5``) or ``atac_gas.h5``,
@@ -523,19 +742,32 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
 
         mtb.io.export_dataset(a, "data/MYCITE", rna="X", adt="obsm:protein",
                               labels="obs:celltype")
+        # or from separate objects (paired by barcode):
+        mtb.io.export_dataset(rna_adata, "data/MYMULTI", atac=atac_adata,
+                              atac_kind="peak", labels=rna_adata.obs["celltype"])
+
+    Every modality is written in ONE master cell order - ``data.obs_names``
+    when ``data`` is given, else the first modality object's - and re-indexed
+    to it by barcode; a modality whose barcodes differ raises ``ValueError``
+    (paired cells must never be mis-paired silently).
 
     Parameters
     ----------
     data
-        AnnData, or MuData (then use ``'mod:<name>'`` selectors).
+        AnnData, or MuData (then use ``'mod:<name>'`` selectors), or ``None``
+        when every modality is passed as an object (then the default
+        ``rna='X'`` means "no RNA": pass ``rna=<AnnData>``).
     dataset_dir
         Folder to create, e.g. ``<data_path>/MYDATA``. Its *name* is the dataset
         id you pass to ``scan`` / ``run_all`` with ``data_path=<parent>``.
     rna, adt, atac
-        Where each modality matrix lives: ``'X'``, ``'obsm:<key>'``,
-        ``'layer:<key>'``, ``'mod:<name>'`` (MuData; optionally
-        ``'mod:<name>.obsm:<key>'``). ``None`` skips the modality. All matrices
-        are cells x features and are written transposed.
+        Where each modality matrix lives - a selector against ``data``
+        (``'X'``, ``'obsm:<key>'``, ``'layer:<key>'``, ``'mod:<name>'``,
+        optionally ``'mod:<name>.obsm:<key>'``), or an object: an AnnData
+        (``.X``), a DataFrame (index = barcodes, columns = features) or a 2-D
+        array / sparse matrix already in the master order (it carries no
+        barcodes, so nothing can be checked). ``None`` skips the modality. All
+        matrices are cells x features and are written transposed.
     atac_kind
         Required with ``atac``: ``'peak'`` (chr:start-end features -> written as
         ``atac_peak.h5`` plus a hard-linked/copied ``atac.h5``, because the
@@ -546,11 +778,13 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
         hard link of ``atac_peak.h5`` (when the filesystem allows it), editing
         one edits both. ``category`` changes these names - see below.
     labels
-        Cell-type column: ``'obs:<col>'`` or ``'mod:<name>.obs:<col>'`` ->
-        ``cty.csv`` (header ``x``).
+        Cell-type labels -> ``cty.csv`` (header ``x``): ``'obs:<col>'`` /
+        ``'mod:<name>.obs:<col>'``, a pandas Series aligned BY INDEX to the
+        master barcodes (``ValueError`` when cells are missing from it), or a
+        1-D sequence in master order.
     batch
-        Batch column (same selector grammar). When given, cells are split per
-        batch value (sorted) and numbered files are written instead:
+        Batch per cell (same forms as ``labels``). When given, cells are split
+        per batch value (sorted) and numbered files are written instead:
         ``rna1.h5``, ``rna2.h5`` ..., ``adt1.h5`` ..., ``cty1.csv`` ...
         (the layout of the shipped D52).
     dtype, compression
@@ -567,6 +801,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
         ``'diagonal'`` / ``'mosaic'`` / ``'cross'``: ``atac_peak.h5`` or
         ``atac_gas.h5`` exactly as named, and NO ``atac.h5`` link (so the
         gene-activity role cannot fall back onto a peak matrix).
+    adt_names
+        Keyword-only; protein names for the ADT matrix. Needed when the
+        matrix is a bare ``obsm`` array (or a bare array) without
+        ``uns['<key>_names']``: otherwise ``feature_0..`` is written and a
+        ``UserWarning`` says so (see :func:`to_canonical`).
 
     Returns
     -------
@@ -576,6 +815,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
     out = Path(dataset_dir)
     out.mkdir(parents=True, exist_ok=True)
     category = _check_category(category)
+    if data is None and isinstance(rna, str) and rna == "X":
+        rna = None                      # no data to select from: no RNA
     if atac is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(
             f"atac={atac!r} needs atac_kind= one of {list(_ATAC_KINDS)} "
@@ -586,34 +827,41 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
 
-    mats = []   # (role_base, adata, kwargs)
+    # master cell order: data's obs_names, else the first modality OBJECT's
+    master, master_name = None, None
+    if data is not None and hasattr(data, "obs_names"):
+        master, master_name = [str(x) for x in data.obs_names], "data"
+    else:
+        for what, spec in (("rna", rna), ("adt", adt), ("atac", atac)):
+            if spec is not None and (_is_anndata(spec) or hasattr(spec, "index")):
+                master = [str(x) for x in (spec.obs_names if _is_anndata(spec) else spec.index)]
+                master_name = what
+                break
+
+    mats = []   # (role_base, adata, kwargs, user-facing name)
     for what, spec in (("rna", rna), ("adt", adt)):
         if spec is not None:
-            a, kw = _select(data, spec, what=what)
-            mats.append((what, a, kw))
+            a, kw = _as_modality(data, spec, what=what, master=master,
+                                 feature_names=adt_names if what == "adt" else None)
+            mats.append((what, a, kw, what))
     if atac is not None:
-        a, kw = _select(data, atac, what="atac")
-        mats.append(("atac_peak" if atac_kind == "peak" else "atac_gas", a, kw))
-    lab = _select_obs(data, labels, what="labels") if labels is not None else None
-
-    n_ref = None
-    for role, a, kw in mats:
-        n = a.n_obs
-        if n_ref is None:
-            n_ref = n
-        elif n != n_ref:
-            raise ValueError(f"{role}: {n} cells but rna/other modalities have {n_ref}; "
-                             "all modalities of one dataset must cover the same cells")
+        a, kw = _as_modality(data, atac, what="atac", master=master)
+        mats.append(("atac_peak" if atac_kind == "peak" else "atac_gas", a, kw, "atac"))
+    if master is None and mats:
+        master, master_name = [str(x) for x in mats[0][1].obs_names], mats[0][3]
+    mats = [(role, _align_cells(a, master=master, master_name=master_name, role=what), kw)
+            for role, a, kw, what in mats]
+    n_ref = len(master) if master is not None else None
+    lab = _as_obs_vector(data, labels, what="labels", master=master) if labels is not None else None
     if lab is not None and n_ref is not None and len(lab) != n_ref:
         raise ValueError(f"labels has {len(lab)} entries for {n_ref} cells")
 
     if batch is None:
         groups = [(None, None)]
     else:
-        b = _select_obs(data, batch, what="batch")
-        if n_ref is not None and len(b) != n_ref:
-            raise ValueError(f"batch has {len(b)} entries for {n_ref} cells")
-        bvals = np.asarray(b)
+        bvals = _as_obs_vector(data, batch, what="batch", master=master)
+        if n_ref is not None and len(bvals) != n_ref:
+            raise ValueError(f"batch has {len(bvals)} entries for {n_ref} cells")
         keys = sorted(set(bvals.tolist()), key=lambda v: str(v))
         groups = [(i + 1, np.flatnonzero(bvals == k)) for i, k in enumerate(keys)]
 
@@ -626,8 +874,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna: str | None = "X",
             # no category: representation-named file (+ atac.h5 link for peaks)
             fname = (f"atac{suf}.h5" if category == "vertical" and role.startswith("atac")
                      else f"{role}{suf}.h5")
+            names = adt_names if role == "adt" else None
             p = to_canonical(sub, out / fname, modality=role,
-                             dtype=dtype, compression=compression, **kw)
+                             dtype=dtype, compression=compression,
+                             feature_names=names, **kw)
             if role == "atac_peak" and category is None:
                 _link_or_copy(p, out / f"atac{suf}.h5")
         if lab is not None:
