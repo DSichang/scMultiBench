@@ -135,3 +135,33 @@ def test_datasets_lists_every_id_with_results(files_dir):
     assert {"D11s", "D28s", "D45s", "D52s", "SD7", "SD10", "D24"} <= set(df.dataset)
     assert df[df.dataset == "D52s"].category.iloc[0] == "cross"
     assert not df.dataset.duplicated().any()
+
+
+# --- re-test round 3: output column agrees with the registry, dir() hygiene ---
+
+def test_methods_output_agrees_with_method_info_output_kind(files_dir):
+    """method.csv said output='embedding' for PASTE/PASTE2/GPSA/SPIRAL while
+    method_info(...)['supports'][*]['output_kind'] says 'coords' (aligned
+    coordinates). The CSV must agree with the registry for EVERY method."""
+    import multibench as mtb
+    df = catalog.methods(files_dir).set_index("canonical_id")
+    for cid in df.index:
+        kinds = {s["output_kind"] for s in mtb.method_info(cid)["supports"]}
+        assert kinds == {df.loc[cid, "output"]}, (cid, kinds, df.loc[cid, "output"])
+    assert df.loc[["PASTE", "PASTE2", "GPSA", "SPIRAL"], "output"].tolist() == ["coords"] * 4
+    assert df.loc["scMoMaT", "output"] == "graph"
+
+
+def test_catalog_dir_lists_public_api_not_leaked_imports():
+    """mtb.catalog.annotations() was a TypeError for a re-tester: dir() listed
+    the __future__ feature object and the module's imports. Tab completion now
+    shows the documented API (__all__) and underscore names only; every
+    attribute is still there."""
+    import multibench as mtb
+    listed = dir(mtb.catalog)
+    assert set(catalog.__all__) <= set(listed)
+    for leaked in ("annotations", "pd", "Path", "re", "config"):
+        assert leaked not in listed, leaked
+        assert hasattr(mtb.catalog, leaked)          # nothing removed
+    assert "_registry_ids" in listed and "__all__" in listed
+    assert listed == sorted(listed)
