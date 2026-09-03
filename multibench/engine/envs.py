@@ -92,15 +92,39 @@ DIFFICULTY = {
          "install.packages() are restored by the env's post-install script",
     "verified": "env built from the lockfile on a fresh machine and the method "
                 "ran end-to-end on its reference dataset",
-    "blocked-script": "the upstream script itself cannot run unmodified (see "
-                      "method_info(m)['notes']); the env builds but the method is "
-                      "not runnable through the wrapper",
+    "blocked-script": "the upstream script itself cannot run unmodified from the "
+                      "public checkout (see method_info(m)['setup_hint'] and scan's "
+                      "files_reason); the env builds, and the benchmark host ran the "
+                      "method only with a local shim",
     "unknown": "no env_spec recipe declared for the method",
 }
 
 #: The ``*`` suffix ``env status`` appends to the difficulty tag.
 VERIFIED_STAR = ("* = verified_working: the env ran the method end-to-end on "
                  "its reference dataset")
+
+#: ONE symbol set for every env listing (``env status`` and ``env doctor``):
+#: installed / missing-with-lockfile / missing-without-lockfile.
+MARK_LEGEND = ("[x]=installed  [L]=missing, lockfile ready (run `multibench env "
+               "install --run`)  [!]=missing, no lockfile")
+
+
+def env_mark(exists: bool, has_lock: bool) -> str:
+    """The one-character mark of :data:`MARK_LEGEND` for an env row.
+
+    Parameters
+    ----------
+    exists : bool
+        The env is installed here.
+    has_lock : bool
+        ``env_locks/<env>.yml`` is shipped, so ``env install --run`` can build it.
+
+    Returns
+    -------
+    str
+        ``"x"``, ``"L"`` or ``"!"``.
+    """
+    return "x" if exists else ("L" if has_lock else "!")
 
 
 _SIZES_JSON = Path(__file__).resolve().parent / "packed_sizes.json"
@@ -218,7 +242,7 @@ def _install_commands(spec: dict, env_name: str, conda: str | None) -> list[list
         create += ["-c", ch]
     if spec.get("python_version"):
         create.append(f"python={spec['python_version']}")
-    create += list(spec.get("conda_packages", []))
+    create += _conda_packages(spec)
     pip_git = list(spec.get("pip_git", []))
     pip_pkgs = list(spec.get("pip_packages", [])) + pip_git
     if pip_pkgs:
@@ -235,6 +259,26 @@ def _install_commands(spec: dict, env_name: str, conda: str | None) -> list[list
     return cmds
 
 
+def _conda_packages(spec: dict) -> list[str]:
+    """The recipe's conda packages, minus a ``python`` pin already emitted.
+
+    A recipe carries ``python_version`` AND (some) list ``python=3.7`` in
+    ``conda_packages`` too, so the create line read ``python=3.7 python=3.7``.
+    Harmless to conda, but it reads as a generator bug; the explicit
+    ``python_version`` wins and the duplicate is dropped.
+    """
+    pkgs = list(spec.get("conda_packages", []))
+    if not spec.get("python_version"):
+        return pkgs
+    return [c for c in pkgs if not _is_python_pin(c)]
+
+
+def _is_python_pin(package: str) -> bool:
+    """``True`` for ``python``, ``python=3.7``, ``python==3.7.10``, ``python>=3``."""
+    name = re.split(r"[=<>!~ ]", str(package).strip(), maxsplit=1)[0]
+    return name == "python"
+
+
 def _environment_yml(spec: dict, env_name: str) -> str:
     channels = list(spec.get("conda_channels", [])) or ["conda-forge"]
     lines = [f"name: {env_name}", "channels:"]
@@ -242,7 +286,7 @@ def _environment_yml(spec: dict, env_name: str) -> str:
     lines.append("dependencies:")
     if spec.get("python_version"):
         lines.append(f"  - python={spec['python_version']}")
-    for c in spec.get("conda_packages", []):
+    for c in _conda_packages(spec):
         lines.append(f"  - {c}")
     pip_pkgs = list(spec.get("pip_packages", [])) + list(spec.get("pip_git", []))
     if pip_pkgs:
@@ -590,11 +634,13 @@ def status(conda: str | None = None, *, as_frame: bool = False):
     -------
     list of dict or pandas.DataFrame
         One entry per registry method: ``{method, env, group, own_env,
-        exists, difficulty, verified_working, has_recipe}``. ``env`` and
-        ``group`` are both the env the package uses for the method
-        (:func:`default_env_name` == :func:`group_for`); ``own_env`` is the
-        singleton ``scmb_<method>`` name, reported installed too when
-        present. ``difficulty`` is one of the :data:`DIFFICULTY` tags
+        exists, has_lock, difficulty, verified_working, has_recipe}``.
+        ``env`` and ``group`` are both the env the package uses for the
+        method (:func:`default_env_name` == :func:`group_for`); ``own_env``
+        is the singleton ``scmb_<method>`` name, reported installed too when
+        present; ``has_lock`` says a shipped lockfile can build ``env``
+        (the ``[L]`` of :data:`MARK_LEGEND`, shared with :func:`doctor`).
+        ``difficulty`` is one of the :data:`DIFFICULTY` tags
         (``easy`` / ``old-scvi`` / ``old-tensorflow`` / ``R`` / ``verified``
         / ``blocked-script``; ``unknown`` without a recipe) and
         ``verified_working`` is the ``*`` of ``env status``
@@ -609,6 +655,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
         out.append({
             "method": s.id, "env": grp, "group": grp, "own_env": own,
             "exists": grp in have or own in have,
+            "has_lock": lockfile(grp) is not None,
             "difficulty": r.get("difficulty", "unknown"),
             "verified_working": bool(r.get("verified_working", False)),
             "has_recipe": bool(r),
@@ -842,9 +889,10 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     -------
     list of dict or pandas.DataFrame
         ``[{env, methods, exists, has_lock}]``, largest env first. ``exists``
-        - the env is installed (the ``[x]`` of ``env doctor``); ``has_lock``
-        - ``env_locks/<env>.yml`` is shipped, so ``env install --run`` can
-        build it (``[L]``); neither (``[!]``) means the recipe path only.
+        - the env is installed (the ``[x]`` of :data:`MARK_LEGEND`);
+        ``has_lock`` - ``env_locks/<env>.yml`` is shipped, so ``env install
+        --run`` can build it (``[L]``); neither (``[!]``) means the recipe
+        path only. The same marks ``env status`` prints per method.
     """
     _check_methods(methods)
     have = set(installed_envs(conda))

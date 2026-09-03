@@ -342,9 +342,15 @@ methods:
     tasks: [clustering]
     atac: peak
     status: verified
+    # `status: verified` is the benchmark host's run (files/final_verification.tsv:
+    # D12, RUN_OK_NO_EMBEDDING, verdict OK); it needed a local logger.py shim
+    # that upstream does not ship - hence env_specs' `blocked-script` tag and the
+    # `helpers` line below, which makes scan say so instead of failing at import.
+    setup_hint: "main_MIRA.py does `from logger import *` (line 9) but the public tools_scripts/MIRA/ holds only main_MIRA.py: from a fresh checkout the script ImportErrors at start. The benchmark host's verification run (D12, RUN_OK_NO_EMBEDDING) used a local logger.py shim beside the script; the env itself (scmb_mira: pip install mira-multiome scanpy) builds and runs fine. scan() reports the missing helper in files_reason; supply a logger.py next to main_MIRA.py to run it."
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py
+        helpers: [logger.py]          # local module the script imports; NOT in the public repo
         language: python
         args:
           - {role: rna, flag: "--rna", repeat: true}
@@ -675,6 +681,7 @@ methods:
         driver: engine/drivers/run_gpsa.py                # the benchmark's working GPSA script, shipped with the package
         language: python
         cwd_at_script: true            # globs *.h5ad from --data_dir; variational-GP spatial alignment (gpsa+gpytorch, torch CUDA), HVG=3000
+        slice_obs: [Ground_Truth]      # the driver reads obs['Ground_Truth'] from every slice at load; scan's file gate checks it
         args:
           - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files (obs[Ground_Truth] + obsm[spatial])
           - {role: out_dir,  flag: "--save_dir"}    # writes aligned_slice_*.h5ad into save_dir

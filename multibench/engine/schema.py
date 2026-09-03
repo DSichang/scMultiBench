@@ -119,6 +119,8 @@ class Variant:
     driver: str | None = None          # package-relative R/py wrapper that source()s the (unmodified) upstream entrypoint then calls its function; see engine/drivers/
     normalize_peaks: list = field(default_factory=list)  # roles whose .h5 ATAC peak names get normalized to chr:start-end before the run
     extra_outputs: list[OutputSpec] = field(default_factory=list)
+    slice_obs: list = field(default_factory=list)   # obs columns EVERY slice of a data_dir must carry (GPSA reads obs['Ground_Truth']); checked by scan's file gate
+    helpers: list = field(default_factory=list)     # local modules the entrypoint imports from its own dir that upstream does NOT ship (MIRA's logger.py); scan reports the script blocked when one is absent
 
     def matches(self, category: str, modalities: set[str]) -> bool:
         return (self.when.get("category") == category
