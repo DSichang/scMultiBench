@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import functools
+import os
+import warnings
 from pathlib import Path
 
 from .engine import registry, upstream, envs
+from .engine import resolve as _resolve
 from .engine.runner import _AUX_ROLES  # noqa: F401  (re-exported for back-compat)
+from .engine.schema import AmbiguousVariantError, is_label_role
 from .engine.schema import base_modality as _base_modality  # noqa: F401  (tests import it from here)
 
 
@@ -30,7 +34,9 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
         return want is None and atac is None and not needs_labels
     if category and v.when.get("category") != category:
         return False
-    if want is not None and not want <= v.modality_types:
+    # A directory-fed variant that names no matrix (the spatial registration
+    # methods) cannot be judged by modality: keep it, find_methods warns.
+    if want is not None and not v.modalities_unknown and not want <= v.modality_types:
         return False
     if needs_labels is not None and v.needs_labels != needs_labels:
         return False
@@ -81,7 +87,13 @@ def find_methods(category: str | None = None, task: str | None = None,
     ...) are reduced to their base type, so ``["rna", "atac_gas"]`` means
     ``["rna", "atac"]``. Because modality info is derived from a method's
     variants, this filter implicitly excludes the declared-but-unwired stub
-    methods (those without variants).
+    methods (those without variants). A method fed a DIRECTORY is judged by
+    the bare filenames its variant names (scBridge's ``rna.h5`` /
+    ``atac_gas.h5`` make it an rna+atac method); the spatial-registration
+    variants name nothing (their ``data_dir`` holds ``.h5ad`` slices), so
+    they cannot be filtered by modality: they are KEPT and a ``UserWarning``
+    names them - ``task='registration'`` (or ``category``) selects or
+    excludes them deliberately.
     ``runnable=True`` restricts to methods with at least one variant (usable by
     ``inputs_for``/``run``); ``runnable=False`` returns only the stubs.
     ``tunable=True`` keeps only methods that expose at least one hyperparameter
@@ -100,6 +112,7 @@ def find_methods(category: str | None = None, task: str | None = None,
     want = (set(registry.normalize_modalities(modalities, base=True))
             if modalities is not None else None)
     out = []
+    unfiltered: list[str] = []
     for s in registry.load():
         if category and category not in s.categories:
             continue
@@ -118,11 +131,21 @@ def find_methods(category: str | None = None, task: str | None = None,
         if atac and s.atac != atac:
             continue
         cands = s.variants or [None]
-        if not any(_variant_matches(v, category, want, needs_labels, atac)
-                   and (not atac or v is None or v.consumes_atac)
-                   for v in cands):
+        hits = [v for v in cands
+                if _variant_matches(v, category, want, needs_labels, atac)
+                and (not atac or v is None or v.consumes_atac)]
+        if not hits:
             continue
         out.append(s.id)
+        if want is not None and all(v is not None and v.modalities_unknown for v in hits):
+            unfiltered.append(s.id)
+    if unfiltered:
+        warnings.warn(
+            f"find_methods: {len(unfiltered)} method(s) take a directory (data_dir role) "
+            f"and could not be filtered by modalities={sorted(want)}; kept: "
+            f"{', '.join(unfiltered)} - see method_info(m)['supports'] "
+            f"(task='registration' selects the spatial ones)",
+            UserWarning, stacklevel=2)
     return out
 
 
@@ -164,7 +187,9 @@ def method_info(method: str, files_dir: Path | str | None = None, *,
     scripts_url (the benchmark's tools_scripts folder), repo_url, version,
     reference ({doi, title, authors, journal, year} or None), notes,
     supports (per variant: category, modalities, output_kind, n_tunable,
-    needs_labels), params (per variant key 'category:mods': defaults, tunable,
+    needs_labels, labels - the label roles the variant reads, e.g.
+    ``['cty']`` / ``['rna_cty']`` / ``[]``), params (per variant key
+    'category:mods': defaults, tunable,
     effective), fixed_in_script, upstream_knobs, upstream_url;
     with ``verbose=True`` also notes_long and verification.
 
@@ -241,7 +266,8 @@ def method_info(method: str, files_dir: Path | str | None = None, *,
                       "modalities": list(v.when.get("modalities", [])),
                       "output_kind": v.output.kind,
                       "n_tunable": len(v.tunable),
-                      "needs_labels": v.needs_labels}
+                      "needs_labels": v.needs_labels,
+                      "labels": [r for r in v.roles() if is_label_role(r)]}
                      for v in s.variants],
         # what the caller may pass to run(params=...): see params_for()
         "params": {_variant_key(v): {"defaults": dict(v.params),
@@ -344,47 +370,99 @@ def _variant_key(v) -> str:
 
 
 def params_for(method: str, category: str | None = None,
-               modalities: list[str] | set[str] | None = None) -> dict:
+               modalities: list[str] | set[str] | None = None, *,
+               dataset: str | None = None,
+               data_path: Path | str | None = None) -> dict:
     """Return the hyperparameters of one method variant.
 
-    Returns ``{"method", "variant", "defaults", "tunable", "effective", ...}`` where:
+    Parameters
+    ----------
+    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
+    category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; selects
+        the variant exactly like ``run`` (validated). May be omitted when the
+        method has only one variant.
+    modalities : the variant's modality tokens; ``protein`` is accepted for
+        ``adt`` and ``atac`` for either ATAC representation role. May be
+        omitted when ``category`` alone selects one variant (the only way to
+        reach a ``data_dir`` variant such as scBridge's or PASTE's).
+    dataset : keyword-only. A dataset folder name; when the selection is
+        still ambiguous, the ONE variant whose input files are all present in
+        ``<data_path>/<dataset>`` is used (``params_for('Matilda',
+        dataset='D11')`` is the rna+adt variant). Nothing changes when the
+        folder settles nothing.
+    data_path : keyword-only; root containing the dataset folder (default
+        ``config.DEFAULT.data_path``).
 
-    * ``defaults`` — parameters the package emits on every run. Override them
-      with ``run(..., params={...})``; the override is merged over these.
-    * ``tunable`` — documentation of the parameters the UPSTREAM script accepts
-      on its command line, as ``{name: {"default": ..., "type": ...}}``. The
-      ``default`` here is the upstream argparse default, NOT necessarily what a
-      wrapper run uses.
-    * ``effective`` — ``tunable`` defaults overlaid with ``defaults``: the value
-      each knob really takes when you pass no ``params``.
+    Returns
+    -------
+    dict
+        ``{"method", "variant", "defaults", "tunable", "effective",
+        "fixed_in_script", "upstream_knobs", "upstream_url"}`` where:
 
-    An **empty** ``tunable`` means the upstream script exposes no hyperparameters
-    on its command line. Because this project never modifies method scripts,
-    such a method cannot be tuned through the wrapper - but it is not
-    parameterless, so two further keys say what it actually does:
+        * ``defaults`` - parameters the package emits on every run. Override
+          them with ``run(..., params={...})``; the override is merged over
+          these.
+        * ``tunable`` - documentation of the parameters the UPSTREAM script
+          accepts on its command line, as ``{name: {"default": ..., "type":
+          ...}}``. The ``default`` here is the upstream argparse default, NOT
+          necessarily what a wrapper run uses.
+        * ``effective`` - ``tunable`` defaults overlaid with ``defaults``: the
+          value each knob really takes when you pass no ``params``.
+        * ``fixed_in_script`` - the values the script pins, each with the
+          ``file:line`` that pins it.
+        * ``upstream_knobs`` - what the wrapped library documents (with its
+          own defaults), unreachable without editing the script.
 
-    * ``fixed_in_script`` — the values the script pins, each with the
-      ``file:line`` that pins it.
-    * ``upstream_knobs`` — what the wrapped library documents (with its own
-      defaults), unreachable without editing the script.
+        An **empty** ``tunable`` means the upstream script exposes no
+        hyperparameters on its command line. Because this project never
+        modifies method scripts, such a method cannot be tuned through the
+        wrapper - but it is not parameterless, which is what the last two keys
+        say (both empty for methods outside the upstream audit).
 
-    Both are empty for methods outside the upstream audit.
-
-    ``category``/``modalities`` select the variant, exactly like ``run``
-    (``category`` is validated; ``modalities`` accepts ``protein`` for ``adt``).
-    They may be omitted when the method has only one variant.
+    Raises
+    ------
+    KeyError
+        Unknown method, a declared stub, or no variant for ``category`` /
+        ``modalities``.
+    ValueError
+        Several variants fit (:class:`AmbiguousVariantError`, which also
+        derives from ``KeyError`` for older callers); the message spells out
+        the call that selects one, e.g. ``params_for('Matilda', 'vertical',
+        ['rna', 'adt'])``.
     """
     s = registry.get(method)
     registry.check_category(category)
     modalities = registry.normalize_modalities(modalities)
     if not s.variants:
         raise KeyError(f"{method}: no variants (declared stub); nothing to tune")
+
+    def _example(v):
+        return (f"params_for({method!r}, {v.when.get('category')!r}, "
+                f"{list(v.when.get('modalities', []))})")
+
+    ds_dir = None
+    if dataset is not None:
+        from . import config
+        root = data_path if data_path is not None else config.DEFAULT.data_path
+        ds_dir = Path(os.path.abspath(os.fspath(root))) / dataset
+
+    def _by_folder(cands):
+        """The single candidate the dataset folder satisfies, else None."""
+        if ds_dir is None or not ds_dir.is_dir():
+            return None
+        ok = [x for x in cands if _resolve._variant_satisfiable(x, ds_dir, s.id)]
+        return ok[0] if len(ok) == 1 else None
+
     if category is None and modalities is None:
         if len(s.variants) > 1:
-            raise KeyError(
-                f"{method} has {len(s.variants)} variants - pass category (and modalities "
-                f"if that is still ambiguous); available: {[_variant_key(v) for v in s.variants]}")
-        v = s.variants[0]
+            v = _by_folder(s.variants)
+            if v is None:
+                raise AmbiguousVariantError(
+                    f"{method} has {len(s.variants)} variants - pass category and "
+                    f"modalities, e.g. {_example(s.variants[0])}; available: "
+                    f"{[_variant_key(x) for x in s.variants]}")
+        else:
+            v = s.variants[0]
     elif modalities is None:
         # category alone is enough whenever it selects exactly one variant. This is
         # the ONLY way to reach a data_dir variant (scBridge, the spatial methods),
@@ -395,20 +473,37 @@ def params_for(method: str, category: str | None = None,
                 f"{method}: no {category!r} variant; available: "
                 f"{[_variant_key(x) for x in s.variants]}")
         if len(cands) > 1:
-            raise KeyError(
-                f"{method} has {len(cands)} {category!r} variants - also pass modalities; "
-                f"available: {[_variant_key(x) for x in cands]}")
-        v = cands[0]
+            v = _by_folder(cands)
+            if v is None:
+                raise AmbiguousVariantError(
+                    f"{method} has {len(cands)} {category!r} variants - also pass "
+                    f"modalities, e.g. {_example(cands[0])}; available: "
+                    f"{[_variant_key(x) for x in cands]}")
+        else:
+            v = cands[0]
     elif category is None:
+        from .engine.schema import modality_family
+        want = {modality_family(m) for m in modalities}
         cands = [x for x in s.variants
                  if set(x.when.get("modalities", [])) == set(modalities)]
-        if len(cands) != 1:
+        if not cands:
+            cands = [x for x in s.variants
+                     if {modality_family(m) for m in x.when.get("modalities", [])} == want]
+        if not cands:
             raise KeyError(
-                f"{method}: modalities {sorted(modalities)} match {len(cands)} variants - "
-                f"also pass category; available: {[_variant_key(x) for x in s.variants]}")
-        v = cands[0]
+                f"{method}: no variant takes modalities {sorted(modalities)}; "
+                f"available: {[_variant_key(x) for x in s.variants]}")
+        if len(cands) > 1:
+            v = _by_folder(cands)
+            if v is None:
+                raise AmbiguousVariantError(
+                    f"{method}: modalities {sorted(modalities)} match {len(cands)} "
+                    f"variants - also pass category, e.g. {_example(cands[0])}; "
+                    f"available: {[_variant_key(x) for x in cands]}")
+        else:
+            v = cands[0]
     else:
-        v = s.select(category, set(modalities))
+        v = s.select(category, set(modalities), loose=True)
     up = upstream.knobs_for(s.id)
     return {"method": s.id, "variant": _variant_key(v),
             "defaults": dict(v.params), "tunable": dict(v.tunable),
@@ -448,31 +543,57 @@ def _format_entry(tag: str, ref: dict, fmt: str) -> str:
     return line
 
 
-def cite(methods: list[str] | str | None = None, fmt: str = "bibtex") -> str:
+def cite(*method_ids, fmt: str = "bibtex", methods=None) -> str:
     """Citation text for the benchmark and (optionally) the methods you ran.
+
+    Both spellings work: ``cite('Matilda', 'MOFA2')`` (one id per argument,
+    like the CLI ``multibench cite Matilda MOFA2``) and
+    ``cite(['Matilda', 'MOFA2'])`` / ``cite(methods=[...])`` (one list).
 
     Parameters
     ----------
-    methods : None (default) -> the benchmark entry only; ``"all"`` -> every
-        registry method; or a list of method ids (``KeyError`` with a
-        did-you-mean hint for an unknown id). Methods whose DOI is not yet
-        curated in engine/references.yaml are emitted as a ``% <id>: no verified
-        reference; see <repo_url>`` comment (bibtex) / ``<id>: ... <repo_url>``
-        line (text) rather than silently dropped.
-    fmt : ``"bibtex"`` (one ``@article`` per entry) or ``"text"`` (one
-        "Authors. Title. Journal (year). https://doi.org/..." line per entry).
+    *method_ids : method ids, each a ``str`` (``KeyError`` with a did-you-mean
+        hint for an unknown id); or a SINGLE list/tuple of ids; or ``"all"``
+        for every registry method; nothing -> the benchmark entry only. The
+        earlier positional ``cite(methods, fmt)`` form is still accepted.
+    fmt : keyword; ``"bibtex"`` (one ``@article`` per entry) or ``"text"``
+        (one "Authors. Title. Journal (year). https://doi.org/..." line per
+        entry). ``ValueError`` listing the two on anything else.
+    methods : keyword alias of the earlier signature (``cite(methods=[...])``);
+        not combinable with positional ids.
 
-    Returns one string: the benchmark entry first, then one entry per method in
-    the order given. Every DOI in the table was resolved against Crossref.
+    Returns
+    -------
+    str
+        The benchmark entry first, then one entry per method in the order
+        given. Methods whose DOI is not curated in engine/references.yaml are
+        emitted as a ``% <id>: no verified reference; see <repo_url>`` comment
+        (bibtex) / ``<id>: ... <repo_url>`` line (text) rather than silently
+        dropped. Every DOI in the table was resolved against Crossref.
     """
+    args = list(method_ids)
+    # legacy positional form cite(methods, fmt): the 2nd positional is a format
+    if len(args) == 2 and args[1] in _CITE_FORMATS and not isinstance(args[0], str):
+        args, fmt = args[:1], args[1]
+    if methods is not None:
+        if args:
+            raise TypeError("cite(): pass method ids positionally OR as methods=, not both")
+        args = [methods]
     if fmt not in _CITE_FORMATS:
         raise ValueError(f"unknown fmt {fmt!r}; valid: {list(_CITE_FORMATS)}")
-    if methods is None:
+    if not args:
         ids: list[str] = []
-    elif isinstance(methods, str):
-        ids = registry.list_methods() if methods == "all" else [registry.check_method(methods)]
+    elif len(args) == 1 and not isinstance(args[0], str):
+        ids = [] if args[0] is None else [registry.check_method(m) for m in args[0]]
+    elif len(args) == 1 and args[0] == "all":
+        ids = registry.list_methods()
     else:
-        ids = [registry.check_method(m) for m in methods]
+        bad = [a for a in args if not isinstance(a, str)]
+        if bad:
+            raise TypeError(
+                f"cite(): method ids must be strings, got {type(bad[0]).__name__}; "
+                f"pass ONE list (cite(['Matilda', 'MOFA2'])) or one id per argument")
+        ids = [registry.check_method(m) for m in args]
     parts = [_format_entry("scMultiBench", registry.benchmark_reference(), fmt)]
     for m in ids:
         s = registry.get(m)
