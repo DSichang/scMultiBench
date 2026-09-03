@@ -70,7 +70,7 @@ def test_source_column_and_values(result_dir):
     assert abs(_val(pub, "iNMF", "ARI") - 0.198677) < 1e-6
     rr = results.load_results("diagonal", dataset="D28", source="rerun",
                               result_path=result_dir)
-    assert (rr.source == "rerun-0.2.1").all()
+    assert (rr.source == "rerun").all()
     assert rr.method.nunique() == 12
     assert abs(_val(rr, "iNMF", "ARI") - 0.472126) < 1e-6
 
@@ -82,7 +82,7 @@ def test_source_both_concat(result_dir):
     both = results.load_results("diagonal", dataset="D28", source="both", result_path=result_dir)
     assert len(both) == len(pub) + len(rr)
     assert list(both.columns) == COLS
-    assert set(both.source.unique()) == {"published", "rerun-0.2.1"}
+    assert set(both.source.unique()) == {"published", "rerun"}
     # a 7-column frame (one source at a time) still plots
     from matplotlib.figure import Figure
     assert isinstance(mtb.plot.bubble(rr), Figure)
@@ -177,7 +177,7 @@ def test_result_path_single_csv(tmp_path, result_dir):
     assert set(back.method) == set(five.method)
     # a round-trip of a 7-col frame keeps its own provenance
     rr.to_csv(f, index=False)
-    assert (results.load_results(result_path=f).source == "rerun-0.2.1").all()
+    assert (results.load_results(result_path=f).source == "rerun").all()
     # not a long CSV -> ValueError naming what is missing
     pd.DataFrame({"Value": [1.0]}, index=["ARI"]).to_csv(tmp_path / "wide.csv")
     with pytest.raises(ValueError, match=r"missing column\(s\) \['metric', 'value', 'method'\]"):
@@ -199,7 +199,7 @@ def test_mosaic_rerun_loads(result_dir):
         results.load_results("mosaic", source="published", result_path=result_dir)
     # 'both' on mosaic = rerun only, no error
     b = results.load_results("mosaic", source="both", result_path=result_dir)
-    assert set(b.source) == {"rerun-0.2.1"}
+    assert set(b.source) == {"rerun"}
 
 
 def test_category_none_unions_everything(result_dir):
@@ -243,13 +243,13 @@ def test_concat_to_csv_reload_keeps_provenance(tmp_path, result_dir):
     back = results.load_results(result_path=f)            # default keeps every row
     assert len(back) == len(rr) + 2
     assert back.clustering.notna().all() and back.source.notna().all()
-    assert set(back.source) == {"rerun-0.2.1", "user"}
+    assert set(back.source) == {"rerun", "user"}
     user = results.load_results(result_path=f, source="user")
     assert set(user.method) == {"MyMethod"} and len(user) == 2
     rerun = results.load_results(result_path=f, source="rerun")   # prefix match
-    assert set(rerun.source) == {"rerun-0.2.1"} and "MyMethod" not in set(rerun.method)
+    assert set(rerun.source) == {"rerun"} and "MyMethod" not in set(rerun.method)
     assert len(results.load_results(result_path=f, source="both")) == len(back)
-    with pytest.raises(ValueError, match=r"source 'bogus' not in .*present: \['rerun-0.2.1', 'user'\]"):
+    with pytest.raises(ValueError, match=r"source 'bogus' not in .*present: \['rerun', 'user'\]"):
         results.load_results(result_path=f, source="bogus")
     # the directory branch still validates against the fixed vocabulary
     with pytest.raises(ValueError, match="unknown source 'user'"):
@@ -340,3 +340,84 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir):
     # the CSV rows come first, the appended ids after them in natural order
     tail = cat.dataset.tolist()[-9:]
     assert tail == ["D11s", "D24", "D28s", "D45s", "D52s", "SD7", "SD8", "SD9", "SD10"]
+
+
+# ---------------------------------------------------------------------------
+# re-test round 3: plain 'rerun' provenance, one-method tables, fetchable()
+# ---------------------------------------------------------------------------
+def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path):
+    """Two of three re-testers filtered df[df.source == 'rerun'] and got an
+    empty frame: the column carried the file stamp 'rerun-0.2.1'. The column
+    now holds exactly 'published' | 'rerun' | 'user'; the stamp lives in
+    frame.attrs['rerun_version']."""
+    rr = _quiet_rerun("vertical", dataset="D11", source="rerun", result_path=result_dir)
+    assert set(rr.source) == {"rerun"}
+    assert rr.attrs["rerun_version"] == "0.2.1"
+    assert len(rr[rr.source == "rerun"]) == len(rr)
+    both = _quiet_rerun("cross", dataset="D52", source="both", result_path=result_dir)
+    assert set(both.source) == {"published", "rerun"}
+    assert both.attrs["rerun_version"] == "0.2.1"
+    # published-only frames carry the key too, as None
+    pub = results.load_results("diagonal", dataset="D28", result_path=result_dir)
+    assert set(pub.source) == {"published"} and pub.attrs["rerun_version"] is None
+    # results_coverage reports the same stamp and plain 'rerun' rows
+    cov = mtb.results_coverage("cross", result_path=result_dir)
+    assert set(cov.source) == {"published", "rerun"} and cov.attrs["rerun_version"] == "0.2.1"
+    # a user file: the column keeps whatever it carries, an old stamp is
+    # still matched by source='rerun' (prefix) and parsed into attrs
+    old = rr.assign(source="rerun-0.1.0")
+    f = tmp_path / "old.csv"
+    pd.concat([old, mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]),
+                                "MyMethod", "D11", "vertical")]).to_csv(f, index=False)
+    back = results.load_results(result_path=f, source="rerun")
+    assert set(back.source) == {"rerun-0.1.0"} and back.attrs["rerun_version"] == "0.1.0"
+    assert set(results.load_results(result_path=f, source="user").method) == {"MyMethod"}
+    # a rerun frame without a stamp (plain 'rerun' written by this version)
+    rr.to_csv(f, index=False)
+    back = results.load_results(result_path=f, source="rerun")
+    assert set(back.source) == {"rerun"} and back.attrs["rerun_version"] is None
+    # the DegenerateRerunWarning keeps naming the full stamp
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(rerun-0.2.1 ARI"):
+        results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
+
+
+def test_single_method_table_warns_when_other_source_has_more(result_dir):
+    """The instructor got a silent 1-method cross/D52 table under the default
+    source='published' (the CLI warns, the API did not)."""
+    with pytest.warns(UserWarning, match=r"only one method \(scMoMaT\) in the published table "
+                                         r"for cross/D52; ranks and Overall bars are not "
+                                         r"meaningful with a single method") as rec:
+        df = results.load_results("cross", dataset="D52", result_path=result_dir)
+    assert set(df.method) == {"scMoMaT"}          # a warning, never an error
+    msgs = [str(w.message) for w in rec if "only one method" in str(w.message)]
+    assert len(msgs) == 1
+    assert "the rerun tables hold 8 methods for it" in msgs[0]
+    assert "pass source='rerun' (or 'both')" in msgs[0]
+    # source='rerun' / 'both' for the same selection are quiet; so is a
+    # published selection with >= 2 methods and a coverage scan
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        warnings.simplefilter("ignore", DegenerateRerunWarning)
+        results.load_results("cross", dataset="D52", source="rerun", result_path=result_dir)
+        results.load_results("cross", dataset="D52", source="both", result_path=result_dir)
+        results.load_results("cross", dataset="D53", result_path=result_dir)
+        results.load_results("cross", result_path=result_dir)
+        mtb.results_coverage("cross", result_path=result_dir)
+        # the source the user asked for is the ONLY one with rows: no warning
+        # (D54 has a single published method and no re-run sweep)
+        results.load_results("cross", dataset="D54", result_path=result_dir)
+
+
+def test_fetchable_lists_the_release_assets(result_dir):
+    from multibench.data.fetch import AVAILABLE      # mtb.data.fetch is the function
+    ids = results.fetchable()
+    assert isinstance(ids, list) and ids == sorted(AVAILABLE, key=mtb.catalog._dataset_sort_key)
+    assert "D11" in ids and "D12" not in ids
+    # the two vocabularies overlap but are DIFFERENT (D46 downloads and has no
+    # stored results; D12 has published tables and no download) - which is
+    # exactly why they are two functions; the docstring says which is which
+    have = set(mtb.available_datasets(source="both", result_path=result_dir))
+    assert set(ids) & have and set(ids) != have
+    assert "D46" in ids and "D46" not in have and "D12" in have and "D12" not in ids
+    doc = mtb.available_datasets.__doc__
+    assert "STORED RESULTS" in doc and "fetch" in doc and "NOT the datasets that can be downloaded" in doc

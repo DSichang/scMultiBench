@@ -194,8 +194,11 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         (bars). Anything else -> ``ValueError``.
     require_complete : bool, keyword-only
         With ``aggregate="summary"``: keep only methods present in EVERY
-        dataset of the frame (``ValueError`` if that leaves nothing). Default
-        ``False`` keeps all methods and warns when the matrix is incomplete.
+        dataset of the frame (``ValueError`` if that leaves nothing). The
+        drop is never silent: one ``UserWarning`` names each dropped method
+        and the datasets it lacks (``"require_complete=True dropped 1
+        method(s) ...: MyRandom (missing D52s)"``). Default ``False`` keeps
+        all methods and warns when the matrix is incomplete.
     overall : {"rank", "mean_overall"}, keyword-only
         Formula for the per-family Overall under ``aggregate="summary"``
         (see :data:`multibench.plot.style.OVERALL_DOC`). Default ``"rank"``
@@ -300,6 +303,20 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
                     f"({', '.join(map(str, parts))}); coverage: "
                     f"{cov.to_dict()}")
             if len(keep) < len(cov):
+                # the drop is what the caller asked for; the NAMES are not
+                # something to hide (the method a student just added is the
+                # one most likely to be on a single dataset)
+                dropped = cov[cov < n].sort_values()
+                lacks = {m: [ds for ds, mat in parts.items() if m not in mat.index]
+                         for m in dropped.index}
+                warnings.warn(
+                    f"require_complete=True dropped {len(dropped)} method(s) "
+                    f"not present on all {n} datasets ({', '.join(map(str, parts))}): "
+                    + ", ".join(f"{m} (missing {', '.join(map(str, lacks[m]))})"
+                                for m in dropped.index)
+                    + "; pass require_complete=False to keep them (a missing "
+                    "dataset then scores rank 0 under overall='rank').",
+                    UserWarning, stacklevel=2)
                 df = df[df["method"].isin(keep)]
                 parts = style.per_dataset_ranks(df)
                 cov = style.coverage(parts)
@@ -846,8 +863,10 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         does not know. Default ``True``.
     require_complete : bool
         With ``aggregate="summary"``: restrict to methods present in EVERY
-        dataset instead of warning about the incomplete matrix; raises
-        ``ValueError`` if no method is complete. Default ``False``.
+        dataset instead of warning about the incomplete matrix; a
+        ``UserWarning`` names each dropped method and the datasets it lacks,
+        and ``ValueError`` is raised if no method is complete. Default
+        ``False``.
     na : {"warn", "skip", "raise"}
         How to report ``n/a`` cells (a method lacking a metric). Under
         ``aggregate="dataset"`` the family Overall averages the metrics the

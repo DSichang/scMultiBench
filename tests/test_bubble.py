@@ -263,10 +263,22 @@ def test_summary_warns_on_incomplete_matrix():
 def test_summary_require_complete_restricts_and_raises():
     long = _three(datasets=("DS1", "DS2"))
     long = long[~((long.method == "C") & (long.dataset == "DS2"))]
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
+    # the drop is kept, but never silent: ONE warning names the dropped
+    # method(s) and the dataset(s) each lacks (re-test round 3: a student's
+    # own method on one dataset vanished from the notebook's summary figure)
+    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method\(s\) not "
+                                         r"present on all 2 datasets \(DS1, DS2\): "
+                                         r"C \(missing DS2\)") as rec:
         tbl = bubble.build_table(long, aggregate="summary", require_complete=True)
     assert set(tbl.methods) == {"A", "B"}
+    assert len([w for w in rec if "require_complete=True dropped" in str(w.message)]) == 1
+    assert "pass require_complete=False to keep them" in str(rec[0].message)
+    # a complete frame stays silent under require_complete=True
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        full = bubble.build_table(_three(datasets=("DS1", "DS2")), aggregate="summary",
+                                  require_complete=True)
+    assert set(full.methods) == {"A", "B", "C"}
     only_partial = long[((long.method == "A") & (long.dataset == "DS1"))
                         | ((long.method == "B") & (long.dataset == "DS2"))]
     with pytest.raises(ValueError, match="no method has results on all 2 datasets"):
