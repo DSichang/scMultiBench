@@ -68,6 +68,8 @@ INSTALL_CELLS = [
 """import importlib.util, sys
 if importlib.util.find_spec("multibench") is None:
     !{sys.executable} -m pip -q install "multibench-sc>=0.3"   # registry, stored tables, env lockfiles and references ship in the wheel - no clone needed
+    if importlib.util.find_spec("multibench") is None:        # PyPI behind the docs? take the same code straight from GitHub
+        !{sys.executable} -m pip -q install "git+https://github.com/DSichang/scMultiBench.git"
 else:
     print("multibench already installed")""",
 ]
