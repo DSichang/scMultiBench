@@ -72,7 +72,15 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     # the nothing-runnable error (built from `reason`) is shorter too
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "cross", methods=["SPIRAL"], out_dir="/tmp/unused", verbose=False)
-    assert "/media/disk2" not in str(e.value) and "benchmark-host-only" in str(e.value)
+    # On the benchmark host SPIRAL's absolute script EXISTS, so the block is
+    # about the dataset, not the script, and naming the path is right there;
+    # everywhere else the collapsed host-only reason must replace the path.
+    from pathlib import Path as _P
+    from multibench.engine import registry as _reg
+    _script = _P(_reg.get("SPIRAL").variants[0].entrypoint)
+    if not _script.exists():
+        assert "/media/disk2" not in str(e.value) and "benchmark-host-only" in str(e.value)
+    assert "SPIRAL" in str(e.value)
 
 
 def test_scan_and_plan_docs_name_the_four_columns():
