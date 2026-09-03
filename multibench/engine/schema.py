@@ -7,6 +7,20 @@ from pathlib import PurePath
 #: values of ``MethodSpec.availability`` (see that property)
 AVAILABILITY = ("public", "benchmark-host-only")
 
+
+class AmbiguousVariantError(ValueError, KeyError):
+    """A method has several variants that satisfy the selection and the caller
+    must say which one (``category=`` / ``modalities=``).
+
+    It is a ``ValueError`` - the package reserves ``KeyError`` for unknown ids
+    (a typo in a method name) - but it still derives from ``KeyError`` so code
+    written against the earlier ``params_for`` / ``inputs_for`` contract keeps
+    catching it. ``str(exc)`` is the plain message (no ``KeyError`` quoting).
+    """
+
+    def __str__(self) -> str:
+        return str(self.args[0]) if self.args else ""
+
 # Roles that are not modalities: passed through verbatim by the runner and
 # never counted when deriving what a variant consumes. (Mirrors runner._AUX_ROLES;
 # kept here so the data model does not import the runner.)
@@ -37,6 +51,26 @@ def base_modality(role: str) -> str:
             return prefix
     if role and role[-1].isdigit():
         return role[:-1]
+    return role
+
+
+def modality_family(role: str) -> str:
+    """Collapse the ATAC representation roles onto their base token.
+
+    ``atac_gas`` / ``atac_peak`` -> ``atac``; ``atac_gas2`` -> ``atac2`` (the
+    batch digit is kept, so mosaic variants stay distinct); every other token
+    (``rna``, ``adt1``, ``atac``, ``atac3``) is returned unchanged. This is the
+    equivalence ``inputs_for`` / ``params_for`` use so that a caller may say
+    ``modalities=['rna', 'atac']`` for a variant declared as
+    ``[rna, atac_gas]`` - the ATAC file on disk is the same ``atac.h5`` either
+    way, and the representation the method wants is ``method_info(m)['atac']``,
+    not the role name.
+    """
+    for rep in ("atac_gas", "atac_peak"):
+        if role == rep:
+            return "atac"
+        if role.startswith(rep) and role[len(rep):].isdigit():
+            return "atac" + role[len(rep):]
     return role
 
 
@@ -119,9 +153,38 @@ class Variant:
 
     @property
     def modality_types(self) -> set[str]:
-        """Base modality types (``rna``/``adt``/``atac``) this variant consumes."""
-        return {base_modality(r) for r in self.roles()
-                if r not in _NON_MODALITY_ROLES and not is_label_role(r)}
+        """Base modality types (``rna``/``adt``/``atac``) this variant consumes.
+
+        Derived from the input roles, plus the ``const`` bare filenames on the
+        ``source_data`` / ``target_data`` roles: scBridge takes the dataset
+        DIRECTORY and names its matrices ``rna.h5`` / ``atac_gas.h5`` as
+        constants, so its only resolved role is ``data_dir`` and the role-based
+        answer alone would be empty (mirrors :attr:`consumes_atac`).
+        """
+        out = {base_modality(r) for r in self.roles()
+               if r not in _NON_MODALITY_ROLES and not is_label_role(r)}
+        for a in self.args:
+            if a.const and a.role in ("source_data", "target_data"):
+                stem = PurePath(str(a.const)).stem
+                if stem and not is_label_role(stem):
+                    out.add(base_modality(stem))
+        return out
+
+    @property
+    def takes_data_dir(self) -> bool:
+        """True when this variant is fed a DIRECTORY (a ``data_dir`` role) -
+        the spatial-registration methods and scBridge - rather than one file
+        per modality. Such variants declare ``when.modalities: []``."""
+        return any(a.role == "data_dir" for a in self.args)
+
+    @property
+    def modalities_unknown(self) -> bool:
+        """True when nothing in the declaration says which modalities this
+        variant consumes: it takes a directory and no bare filename names a
+        matrix (SPIRAL/GPSA/PASTE/PASTE2, whose slices are ``.h5ad`` files).
+        ``find_methods(modalities=...)`` keeps such variants and warns rather
+        than silently dropping them."""
+        return self.takes_data_dir and not self.modality_types
 
     @property
     def consumes_atac(self) -> bool:
@@ -146,8 +209,13 @@ class Variant:
 class MethodSpec:
     id: str
     language: str
-    categories: list[str]
-    tasks: list[str]
+    # Categories this method is WIRED for. Left empty by registry.load() and
+    # derived in __post_init__ from the variants' `when.category` (methods.yaml
+    # may not carry a hand `categories:` key: Multigrate/totalVI/sciPENN drifted
+    # from their variants, so list_methods(category=) disagreed with scan/
+    # find_methods). A value passed explicitly (tests, ad-hoc specs) is kept.
+    categories: list[str] = field(default_factory=list)
+    tasks: list[str] = field(default_factory=list)
     # ATAC representation the UPSTREAM method expects: "peak" | "gene_activity"
     # | None. This is deliberately an EXPLICIT key, not derived from role names:
     # moETM/scMM/iPOLNG declare role `atac_gas` (a resolver alias for atac.h5)
@@ -164,6 +232,18 @@ class MethodSpec:
     # curated provenance (engine/references.yaml): repo_url, version, summary,
     # reference {doi, title, authors, journal, year}
     reference: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        if not self.categories:
+            self.categories = self.wired_categories
+
+    @property
+    def wired_categories(self) -> list[str]:
+        """The distinct ``when.category`` of the variants, in declaration order
+        - what ``scan`` / ``run_all`` / ``find_methods`` can actually dispatch.
+        ``categories`` equals this for every registry-loaded spec."""
+        return [c for c in dict.fromkeys(v.when.get("category") for v in self.variants)
+                if c]
 
     @property
     def needs_labels(self) -> bool:
@@ -213,10 +293,51 @@ class MethodSpec:
         return ("benchmark-host-only"
                 if any(not v.is_public for v in self.variants) else "public")
 
-    def select(self, category: str, modalities: set[str]) -> Variant:
+    def select(self, category: str, modalities: set[str], *,
+               loose: bool = False) -> Variant:
+        """The variant declared for ``(category, modalities)``.
+
+        Parameters
+        ----------
+        category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``.
+        modalities : the variant's modality tokens as a set (``set()`` for the
+            ``data_dir`` variants).
+        loose : keyword-only, default ``False`` (exact token match, as before).
+            ``True`` additionally accepts the ATAC representation roles under
+            their base name - ``{'rna', 'atac'}`` selects a variant declared
+            ``[rna, atac_gas]`` or ``[rna, atac_peak]`` (see
+            :func:`modality_family`) - when exactly ONE variant of the category
+            matches that way.
+
+        Returns
+        -------
+        Variant
+
+        Raises
+        ------
+        KeyError
+            No variant matches (the message lists the declared
+            ``(category, modalities)`` pairs).
+        AmbiguousVariantError
+            ``loose=True`` and several variants match under the family rule
+            (e.g. one ``atac_gas`` and one ``atac_peak`` variant in the same
+            category) - pass the exact role tokens.
+        """
         for v in self.variants:
             if v.matches(category, modalities):
                 return v
+        if loose:
+            want = {modality_family(m) for m in modalities}
+            hits = [v for v in self.variants
+                    if v.when.get("category") == category
+                    and {modality_family(m) for m in v.when.get("modalities", [])} == want]
+            if len(hits) == 1:
+                return hits[0]
+            if len(hits) > 1:
+                raise AmbiguousVariantError(
+                    f"{self.id}: modalities={sorted(modalities)} match {len(hits)} "
+                    f"{category!r} variants: {[v.when.get('modalities') for v in hits]}; "
+                    f"pass the exact role tokens (method_info({self.id!r})['supports'])")
         raise KeyError(
             f"{self.id}: no variant for category={category!r} modalities={sorted(modalities)}; "
             f"available: {[(v.when.get('category'), v.when.get('modalities')) for v in self.variants]}"
