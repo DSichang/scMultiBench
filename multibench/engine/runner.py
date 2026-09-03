@@ -1,6 +1,8 @@
 """Run a method variant: build cmd, wrap via cmd_template, exec in a workdir, load output."""
 from __future__ import annotations
 
+import glob
+import json
 import os
 import shlex
 import subprocess
@@ -26,7 +28,9 @@ class RunResult:
         dims x cells rather than cells x dims - ``evaluate`` re-orients a raw array
         against the label count for you.
     extra : ``{filename: loaded object}`` for any ``extra_outputs`` the variant
-        declares (e.g. scMoMaT's UMAP embedding alongside its KNN graph).
+        declares (e.g. scMoMaT's UMAP embedding alongside its KNN graph); for
+        a registration method the ``slices_manifest.json`` dict as well
+        (:func:`stage_slices`).
     stdout, stderr : captured output of the method process. ``stderr`` is where a
         method's own diagnostics go and is the first place to look when a run
         produced a file but the numbers look wrong.
@@ -58,6 +62,74 @@ def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
 # and are excluded from the modality set used for variant selection.
 _AUX_ROLES = {"data_dir", "source_data", "target_data", "cty", "source_cty", "target_cty",
               "out_dir"}
+
+
+#: name of the per-run file mapping ``aligned_slice_<i>`` back to its source slice
+SLICES_MANIFEST = "slices_manifest.json"
+
+
+def stage_slices(data_dir, staged_dir) -> dict:
+    """Stage a directory of ``*.h5ad`` slices as sorted, zero-padded symlinks.
+
+    The registration scripts (PASTE, PASTE2, GPSA's driver, SPIRAL) load
+    ``glob.glob(data_dir + "*.h5ad")`` and write ``aligned_slice_<i>.h5ad``
+    for the ``i``-th file that glob returned - directory order, which is
+    filesystem-dependent and sorted nowhere by the scripts - and PASTE strips
+    every ``obs`` column at load, so nothing in an output slice says which
+    input it came from. Staging gives the scripts a directory whose names sort
+    as ``00_<name>.h5ad, 01_<name>.h5ad, ...`` (the numbering the user chose,
+    as ``sorted()`` orders it) and records the order the glob actually
+    returns in that directory - the order the script will load - so the
+    manifest is the ground truth even on a filesystem whose listing is not
+    sorted. The ``NN_`` prefix is unique per slice, which also satisfies
+    SPIRAL's unique-leading-token rule.
+
+    Parameters
+    ----------
+    data_dir : path
+        The user's slice directory (only ``*.h5ad`` regular files are staged).
+    staged_dir : path
+        Where the symlinks go (created; stale ``*.h5ad`` symlinks from an
+        earlier run in the same directory are removed first).
+
+    Returns
+    -------
+    dict
+        The manifest: ``data_dir``, ``staged_dir`` (both with a trailing
+        separator), ``n_slices``, ``order`` (how the list was ordered) and
+        ``slices`` - one ``{index, output, staged, source}`` per slice in
+        load order, ``output`` being ``aligned_slice_<index>.h5ad``.
+    """
+    src = Path(os.path.abspath(os.fspath(data_dir)))
+    dst = Path(os.path.abspath(os.fspath(staged_dir)))
+    files = sorted(p for p in src.glob("*.h5ad") if p.is_file())
+    dst.mkdir(parents=True, exist_ok=True)
+    for old in dst.glob("*.h5ad"):
+        if old.is_symlink():
+            old.unlink()
+    width = max(2, len(str(max(len(files) - 1, 0))))
+    source_of: dict[str, str] = {}
+    for i, f in enumerate(files):
+        link = dst / f"{i:0{width}d}_{f.name}"
+        os.symlink(str(f), str(link))
+        source_of[link.name] = str(f)
+    # the exact call the upstream scripts make, in the directory they will
+    # make it in: os.scandir order, whatever the filesystem's is
+    seen = [Path(p).name for p in glob.glob(os.path.join(str(dst), "") + "*.h5ad")]
+    slices = [{"index": i, "output": f"aligned_slice_{i}.h5ad", "staged": name,
+               "source": source_of[name]} for i, name in enumerate(seen)]
+    return {
+        "data_dir": os.path.join(str(src), ""),
+        "staged_dir": os.path.join(str(dst), ""),
+        "n_slices": len(slices),
+        "order": ("the order glob.glob(data_dir + '*.h5ad') returned in staged_dir - "
+                  "the order the script loads the slices, so aligned_slice_<index>.h5ad "
+                  "is the registration of 'source'"
+                  + ("" if seen == sorted(seen) else
+                     " (NOTE: this filesystem does not list the staged names in sorted "
+                     "order; trust this list, not the NN_ prefixes)")),
+        "slices": slices,
+    }
 
 
 def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
@@ -118,8 +190,13 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         trailing separator) before the argv is built, because the method
         runs with ``cwd=out_dir`` - see :func:`normalize_paths`.
     out_dir : directory the method writes into (created; ``inputs/`` holds the
-        canonical .h5 copies when ``convert=True``). Made absolute the same
-        way; ``RunResult.out_dir`` is that absolute path.
+        canonical .h5 copies when ``convert=True``, or - for a registration
+        method fed a ``data_dir`` of slices - the sorted, zero-padded symlinks
+        the script is pointed at, with ``slices_manifest.json`` beside it
+        mapping ``aligned_slice_<i>.h5ad`` back to the source slice, see
+        :func:`stage_slices`; a ``data_dir`` method that stages nothing gets
+        no ``inputs/`` at all). Made absolute the same way; ``RunResult.out_dir``
+        is that absolute path.
     params : overrides merged over the variant's default hyperparameters.
     convert : convert modality inputs to the canonical .h5 layout (default True).
     cmd_template : wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``.
@@ -169,7 +246,16 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     workdir = out
     workdir.mkdir(parents=True, exist_ok=True)
     inputs_dir = workdir / "inputs"
-    inputs_dir.mkdir(parents=True, exist_ok=True)
+    # File-role methods keep their inputs/ (canonical copies land there); a
+    # directory-fed method used to get an EMPTY inputs/ - now it holds the
+    # staged slice links, or is not created at all (scBridge).
+    if any(k not in _AUX_ROLES and "cty" not in k and "label" not in k for k in inputs):
+        inputs_dir.mkdir(parents=True, exist_ok=True)
+    manifest = None
+    if "data_dir" in inputs and variant.output.kind == "coords":
+        manifest = stage_slices(inputs["data_dir"], inputs_dir)
+        (workdir / SLICES_MANIFEST).write_text(json.dumps(manifest, indent=1) + "\n")
+        inputs = {**inputs, "data_dir": manifest["staged_dir"]}
 
     # normalize modality inputs to canonical .h5 inside a dedicated inputs dir.
     # For the two ATAC-representation roles the role token is passed as the
@@ -284,5 +370,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
 
     primary = io.load_output(out, variant.output)
     extra = {o.file: io.load_output(out, o) for o in variant.extra_outputs}
+    if manifest is not None:
+        extra[SLICES_MANIFEST] = manifest
     return RunResult(method=method, out_dir=out, cmd=cmd, output=primary, extra=extra,
                      stdout=proc.stdout, stderr=proc.stderr)
