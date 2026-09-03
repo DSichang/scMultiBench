@@ -545,10 +545,11 @@ is **aligned spatial coordinates**, not an embedding - their status reports
 `RUN_OK_NO_EMBEDDING` and clustering metrics genuinely do not apply. They take
 a directory of per-slice `.h5ad` files (`.X` + `obsm['spatial']`); the SPATIAL
 REGISTRATION block of `describe_layout("cross")` above is the contract, and
-`scan` checks the directory for it. `PASTE` and `PASTE2` are public; `SPIRAL`
-and `GPSA` are `availability="benchmark-host-only"` - their scripts are not
-published, so `scan` reports them `benchmark-host-only: script not published`
-and `mtb.find_methods(task="registration", available=True)` omits them."""
+`scan` checks the directory for it. `PASTE`, `PASTE2` and `GPSA` are public
+(GPSA through the package driver `engine/drivers/run_gpsa.py`); `SPIRAL` is
+`availability="benchmark-host-only"` - its script is not published, so `scan`
+reports it `benchmark-host-only: script not published` and
+`mtb.find_methods(task="registration", available=True)` omits it."""
     if cat == "mosaic":
         trouble_extra = """
 ### Why is UINMF not in mosaic?
