@@ -15,10 +15,13 @@ method.
 from __future__ import annotations
 
 import functools
+import json as _json
+import platform as _platform
 import shutil
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -29,11 +32,125 @@ __all__ = [
     # inspection
     "recipe", "default_env_name", "own_env_name", "group_for", "groups", "plan", "status",
     "doctor", "required_envs", "installed_envs", "lockfile",
+    "host_platform_problem", "packed_sizes", "DIFFICULTY", "VERIFIED_STAR",
     # recipe view (the declared, hand-written recipe — for transparency)
     "create_commands", "environment_yml", "group_create_commands",
     # provisioning (lockfile-based: build the REAL envs run() uses)
     "create", "create_group", "create_env", "create_all", "freeze",
 ]
+
+
+# --- host platform --------------------------------------------------------
+def host_platform_problem() -> str | None:
+    """Why method environments cannot be built on THIS host, or ``None``.
+
+    Every method env is a linux-64 conda env: the packed archives are
+    conda-pack snapshots of linux-64 envs and the lockfiles pin linux-only
+    packages (``libgcc-ng`` ...), so on macOS or Windows a build either fails
+    on ELF binaries after a multi-GB download or dies in the solver. Nothing
+    enforced that before 0.3.1: the CLI happily started the download.
+
+    Returns
+    -------
+    str or None
+        ``None`` when ``sys.platform == "linux"`` (WSL counts as Linux);
+        otherwise one sentence naming the requirement and this host, e.g.
+        ``"method environments are linux-64 conda envs (packed archives +
+        lockfiles); this host is darwin/arm64"``. Module-level so tests can
+        monkeypatch it.
+    """
+    if sys.platform == "linux":
+        return None
+    return (f"method environments are linux-64 conda envs (packed archives + "
+            f"lockfiles); this host is {sys.platform}/{_platform.machine() or '?'}")
+
+
+def _require_linux(force: bool) -> None:
+    """Raise ``RuntimeError`` before any download or build on a non-Linux host.
+
+    ``force=True`` skips the check (``--force`` on the CLI) for people who
+    know what they are doing - a Linux container on a Mac, say.
+    """
+    problem = None if force else host_platform_problem()
+    if problem:
+        raise RuntimeError(
+            f"{problem} - method envs cannot be built here. Run methods on a "
+            f"Linux host (the registry, stored results, scan's file gate, "
+            f"evaluate and plot all work on this machine); pass force=True / "
+            f"--force to try anyway.")
+
+
+#: What the ``difficulty`` tag of ``env_specs.yaml`` (shown by ``env status``
+#: and :func:`status`) means. The tag describes how hard the env is to BUILD
+#: from its recipe, not how well the method works.
+DIFFICULTY = {
+    "easy": "modern python/torch stack, builds from the lockfile without surprises",
+    "old-scvi": "pins an old scvi-tools (<0.20) / old anndata - needs its own env, "
+                "cannot share the modern torch env",
+    "old-tensorflow": "pins TensorFlow 1.x/2.4 - needs its own env with matching CUDA",
+    "R": "an R env (Seurat/MOFA2/rliger ...); R packages installed by "
+         "install.packages() are restored by the env's post-install script",
+    "verified": "env built from the lockfile on a fresh machine and the method "
+                "ran end-to-end on its reference dataset",
+    "blocked-script": "the upstream script itself cannot run unmodified (see "
+                      "method_info(m)['notes']); the env builds but the method is "
+                      "not runnable through the wrapper",
+    "unknown": "no env_spec recipe declared for the method",
+}
+
+#: The ``*`` suffix ``env status`` appends to the difficulty tag.
+VERIFIED_STAR = ("* = verified_working: the env ran the method end-to-end on "
+                 "its reference dataset")
+
+
+_SIZES_JSON = Path(__file__).resolve().parent / "packed_sizes.json"
+
+
+@functools.lru_cache(maxsize=1)
+def packed_sizes() -> dict:
+    """Byte sizes of the published packed archives, per env.
+
+    Read from the shipped ``engine/packed_sizes.json`` (a snapshot written by
+    ``tools/packed_sizes.py``, which HEAD-requests every URL in
+    ``packed_urls.json``; no request is made at runtime - offline nodes and
+    Zenodo rate limits make that a bad idea). Keys starting with ``_`` are
+    metadata, not envs.
+
+    Returns
+    -------
+    dict
+        ``{env: {"archive_bytes": int | None, "unpacked_bytes": int | None}}``;
+        ``None`` means "not measured yet". ``{}`` when the file is absent or
+        unreadable.
+    """
+    if not _SIZES_JSON.is_file():
+        return {}
+    try:
+        data = _json.loads(_SIZES_JSON.read_text())
+    except Exception:  # noqa: BLE001 - a broken table means "sizes unknown"
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items()
+            if not str(k).startswith("_") and isinstance(v, dict)}
+
+
+def _gb(n) -> str:
+    """``3215645570`` -> ``"3.2 GB"``; ``None`` / non-numeric -> ``"?"``."""
+    try:
+        if n is None:
+            return "?"
+        return f"{float(n) / 1e9:.1f} GB"
+    except (TypeError, ValueError):
+        return "?"
+
+
+def _as_frame(rows: list[dict], as_frame: bool):
+    """``rows`` as given, or as a ``pandas.DataFrame`` when ``as_frame``."""
+    if not as_frame:
+        return rows
+    import pandas as pd
+    return pd.DataFrame(rows)
 
 _GROUPS_YAML = Path(__file__).resolve().parent / "env_groups.yaml"
 # Committed per-env lockfiles (`conda env export --no-builds`). These capture the
@@ -245,11 +362,35 @@ def _check_methods(methods):
         registry.check_method(m)
 
 
-def plan(category: str | None = None, methods: list[str] | None = None) -> list[dict]:
+def plan(category: str | None = None, methods: list[str] | None = None, *,
+         as_frame: bool = False):
     """Which envs to build to cover a set of methods (e.g. all for a category).
 
-    Returns [{env, shared, methods}] — one entry per distinct env, listing the
-    methods it serves. Build these (few) envs instead of one per method.
+    One entry per distinct conda env, listing the methods it serves - build
+    these (few) envs instead of one per method. ``multibench env plan`` prints
+    it with the archive / on-disk sizes from :func:`packed_sizes`.
+
+    Parameters
+    ----------
+    category : str, optional
+        Restrict to the methods wired for this integration category
+        (``ValueError`` listing the four on a typo); default: every method.
+    methods : list of str, optional
+        Explicit method ids instead of ``category`` (``KeyError`` with a
+        did-you-mean hint on a typo).
+    as_frame : bool, keyword-only
+        ``True`` returns a ``pandas.DataFrame`` with the same columns
+        instead of the list of dicts (the default, kept for compatibility).
+
+    Returns
+    -------
+    list of dict or pandas.DataFrame
+        ``[{env, shared, methods, availability}]``, largest env first.
+        ``shared`` - the env serves several methods (an ``env_groups.yaml``
+        group); ``availability`` - ``'public'``, or ``'benchmark-host-only'``
+        when EVERY method the env serves needs a script that is not
+        published (SPIRAL): the env builds, the method still cannot run off
+        the benchmark host.
     """
     _check_methods(methods)
     if methods is None:
@@ -258,7 +399,7 @@ def plan(category: str | None = None, methods: list[str] | None = None) -> list[
     buckets: dict[str, list[str]] = {}
     for m in methods:
         buckets.setdefault(group_for(m), []).append(m)
-    return [
+    rows = [
         {"env": env, "shared": env in shared, "methods": sorted(ms),
          # 'benchmark-host-only' when every method the env serves needs a
          # script that is not published (SPIRAL, GPSA): the env builds, the
@@ -268,6 +409,7 @@ def plan(category: str | None = None, methods: list[str] | None = None) -> list[
                           else "public")}
         for env, ms in sorted(buckets.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     ]
+    return _as_frame(rows, as_frame)
 
 
 # --- env existence / status -----------------------------------------------
@@ -319,14 +461,31 @@ def _envs_dir(conda_bin: str) -> Path | None:
     return None
 
 
-def install_packed(env: str, conda: str | None = None) -> bool:
+def install_packed(env: str, conda: str | None = None, *, force: bool = False) -> bool:
     """Provision ``env`` from a prebuilt conda-pack archive, if one is published.
 
-    Downloads ``<PACKED_URL>/<env>.tar.gz``, unpacks it into the conda envs
-    directory and runs the archive's own ``bin/conda-unpack`` to rewrite the
-    embedded prefixes. Returns True on success, False when no archive exists
-    for this env (the caller falls back to the lockfile build). This turns a
-    10-30 minute solve-and-download into a download-bound couple of minutes.
+    Downloads the archive named in ``packed_urls.json`` (else
+    ``<PACKED_URL>/<env>.tar.gz``), unpacks it into the conda envs directory
+    and runs the archive's own ``bin/conda-unpack`` to rewrite the embedded
+    prefixes. This turns a 10-30 minute solve-and-download into a
+    download-bound couple of minutes.
+
+    Parameters
+    ----------
+    env : str
+        The real conda env name (:func:`group_for`), e.g. ``'matilda'``.
+    conda : str, optional
+        conda/mamba executable; default: mamba if found, else conda.
+    force : bool, keyword-only
+        The archives are linux-64; on any other host ``RuntimeError`` is
+        raised BEFORE the download unless ``force=True``.
+
+    Returns
+    -------
+    bool
+        ``True`` on success (or when the env already exists), ``False`` when
+        no archive exists for this env or the unpack failed - the caller
+        falls back to the lockfile build.
     """
     import subprocess
     import tarfile
@@ -334,6 +493,7 @@ def install_packed(env: str, conda: str | None = None) -> bool:
     import urllib.error
     import urllib.request
 
+    _require_linux(force)                 # fail closed before any bytes land
     bin_ = _conda_bin() if conda is None else conda
     if shutil.which(bin_) is None:
         return False
@@ -416,13 +576,29 @@ def installed_envs(conda: str | None = None) -> list[str]:
     return names
 
 
-def status(conda: str | None = None) -> list[dict]:
-    """Per-method install status: ``{method, env, group, own_env, exists,
-    difficulty, verified_working, has_recipe}``.
+def status(conda: str | None = None, *, as_frame: bool = False):
+    """Per-method install status: is the method's env on this machine?
 
-    ``env`` and ``group`` are both the env the package uses for the method
-    (:func:`default_env_name` == :func:`group_for`); ``own_env`` is the
-    singleton ``scmb_<method>`` name, reported installed too when present.
+    Parameters
+    ----------
+    conda : str, optional
+        conda executable used to list the installed envs.
+    as_frame : bool, keyword-only
+        ``True`` returns a ``pandas.DataFrame`` instead of the list of dicts.
+
+    Returns
+    -------
+    list of dict or pandas.DataFrame
+        One entry per registry method: ``{method, env, group, own_env,
+        exists, difficulty, verified_working, has_recipe}``. ``env`` and
+        ``group`` are both the env the package uses for the method
+        (:func:`default_env_name` == :func:`group_for`); ``own_env`` is the
+        singleton ``scmb_<method>`` name, reported installed too when
+        present. ``difficulty`` is one of the :data:`DIFFICULTY` tags
+        (``easy`` / ``old-scvi`` / ``old-tensorflow`` / ``R`` / ``verified``
+        / ``blocked-script``; ``unknown`` without a recipe) and
+        ``verified_working`` is the ``*`` of ``env status``
+        (:data:`VERIFIED_STAR`).
     """
     have = set(installed_envs(conda))
     out = []
@@ -437,7 +613,7 @@ def status(conda: str | None = None) -> list[dict]:
             "verified_working": bool(r.get("verified_working", False)),
             "has_recipe": bool(r),
         })
-    return out
+    return _as_frame(out, as_frame)
 
 
 # --- lockfile-based provisioning (the reproducible install path) -----------
@@ -535,11 +711,30 @@ def post_install(env_name: str):
 
 
 def create_env(env_name: str, conda: str | None = None,
-               dry_run: bool = True) -> list[list[str]]:
+               dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
     """Create one real env from its committed lockfile (the reproducible path).
 
     Builds the env under its real name (the one run() uses), so 'what you build'
-    == 'what runs'. Raises if no lockfile was captured for it.
+    == 'what runs'.
+
+    Parameters
+    ----------
+    env_name : str
+        The env to build (``env_locks/<env_name>.yml`` must exist -
+        ``FileNotFoundError`` otherwise, naming ``freeze`` as the fix).
+    conda : str, optional
+        conda executable; default ``conda``.
+    dry_run : bool
+        ``True`` (default) only returns the commands; ``False`` runs them.
+    force : bool, keyword-only
+        Lockfiles are linux-64; with ``dry_run=False`` on another host
+        ``RuntimeError`` is raised before anything runs unless ``force``.
+
+    Returns
+    -------
+    list of list of str
+        The argv commands (conda phase, pip ``--no-deps`` phase, post-install
+        script when committed), whether or not they were executed.
     """
     lock = lockfile(env_name)
     if lock is None:
@@ -564,20 +759,44 @@ def create_env(env_name: str, conda: str | None = None,
     if post.is_file():
         cmds.append([conda, "run", "-n", env_name, "bash", str(post)])
     if not dry_run:
+        _require_linux(force)
         _run_all(cmds)
     return cmds
 
 
 def create_all(category: str | None = None, methods: list[str] | None = None,
-               conda: str | None = None, dry_run: bool = True) -> list[dict]:
+               conda: str | None = None, dry_run: bool = True, *,
+               force: bool = False) -> list[dict]:
     """Provision EVERY env needed to run the methods, from lockfiles.
 
-    One-shot 'set up a fresh machine'. Returns one entry per distinct env:
-    {env, methods, exists, has_lock, cmds}. With dry_run=False, builds the envs
-    that are MISSING and have a lockfile (existing envs are skipped; envs without
-    a lockfile are reported, not built).
+    One-shot 'set up a fresh machine' (``multibench env install --run``).
+    With ``dry_run=False`` the envs that are MISSING and have a lockfile are
+    built; existing envs are skipped and envs without a lockfile are
+    reported, not built.
+
+    Parameters
+    ----------
+    category : str, optional
+        Restrict to the methods wired for this category; default: all.
+    methods : list of str, optional
+        Explicit method ids (``KeyError`` with a did-you-mean hint on a typo).
+    conda : str, optional
+        conda executable; default ``conda``.
+    dry_run : bool
+        ``True`` (default) plans only - works on every host.
+    force : bool, keyword-only
+        Lockfiles are linux-64; ``dry_run=False`` on macOS/Windows raises
+        ``RuntimeError`` BEFORE any build unless ``force=True``.
+
+    Returns
+    -------
+    list of dict
+        One entry per distinct env, largest first: ``{env, methods, exists,
+        has_lock, cmds}`` (``cmds`` = the commands run, or that would run).
     """
     _check_methods(methods)
+    if not dry_run:
+        _require_linux(force)             # before conda is even asked anything
     have = set(installed_envs(conda))
     if methods is None:
         methods = registry.list_methods(category=category)
@@ -599,11 +818,33 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
 
 
 def doctor(category: str | None = None, methods: list[str] | None = None,
-           conda: str | None = None) -> list[dict]:
-    """Preflight: per env needed to run the methods, is it present + is a lockfile
-    available to build it. [{env, methods, exists, has_lock}], coverage-sorted.
+           conda: str | None = None, *, as_frame: bool = False):
+    """Report, per conda env the selected methods need, whether it exists here and whether a lockfile can build it.
 
-    A fresh machine sees exists=False everywhere; run create_all(dry_run=False).
+    This is the preflight behind ``multibench env doctor`` and the ``env_ok``
+    gate of :func:`multibench.scan`. A fresh machine sees ``exists=False``
+    everywhere; ``multibench env install --run`` (Python:
+    :func:`create_all` ``(dry_run=False)``) builds the missing ones - on
+    Linux only, see :func:`host_platform_problem`.
+
+    Parameters
+    ----------
+    category : str, optional
+        Restrict to the methods wired for this category; default: all.
+    methods : list of str, optional
+        Explicit method ids (``KeyError`` with a did-you-mean hint on a typo).
+    conda : str, optional
+        conda executable used to list the installed envs.
+    as_frame : bool, keyword-only
+        ``True`` returns a ``pandas.DataFrame`` instead of the list of dicts.
+
+    Returns
+    -------
+    list of dict or pandas.DataFrame
+        ``[{env, methods, exists, has_lock}]``, largest env first. ``exists``
+        - the env is installed (the ``[x]`` of ``env doctor``); ``has_lock``
+        - ``env_locks/<env>.yml`` is shipped, so ``env install --run`` can
+        build it (``[L]``); neither (``[!]``) means the recipe path only.
     """
     _check_methods(methods)
     have = set(installed_envs(conda))
@@ -612,9 +853,10 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     by_env: dict[str, list[str]] = {}
     for m in methods:
         by_env.setdefault(group_for(m), []).append(m)
-    return [{"env": env, "methods": sorted(ms), "exists": env in have,
+    rows = [{"env": env, "methods": sorted(ms), "exists": env in have,
              "has_lock": lockfile(env) is not None}
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
+    return _as_frame(rows, as_frame)
 
 
 
@@ -808,34 +1050,72 @@ def freeze(env_name: str, conda: str | None = None,
 
 # --- recipe/lockfile provisioning entry points -----------------------------
 def create(method: str, env_name: str | None = None, conda: str | None = None,
-           dry_run: bool = True) -> list[list[str]]:
-    """Provision the env a method runs in. dry_run=True (default) returns the
-    commands without running.
+           dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
+    """Provision the env a method runs in.
 
     Prefers the committed lockfile for the REAL env run() uses (group_for), so
     'what you build' == 'what runs'. Falls back to the hand-written recipe
     (its own scmb_<method> env) only when no lockfile was captured.
+
+    Parameters
+    ----------
+    method : str
+        Registry method id.
+    env_name : str, optional
+        Build into this env instead of :func:`default_env_name`.
+    conda : str, optional
+        conda executable.
+    dry_run : bool
+        ``True`` (default) returns the commands without running them.
+    force : bool, keyword-only
+        Build even though this host is not linux-64 (``dry_run=False`` on
+        macOS/Windows otherwise raises ``RuntimeError`` first).
+
+    Returns
+    -------
+    list of list of str
+        The argv commands.
     """
     target = env_name or group_for(method)
     if lockfile(target) is not None:
-        return create_env(target, conda=conda, dry_run=dry_run)
+        return create_env(target, conda=conda, dry_run=dry_run, force=force)
     cmds = create_commands(method, env_name=env_name, conda=conda)
     if not dry_run:
+        _require_linux(force)
         _run_all(cmds)
     return cmds
 
 
 def create_group(group: str, env_name: str | None = None, conda: str | None = None,
-                 dry_run: bool = True) -> list[list[str]]:
-    """Provision a shared group env. dry_run=True (default) returns the commands.
+                 dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
+    """Provision a shared group env.
 
     Prefers the committed lockfile for the env; falls back to the hand recipe.
+
+    Parameters
+    ----------
+    group : str
+        Group env name (see :func:`groups`); ``KeyError`` when unknown.
+    env_name : str, optional
+        Build into this env instead of ``group``.
+    conda : str, optional
+        conda executable.
+    dry_run : bool
+        ``True`` (default) returns the commands without running them.
+    force : bool, keyword-only
+        Build even though this host is not linux-64.
+
+    Returns
+    -------
+    list of list of str
+        The argv commands.
     """
     target = env_name or group
     if lockfile(target) is not None:
-        return create_env(target, conda=conda, dry_run=dry_run)
+        return create_env(target, conda=conda, dry_run=dry_run, force=force)
     cmds = group_create_commands(group, env_name=env_name, conda=conda)
     if not dry_run:
+        _require_linux(force)
         _run_all(cmds)
     return cmds
 
