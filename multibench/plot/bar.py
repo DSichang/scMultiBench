@@ -41,33 +41,73 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
 
     Parameters
     ----------
-    long_df : tidy frame (``metric, value, method, dataset, category``) - the same
-        frame :meth:`BatchResult.long` produces. Concatenate several datasets'
-        frames to summarise across them.
-    metrics : restrict to these metric names. Ignored when ``group`` is given.
-    group : ``"clustering"`` or ``"batch"`` - shorthand for that metric family, so
-        you can produce the benchmark's two summary panels.
-    top : keep only the N best methods.
-    title : figure title (default names the number of datasets).
-    cmap : matplotlib colormap for the bars (``"Greens"`` is forced for
+    long_df : pandas.DataFrame
+        Tidy frame (``metric, value, method, dataset, category``) - the same
+        frame :func:`multibench.load_results`, :func:`multibench.to_long` and
+        the ``BatchResult.long`` property produce. Concatenate several
+        datasets' frames to summarise across them. An empty frame raises
+        ``ValueError`` saying so (``load_results`` may have returned nothing).
+    metrics : list of str, optional
+        Restrict to these metric codes (case/alias tolerant, ``"ari"`` ->
+        ``"ARI"``; an unknown code raises ``ValueError`` listing the metrics
+        present). Ignored when ``group`` is given.
+    group : {"clustering", "batch"}, optional
+        Shorthand for that metric family, so you can produce the benchmark's
+        two summary panels.
+    top : int, optional
+        Keep only the N best methods.
+    title : str, optional
+        Figure title (default names the number of datasets).
+    cmap : str
+        Matplotlib colormap for the bars (``"Greens"`` is forced for
         ``group="batch"`` to match the paper's family colours).
-    show_datasets : overlay one dot per dataset behind each bar, so a method that
-        is uniformly good is distinguishable from one that averages well by
+    show_datasets : bool
+        Overlay one dot per dataset behind each bar, so a method that is
+        uniformly good is distinguishable from one that averages well by
         winning on a single dataset (only meaningful under
         ``overall="mean_overall"``; the dots are omitted under ``"rank"``).
-    save : path to write the figure to (``fig.savefig``).
+    save : str, optional
+        Path to write the figure to (``fig.savefig``).
 {OVERALL_DOC}
         The default here is ``"mean_overall"``; ``plot.bubble`` defaults to
         ``"rank"``. Pass the same value to both to get the same ordering.
 
-    Returns a matplotlib ``Figure``. Under ``overall="mean_overall"`` whiskers
-    are the SD of the per-dataset scores (methods present in a single dataset
-    get none - there is no spread to show) and the x label names the single
-    dataset or the formula. Because the score is rank-based, it is only
-    meaningful relative to the other methods in the same figure.
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Under ``overall="mean_overall"`` whiskers are the SD of the
+        per-dataset scores (methods present in a single dataset get none -
+        there is no spread to show) and the x label names the single dataset
+        or the formula. Because the score is rank-based, it is only
+        meaningful relative to the other methods in the same figure. A
+        method lacking a metric is compared on the metrics it has (the
+        within-dataset rank matrix skips NaN cells).
+
+    Raises
+    ------
+    ValueError
+        An empty or column-less frame, an unknown ``metrics`` code, a bad
+        ``group`` / ``overall``, or ``group="batch"`` on a frame without
+        batch metrics.
     """
     import matplotlib.pyplot as plt
+    from .bubble import _resolve
+    from ..data import catalog
 
+    need = {"method", "metric", "value"}
+    have = set(getattr(long_df, "columns", []))
+    if not need.issubset(have):
+        raise ValueError(
+            f"bar() needs a tidy long frame with columns ['method', 'metric', "
+            f"'value']; missing {sorted(need - have)}")
+    if len(long_df) == 0:
+        raise ValueError(
+            "long_df is empty (0 rows) - nothing to plot; load_results(...) may "
+            "have returned nothing, see its UserWarning (e.g. a method with no "
+            "rows under source='published' - try source='rerun')")
+    if metrics is not None and not group:
+        metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
+                           "metric", catalog.canonical_metric)
     if group:
         fam = {"clustering": CLUSTERING_METRICS, "batch": BATCH_METRICS}
         if group not in fam:
