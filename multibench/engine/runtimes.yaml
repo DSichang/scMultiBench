@@ -7,11 +7,18 @@
 # actually took. Use it to size run_all(timeout=...), and still add headroom.
 #
 # tier:  fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h
+# Merged from three sources, keeping the LONGEST time per (method, dataset):
+# the earlier hand-kept rows (source: manual), notebooks/results/summary_D*.csv
+# run_sec rounded up (source: summary_csv) and files/final_verification.tsv
+# wall_s (source: verification). cells is null where no run recorded the count.
+# tests/test_runtime_table.py pins these invariants - update all three
+# sources together rather than editing a number here.
 Cobolt:
   observed:
   - cells: 32151
     dataset: D45
     sec: 3637
+    source: manual
   tier: slow
   worst_sec: 3637
 Concerto:
@@ -19,9 +26,11 @@ Concerto:
   - cells: 2864
     dataset: D11
     sec: 1388
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 8798
+    source: manual
   tier: very_slow
   worst_sec: 8798
 Conos:
@@ -29,6 +38,7 @@ Conos:
   - cells: 11014
     dataset: D28
     sec: 713
+    source: manual
   tier: medium
   worst_sec: 713
 GLUE:
@@ -36,20 +46,27 @@ GLUE:
   - cells: 10717
     dataset: D27
     sec: 9031
+    source: manual
   tier: very_slow
   worst_sec: 9031
 GPSA:
   observed:
   - cells: 1272
     dataset: D63
-    sec: 1
-  tier: fast
-  worst_sec: 1
+    sec: 3729
+    source: verification
+  tier: slow
+  worst_sec: 3729
 MIRA:
   observed:
+  - cells: null
+    dataset: D12
+    sec: 4755
+    source: verification
   - cells: 10717
     dataset: D15
     sec: 7168
+    source: manual
   tier: slow
   worst_sec: 7168
 MOFA2:
@@ -57,6 +74,7 @@ MOFA2:
   - cells: 2864
     dataset: D11
     sec: 869
+    source: manual
   tier: medium
   worst_sec: 869
 Matilda:
@@ -64,6 +82,7 @@ Matilda:
   - cells: 2864
     dataset: D11
     sec: 190
+    source: manual
   tier: fast
   worst_sec: 190
 MultiMAP:
@@ -71,6 +90,7 @@ MultiMAP:
   - cells: 11014
     dataset: D28
     sec: 2041
+    source: manual
   tier: slow
   worst_sec: 2041
 MultiVI:
@@ -78,37 +98,43 @@ MultiVI:
   - cells: 32151
     dataset: D45
     sec: 12042
+    source: manual
   tier: very_slow
   worst_sec: 12042
 Multigrate:
   observed:
-  - cells: 32151
-    dataset: D45
-    sec: 10369
   - cells: 2864
     dataset: D11
     sec: 1277
+    source: manual
+  - cells: 32151
+    dataset: D45
+    sec: 10369
+    source: manual
   tier: very_slow
   worst_sec: 10369
 PASTE:
   observed:
   - cells: 1272
     dataset: D63
-    sec: 1
-  tier: fast
-  worst_sec: 1
+    sec: 569
+    source: verification
+  tier: medium
+  worst_sec: 569
 PASTE2:
   observed:
   - cells: 1272
     dataset: D63
-    sec: 1
-  tier: fast
-  worst_sec: 1
+    sec: 2735
+    source: verification
+  tier: slow
+  worst_sec: 2735
 Portal:
   observed:
   - cells: 11014
     dataset: D28
     sec: 401
+    source: manual
   tier: medium
   worst_sec: 401
 SCALEX:
@@ -116,6 +142,7 @@ SCALEX:
   - cells: 11014
     dataset: D28
     sec: 2233
+    source: manual
   tier: slow
   worst_sec: 2233
 SMILE:
@@ -123,20 +150,23 @@ SMILE:
   - cells: 32151
     dataset: D45
     sec: 1916
+    source: manual
   tier: slow
   worst_sec: 1916
 SPIRAL:
   observed:
   - cells: 1272
     dataset: D63
-    sec: 1
-  tier: fast
-  worst_sec: 1
+    sec: 3093
+    source: verification
+  tier: slow
+  worst_sec: 3093
 Seurat_WNN:
   observed:
   - cells: 2864
     dataset: D11
     sec: 330
+    source: manual
   tier: medium
   worst_sec: 330
 Seurat_v3:
@@ -144,6 +174,7 @@ Seurat_v3:
   - cells: 11014
     dataset: D28
     sec: 3365
+    source: manual
   tier: slow
   worst_sec: 3365
 Seurat_v5:
@@ -151,23 +182,31 @@ Seurat_v5:
   - cells: 10717
     dataset: D27
     sec: 15778
+    source: manual
   tier: very_slow
   worst_sec: 15778
 StabMap:
   observed:
+  - cells: null
+    dataset: D46
+    sec: 209
+    source: verification
   - cells: 23478
     dataset: D52
     sec: 69
+    source: manual
   tier: fast
-  worst_sec: 69
+  worst_sec: 209
 UINMF:
   observed:
   - cells: 2864
     dataset: D11
     sec: 262
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 63
+    source: manual
   tier: fast
   worst_sec: 262
 UnitedNet:
@@ -175,6 +214,7 @@ UnitedNet:
   - cells: 10717
     dataset: D27
     sec: 1565
+    source: manual
   tier: medium
   worst_sec: 1565
 VIMCCA:
@@ -182,6 +222,7 @@ VIMCCA:
   - cells: 2864
     dataset: D11
     sec: 549
+    source: manual
   tier: medium
   worst_sec: 549
 VIPCCA:
@@ -189,48 +230,59 @@ VIPCCA:
   - cells: 11014
     dataset: D28
     sec: 335
+    source: manual
   tier: medium
   worst_sec: 335
 iNMF:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 121
+    sec: 136
+    source: verification
   tier: fast
-  worst_sec: 121
+  worst_sec: 136
 iPOLNG:
   observed:
+  - cells: null
+    dataset: D12
+    sec: 2098
+    source: verification
   - cells: 10717
     dataset: D27
     sec: 357
-  tier: medium
-  worst_sec: 357
+    source: manual
+  tier: slow
+  worst_sec: 2098
 moETM:
   observed:
   - cells: 2864
     dataset: D11
     sec: 429
+    source: manual
   tier: medium
   worst_sec: 429
 online_iNMF:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 81
+    sec: 99
+    source: verification
   tier: fast
-  worst_sec: 81
+  worst_sec: 99
 scBridge:
   observed:
   - cells: 11014
     dataset: D28
-    sec: 1
-  tier: fast
-  worst_sec: 1
+    sec: 964
+    source: summary_csv
+  tier: medium
+  worst_sec: 964
 scJoint:
   observed:
   - cells: 11014
     dataset: D28
     sec: 209
+    source: manual
   tier: fast
   worst_sec: 209
 scMDC:
@@ -238,9 +290,11 @@ scMDC:
   - cells: 2864
     dataset: D11
     sec: 889
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 2702
+    source: manual
   tier: slow
   worst_sec: 2702
 scMM:
@@ -248,9 +302,11 @@ scMM:
   - cells: 2864
     dataset: D11
     sec: 235
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 628
+    source: manual
   tier: medium
   worst_sec: 628
 scMSI:
@@ -258,16 +314,27 @@ scMSI:
   - cells: 2864
     dataset: D11
     sec: 8164
+    source: manual
   tier: very_slow
   worst_sec: 8164
+scMVP:
+  observed:
+  - cells: null
+    dataset: D13
+    sec: 2424
+    source: verification
+  tier: slow
+  worst_sec: 2424
 scMoMaT:
   observed:
   - cells: 2864
     dataset: D11
     sec: 412
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 1023
+    source: manual
   tier: medium
   worst_sec: 1023
 sciCAN:
@@ -275,6 +342,7 @@ sciCAN:
   - cells: 11014
     dataset: D28
     sec: 15735
+    source: manual
   tier: very_slow
   worst_sec: 15735
 sciPENN:
@@ -282,9 +350,11 @@ sciPENN:
   - cells: 2864
     dataset: D11
     sec: 144
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 65
+    source: manual
   tier: fast
   worst_sec: 144
 totalVI:
@@ -292,9 +362,11 @@ totalVI:
   - cells: 2864
     dataset: D11
     sec: 2097
+    source: manual
   - cells: 23478
     dataset: D52
     sec: 2840
+    source: manual
   tier: slow
   worst_sec: 2840
 uniPort:
@@ -302,5 +374,6 @@ uniPort:
   - cells: 11014
     dataset: D28
     sec: 4133
+    source: manual
   tier: slow
   worst_sec: 4133
