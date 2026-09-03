@@ -166,6 +166,7 @@ EXPORT_DEMO = {
 rng = np.random.default_rng(0)
 demo = ad.AnnData(X=sp.random(120, 40, density=0.2, random_state=0, format="csr"))  # RNA, cells x genes (sparse is fine)
 demo.obsm["protein"] = rng.poisson(3.0, size=(120, 12)).astype(float)             # ADT, cells x proteins
+demo.uns["protein_names"] = [f"CD{i}" for i in range(12)]                        # names travel with the obsm key
 demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 120)
 demo.obs_names = [f"cell{i}" for i in range(120)]; demo.var_names = [f"gene{i}" for i in range(40)]
 
@@ -202,7 +203,9 @@ def batch(n):
     a.obs["celltype"] = rng.choice(["T", "B", "NK"], n); return a
 b1, b2, b3 = batch(100), batch(80), batch(60)                                  # three batches, D46's pattern:
 b1.obsm["protein"] = rng.poisson(3.0, size=(100, 12)).astype(float)           #   batch 1 = RNA + ADT
+b1.uns["protein_names"] = [f"CD{i}" for i in range(12)]
 b2.obsm["peaks"]   = rng.poisson(0.3, size=(80, 50)).astype(float)            #   batch 2 = RNA + ATAC, batch 3 = RNA only
+b2.uns["peaks_names"] = [f"chr1:{100 * i}-{100 * i + 50}" for i in range(50)]
 
 folder = os.path.join(tempfile.mkdtemp(), "MYMOSAIC"); os.makedirs(folder)
 for i, a in enumerate([b1, b2, b3], start=1):
@@ -218,6 +221,7 @@ rng = np.random.default_rng(0)
 demo = ad.AnnData(X=rng.poisson(1.0, size=(150, 40)).astype(float))            # RNA, cells x genes
 demo.var_names = [f"gene{i}" for i in range(40)]
 demo.obsm["protein"] = rng.poisson(3.0, size=(150, 12)).astype(float)          # ADT
+demo.uns["protein_names"] = [f"CD{i}" for i in range(12)]
 demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 150)
 demo.obs["batch"]    = rng.choice(["donor1", "donor2", "donor3"], 150)
 

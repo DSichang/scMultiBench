@@ -828,7 +828,7 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, only=None):
             bat = np.asarray(batch)
         grp = "all" if len(set(np.asarray(bat).tolist())) > 1 else "clustering"
         kw = {"only": only} if only is not None else {}
-        return _evaluate(emb, category=category, task=grp, labels=lab,
+        return _evaluate(emb, category=category, task=grp, labels=lab, verbose=False,
                          batch=(bat if grp == "all" else None),
                          clustering=clustering, **kw)
 
@@ -863,7 +863,7 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, only=None):
     for names, lab, bat in cands:
         try:
             if sweep_adata is None:      # fall back to a self-contained screen
-                val = _evaluate(emb, category=category, task="clustering",
+                val = _evaluate(emb, category=category, task="clustering", verbose=False,
                                 labels=lab, only={"ARI"})
                 scored.append((float(val["Value"]["ARI"]), names, lab, bat, None))
                 continue
