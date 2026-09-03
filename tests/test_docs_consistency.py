@@ -172,6 +172,13 @@ BANNED_PHRASES = {
     "184 KB": "the wheel is ~1.3 MB and ships the stored tables; state the measured number",
     "2-14 GB": "per-env sizes come from `multibench env plan` (engine/packed_sizes.json), not a hand-written range",
     "45-101 GB": "per-category sizes come from `multibench env plan --category C`, not a hand-written range",
+    # retest after polish round 2: printed-example drift the fresh installer found
+    "raises `EnvironmentError`": "the env preflight raises OSError (EnvironmentError is only its alias): say OSError",
+    "prints the path": "labels_for returns a dict of paths and prints nothing",
+    "# ['PASTE', 'PASTE2']": "find_methods(task='registration', available=True) is ['GPSA', 'PASTE', 'PASTE2']",
+    "rerun-0.2.1": "the source column says 'rerun'; the sweep version is not part of the value",
+    "IMPUTATION_ONLY": "coverage derives from method_info(m)['categories'] / ['tasks'], not a hand-written list",
+    'warnings.filterwarnings("ignore")': "library-specific filters only; multibench's own UserWarnings must stay visible",
 }
 
 
@@ -199,6 +206,33 @@ def test_retired_phrases_absent_from_docs_surfaces(path):
         if "benchmark-host-only" in sentence:
             assert "GPSA" not in sentence, \
                 f"{path.name} pairs GPSA with benchmark-host-only: {sentence.strip()[:160]!r}"
+
+
+def test_printed_examples_match_the_live_package():
+    """The README / quickstart examples the fresh installer re-ran: labels_for
+    returns a dict, runtime_hint carries 'source' inside 'observed', the
+    diagonal rna+atac list includes scBridge, registration is three methods."""
+    import multibench as mtb
+    assert set(mtb.labels_for("D11")) == {"cty"}
+    hint = mtb.runtime_hint("SCALEX")
+    assert hint["tier"] == "slow" and hint["worst_sec"] == 2233
+    assert hint["observed"][0]["source"] == "manual"
+    found = mtb.find_methods(category="diagonal", modalities=["rna", "atac"])
+    assert "scBridge" in found and len(found) == 14
+    assert mtb.find_methods(task="registration", available=True) == ["GPSA", "PASTE", "PASTE2"]
+    readme = (ROOT / "README.md").read_text()
+    assert "mtb.describe_layout(" in readme
+    assert "multibench run --method Matilda --category vertical --input rna=" in readme \
+        and "--dry-run" in readme
+    for path in _docs_md_files():
+        if path.name in ("quickstart.md", "installation.md"):
+            text = path.read_text()
+            assert "mtb.describe_layout(" in text, f"{path.name} must name describe_layout"
+            assert "multibench run --method SCALEX --category diagonal" in text \
+                and "--dry-run" in text, f"{path.name} must show one `multibench run ... --dry-run` line"
+        if path.name == "quickstart.md":
+            assert "'source': 'manual'" in path.read_text()
+            assert "'scBridge'" in path.read_text()
 
 
 def test_host_only_method_set_behind_the_docs_rule():

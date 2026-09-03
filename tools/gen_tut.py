@@ -32,14 +32,49 @@ PAPER_METHODS = {
  "cross":    ["totalVI","scMoMaT","UnitedNet","sciPENN","Concerto","scMDC","StabMap",
               "UINMF","scMM","MOFA2","Multigrate","PASTE","PASTE2","SPIRAL","GPSA"],
 }
-MOSAIC_IMPUTATION_ONLY = ["scMM","moETM","UnitedNet","totalVI","sciPENN"]
 
 
-def env_size_text(category=None, methods=None):
+def stand_in(cat, dataset, methods):
+    """Which stored sweep a run cell falls back to on a host without method
+    environments: ``(dataset, methods)`` for ``stored_sweep`` in the notebook.
+    Read from the live tables at generation time: ``methods`` is kept only when
+    every requested method is in that dataset's sweep (vertical / diagonal /
+    cross), else ``None`` selects the whole sweep (mosaic runs StabMap and
+    scMoMaT on D46, whose layout the D45 sweep does not share)."""
+    import warnings
+    import multibench as mtb
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        stored = set(mtb.load_results(cat, dataset=dataset, source="rerun").method)
+    return dataset, (list(methods) if set(methods) <= stored else None)
+
+
+def published_note(cat, dataset):
+    """One measured sentence on why every ``load_results`` call in a tutorial
+    names its ``source``: the paper's table for the reference dataset vs the
+    package's own sweep, counted from ``results_coverage`` at generation time."""
+    import multibench as mtb
+    cov = mtb.results_coverage(cat)
+    cov = cov[cov.dataset == dataset]
+    n_pub = cov[cov.source == "published"].method.nunique()
+    n_rerun = cov[cov.source.str.startswith("rerun")].method.nunique()
+    if n_pub == 0:
+        return (f"The paper has no scIB tables for {cat} (`source=\"published\"` "
+                f"raises `FileNotFoundError` pointing at `\"rerun\"`), so the "
+                f"package's sweep ({n_rerun} methods on `{dataset}`) is this "
+                f"category's only stored source.")
+    return (f"The paper's table for `{dataset}` holds {n_pub} method"
+            f"{'s' if n_pub != 1 else ''} against {n_rerun} in the package's "
+            f"sweep, so the default `source=\"published\"` would show "
+            f"{n_pub} - every call in this notebook names its source.")
+
+
+def env_size_text(category=None, methods=None, short=False):
     """One phrase describing the conda envs a category / method set needs,
     derived from mtb.env.plan() x mtb.env.packed_sizes() at generation time
     (env count, the download total of the archives measured so far, and the
-    CLI line that prints the per-env sizes) - never a hand-written GB figure."""
+    CLI line that prints the per-env sizes) - never a hand-written GB figure.
+    ``short=True`` keeps only the count and the total, for a code comment."""
     import multibench as mtb
     rows = mtb.env.plan(category=category, methods=methods)
     sizes = mtb.env.packed_sizes()
@@ -49,8 +84,11 @@ def env_size_text(category=None, methods=None):
     flag = f"--category {category}" if category else f"--methods {','.join(methods)}"
     s = f"{n} env{'s' if n != 1 else ''}"
     if known:
-        s += (f", at least {sum(known) / 1e9:.1f} GB to download "
-              f"({len(known)} of {n} archives measured)")
+        s += f", at least {sum(known) / 1e9:.1f} GB to download"
+        if not short:
+            s += f" ({len(known)} of {n} archives measured)"
+    if short:
+        return s
     return s + f"; `multibench env plan {flag}` prints the per-env sizes"
 
 CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
@@ -74,11 +112,22 @@ else:
     print("multibench already installed")""",
 ]
 
+# The "Run all" switch (tests/test_tutorial_runall_safety.py pins it): every
+# download of a method environment - condacolab and `env install` - sits
+# behind INSTALL_ENVS, so the default is safe for thirty people on Colab at
+# once (the packed envs for three methods are a multi-GB download). The size
+# in the comment is measured at generation time, never hand-written.
+FLAG_CELL_TEMPLATE = """# "Run all" switch. False (the default): nothing is downloaded and no method executes -
+# every section runs on any machine, and the run cells fall back to the package's stored sweep.
+# True: on Colab / Linux, provision conda and download the packed environments for the
+# methods this notebook runs ({size}), then run them here for real.
+INSTALL_ENVS = False"""
+
 # Opt-in, only for running methods: Colab ships without conda; this provisions
 # it (the kernel restarts ONCE) - on a machine that already has conda it does
 # nothing. Placed AFTER the pip cell: a package installed before the restart
 # stays importable afterwards.
-CONDA_OPTIN_CELL = """# Colab ships without conda; this provisions it (the kernel restarts ONCE).
+CONDA_OPTIN_CELL = """# Colab ships without conda; with INSTALL_ENVS = True this provisions it (the kernel restarts ONCE).
 # On a machine that already has conda, this cell does nothing.
 import importlib.util, shutil
 
@@ -88,14 +137,33 @@ def _has(mod):
     except ModuleNotFoundError:
         return False
 
-if shutil.which("conda") or shutil.which("mamba"):
+if not INSTALL_ENVS:
+    print("INSTALL_ENVS is False - conda is not provisioned and nothing is downloaded")
+elif shutil.which("conda") or shutil.which("mamba"):
     print("conda available - nothing to do")
 elif _has("google.colab"):
     !pip -q install condacolab
     import condacolab
-    condacolab.install()   # restarts the kernel; afterwards, re-run the setup cell in section 1 and continue here
+    condacolab.install()   # restarts the kernel; afterwards, re-run section 1 (INSTALL_ENVS = True again) and continue here
 else:
     print("no conda found - install it first (mamba recommended); see the installation guide")"""
+
+# The one line a run cell prints on a host without method environments
+# (tests pin the phrase), before standing in the package's own sweep.
+SKIP_LINE = ("no method environment on this host - the run is skipped; "
+             "the stored results below cover it")
+
+# Defined next to its first use: the fallback the run cells take when
+# scan() finds no environment for the requested methods. A BatchResult built
+# from the stored sweep's rows has the same .summary / .plot() as run_all's,
+# so every later cell renders unchanged; status='STORED' says nothing ran.
+STORED_SWEEP_FN = '''def stored_sweep(dataset, methods=None):
+    """The package's own sweep of `dataset` (`load_results(source="rerun")`) as the object
+    `run_all` returns, so `.summary` / `.plot()` work on a host that cannot run the methods."""
+    long = mtb.load_results(CATEGORY, dataset=dataset, source="rerun", methods=methods)
+    recs = [{"method": m, "status": "STORED", "metrics": g.set_index("metric")["value"].to_dict()}
+            for m, g in long.groupby("method")]
+    return mtb.BatchResult(recs, dataset, CATEGORY)'''
 
 SCEN = {
  "vertical": dict(
@@ -310,15 +378,23 @@ reproduces.""")
 method registry, the stored result tables, the env lockfiles and the reference
 metadata. The package alone runs this section, section 3 (`scan`) and sections
 4-5. Running methods (section 2, and `run_all` in section 3) additionally
-needs their conda environments on a **Linux** host - section 2 sets them up;
-on Colab's CPU runtime those two sections are a demo of the calls, not a place
-to benchmark.""")
+needs their conda environments on a **Linux** host. The flag cell decides:
+with `INSTALL_ENVS = False` (the default) **Run all** is safe anywhere -
+nothing is downloaded, and a run cell on a host without the environments
+prints one line and falls back to the package's stored sweep; set it `True`
+on Colab or a Linux machine to download the environments in section 2 and
+run the methods for real.""")
     for cell in INSTALL_CELLS:
         code(cell)
-    code(f'''import warnings; warnings.filterwarnings("ignore")
-%matplotlib inline
+    code(FLAG_CELL_TEMPLATE.format(size=env_size_text(methods=live_methods, short=True)))
+    code(f'''%matplotlib inline
+import warnings
 from pathlib import Path
+import anndata
 import pandas as pd
+for _w in (FutureWarning, DeprecationWarning, pd.errors.PerformanceWarning,
+           anndata.ImplicitModificationWarning):   # library noise only - multibench's own warnings stay visible
+    warnings.filterwarnings("ignore", category=_w)
 pd.set_option("display.max_colwidth", None)   # never truncate a `reason`
 pd.set_option("display.max_columns", None)    # never hide a metric column
 pd.set_option("display.width", 200)
@@ -334,10 +410,11 @@ print("multibench", mtb.__version__)''')
 
 ### Environments - only if you will run methods in this session
 
-Linux + conda; {env_size_text(methods=live_methods)}. On Colab the next cell
-provisions conda and restarts the kernel once: afterwards re-run the setup
-cell in section 1, then continue here. Without the environments, skip to
-section 3's `scan` or to section 4.""")
+Linux + conda; {env_size_text(methods=live_methods)}. Both cells below do
+nothing unless `INSTALL_ENVS = True`. On Colab the first then provisions
+conda and restarts the kernel once: afterwards re-run section 1 (the flag
+included), then continue here. Without the environments, section 3's `scan`
+and sections 4-5 work as they are.""")
     code(CONDA_OPTIN_CELL)
     md(f"""Now the environments for the methods this tutorial runs
 ({', '.join(live_methods)}). `--packed` downloads a prebuilt archive instead
@@ -346,31 +423,50 @@ present. Other tiers are one flag away: `--category {cat}`
 ({env_size_text(category=cat)}), or no flag for the whole benchmark (29 envs;
 `multibench env plan` totals them). Method environments are linux-64 conda
 envs: on macOS / Windows `env install --run` refuses (`--force` overrides),
-which is why the cell checks the platform first.""")
+which is why the cell checks the platform too.""")
     code(f"""import sys
-if sys.platform == "linux":
-    !{{sys.executable}} -m multibench env install --methods {mlist} --packed --run
+if not INSTALL_ENVS:
+    print("INSTALL_ENVS is False - no environment is downloaded (sections 3-5 need none)")
+elif sys.platform != "linux":
+    print("method environments are linux-64 conda envs - skipped on", sys.platform)
 else:
-    print("method environments are linux-64 conda envs - skipped on", sys.platform, "(sections 4-5 need none)")""")
+    !{{sys.executable}} -m multibench env install --methods {mlist} --packed --run""")
 
     # ------------------------------------------------------------- run + plot
     trio = s["own_trio"]
     params_note = f', params={{"{fastm}": {s["live"][1]}}}' if s["live"][1] != "None" else ""
     extra = (f' (on `{live_ds}`, whose layout fits these methods; mosaic layouts '
              f'vary per dataset)' if live_ds != s["ds"] else "")
+    si_ds, si_methods = stand_in(cat, ds, trio)
+    si_args = f'"{si_ds}"' + (f", {si_methods!r}" if si_methods else "")
+    si_what = (f"the same methods from the package's own sweep of `{si_ds}`"
+               if si_methods else f"the package's own sweep of `{si_ds}`")
     md(f"""### One call
 
 One call is the whole pipeline: resolve each method's inputs, run it in its own
 conda env, load the embeddings, score them with scIB metrics. Here
-{', '.join(trio)}{extra}. {s['live'][2]}.""")
-    code(f'''res = mtb.run_all("{live_ds}", CATEGORY,
-                  methods={trio!r}{params_note},
-                  out_dir="/tmp/tutorial_{cat}")
+{', '.join(trio)}{extra}. {s['live'][2]}. The cell first asks `scan` whether
+any of these methods has its environment here; where none does (a laptop,
+Colab with the flag off) it prints one line and stands in {si_what}
+(`load_results(source="rerun")`, the package's re-execution of every wired
+method - the paper's own tables are `source="published"`), so every cell
+below still renders.""")
+    code(f'''{STORED_SWEEP_FN}
+
+check = mtb.scan("{live_ds}", CATEGORY, methods={trio!r})
+if check.env_ok.any():
+    res = mtb.run_all("{live_ds}", CATEGORY,
+                      methods={trio!r}{params_note},
+                      out_dir="/tmp/tutorial_{cat}")
+else:
+    print("{SKIP_LINE}")
+    res = stored_sweep({si_args})
 res.summary''')
     md(f"""`summary` is sorted by method name, whatever order `methods=` listed;
 `emb_shape` is the embedding each method produced and `batch_source` says which
-batch vector the batch metrics used. {s['summary_note']} The result object plots
-itself in the paper's layout:""")
+batch vector the batch metrics used; a stand-in from the stored sweep says
+`STORED` in `status` and leaves the run columns empty. {s['summary_note']} The
+result object plots itself in the paper's layout:""")
     code("""res.plot()""")
     md("""Each circle carries two encodings: its **size is the method's rank** in
 that column (largest = rank 1) and its **colour is the metric's value**, min-max
@@ -403,9 +499,11 @@ peaks - because the wrong one runs to completion and returns a plausible but
 wrong embedding. The shipped label files, as `evaluate` will read them - the
 dict comes back in the benchmark's **cell-stacking order** (`cty`; `cty1, cty2,
 ...` numerically; `rna_cty` before `atac_cty`), so
-`mtb.evaluate(embedding, labels=mtb.labels_for(DATASET))` scores a multi-file
-dataset directly, with each cell's file of origin as its batch; a dict you
-built in any other order must say so with `label_order=[...]`:""")
+`mtb.evaluate(embedding, labels=mtb.labels_for(DATASET), task="all")` scores a
+multi-file dataset directly, with each cell's file of origin as its batch (the
+default `task="clustering"` computes the clustering family only - batch
+metrics need `task="all"` or `"batch"`); a dict you built in any other order
+must say so with `label_order=[...]`:""")
     code("""labels = mtb.labels_for(DATASET)            # {stem: path} in cell-stacking order - what the metrics are scored against
 print({k: Path(v).name for k, v in labels.items()})
 print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")""")
@@ -430,10 +528,16 @@ subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
 sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
 print(f"files_ok {{int(sc.files_ok.sum())}}, env_ok {{int(sc.env_ok.sum())}}, runnable {{int(sc.runnable.sum())}} of {{len(sc)}} method variants")
 sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)''')
-    code(f'''mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
-                   methods={s['own_trio']!r},
-                   out_dir=f"{{DATA_ROOT}}/out_{cat}",
-                   data_path=DATA_ROOT)
+    own_ds, own_methods = stand_in(cat, ds2, s["own_trio"])
+    own_args = f'"{own_ds}"' + (f", {own_methods!r}" if own_methods else "")
+    code(f'''if sc[sc.method.isin({s['own_trio']!r})].env_ok.any():
+    mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
+                       methods={s['own_trio']!r},
+                       out_dir=f"{{DATA_ROOT}}/out_{cat}",
+                       data_path=DATA_ROOT)
+else:
+    print("{SKIP_LINE}")
+    mine = stored_sweep({own_args})   # {own_ds}: the package's own 60% subsample of {own_ds[:-1]}, the construction above
 mine.summary''')
     code("""mine.plot()""")
     md(f"""{s['own_note']} For your real data the only work is producing the
@@ -455,10 +559,8 @@ calls do the rest.""")
 Section 2 ran {n_word}; the package ships the **full sweep** for `{ds}` -
 every wired method at default settings, hours of compute - so the paper's
 figures reproduce from stored results in seconds. `load_results` reads them
-back as the tidy frame `mtb.plot.bubble` takes; `source="rerun"` selects the
-package's own re-execution (the tables behind this notebook), `"published"`
-the paper's tables, and every row says which it came from in its `source`
-column.""")
+back as the tidy frame `mtb.plot.bubble` takes, and every row says in its
+`source` column which sweep it came from. {published_note(cat, ds)}""")
     code(f'''long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")
 print(long.method.nunique(), "methods,", long.source.unique())
 fig = mtb.plot.bubble(long)
@@ -503,12 +605,16 @@ the compact table (method, modalities, runnable, files_ok, env_ok,
 runtime_tier, reason); `--columns all` or `--format csv|tsv|json` gives every
 column, and `multibench run-all ... --dry-run` prints the plan plus the exact
 command line per variant whose inputs resolve - the line to paste into a
-scheduler job.""")
+scheduler job. Below, the rows the **data** admits (`files_ok`), with the
+environment gate next to them: `env_ok` is what this machine has, `env_reason`
+the install line for what it lacks, and `runnable` (both gates) stays empty
+until the environments exist.""")
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
-avail[avail.runnable][["method", "modalities", "env", "output_kind",
-                       "n_tunable", "needs_labels", "runtime_tier"]]""")
-    code("""not_ok = avail[~avail.runnable][["method", "modalities", "files_ok", "env_ok", "reason"]]
-not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
+print(f"files_ok {int(avail.files_ok.sum())}, env_ok {int(avail.env_ok.sum())}, runnable {int(avail.runnable.sum())} of {len(avail)} method variants")
+avail[avail.files_ok][["method", "modalities", "env", "env_ok", "env_reason",
+                       "output_kind", "needs_labels", "runtime_tier"]]""")
+    code("""not_ok = avail[~avail.files_ok][["method", "modalities", "files_reason"]]
+not_ok.head(5) if len(not_ok) else "(every method's inputs resolve on this dataset)"
 """)
     md("""### What each method exposes for tuning
 
@@ -553,22 +659,26 @@ single-batch dataset is correct, not missing data. `kBET` is opt-in
     md(f"""### Coverage of the paper
 
 `scan()` answers "what runs on this dataset"; this answers how many of the
-methods the paper benchmarks for **{cat}** the package wires at all.""")
+methods the paper benchmarks for **{cat}** the package wires at all. For each
+one it does not, the registry's own record is printed - the categories it
+**is** wired for and the tasks (`mtb.list_tasks()` vocabulary) its variants
+are registered under; no variant for this category means the paper scored it
+here through a task the package does not run.""")
     code(f"""PAPER = {PAPER_METHODS!r}
-IMPUTATION_ONLY = {MOSAIC_IMPUTATION_ONLY!r}
 
 paper = PAPER[CATEGORY]
-wired = sorted(m for m in mtb.list_methods()
+registry = set(mtb.list_methods())
+wired = sorted(m for m in registry
                if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
 missing = [m for m in paper if m not in wired]
 print(f"paper benchmarks {{len(paper)}} methods for {{CATEGORY}}; this package wires {{len(wired)}}")
-if missing:
-    print("not wired here:", ", ".join(missing))
-    imp = [m for m in missing if m in IMPUTATION_ONLY]
-    if imp:
-        print("  the paper evaluates these only via IMPUTATION, which is not wired:",
-              ", ".join(imp))
-else:
+for m in missing:
+    if m in registry:
+        info = mtb.method_info(m)
+        print(f"  {{m}}: wired for {{', '.join(info['categories'])}} only (registered tasks: {{', '.join(info['tasks'])}})")
+    else:
+        print(f"  {{m}}: not in the registry")
+if not missing:
     print("full parity with the paper for this category")""")
 
     # -------------------------------------------------------- troubleshooting
