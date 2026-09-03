@@ -7,6 +7,7 @@ Every test here is host-independent: where a verdict depends on which conda
 envs are installed, ``workflow._installed_envs`` is pinned to "none".
 """
 import json
+import os
 import re
 
 import pandas as pd
@@ -200,7 +201,7 @@ def test_command_preview_mirrors_run_builder():
                                     params={"epochs": 5})
     assert argv[:4] == ["conda", "run", "-n", "matilda"] or argv[1:4] == ["run", "-n", "matilda"]
     assert "--epochs" in argv and argv[argv.index("--epochs") + 1] == "5"
-    assert argv[argv.index("--save_path") + 1] == "o/"
+    assert argv[argv.index("--save_path") + 1] == os.path.join(os.path.abspath("o"), "")
     # a custom template is honoured verbatim, like run(cmd_template=)
     argv2 = workflow.command_preview("Matilda", "vertical", inputs=inp, out_dir="o",
                                      cmd_template="srun {cmd}")

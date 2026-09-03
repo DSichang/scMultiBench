@@ -760,7 +760,7 @@ def _cmd_evaluate(args) -> int:
     Default output is the wide ``metric.csv`` shape (index = metric, one
     ``Value`` column). With ``--method`` AND ``--dataset`` (and ``--category``)
     the frame is reshaped with :func:`multibench.to_long` to the tidy
-    ``metric,value,method,dataset,category`` table that ``plot --input`` and
+    ``metric,value,method,dataset,category,clustering,source`` table that ``plot --input`` and
     ``load_results`` speak.
     """
     import multibench
@@ -1235,7 +1235,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="stored table to load: published (the paper's numbers, "
                          "default) or rerun (the package's own re-execution)")
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
-                    help="a long results CSV (metric,value,method,dataset,category) or "
+                    help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "
                          "plot. With --category: concatenated onto the stored table "
                          "(a '# overlay: ...' note on stderr says how many rows came "

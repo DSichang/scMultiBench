@@ -414,7 +414,7 @@ def test_cli_evaluate_npy_only_method_dataset(monkeypatch, tmp_path, capsys):
     assert captured["only"] == ["ARI", "NMI"]
     assert captured["output"] == str(emb)
     df = pd.read_csv(out)
-    assert list(df.columns) == ["metric", "value", "method", "dataset", "category"]
+    assert list(df.columns) == ['metric', 'value', 'method', 'dataset', 'category', 'clustering', 'source']
     assert set(df["method"]) == {"M"} and set(df["dataset"]) == {"D"}
     capsys.readouterr()
     # long mode printed (no --out) has no index column
