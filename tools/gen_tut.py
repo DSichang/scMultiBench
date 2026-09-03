@@ -34,19 +34,49 @@ PAPER_METHODS = {
 }
 MOSAIC_IMPUTATION_ONLY = ["scMM","moETM","UnitedNet","totalVI","sciPENN"]
 
-CAT_GB = {"vertical": "~101 GB (18 envs)", "diagonal": "~58 GB (9 envs)",
-          "mosaic": "~45 GB (7 envs)", "cross": "~71 GB (11 envs)"}
+
+def env_size_text(category=None, methods=None):
+    """One phrase describing the conda envs a category / method set needs,
+    derived from mtb.env.plan() x mtb.env.packed_sizes() at generation time
+    (env count, the download total of the archives measured so far, and the
+    CLI line that prints the per-env sizes) - never a hand-written GB figure."""
+    import multibench as mtb
+    rows = mtb.env.plan(category=category, methods=methods)
+    sizes = mtb.env.packed_sizes()
+    known = [sizes.get(r["env"], {}).get("archive_bytes") for r in rows]
+    known = [b for b in known if b]
+    n = len(rows)
+    flag = f"--category {category}" if category else f"--methods {','.join(methods)}"
+    s = f"{n} env{'s' if n != 1 else ''}"
+    if known:
+        s += (f", at least {sum(known) / 1e9:.1f} GB to download "
+              f"({len(known)} of {n} archives measured)")
+    return s + f"; `multibench env plan {flag}` prints the per-env sizes"
+
 CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
             "mosaic": ["D45", "D46"], "cross": ["D52"]}
 DS_MB = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB", "D46": "97 MB",
          "D52": "179 MB"}
 
-# The ONE install sequence every notebook shares (tests/test_docs_consistency.py
-# pins it): conda (Colab restarts the kernel once), then the package WITH its
-# dependencies - evaluate() needs scib/scanpy, which pip brings in; no conda env
-# is needed for discovery, evaluation, stored results or figures.
+# The ONE install cell every notebook shares (tests/test_docs_consistency.py
+# pins it): the package WITH its dependencies - the wheel ships the registry,
+# the stored result tables, the env lockfiles and the reference metadata, so no
+# clone is needed; evaluate() needs scib/scanpy, which pip brings in. The
+# find_spec guard keeps the cell idempotent and leaves a developer's editable
+# install alone. Conda (for running methods) is a separate opt-in cell.
 INSTALL_CELLS = [
-"""# Colab ships without conda; this provisions it (the kernel restarts ONCE).
+"""import importlib.util, sys
+if importlib.util.find_spec("multibench") is None:
+    !{sys.executable} -m pip -q install "multibench-sc>=0.3"   # registry, stored tables, env lockfiles and references ship in the wheel - no clone needed
+else:
+    print("multibench already installed")""",
+]
+
+# Opt-in, only for running methods: Colab ships without conda; this provisions
+# it (the kernel restarts ONCE) - on a machine that already has conda it does
+# nothing. Placed AFTER the pip cell: a package installed before the restart
+# stays importable afterwards.
+CONDA_OPTIN_CELL = """# Colab ships without conda; this provisions it (the kernel restarts ONCE).
 # On a machine that already has conda, this cell does nothing.
 import importlib.util, shutil
 
@@ -61,29 +91,9 @@ if shutil.which("conda") or shutil.which("mamba"):
 elif _has("google.colab"):
     !pip -q install condacolab
     import condacolab
-    condacolab.install()   # restarts the kernel; afterwards, continue below
+    condacolab.install()   # restarts the kernel; afterwards, re-run the setup cell in section 1 and continue here
 else:
-    print("no conda found - install it first (mamba recommended); see the installation guide")""",
-"""import importlib.util, os
-if importlib.util.find_spec("multibench") is None:
-    !git clone --depth 1 https://github.com/DSichang/scMultiBench.git
-    %cd scMultiBench
-    !pip -q install -e .
-elif os.path.isdir("/content/scMultiBench"):
-    # reused Colab runtime: refresh the editable install to the latest code,
-    # then drop the already-imported modules so the NEXT import sees it -
-    # a live kernel never re-reads changed files on its own
-    %cd /content/scMultiBench
-    !git pull -q
-    !pip -q install -e .
-    import importlib, sys
-    for _m in [m for m in list(sys.modules) if m == "multibench" or m.startswith("multibench.")]:
-        del sys.modules[_m]
-    importlib.invalidate_caches()
-    print("multibench refreshed to the latest repository state")
-else:
-    print("multibench already installed")""",
-]
+    print("no conda found - install it first (mamba recommended); see the installation guide")"""
 
 SCEN = {
  "vertical": dict(
@@ -290,21 +300,15 @@ reproduces.""")
     mlist = ",".join(live_methods)
     md("""## 1. Install
 
-Two layers: the `multibench` package (~2 MB) and the conda environments of the
-methods you run. On **Colab**, run the first cell and let the kernel restart
-once - then keep running from the next cell. Sections 2-3 (running methods)
-need the environments and a Linux runtime with the disk for them; sections
-4-5 (stored results, reference) need only the package.""")
+`pip install multibench-sc` is the whole install: the 1.3 MB wheel ships the
+method registry, the stored result tables, the env lockfiles and the reference
+metadata. The package alone runs this section, section 3 (`scan`) and sections
+4-5. Running methods (section 2, and `run_all` in section 3) additionally
+needs their conda environments on a **Linux** host - section 2 sets them up;
+on Colab's CPU runtime those two sections are a demo of the calls, not a place
+to benchmark.""")
     for cell in INSTALL_CELLS:
         code(cell)
-    md(f"""Now the environments for the methods this tutorial runs
-({', '.join(live_methods)}). `--packed` downloads a prebuilt archive (2-14 GB
-per environment) instead of solving one from scratch, and `env install` skips
-anything already present. Other tiers are one flag away: `--category {cat}`
-({CAT_GB[cat]}), or no flag for the whole benchmark (29 envs, ~167 GB).""")
-    code(f"""import sys
-!{{sys.executable}} -m multibench env install --methods {mlist} --packed --run""")
-
     code(f'''import warnings; warnings.filterwarnings("ignore")
 %matplotlib inline
 from pathlib import Path
@@ -316,15 +320,39 @@ import multibench as mtb
 
 DATASET  = "{s['ds']}"
 CATEGORY = "{cat}"
-mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})   # reference data ({', '.join(DS_MB[d] for d in CAT_DATA[cat])}); no-op when present
+mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})   # reference data ({', '.join(DS_MB[d] for d in CAT_DATA[cat])}) -> mtb.config.DEFAULT.data_path; no-op when present
 print("multibench", mtb.__version__)''')
+
+    # ------------------------------------------------------------ environments
+    md(f"""## 2. Run the analysis
+
+### Environments - only if you will run methods in this session
+
+Linux + conda; {env_size_text(methods=live_methods)}. On Colab the next cell
+provisions conda and restarts the kernel once: afterwards re-run the setup
+cell in section 1, then continue here. Without the environments, skip to
+section 3's `scan` or to section 4.""")
+    code(CONDA_OPTIN_CELL)
+    md(f"""Now the environments for the methods this tutorial runs
+({', '.join(live_methods)}). `--packed` downloads a prebuilt archive instead
+of solving one from scratch, and `env install` skips anything already
+present. Other tiers are one flag away: `--category {cat}`
+({env_size_text(category=cat)}), or no flag for the whole benchmark (29 envs;
+`multibench env plan` totals them). Method environments are linux-64 conda
+envs: on macOS / Windows `env install --run` refuses (`--force` overrides),
+which is why the cell checks the platform first.""")
+    code(f"""import sys
+if sys.platform == "linux":
+    !{{sys.executable}} -m multibench env install --methods {mlist} --packed --run
+else:
+    print("method environments are linux-64 conda envs - skipped on", sys.platform, "(sections 4-5 need none)")""")
 
     # ------------------------------------------------------------- run + plot
     trio = s["own_trio"]
     params_note = f', params={{"{fastm}": {s["live"][1]}}}' if s["live"][1] != "None" else ""
     extra = (f' (on `{live_ds}`, whose layout fits these methods; mosaic layouts '
              f'vary per dataset)' if live_ds != s["ds"] else "")
-    md(f"""## 2. Run the analysis
+    md(f"""### One call
 
 One call is the whole pipeline: resolve each method's inputs, run it in its own
 conda env, load the embeddings, score them with scIB metrics. Here
@@ -432,7 +460,10 @@ fig.set_dpi(110)
 fig''')
     md(f"""`run_all(DATASET, CATEGORY, out_dir=...)` without `methods=` writes the
 same `summary.csv` and `long.csv` for your own data; `mtb.load_batch(out_dir)`
-reads them back.
+reads them back. A single `mtb.evaluate` frame becomes the same seven-column
+long frame with `mtb.to_long(metrics, method, dataset, category)`
+(`source="user"`; `needs_labels=True` gives your own supervised method the
+`L` badge), so `pd.concat([long, mine])` plots next to the stored sweep.
 
 **Across datasets.** A summary needs every method to have results on every
 dataset it averages over, or absence and performance blur into the same bar. Two
@@ -478,8 +509,8 @@ not_ok.head(5) if len(not_ok) else "(everything in this category runs here)"
 `method_info(m)["supports"]` lists a method's variants with how many
 hyperparameters each exposes on its command line; `mtb.params_for(m, CATEGORY,
 modalities)` names them, `params={"Method": {"key": value}}` sets them in
-`run_all` (`--param METHOD:KEY=VALUE` on the command line). An empty `tunable`
-is honest: many upstream scripts hardcode their hyperparameters, and this
+`run_all` (`--param METHOD:KEY=VALUE` on the command line; `multibench params
+METHOD` prints the same table for every variant). An empty `tunable` is honest: many upstream scripts hardcode their hyperparameters, and this
 package never edits upstream code.""")
     code("""rows = [{"method": m, "modalities": "+".join(v["modalities"]) or "(data_dir)",
          "n_tunable": v["n_tunable"], "needs_labels": v["needs_labels"],
@@ -491,8 +522,8 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
 
 `method_info` carries the upstream reference, repository and version next to
 the run metadata - `availability` says whether a public install can run it
-(`'public'`, or `'benchmark-host-only'` for the two methods whose scripts are
-not published), `needs_labels` is the any-variant flag (`supports[i]` has it
+(`'public'`, or `'benchmark-host-only'` for SPIRAL, the one method whose
+script is not published), `needs_labels` is the any-variant flag (`supports[i]` has it
 per variant), and `verbose=True` adds the long audit notes plus
 `verification`, the recorded end-to-end run(s) behind `status='verified'`
 (`{{dataset, category, status, wall_s, ARI, baseline, verdict, note}}`);
@@ -549,7 +580,11 @@ REGISTRATION block of `describe_layout("cross")` above is the contract, and
 (GPSA through the package driver `engine/drivers/run_gpsa.py`); `SPIRAL` is
 `availability="benchmark-host-only"` - its script is not published, so `scan`
 reports it `benchmark-host-only: script not published` and
-`mtb.find_methods(task="registration", available=True)` omits it."""
+`mtb.find_methods(task="registration", available=True)` omits it. GPSA
+additionally reads `obs['Ground_Truth']` (a region / layer label per spot)
+from every slice: it drives GPSA's own PAA / LTARI / SCS scores, written to
+`<out_dir>/GPSA_aligned_slices/<data_dir_name>_metrics.csv`. The scripts
+glob the slices without sorting, so the output index follows glob order."""
     if cat == "mosaic":
         trouble_extra = """
 ### Why is UINMF not in mosaic?
@@ -578,7 +613,7 @@ must actually run, so it is deliberately not offered."""
 - the other three tutorials: {siblings}
 - the hosted interactive explorer: <https://shiny.maths.usyd.edu.au/scMultiBench/> -
   the full benchmark's rankings, browsable without installing anything
-- `mtb.recommend(CATEGORY, modalities=[...])` - stored-result ranking with coverage made explicit
+- `mtb.recommend(CATEGORY, modalities=[...])` - stored-result ranking with coverage made explicit; methods wired for the category but absent from the chosen `source` appear with `grand_score` NaN rather than vanishing
 - `mtb.sweep(...)` - one method over a range of one hyperparameter""")
     return C
 
@@ -591,13 +626,13 @@ def build_colab_quickstart():
 
 This notebook runs **entirely in Colab**: it installs the `multibench` API,
 explores the method registry, loads the shipped benchmark results, and draws
-the standard figures. Run the first cell and let the kernel restart once -
-then keep running from the next cell.
+the standard figures - `pip install multibench-sc` is the whole install (the
+wheel ships the registry, the stored tables and the references).
 
 One scope note: *executing* an integration method needs that method's conda
-environment (2-14 GB each) and reference data, which this notebook does not
-provision - for that, follow a category tutorial on your own Linux machine.
-Everything below runs here, now.""")
+environment (linux-64; `multibench env plan` prints the sizes) and reference
+data, which this notebook does not provision - for that, follow a category
+tutorial on your own Linux machine. Everything below runs here, now.""")
     for cell in INSTALL_CELLS:
         code(cell)
     code("""import multibench as mtb

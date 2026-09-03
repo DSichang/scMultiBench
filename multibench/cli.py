@@ -1354,7 +1354,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Compute the benchmark's metrics for one embedding file. Prints "
                     "the metric table (or writes it with --out). With --method, "
                     "--dataset and --category the table is written in the long "
-                    "format (metric,value,method,dataset,category) that `multibench "
+                    "format (metric,value,method,dataset,category,clustering,source) that `multibench "
                     "plot --input` reads, so your method can be plotted next to the "
                     "benchmark's.")
     pe.add_argument("--output", required=True,
