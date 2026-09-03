@@ -1486,7 +1486,7 @@ expects.</p>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span>      <span class="c1"># vertical | diagonal | mosaic | cross; None -&gt; every category</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">task</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># None/&quot;all&quot; -&gt; every metric; &quot;clustering&quot; / &quot;batch&quot; -&gt; one family</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">metric_set</span><span class="o">=</span><span class="s2">&quot;scib&quot;</span><span class="p">,</span>        <span class="c1"># only &quot;scib&quot; is wired in v1</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">metric_set</span><span class="o">=</span><span class="s2">&quot;scib&quot;</span><span class="p">,</span>        <span class="c1"># the only metric set</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span>            <span class="c1"># None -&gt; every dataset; a list -&gt; several</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every method present; a name or list (alias tolerant)</span>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">metric</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every metric; or [&quot;ARI&quot;, &quot;NMI&quot;]</span>
@@ -1573,7 +1573,12 @@ compare against your own run</strong>, and compare ranks rather than decimals
 (see <a href="../evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>).
 <code>mtb.results_coverage(category)</code> lists which (dataset, method, clustering,
 source) combinations exist; <code>mtb.available_datasets(category, source=...)</code>
-lists the loadable dataset ids.</p>
+lists the loadable dataset ids. A re-run row that most likely failed
+silently - ARI below 0.01 where the published table scored above 0.2 for
+the same (category, dataset, method); today Conos on D28 - is flagged by
+<code>mtb.DegenerateRerunWarning</code> (a <code>UserWarning</code>) whenever <code>source="rerun"</code> or
+<code>"both"</code> loads it, with the <code>df[df.method != ...]</code> line to drop it before
+ranking.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">cov</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">results_coverage</span><span class="p">(</span><span class="s2">&quot;cross&quot;</span><span class="p">)</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">cov</span><span class="p">[</span><span class="n">cov</span><span class="o">.</span><span class="n">dataset</span> <span class="o">==</span> <span class="s2">&quot;D52&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>   <span class="c1"># published 1, rerun-0.2.1 8</span>
 </span></code></pre></div>
@@ -1638,10 +1643,14 @@ never breaks on one typo.</p>
 <p>To score <em>your own</em> run instead, compute metrics with
 <a href="../evaluate/"><code>mtb.evaluate</code></a> and reshape the wide frame with
 <code>mtb.to_long(value_df, method, dataset, category)</code> - it emits the same
-long frame, so it drops straight into <code>plot.bubble</code> next to a stored
-table. <code>result_path=</code> also accepts a single long CSV (one you saved with
-<code>to_csv</code>, or a <code>run_all</code> output's <code>long.csv</code>) and reads it back with
-<code>source="user"</code> unless the file carries its own.</p>
+seven columns (<code>clustering="default"</code>, <code>source="user"</code>), so it drops
+straight into <code>plot.bubble</code> next to a stored table. <code>result_path=</code> also
+accepts a single long CSV (one you saved with <code>to_csv</code>, or a <code>run_all</code>
+output's <code>long.csv</code>): blank <code>clustering</code> / <code>source</code> cells are filled per
+row (<code>default</code> / <code>user</code>), <code>source="published"</code> or <code>"both"</code> keeps every
+row, and any other <code>source</code> value filters on the file's own column - a
+value the file does not carry raises <code>ValueError</code> listing the ones
+present.</p>
 </div>
 <hr />
 <h2 id="step-2-render-the-scib-bubble-table">Step 2, Render the scIB bubble table<a class="headerlink" href="#step-2-render-the-scib-bubble-table" title="Anchor link to this section">&para;</a></h2>
@@ -1660,7 +1669,8 @@ table</strong> - the grid of circles the paper uses to rank methods. It returns 
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">show_language</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>                        <span class="c1"># Py / R chip per row, &#39;L&#39; badge for label-consuming methods</span>
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">require_complete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>                    <span class="c1"># summary: keep only methods present in every dataset</span>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">overall</span><span class="o">=</span><span class="s2">&quot;rank&quot;</span><span class="p">,</span>                            <span class="c1"># how the across-dataset Overall is formed (see below)</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="p">)</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">na</span><span class="o">=</span><span class="s2">&quot;warn&quot;</span><span class="p">,</span>                                 <span class="c1"># a method missing a metric: &quot;warn&quot; (once per build) | &quot;skip&quot; | &quot;raise&quot;</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>How to read it:</p>
 <ul>
@@ -1670,16 +1680,27 @@ table</strong> - the grid of circles the paper uses to rank methods. It returns 
   the mean of the family Overall scores, best at the top.</li>
 <li><strong>Circle fill ~ value</strong> - darker = higher, on a per-column min-max scale.</li>
 <li><strong>Circle radius ~ rank</strong> - bigger = better in that column
-  (<code>0.85 * sqrt(rank / n)</code>; ties take the maximum rank, matching the original
-  R <code>ties.method="max"</code>).</li>
+  (<code>0.85 * sqrt(rank / n)</code> with <code>n</code> = the methods <em>scored</em> in that column;
+  ties take the maximum rank, matching the original R <code>ties.method="max"</code>).</li>
 <li><strong>The family Overall bar</strong> - within one dataset, <code>minmax(mean over the
   family's metrics of per-metric max-rank)</code>; length and fill both carry it.</li>
+<li><strong>Missing metrics</strong> - a dash marks a metric that was not computed for that
+  method (<code>n/a</code>). Its row's Overall averages the ranks of the metrics the
+  method <em>has</em>, and that column's ranks count only the methods scored in it.
+  <code>na="warn"</code> (default) reports each such method once per <code>build_table</code>
+  (<code>YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)</code>),
+  <code>na="skip"</code> silences it, <code>na="raise"</code> refuses an incomplete frame; the rule
+  is also printed in the <code>n/a</code> legend line.</li>
 <li><strong>Legend</strong> - a <em>Score</em> colour ramp per family always; the <em>Rank</em> circle-size
-  legend only under <code>aggregate="dataset"</code> (summary panels draw bars); a
-  dash marks a metric that was not computed for that method (<code>n/a</code>).</li>
+  legend only under <code>aggregate="dataset"</code> (summary panels draw bars); a key
+  line under the legends explains the chips: <code>Py / R = language · L =
+  consumes cell-type labels (supervised) · ? = not a registry method</code>.</li>
 <li>A <strong><code>?</code> chip</strong> marks a method that is not in the registry (your own), an
   <strong><code>L</code> badge</strong> a method that consumes cell-type labels - supervised, so its
-  scores are not comparable with the unsupervised rows.</li>
+  scores are not comparable with the unsupervised rows. The badge follows
+  the variants of the <em>frame's</em> category (scMoMaT has no <code>L</code> in a vertical
+  panel); for a method outside the registry, <code>to_long(..., needs_labels=True)</code>
+  adds the column <code>build_table</code> honours.</li>
 </ul>
 <h3 id="individual-vs-summary-panels">Individual vs. summary panels<a class="headerlink" href="#individual-vs-summary-panels" title="Anchor link to this section">&para;</a></h3>
 <p>The <code>aggregate</code> argument decides what a row's numbers <em>mean</em>.</p>
@@ -1696,18 +1717,22 @@ frame happens to hold several datasets, values are averaged per
 the dataset ids.</p>
 </div>
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># all vertical datasets -&gt; rank within each, then average ranks</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>          <span class="c1"># no dataset= -&gt; all</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># two vertical datasets swept identically -&gt; rank within each, then average ranks</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span> <span class="s2">&quot;D11s&quot;</span><span class="p">],</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;rerun&quot;</span><span class="p">)</span>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">,</span> <span class="s2">&quot;cLISI&quot;</span><span class="p">],</span>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>                      <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;summary&quot;</span><span class="p">,</span> <span class="n">require_complete</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, summary&quot;</span><span class="p">)</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Vertical integration, summary of D11 + D11s&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Ranks methods within each dataset per metric, then <strong>averages those ranks
 across datasets</strong> and draws them as bars - the cross-dataset leaderboard,
 not a raw mean of incommensurable scores. A method absent from a dataset
 scores rank 0 there (the paper's rule), which pulls it down; a
 <code>UserWarning</code> lists such methods, and <code>require_complete=True</code> restricts
-the panel to methods present in <strong>every</strong> dataset instead.</p>
+the panel to methods present in <strong>every</strong> dataset instead. The re-run
+pair above is complete by construction (13 methods on both); the
+<em>published</em> vertical tables are partial, so <code>require_complete=True</code> over
+all 23 of them leaves a single method - read the coverage warning before
+trusting any across-dataset order.</p>
 </div>
 </div>
 </div>
@@ -1734,11 +1759,16 @@ family. Duplicate <code>(method[, dataset], metric)</code> rows raise rather tha
 being silently averaged - name variants distinctly.</p>
 </div>
 <h3 id="audit-the-numbers-before-drawing">Audit the numbers before drawing<a class="headerlink" href="#audit-the-numbers-before-drawing" title="Anchor link to this section">&para;</a></h3>
-<p><code>mtb.plot.build_table(df, ...)</code> returns the <code>BubbleTable</code> behind the figure
-(<code>methods</code> in row order, <code>overall</code>, <code>matrix</code>, <code>raw</code>, <code>norm</code>, <code>ranks</code>,
-<code>blocks</code>), so ranks can be read programmatically - e.g. the position of your
-own method: <code>mtb.plot.build_table(allruns).methods.index("MyMethod") + 1</code>.
-<code>mtb.plot.render(table)</code> draws it.</p>
+<p><code>mtb.plot.build_table(df, ...)</code> (same keywords as <code>bubble</code> minus the drawing
+ones) returns the <code>BubbleTable</code> behind the figure: <code>methods</code> in row order,
+<code>overall</code>, <code>matrix</code> (the min-max fills; <code>norm</code> is the same frame), <code>raw</code>,
+<code>ranks</code> (the per-column max-ranks concatenated over the family blocks in
+figure order, index == <code>methods</code>, <code>n</code> = best), <code>blocks</code>, <code>aggregate</code>,
+<code>overall_basis</code>, <code>datasets</code>, <code>coverage</code>, <code>method_datasets</code>, <code>category</code>,
+<code>needs_labels</code> and <code>na_cells</code> (the missing-metric report). So ranks can be
+read programmatically - e.g. the position of your own method:
+<code>mtb.plot.build_table(allruns).methods.index("MyMethod") + 1</code>.
+<code>mtb.plot.render(table, cmap=, title=, show_language=)</code> draws it.</p>
 <h3 id="summary-bars">Summary bars<a class="headerlink" href="#summary-bars" title="Anchor link to this section">&para;</a></h3>
 <p><code>mtb.plot.bar(df, group="clustering" | "batch", overall=..., top=N, save=...)</code>
 draws one bar per method with its across-dataset Overall - the benchmark's two
@@ -1778,11 +1808,15 @@ one that wins a single dataset.</p>
 </span></code></pre></div>
 <p><code>multibench plot</code> accepts <code>--aggregate dataset|summary</code>, <code>--overall
 rank|mean_overall</code>, <code>--require-complete</code>, <code>--methods</code>, <code>--title</code>, <code>--input
-long.csv</code> (your own long table, or a <code>run_all</code> output directory, instead of
-<code>--category</code>), <code>bar</code> with <code>--group clustering|batch</code>, and writes whatever
-format <code>--out</code>'s extension implies (<code>.pdf</code>, <code>.png</code>, ...). It calls
-<code>load_results</code> and <code>plot.bubble</code> / <code>plot.bar</code> under the hood, so the result is
-identical to the script above.</p>
+long.csv</code> (your own long table, or a <code>run_all</code> output directory; repeatable),
+<code>bar</code> with <code>--group clustering|batch</code>, and writes whatever format <code>--out</code>'s
+extension implies (<code>.pdf</code>, <code>.png</code>, ...). <code>--input</code> alone plots your table;
+<code>--input</code> together with <code>--category</code> (and <code>--dataset</code> / <code>--source</code>)
+concatenates your rows onto the stored table - the CLI form of the
+<code>pd.concat([bench, mine])</code> above, with a <code># overlay: ...</code> note on stderr
+saying how many rows came from where. It calls <code>load_results</code> and
+<code>plot.bubble</code> / <code>plot.bar</code> under the hood, so the result is identical to the
+script above.</p>
 <div class="admonition note">
 <p class="admonition-title">Visual fidelity</p>
 <p>The bubble table is a <strong>matplotlib reproduction</strong> of scIB's original R

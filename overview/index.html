@@ -1266,8 +1266,9 @@ spatial registration. The published benchmark spans <strong>64 real and 22 simul
 <p>Each task gets its own metric panel: scIB-style batch-correction and biological-conservation
 metrics (kBET, iLISI, ASW, graph connectivity, PCR, ARI, NMI, and more), classification
 accuracy and F1, marker overlap and correlation for feature selection, RMSE for imputation,
-and label-transfer and alignment scores for spatial registration, plus runtime and peak
-memory. Results are aggregated into per-method <strong>grand rank scores</strong> and distilled into a
+and label-transfer and alignment scores for spatial registration (in the package, PASTE,
+PASTE2 and GPSA run from a public install - see <a href="../tutorials/run/#spatial-registration">Spatial registration</a>),
+plus runtime and peak memory. Results are aggregated into per-method <strong>grand rank scores</strong> and distilled into a
 decision tree that recommends top methods per scenario and task (Fig. 6 of
 the paper; the <a href="../shiny/">interactive explorer</a> carries the same rankings).</p>
 <p>A key takeaway: no single method wins everywhere. Performance depends on the dataset, task,

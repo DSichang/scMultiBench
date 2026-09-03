@@ -1388,9 +1388,11 @@
 <p><code>multibench</code> is the Python API that wraps the <strong>scMultiBench</strong>
 benchmark (Liu, Ding <em>et al.</em>, <em>Nature Methods</em> 2025). It is tested on
 <strong>Python 3.9+</strong> on Linux and macOS - the API itself; the per-method conda
-environments are Linux-only. The package itself is lightweight, a handful
-of pure-Python data dependencies, so installing it takes <strong>under a minute</strong> with
-a warm cache.</p>
+environments are Linux-only. The wheel is ~1.3 MB and ships the method
+registry, the stored result tables, the env lockfiles and the reference
+metadata; <code>scanpy</code> and <code>scib</code>, which <code>mtb.evaluate</code> needs, bring ~650 MB of
+scientific-Python dependencies, so a fresh install takes about half a minute
+with a warm pip cache.</p>
 <div class="admonition tip">
 <p class="admonition-title">TL;DR</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>multibench<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>-y<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>multibench
@@ -1400,9 +1402,9 @@ a warm cache.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Two layers, two install scopes</p>
-<p>The <code>multibench</code> API only orchestrates the benchmark, it has
-light dependencies. The integration <strong>methods</strong> it runs each live in their own
-conda env (they have mutually incompatible deps). You install
+<p>The <code>multibench</code> API only orchestrates the benchmark. The integration
+<strong>methods</strong> it runs each live in their own conda env (they have mutually
+incompatible deps). You install
 <code>multibench</code> once; you install a method's env only when you want to <em>run</em>
 that method. See <a href="#method-environments">Method environments</a> below.</p>
 </div>
@@ -1436,36 +1438,29 @@ orchestration relies on named conda envs.</p>
 </div>
 <hr />
 <h2 id="step-2-install-multibench">Step 2, Install multibench<a class="headerlink" href="#step-2-install-multibench" title="Anchor link to this section">&para;</a></h2>
-<p>Two ways in - both give you the same <code>import multibench</code>:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="pypi-your-own-data" name="__tabbed_2" type="radio" /><input id="repository-tutorials" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="pypi-your-own-data">PyPI (your own data)</label><label for="repository-tutorials">Repository (tutorials)</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
+<p>One install path:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
 </span></code></pre></div>
-<p>The full API in a 184 KB package: discovery, running methods (environments
-build from the shipped lockfiles; the method scripts fetch themselves on
-first run), evaluation and figures. Datasets and clones go to
-<code>~/.cache/multibench/</code>.</p>
-</div>
-<div class="tabbed-block">
+<p>The wheel (~1.3 MB) carries the whole API - discovery, running methods
+(environments build from the shipped lockfiles; the method scripts fetch
+themselves on first run), evaluation and figures - <strong>and</strong> the stored
+benchmark tables behind <code>load_results</code>, the env lockfiles and the reference
+metadata, so the tutorials need nothing else. Datasets and the method-script
+checkout go to <code>~/.cache/multibench/</code>.</p>
+<details class="note">
+<summary>Developer install - only to edit the notebooks or run the test suite</summary>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DSichang/scMultiBench.git
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>scMultiBench
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.<span class="w"> </span>--config-settings<span class="w"> </span><span class="nv">editable_mode</span><span class="o">=</span>compat
 </span></code></pre></div>
-<p>What the tutorials use: also carries the stored benchmark tables their
-figure sections reproduce, and the notebooks themselves.</p>
-</div>
-</div>
-</div>
-<div class="admonition note">
-<p class="admonition-title">What <code>multibench</code> is</p>
-<p><code>multibench</code> is the Python API for the scMultiBench benchmark (imported
-throughout the docs as <code>mtb</code>). For the editable <code>from source</code> install, the
-<code>compat</code> editable mode writes a plain path entry so <code>import multibench</code>
+<p>The <code>compat</code> editable mode writes a plain path entry so <code>import multibench</code>
 resolves from <strong>any</strong> working directory (not only the repo root). Plain
 <code>pip install -e .</code> works too, but the compat flag avoids an empty-namespace
-import surprise when you later call the API from a script outside the clone.</p>
-</div>
+import surprise when you later call the API from a script outside the
+clone. In a checkout the data path is <code>&lt;repo&gt;/data</code> (see
+<a href="#get-the-data">Get the data</a>), and <code>python -m pytest tests -q</code> is green
+on a laptop with no conda environments.</p>
+</details>
 <p>This pulls in the core data-handling stack and the evaluation stack:</p>
 <table>
 <thead>
@@ -1517,8 +1512,9 @@ import surprise when you later call the API from a script outside the clone.</p>
 <p class="admonition-title">What is <em>not</em> installed here</p>
 <p>No deep-learning frameworks, no per-method packages (<code>torch</code>, <code>scvi-tools</code>,
 Seurat, etc.). Those belong to the individual method environments, not to
-<code>multibench</code>. Keeping the core thin is deliberate, you can load published
-results, plot, and resolve inputs without any heavy stack present.</p>
+<code>multibench</code>. Keeping deep learning out of the core is deliberate: you can
+load published results, plot, evaluate and resolve inputs without any
+method's framework present.</p>
 </div>
 <hr />
 <h2 id="step-3-verify-the-install">Step 3, Verify the install<a class="headerlink" href="#step-3-verify-the-install" title="Anchor link to this section">&para;</a></h2>
@@ -1577,14 +1573,20 @@ checkout of the method scripts. The default is <code>"conda run -n {env} {cmd}"<
 been cross-checked against the real entrypoint and executed end-to-end on a
 reference dataset.</p>
 <h3 id="build-the-environments">Build the environments<a class="headerlink" href="#build-the-environments" title="Anchor link to this section">&para;</a></h3>
-<p>The <code>multibench</code> package itself is ~2 MB; disk goes to the conda environments
-of the methods you choose to run. The repository commits one lockfile per
-environment, and the CLI builds them reproducibly (Linux; method environments
-are not supported on macOS). <strong>Install only what you need</strong>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only (2-14 GB)</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category (45-101 GB, see below)</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs, ~167 GB)</span>
+<p>Disk goes to the conda environments of the methods you choose to run - the
+wheel itself is ~1.3 MB. The package ships one lockfile per environment, and
+the CLI builds them reproducibly. <strong>They are linux-64 environments</strong> (the
+lockfiles and the packed archives both): on macOS / Windows <code>env status</code>,
+<code>plan</code>, <code>doctor</code> and <code>install</code> print a <code>warning: ... linux-64 ...</code> line
+first and <code>env install --run</code> refuses (exit 1) unless <code>--force</code>; dry runs
+work everywhere, and everything that does not run a method - the registry,
+the stored results, <code>scan</code>'s file gate, <code>evaluate</code>, the figures - works on
+any machine. <strong>Install only what you need</strong>:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing, with the install line</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>plan<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w">           </span><span class="c1"># the envs a category needs, with download / disk sizes</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs; 175 GB measured, see SETUP.md)</span>
 </span></code></pre></div>
 <p>Add <code>--packed</code> to any <code>env install</code> to use <strong>prebuilt archives</strong> (download +
 unpack in minutes instead of a 10-30 minute solve-and-build). All 29
@@ -1594,34 +1596,67 @@ larger ones from Zenodo
 (<a href="https://doi.org/10.5281/zenodo.21928885">10.5281/zenodo.21928885</a>,
 <a href="https://doi.org/10.5281/zenodo.21928889">10.5281/zenodo.21928889</a>); if a
 download fails, the install falls back to the lockfile build automatically.</p>
-<p>Measured per-category footprints: vertical ~101 GB (18 envs), diagonal ~58 GB
-(9), mosaic ~45 GB (7), cross ~71 GB (11) - categories share environments, so
-combinations cost less than their sum. <code>env doctor</code> is safe to run any time;
-<code>env install</code> skips environments that already exist, so it resumes after
-interruption. <code>multibench env recipe &lt;method&gt;</code> / <code>env yml &lt;method&gt;</code> print the
-conda commands / an <code>environment.yml</code> for one method, naming the env exactly
-as <code>scan</code>'s <code>env</code> column, <code>method_info(m)["env"]</code> and <code>env doctor</code> do
-(<code>matilda</code> for Matilda, <code>scmb_r</code> for the R methods), so a recipe pasted into
-a build job yields an env the package recognises. Every command writes its
-table or commands to stdout and its progress / <code># dry run</code> notes to stderr.
-<code>mtb.env.plan()</code> rows carry <code>availability</code>: SPIRAL and GPSA need scripts that
-are not published (<code>benchmark-host-only</code>), so their envs build but the
-methods cannot run off the benchmark host.</p>
+<p><code>multibench env plan [--category C | --methods M,...]</code> prints, per env, the
+packed-archive download size (<code>dl</code>) and the unpacked size on disk (<code>disk</code>)
+from the shipped snapshot <code>multibench/engine/packed_sizes.json</code>, plus a
+<code># total</code> line; <code>?</code> marks an archive not measured yet (the maintainer tool
+<code>tools/packed_sizes.py</code> fills the table on a host with network), so read the
+total as a lower bound. <code>env install --packed</code> shows the same size and the
+URL per archive. Categories share environments (vertical needs 18 envs,
+diagonal 9, mosaic 6, cross 10; the R env <code>scmb_r</code> alone serves five
+methods), so combinations cost less than their sum. <code>env doctor</code> is safe to
+run any time; <code>env install</code> skips environments that already exist, so it
+resumes after interruption. <code>env status</code> tags each method's env with how
+hard it is to <em>build</em> (<code>easy</code>, <code>old-scvi</code>, <code>old-tensorflow</code>, <code>R</code>,
+<code>verified</code>, <code>blocked-script</code>; the legend goes to stderr and
+<code>mtb.env.DIFFICULTY</code> holds the definitions). <code>multibench env recipe
+&lt;method&gt;</code> / <code>env yml &lt;method&gt;</code> print the conda commands / an
+<code>environment.yml</code> for one method, naming the env exactly as <code>scan</code>'s <code>env</code>
+column, <code>method_info(m)["env"]</code> and <code>env doctor</code> do (<code>matilda</code> for Matilda,
+<code>scmb_r</code> for the R methods), so a recipe pasted into a build job yields an
+env the package recognises. Every command writes its table or commands to
+stdout and its progress / <code># dry run</code> / <code>warning:</code> notes to stderr.
+<code>mtb.env.plan()</code> rows carry <code>availability</code>: SPIRAL needs a script that is
+not published (<code>benchmark-host-only</code>), so its env builds but the method
+cannot run off the benchmark host; GPSA runs through the package driver and
+is public, like PASTE and PASTE2.</p>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
-<p>The benchmark datasets are not part of the git clone, and for the tutorials
-you do not need to fetch anything by hand: <strong>each tutorial auto-downloads its
-own reference data</strong> (11-290 MB) from the repository's
+<p>The benchmark datasets are not part of the wheel or of the clone, and for the
+tutorials you do not need to fetch anything by hand: <strong>each tutorial
+auto-downloads its own reference data</strong> (11-290 MB) from the repository's
 <a href="https://github.com/DSichang/scMultiBench/releases/tag/data-v1">release assets</a>
-into <code>data/</code> on first run. Manual equivalent, e.g. for <code>D11</code>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span>data/
+into the package's data path on first run (<code>mtb.data.fetch("D11")</code>). That
+path is <code>mtb.config.DEFAULT.data_path</code>, and it depends on how you installed:</p>
+<table>
+<thead>
+<tr>
+<th>install</th>
+<th><code>mtb.config.DEFAULT.data_path</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pip install multibench-sc</code></td>
+<td><code>~/.cache/multibench/data</code> (<code>$XDG_CACHE_HOME/multibench/data</code> when that variable is set)</td>
+</tr>
+<tr>
+<td>a checkout (<code>pip install -e .</code>)</td>
+<td><code>&lt;repo&gt;/data</code></td>
+</tr>
+</tbody>
+</table>
+<p>Manual equivalent, e.g. for <code>D11</code>, into whichever of the two applies:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">DATA</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import multibench as mtb; print(mtb.config.DEFAULT.data_path)&#39;</span><span class="k">)</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DATA</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p>Available there: <code>D11</code> (vertical, 11 MB), <code>D28</code> (diagonal, 137 MB), <code>D45</code>
 (mosaic, 290 MB), <code>D46</code> (mosaic, 97 MB), <code>D52</code> (cross, 179 MB). The <strong>full
 65-dataset collection</strong> is linked from the
 <a href="https://github.com/PYangLab/scMultiBench#readme">scMultiBench README</a>; unpack
-any of it under <code>data/</code> at the repository root - <code>mtb.config.DEFAULT.data_path</code>
-defaults to exactly that folder, and every <code>data_path=</code> argument in the API
-accepts an alternative location.</p>
+any of it under that data path, or anywhere else and pass <code>data_path=</code>
+(<code>--data-path</code> on the command line): <code>dataset</code> is always the folder <em>name</em>,
+<code>data_path</code> the folder that contains it, and a missing folder raises
+<code>FileNotFoundError</code> listing the folders that are there.</p>
 <hr />
 <h2 id="the-evaluation-stack">The evaluation stack<a class="headerlink" href="#the-evaluation-stack" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.evaluate(...)</code> computes scIB metrics on a run output. Since v0.2, <code>scib</code>
@@ -1646,11 +1681,21 @@ package; this means <code>multibench</code> was installed with <code>--no-deps</
 into a different interpreter. Re-run <code>pip install multibench-sc</code> (or
 <code>pip install -e .</code> in the clone) in the env you import from.</p>
 </dd>
-<dt><strong><code>cLISI</code> / <code>iLISI</code> / <code>kBET</code> come back as <code>NaN</code></strong></dt>
+<dt><strong><code>cLISI</code> / <code>iLISI</code> come back as <code>NaN</code></strong> (with a warning naming <code>knn_graph.o</code>)</dt>
 <dd>
-<p>This is expected when the LISI binary or <code>rpy2</code> is unavailable, it is a
-warning, not an error. Install the LISI binary / <code>rpy2</code> to populate
-those rows; everything else still computes.</p>
+<p>Both need scib's compiled LISI helper, <code>scib/knn_graph/knn_graph.o</code>.
+The binary that ships with <code>scib</code> is a Linux x86-64 executable, so on
+macOS (and other <abbr title="Central Processing Unit">CPU</abbr> architectures) it cannot run. <code>evaluate()</code>
+rebuilds it in place automatically the first time this happens, using
+scib's own build line, when a C++ compiler (<code>g++</code>, <code>c++</code> or <code>clang++</code>)
+is on <code>PATH</code> - a few seconds - and then computes the metric. Without
+a compiler the metric is recorded as <code>NaN</code> and the warning carries the
+exact command to run yourself once one is installed (Xcode command-line
+tools on macOS):</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>g++<span class="w"> </span>-std<span class="o">=</span>c++11<span class="w"> </span>-O3<span class="w"> </span>-o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.cpp
+</span></code></pre></div>
+<p>Everything else still computes. <code>kBET</code> is separate: it needs R via
+<code>rpy2</code> and <code>slow_metrics=True</code>.</p>
 </dd>
 <dt><strong><code>conda</code> solver hangs for &gt;2 minutes</strong></dt>
 <dd>

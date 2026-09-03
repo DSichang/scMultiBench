@@ -1160,6 +1160,14 @@
   <a href="../tutorials/mosaic/">mosaic</a>, <a href="../tutorials/cross/">cross</a></li>
 <li><strong>Exploring published results</strong> - see the
   <a href="../shiny/">interactive explorer</a></li>
+<li><strong><code>cLISI</code> / <code>iLISI</code> are <code>NaN</code> on my Mac</strong> - scib's LISI helper ships as a
+  Linux x86-64 binary; <code>evaluate()</code> rebuilds it once when a C++ compiler is on
+  <code>PATH</code>, otherwise the warning carries the <code>g++</code> line - see
+  <a href="../installation/#troubleshooting">Troubleshooting</a></li>
+<li><strong><code>env install --run</code> refuses on macOS / Windows</strong> - the method environments
+  are linux-64 conda envs; run methods on a Linux host (<code>--force</code> overrides).
+  The registry, stored results, <code>scan</code>'s file gate, <code>evaluate</code> and the figures
+  work anywhere - see <a href="../installation/#method-environments">Method environments</a></li>
 </ul>
 
 

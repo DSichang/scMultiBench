@@ -1441,7 +1441,12 @@ exists and what is missing. <code>mtb.run</code> shells out with <code>conda run
 ...</code>; if the env is missing the preflight raises <code>EnvironmentError</code> with
 that install command. <code>multibench run ... --dry-run</code> prints the exact
 command line without executing it (<code>--param KEY=VALUE</code> merges
-hyperparameters into it), the line an HPC job can carry.</p>
+hyperparameters into it), the line an HPC job can carry;
+<code>mtb.command_preview(method, category, inputs=..., out_dir=...)</code> is the
+same argv from Python (paths absolutized exactly as <code>run</code> passes them),
+and <code>mtb.plan_commands(dataset, category)</code> the per-variant form for a
+laid-out dataset folder (<code>out_dir</code> defaults to a <code>&lt;out_dir&gt;</code> placeholder
+for previews).</p>
 </div>
 <hr />
 <h2 id="inputs-roles-and-format-flexibility">Inputs: roles and format flexibility<a class="headerlink" href="#inputs-roles-and-format-flexibility" title="Anchor link to this section">&para;</a></h2>
@@ -1451,12 +1456,23 @@ registry - for SCALEX's diagonal variant they are <code>rna</code> and <code>ata
 (gene-activity scores derived from <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>). For a benchmark dataset,
 <code>mtb.inputs_for(dataset, method, category)</code> resolves them for you (and
 <code>check=True</code> verifies the files exist, are oriented features x cells and have
-one label per cell).</p>
+one label per cell). Every path it returns is absolute. When the method has
+several variants for the category and you pass no <code>modalities</code>, it picks the
+one whose input files are all in the folder; when none or several are, it
+raises <code>mtb.AmbiguousVariantError</code> - a <code>ValueError</code> (which also matches
+<code>KeyError</code>, for older handlers) - listing the modality-sets, the folder's
+contents and an example <code>modalities=</code>. <code>modalities=["rna", "atac"]</code> selects
+a variant declared <code>atac_gas</code> or <code>atac_peak</code> too (<code>gas</code> / <code>peak</code> are
+accepted as aliases).</p>
 <p>You do not have to pre-convert your data. By default <code>mtb.run</code> routes every
 modality input through <code>mtb.io.to_canonical</code>, which adapts common formats to the
 canonical scMultiBench <code>.h5</code> (HDF5 with <code>matrix/data</code> as features x cells,
 <code>matrix/features</code>, <code>matrix/barcodes</code>; sparse matrices are streamed, the file is
-gzip-compressed):</p>
+gzip-compressed). <code>matrix/data</code> is stored <strong>dense</strong>: cells x features x 8 B
+uncompressed on disk (<code>dtype="float32"</code> halves it), so filter to highly
+variable genes / informative peaks before export - a 100k-cell x 200k-peak
+multiome would be 160 GB; <code>to_canonical</code> warns above 1 GB
+(<code>mtb.io.DENSE_WARN_BYTES</code>) naming the size and the two mitigations:</p>
 <table>
 <thead>
 <tr>
@@ -1551,8 +1567,9 @@ returns those runs (from the shipped
 <code>baseline</code> ARI from first verification and a <code>verdict</code> (<code>DRIFT</code> when a
 stochastic re-run leaves the tolerance). <code>status</code> says nothing about
 where the script lives: <code>method_info(m)["availability"]</code> is <code>public</code> for
-every method but SPIRAL and GPSA, whose scripts are
-<code>benchmark-host-only</code> (not published - <code>scan</code> reports them not runnable).</p>
+every method but SPIRAL, whose script is not published
+(<code>benchmark-host-only</code>; <code>scan</code> reports it not runnable); GPSA runs
+through the package driver <code>engine/drivers/run_gpsa.py</code> and is public.</p>
 </div>
 <hr />
 <h2 id="validated-example-scalex-diagonal-integration-on-d28">Validated example: SCALEX diagonal integration on D28<a class="headerlink" href="#validated-example-scalex-diagonal-integration-on-d28" title="Anchor link to this section">&para;</a></h2>
@@ -1576,15 +1593,17 @@ gene-activity scores (<code>atac_gas</code>) from dataset <strong>D28</strong>, 
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">)</span>            <span class="c1"># the exact argv that ran, including the conda wrapper</span>
 </span></code></pre></div>
 <div class="admonition note">
-<p class="admonition-title">Use absolute paths for inputs and <code>out_dir</code></p>
+<p class="admonition-title">Paths are made absolute for you</p>
 <p>The method script runs with <code>out_dir</code> as its working directory (step 6
-above), and <code>out_dir</code> is also passed to the script as its save path. So a
-<strong>relative</strong> <code>out_dir</code> (or relative inputs) is resolved against the
-subprocess cwd, not your shell's cwd, which makes the outputs land in the
-wrong place. <code>inputs_for</code> returns absolute paths; pass an absolute
-<code>out_dir</code> too. No <code>cmd_template</code> is needed: the default
-<code>conda run -n {env} {cmd}</code> fills <code>{env}</code> from the spec (<code>scmb_torch</code> for
-SCALEX), so the run lands in the right conda env automatically.</p>
+above), and <code>out_dir</code> is also passed to the script as its save path, so
+a relative path resolved by the subprocess would land in the wrong
+place. <code>run</code> therefore makes every path-valued input and <code>out_dir</code>
+absolute (symlinks preserved) before it builds the command - a directory
+role such as <code>data_dir</code> also gets its trailing separator - and
+<code>inputs_for</code> returns absolute paths; <code>RunResult.out_dir</code> is the absolute
+path. No <code>cmd_template</code> is needed: the default <code>conda run -n {env}
+{cmd}</code> fills <code>{env}</code> from the spec (<code>scmb_torch</code> for SCALEX), so the run
+lands in the right conda env automatically.</p>
 </div>
 <p><code>mtb.run</code> returns a <code>RunResult</code> dataclass:</p>
 <table>
@@ -1695,18 +1714,27 @@ that assume an embedding (e.g. ASW-style metrics) will not apply directly.
 <h2 id="spatial-registration">Spatial registration<a class="headerlink" href="#spatial-registration" title="Anchor link to this section">&para;</a></h2>
 <p><code>PASTE</code>, <code>PASTE2</code>, <code>SPIRAL</code> and <code>GPSA</code> (task <code>registration</code>, category <code>cross</code>)
 align <strong>spatial slices</strong>; their output is aligned coordinates, not an
-embedding. <code>PASTE</code> and <code>PASTE2</code> are public; <code>SPIRAL</code> and <code>GPSA</code> are
-<code>availability="benchmark-host-only"</code> - their scripts are not published, so a
-public install cannot fetch or run them (<code>scan</code> says <code>benchmark-host-only:
-script not published</code>, <code>find_methods(task="registration", available=True)</code>
-lists the two that run). They take a <strong>directory</strong> of slices instead of modality files - the
-role is <code>data_dir</code>, <code>scan()</code> shows their modalities as <code>(data_dir)</code>, and you
-pass no <code>modalities</code> to <code>run_all</code> / <code>inputs_for</code>:</p>
+embedding. Availability comes from the registry: <code>PASTE</code>, <code>PASTE2</code> and
+<code>GPSA</code> are public (GPSA through the package driver
+<code>method_info("GPSA")["driver"]</code>, <code>engine/drivers/run_gpsa.py</code>), so
+<code>find_methods(task="registration", available=True)</code> lists those three;
+<code>SPIRAL</code> is <code>availability="benchmark-host-only"</code> - its script is not
+published, so a public install cannot fetch or run it and <code>scan</code> says
+<code>benchmark-host-only: script not published</code>. They take a <strong>directory</strong> of
+slices instead of modality files - the role is <code>data_dir</code> (<code>run</code> appends
+its trailing <code>/</code>), <code>scan()</code> shows their modalities as <code>(data_dir)</code>, and you
+pass no <code>modalities</code> to <code>run_all</code> / <code>inputs_for</code> (a <code>modalities=</code> filter
+keeps them with a <code>UserWarning</code>; <code>modalities=[]</code> selects exactly them):</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>&lt;data_path&gt;/MYVISIUM/            (or &lt;data_path&gt;/MYVISIUM/processed/)
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, &gt;= 2
 </span></code></pre></div>
 <p>Each <code>.h5ad</code> needs <code>.X</code> (expression, spots x genes) and <code>.obsm['spatial']</code>
-(spot coordinates, spots x 2). The upstream scripts glob <code>data_dir + '*.h5ad'</code>
+(spot coordinates, spots x 2). GPSA additionally reads <code>obs['Ground_Truth']</code>
+(a region / layer label per spot) from <strong>every</strong> slice: it drives GPSA's own
+PAA / LTARI / SCS scores, written to
+<code>&lt;out_dir&gt;/GPSA_aligned_slices/&lt;data_dir_name&gt;_metrics.csv</code> - a slice
+without that column fails inside the driver, not at <code>scan</code>. The upstream
+scripts glob <code>data_dir + '*.h5ad'</code>
 <strong>without sorting</strong>, so the slice index in the output follows glob order, not
 your numbering; SPIRAL also wants a unique leading token per filename (the
 part before the first <code>_</code>) - the package stages symlinks for that when needed.

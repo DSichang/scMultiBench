@@ -1431,7 +1431,11 @@ and/or task.</p>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Both arguments are AND-combined: a method is returned only if it declares the
-requested category <strong>and</strong> the requested task.</p>
+requested category <strong>and</strong> the requested task. A method's categories are
+derived from its variants (<code>method_info(m)["supports"]</code>), never declared
+separately, so <code>list_methods(category=c)</code>, <code>find_methods(category=c)</code> and
+<code>env plan --category c</code> always agree: 18 vertical, 14 diagonal, 6 mosaic
+and 12 cross methods.</p>
 <hr />
 <h2 id="filter-by-what-your-data-has">Filter by what your data has<a class="headerlink" href="#filter-by-what-your-data-has" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.list_methods</code> filters on category and task only. When you want to filter by
@@ -1470,7 +1474,13 @@ broad and <code>["rna", "atac"]</code> is stricter. Role tokens are reduced to t
 base type (<code>"atac_gas"</code> means <code>"atac"</code>, <code>"rna1"</code> means <code>"rna"</code>) and
 <code>"protein"</code> is accepted for <code>"adt"</code>. Every token is <strong>validated</strong>: a typo
 in <code>category</code>, <code>task</code>, <code>atac</code> or a modality raises <code>ValueError</code> naming the
-valid vocabulary instead of silently matching nothing.</p>
+valid vocabulary instead of silently matching nothing, and a bare string
+where a list is expected (<code>modalities="rna"</code>) raises <code>TypeError</code> with the
+list form. Methods that consume a whole <em>directory</em> (the four spatial
+registration methods) cannot be judged by <code>modalities=</code>: they are kept
+under any such filter with a <code>UserWarning</code> naming them (<code>task=
+"registration"</code> selects them); scBridge's modalities are derived from
+the bare filenames it reads (<code>rna</code>, <code>atac</code>).</p>
 </div>
 <p>The <code>atac</code> filter is about <em>encoding</em>, not presence: methods that consume <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
 do so either as a <strong>gene-activity</strong> matrix (<code>atac="gene_activity"</code>, alias
@@ -1488,10 +1498,11 @@ filter is per variant; <code>method_info(m)["needs_labels"]</code> is the <em>an
 flag (scMoMaT is <code>True</code> because of its mosaic variant) and
 <code>method_info(m)["supports"][i]["needs_labels"]</code> the per-variant answer.</p>
 <p><code>available=True</code> keeps the methods a public install can run;
-<code>available=False</code> lists the two whose scripts are not published - SPIRAL and
-GPSA (<code>method_info(m)["availability"] == "benchmark-host-only"</code>; <code>scan</code>
-reports them not runnable with the reason <code>benchmark-host-only: script not
-published</code>). PASTE and PASTE2, the other two registration methods, are
+<code>available=False</code> lists the one whose script is not published - SPIRAL
+(<code>method_info(m)["availability"] == "benchmark-host-only"</code>; <code>scan</code> reports it
+not runnable with the reason <code>benchmark-host-only: script not published</code>).
+GPSA runs through a package driver (<code>method_info("GPSA")["driver"]</code>) and is
+public, like PASTE and PASTE2; all three registration methods are
 public:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s2">&quot;registration&quot;</span><span class="p">,</span> <span class="n">available</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># [&#39;PASTE&#39;, &#39;PASTE2&#39;]</span>
 </span></code></pre></div>
@@ -1552,7 +1563,7 @@ method before you commit to running it.</p>
 </tr>
 <tr>
 <td><code>availability</code></td>
-<td><code>public</code> (every entrypoint is in the public scMultiBench repository) or <code>benchmark-host-only</code> (SPIRAL, GPSA: an entrypoint is an absolute path on the benchmark host, not published - <code>scan</code> reports them not runnable)</td>
+<td><code>public</code> - every entrypoint is in the public scMultiBench repository, or a package driver (GPSA); <code>benchmark-host-only</code> - the entrypoint is an absolute path on the benchmark host, not published (SPIRAL; <code>scan</code> reports it not runnable)</td>
 </tr>
 <tr>
 <td><code>variants</code> / <code>supports</code></td>
@@ -1578,9 +1589,19 @@ method before you commit to running it.</p>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># adds: &#39;deep_learning&#39;: &#39;Yes&#39;, &#39;output&#39;: &#39;embedding&#39;</span>
 </span></code></pre></div>
 <p><code>mtb.runtime_hint(method)</code> adds what the method has been <em>observed</em> to cost
-(<code>{"tier", "worst_sec", "observed": [(dataset, cells, sec), ...]}</code>) - the
-measurements behind <code>scan()</code>'s <code>runtime_tier</code> column. An unknown method id
-raises <code>KeyError</code> with a did-you-mean hint in every one of these functions.</p>
+(<code>{"tier", "worst_sec", "observed": [{dataset, cells, sec, source}, ...]}</code>) -
+the measurements behind <code>scan()</code>'s <code>runtime_tier</code> column. Each observation
+says where it came from (<code>source</code>: <code>manual</code>, <code>summary_csv</code> = the shipped
+re-run sweeps, <code>verification</code> = the shipped verification table); the table
+keeps the longest recorded time per (method, dataset), and <code>cells</code> is null
+where no run recorded the count. An unknown method id raises <code>KeyError</code> with
+a did-you-mean hint in every one of these functions; <code>mtb.cite("SCALEX",
+"GLUE")</code> takes ids one per argument (or one list), like the CLI. For a
+benchmark dataset, <code>mtb.inputs_for(dataset, method, category)</code> returns
+absolute paths and, when a method has several variants for the category,
+picks the one whose files are in the folder (<code>mtb.params_for(method,
+dataset=...)</code> does the same for the hyperparameter table; when none or
+several fit, both raise <code>mtb.AmbiguousVariantError</code>, a <code>ValueError</code>).</p>
 <h2 id="rank-from-stored-results">Rank from stored results<a class="headerlink" href="#rank-from-stored-results" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.recommend</code> turns the shipped metric tables into a ranking for a category,
 with coverage made explicit - a method scored on 1 of 22 datasets is not a
@@ -1592,8 +1613,18 @@ winner:</p>
 in a vertical ranking), as does the <code>L</code> badge of the bubble plot.</p>
 <p><code>source="rerun"</code> ranks the package's own re-run sweeps instead of the paper's
 tables; <code>long_df=pd.concat([published, mine])</code> places your own method in the
-same ranking. Datasets with fewer than <code>min_methods</code> methods are dropped and a
-<code>UserWarning</code> states what was dropped or partial.</p>
+same ranking; <code>family="batch"</code> (or <code>task="batch"</code>) ranks on the
+batch-correction metrics. Nothing is hidden: every method wired for the
+category (<code>find_methods(task=..., modalities=..., runnable=True)</code>) that has
+no rows in the chosen source is appended with <code>grand_score</code> NaN,
+<code>n_datasets</code> 0 and <code>coverage</code> 0.0 after the scored rows, and ONE
+<code>UserWarning</code> lists the datasets dropped for having fewer than <code>min_methods</code>
+methods, the partial coverage, and the unscored methods (<code>try
+source="rerun"</code> when that source has them). The choices the ranking was
+made under travel with the frame as <code>df.attrs</code> (<code>family</code>, <code>task</code>, <code>source</code>,
+<code>not_scored</code>, <code>missing</code>) - pandas keeps <code>.attrs</code> through <code>.copy()</code> and column
+selection but most <code>concat</code> / <code>merge</code> operations drop them, so the NaN rows
+themselves are the robust signal.</p>
 <h2 id="the-full-benchmark-catalog">The full benchmark catalog<a class="headerlink" href="#the-full-benchmark-catalog" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.catalog.*</code> exposes the benchmark metadata as tidy DataFrames, useful when
 you want the whole picture rather than a single lookup.</p>
@@ -1604,17 +1635,24 @@ you want the whole picture rather than a single lookup.</p>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>   <span class="c1"># one row per dataset: dataset, simulated, category, has_results, ...</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">()</span>    <span class="c1"># the metric-details table</span>
 </span></code></pre></div>
-<p>The bundled catalog (<code>catalog.datasets()</code>) covers <strong>63 real + 8 simulated</strong>
-datasets (<strong>71 total</strong>); <code>category</code> and <code>has_results</code> are filled from the
-shipped result tree at call time, and the <code>simulated</code> flag (set for ids
-beginning <code>SD</code>) separates the simulations:</p>
+<p><code>catalog.datasets()</code> is the union of the paper's dataset table (63 real + 8
+simulated, 71 ids) and every dataset id that has a stored result table - 80
+rows today, the extra nine being ids that exist only as result tables (the
+<code>D11s</code> / <code>D28s</code> / <code>D45s</code> / <code>D52s</code> re-run subsamples, <code>D24</code>, <code>SD7</code>-<code>SD10</code>);
+<code>category</code> and <code>has_results</code> are filled from the shipped result tree at call
+time, and the <code>simulated</code> flag (set for ids beginning <code>SD</code>) separates the
+simulations:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">ds</span> <span class="o">=</span> <span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">ds</span><span class="p">[</span><span class="o">~</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;simulated&quot;</span><span class="p">]]</span>    <span class="c1"># real datasets only</span>
 </span></code></pre></div>
 <p>Two helpers normalise the catalog's free-text spellings to canonical tokens:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">&quot;Seurat v5&quot;</span><span class="p">)</span>     <span class="c1"># &#39;Seurat_v5&#39;</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">&quot;kbet&quot;</span><span class="p">)</span>      <span class="c1"># &#39;kBET&#39;</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">&quot;scipenn&quot;</span><span class="p">)</span>       <span class="c1"># &#39;sciPENN&#39; - case-folded against the registry</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">&quot;kbet&quot;</span><span class="p">)</span>      <span class="c1"># &#39;kBET&#39;</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">catalog</span><span class="o">.</span><span class="n">known_metrics</span><span class="p">()</span>               <span class="c1"># the ten scIB codes + &#39;PCR&#39;</span>
 </span></code></pre></div>
+<p>An unknown name comes back unchanged; <code>canonical_id(name, strict=True)</code>
+raises <code>KeyError</code> with a did-you-mean hint instead (what <code>load_results</code> uses).</p>
 <hr />
 <h2 id="which-method-should-i-use">Which method should I use?<a class="headerlink" href="#which-method-should-i-use" title="Anchor link to this section">&para;</a></h2>
 <p>A practical decision path tied to the four categories:</p>
