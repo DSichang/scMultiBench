@@ -60,23 +60,66 @@ _AUX_ROLES = {"data_dir", "source_data", "target_data", "cty", "source_cty", "ta
               "out_dir"}
 
 
+def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
+    """Absolutize every path-valued input and ``out_dir``; directory roles get
+    a trailing separator.
+
+    The method runs with ``cwd=out_dir`` (or the script's own directory), so a
+    relative ``data/MYCITE/rna.h5`` would be looked up relative to the wrong
+    place - the child saw ``exists=False`` and a relative ``--save_path
+    out/x/`` made it write ``out/x/out/x/embedding.h5``. Many upstream scripts
+    also string-concatenate ``data_dir + "*.h5ad"``, hence the separator on
+    directory values. ``os.path.abspath`` (not ``Path.resolve``) keeps symlinked
+    data roots as the user wrote them.
+
+    Parameters
+    ----------
+    inputs : ``{role: path-or-object}``. Strings / ``os.PathLike`` values are
+        absolutized; ``data_dir`` and any value that is an existing directory
+        get a trailing ``os.sep``; anything else (in-memory AnnData / MuData)
+        is passed through untouched for ``to_canonical`` to convert.
+    out_dir : the output directory (str or path-like).
+
+    Returns
+    -------
+    tuple[dict, str]
+        ``(inputs_with_absolute_paths, absolute_out_dir_with_trailing_sep)``.
+    """
+    out = os.path.join(os.path.abspath(os.fspath(out_dir)), "")
+    vals: dict = {}
+    for role, v in inputs.items():
+        if isinstance(v, (str, os.PathLike)):
+            p = os.path.abspath(os.fspath(v))
+            if role == "data_dir" or os.path.isdir(p):
+                p = os.path.join(p, "")
+            vals[role] = p
+        else:
+            vals[role] = v
+    return vals, out
+
+
 def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         out_dir: str, params: dict | None = None, convert: bool = True,
         cmd_template: str | None = None, repo_path: Path | None = None) -> RunResult:
     """Run a method and load its output. Method scripts are never modified.
 
-    The ``task`` parameter is reserved for future per-task dispatch; variant
-    selection in v1 depends only on ``category`` and the supplied modalities.
+    Variant selection currently depends only on ``category`` and the supplied
+    modalities; ``task`` is accepted and ignored.
 
     Parameters
     ----------
     method : registry id (``KeyError`` with a did-you-mean hint otherwise).
     category : integration category of the variant to run.
-    task : reserved (see above).
+    task : accepted for forward compatibility and currently ignored (see
+        above).
     inputs : ``{role: path-or-AnnData}``; the non-auxiliary, non-label roles
         select the variant. See ``inputs_for`` / ``method_info(m)['supports']``.
+        Paths may be relative: they are made absolute (and ``data_dir`` gets a
+        trailing separator) before the argv is built, because the method
+        runs with ``cwd=out_dir`` - see :func:`normalize_paths`.
     out_dir : directory the method writes into (created; ``inputs/`` holds the
-        canonical .h5 copies when ``convert=True``).
+        canonical .h5 copies when ``convert=True``). Made absolute the same
+        way; ``RunResult.out_dir`` is that absolute path.
     params : overrides merged over the variant's default hyperparameters.
     convert : convert modality inputs to the canonical .h5 layout (default True).
     cmd_template : wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``.
@@ -118,7 +161,11 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
                 f"`multibench env install --methods {method} --packed --run` "
                 f"(or mtb.env.create_env({env_name!r})); see mtb.env.doctor()")
 
-    out = Path(out_dir)
+    # Absolute paths + trailing separator on directory roles BEFORE conversion,
+    # so canonical passthrough files are absolute too; converted copies live
+    # under the (absolute) inputs_dir and come out absolute by construction.
+    inputs, out_str = normalize_paths(inputs, out_dir)
+    out = Path(out_str)
     workdir = out
     workdir.mkdir(parents=True, exist_ok=True)
     inputs_dir = workdir / "inputs"
@@ -149,8 +196,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # Pass out_dir with a trailing separator: many method scripts build their
     # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
     # etc.), so a missing slash writes a SIBLING file instead of into out_dir.
-    cmd = builder.build_command(variant, values=values,
-                                out_dir=os.path.join(str(out), ""), params=params)
+    cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
     # entrypoint is relative to the reference repo. A variant may declare a
     # package-side `driver`: a wrapper script (shipped with the package) that
     # source()s the UNMODIFIED upstream entrypoint and calls its function. When

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .. import config
 from . import registry
-from .schema import base_modality, is_label_role
+from .schema import AmbiguousVariantError, base_modality, is_label_role
 
 # A few variant roles name a modality *representation* whose on-disk filename
 # differs from the role token (e.g. the diagonal ATAC roles). Candidate bases
@@ -114,6 +114,91 @@ def _stage_unique_leading_token(slice_dir: Path) -> str:
     return os.path.join(str(staged), "")
 
 
+def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
+    """``{role: path}`` for every input role of ``variant`` in ``ds_dir``
+    (best effort: a missing file resolves to its canonical name)."""
+    # Skip args with a const (they don't need on-disk resolution) and out_dir.
+    # an arg may name ONE role (a.role) or GROUP several under one flag (a.roles)
+    roles = [r
+             for a in variant.args if getattr(a, "const", None) is None
+             for r in (getattr(a, "roles", None) or [a.role])
+             # "=VALUE" entries are literals emitted verbatim (e.g. scMoMaT's
+             # per-batch `None` placeholders), not input roles to find on disk
+             if r and not str(r).startswith("=")
+             and r not in ("out_dir", "data_dir")]
+    out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
+    # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
+    if any(a.role == "data_dir" for a in variant.args):
+        out["data_dir"] = _resolve_data_dir(ds_dir, method)
+    return out
+
+
+def _variant_satisfiable(variant, ds_dir: Path, method: str) -> bool:
+    """Does the folder hold every input this variant needs? (No content checks:
+    existence only, plus the ``data_dir`` content rule for directory-fed
+    variants, whose directory always exists.)"""
+    got = _resolve_variant_inputs(variant, ds_dir, method)
+    if any(not Path(p).exists() for p in got.values()):
+        return False
+    if "data_dir" in got:
+        return _check_data_dir(variant, got["data_dir"])[0]
+    return True
+
+
+def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = None):
+    """Pick the one variant of ``spec`` for ``category`` (+ ``modalities``).
+
+    Shared by :func:`inputs_for`, :func:`labels_for` and
+    :func:`multibench.params_for` so the three agree on what "ambiguous" means.
+
+    Parameters
+    ----------
+    spec : ``MethodSpec``.
+    category : validated category token.
+    modalities : normalised modality tokens (``registry.normalize_modalities``)
+        or None. When given, ``spec.select(..., loose=True)`` is used: exact
+        tokens first, then ``atac`` standing for ``atac_gas`` / ``atac_peak``.
+    ds_dir : keyword-only; the dataset folder. When ``modalities`` is None and
+        several variants exist for ``category``, the ONE whose input files are
+        all present in this folder is chosen; None (or a folder that settles
+        nothing) leaves the choice ambiguous.
+
+    Returns
+    -------
+    Variant
+
+    Raises
+    ------
+    KeyError
+        No variant for ``category`` (or for the given modalities).
+    AmbiguousVariantError
+        Several variants remain (a ``ValueError``): the message lists the
+        modality-sets, the folder contents when a folder was consulted, and
+        says to pass ``modalities=``.
+    """
+    if modalities is not None:
+        return spec.select(category, set(modalities), loose=True)
+    candidates = [v for v in spec.variants if v.when.get("category") == category]
+    if not candidates:
+        raise KeyError(f"{spec.id} has no variant for category={category!r}")
+    if len(candidates) == 1:
+        return candidates[0]
+    available = [v.when.get("modalities", []) for v in candidates]
+    folder_note = ""
+    if ds_dir is not None and Path(ds_dir).is_dir():
+        ok = [v for v in candidates if _variant_satisfiable(v, Path(ds_dir), spec.id)]
+        if len(ok) == 1:
+            return ok[0]
+        names = sorted(q.name for q in Path(ds_dir).glob("*"))
+        folder_note = (f" - {len(ok)} of them have every input file in {ds_dir} "
+                       f"(files: {names})")
+    raise AmbiguousVariantError(
+        f"{spec.id} has multiple variants for category={category!r}: "
+        f"modality-sets {available}{folder_note}; pass modalities= to disambiguate, "
+        f"e.g. modalities={available[0]}"
+    )
+
+
 def inputs_for(dataset: str, method: str, category: str,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
@@ -123,8 +208,12 @@ def inputs_for(dataset: str, method: str, category: str,
     The dataset tree is **flat** (``<data_path>/<dataset>/<file>``). Each role is
     resolved to the actual file present in that dir (the role token, or a known
     alias such as ``atac_peak``->``peak.h5`` / ``atac_gas``->``atac.h5``),
-    falling back to ``<role>.h5`` when no candidate exists. Use
-    :func:`labels_for` to get the matching cell-type label CSVs.
+    falling back to ``<role>.h5`` when no candidate exists. Every returned
+    path is ABSOLUTE (``data_path='data'`` relative to the current directory
+    included): ``run`` executes the method with ``cwd=out_dir``, where a
+    relative path would point at the wrong place. A ``data_dir`` value ends
+    with the path separator. Use :func:`labels_for` to get the matching
+    cell-type label CSVs.
 
     Parameters
     ----------
@@ -134,9 +223,13 @@ def inputs_for(dataset: str, method: str, category: str,
         ``ValueError`` listing the valid tokens on a typo).
     modalities : the variant's modality tokens (see
         ``method_info(m)['supports']``); ``protein`` is accepted for ``adt``,
-        unknown tokens raise ``ValueError`` naming the vocabulary.
+        and ``atac`` for ANY ATAC representation role (``atac_gas`` /
+        ``atac_peak`` - the file is the same ``atac.h5`` on disk; the
+        representation the method wants is ``method_info(m)['atac']``).
+        Unknown tokens raise ``ValueError`` naming the vocabulary.
     data_path : root that CONTAINS the dataset folder; default
-        ``config.DEFAULT.data_path``.
+        ``config.DEFAULT.data_path``. A relative root is resolved against the
+        current directory, so the returned paths are absolute.
     check : what to do when a resolved path does not exist on disk.
         ``None`` (default) - return the best-effort paths but emit a
         ``UserWarning`` listing the missing ones; ``True`` - raise
@@ -151,48 +244,35 @@ def inputs_for(dataset: str, method: str, category: str,
         ``files_ok`` / ``files_reason``; ``False`` - fully silent.
 
     Variant selection:
-      * If ``modalities`` is given, the exact variant matching
-        ``(category, set(modalities))`` is selected via ``spec.select``.
+      * If ``modalities`` is given, the variant matching
+        ``(category, set(modalities))`` is selected via ``spec.select``
+        (exact tokens first; then ``atac`` standing for ``atac_gas`` /
+        ``atac_peak`` when that leaves exactly one variant).
       * If ``modalities`` is None and exactly one variant matches ``category``,
         that variant is used.
-      * If ``modalities`` is None and MORE than one variant matches ``category``,
-        a ``ValueError`` is raised listing the available modality-sets and asking
+      * If ``modalities`` is None and MORE than one variant matches
+        ``category``, the dataset folder decides: when exactly ONE of them has
+        every input file present on disk, it is used (Matilda on a
+        ``rna.h5 + adt.h5`` folder is its rna+adt variant). When none or
+        several do, ``ValueError`` (:class:`AmbiguousVariantError`) is raised
+        listing the available modality-sets and the folder contents and asking
         the caller to disambiguate with ``modalities=``.
       * If no variant matches ``category``, a ``KeyError`` is raised.
+
+    Returns
+    -------
+    dict
+        ``{role: absolute path}`` - one entry per input role of the selected
+        variant (``data_dir`` for the directory-fed methods).
     """
-    base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
+    root = data_path if data_path is not None else config.DEFAULT.data_path
+    base = Path(os.path.abspath(os.fspath(root)))
     ds_dir = base / dataset  # flat layout: data/<dataset>/<file>
     spec = registry.get(method)
     registry.check_category(category)
     modalities = registry.normalize_modalities(modalities)
-
-    if modalities is not None:
-        variant = spec.select(category, set(modalities))
-    else:
-        candidates = [v for v in spec.variants if v.when.get("category") == category]
-        if not candidates:
-            raise KeyError(f"{method} has no variant for category={category!r}")
-        if len(candidates) > 1:
-            available = [v.when.get("modalities", []) for v in candidates]
-            raise ValueError(
-                f"{method} has multiple variants for category={category!r}: "
-                f"modality-sets {available}; pass modalities= to disambiguate"
-            )
-        variant = candidates[0]
-
-    # Skip args with a const (they don't need on-disk resolution) and out_dir.
-    # an arg may name ONE role (a.role) or GROUP several under one flag (a.roles)
-    roles = [r
-             for a in variant.args if getattr(a, "const", None) is None
-             for r in (getattr(a, "roles", None) or [a.role])
-             # "=VALUE" entries are literals emitted verbatim (e.g. scMoMaT's
-             # per-batch `None` placeholders), not input roles to find on disk
-             if r and not str(r).startswith("=")
-             and r not in ("out_dir", "data_dir")]
-    out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
-    # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
-    if any(a.role == "data_dir" for a in variant.args):
-        out["data_dir"] = _resolve_data_dir(ds_dir, method)
+    variant = select_variant(spec, category, modalities, ds_dir=ds_dir)
+    out = _resolve_variant_inputs(variant, ds_dir, method)
     missing = {r: p for r, p in out.items() if not Path(p).exists()}
     near = _near_miss_hints(ds_dir, missing, category)
     if check:
@@ -616,15 +696,18 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     above is used): a label file is placed where the modality it labels sits
     in the variant's inputs. Pass the single path - or, for a multi-file
     dataset, ``list(labels_for(ds).values())`` in that order - to
-    ``mtb.evaluate(labels=...)``: a one-entry dict is accepted directly, a
-    multi-entry dict raises with that hint. Raises ``FileNotFoundError`` if the
-    dataset dir is absent.
+    ``mtb.evaluate(labels=...)``: a dict from ``labels_for`` goes in as is,
+    in its stacking order. Raises ``FileNotFoundError`` if the dataset dir is
+    absent. Paths are absolute.
 
     Parameters
     ----------
     dataset : dataset folder name under ``data_path``.
-    method, category : optional; when BOTH are given the files are ordered by
-        that variant's modality order (see above); labels are per DATASET, so
+    method, category : optional. ``method`` is validated whenever given
+        (``KeyError`` with a did-you-mean hint on a typo). When BOTH are given
+        the files are ordered by that variant's modality order (see above;
+        the variant is chosen like ``inputs_for`` does - ``modalities=``,
+        else the one the folder's files satisfy); labels are per DATASET, so
         the SET of files never depends on them.
     data_path : keyword-only. Root that CONTAINS the dataset folder; default
         ``config.DEFAULT.data_path``. For back-compat, a ``Path`` (or a string
@@ -642,7 +725,12 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
                       "(the 2nd positional argument is now `method`)",
                       DeprecationWarning, stacklevel=2)
         data_path, method = method, None
-    base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
+    if method is not None:
+        # validated whenever given (it used to be echoed back unchecked unless
+        # category was also passed): a typo raises KeyError with a did-you-mean
+        registry.check_method(method)
+    root = data_path if data_path is not None else config.DEFAULT.data_path
+    base = Path(os.path.abspath(os.fspath(root)))
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         raise FileNotFoundError(f"no dataset dir at {ds_dir}")
@@ -653,12 +741,12 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
         spec = registry.get(method)
         registry.check_category(category)
         mods = registry.normalize_modalities(modalities)
-        if mods is not None:
-            cands = [spec.select(category, set(mods))]
-        else:
-            cands = [v for v in spec.variants if v.when.get("category") == category]
-        if len(cands) == 1:
-            rank = _variant_label_rank(stems, cands[0])
+        try:
+            cand = select_variant(spec, category, mods, ds_dir=ds_dir)
+        except AmbiguousVariantError:
+            cand = None                 # still ambiguous: canonical order
+        if cand is not None:
+            rank = _variant_label_rank(stems, cand)
             if rank is not None:
                 stems = sorted(stems, key=lambda st: rank[st])
     return {st: files[st] for st in stems}
