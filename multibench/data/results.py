@@ -448,6 +448,37 @@ def _check_metric_set(metric_set: str) -> None:
             f"wired into load_results yet (only 'scib' is).")
 
 
+def _canonical_dataset_ids(category, datasets, base, metric_set, source) -> list:
+    """Replace a dataset id that differs from a stored table id only in case.
+
+    macOS / Windows filesystems open ``long_all_d52.csv`` for ``D52`` too, so
+    ``dataset="d52"`` used to load and stamp the lower-case spelling into the
+    frame (a concat with ``D52`` rows then held two datasets). The on-disk id
+    wins, with one ``UserWarning``; anything else is returned unchanged so the
+    usual "no table" error still names it.
+    """
+    try:
+        have = available_datasets(category, metric_set=metric_set, result_path=base,
+                                  source="both" if source == "user" else source)
+    except Exception:
+        return list(datasets)
+    have = [str(h) for h in have]
+    by_lower = {h.lower(): h for h in have}
+    out = []
+    for d in datasets:
+        s = str(d)
+        canon = by_lower.get(s.lower())
+        if canon is not None and canon != s and s not in have:
+            warnings.warn(
+                f"dataset {s!r} is not a stored table id but {canon!r} is - using "
+                f"that spelling (dataset ids are case-sensitive: 'D52', not 'd52')",
+                UserWarning, stacklevel=3)
+            out.append(canon)
+        else:
+            out.append(s)
+    return out
+
+
 def _check_methods(wanted: list, present) -> None:
     """Every requested method must be a registry id or a name in the frame.
 
@@ -705,6 +736,8 @@ def load_results(
     wanted_methods = _as_list(method)
 
     base = _base_path(result_path)
+    if datasets and category is not None and not base.is_file():
+        datasets = _canonical_dataset_ids(category, datasets, base, metric_set, source)
     rerun_versions: set[str] = set()
 
     if base.is_file():
