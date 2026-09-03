@@ -11,6 +11,20 @@ from .. import config
 __all__ = ["methods", "datasets", "metrics", "canonical_id", "canonical_metric",
            "known_metrics", "PAPER_COLUMNS"]
 
+
+def __dir__() -> list[str]:
+    """Tab completion (``dir(mtb.catalog)``) shows the public API and the
+    underscore names, not the imports this module merely uses.
+
+    ``dir()`` always sorts, so the public names cannot be listed FIRST; what
+    can be done (PEP 562) is to leave out the leak-through module-level
+    imports (``pd``, ``Path``, ``re``, ``config`` and the ``annotations``
+    future-feature object - ``mtb.catalog.annotations()`` was a puzzling
+    ``TypeError`` for one re-tester). Every attribute stays accessible;
+    only the listing changes.
+    """
+    return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
+
 # --- canonical method id + aliases -----------------------------------------
 # Canonical id = the registry token. Map known display / result-dir spellings.
 _ALIASES = {
