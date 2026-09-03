@@ -35,7 +35,8 @@ mtb.plan("D11", "vertical")        # the run plan (= run_all(dry_run=True)); blo
 res = mtb.run_all("D11", "vertical", out_dir="out/")   # run + score
 res.plot()                         # the paper-style bubble panel
 
-# your own data: one call writes the dataset folder, then the same three calls
+# your own data: describe_layout says how the folder is laid out, one call writes it, then the same three calls
+print(mtb.describe_layout("vertical"))   # role -> filename per category (`multibench layout vertical` on the command line)
 mtb.io.export_dataset(adata, "data/MYCITE", rna="X", adt="obsm:protein", labels="obs:celltype")
 #   selectors as above, or objects: adt=<DataFrame / AnnData / array> (adt_names=[...]), labels=<Series>
 mtb.scan("MYCITE", "vertical", data_path="data")
@@ -66,8 +67,9 @@ multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:c
 multibench scan D11 --category vertical               # preflight table: files_ok / env_ok / reason (--columns all: every column)
 multibench find --category vertical --modalities rna,adt --needs-labels false
 multibench params Matilda                              # the hyperparameters --param accepts, per variant
+multibench run --method Matilda --category vertical --input rna=<data_path>/D11/rna.h5 --input adt=<data_path>/D11/adt.h5 --input cty=<data_path>/D11/cty.csv --out-dir out/Matilda --dry-run   # one method: prints the exact `conda run -n matilda python ...` line; drop --dry-run to execute
 multibench run-all D11 --category vertical --out-dir out/ --dry-run   # the plan + the command per variant; nothing runs
-multibench evaluate --output out/Matilda/embedding.h5 --labels <data_path>/D11/cty.csv --only ARI,NMI   # mtb.labels_for("D11") prints the path
+multibench evaluate --output out/Matilda/embedding.h5 --labels <data_path>/D11/cty.csv --only ARI,NMI   # mtb.labels_for("D11") returns {'cty': <that path>}
 multibench plot bubble --category vertical --dataset D11 --source rerun --out d11.pdf
 multibench plot bubble --input mine.csv --category vertical --dataset D11 --source rerun --out d11.pdf   # your rows next to the stored table
 multibench cite Matilda MOFA2                          # BibTeX for the benchmark + each method
