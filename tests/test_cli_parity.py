@@ -365,11 +365,27 @@ def test_cli_plot_input_run_all_dir(tmp_path, monkeypatch):
     from multibench import workflow
 
     class FakeBatch:
-        def long(self):
+        @property
+        def long(self):           # BatchResult.long IS a property, not a method
             return _long_df()
     d = tmp_path / "runs"; d.mkdir()
     monkeypatch.setattr(workflow, "load_batch", lambda p: FakeBatch())
     png = tmp_path / "b.png"
+    rc = cli.main(["plot", "bar", "--input", str(d), "--out", str(png)])
+    assert rc == 0 and png.exists()
+
+
+def test_cli_plot_input_real_run_all_dir(tmp_path):
+    """A REAL BatchResult.save() directory plots: the CLI used to call
+    ``.long()`` on the property and die with "'DataFrame' object is not
+    callable" on every genuine run_all output (only the fake had a method)."""
+    import matplotlib; matplotlib.use("Agg")
+    from multibench.workflow import BatchResult
+    recs = [{"method": m, "status": "CHAIN_OK", "run_sec": 1.0, "output_kind": "embedding",
+             "emb_shape": [10, 2], "n_tunable": 0, "metrics": {"ARI": v, "NMI": v},
+             "_long": None} for m, v in (("A", 0.5), ("B", 0.7))]
+    d = BatchResult(recs, "D1", "vertical").save(tmp_path / "runs")
+    png = tmp_path / "real.png"
     rc = cli.main(["plot", "bar", "--input", str(d), "--out", str(png)])
     assert rc == 0 and png.exists()
 
