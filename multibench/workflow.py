@@ -230,16 +230,29 @@ def describe_layout(category: str | None = None) -> str:
                   "    <data_path>/MYVISIUM/            (or <data_path>/MYVISIUM/processed/)",
                   "        slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, >= 2",
                   "  Each .h5ad needs .X (expression, spots x genes) and",
-                  "  .obsm['spatial'] (spot coordinates, spots x 2). The upstream",
-                  "  scripts glob data_dir + '*.h5ad' WITHOUT sorting, so the slice",
-                  "  index in the output follows glob order, not your numbering; SPIRAL",
-                  "  also wants a UNIQUE leading token per filename (the part before",
-                  "  the first '_') - the package stages symlinks for that when needed.",
+                  "  .obsm['spatial'] (spot coordinates, spots x 2). GPSA additionally",
+                  "  needs obs['Ground_Truth'] (a region/layer label per spot) in",
+                  "  EVERY slice - its driver reads that column at load; PASTE and",
+                  "  PASTE2 read no obs column. The upstream scripts glob",
+                  "  data_dir + '*.h5ad' WITHOUT sorting (directory order, which the",
+                  "  filesystem decides), so run() stages the slices as zero-padded",
+                  "  symlinks (00_<name>.h5ad ... in sorted order) under <out_dir>/inputs/",
+                  "  and writes <out_dir>/slices_manifest.json: aligned_slice_<i>.h5ad ->",
+                  "  the source file, in the order the script's glob returned - that",
+                  "  manifest, not the prefix, is authoritative. Keep it - it is the",
+                  "  ONLY link back:",
+                  "  PASTE writes its slices WITHOUT any obs column (upstream",
+                  "  main_PASTE_pairwise.py drops them all at load), PASTE2 rewrites .X",
+                  "  (normalize_total + log1p + a 2,000-HVG subset) before writing, and",
+                  "  GPSA keeps obs['Ground_Truth'] only. SPIRAL also wants a UNIQUE",
+                  "  leading token per filename (the part before the first '_'); the",
+                  "  staged 00_/01_ prefixes satisfy that.",
                   "  Output: aligned_slice_<i>.h5ad per slice (coordinates, not an",
                   "  embedding), so run_all records RUN_OK_NO_EMBEDDING - clustering",
                   "  metrics do not apply, and registration metrics are NOT wired into",
                   "  mtb.evaluate in this version.",
-                  "  scan() checks the dir for >= 2 .h5ad slices with obsm['spatial'].",
+                  "  scan() checks the dir for >= 2 .h5ad slices with obsm['spatial'],",
+                  "  and for GPSA that every slice carries obs['Ground_Truth'].",
                   ""]
     if category:
         lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
@@ -331,19 +344,29 @@ _CAVEATS = {
 }
 
 
-def _missing_script(variant) -> str:
+def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script is unreachable here, or "" when it is fine.
 
     A method whose script is absent must not be reported runnable: the run
     would fail minutes later with a shell error instead of here, instantly.
-    Two cases are checked and no more:
+    Three cases are checked and no more:
 
     * an ABSOLUTE entrypoint that does not exist - it names one machine's
       filesystem, so no download can supply it;
     * a repo-relative entrypoint missing from a reference checkout that IS
       present. When no checkout exists at all, nothing is reported: `run` and
       `run_all` fetch it on first use, and flagging every method as broken
-      before that first fetch would be wrong.
+      before that first fetch would be wrong;
+    * a local helper module the entrypoint imports from its own directory
+      (``variant.helpers``, e.g. MIRA's ``logger.py``) that the public
+      repository does not ship - the script would ``ImportError`` at start.
+
+    Parameters
+    ----------
+    variant : Variant
+        The variant whose ``entrypoint`` / ``helpers`` are checked.
+    method : str, keyword-only, optional
+        The method id, named in the helper message.
     """
     from pathlib import Path as _P
 
@@ -358,10 +381,20 @@ def _missing_script(variant) -> str:
     repo = _P(config.DEFAULT.repo_path)
     for root in (repo, _P(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
-            return "" if (root / ep).exists() else (
-                f"method script {ep} is missing from the reference checkout at "
-                f"{root} - update it (git pull) or delete it and let the next "
-                f"run fetch a fresh copy")
+            if not (root / ep).exists():
+                return (f"method script {ep} is missing from the reference checkout at "
+                        f"{root} - update it (git pull) or delete it and let the next "
+                        f"run fetch a fresh copy")
+            gone = [h for h in (getattr(variant, "helpers", None) or [])
+                    if not (root / ep).parent.joinpath(h).exists()]
+            if gone:
+                who = f"mtb.method_info({method!r})" if method else "method_info(m)"
+                return (f"method script {ep.name} imports the local module(s) {gone} from "
+                        f"its own directory, which the public scMultiBench repository "
+                        f"does not ship (none next to it in the checkout at {root}); "
+                        f"the benchmark host runs it with a local shim - supply the "
+                        f"file(s) beside {ep.name}, see {who}['setup_hint']")
+            return ""
     return ""            # no checkout yet: run()/run_all() fetch one
 
 
@@ -515,7 +548,11 @@ def scan(dataset: str, category: str | None = None,
     Parameters
     ----------
     dataset : folder NAME under ``data_path`` (not a path). If the folder does
-        not exist, ``FileNotFoundError`` lists the folders that do.
+        not exist, ``FileNotFoundError`` lists the folders that do. A spelling
+        that differs from the folder only in case (``'d52'`` on macOS) is
+        replaced by the on-disk spelling with a ``UserWarning``
+        (:func:`multibench.engine.resolve.canonical_dataset`), so the reasons,
+        ``out_dir`` names and records never carry a name Linux would reject.
     category : restrict to one integration category (``ValueError`` listing the
         valid ones on a typo); default: all four.
     data_path : the folder that CONTAINS ``dataset``; default the configured
@@ -566,6 +603,7 @@ def scan(dataset: str, category: str | None = None,
     if modalities is not None:
         want_mods = "+".join(registry.normalize_modalities(modalities)) or "(data_dir)"
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
+    dataset = _resolve.canonical_dataset(base, dataset)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
@@ -598,7 +636,7 @@ def scan(dataset: str, category: str | None = None,
         # Both halves are checked (the method's script AND the dataset's files)
         # so a missing script does not hide a layout problem or vice versa.
         file_problems = []
-        why_script = _missing_script(v)
+        why_script = _missing_script(v, method=spec.id)
         if why_script:
             file_problems.append(why_script)
         try:
@@ -650,7 +688,9 @@ def plan(dataset: str, category: str, *, methods: list[str] | None = None,
     to ``methods`` / ``modalities`` - runnable rows first, blocked rows kept
     with ``reason`` (and the ``files_ok`` / ``env_ok`` gate columns). Filter
     ``plan[plan.runnable]`` for what will actually run. The frame has the 17
-    :func:`scan` columns; the readable view at the REPL is
+    :func:`scan` columns plus ``command`` - the shell line each variant would
+    run, with the literal ``'<out_dir>'`` placeholder for the output folder
+    (``""`` when the inputs do not resolve); the readable view at the REPL is
     ``plan[["method", "modalities", "runnable", "reason"]]``
     (``files_reason`` / ``env_reason`` hold the verbatim, full-path text).
 
@@ -680,9 +720,9 @@ def plan(dataset: str, category: str, *, methods: list[str] | None = None,
         diagonal variant, say).
 
     See also ``mtb.workflow.plan_commands(dataset, category, data_path=...,
-    out_dir=...)``: this frame plus a ``command`` column with the exact shell
-    line each variant would run (``out_dir`` defaults to the placeholder
-    ``'<out_dir>'``; ``multibench run-all --dry-run`` prints the same).
+    out_dir=...)``: the same frame with the ``command`` column rendered for a
+    REAL ``out_dir`` instead of the placeholder (``multibench run-all
+    --dry-run`` prints the same).
     """
     return run_all(dataset, category, out_dir=None, methods=methods,
                    modalities=modalities, data_path=data_path, dry_run=True,
@@ -1339,12 +1379,13 @@ OUT_DIR_PLACEHOLDER = "<out_dir>"
 def plan_commands(dataset: str, category: str, *, out_dir=OUT_DIR_PLACEHOLDER,
                   methods=None, modalities=None, data_path=None,
                   params: dict | None = None, verbose: bool = False) -> pd.DataFrame:
-    """:func:`plan` plus a ``command`` column: the shell line ``run_all`` would execute for each variant.
+    """:func:`plan` with its ``command`` column rendered for a REAL ``out_dir``.
 
     Reach it as ``mtb.workflow.plan_commands(dataset, category, data_path=...,
-    out_dir=...)``. The frame is :func:`plan` (= ``run_all(dry_run=True)``)
-    with one extra trailing column, so ``plan_commands(...)[plan.columns]`` is
-    the plan. A row whose ``files_ok`` is False has an empty command (there
+    out_dir=...)``. The frame is exactly :func:`plan` (= ``run_all(dry_run=True)``,
+    which carries ``command`` itself, rendered for the ``'<out_dir>'``
+    placeholder); here the lines name the directory you pass, so they are
+    paste-ready. A row whose ``files_ok`` is False has an empty command (there
     is nothing to pass the script); a row blocked only by ``env_ok`` still
     shows its command - that is the line to paste into a job script once the
     env is built. Nothing runs.
@@ -1369,13 +1410,47 @@ def plan_commands(dataset: str, category: str, *, out_dir=OUT_DIR_PLACEHOLDER,
     Returns
     -------
     pandas.DataFrame
-        The plan plus ``command`` (a ``shlex``-joined shell line, ``""`` when
-        the inputs do not resolve, ``(no preview: ...)`` when building it
-        failed).
+        The plan, its ``command`` column holding a ``shlex``-joined shell line
+        (``""`` when the inputs do not resolve, ``(no preview: ...)`` when
+        building it failed).
     """
-    df = run_all(dataset, category, out_dir=None, methods=methods,
-                 modalities=modalities, data_path=data_path, dry_run=True,
-                 params=params, verbose=verbose).copy()
+    # run_all(dry_run=True) renders the column itself (the Python return and
+    # the CLI csv used to differ: the CLI had `command`, the API did not);
+    # this entry point only chooses the out_dir the lines are rendered for.
+    return run_all(dataset, category, out_dir=out_dir, methods=methods,
+                   modalities=modalities, data_path=data_path, dry_run=True,
+                   params=params, verbose=verbose)
+
+
+def _with_commands(df: pd.DataFrame, dataset: str, category: str, *, out_dir,
+                   data_path=None, params: dict | None = None) -> pd.DataFrame:
+    """Append the ``command`` column to a plan frame (a copy is returned).
+
+    One shell line per row via :func:`command_preview`; ``""`` for a row
+    whose ``files_ok`` is False (nothing to hand the script), ``(no preview:
+    ...)`` when building it failed - a preview must never abort the plan.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The :func:`scan` frame restricted to the plan.
+    dataset, category : str
+        As given to :func:`run_all`.
+    out_dir : path or str, keyword-only
+        Root the lines write under (``<out_dir>/<method>_<dataset>/``); the
+        placeholder :data:`OUT_DIR_PLACEHOLDER` when the caller gave none.
+    data_path : path, keyword-only, optional
+        Root containing the dataset folder.
+    params : dict, keyword-only, optional
+        ``{method: {key: value}}`` overrides merged into each line.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``df`` plus a trailing ``command`` column.
+    """
+    import shlex
+    df = df.copy()
     cmds = []
     for _, r in df.iterrows():
         if not r["files_ok"]:
@@ -1388,7 +1463,6 @@ def plan_commands(dataset: str, category: str, *, out_dir=OUT_DIR_PLACEHOLDER,
             argv = command_preview(r["method"], category, inputs=inp,
                                    out_dir=Path(out_dir) / f"{r['method']}_{dataset}",
                                    params=(params or {}).get(r["method"]))
-            import shlex
             cmds.append(shlex.join(argv))
         except Exception as e:  # noqa: BLE001 - a preview must never abort the plan
             cmds.append(f"(no preview: {type(e).__name__}: {e})")
@@ -1494,7 +1568,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
         A folder that does not exist raises ``FileNotFoundError`` (listing the
         folders that do) before anything else happens - on the dry run and
         the real run alike, so a typo never reaches the per-method loop (where
-        ``inputs_for``'s missing-file warning would be the only signal).
+        ``inputs_for``'s missing-file warning would be the only signal). A
+        spelling that differs from the folder only in case (``'d52'`` on a
+        case-insensitive filesystem) is replaced by the on-disk spelling, with
+        a ``UserWarning``, before anything is named after it.
     data_path : the folder that CONTAINS ``dataset``, e.g. ``"/home/wen/data"``
         (so the files live in ``/home/wen/data/MYCITE/``). Defaults to the
         package's configured data root.
@@ -1519,8 +1596,12 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
     dry_run : return the plan without running anything - the :func:`scan` table
         restricted to the requested ``methods`` / ``modalities``: one row per
         (method, modalities) variant, runnable rows first, blocked rows KEPT
-        with their ``reason`` (and the ``files_ok`` / ``env_ok`` gate columns).
-        Never empty: ``ValueError`` if nothing matches. Free; do it first.
+        with their ``reason`` (and the ``files_ok`` / ``env_ok`` gate columns),
+        plus a ``command`` column: the shell line each variant would run
+        (rendered for ``out_dir``, or the literal ``'<out_dir>'`` placeholder
+        when ``out_dir`` is None; ``""`` for a row whose files do not resolve)
+        - the same column ``multibench run-all --dry-run --format csv``
+        writes. Never empty: ``ValueError`` if nothing matches. Free; do it first.
         Filter ``plan[plan.runnable]`` for what will actually be attempted -
         ``len(plan)`` is NOT the sweep size; the readable view is
         ``plan[["method", "modalities", "runnable", "reason"]]``.
@@ -1589,6 +1670,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
             "skip_existing=True with params=... would silently return results computed "
             "with the OLD parameters (reuse is keyed on the output file, not on params). "
             "Use a fresh out_dir per parameter setting, or skip_existing=False.")
+    # the on-disk spelling, decided ONCE here so out_dir names, records and
+    # every downstream call agree (and warn once, not per method)
+    dataset = _resolve.canonical_dataset(
+        Path(data_path) if data_path is not None else config.DEFAULT.data_path, dataset)
     # KeyError (did-you-mean) on an unknown method id and FileNotFoundError on a
     # missing dataset folder both come from scan(); blocked rows are kept.
     plan_df = scan(dataset, category=category, data_path=data_path,
@@ -1604,6 +1689,10 @@ def run_all(dataset: str, category: str, *, out_dir, modalities=None, methods=No
             f"mtb.scan({dataset!r})")
     if dry_run:
         _check_param_keys(plan_df, params)   # a typo'd key must not start a sweep
+        plan_df = _with_commands(
+            plan_df, dataset, category,
+            out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir,
+            data_path=data_path, params=params)
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
             msg = (f"[run_all] dry run: {k} of {n} requested variant(s) runnable on "

@@ -301,6 +301,8 @@ def _cmd_scan(args) -> int:
 
     Whatever columns ``scan`` returns are printed (no hard-coded list); use
     ``--columns`` to pick some and ``--format csv`` to pipe into other tools.
+    ``--category`` is optional, exactly as in ``mtb.scan(dataset)``: without
+    it every category is scanned (it used to be a usage error).
     """
     import multibench
     from .engine import registry
@@ -312,10 +314,12 @@ def _cmd_scan(args) -> int:
     if methods:
         unknown = sorted(set(methods) - set(df["method"]))
         if unknown:
+            where = f"{args.dataset}/{args.category}" if args.category else (
+                f"{args.dataset} (all categories)")
             raise ValueError(
                 f"method(s) {unknown} are not in the scan table for "
-                f"{args.dataset}/{args.category}; methods present: "
-                f"{sorted(df['method'])}")
+                f"{where}; methods present: "
+                f"{sorted(set(df['method']))}")
         df = df[df["method"].isin(methods)]
     _print_frame(df, columns=_csv_list(args.columns), fmt=args.format,
                  compact=_COMPACT_PLAN_COLUMNS)
@@ -545,7 +549,10 @@ def _cmd_cite(args) -> int:
     from . import discover
     if args.all and args.methods:
         _usage_error(args, "--all and explicit method ids are mutually exclusive")
-    methods = "all" if args.all else (args.methods or None)
+    # `cite A B` and `cite A,B` both work: every other multi-id flag of the
+    # CLI is comma-separated, so the positional list splits on commas too
+    ids = [m for tok in (args.methods or []) for m in _csv_list(tok)]
+    methods = "all" if args.all else (ids or None)
     text = discover.cite(methods, fmt=args.format)
     if args.out:
         Path(args.out).write_text(text + "\n")
@@ -798,29 +805,32 @@ def _cmd_evaluate(args) -> int:
 
 
 def _size_total_line(rows, sizes: dict, what: str = "download") -> str:
-    """``# total: X GB download, Y GB on disk (N archives, M unknown)`` for ``rows``.
+    """``# total: X GB download, Y GB on disk (N archives; download size unknown for A, disk size unknown for B)`` for ``rows``.
 
     ``rows`` carry an ``env`` key; ``sizes`` is :func:`multibench.env.packed_sizes`.
-    Envs without a measured size are counted as unknown, never as zero, so
-    the total is a floor and says so.
+    Envs without a measured size are counted as unknown PER COLUMN, never as
+    zero - a row printing ``? disk`` is one disk unknown even when its
+    download size is known (the old single count covered the download column
+    only and said ``0 of unknown size`` under 16 rows of ``? disk``) - so
+    each total is a floor and says so.
     """
     from .engine import envs
     dl = disk = 0
-    n = unknown = n_dl = n_disk = 0
+    n = n_dl = n_disk = 0
     for r in rows:
         n += 1
         sz = sizes.get(r["env"], {})
         a, u = sz.get("archive_bytes"), sz.get("unpacked_bytes")
-        if a is None and u is None:
-            unknown += 1
         if a is not None:
             n_dl += 1
             dl += a
         if u is not None:
             n_disk += 1
             disk += u
-    tail = f" ({n} archive{'s' if n != 1 else ''}, {unknown} of unknown size)" if n else ""
-    floor = " at least" if unknown else ""
+    unknown_dl, unknown_disk = n - n_dl, n - n_disk
+    tail = (f" ({n} archive{'s' if n != 1 else ''}; download size unknown for "
+            f"{unknown_dl}, disk size unknown for {unknown_disk})") if n else ""
+    floor = " at least" if (unknown_dl or unknown_disk) else ""
     return (f"# total{floor}: {envs._gb(dl) if n_dl else '?'} {what}, "
             f"{envs._gb(disk) if n_disk else '?'} on disk{tail}; "
             f"sizes are the shipped snapshot engine/packed_sizes.json")
@@ -850,13 +860,13 @@ def _cmd_env(args) -> int:
         for r in envs.status():
             if keep is not None and r["method"] not in keep:
                 continue
-            mark = "x" if r["exists"] else " "
+            mark = envs.env_mark(r["exists"], r["has_lock"])   # same marks as doctor
             tag = r["difficulty"] + ("*" if r["verified_working"] else "")
             if r["difficulty"] not in seen_tags:
                 seen_tags.append(r["difficulty"])
             print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}")
         # the legend is a note, so stderr: stdout stays one line per method
-        print("# legend: [x]=installed  [ ]=missing;  tag = difficulty of BUILDING "
+        print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of BUILDING "
               "the env: " + "; ".join(f"{t} = {envs.DIFFICULTY.get(t, '?')}"
                                        for t in seen_tags)
               + f";  {envs.VERIFIED_STAR}", file=sys.stderr)
@@ -881,13 +891,13 @@ def _cmd_env(args) -> int:
         _mlist = _csv_list(getattr(args, "methods", None))
         rows = envs.doctor(category=getattr(args, "category", None), methods=_mlist)
         for r in rows:
-            mark = "x" if r["exists"] else ("L" if r["has_lock"] else "!")
+            mark = envs.env_mark(r["exists"], r["has_lock"])
             print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}")
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"
               + (f"; NO lockfile for: {', '.join(nolock)}" if nolock else ""))
-        print("# legend: [x]=installed  [L]=missing, lockfile ready (run `multibench env install --run`)  [!]=missing, no lockfile")
+        print(f"# legend: {envs.MARK_LEGEND}")
         if missing:
             miss_methods = sorted({m for r in missing for m in r["methods"]})
             print(f"# next: multibench env install --methods {','.join(miss_methods)} "
@@ -1116,7 +1126,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "env_reason, needs_labels, atac ...")
     ps.add_argument("dataset", help="dataset id = the folder name under --data-path "
                                    "(e.g. D11, or MYCITE for your own data)")
-    ps.add_argument("--category", required=True, help=_CATEGORY_HELP)
+    ps.add_argument("--category", help=_CATEGORY_HELP + " (default: every category, "
+                                                        "exactly like mtb.scan(dataset))")
     ps.add_argument("--data-path", dest="data_path",
                     help="folder that CONTAINS the dataset folder (default: the "
                          "package data path, see mtb.config)")
@@ -1203,7 +1214,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "given (in that order). Methods without a verified DOI are "
                     "emitted as a comment naming their repository.")
     pci.add_argument("methods", nargs="*", metavar="METHOD",
-                     help="method ids to cite (none: the benchmark entry only)")
+                     help="method ids to cite, space- or comma-separated (`cite A B` "
+                          "and `cite A,B` are the same; none: the benchmark entry only)")
     pci.add_argument("--all", action="store_true",
                      help="cite every registry method")
     pci.add_argument("--format", choices=["bibtex", "text"], default="bibtex",

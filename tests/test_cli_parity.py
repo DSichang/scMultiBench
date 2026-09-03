@@ -132,10 +132,17 @@ def test_cli_scan_unknown_column_and_method_errors(capsys):
     assert rc == 1 and "not in the scan table" in err
 
 
-def test_cli_scan_requires_category():
-    with pytest.raises(SystemExit) as ei:
-        cli.main(["scan", "D28"])
-    assert ei.value.code == 2
+def test_cli_scan_without_category_scans_every_category(capsys):
+    """`multibench scan D28` = mtb.scan('D28'): all four categories, not exit 2."""
+    import io
+    import pandas as pd
+    rc = cli.main(["scan", "D28", "--format", "csv"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    df = pd.read_csv(io.StringIO(out))
+    assert set(df["category"]) == set(multibench.scan("D28")["category"])
+    assert len(set(df["category"])) > 1
+    assert len(df) == len(multibench.scan("D28"))
 
 
 def test_cli_layout(capsys):

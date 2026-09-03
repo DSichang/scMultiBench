@@ -71,6 +71,8 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         driver=d.get("driver"),
         normalize_peaks=d.get("normalize_peaks", []),
         extra_outputs=[OutputSpec(**o) for o in d.get("extra_outputs", [])],
+        slice_obs=list(d.get("slice_obs", []) or []),
+        helpers=list(d.get("helpers", []) or []),
     )
 
 
