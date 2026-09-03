@@ -699,8 +699,10 @@ reports it `benchmark-host-only: script not published` and
 `mtb.find_methods(task="registration", available=True)` omits it. GPSA
 additionally reads `obs['Ground_Truth']` (a region / layer label per spot)
 from every slice: it drives GPSA's own PAA / LTARI / SCS scores, written to
-`<out_dir>/GPSA_aligned_slices/<data_dir_name>_metrics.csv`. The scripts
-glob the slices without sorting, so the output index follows glob order."""
+`<out_dir>/GPSA_aligned_slices/<data_dir_name>_metrics.csv`. `mtb.run` stages
+the slices as sorted, zero-padded symlinks under `<out_dir>/inputs/` and writes
+`<out_dir>/slices_manifest.json` mapping each `aligned_slice_<i>` to its source
+file (the scripts glob without sorting; the manifest is the authority)."""
     if cat == "mosaic":
         trouble_extra = """
 ### Why is UINMF not in mosaic?

@@ -30,6 +30,12 @@ import numpy as np
 __all__ = ["to_canonical", "read_canonical", "normalize_peak_names",
            "export_dataset", "from_mudata", "write_labels"]
 
+
+def __dir__() -> list[str]:
+    """Tab completion (``dir(mtb.io)``) shows the public API and the
+    underscore names, not the imports this module merely uses (PEP 562)."""
+    return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
+
 # ATAC peak ids come in chr_start_end / chr-start-end / chr:start-end flavours.
 # Signac CreateChromatinAssay(sep=c(":","-")) (Seurat_v3 etc.) needs chr:start-end.
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")

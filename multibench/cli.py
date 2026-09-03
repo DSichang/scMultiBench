@@ -637,7 +637,10 @@ def _cmd_plot(args) -> int:
         df = df[df["method"].isin(methods)]
     if len(df) == 0:
         raise ValueError("the results table is empty after filtering - nothing to plot")
-    if df["method"].nunique() == 1:
+    if df["method"].nunique() == 1 and args.category is None:
+        # --category frames come through load_results, which already warns
+        # (and names the source that holds more methods); --input-only
+        # frames never pass through it
         print("warning: only one method in this table; ranks and Overall bars "
               "are not meaningful with a single method", file=sys.stderr)
     title = args.title
