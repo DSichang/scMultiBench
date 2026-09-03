@@ -27,16 +27,66 @@ import pandas as pd
 _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 
 
-def read_embedding(path: Path | str) -> np.ndarray:
-    """Read embedding from h5 dataset 'data'; orient as (cells, dims).
+def _require_file(path: Path | str, what: str = "file") -> Path:
+    """``Path(path)`` when it is an existing file; else ``FileNotFoundError``
+    naming the path AND the working directory (a relative path that resolves
+    from the repository but not from a notebook's cwd is the usual cause)."""
+    p = Path(path)
+    if p.is_dir():
+        raise FileNotFoundError(
+            f"{what} {p} is a directory, not a file (cwd {Path.cwd()})")
+    if not p.is_file():
+        raise FileNotFoundError(
+            f"{what} {p} does not exist (cwd {Path.cwd()}"
+            + (f"; resolved {p.resolve()}" if not p.is_absolute() else "") + ")")
+    return p
 
-    Note: orientation auto-detection assumes there are MORE cells than
-    embedding dimensions. Square embeddings (cells == dims) or tall-thin
-    embeddings cannot be auto-disambiguated and may be returned in the wrong
-    orientation.
+
+def read_embedding(path: Path | str) -> np.ndarray:
+    """Read an embedding from an HDF5 file's dataset ``data``; orient as (cells, dims).
+
+    Parameters
+    ----------
+    path : str or Path
+        The benchmark's ``embedding.h5`` layout: one top-level dataset
+        ``data`` (either orientation).
+
+    Returns
+    -------
+    numpy.ndarray
+        2-D array, cells x dims. Orientation auto-detection assumes there are
+        MORE cells than embedding dimensions; square (cells == dims) or
+        tall-thin embeddings cannot be auto-disambiguated and may come back
+        transposed.
+
+    Raises
+    ------
+    FileNotFoundError
+        ``path`` does not exist (the message names it and the cwd).
+    ValueError
+        The file has no dataset ``data``: the message lists the keys found
+        and, when they are the canonical INPUT layout (a ``matrix`` group
+        holding ``data``/``barcodes``/``features``), says that this is an
+        input matrix, not a method output.
     """
+    path = _require_file(path, "output")
     with h5py.File(path, "r") as f:
+        if "data" not in f or not isinstance(f["data"], h5py.Dataset):
+            keys = sorted(f.keys())
+            hint = ""
+            if "matrix" in keys:
+                hint = (" - this looks like a canonical INPUT matrix (matrix/data, "
+                        "matrix/barcodes, matrix/features: rna.h5 / adt.h5 / "
+                        "atac.h5), not an embedding; evaluate() wants a method "
+                        "OUTPUT such as out/<method>/embedding.h5 (or pass an "
+                        "AnnData / .npy / .csv embedding)")
+            raise ValueError(
+                f"{path} has no dataset 'data'; found keys {keys}{hint}")
         X = np.asarray(f["data"])
+    if X.ndim != 2:
+        raise ValueError(
+            f"{path}: dataset 'data' is {X.ndim}-D {X.shape}; an embedding is "
+            f"2-D (cells x dims)")
     if X.shape[0] < X.shape[1]:
         X = X.T
     return X
@@ -79,7 +129,7 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
         1-D array of the raw label values (strings or numbers, as written);
         not integer codes. Every consumer in the package casts to ``str``.
     """
-    path = Path(path)
+    path = _require_file(path, "labels file")
     d = pd.read_csv(path, sep=_sep_for(path))
     cols = [str(c) for c in d.columns]
     if column is not None:
@@ -103,8 +153,33 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
 
 
 def read_clustering(path: Path | str) -> np.ndarray:
-    """Read precomputed clustering from h5 '/obs/cluster_leiden' (bytes -> int)."""
+    """Read a precomputed clustering from an h5 file's ``/obs/cluster_leiden``.
+
+    Parameters
+    ----------
+    path : str or Path
+        The benchmark's clustered-output layout (bytes or ints under
+        ``/obs/cluster_leiden``).
+
+    Returns
+    -------
+    numpy.ndarray
+        1-D integer cluster ids.
+
+    Raises
+    ------
+    FileNotFoundError
+        ``path`` does not exist (names the path and the cwd).
+    ValueError
+        No ``/obs/cluster_leiden`` in the file (lists the keys found).
+    """
+    path = _require_file(path, "clustering file")
     with h5py.File(path, "r") as f:
+        if "obs" not in f or "cluster_leiden" not in f["obs"]:
+            raise ValueError(
+                f"{path} has no dataset '/obs/cluster_leiden'; found keys "
+                f"{sorted(f.keys())} - pass the clustering as a label CSV or a "
+                f"1-D array instead")
         raw = np.asarray(f["/obs/cluster_leiden"]).flatten()
     decoded = [x.decode("utf-8") if isinstance(x, (bytes, bytearray)) else x for x in raw]
     return np.asarray(decoded).astype(int)
@@ -132,10 +207,12 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
       in ``.csv``/``.tsv``/``.txt``) - read each and concatenate IN THE GIVEN
       ORDER, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
     * ``dict`` with ONE entry (what :func:`multibench.labels_for` returns for a
-      single-label dataset) - that file; several entries raise, because a dict
-      has no cell order of its own - pass the paths as a list in the method's
-      stacking order (or, in :func:`multibench.evaluate`, the dict plus
-      ``label_order=``);
+      single-label dataset) - that file. Several entries raise HERE, because
+      this coercer does not know the method's stacking order; pass the paths
+      as a list in that order. (:func:`multibench.evaluate` is more lenient:
+      it takes a multi-entry dict as is when its insertion order IS the
+      stacking order - what ``labels_for`` returns - and needs
+      ``label_order=`` only for a dict in any other order.)
     * ``numpy.ndarray`` (1-D, or ``(n, 1)``), ``pandas.Series``,
       ``pandas.Categorical``, ``pandas.Index``, or a list/tuple of scalars;
     * a single-column ``pandas.DataFrame`` (or a wider one with ``column=``).
@@ -338,6 +415,10 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
 
     Orientation is NOT decided here: :func:`read_embedding` orients files, and
     :func:`multibench.evaluate` orients everything else against the label count.
+    A path that does not exist raises ``FileNotFoundError`` naming it and the
+    working directory; an ``.h5`` without dataset ``data`` raises
+    ``ValueError`` listing the keys found (and says so when they are the
+    canonical INPUT layout ``matrix/...``).
 
     Parameters
     ----------
@@ -360,7 +441,7 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
     if _is_anndata(output):
         return _anndata_matrix(output, obsm)
     if isinstance(output, (str, Path)):
-        p = Path(output)
+        p = _require_file(output, "output")
         suf = p.suffix.lower()
         if suf in {".h5", ".hdf5", ".hdf"}:
             return read_embedding(p)
@@ -371,7 +452,7 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
             return np.asarray(np.load(p), dtype=float)
         if suf in {".csv", ".tsv"}:
             return _read_csv_matrix(p)
-        if p.is_file() and h5py.is_hdf5(p):
+        if h5py.is_hdf5(p):
             return read_embedding(p)
         raise ValueError(
             f"output path {p} has unrecognised suffix {suf!r}; expected "
