@@ -1,4 +1,4 @@
-"""export_dataset / from_mudata: AnnData or MuData -> canonical dataset folder
+"""export_dataset: AnnData or MuData -> canonical dataset folder
 (work package D_ingest, proposal P04)."""
 import os
 import warnings
@@ -53,7 +53,7 @@ def test_export_dataset_vertical(tmp_path):
     lab = pd.read_csv(d / "cty.csv")
     assert lab.columns.tolist() == ["x"] and lab["x"].tolist() == a.obs["ct"].astype(str).tolist()
     # the folder passes the orientation/existence preflight ...
-    got = _resolve.inputs_for("MYCITE", "Matilda", "vertical", modalities=["rna", "adt"],
+    got = _resolve.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
                               data_path=root, check=True)
     assert got["rna"].endswith("rna.h5") and got["adt"].endswith("adt.h5")
     # ... and scan() lists the vertical rna+adt methods for it (env-independent)
@@ -143,7 +143,7 @@ def test_export_dataset_batch_numbering(tmp_path):
     assert pd.read_csv(d / "cty1.csv")["x"].tolist() == a.obs["ct"].astype(str).tolist()[:25]
     assert len(pd.read_csv(d / "cty2.csv")) == 35
     # the numbered layout resolves like the shipped D52 (rna1.h5 / cty1.csv)
-    got = _resolve.inputs_for("B", "Matilda", "vertical", modalities=["rna", "adt"],
+    got = _resolve.inputs_for("B", "vertical", "Matilda", modalities=["rna", "adt"],
                               data_path=tmp_path, check=True)
     assert got["rna"].endswith("rna1.h5")
 
@@ -158,7 +158,9 @@ def test_export_dataset_cell_count_mismatch(tmp_path):
         ingest.export_dataset(m, tmp_path / "M", rna="mod:rna", adt="mod:adt")
 
 
-def test_from_mudata(tmp_path):
+def test_export_dataset_accepts_mudata_modality_names(tmp_path):
+    """The 0.2 from_mudata helper is folded in: bare modality names select
+    mdata.mod[name], '<mod>:<col>' selects an obs column."""
     mu = pytest.importorskip("mudata")
     a = _cite()
     rna = ad.AnnData(a.X.copy(), obs=a.obs[["ct", "batch"]].copy())
@@ -168,7 +170,7 @@ def test_from_mudata(tmp_path):
     adt.var_names = a.uns["protein_names"]
     adt.obs_names = a.obs_names
     m = mu.MuData({"rna": rna, "adt": adt})
-    d1 = ingest.from_mudata(m, tmp_path / "FM", rna="rna", adt="adt", labels="rna:ct")
+    d1 = ingest.export_dataset(m, tmp_path / "FM", rna="rna", adt="adt", labels="rna:ct")
     d2 = ingest.export_dataset(m, tmp_path / "ED", rna="mod:rna", adt="mod:adt",
                                labels="mod:rna.obs:ct")
     assert sorted(p.name for p in d1.iterdir()) == sorted(p.name for p in d2.iterdir()) \
@@ -178,17 +180,16 @@ def test_from_mudata(tmp_path):
         assert np.allclose(x1[0], x2[0]) and x1[3] == x2[3]
     assert _h5(d1 / "adt.h5")[3] == list(adt.var_names)
     assert pd.read_csv(d1 / "cty.csv")["x"].tolist() == pd.read_csv(d2 / "cty.csv")["x"].tolist()
-    # an .h5mu path is accepted too; AnnData is rejected with a pointer
+    # a loaded .h5mu behaves the same; from_mudata itself is gone
     p = tmp_path / "m.h5mu"
     m.write(p)
-    d3 = ingest.from_mudata(p, tmp_path / "FP", rna="rna", labels="rna:ct")
+    d3 = ingest.export_dataset(ingest._to_anndata(p), tmp_path / "FP", rna="rna", labels="rna:ct")
     assert (d3 / "rna.h5").exists() and (d3 / "cty.csv").exists()
-    with pytest.raises(TypeError, match="use export_dataset for AnnData"):
-        ingest.from_mudata(a, tmp_path / "X")
-    # MuData without a mod: selector is refused with the available names
+    assert not hasattr(ingest, "from_mudata")
+    # MuData without a mod: selector (and no such mod name) is refused with the names
     with pytest.raises(ValueError, match="MuData input needs a 'mod:<name>' selector"):
         ingest.export_dataset(m, tmp_path / "X", rna="X")
     # batch split through MuData obs
-    d4 = ingest.from_mudata(m, tmp_path / "FB", rna="rna", adt="adt",
-                            labels="rna:ct", batch="rna:batch")
+    d4 = ingest.export_dataset(m, tmp_path / "FB", rna="rna", adt="adt",
+                               labels="rna:ct", batch="rna:batch")
     assert (d4 / "rna1.h5").exists() and (d4 / "cty2.csv").exists()

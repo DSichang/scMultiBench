@@ -52,8 +52,8 @@ def test_to_canonical_peak_vertical_makes_scan_find_a_runnable_layout(tmp_path):
     rna = _genes(); rna.obs["ct"] = ["a", "b"] * 3
     ingest.to_canonical(rna, d, modality="rna")
     ingest.to_canonical(_peaks(), d, modality="peak", category="vertical")
-    ingest.write_labels(rna.obs["ct"], d / "cty.csv")
-    got = resolve.inputs_for("TWOADATA", "Matilda", "vertical", modalities=["rna", "atac"],
+    ingest._write_labels(rna.obs["ct"], d / "cty.csv")
+    got = resolve.inputs_for("TWOADATA", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
     assert got["atac"].endswith("atac.h5")
 
@@ -98,11 +98,11 @@ def test_export_dataset_explicit_other_category_keeps_representation_names(tmp_p
                               category="paired")
 
 
-def test_from_mudata_forwards_category(tmp_path):
+def test_export_dataset_mudata_forwards_category(tmp_path):
     mudata = pytest.importorskip("mudata")
     rna = _genes(); pk = _peaks()
     rna.obs_names = pk.obs_names = [f"c{i}" for i in range(6)]
     md = mudata.MuData({"rna": rna, "atac": pk})
-    out = mtb.io.from_mudata(md, tmp_path / "MU", rna="rna", atac="atac", atac_kind="peak",
-                             category="vertical")
+    out = mtb.io.export_dataset(md, tmp_path / "MU", rna="rna", atac="atac", atac_kind="peak",
+                                category="vertical")
     assert sorted(p.name for p in out.iterdir()) == ["atac.h5", "rna.h5"]

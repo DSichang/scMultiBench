@@ -87,18 +87,22 @@ def test_params_for_dataset_disambiguates_by_folder(tmp_path):
 
 
 def test_cite_is_variadic_and_keeps_the_list_form():
-    both = mtb.cite("Matilda", "MOFA2")
-    assert both == mtb.cite(["Matilda", "MOFA2"]) == mtb.cite(methods=["Matilda", "MOFA2"])
-    assert both == mtb.cite(("Matilda", "MOFA2"))
+    both = mtb.cite("Matilda", "MOFA2", fmt="bibtex")
+    assert both == mtb.cite(["Matilda", "MOFA2"], fmt="bibtex")
+    assert both == mtb.cite(("Matilda", "MOFA2"), fmt="bibtex")
     assert "Matilda" in both and "MOFA2" in both and both.startswith("@article{scMultiBench")
-    assert mtb.cite() == mtb.cite(None) == mtb.cite(methods=None)
-    assert mtb.cite("Matilda", fmt="text") == mtb.cite(["Matilda"], "text")     # legacy positional fmt
-    assert mtb.cite("all") == mtb.cite(["all"][0]) and mtb.cite("all").count("@") > 30
+    assert mtb.cite() == mtb.cite(None)
+    assert "https://doi.org/" in mtb.cite() and "@article" not in mtb.cite()   # text is the default
+    assert mtb.cite("Matilda") == mtb.cite(["Matilda"], fmt="text")
+    assert mtb.cite("all") == mtb.cite(["all"][0]) and mtb.cite("all", fmt="bibtex").count("@") > 30
     with pytest.raises(ValueError, match="unknown fmt 'nope'"):
         mtb.cite("Matilda", fmt="nope")
     with pytest.raises(KeyError, match="did you mean 'Matilda'"):
         mtb.cite("Matlida")
     with pytest.raises(TypeError, match="pass ONE list"):
         mtb.cite(["Matilda"], ["MOFA2"])
-    with pytest.raises(TypeError, match="not both"):
-        mtb.cite("Matilda", methods=["MOFA2"])
+    # the 0.2 methods= keyword and the positional fmt are gone: loud
+    with pytest.raises(TypeError, match="methods"):
+        mtb.cite(methods=["MOFA2"])
+    with pytest.raises(TypeError, match="method ids must be strings"):
+        mtb.cite(["Matilda"], "text")

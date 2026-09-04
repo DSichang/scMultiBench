@@ -28,16 +28,15 @@ import yaml
 
 from . import registry
 
-__all__ = [
-    # inspection
-    "recipe", "default_env_name", "own_env_name", "group_for", "groups", "plan", "status",
-    "doctor", "required_envs", "installed_envs", "lockfile",
-    "host_platform_problem", "packed_sizes", "DIFFICULTY", "VERIFIED_STAR",
-    # recipe view (the declared, hand-written recipe — for transparency)
-    "create_commands", "environment_yml", "group_create_commands",
-    # provisioning (lockfile-based: build the REAL envs run() uses)
-    "create", "create_group", "create_env", "create_all", "freeze",
-]
+__all__ = ["status", "plan", "install", "doctor", "recipe"]
+
+
+def __dir__() -> list[str]:
+    """``dir(mtb.env)`` shows the five public entry points and the dunders
+    (PEP 562). Everything else in this module - the env-name resolvers, the
+    lockfile/recipe builders, ``create_all`` / ``install_packed`` ... - stays
+    importable for the CLI and the tests but is not advertised."""
+    return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
 
 
 # --- host platform --------------------------------------------------------
@@ -187,6 +186,21 @@ _LOCKS_DIR = Path(__file__).resolve().parent / "env_locks"
 
 # --- recipes ---------------------------------------------------------------
 def recipe(method: str) -> dict:
+    """The hand-written environment recipe of ``method`` (``engine/env_specs.yaml``).
+
+    Parameters
+    ----------
+    method : str
+        Registry id (``KeyError`` with a did-you-mean hint on a typo).
+
+    Returns
+    -------
+    dict
+        The declared ``env_spec`` (``conda``/``pip`` package lists,
+        ``difficulty``, ``verified_working`` ...); ``{}`` when the method
+        has no recipe. ``multibench env recipe METHOD`` renders it as
+        commands.
+    """
     """Return the method's environment recipe (its ``env_spec``); ``{}`` if none."""
     return registry.get(method).env_spec or {}
 
@@ -861,6 +875,108 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
                 _run_all(cmds)
         out.append({"env": env, "methods": sorted(ms), "exists": exists,
                     "has_lock": lock is not None, "cmds": cmds})
+    return out
+
+
+_PACKED_MANIFEST = Path(__file__).resolve().parent / "packed_urls.json"
+
+
+def packed_manifest() -> dict:
+    """The ``{env: archive_url}`` map shipped as ``engine/packed_urls.json`` (``{}`` if absent).
+
+    The KEYS say whether an archive is published for an env; the URL is what
+    ``multibench env install --packed`` (dry run) prints so a cluster user can
+    check it against an egress proxy. Sizes come from the sibling snapshot
+    ``engine/packed_sizes.json`` (:func:`packed_sizes`).
+    """
+    if not _PACKED_MANIFEST.is_file():
+        return {}
+    try:
+        data = _json.loads(_PACKED_MANIFEST.read_text())
+    except Exception:  # noqa: BLE001 - a broken manifest means "no archives"
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def install(methods: list[str] | None = None, *, category: str | None = None,
+            packed: bool = True, dry_run: bool = True, conda: str | None = None,
+            force: bool = False) -> list[dict]:
+    """Install the conda envs a selection of methods needs - the Python face of
+    ``multibench env install`` (the CLI calls this function).
+
+    Parameters
+    ----------
+    methods : list of str, optional
+        Registry ids (``KeyError`` with a did-you-mean hint on a typo);
+        default: every method of ``category``, or every method.
+    category : str, keyword-only, optional
+        Restrict to the methods wired for this integration category.
+    packed : bool, keyword-only
+        Use the prebuilt conda-pack archives where one is published
+        (:func:`packed_manifest`), falling back to the lockfile build;
+        ``False`` builds every missing env from its lockfile.
+    dry_run : bool, keyword-only
+        ``True`` (default) installs nothing and returns the plan: one entry
+        per env with its ``state`` (``'have'``, ``'packed archive published'``
+        plus its sizes/URL, ``'no archive - lockfile build'``,
+        ``'build(dry-run)'``, ``'NO-LOCK'`` ...). ``False`` installs the
+        missing envs - packed archives first when ``packed``, lockfile builds
+        otherwise - and returns the per-env outcome (``'PACKED'`` /
+        ``'BUILD'`` / ``'have'`` / ``'NO-LOCK'``).
+    conda : str, keyword-only, optional
+        conda/mamba executable; default: mamba if found, else conda.
+    force : bool, keyword-only
+        The archives and lockfiles are linux-64; ``dry_run=False`` on
+        macOS/Windows raises ``RuntimeError`` BEFORE any download unless
+        ``force=True``.
+
+    Returns
+    -------
+    list of dict
+        One entry per distinct env, largest first: ``{env, methods, exists,
+        has_lock, cmds, state, packed_url, archive_bytes, unpacked_bytes}``
+        (``cmds`` = the lockfile commands run, or that would run; the last
+        three are ``None`` unless ``packed`` and known).
+
+    Raises
+    ------
+    RuntimeError
+        No conda here, a failed build, or a non-Linux host without ``force``
+        (``dry_run=False`` only).
+    """
+    _check_methods(methods)
+    manifest = packed_manifest() if packed else {}
+    sizes = packed_sizes() if packed else {}
+    unpacked: set[str] = set()
+    if packed and not dry_run:
+        for r in doctor(category=category, methods=methods, conda=conda):
+            if not r["exists"] and install_packed(r["env"], conda=conda, force=force):
+                unpacked.add(r["env"])
+    # a RuntimeError (no conda here, a failed build, a non-Linux host)
+    # propagates: the CLI prints it as "error: ..." on stderr, exit 1
+    rows = create_all(category=category, methods=methods, conda=conda,
+                      dry_run=dry_run, force=force)
+    out = []
+    for r in rows:
+        env = r["env"]
+        if env in unpacked:
+            state = "PACKED"
+        elif r["exists"]:
+            state = "have"
+        elif not dry_run:
+            state = "BUILD" if r["has_lock"] else "NO-LOCK"
+        elif packed:
+            if env in manifest:
+                state = "packed archive published"
+            else:
+                state = ("no archive - lockfile build" if r["has_lock"]
+                         else "no archive - NO-LOCK")
+        else:
+            state = "build(dry-run)" if r["has_lock"] else "NO-LOCK"
+        sz = sizes.get(env, {})
+        out.append({**r, "state": state, "packed_url": manifest.get(env),
+                    "archive_bytes": sz.get("archive_bytes"),
+                    "unpacked_bytes": sz.get("unpacked_bytes")})
     return out
 
 

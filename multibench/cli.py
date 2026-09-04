@@ -2,7 +2,7 @@
 
 Every subcommand is a thin wrapper around one public Python function, with the
 same parameter names where a flag exists (``--category``, ``--metrics``,
-``--only``, ``--out-dir`` ...). The end-to-end story mirrors the Python one::
+``--out-dir`` ...). The end-to-end story mirrors the Python one::
 
     multibench layout vertical                         # how to lay out MY data
     multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:celltype
@@ -228,25 +228,6 @@ def _parse_params(pairs, args=None, default_method: str | None = None) -> dict:
     return out
 
 
-def _packed_manifest() -> dict:
-    """The ``{env: archive_url}`` map shipped as ``engine/packed_urls.json`` (``{}`` if absent).
-
-    The KEYS say whether an archive is published for an env; the URL is
-    printed by ``env install --packed`` (dry run) so a cluster user can check
-    it against an egress proxy. Sizes come from the sibling snapshot
-    ``engine/packed_sizes.json`` (:func:`multibench.env.packed_sizes`).
-    """
-    from .engine import envs
-    mf = Path(envs.__file__).parent / "packed_urls.json"
-    if not mf.is_file():
-        return {}
-    try:
-        data = json.loads(mf.read_text())
-    except Exception:  # noqa: BLE001 - a broken manifest means "no archives"
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
 def _usage_error(args, message: str) -> None:
     """Report a usage error the way argparse does (usage line + message, exit 2)."""
     parser = getattr(args, "_parser", None)
@@ -275,9 +256,14 @@ def _platform_note() -> str | None:
 
 # ----------------------------------------------------------------- commands
 def _cmd_list(args) -> int:
-    """``multibench list``: method ids from the registry, one per line."""
-    from .engine import registry
-    for m in registry.list_methods(category=args.category, task=args.task,
+    """``multibench list``: method ids from the registry, one per line.
+
+    Plain ``list [--category C]`` is :func:`multibench.list_methods`; the
+    ``--task`` / ``--runnable`` filters are :func:`multibench.find_methods`
+    filters (same order, same set).
+    """
+    from . import discover
+    for m in discover.find_methods(category=args.category, task=args.task,
                                    runnable=args.runnable or None):
         print(m)
     return _EXIT_OK
@@ -310,7 +296,7 @@ def _cmd_scan(args) -> int:
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
     df = multibench.scan(args.dataset, args.category, data_path=args.data_path,
-                         modalities=_csv_list(args.modalities))
+                         modalities=_csv_list(args.modalities), verbose=False)
     if methods:
         unknown = sorted(set(methods) - set(df["method"]))
         if unknown:
@@ -692,17 +678,16 @@ def _cmd_run(args) -> int:
 
     ``--param KEY=VALUE`` (repeatable; ``METHOD:KEY=VALUE`` is accepted when
     METHOD is ``--method``) becomes ``params={KEY: value}``. ``--dry-run``
-    prints the command line ``run`` would execute (via
-    :func:`multibench.workflow.command_preview`) and executes nothing.
+    prints the command line ``run`` would execute (``mtb.run(...,
+    dry_run=True)``) and executes nothing.
     """
     import multibench
-    from .workflow import command_preview
     params = _parse_params(args.param, args, default_method=args.method) or {}
     inputs = _parse_inputs(args.input, args)
     if args.dry_run:
-        argv = command_preview(args.method, args.category, inputs=inputs,
-                               out_dir=args.out, params=params.get(args.method),
-                               cmd_template=args.runner)
+        argv = multibench.run(args.method, args.category, inputs=inputs,
+                              out_dir=args.out, params=params.get(args.method),
+                              cmd_template=args.runner, dry_run=True)
         print("# dry run - nothing was executed; run() would execute:", file=sys.stderr)
         print(shlex.join(argv))
         return _EXIT_OK
@@ -718,26 +703,27 @@ def _cmd_run(args) -> int:
 def _cmd_run_all(args) -> int:
     """``multibench run-all``: :func:`multibench.run_all` on a laid-out dataset.
 
-    ``--dry-run`` prints the plan (one row per method variant: runnable,
+    ``--dry-run`` prints the plan - the :func:`multibench.scan` frame
+    ``run_all(dry_run=True)`` returns (one row per method variant: runnable,
     files_ok, env_ok, reason; compact columns - ``--columns all`` for every
-    column) and, in table mode, the command line each variant would run (via
-    :func:`multibench.workflow.plan_commands`; in csv/tsv/json it is the
-    ``command`` column); nothing is executed or created. Otherwise the
+    column) and, in table mode, the command line each variant would run (in
+    csv/tsv/json it is the ``command`` column); nothing is executed or
+    created. Otherwise the
     summary table is printed and everything is saved under ``--out-dir``
     (reload with ``multibench plot bubble --input OUT_DIR``). Progress lines
     go to stderr; tables to stdout. ``--param METHOD:KEY=VALUE`` (repeatable)
     becomes ``params={METHOD: {KEY: value}}``.
     """
     import multibench
-    from .workflow import plan_commands
     params = _parse_params(args.param, args) or None
     columns = _csv_list(args.columns)
     if args.dry_run:
         with _quiet_stdout():
-            df = plan_commands(args.dataset, args.category, out_dir=args.out,
-                               methods=_csv_list(args.methods),
-                               modalities=_csv_list(args.modalities),
-                               data_path=args.data_path, params=params, verbose=False)
+            df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
+                                    methods=_csv_list(args.methods),
+                                    modalities=_csv_list(args.modalities),
+                                    data_path=args.data_path, params=params,
+                                    dry_run=True, verbose=False)
         k, n = int(df["runnable"].sum()), len(df)
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
               f"{args.dataset} ({args.category}); commands below are what run() "
@@ -774,6 +760,7 @@ def _cmd_evaluate(args) -> int:
     ``load_results`` speak.
     """
     import multibench
+    from .workflow import _evaluate_compat
     long_mode = args.method is not None or args.dataset is not None
     if long_mode:
         missing = [f for f, v in (("--method", args.method), ("--dataset", args.dataset),
@@ -782,17 +769,32 @@ def _cmd_evaluate(args) -> int:
             _usage_error(args, f"--method/--dataset write a long table and need "
                          f"all of --method, --dataset, --category; missing "
                          f"{', '.join(missing)}")
-    kw = dict(output=args.output, category=args.category, task=args.task,
-              labels=args.labels, clustering=args.cluster,
-              batch=getattr(args, "batch", None), only=_csv_list(args.only))
+    # ONE metric-selection knob: --metrics (a family token or a comma list of
+    # codes); --only is the hidden 0.2 spelling of the list form
+    metrics = _csv_list(args.metrics)
+    if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
+        metrics = metrics[0]
+    if getattr(args, "only", None) is not None:
+        print("warning: --only is deprecated since 0.3.0; use --metrics", file=sys.stderr)
+        if metrics is None:
+            metrics = _csv_list(args.only)
+    if metrics is None:
+        # the --task family (default clustering) selects the family, as before
+        metrics = {"dimension_reduction": "clustering"}.get(args.task, args.task)
+    labels = args.labels
+    if args.column is not None and labels is not None:
+        # evaluate() takes the labels themselves: read the named column here
+        import pandas as pd
+        labels = pd.read_csv(labels)[args.column]
+    kw = dict(category=args.category, labels=labels, clustering=args.cluster,
+              batch=getattr(args, "batch", None))
     if args.obsm is not None:
         kw["obsm"] = args.obsm
-    if args.column is not None:
-        kw["column"] = args.column
     with _quiet_stdout():                     # library progress -> stderr
-        df = multibench.evaluate(**kw)
+        df = _evaluate_compat(multibench.evaluate, args.output, metrics=metrics, **kw)
     if long_mode:
-        df = multibench.to_long(df, args.method, args.dataset, args.category)
+        df = multibench.to_long(df, method=args.method, dataset=args.dataset,
+                                category=args.category)
         if args.out:
             df.to_csv(args.out, index=False)
             print(f"wrote {args.out}")
@@ -913,51 +915,27 @@ def _cmd_env(args) -> int:
         do_run = getattr(args, "run", False)
         packed = getattr(args, "packed", False)
         force = getattr(args, "force", False)
-        if packed and do_run:
-            for r in envs.doctor(category=getattr(args, "category", None),
-                                 methods=_mlist):
-                with _quiet_stdout():           # "[env] unpacking ..." -> stderr
-                    got = (not r["exists"]) and envs.install_packed(r["env"], force=force)
-                if got:
-                    print(f"{r['env']:18} [PACKED        ] <- {', '.join(r['methods'])}")
-        # a RuntimeError (no conda here, a failed build, a non-Linux host)
-        # propagates to main(): "error: ..." on stderr, exit 1 - never an
-        # error line on stdout
+        # mtb.env.install(): a RuntimeError (no conda here, a failed build, a
+        # non-Linux host) propagates to main(): "error: ..." on stderr, exit 1
+        # - never an error line on stdout; "[env] unpacking ..." -> stderr
         with _quiet_stdout():
-            rows = envs.create_all(category=getattr(args, "category", None),
-                                   methods=_mlist, dry_run=not do_run, force=force)
-        manifest = _packed_manifest() if (packed and not do_run) else {}
-        sizes = envs.packed_sizes() if (packed and not do_run) else {}
-        states, extras = [], []
+            rows = envs.install(_mlist, category=getattr(args, "category", None),
+                                packed=packed, dry_run=not do_run, force=force)
+        width = max([14] + [len(r["state"]) for r in rows])
         for r in rows:
             extra = ""
-            if r["exists"]:
-                state = "have"
-            elif do_run:
-                state = "BUILD" if r["has_lock"] else "NO-LOCK"
-            elif packed:
-                if r["env"] in manifest:
-                    state = "packed archive published"
-                    sz = sizes.get(r["env"], {})
-                    extra = (f" {envs._gb(sz.get('archive_bytes')):>8} dl "
-                             f"{envs._gb(sz.get('unpacked_bytes')):>8} disk  {manifest[r['env']]}")
-                else:
-                    state = ("no archive - lockfile build" if r["has_lock"]
-                             else "no archive - NO-LOCK")
-            else:
-                state = "build(dry-run)" if r["has_lock"] else "NO-LOCK"
-            states.append(state)
-            extras.append(extra)
-        width = max([14] + [len(s) for s in states])
-        for r, state, extra in zip(rows, states, extras):
-            print(f"{r['env']:18} [{state:{width}}] <- {', '.join(r['methods'])}{extra}")
+            if r["state"] == "packed archive published":
+                extra = (f" {envs._gb(r.get('archive_bytes')):>8} dl "
+                         f"{envs._gb(r.get('unpacked_bytes')):>8} disk  {r['packed_url']}")
+            print(f"{r['env']:18} [{r['state']:{width}}] <- {', '.join(r['methods'])}{extra}")
         if not do_run:
             print("# dry-run - add --run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
                      if packed else " from their lockfiles"), file=sys.stderr)
             if packed:
-                todo = [r for r in rows if not r["exists"] and r["env"] in manifest]
-                print(_size_total_line(todo, sizes, what="to download"), file=sys.stderr)
+                todo = [r for r in rows if not r["exists"] and r.get("packed_url")]
+                print(_size_total_line(todo, envs.packed_sizes(), what="to download"),
+                      file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if getattr(args, "all", False):
@@ -1038,6 +1016,8 @@ _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
 _FORCE_HELP = ("build even though this host is not linux-64 (the packed archives and "
                "lockfiles are; without --force a non-Linux host refuses before any "
                "download)")
+#: the family tokens ``--metrics`` accepts besides a comma list of codes
+_METRIC_FAMILIES = ("clustering", "batch", "all")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1057,12 +1037,14 @@ def build_parser() -> argparse.ArgumentParser:
                            title="commands")
 
     # ---- list
-    pl = sub.add_parser("list", help="list method ids (mtb.list_methods)",
+    pl = sub.add_parser("list", help="list method ids (mtb.list_methods; --task/--runnable "
+                                     "are mtb.find_methods filters)",
                         description="Print registry method ids, one per line.")
     pl.add_argument("--category", help=_CATEGORY_HELP)
-    pl.add_argument("--task", help=_TASK_HELP)
+    pl.add_argument("--task", help=_TASK_HELP + " (mtb.find_methods(task=))")
     pl.add_argument("--runnable", action="store_true",
-                    help="only methods with a declared variant (usable by run)")
+                    help="only methods with a declared variant (usable by run; "
+                         "mtb.find_methods(runnable=True))")
     pl.set_defaults(func=_cmd_list, _parser=pl)
 
     # ---- find
@@ -1332,11 +1314,12 @@ def build_parser() -> argparse.ArgumentParser:
                      help="folder that CONTAINS the dataset folder (default: the "
                           "package data path)")
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
-                     help="print the plan (one row per method variant: runnable, "
-                          "files_ok, env_ok, reason; --columns all for every column) "
-                          "and, per variant whose inputs resolve, the exact command "
-                          "line run() would execute (a 'command' column in csv/tsv/"
-                          "json); execute and create nothing")
+                     help="print the plan - the mtb.scan frame run_all(dry_run=True) "
+                          "returns (one row per method variant: runnable, files_ok, "
+                          "env_ok, reason; --columns all for every column) and, per "
+                          "variant whose inputs resolve, the exact command line run() "
+                          "would execute (the 'command' column in csv/tsv/json); "
+                          "execute and create nothing")
     pra.add_argument("--param", "-p", action="append", metavar="METHOD:KEY=VALUE",
                      help="one hyperparameter override, repeatable: --param "
                           "Matilda:epochs=5 --param Matilda:lr=0.001 -> params="
@@ -1380,8 +1363,9 @@ def build_parser() -> argparse.ArgumentParser:
                                                         "required with --method/--dataset)")
     pe.add_argument("--task", default="clustering", choices=["clustering", "batch", "all",
                                                              "dimension_reduction"],
-                    help="metric group: clustering (default; ARI, NMI, ASW, ...), batch "
-                         "(ASW_batch, GC, iLISI, ... needs --batch), all")
+                    help="metric family when --metrics is not given: clustering "
+                         "(default; ARI, NMI, ASW, ...), batch (ASW_batch, GC, iLISI, "
+                         "... needs --batch), all (mtb.evaluate(metrics=<family>))")
     pe.add_argument("--labels", help="cell-type labels CSV, one row per cell in the "
                                      "embedding's order (header row; column 'x', the "
                                      "only column, or see --column)")
@@ -1391,13 +1375,17 @@ def build_parser() -> argparse.ArgumentParser:
                     help="precomputed cluster assignment (CSV, or an .h5 read from "
                          "/obs/cluster_leiden); skips the Leiden resolution sweep. "
                          "--cluster is an alias")
-    pe.add_argument("--only", help="comma-separated metric names to compute (e.g. "
-                                   "ARI,NMI); everything else, including the Leiden "
-                                   "sweep when not needed, is skipped")
+    pe.add_argument("--metrics", help="what to compute (mtb.evaluate(metrics=)): a family "
+                                      "token (clustering | batch | all) or a comma-"
+                                      "separated list of metric codes (e.g. ARI,NMI); "
+                                      "with a list everything else, including the "
+                                      "Leiden sweep when not needed, is skipped")
+    pe.add_argument("--only", help=argparse.SUPPRESS)     # deprecated spelling of --metrics
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
                                    "embedding (default X_emb; 'X' = .X)")
     pe.add_argument("--column", help="column of the labels CSV to use when it has "
-                                     "several")
+                                     "several (read here and passed to mtb.evaluate as "
+                                     "the labels)")
     pe.add_argument("--method", help="label the rows with this method name and write "
                                      "the long format (needs --dataset and --category)")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
@@ -1495,7 +1483,8 @@ def build_parser() -> argparse.ArgumentParser:
                            "`env doctor --strict || env install ...`)")
     edoc.set_defaults(func=_cmd_env, _parser=edoc)
     ei = ev.add_parser(
-        "install", help="build every needed env from its lockfile or packed archive",
+        "install", help="build every needed env from its lockfile or packed archive "
+                        "(mtb.env.install)",
         description="Install the envs the selected methods need. Dry run by default: "
                     "prints per env 'have' / 'build(dry-run)' / 'NO-LOCK', or with "
                     "--packed 'packed archive published' plus the archive's download "

@@ -313,7 +313,11 @@ def list_tasks() -> list[str]:
 
 def list_methods(category: str | None = None, task: str | None = None,
                  runnable: bool | None = None) -> list[str]:
-    """Registry method ids, optionally filtered.
+    """Registry method ids, optionally filtered (engine-internal form).
+
+    The public ``mtb.list_methods`` takes ``category`` only; ``task`` /
+    ``runnable`` are ``find_methods`` filters there. This engine function
+    keeps them for the package's own callers.
 
     Parameters
     ----------

@@ -25,14 +25,14 @@ def test_inputs_for_check_raises_on_missing(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
     (d / "rna.h5").write_text("")  # peak.h5 deliberately missing
     with pytest.raises(FileNotFoundError):
-        resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path, check=True)
+        resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
 
 
 def test_inputs_for_check_passes_when_present(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
     for n in ["rna.h5", "peak.h5"]:
         (d / n).write_text("")
-    got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path, check=True)
+    got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
     assert "atac_peak" in got
 
 
@@ -47,30 +47,33 @@ def test_to_long_exposed_top_level():
 def test_namespace_all_hygiene():
     # env/config/io expose a curated __all__ (no leaked stdlib imports)
     assert "recipe" in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
-    assert "category_folder" in mtb.config.__all__ and "Path" not in mtb.config.__all__
+    assert "Config" in mtb.config.__all__ and "Path" not in mtb.config.__all__
+    assert "category_folder" not in mtb.config.__all__      # internal token map
     assert "to_canonical" in mtb.io.__all__
 
 
-# --- P12: inputs_for's default warns about phantom paths ---------------------
+# --- P12: inputs_for(check=None) warns about phantom paths; the default is silent
 
-def test_inputs_for_default_warns_on_missing(tmp_path):
+def test_inputs_for_check_none_warns_on_missing(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
     (d / "rna.h5").write_text("")   # peak.h5 deliberately missing
     with pytest.warns(UserWarning, match="atac_peak") as rec:
-        got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path)
+        got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path,
+                                 check=None)
     assert got["atac_peak"].endswith("/D27/atac_peak.h5")     # fallback path still returned
     msg = str(rec[0].message)
     assert "1 resolved input path(s) do not exist" in msg and "check=True to raise" in msg
 
 
-def test_inputs_for_check_false_is_silent(tmp_path):
+def test_inputs_for_check_false_is_silent_and_is_the_default(tmp_path):
     import warnings
     d = tmp_path / "D27"; d.mkdir()
     (d / "rna.h5").write_text("")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path,
+        got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path,
                                  check=False)
+        assert resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path) == got
     assert "atac_peak" in got
 
 
@@ -81,7 +84,7 @@ def test_inputs_for_default_no_warning_when_present(tmp_path):
         (d / n).write_text("")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        got = resolve.inputs_for("D27", "Seurat_v5", "diagonal", data_path=tmp_path)
+        got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path)
     assert got["atac_peak"].endswith("/D27/peak.h5")
 def test_available_datasets_warns_on_missing_root(tmp_path, result_dir):
     with pytest.warns(UserWarning, match="does not exist"):

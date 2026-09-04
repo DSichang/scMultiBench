@@ -87,17 +87,17 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     assert "SPIRAL" in str(e.value)
 
 
-def test_scan_and_plan_docs_name_the_four_columns():
-    for fn in (mtb.scan, mtb.plan):
-        doc = inspect.getdoc(fn)
-        assert '["method", "modalities", "runnable", "reason"]' in doc, fn.__name__
-        assert "files_reason" in doc and "env_reason" in doc
+def test_scan_docs_name_the_four_columns():
+    doc = inspect.getdoc(mtb.scan)
+    assert '["method", "modalities", "runnable", "reason"]' in doc
+    assert "files_reason" in doc and "env_reason" in doc
+    assert '["method", "modalities", "runnable", "reason"]' in inspect.getdoc(mtb.run_all)
 
 
 # ----------------------------------------------------------------- P17: str is not a list
 @pytest.mark.parametrize("call", [
     lambda: mtb.scan("D11", "vertical", methods="StabMap"),
-    lambda: mtb.plan("D11", "vertical", methods="StabMap"),
+    lambda: mtb.scan("D11", "vertical", methods="StabMap", out_dir="runs"),
     lambda: mtb.run_all("D11", "vertical", methods="StabMap", out_dir="/tmp/unused",
                         verbose=False),
     lambda: mtb.run_all("D11", "vertical", methods="StabMap", out_dir=None, dry_run=True,
@@ -149,27 +149,25 @@ def test_scan_modalities_warns_about_excluded_data_dir_methods(all_envs):
         mtb.scan("D11", "vertical", modalities=["rna", "adt"])
 
 
-# ----------------------------------------------------------------- P16: plan_commands
-def test_plan_commands_works_without_out_dir(no_envs):
-    df = W.plan_commands("D11", "vertical", methods=["Matilda"])
+# ----------------------------------------------------------------- P16: scan's command column
+def test_scan_command_works_without_out_dir(no_envs):
+    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     ok = df[df["files_ok"]]
     assert len(ok) == 1
     cmd = ok["command"].iloc[0]
     assert "<out_dir>/Matilda_D11/" in cmd and "conda run -n matilda" in cmd
     assert W.OUT_DIR_PLACEHOLDER == "<out_dir>"
-    # positional/keyword compatibility: the explicit form is unchanged
-    df2 = W.plan_commands("D11", "vertical", out_dir="runs", methods=["Matilda"])
+    # the explicit out_dir renders paste-ready lines
+    df2 = mtb.scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
     assert "runs/Matilda_D11/" in df2[df2["files_ok"]]["command"].iloc[0]
 
 
-def test_plan_and_run_all_docs_cite_plan_commands_full_path():
-    for fn in (mtb.plan, mtb.run_all):
+def test_scan_and_run_all_docs_cite_the_placeholder():
+    for fn in (mtb.scan, mtb.run_all):
         flat = " ".join(inspect.getdoc(fn).split())          # docstrings wrap
-        assert "mtb.workflow.plan_commands(dataset, category, data_path=..., out_dir=...)" \
-            in flat, fn.__name__
-        assert "'<out_dir>'" in flat
-    doc = inspect.getdoc(W.plan_commands)
-    assert "Parameters" in doc and "Returns" in doc and "'<out_dir>'" in doc
+        assert "'<out_dir>'" in flat, fn.__name__
+    doc = inspect.getdoc(mtb.scan)
+    assert "Parameters" in doc and "Returns" in doc and "out_dir" in doc and "command" in doc
 
 
 # ----------------------------------------------------------------- P05: platform note

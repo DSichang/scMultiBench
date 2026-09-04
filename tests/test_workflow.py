@@ -84,8 +84,9 @@ def test_run_all_dry_run_is_the_scan_frame():
         if not _has_dataset(ds):
             continue
         plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
-        assert list(plan.columns)[-1] == "command"      # plus the CLI csv's column
-        pd.testing.assert_frame_equal(plan.drop(columns="command"), mtb.scan(ds, cat))
+        assert list(plan.columns)[-1] == "command"      # the CLI csv's column, in scan too
+        pd.testing.assert_frame_equal(
+            plan, mtb.scan(ds, cat, out_dir="/tmp/unused", verbose=False))
 
 
 @pytest.mark.skipif(not (_envs_installed("vertical") and _envs_installed("cross")

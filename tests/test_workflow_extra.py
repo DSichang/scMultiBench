@@ -211,14 +211,15 @@ def test_describe_layout_spatial_block_and_export_route():
     assert "files_ok" in vert and "env_ok" in vert
 
 
-def test_runtime_hint_validates_method_id():
+def test_method_info_runtime_validates_method_id():
     with pytest.raises(KeyError, match="did you mean 'StabMap'"):
-        mtb.runtime_hint("Stabmap")
-    h = mtb.runtime_hint("StabMap")
+        mtb.method_info("Stabmap")
+    h = mtb.method_info("StabMap")["runtime"]
     assert set(h) == {"tier", "worst_sec", "observed"}
-    unmeasured = [m for m in mtb.list_methods() if m not in __import__("multibench.workflow").workflow._runtimes()]
+    from multibench.discover import _runtimes
+    unmeasured = [m for m in mtb.list_methods() if m not in _runtimes()]
     if unmeasured:
-        assert mtb.runtime_hint(unmeasured[0])["tier"] == "unknown"
+        assert mtb.method_info(unmeasured[0])["runtime"]["tier"] == "unknown"
 
 
 def test_sweep_validates_method_id():

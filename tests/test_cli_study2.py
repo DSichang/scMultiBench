@@ -263,7 +263,7 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(envs, "create_all", lambda **kw: rows)
     monkeypatch.setattr(envs, "install_packed", lambda env, **kw: pytest.fail("no download"))
-    monkeypatch.setattr(cli, "_packed_manifest",
+    monkeypatch.setattr(envs, "packed_manifest",
                         lambda: {"scmb_torch": "https://x/t.tar.gz", "mystery": "https://x/m.tar.gz"})
     envs.packed_sizes.cache_clear()
     monkeypatch.setattr(envs, "packed_sizes",

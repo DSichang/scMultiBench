@@ -116,7 +116,7 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
     assert res.summary.loc[0, "batch_source"] is None
     # user labels bypass the label-order search
     shuffled = labels[::-1]
-    re2 = res.rescore(labels=shuffled, only={"ARI", "NMI"})
+    re2 = res.rescore(labels=shuffled, metrics=["ARI", "NMI"])
     assert re2.summary.loc[0, "label_order"] == "(user labels)"
     assert set(re2.long["metric"]) == {"ARI", "NMI"}
     # a batch CSV path is accepted too (read like a label file)

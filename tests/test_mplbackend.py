@@ -25,7 +25,7 @@ def test_method_subprocess_gets_headless_backend(monkeypatch):
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["matilda"])
     try:
         import multibench as mtb
-        inp = mtb.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"])
+        inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
         runner.run(method="Matilda", category="vertical", inputs=inp,
                    out_dir="/tmp/mpl_test")
     except Exception:

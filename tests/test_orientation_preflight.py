@@ -39,7 +39,7 @@ def _dataset(root, name, transpose, n_cells=120, n_genes=40, n_adt=8,
 
 
 def _resolve_it(root, name):
-    return _resolve.inputs_for(name, "Matilda", "vertical",
+    return _resolve.inputs_for(name, "vertical", "Matilda",
                                modalities=["rna", "adt"],
                                data_path=str(root), check=True)
 

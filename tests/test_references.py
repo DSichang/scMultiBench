@@ -77,7 +77,7 @@ def test_effective_merges_wrapper_defaults_over_upstream():
 
 def test_cite_bibtex_and_text():
     from multibench.discover import cite
-    s = cite(["StabMap", "GLUE"])
+    s = cite(["StabMap", "GLUE"], fmt="bibtex")
     assert s.count("@article{") == 3
     assert "10.1038/s41592-025-02856-3" in s
     assert "10.1038/s41587-023-01766-z" in s and "10.1038/s41587-022-01284-4" in s
@@ -88,8 +88,9 @@ def test_cite_bibtex_and_text():
     with pytest.raises(KeyError, match="unknown method 'NoSuchMethod'"):
         cite(["NoSuchMethod"])
     # an unverified method is flagged, not silently dropped
-    u = cite(["VIMCCA"])
+    u = cite(["VIMCCA"], fmt="bibtex")
     assert "% VIMCCA: no verified reference" in u and "scbean" in u
-    allb = cite("all")
+    assert "VIMCCA: no verified reference" in cite("VIMCCA") and "%" not in cite("VIMCCA")
+    allb = cite("all", fmt="bibtex")
     assert allb.count("@article{") == 1 + len(registry.list_methods()) - len(UNREFERENCED)
     assert cite("StabMap") == cite(["StabMap"])
