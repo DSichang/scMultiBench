@@ -1,8 +1,7 @@
 """evaluate()'s vocabulary and file errors (Rin / Noor findings).
 
-A typo in the family selector must be a ValueError listing the valid values,
-a metric_set typo the same message config gives, `only=` must fold case like
-every other metric argument, and a wrong or missing output path must name
+A typo in the metrics= token must be a ValueError listing the valid values,
+a list of codes must fold case like every other metric argument, and a wrong or missing output path must name
 the path, the working directory and - for a canonical INPUT matrix handed in
 as an output - what the file actually is.
 """
@@ -24,41 +23,33 @@ def _blobs(n_per=40, n_labels=3, dims=4, seed=0):
     return emb, lab
 
 
-def test_family_typo_is_a_value_error_listing_valid_values():
+def test_metrics_token_typo_is_a_value_error_listing_valid_values():
     emb, lab = _blobs()
-    with pytest.raises(ValueError, match=r"unknown family 'clusterin' \(given as task=\); valid: \['all', 'batch', 'clustering', 'dimension_reduction'\]"):
-        evaluate(emb, labels=lab, task="clusterin")
-    with pytest.raises(ValueError, match=r"unknown family 'clusterin' \(given as family=\)"):
-        evaluate(emb, labels=lab, family="clusterin")
-    # a declared benchmark task evaluate() cannot score is the one case that
-    # stays NotImplementedError - and it says so without the word "v1"
-    with pytest.raises(NotImplementedError, match="metrics for the 'imputation' task are not wired") as e:
-        evaluate(emb, labels=lab, task="imputation")
-    assert "v1" not in str(e.value)
+    with pytest.raises(ValueError, match=r"unknown metrics= token 'clusterin'; valid: 'all', 'clustering', 'batch'"):
+        evaluate(emb, labels=lab, metrics="clusterin")
+    # a declared benchmark task is not a metric family: the error says which
+    # slot this is, without the word "v1"
+    with pytest.raises(ValueError, match="selects a METRIC FAMILY, not a mtb.list_tasks") as e:
+        evaluate(emb, labels=lab, metrics="imputation")
+    assert "imputation" in str(e.value) and "v1" not in str(e.value)
 
 
-def test_family_keyword_is_an_alias_of_task():
+def test_metrics_family_token_and_code_list_agree():
     emb, lab = _blobs()
-    a = evaluate(emb, labels=lab, only={"ASW"})
-    b = evaluate(emb, labels=lab, family="clustering", only={"ASW"})
+    a = evaluate(emb, labels=lab, metrics=["ASW"])
+    b = evaluate(emb, labels=lab, metrics="clustering")
     assert a.loc["ASW", "Value"] == pytest.approx(b.loc["ASW", "Value"])
-    # family wins over the alias when both are given
+    # the batch family needs batch labels
     with pytest.raises(ValueError, match="batch labels required"):
-        evaluate(emb, labels=lab, task="clustering", family="batch", only={"GC"})
+        evaluate(emb, labels=lab, metrics="batch")
 
 
-def test_metric_set_typo_is_a_value_error_with_the_valid_list():
+def test_metrics_folds_case_like_the_other_metric_arguments():
     emb, lab = _blobs()
-    with pytest.raises(ValueError, match=r"unknown metric_set 'scibb'; valid: \['scib'\]"):
-        evaluate(emb, labels=lab, metric_set="scibb")
-
-
-def test_only_folds_case_like_the_other_metric_arguments():
-    emb, lab = _blobs()
-    out = evaluate(emb, labels=lab, only=["asw"])
+    out = evaluate(emb, labels=lab, metrics=["asw"])
     assert out.index.tolist() == ["ASW"]
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; choose from \['ARI'"):
-        evaluate(emb, labels=lab, only=["asw", "nope"])
+    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid codes: \['ARI'"):
+        evaluate(emb, labels=lab, metrics=["asw", "nope"])
 
 
 def test_missing_output_file_names_path_and_cwd(tmp_path):
@@ -96,20 +87,21 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
         eio.read_clustering(g2)
 
 
-def test_verbose_sweep_notice(capsys):
-    emb, lab = _blobs()
-    evaluate(emb, labels=lab, only={"ARI"}, verbose=True)
-    err = capsys.readouterr().err
-    assert re.search(r"Leiden resolution sweep \(10 resolutions\) over 120 cells for ARI", err)
-    assert "pass clustering= or only=" in err
-    evaluate(emb, labels=lab, only={"ARI"})            # 120 cells: auto-quiet
-    assert "Leiden" not in capsys.readouterr().err
-    evaluate(emb, labels=lab, only={"ARI"}, verbose=False)
-    assert "Leiden" not in capsys.readouterr().err
-    evaluate(emb, labels=lab, only={"ASW"}, verbose=True)     # no sweep needed
-    assert "Leiden" not in capsys.readouterr().err
+def test_verbose_sweep_notice(capsys, monkeypatch):
     from multibench.eval import scib as mscib
     assert mscib._SWEEP_NOTICE_CELLS == 2000
+    emb, lab = _blobs()
+    evaluate(emb, labels=lab, metrics=["ARI"])            # 120 cells: below the threshold, quiet
+    assert "Leiden" not in capsys.readouterr().err
+    monkeypatch.setattr(mscib, "_SWEEP_NOTICE_CELLS", 0)  # every sweep now counts as long
+    evaluate(emb, labels=lab, metrics=["ARI"])            # default verbose=True announces it
+    err = capsys.readouterr().err
+    assert re.search(r"Leiden resolution sweep \(10 resolutions\) over 120 cells for ARI", err)
+    assert "pass clustering= or metrics=" in err
+    evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
+    assert "Leiden" not in capsys.readouterr().err
+    evaluate(emb, labels=lab, metrics=["ASW"])            # no sweep needed
+    assert "Leiden" not in capsys.readouterr().err
 
 
 def test_docstrings_match_the_code():

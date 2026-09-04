@@ -85,7 +85,7 @@ def test_shared_sweep_reproduces_the_standard_protocol_ari():
 
     by_order = {tuple(d["order"]): d["ARI"] for d in spread}
     for order, labels in ((["good.csv"], lab), (["scrambled.csv"], wrong)):
-        ref = _evaluate(emb, category="vertical", task="clustering", labels=labels)
+        ref = _evaluate(emb, category="vertical", metrics="clustering", labels=labels)
         assert by_order[tuple(order)] == pytest.approx(
             round(float(ref["Value"]["ARI"]), 4), abs=1e-4), (
             f"{order}: shared-sweep ARI {by_order[tuple(order)]} != "

@@ -12,15 +12,6 @@ def test_available_datasets_lists_diagonal(result_dir):
     assert mtb.available_datasets("mosaic", result_path=result_dir) == []
 
 
-def test_available_datasets_rejects_unknown_metric_set(result_dir):
-    # a typo is a ValueError listing the valid tokens (the same message
-    # config.metric_set_dir gives), not a "declared but not wired" claim
-    with pytest.raises(ValueError, match=r"unknown metric_set 'classification'; valid: \['scib'\]"):
-        mtb.available_datasets("vertical", metric_set="classification", result_path=result_dir)
-    with pytest.raises(ValueError, match="unknown metric_set 'scibb'"):
-        mtb.load_results("vertical", metric_set="scibb", result_path=result_dir)
-
-
 def test_inputs_for_check_raises_on_missing(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
     (d / "rna.h5").write_text("")  # peak.h5 deliberately missing
@@ -89,9 +80,7 @@ def test_available_datasets_warns_on_missing_root(tmp_path, result_dir):
     assert mtb.available_datasets("mosaic", source="rerun", result_path=result_dir) == ["D45", "D45s"]
     assert mtb.available_datasets("mosaic", result_path=result_dir) == []   # published: still none
     assert "D27" in mtb.available_datasets()
-    # only datasets holding the requested clustering file are listed
-    assert mtb.available_datasets("vertical", clustering="louvain", result_path=result_dir) == ["D3"]
-    assert "D27" in mtb.available_datasets("diagonal", clustering="kmeans", result_path=result_dir)
+    assert "D27" in mtb.available_datasets("diagonal", result_path=result_dir)
 
 
 def test_results_coverage(result_dir):
@@ -178,10 +167,8 @@ def test_recommend_unknown_result_id_and_modalities(result_dir):
     sub = long[long.method.isin(["sciPENN", "scMSI"])]
     with pytest.raises(ValueError, match="consumes modalities"):
         recommend("vertical", long_df=sub, modalities=["rna", "atac"])
-    with pytest.raises(ValueError, match=r"unknown family 'bogus' \(given as task=\)"):
-        recommend("vertical", long_df=long, task="bogus")
-    with pytest.raises(ValueError, match=r"unknown family 'bogus' \(given as family=\)"):
-        recommend("vertical", long_df=long, family="bogus")
+    with pytest.raises(ValueError, match=r"unknown metrics= token 'bogus'"):
+        recommend("vertical", long_df=long, metrics="bogus")
 
 
 # --- P04: unscored methods are named, source/family recorded on the frame ---
@@ -209,7 +196,7 @@ def test_recommend_lists_unscored_methods(result_dir):
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
                                "env", "output_kind"]
     assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
-    assert r.attrs["family"] == "clustering" and r.attrs["task"] == "clustering"
+    assert r.attrs["family"] == "clustering" and r.attrs["metrics"] == "clustering"
     assert r.attrs["source"] == "published"
     assert r.attrs["not_scored"] == r.attrs["missing"] == sorted(nan_rows.method, key=str.lower)
     import re
@@ -230,10 +217,10 @@ def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
 
 def test_recommend_long_df_records_source_and_family(result_dir):
     long = mtb.load_results("vertical", dataset="D11", source="rerun", result_path=result_dir)
-    r, _ = _rec("vertical", long_df=long, family="clustering")
+    r, _ = _rec("vertical", long_df=long, metrics="clustering")
     assert r.attrs["source"] == "long_df" and r.attrs["family"] == "clustering"
     r2, _ = _rec("vertical", long_df=long, metrics=["ARI", "NMI"])
-    assert r2.attrs["family"] is None and r2.attrs["task"] is None
+    assert r2.attrs["family"] is None and r2.attrs["metrics"] == ["ARI", "NMI"]
 
 
 def test_recommend_cross_skips_registration_methods(result_dir):
@@ -270,7 +257,7 @@ def test_recommend_scores_only_methods_the_registry_lists_for_the_category(resul
     # are dropped and named ("long_df frame"), an unknown name (yours) is kept
     long = mtb.load_results("cross", dataset="D53", result_path=result_dir)
     mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]),
-                       "MyMethod", "D53", "cross")
+                       method="MyMethod", dataset="D53", category="cross")
     r2, msg2 = _rec("cross", long_df=pd.concat([long, mine]))
     assert "MyMethod" in set(r2.method) and "MOFA2" not in set(r2.method)
     assert "also scored in the long_df frame but not run by this package for cross: MOFA2, Multigrate" in msg2
@@ -300,10 +287,10 @@ def test_recommend_methods_keyword(result_dir):
         recommend("cross", methods=["Matlida"], result_path=result_dir)
     with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in source='published' for cross"):
         recommend("cross", methods=["totalVI"], result_path=result_dir)
-    # positional order and the old keywords are untouched
+    # category is the only positional; every selector is keyword-only
     import inspect
     params = list(inspect.signature(recommend).parameters)
-    assert params[0] == "category" and params[-1] == "methods"
+    assert params[0] == "category" and "methods" in params and "metrics" in params
     assert inspect.signature(recommend).parameters["methods"].kind is inspect.Parameter.KEYWORD_ONLY
 
 
@@ -312,16 +299,16 @@ def test_recommend_task_error_names_real_metrics(result_dir):
     # vertical ships no batch metrics; the error must list what IS there,
     # not "metrics present: []" (the loader used to pre-filter by task)
     with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
-        recommend("vertical", family="batch", result_path=result_dir)
+        recommend("vertical", metrics="batch", result_path=result_dir)
     with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
-        recommend("vertical", task="batch", result_path=result_dir)
+        recommend("vertical", metrics=["GC", "iLISI"], result_path=result_dir)
 
 
-def test_recommend_family_batch_on_diagonal_rerun(result_dir):
-    r, _ = _rec("diagonal", family="batch", source="rerun", result_path=result_dir)
+def test_recommend_metrics_batch_on_diagonal_rerun(result_dir):
+    r, _ = _rec("diagonal", metrics="batch", source="rerun", result_path=result_dir)
     assert r.attrs["family"] == "batch" and r.grand_score.notna().any()
-    # family wins over the task alias when both are given
-    r2, _ = _rec("diagonal", task="clustering", family="batch", source="rerun",
+    # the explicit list of the same family scores the same
+    r2, _ = _rec("diagonal", metrics=list(mtb.plot.BATCH_METRICS), source="rerun",
                  result_path=result_dir)
-    assert r2.attrs["family"] == "batch"
+    assert r2.attrs["family"] is None and r2.attrs["metrics"] == list(mtb.plot.BATCH_METRICS)
     pd.testing.assert_frame_equal(r, r2)

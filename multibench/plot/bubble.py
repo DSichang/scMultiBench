@@ -18,6 +18,7 @@ import pandas as pd
 
 from . import style
 from .bar import BATCH_METRICS, CLUSTERING_METRICS
+from ..eval import _compat
 
 # column order within each family, as in the paper's panels
 FAMILIES = [
@@ -153,8 +154,8 @@ def _resolve(requested, available, kind: str, canon) -> list:
 NA_POLICIES = ("skip", "warn", "raise")
 
 
-def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
-                aggregate: str = "dataset", *, require_complete: bool = False,
+def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
+                aggregate: str = "dataset", require_complete: bool = False,
                 overall: str = "rank", na: str = "warn") -> BubbleTable:
     """Pivot tidy long results into per-family matrices plus a combined row order.
 
@@ -173,7 +174,7 @@ def build_table(long_df: pd.DataFrame, metrics=None, methods=None, order=None,
         Tidy frame with at least ``method, metric, value``; an optional
         ``dataset`` column is used by ``aggregate="summary"`` and for the
         duplicate check; an optional boolean ``needs_labels`` column
-        (``to_long(..., needs_labels=True)``) overrides the registry's
+        (add it to your own frame) overrides the registry's
         supervised badge per method. Rows whose ``metric`` is NaN are dropped.
     metrics : list of str, optional
         Metric codes to keep, drawn in THIS order within each family block
@@ -857,8 +858,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         with unsupervised rows), plus a one-line key under the legends
         explaining the chips. The badge follows the variants of the frame's
         single ``category`` (scMoMaT is supervised in mosaic only); an
-        optional boolean ``needs_labels`` column in the frame
-        (``to_long(..., needs_labels=True)``) overrides the registry lookup
+        optional boolean ``needs_labels`` column in the frame (add it to
+        your own frame) overrides the registry lookup
         per method, which is the only way to badge a method the registry
         does not know. Default ``True``.
     require_complete : bool
@@ -928,5 +929,5 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 # spliced into every docstring that accepts it (bubble, build_table, bar)
 bubble.__doc__ = bubble.__doc__.replace("{OVERALL_DOC}", style.OVERALL_DOC)
 
-#: back-compat name; ``mtb.plot.plot_bubble`` and ``bubble.plot_bubble`` keep working
-plot_bubble = bubble
+#: deprecated 0.2.x name of :func:`bubble` (DeprecationWarning; removed in 0.4)
+plot_bubble = _compat.deprecated_alias("mtb.plot.plot_bubble", "mtb.plot.bubble", bubble)
