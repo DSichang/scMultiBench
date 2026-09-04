@@ -18,7 +18,7 @@ import pandas as pd
 
 from . import style
 from .bar import BATCH_METRICS, CLUSTERING_METRICS
-from ..eval import _compat
+from .. import _compat
 
 # column order within each family, as in the paper's panels
 FAMILIES = [

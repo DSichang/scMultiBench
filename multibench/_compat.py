@@ -13,6 +13,12 @@ import warnings
 DEPRECATED_SINCE = "0.3.0"
 
 
+def warn(old: str, new: str, *, stacklevel: int = 3) -> None:
+    """Emit the package's ``DeprecationWarning`` for ``old`` -> ``new``."""
+    warnings.warn(f"{old} is deprecated since {DEPRECATED_SINCE} and will be removed in "
+                  f"0.4; use {new} instead", DeprecationWarning, stacklevel=stacklevel)
+
+
 def deprecated_alias(old: str, new: str, fn):
     """Wrap ``fn`` as the deprecated spelling ``old`` of the public name ``new``.
 
@@ -24,24 +30,34 @@ def deprecated_alias(old: str, new: str, fn):
         What callers should write instead, e.g. ``"scan"`` or
         ``"method_info(m)['runtime']"``; quoted verbatim in the warning.
     fn : callable
-        The function the alias forwards to. It receives the alias's arguments
+        The function the alias forwards to; it receives the arguments
         unchanged and its return value is returned as is.
 
     Returns
     -------
     callable
-        A function named ``old`` that emits ``DeprecationWarning`` (pointing at
-        the caller) and then calls ``fn(*args, **kwargs)``.
+        A function named ``old`` that emits ``DeprecationWarning`` (pointing
+        at the caller) and then calls ``fn(*args, **kwargs)``.
     """
     @functools.wraps(fn)
     def alias(*args, **kwargs):
-        warnings.warn(
-            f"{old} is deprecated since {DEPRECATED_SINCE} and will be removed in "
-            f"the next release; use {new}",
-            DeprecationWarning, stacklevel=2)
+        warn(old, new)
         return fn(*args, **kwargs)
-
-    alias.__name__ = old
-    alias.__qualname__ = old
-    alias.__doc__ = f"Deprecated alias of ``{new}`` (kept for one release; emits DeprecationWarning)."
+    alias.__name__ = alias.__qualname__ = old.rsplit(".", 1)[-1]
+    alias.__doc__ = f"Deprecated alias of ``{new}`` (removed in 0.4); emits DeprecationWarning."
     return alias
+
+
+def legacy_kwargs(translate):
+    """Decorator: pass the call's ``**kwargs`` through ``translate`` first.
+
+    ``translate(kwargs) -> kwargs`` maps deprecated keywords onto the new
+    spelling (calling :func:`warn` with ``stacklevel=4`` so the warning points
+    at the caller) and raises ``TypeError`` for removed ones.
+    """
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            return fn(*args, **translate(kwargs))
+        return wrapper
+    return deco
