@@ -2555,7 +2555,7 @@ exist (or the path and the current directory); a method with several
 variants that neither <code>modalities=</code> nor the folder's files single out
 raises <code>mtb.AmbiguousVariantError</code> - a <code>ValueError</code> that also matches
 <code>KeyError</code>, listing the modality-sets and the folder's contents; a missing
-conda env raises <code>EnvironmentError</code> naming the install command. Warnings
+conda env raises <code>OSError</code> naming the install command. Warnings
 are <code>UserWarning</code>s, one of them a subclass you can filter on:
 <code>mtb.DegenerateRerunWarning</code> (a re-run row that most likely failed
 silently). Nothing silently returns an empty result.</p>
@@ -2616,15 +2616,16 @@ executed.</p>
 <p>What <a href="#mtbrun_all"><code>run_all</code></a> WOULD attempt - exactly the frame
 <code>run_all(..., dry_run=True)</code> returns, without an <code>out_dir</code>: <code>scan</code> restricted
 to <code>methods</code> / <code>modalities</code>, runnable rows first, blocked rows kept with
-<code>reason</code> and the <code>files_ok</code> / <code>env_ok</code> columns. Never empty: <code>ValueError</code> when
-no variant of the requested methods exists under <code>category</code>. Filter
-<code>plan[plan.runnable]</code> for what will actually run.
+<code>reason</code> and the <code>files_ok</code> / <code>env_ok</code> columns, plus a <code>command</code> column - the
+exact shell line <code>run()</code> would execute per variant whose inputs resolve (what
+<code>multibench run-all --dry-run</code> prints; <code>out_dir</code> defaults to the literal
+placeholder <code>&lt;out_dir&gt;</code> so a preview needs no directory - pass the real one
+for paste-ready lines). Never empty: <code>ValueError</code> when no variant of the
+requested methods exists under <code>category</code>. Filter <code>plan[plan.runnable]</code> for
+what will actually run.
 <code>mtb.plan_commands(dataset, category, *, out_dir="&lt;out_dir&gt;", methods=,
-modalities=, data_path=, params=)</code> is the same frame plus a <code>command</code> column -
-the exact shell line <code>run()</code> would execute per variant whose inputs resolve
-(what <code>multibench run-all --dry-run</code> prints; <code>out_dir</code> defaults to the
-literal placeholder so a preview needs no directory - pass the real one for
-paste-ready lines); <code>mtb.command_preview(method, category, *, inputs,
+modalities=, data_path=, params=)</code> returns the same frame (kept as the
+explicit spelling); <code>mtb.command_preview(method, category, *, inputs,
 out_dir, params=, cmd_template=, repo_path=)</code> returns the argv list for one
 call, the form behind <code>multibench run --dry-run</code>. Both absolutize the paths
 exactly as <code>run</code> does, and neither fetches or writes anything.</p>
@@ -2743,7 +2744,7 @@ non-canonical modality inputs are auto-converted to the canonical scMultiBench
 <li><code>out_dir</code> (<code>str</code>) - working directory; created if missing, made absolute the same way (<code>RunResult.out_dir</code> is the absolute path).</li>
 <li><code>params</code> (<code>dict | None</code>) - extra method hyperparameters merged into the command.</li>
 <li><code>convert</code> (<code>bool</code>) - convert non-aux inputs to the canonical <code>.h5</code> (default <code>True</code>).</li>
-<li><code>cmd_template</code> (<code>str | None</code>) - command wrapper; <code>None</code> uses the method's env via <code>conda run -n {env} {cmd}</code> and <strong>preflights</strong> it (<code>EnvironmentError</code> naming the install command when the env is missing); a custom template skips the preflight.</li>
+<li><code>cmd_template</code> (<code>str | None</code>) - command wrapper; <code>None</code> uses the method's env via <code>conda run -n {env} {cmd}</code> and <strong>preflights</strong> it (<code>OSError</code> naming the install command when the env is missing); a custom template skips the preflight.</li>
 <li><code>repo_path</code> (<code>Path | None</code>) - checkout holding <code>tools_scripts/</code>; default auto-provisioned (<code>config.DEFAULT.repo_path</code>).</li>
 </ul>
 <h3 id="mtbevaluate"><code>mtb.evaluate</code><a class="headerlink" href="#mtbevaluate" title="Anchor link to this section">&para;</a></h3>
@@ -2843,8 +2844,8 @@ iASW / iF1 values <strong>override</strong> those in <code>metric.csv</code>.</p
 <li><code>method</code> / <code>methods</code> (<code>str | list[str] | None</code>) - keep only these methods (alias tolerant, case-folded against the registry); an id the registry does not know raises <code>KeyError</code> with a did-you-mean hint, a known method with no rows gives an <strong>empty</strong> frame plus a <code>UserWarning</code> listing the methods present (and the source that has it). <code>methods=</code> is the list alias; passing both raises.</li>
 <li><code>metric</code> (<code>list[str] | str | None</code>) - keep only these metric codes (alias tolerant; same empty-frame rule).</li>
 <li><code>clustering</code> (<code>str</code>) - <code>default</code>, <code>louvain</code>, or <code>kmeans</code> (<code>metric.csv</code> / <code>metric_louvain.csv</code> / <code>metric_kmeans.csv</code>). A <code>&lt;method&gt;_louvain</code> result dir is reported under the canonical id with <code>clustering="louvain"</code>; a table kept one level down in a run-configuration folder (<code>MOFA2/filtered3/metric.csv</code>, <code>MOFA2/kmeans/metric_kmeans.csv</code> - cross D53 / D56 / D57) is read too (<code>kbet/</code> skipped, an ambiguity warned). The re-run sweeps are <code>default</code> only.</li>
-<li><code>result_path</code> (<code>Path | str | None</code>) - a results ROOT (holding <code>scib_metric/</code> and/or <code>rerun/</code>; default the tables shipped in the package) OR a single long CSV file: blank <code>clustering</code> / <code>source</code> cells are filled per row (<code>default</code> / <code>user</code>), <code>source="published"</code> or <code>"both"</code> keeps every row, and any other <code>source</code> value filters on the file's own column (<code>"rerun"</code> prefix-matches <code>rerun-&lt;version&gt;</code>; a value the file does not carry raises <code>ValueError</code> listing the ones present).</li>
-<li><code>source</code> (<code>str</code>, keyword-only) - <code>"published"</code> (default; the paper's scIB tables - none for mosaic), <code>"rerun"</code> (the package's sweeps <code>rerun/long_all_&lt;dataset&gt;.csv</code>: vertical D11/D11s, diagonal D28/D28s, mosaic D45/D45s, cross D52/D52s; <code>source="rerun-&lt;version&gt;"</code>), or <code>"both"</code>. Loading <code>rerun</code> / <code>both</code> emits <code>mtb.DegenerateRerunWarning</code> (a <code>UserWarning</code>) for a re-run row whose ARI is below 0.01 where the published table scored above 0.2 for the same (category, dataset, method) - computed at load time, today Conos on D28 - with the line to drop it before ranking.</li>
+<li><code>result_path</code> (<code>Path | str | None</code>) - a results ROOT (holding <code>scib_metric/</code> and/or <code>rerun/</code>; default the tables shipped in the package) OR a single long CSV file: blank <code>clustering</code> / <code>source</code> cells are filled per row (<code>default</code> / <code>user</code>), <code>source="published"</code> or <code>"both"</code> keeps every row, and any other <code>source</code> value filters on the file's own column (a value the file does not carry raises <code>ValueError</code> listing the ones present).</li>
+<li><code>source</code> (<code>str</code>, keyword-only) - <code>"published"</code> (default; the paper's scIB tables - none for mosaic), <code>"rerun"</code> (the package's sweeps <code>rerun/long_all_&lt;dataset&gt;.csv</code>: vertical D11/D11s, diagonal D28/D28s, mosaic D45/D45s, cross D52/D52s; the <code>source</code> column says <code>rerun</code>, the sweep's package version travels in <code>frame.attrs["rerun_version"]</code>), or <code>"both"</code>. Loading <code>rerun</code> / <code>both</code> emits <code>mtb.DegenerateRerunWarning</code> (a <code>UserWarning</code>) for a re-run row whose ARI is below 0.01 where the published table scored above 0.2 for the same (category, dataset, method) - computed at load time, today Conos on D28 - with the line to drop it before ranking.</li>
 </ul>
 <p>Raises <code>FileNotFoundError</code> (no table for the request, with the path looked at
 and what IS available - mosaic says "use <code>source='rerun'</code>"), <code>ValueError</code>
@@ -2858,7 +2859,10 @@ file without the long-format columns).</p>
 <p>The dataset ids that have a stored table for <code>category</code> / <code>source</code> /
 <code>clustering</code> - exactly what <a href="#mtbload_results"><code>load_results</code></a> can load
 (<code>[]</code> with a warning when the root is absent); published: vertical 23,
-diagonal 18, cross 7 (<code>D52</code>-<code>D54</code>, <code>D56</code>-<code>D59</code>), mosaic none.</p>
+diagonal 18, cross 7 (<code>D52</code>-<code>D54</code>, <code>D56</code>-<code>D59</code>), mosaic none. These are
+ids with stored <em>tables</em>, not downloads: the datasets <code>mtb.data.fetch</code> can
+download are the five reference sets <code>D11</code>, <code>D28</code>, <code>D45</code>, <code>D46</code>, <code>D52</code>
+(any other id raises <code>ValueError</code> naming them).</p>
 <h3 id="mtbresults_coverage"><code>mtb.results_coverage</code><a class="headerlink" href="#mtbresults_coverage" title="Anchor link to this section">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">results_coverage</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;both&quot;</span><span class="p">,</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>                     <span class="n">result_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
@@ -3331,7 +3335,7 @@ reference repository.</p>
 </ul>
 <p>A failed run (non-zero exit) raises <code>RuntimeError</code> with the tail of stderr/stdout
 rather than returning a <code>RunResult</code>; a missing conda env raises
-<code>EnvironmentError</code> before anything is written.</p>
+<code>OSError</code> before anything is written.</p>
 <hr />
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link to this section">&para;</a></h2>
 <p>The package version is available as <code>multibench.__version__</code>.</p>

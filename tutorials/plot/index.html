@@ -1554,7 +1554,7 @@ which one a row came from:</p>
 </tr>
 <tr>
 <td><code>"rerun"</code></td>
-<td>the package's own sweeps - every wired method at default settings, the tables behind the category tutorials (<code>multibench/result/rerun/long_all_&lt;dataset&gt;.csv</code>, <code>source="rerun-0.2.1"</code>)</td>
+<td>the package's own sweeps - every wired method at default settings, the tables behind the category tutorials (<code>multibench/result/rerun/long_all_&lt;dataset&gt;.csv</code>; <code>source</code> says <code>rerun</code>, the sweep's package version travels in <code>frame.attrs["rerun_version"]</code>)</td>
 <td>vertical <code>D11</code>/<code>D11s</code>, diagonal <code>D28</code>/<code>D28s</code>, mosaic <code>D45</code>/<code>D45s</code>, cross <code>D52</code>/<code>D52s</code></td>
 </tr>
 <tr>
@@ -1573,14 +1573,16 @@ compare against your own run</strong>, and compare ranks rather than decimals
 (see <a href="../evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>).
 <code>mtb.results_coverage(category)</code> lists which (dataset, method, clustering,
 source) combinations exist; <code>mtb.available_datasets(category, source=...)</code>
-lists the loadable dataset ids. A re-run row that most likely failed
+lists the dataset ids that have a stored table (48 across the categories) -
+result tables, not downloads: the five datasets <code>mtb.data.fetch</code> can download
+are <code>D11</code>, <code>D28</code>, <code>D45</code>, <code>D46</code> and <code>D52</code>. A re-run row that most likely failed
 silently - ARI below 0.01 where the published table scored above 0.2 for
 the same (category, dataset, method); today Conos on D28 - is flagged by
 <code>mtb.DegenerateRerunWarning</code> (a <code>UserWarning</code>) whenever <code>source="rerun"</code> or
 <code>"both"</code> loads it, with the <code>df[df.method != ...]</code> line to drop it before
 ranking.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">cov</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">results_coverage</span><span class="p">(</span><span class="s2">&quot;cross&quot;</span><span class="p">)</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">cov</span><span class="p">[</span><span class="n">cov</span><span class="o">.</span><span class="n">dataset</span> <span class="o">==</span> <span class="s2">&quot;D52&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>   <span class="c1"># published 1, rerun-0.2.1 8</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">cov</span><span class="p">[</span><span class="n">cov</span><span class="o">.</span><span class="n">dataset</span> <span class="o">==</span> <span class="s2">&quot;D52&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span>   <span class="c1"># published 1, rerun 8</span>
 </span></code></pre></div>
 <h3 id="clustering-variants">Clustering variants<a class="headerlink" href="#clustering-variants" title="Anchor link to this section">&para;</a></h3>
 <p>scIB clustering metrics depend on the upstream clustering. The published tree

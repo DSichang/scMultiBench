@@ -1526,6 +1526,7 @@ public API is reachable. A quick smoke test of the read-only surface:</p>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">())</span>                 <span class="c1"># available tasks</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">))</span>   <span class="c1"># methods declared for a category</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">(</span><span class="s2">&quot;vertical&quot;</span><span class="p">))</span>  <span class="c1"># how to lay out your own dataset on disk (`multibench layout vertical`)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="method-environments">Method environments<a class="headerlink" href="#method-environments" title="Anchor link to this section">&para;</a></h2>
@@ -1555,9 +1556,14 @@ need R, scBridge / Portal / uniPort each pin their own PyTorch line, and these
 </span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>    <span class="c1"># the joint embedding (ndarray)</span>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>       <span class="c1"># the exact command that was executed (list[str])</span>
 </span></code></pre></div>
+<p>The same call from the shell, checked before anything runs:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>data/D28/rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>data/D28/atac_gas.h5<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--out-dir<span class="w"> </span>runs/scalex_d28<span class="w"> </span>--dry-run<span class="w">      </span><span class="c1"># prints the exact `conda run -n scmb_torch python .../main_SCALEX.py ...` line</span>
+</span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Create the method's env first</p>
-<p><code>mtb.run(...)</code> preflights the env and raises <code>EnvironmentError</code> naming the
+<p><code>mtb.run(...)</code> preflights the env and raises <code>OSError</code> naming the
 install command if it does not exist; <code>scan()</code> reports the same per method
 in its <code>env_ok</code> column. Build it with <code>multibench env install --methods
 &lt;method&gt; --packed --run</code> (see below) <strong>before</strong> running. The method scripts
@@ -1582,11 +1588,11 @@ first and <code>env install --run</code> refuses (exit 1) unless <code>--force</
 work everywhere, and everything that does not run a method - the registry,
 the stored results, <code>scan</code>'s file gate, <code>evaluate</code>, the figures - works on
 any machine. <strong>Install only what you need</strong>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing, with the install line</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>plan<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w">           </span><span class="c1"># the envs a category needs, with download / disk sizes</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs; 175 GB measured, see SETUP.md)</span>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                             </span><span class="c1"># which envs exist / are missing, with the install line</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>plan<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w">           </span><span class="c1"># the envs a category needs, with download / disk sizes</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>Matilda<span class="w"> </span>--run<span class="w">    </span><span class="c1"># one method: its env only</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--run<span class="w">                      </span><span class="c1"># the whole benchmark (29 envs; 175 GB measured, see SETUP.md)</span>
 </span></code></pre></div>
 <p>Add <code>--packed</code> to any <code>env install</code> to use <strong>prebuilt archives</strong> (download +
 unpack in minutes instead of a 10-30 minute solve-and-build). All 29
@@ -1646,8 +1652,8 @@ path is <code>mtb.config.DEFAULT.data_path</code>, and it depends on how you ins
 </tbody>
 </table>
 <p>Manual equivalent, e.g. for <code>D11</code>, into whichever of the two applies:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">DATA</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import multibench as mtb; print(mtb.config.DEFAULT.data_path)&#39;</span><span class="k">)</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DATA</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nv">DATA</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import multibench as mtb; print(mtb.config.DEFAULT.data_path)&#39;</span><span class="k">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DATA</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p>Available there: <code>D11</code> (vertical, 11 MB), <code>D28</code> (diagonal, 137 MB), <code>D45</code>
 (mosaic, 290 MB), <code>D46</code> (mosaic, 97 MB), <code>D52</code> (cross, 179 MB). The <strong>full
@@ -1667,7 +1673,7 @@ and <code>scanpy</code> install with the package - no extra step. (<code>pip ins
 <div class="admonition question">
 <p class="admonition-title">Stuck on install?</p>
 <dl>
-<dt><strong><code>EnvironmentError: conda env '&lt;env&gt;' is not installed</code></strong> from <code>mtb.run</code>, or <code>env_ok</code> False in <code>scan()</code></dt>
+<dt><strong><code>OSError: conda env '&lt;env&gt;' (&lt;method&gt;) is not installed</code></strong> from <code>mtb.run</code>, or <code>env_ok</code> False in <code>scan()</code></dt>
 <dd>
 <p>The method's conda env does not exist here. <code>multibench env install
 --methods &lt;method&gt; --packed --run</code> builds it (the message carries the
@@ -1692,7 +1698,7 @@ is on <code>PATH</code> - a few seconds - and then computes the metric. Without
 a compiler the metric is recorded as <code>NaN</code> and the warning carries the
 exact command to run yourself once one is installed (Xcode command-line
 tools on macOS):</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>g++<span class="w"> </span>-std<span class="o">=</span>c++11<span class="w"> </span>-O3<span class="w"> </span>-o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.cpp
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>g++<span class="w"> </span>-std<span class="o">=</span>c++11<span class="w"> </span>-O3<span class="w"> </span>-o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.cpp
 </span></code></pre></div>
 <p>Everything else still computes. <code>kBET</code> is separate: it needs R via
 <code>rpy2</code> and <code>slow_metrics=True</code>.</p>

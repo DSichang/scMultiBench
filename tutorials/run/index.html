@@ -1418,7 +1418,7 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
    match is exact on the <em>set</em> of modality roles - <code>{"rna", "atac_gas"}</code> selects
    the diagonal <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + gene-activity variant, not the vertical one.</li>
 <li><strong>Preflight the environment</strong>: with the default <code>cmd_template</code>, a missing
-   conda env raises <code>EnvironmentError</code> naming the install command <em>before</em>
+   conda env raises <code>OSError</code> naming the install command <em>before</em>
    anything is written.</li>
 <li><strong>Convert inputs</strong> to the canonical scMultiBench <code>.h5</code> (unless
    <code>convert=False</code>) into a per-run <code>inputs/</code> folder.</li>
@@ -1438,7 +1438,7 @@ recipe / yml</code> use) - and it must exist on your machine. Build it from the
 committed lockfile (or a prebuilt archive) with <code>multibench env install
 --methods SCALEX --packed --run</code>; <code>multibench env doctor</code> lists what
 exists and what is missing. <code>mtb.run</code> shells out with <code>conda run -n &lt;env&gt;
-...</code>; if the env is missing the preflight raises <code>EnvironmentError</code> with
+...</code>; if the env is missing the preflight raises <code>OSError</code> with
 that install command. <code>multibench run ... --dry-run</code> prints the exact
 command line without executing it (<code>--param KEY=VALUE</code> merges
 hyperparameters into it), the line an HPC job can carry;
@@ -1732,12 +1732,15 @@ keeps them with a <code>UserWarning</code>; <code>modalities=[]</code> selects e
 (spot coordinates, spots x 2). GPSA additionally reads <code>obs['Ground_Truth']</code>
 (a region / layer label per spot) from <strong>every</strong> slice: it drives GPSA's own
 PAA / LTARI / SCS scores, written to
-<code>&lt;out_dir&gt;/GPSA_aligned_slices/&lt;data_dir_name&gt;_metrics.csv</code> - a slice
-without that column fails inside the driver, not at <code>scan</code>. The upstream
-scripts glob <code>data_dir + '*.h5ad'</code>
-<strong>without sorting</strong>, so the slice index in the output follows glob order, not
-your numbering; SPIRAL also wants a unique leading token per filename (the
-part before the first <code>_</code>) - the package stages symlinks for that when needed.
+<code>&lt;out_dir&gt;/GPSA_aligned_slices/&lt;data_dir_name&gt;_metrics.csv</code> - <code>scan</code> reports
+GPSA <code>files_ok=False</code> for a slice without that column. The upstream scripts
+glob <code>data_dir + '*.h5ad'</code> <strong>without sorting</strong>, so <code>mtb.run</code> stages the slices
+as sorted, zero-padded symlinks under <code>&lt;out_dir&gt;/inputs/</code> (which also gives
+SPIRAL the unique leading token per filename it wants) and writes
+<code>&lt;out_dir&gt;/slices_manifest.json</code> mapping each <code>aligned_slice_&lt;i&gt;</code> to its
+source file - the manifest is the authority for which input became which
+output. PASTE writes its slices without any <code>obs</code> column and PASTE2 rewrites
+<code>.X</code> (normalize, log1p, <abbr title="Highly Variable Gene">HVG</abbr> subset) before writing, so keep your originals.
 Output: <code>aligned_slice_&lt;i&gt;.h5ad</code> per slice, so <code>run_all</code> records
 <code>RUN_OK_NO_EMBEDDING</code> - clustering metrics do not apply, and registration
 metrics are not wired into <code>mtb.evaluate</code> in this version. <code>scan()</code> checks the

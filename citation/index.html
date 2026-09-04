@@ -1368,8 +1368,9 @@ prints it (<code>mtb.cite()</code> does not emit this software entry).</p>
 field is the exact command line that was executed, and <code>run_all</code> saves the
 per-method records under <code>out_dir</code>. Recording those alongside the method's
 conda environment and the scMultiBench version (<code>multibench.__version__</code>)
-makes a run fully reproducible; the re-run tables the package ships carry
-their version in the <code>source</code> column (<code>rerun-0.2.1</code>).</p>
+makes a run fully reproducible; the re-run tables the package ships say
+<code>rerun</code> in their <code>source</code> column and carry the sweep's package version
+in <code>frame.attrs["rerun_version"]</code>.</p>
 </div>
 
 
