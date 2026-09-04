@@ -1303,8 +1303,8 @@ integration methods, also cite that method's own publication.</p>
 <p>Cite <strong>Liu, Ding et al., <em>Nature Methods</em> (2025)</strong> for the benchmark, <strong>and</strong>
 cite each integration method you actually run. <code>mtb.cite([...])</code> prints
 both:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">&quot;Matilda&quot;</span><span class="p">,</span> <span class="s2">&quot;MOFA2&quot;</span><span class="p">))</span>              <span class="c1"># BibTeX: the benchmark + one entry per method</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">&quot;text&quot;</span><span class="p">))</span>  <span class="c1"># every method a run_all sweep used (a list works too)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">&quot;Matilda&quot;</span><span class="p">,</span> <span class="s2">&quot;MOFA2&quot;</span><span class="p">))</span>                 <span class="c1"># one line per entry: the benchmark + one per method</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">&quot;bibtex&quot;</span><span class="p">))</span>   <span class="c1"># every method a run_all sweep used (a list works too), as BibTeX</span>
 </span></code></pre></div>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>multibench<span class="w"> </span>cite<span class="w"> </span>Matilda<span class="w"> </span>MOFA2<span class="w"> </span>--format<span class="w"> </span>bibtex<span class="w"> </span>--out<span class="w"> </span>refs.bib
 </span></code></pre></div>
@@ -1316,9 +1316,10 @@ both:</p>
 <em>Nature Methods</em>, <strong>22</strong>, 2449–2460 (2025).
 <a href="https://doi.org/10.1038/s41592-025-02856-3">https://doi.org/10.1038/s41592-025-02856-3</a></p>
 <h3 id="bibtex">BibTeX<a class="headerlink" href="#bibtex" title="Anchor link to this section">&para;</a></h3>
-<p>The entry below is exactly what <code>print(mtb.cite())</code> emits - the package is the
-single source of the benchmark's BibTeX, so the two cannot drift:</p>
-<div class="language-bibtex highlight"><span class="filename">scmultibench.bib  (= mtb.cite())</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nc">@article</span><span class="p">{</span><span class="nl">scMultiBench_2025</span><span class="p">,</span>
+<p>The entry below is exactly what <code>print(mtb.cite(fmt="bibtex"))</code> emits - the
+package is the single source of the benchmark's BibTeX, so the two cannot
+drift (<code>mtb.cite()</code> alone prints the same reference as one line of text):</p>
+<div class="language-bibtex highlight"><span class="filename">scmultibench.bib  (= mtb.cite(fmt='bibtex'))</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nc">@article</span><span class="p">{</span><span class="nl">scMultiBench_2025</span><span class="p">,</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="na">author</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Liu C and Ding S and Kim HJ and Long S and Xiao D and Ghazanfar S and Yang P}</span><span class="p">,</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="na">title</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Multitask benchmarking of single-cell multimodal omics integration methods}</span><span class="p">,</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="na">journal</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Nature Methods}</span><span class="p">,</span>
@@ -1334,8 +1335,9 @@ single source of the benchmark's BibTeX, so the two cannot drift:</p>
 paper - cite it alongside scMultiBench whenever its output appears in your
 manuscript. <code>mtb.cite("Matilda", "MOFA2")</code> - one id per argument, like
 <code>multibench cite Matilda MOFA2</code>, or one list - emits the benchmark entry
-followed by one entry per method, in the order given (<code>fmt="bibtex"</code>, the
-default, or <code>"text"</code>); every DOI was resolved against Crossref, and a method
+followed by one entry per method, in the order given (<code>fmt="text"</code>, the
+default - one line per entry - or <code>"bibtex"</code>; <code>multibench cite</code> defaults to
+BibTeX); every DOI was resolved against Crossref, and a method
 whose reference is not yet curated is emitted as a <code>% &lt;id&gt;: no verified
 reference ...; see &lt;repository&gt;</code> comment rather than silently dropped.
 <code>mtb.cite("all")</code> lists every registry method.

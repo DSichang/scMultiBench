@@ -1358,11 +1358,11 @@ alongside the rest. Everything but step 3 runs on a laptop with
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 3. run a method on the fetchable D28 (needs the method&#39;s conda env)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>              <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">),</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>              <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">),</span>   <span class="c1"># (dataset, category, method)</span>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>              <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/out/scalex_d28&quot;</span><span class="p">)</span>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># 4. score it with scIB metrics (labels_for returns the files in the embedding&#39;s cell order)</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">))</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">),</span> <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">)</span>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># 5. reshape and plot it next to the benchmark</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX_rerun&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
@@ -1390,7 +1390,7 @@ have a candidate, inspect its spec and what it has been observed to cost:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">&quot;env&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;atac&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;needs_labels&quot;</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">&quot;reference&quot;</span><span class="p">][</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># (&#39;scmb_torch&#39;, &#39;gene_activity&#39;, False, &#39;10.1038/s41467-022-33758-z&#39;)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">runtime_hint</span><span class="p">(</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">info</span><span class="p">[</span><span class="s2">&quot;runtime&quot;</span><span class="p">]</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># {&#39;observed&#39;: [{&#39;cells&#39;: 11014, &#39;dataset&#39;: &#39;D28&#39;, &#39;sec&#39;: 2233, &#39;source&#39;: &#39;manual&#39;}], &#39;tier&#39;: &#39;slow&#39;, &#39;worst_sec&#39;: 2233}</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="s2">&quot;atac&quot;</span><span class="p">])</span>   <span class="c1"># ranked from the stored tables, with coverage</span>
 </span></code></pre></div>
@@ -1398,7 +1398,7 @@ have a candidate, inspect its spec and what it has been observed to cost:</p>
 does not hide what it could not score: a method wired for the category with
 no rows in the chosen <code>source</code> is listed with <code>grand_score</code> NaN, one warning
 names it (and suggests <code>source="rerun"</code> when that source has it), and
-<code>family="batch"</code> ranks on the batch-correction metrics instead.</p>
+<code>metrics="batch"</code> ranks on the batch-correction metrics instead.</p>
 <hr />
 <h2 id="step-2-plot-the-stored-results">Step 2 - Plot the stored results<a class="headerlink" href="#step-2-plot-the-stored-results" title="Anchor link to this section">&para;</a></h2>
 <p>Before running anything, you can reproduce the paper's scIB-style bubble tables
@@ -1410,7 +1410,8 @@ metric family.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>          <span class="c1"># the paper&#39;s table, 14 methods</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW&quot;</span><span class="p">],</span> <span class="n">save</span><span class="o">=</span><span class="s2">&quot;fig.pdf&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p><code>load_results</code> also takes <code>task</code>, <code>method</code>, <code>metric</code>, <code>clustering</code>
+<p><code>load_results</code> also takes <code>methods</code>, <code>metrics</code> (<code>"clustering"</code> / <code>"batch"</code>
+/ <code>"all"</code>, or a list of codes such as <code>["ARI", "NMI"]</code>), <code>clustering</code>
 (<code>"default"</code>, <code>"louvain"</code>, or <code>"kmeans"</code>) and <code>source</code> - <code>"published"</code> (the
 paper's numbers, default) or <code>"rerun"</code> (the package's own sweep, the tables
 behind the category tutorials). The two cover different methods - the paper's
@@ -1431,7 +1432,7 @@ method scripts themselves are never modified.</strong></p>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">),</span>    <span class="c1"># {&#39;rna&#39;: .../D28/rna.h5, &#39;atac_gas&#39;: .../D28/atac_gas.h5}</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">),</span>    <span class="c1"># {&#39;rna&#39;: .../D28/rna.h5, &#39;atac_gas&#39;: .../D28/atac_gas.h5}</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/out/scalex_d28&quot;</span><span class="p">,</span>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
@@ -1477,25 +1478,29 @@ call writes it from an AnnData:</p>
 <code>metric.csv</code>-shaped frame (index = metric name, single <code>"Value"</code> column).
 Clustering metrics need the ground-truth cell-type <code>labels</code>; <code>clustering</code> is
 optional (omitted, scIB's optimal-resolution Leiden clustering is derived from
-the embedding). For <code>task="batch"</code> or <code>task="all"</code> you also pass <code>batch</code>
-labels - or a list of label files, one per batch.</p>
+the embedding). <code>metrics=</code> selects what is computed: <code>None</code> (the default) is
+every applicable metric - the clustering family, plus the batch family when
+a <code>batch</code> vector exists (or <code>labels</code> is a list of label files, one per
+batch); <code>"clustering"</code>, <code>"batch"</code> and <code>"all"</code> name a family, a list of codes
+names exactly those.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">),</span>   <span class="c1"># {&#39;rna_cty&#39;: ..., &#39;atac_cty&#39;: ...} - one file per modality, in the</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>                                   <span class="c1"># order SCALEX stacks the cells (RNA first, then ATAC)</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">),</span>   <span class="c1"># {&#39;rna_cty&#39;: ..., &#39;atac_cty&#39;: ...} - one file per modality, in the</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>           <span class="c1"># order SCALEX stacks the cells (RNA first, then ATAC)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># index: ARI, NMI, ASW, iASW, iF1, cLISI   column: Value</span>
 </span></code></pre></div>
 <p><code>labels_for</code> returns a multi-file dataset's label files in the benchmark's
 cell-stacking order, so the dict goes in as is (a dict in any other order
-needs <code>label_order=</code>; <code>task="all"</code> then uses each cell's file of origin as
-its batch). <code>labels</code> can equally be a <code>pandas.Series</code>, an array, or an <code>obs</code>
-column name when <code>output</code> is an AnnData; <code>only={"ARI", "NMI"}</code> restricts the
+needs <code>label_order=</code>; the default <code>metrics=None</code> - or <code>metrics="all"</code> - then
+uses each cell's file of origin as its batch and adds the batch family).
+<code>labels</code> can equally be a <code>pandas.Series</code>, an array, or an <code>obs</code> column name
+when <code>output</code> is an AnnData; <code>metrics=["ARI", "NMI"]</code> restricts the
 computation. ARI, NMI and iF1 need scIB's Leiden resolution sweep - tens of
 seconds for a few thousand cells, minutes for ~10^4 - which <code>evaluate</code>
-announces on stderr above 2,000 cells (<code>verbose=True</code> / <code>False</code> forces it);
-<code>clustering=</code> (your own assignment) or <code>only=</code> with metrics that do not need
-it (ASW, iASW, cLISI, the batch family) skips the sweep.</p>
+announces on stderr above 2,000 cells (<code>verbose=False</code> silences it);
+<code>clustering=</code> (your own assignment) or a <code>metrics=[...]</code> list of metrics that
+do not need it (ASW, iASW, cLISI, the batch family) skips the sweep.</p>
 <hr />
 <h2 id="step-5-plot-your-own-result">Step 5 - Plot your own result<a class="headerlink" href="#step-5-plot-your-own-result" title="Anchor link to this section">&para;</a></h2>
 <p>To compare your run against the benchmark, reshape <code>evaluate</code>'s wide frame into
@@ -1532,12 +1537,13 @@ row labels), and <code>aggregate="summary"</code> ranks within each dataset firs
 <code>convert</code>, <code>run</code>, <code>run-all</code>, <code>cite</code> and <code>env</code> (status / plan / doctor /
 install / recipe) subcommands that mirror the Python API - <code>multibench
 &lt;command&gt; --help</code> documents every flag. <code>scan</code> prints a compact table by
-default (<code>--columns all</code> or <code>--format csv|tsv|json</code> for every column),
-<code>run-all --dry-run</code> prints the plan plus the exact command per variant, <code>run
---dry-run</code> the one command, <code>--param METHOD:KEY=VALUE</code> sets hyperparameters
-and <code>params METHOD</code> lists them; <code>plot --input</code> is repeatable and, combined
-with <code>--category</code>, overlays your rows on the stored table; data goes to
-stdout, progress and notes to stderr.</p>
+default (<code>--columns all</code> or <code>--format csv|tsv|json</code> for every column,
+<code>command</code> included), <code>run-all --dry-run</code> prints the same table plus the exact
+command per variant, <code>run --dry-run</code> the one command, <code>--param
+METHOD:KEY=VALUE</code> sets hyperparameters and <code>params METHOD</code> lists them;
+<code>evaluate --metrics</code> takes a family token or a comma list; <code>plot --input</code> is
+repeatable and, combined with <code>--category</code>, overlays your rows on the stored
+table; data goes to stdout, progress and notes to stderr.</p>
 <hr />
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Anchor link to this section">&para;</a></h2>
 <ul>

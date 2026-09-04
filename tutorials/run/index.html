@@ -1399,7 +1399,7 @@ on it; this page is the single-method call underneath.)</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">)</span>                          <span class="c1"># 137 MB reference dataset; no-op when present</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">),</span>   <span class="c1"># {&#39;rna&#39;: .../D28/rna.h5, &#39;atac_gas&#39;: .../D28/atac_gas.h5}</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">),</span>   <span class="c1"># (dataset, category, method) -&gt; {&#39;rna&#39;: .../D28/rna.h5, &#39;atac_gas&#39;: .../D28/atac_gas.h5}</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d28&quot;</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span>   <span class="c1"># -&gt; (11014, 10)  joint embedding: 6,408 RNA + 4,606 ATAC cells x latent dims</span>
@@ -1433,20 +1433,21 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
 <p class="admonition-title">Each method needs its own conda environment</p>
 <p>The env each method needs is declared in the registry - for <code>SCALEX</code> it is
 <code>scmb_torch</code> (see <code>mtb.method_info("SCALEX")["env"]</code>, the same name
-<code>scan</code>'s <code>env</code> column, <code>mtb.env.default_env_name</code> and <code>multibench env
-recipe / yml</code> use) - and it must exist on your machine. Build it from the
-committed lockfile (or a prebuilt archive) with <code>multibench env install
---methods SCALEX --packed --run</code>; <code>multibench env doctor</code> lists what
-exists and what is missing. <code>mtb.run</code> shells out with <code>conda run -n &lt;env&gt;
-...</code>; if the env is missing the preflight raises <code>OSError</code> with
-that install command. <code>multibench run ... --dry-run</code> prints the exact
-command line without executing it (<code>--param KEY=VALUE</code> merges
-hyperparameters into it), the line an HPC job can carry;
-<code>mtb.command_preview(method, category, inputs=..., out_dir=...)</code> is the
-same argv from Python (paths absolutized exactly as <code>run</code> passes them),
-and <code>mtb.plan_commands(dataset, category)</code> the per-variant form for a
-laid-out dataset folder (<code>out_dir</code> defaults to a <code>&lt;out_dir&gt;</code> placeholder
-for previews).</p>
+<code>scan</code>'s <code>env</code> column, <code>env doctor</code> and <code>multibench env recipe / yml</code>
+use) - and it must exist on your machine. Build it from the committed
+lockfile (or a prebuilt archive) with <code>multibench env install --methods
+SCALEX --packed --run</code> (<code>mtb.env.install(["SCALEX"], dry_run=False)</code> from
+Python); <code>multibench env doctor</code> lists what exists and what is missing.
+<code>mtb.run</code> shells out with <code>conda run -n &lt;env&gt; ...</code>; if the env is
+missing the preflight raises <code>OSError</code> with that install command.
+<code>multibench run ... --dry-run</code> prints the exact command line without
+executing it (<code>--param KEY=VALUE</code> merges hyperparameters into it), the
+line an HPC job can carry; <code>mtb.run(method, category, inputs=...,
+out_dir=..., dry_run=True)</code> returns the same argv from Python (paths
+absolutized exactly as a real call passes them, nothing created), and
+<code>mtb.scan(dataset, category)</code> carries the per-variant form for a
+laid-out dataset folder in its <code>command</code> column (<code>out_dir</code> defaults to a
+<code>&lt;out_dir&gt;</code> placeholder for previews).</p>
 </div>
 <hr />
 <h2 id="inputs-roles-and-format-flexibility">Inputs: roles and format flexibility<a class="headerlink" href="#inputs-roles-and-format-flexibility" title="Anchor link to this section">&para;</a></h2>
@@ -1454,9 +1455,12 @@ for previews).</p>
 in-memory <code>AnnData</code>). Roles are the method's own argument names from the
 registry - for SCALEX's diagonal variant they are <code>rna</code> and <code>atac_gas</code>
 (gene-activity scores derived from <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>). For a benchmark dataset,
-<code>mtb.inputs_for(dataset, method, category)</code> resolves them for you (and
-<code>check=True</code> verifies the files exist, are oriented features x cells and have
-one label per cell). Every path it returns is absolute. When the method has
+<code>mtb.inputs_for(dataset, category, method)</code> resolves them for you - the same
+<code>(dataset, category, ...)</code> order as <code>scan</code> and <code>run_all</code>; the 0.2 <code>(dataset,
+method, category)</code> order raises <code>TypeError</code> - and <code>check=True</code> verifies the
+files exist, are oriented features x cells and have one label per cell (the
+default <code>check=False</code> returns the paths without looking; <code>check=None</code> warns
+about missing ones). Every path it returns is absolute. When the method has
 several variants for the category and you pass no <code>modalities</code>, it picks the
 one whose input files are all in the folder; when none or several are, it
 raises <code>mtb.AmbiguousVariantError</code> - a <code>ValueError</code> (which also matches
@@ -1523,14 +1527,15 @@ contract. One call writes it from an AnnData or MuData:</p>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">a</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">&quot;my_citeseq.h5ad&quot;</span><span class="p">)</span>                 <span class="c1"># X = RNA, obsm[&#39;protein&#39;] = ADT, obs[&#39;celltype&#39;]</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="s2">&quot;data/MYCITE&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">&quot;obsm:protein&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;obs:celltype&quot;</span><span class="p">)</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1">#   -&gt; data/MYCITE/rna.h5, adt.h5, cty.csv; batch=&quot;obs:sample&quot; writes rna1.h5/cty1.csv ... per batch</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">from_mudata</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>                   <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>   <span class="c1"># -&gt; rna.h5, atac.h5, cty.csv</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>   <span class="c1"># MuData: bare modality names -&gt; rna.h5, atac.h5, cty.csv</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">&quot;MYCITE&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>    <span class="c1"># files_ok / env_ok per method, with reasons</span>
 </span></code></pre></div>
 <p>Or file by file - <code>to_canonical(src, "data/MYDIAG", modality="rna")</code> picks the
-canonical filename for the modality, <code>mtb.io.write_labels(labels, path)</code> writes
-the single-column <code>cty</code> CSV, and <code>read_canonical</code> is the inverse (canonical
-<code>.h5</code> -&gt; <code>AnnData</code>, cells x genes). The <code>modality</code> argument is validated, and
+canonical filename for the modality, the single-column <code>cty</code> CSV is one
+header line <code>x</code> and one label per cell (<code>pd.Series(labels,
+name="x").to_csv(path, index=False)</code>), and <code>read_canonical</code> is the inverse
+(canonical <code>.h5</code> -&gt; <code>AnnData</code>, cells x genes). The <code>modality</code> argument is validated, and
 for <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> it is the one place you say whether the matrix is peaks or gene
 activity - the two are <em>not</em> interchangeable, see the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> note printed by
 <code>describe_layout</code>. Pass <code>category=</code> with an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> matrix: <code>category="vertical"</code>
@@ -1573,7 +1578,7 @@ through the package driver <code>engine/drivers/run_gpsa.py</code> and is public
 </div>
 <hr />
 <h2 id="validated-example-scalex-diagonal-integration-on-d28">Validated example: SCALEX diagonal integration on D28<a class="headerlink" href="#validated-example-scalex-diagonal-integration-on-d28" title="Anchor link to this section">&para;</a></h2>
-<p>This is a real, <abbr title="Graphics Processing Unit">GPU</abbr>-validated run (2,233 s on our host - <code>mtb.runtime_hint("SCALEX")</code>).
+<p>This is a real, <abbr title="Graphics Processing Unit">GPU</abbr>-validated run (2,233 s on our host - <code>mtb.method_info("SCALEX")["runtime"]</code>).
 SCALEX performs <strong>diagonal</strong> integration (unpaired modalities bridged by shared
 features): an <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> population (<code>rna</code>) and an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> population summarised as
 gene-activity scores (<code>atac_gas</code>) from dataset <strong>D28</strong>, which
@@ -1584,13 +1589,12 @@ gene-activity scores (<code>atac_gas</code>) from dataset <strong>D28</strong>, 
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/runs/scalex_d28&quot;</span><span class="p">,</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">)</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>   <span class="c1"># -&gt; (11014, 10)   joint embedding (RNA + ATAC cells x latent dims)</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">)</span>            <span class="c1"># the exact argv that ran, including the conda wrapper</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">,</span> <span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/runs/scalex_d28&quot;</span><span class="p">,</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="p">)</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>   <span class="c1"># -&gt; (11014, 10)   joint embedding (RNA + ATAC cells x latent dims)</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">)</span>            <span class="c1"># the exact argv that ran, including the conda wrapper</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Paths are made absolute for you</p>
@@ -1655,13 +1659,13 @@ lands in the right conda env automatically.</p>
 two files - one per modality, because the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells differ - and
 passing both as a list makes each cell's file of origin the batch for the
 batch metrics (see <a href="../evaluate/">Evaluate a run</a>):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>                       <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">))</span>   <span class="c1"># {&#39;rna_cty&#39;: ..., &#39;atac_cty&#39;: ...} - RNA cells first, then ATAC</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D28&quot;</span><span class="p">),</span>   <span class="c1"># {&#39;rna_cty&#39;: ..., &#39;atac_cty&#39;: ...} - RNA cells first, then ATAC</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>                       <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">)</span>         <span class="c1"># both families; the default metrics=None does the same here</span>
 </span></code></pre></div>
 <p><code>labels_for</code> returns the files in the benchmark's cell-stacking order (<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>
 before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>; <code>cty1, cty2, ...</code> numerically), which is the order SCALEX
-stacks the cells, so the dict goes in directly; <code>labels_for("D28", "SCALEX",
-"diagonal")</code> follows that variant's own modality order. A dict you assembled
+stacks the cells, so the dict goes in directly; <code>labels_for("D28", "diagonal",
+"SCALEX")</code> follows that variant's own modality order. A dict you assembled
 in another order must pass <code>label_order=[...]</code> (or a list of paths in cell
 order). <code>run_all</code> finds that order for you and records it as
 <code>summary.label_order</code>.</p>

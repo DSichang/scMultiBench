@@ -1484,21 +1484,19 @@ expects.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">,</span>      <span class="c1"># vertical | diagonal | mosaic | cross; None -&gt; every category</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">task</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># None/&quot;all&quot; -&gt; every metric; &quot;clustering&quot; / &quot;batch&quot; -&gt; one family</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">metric_set</span><span class="o">=</span><span class="s2">&quot;scib&quot;</span><span class="p">,</span>        <span class="c1"># the only metric set</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span>            <span class="c1"># None -&gt; every dataset; a list -&gt; several</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every method present; a name or list (alias tolerant)</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">metric</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>              <span class="c1"># None -&gt; every metric; or [&quot;ARI&quot;, &quot;NMI&quot;]</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>     <span class="c1"># default | louvain | kmeans</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;published&quot;</span><span class="p">,</span>       <span class="c1"># published | rerun | both</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">)</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1">#   metric     value      method dataset  category clustering     source</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># 0    NMI  0.792936  Multigrate     D11  vertical    default  published</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># 1    ARI  0.759446  Multigrate     D11  vertical    default  published</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="c1"># 2    ASW  0.656011  Multigrate     D11  vertical    default  published</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="c1"># ...</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">&quot;vertical&quot;</span><span class="p">,</span>               <span class="c1"># vertical | diagonal | mosaic | cross; None -&gt; every category (the only positional argument)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">dataset</span><span class="o">=</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span>            <span class="c1"># None -&gt; every dataset; a list -&gt; several</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># None -&gt; every method present; a name or list (alias tolerant)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># None -&gt; every metric; &quot;clustering&quot; / &quot;batch&quot; / &quot;all&quot; -&gt; a family; or [&quot;ARI&quot;, &quot;NMI&quot;]</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>     <span class="c1"># default | louvain | kmeans</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">source</span><span class="o">=</span><span class="s2">&quot;published&quot;</span><span class="p">,</span>       <span class="c1"># published | rerun | both</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1">#   metric     value      method dataset  category clustering     source</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># 0    NMI  0.792936  Multigrate     D11  vertical    default  published</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># 1    ARI  0.759446  Multigrate     D11  vertical    default  published</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="c1"># 2    ASW  0.656011  Multigrate     D11  vertical    default  published</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># ...</span>
 </span></code></pre></div>
 <h3 id="category-tokens">Category tokens<a class="headerlink" href="#category-tokens" title="Anchor link to this section">&para;</a></h3>
 <p>scMultiBench groups its 40 integration methods into four <strong>integration
@@ -1628,13 +1626,13 @@ The re-run sweeps are <code>default</code> only. A result directory named
 </div>
 <div class="admonition note">
 <p class="admonition-title">Metric names and method ids are canonicalised</p>
-<p>Both <code>metric=</code> and the returned <code>metric</code> column are passed through
+<p>Both a <code>metrics=</code> list and the returned <code>metric</code> column are passed through
 <code>catalog.canonical_metric</code>, so you can filter with the clean scIB names -
 <code>ARI</code>, <code>NMI</code>, <code>ASW</code>, <code>iASW</code>, <code>iF1</code>, <code>cLISI</code> (clustering) and
 <code>ASW_batch</code>, <code>GC</code>, <code>iLISI</code>, <code>kBET</code> (batch) - regardless of how the
 underlying CSV spelled them; <code>mtb.evaluate</code> emits the same spelling, so a
 <code>to_long</code> frame concatenates with a stored table without duplicate metric
-columns. Likewise <code>method=</code> accepts any alias of a
+columns. Likewise <code>methods=</code> accepts any alias of a
 method id (<code>"mofa+"</code> -&gt; <code>MOFA2</code>, <code>"Seurat(WNN)"</code> -&gt; <code>Seurat_WNN</code>). A
 filter that matches nothing returns an <strong>empty</strong> frame with a
 <code>UserWarning</code> listing what is present, so concatenating several calls
@@ -1644,7 +1642,7 @@ never breaks on one typo.</p>
 <p class="admonition-title">These are stored tables, not a live run</p>
 <p>To score <em>your own</em> run instead, compute metrics with
 <a href="../evaluate/"><code>mtb.evaluate</code></a> and reshape the wide frame with
-<code>mtb.to_long(value_df, method, dataset, category)</code> - it emits the same
+<code>mtb.to_long(value_df, method=..., dataset=..., category=...)</code> - it emits the same
 seven columns (<code>clustering="default"</code>, <code>source="user"</code>), so it drops
 straight into <code>plot.bubble</code> next to a stored table. <code>result_path=</code> also
 accepts a single long CSV (one you saved with <code>to_csv</code>, or a <code>run_all</code>
@@ -1701,8 +1699,8 @@ table</strong> - the grid of circles the paper uses to rank methods. It returns 
   <strong><code>L</code> badge</strong> a method that consumes cell-type labels - supervised, so its
   scores are not comparable with the unsupervised rows. The badge follows
   the variants of the <em>frame's</em> category (scMoMaT has no <code>L</code> in a vertical
-  panel); for a method outside the registry, <code>to_long(..., needs_labels=True)</code>
-  adds the column <code>build_table</code> honours.</li>
+  panel); for a method outside the registry, a <code>needs_labels</code> column in the
+  frame (<code>mine["needs_labels"] = True</code>) is what <code>build_table</code> honours.</li>
 </ul>
 <h3 id="individual-vs-summary-panels">Individual vs. summary panels<a class="headerlink" href="#individual-vs-summary-panels" title="Anchor link to this section">&para;</a></h3>
 <p>The <code>aggregate</code> argument decides what a row's numbers <em>mean</em>.</p>
@@ -1769,8 +1767,10 @@ figure order, index == <code>methods</code>, <code>n</code> = best), <code>block
 <code>overall_basis</code>, <code>datasets</code>, <code>coverage</code>, <code>method_datasets</code>, <code>category</code>,
 <code>needs_labels</code> and <code>na_cells</code> (the missing-metric report). So ranks can be
 read programmatically - e.g. the position of your own method:
-<code>mtb.plot.build_table(allruns).methods.index("MyMethod") + 1</code>.
-<code>mtb.plot.render(table, cmap=, title=, show_language=)</code> draws it.</p>
+<code>mtb.plot.build_table(allruns).methods.index("MyMethod") + 1</code>. Every
+selector is keyword-only (<code>build_table(df, ["ARI"])</code> raises <code>TypeError</code>).
+<code>mtb.plot.render(table, cmap=, title=, show_language=)</code> draws it (importable,
+not in <code>mtb.plot.__all__</code>).</p>
 <h3 id="summary-bars">Summary bars<a class="headerlink" href="#summary-bars" title="Anchor link to this section">&para;</a></h3>
 <p><code>mtb.plot.bar(df, group="clustering" | "batch", overall=..., top=N, save=...)</code>
 draws one bar per method with its across-dataset Overall - the benchmark's two

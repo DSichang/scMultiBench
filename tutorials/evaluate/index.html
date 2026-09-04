@@ -1429,8 +1429,8 @@ you can read, save, or feed straight into a bubble plot.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>                        <span class="c1"># embedding: ndarray / DataFrame / AnnData / .h5 / .npy / .csv</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>                    <span class="c1"># ARI, NMI, ASW, iASW, iF1, cLISI</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D11&quot;</span><span class="p">)[</span><span class="s2">&quot;cty&quot;</span><span class="p">],</span>  <span class="c1"># one label per cell, in the embedding&#39;s row order</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D11&quot;</span><span class="p">)[</span><span class="s2">&quot;cty&quot;</span><span class="p">],</span>  <span class="c1"># one label per cell, in the embedding&#39;s row order</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>                 <span class="c1"># ARI, NMI, ASW, iASW, iF1, cLISI (the default None: every applicable metric)</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="c1"># clustering= is optional - omitted, scIB&#39;s optimal-resolution Leiden</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="c1"># clustering is derived from the embedding</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
@@ -1439,18 +1439,18 @@ you can read, save, or feed straight into a bubble plot.</p>
 </div>
 <hr />
 <h2 id="what-evaluate-does">What <code>evaluate</code> does<a class="headerlink" href="#what-evaluate-does" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>             <span class="n">clustering</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metric_set</span><span class="o">=</span><span class="s2">&quot;scib&quot;</span><span class="p">,</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>             <span class="n">slow_metrics</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">only</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">&quot;X_emb&quot;</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>             <span class="n">label_order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">family</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>             <span class="n">clustering</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">&quot;X_emb&quot;</span><span class="p">,</span> <span class="n">label_order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
 </span></code></pre></div>
+<p><code>output</code> and <code>labels</code> are the two positional parameters; everything else is
+keyword-only.</p>
 <p><strong>Cost.</strong> ARI, NMI and iF1 need scIB's optimal-resolution Leiden sweep (ten
 resolutions on a kNN graph of the embedding): tens of seconds for a few
 thousand cells, minutes for ~10^4. <code>evaluate</code> announces the sweep with one
-stderr line when it starts on more than 2,000 cells (<code>verbose=None</code>, the
-default; <code>True</code> / <code>False</code> force the line on or off); <code>clustering=</code> (your own
-assignment) or <code>only=</code> naming metrics that do not need it (ASW, iASW, cLISI,
-the batch family) skips it entirely.</p>
+stderr line when it starts on more than 2,000 cells (<code>verbose=True</code>, the
+default; <code>False</code> never prints); <code>clustering=</code> (your own assignment) or a
+<code>metrics=[...]</code> list naming only metrics that do not need it (ASW, iASW,
+cLISI, the batch family) skips it entirely.</p>
 <p>Under the hood it assembles a small <code>AnnData</code> carrying your embedding in
 <code>obsm["X_emb"]</code>, with <code>celltype</code>, <code>cluster</code>, and <code>batch</code> as observation
 columns, builds a neighbour graph on the embedding, and runs the
@@ -1461,33 +1461,43 @@ canonical metric spelling <code>load_results</code> uses (<code>ARI, NMI, ASW, i
 cLISI, ASW_batch, GC, iLISI, kBET</code>), so a <code>to_long</code> frame concatenates with a
 stored table without duplicate metric columns - and it is never empty: a
 request that would select no metric raises instead of returning nothing.</p>
+<p><code>metrics=</code> is the one selection knob - the same vocabulary <code>load_results</code>
+and <code>recommend</code> take:</p>
 <table>
 <thead>
 <tr>
-<th><code>task</code></th>
+<th><code>metrics=</code></th>
 <th>Metrics computed</th>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>None</code> (default)</td>
+<td>every applicable metric: the clustering family, plus the batch family when a batch vector exists (<code>batch=</code>, or <code>labels</code> as a list of two or more files)</td>
+</tr>
 <tr>
 <td><code>"clustering"</code></td>
 <td>ARI, NMI, ASW, iASW, iF1, cLISI</td>
 </tr>
 <tr>
 <td><code>"batch"</code></td>
-<td>ASW_batch, GC (graph connectivity), iLISI (+ <code>kBET</code> with <code>slow_metrics=True</code>)</td>
+<td>ASW_batch, GC (graph connectivity), iLISI - needs a batch vector</td>
 </tr>
 <tr>
 <td><code>"all"</code></td>
-<td>both groups above</td>
+<td>both families - needs a batch vector</td>
+</tr>
+<tr>
+<td><code>["ARI", "ASW_batch", ...]</code></td>
+<td>exactly these codes (alias tolerant); <code>kBET</code> is computed <strong>only</strong> this way</td>
 </tr>
 </tbody>
 </table>
 <p><code>category</code> (<code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>, <code>cross</code>) is optional: it is
 validated when given (a typo raises <code>ValueError</code> listing the four), but the
-metrics do not depend on it. <code>family=</code> is accepted alongside <code>task=</code> - the
-same <code>clustering</code> / <code>batch</code> vocabulary <code>load_results</code> and <code>recommend</code> use
-(<code>task="dimension_reduction"</code> is served by the clustering group).</p>
+metrics do not depend on it. <code>metrics=</code> selects a metric <em>family</em>, not a
+<code>mtb.list_tasks()</code> token: <code>metrics="dimension_reduction"</code> raises <code>ValueError</code>
+saying so (that task shares the clustering family).</p>
 <hr />
 <h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Anchor link to this section">&para;</a></h2>
 <p><code>evaluate</code> is honest about what each metric group needs, and raises early if
@@ -1500,8 +1510,8 @@ measured by comparing predicted clusters against the ground-truth cell
 types, and the clusters are derived for you when you do not pass any.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;data/D11/cty.csv&quot;</span><span class="p">,</span>   <span class="c1"># single-column CSV, one header line, one label per cell</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;data/D11/cty.csv&quot;</span><span class="p">,</span>   <span class="c1"># single-column CSV, one header line, one label per cell</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="c1"># clustering=&quot;cluster.h5&quot;    # optional: a precomputed clustering (h5 dataset</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>                                 <span class="c1"># /obs/cluster_leiden, or any label-like input)</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>                                 <span class="c1"># skips the internal Leiden sweep</span>
@@ -1509,27 +1519,29 @@ types, and the clusters are derived for you when you do not pass any.</p>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<p>Batch correction is scored against a <code>batch</code> vector, so <code>task="batch"</code>
-(and <code>task="all"</code>) additionally require <code>batch</code> - unless <code>labels</code> is a
-list (or an ordered dict) of two or more files, in which case each cell's
+<p>Batch correction is scored against a <code>batch</code> vector, so <code>metrics="batch"</code>
+(and <code>"all"</code>) additionally require <code>batch</code> - unless <code>labels</code> is a list
+(or an ordered dict) of two or more files, in which case each cell's
 <strong>file of origin</strong> (1, 2, ...) is the batch, the rule <code>run_all</code> applies
-(see below).</p>
+(see below). The default <code>metrics=None</code> adds the batch family exactly
+when such a vector exists.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D52&quot;</span><span class="p">),</span>     <span class="c1"># {cty1, cty2, cty3} in the benchmark&#39;s cell-stacking order</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">&quot;D52&quot;</span><span class="p">),</span>     <span class="c1"># {cty1, cty2, cty3} in the benchmark&#39;s cell-stacking order</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span>                    <span class="c1"># (or leave metrics=None: three files -&gt; both families)</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="c1"># batch=my_batch_vector           # overrides the file-of-origin rule</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><code>mtb.labels_for(ds)</code> returns the files in the order the methods stack the
 cells (<code>cty</code>; <code>cty1, cty2, ...</code> numerically; <code>rna_cty</code> before <code>atac_cty</code>;
-<code>labels_for(ds, method, category)</code> follows that variant's own modality
+<code>labels_for(ds, category, method)</code> follows that variant's own modality
 order), so the dict plugs in directly. A dict you built in any other order
 raises; pass <code>label_order=["cty1", "cty2", "cty3"]</code> - the keys in the
 method's stacking order, numbered files ascending and <code>rna</code> before <code>atac</code>,
-NOT alphabetical - or a list of paths in that order. Passing <code>batch=</code> under
-the default <code>task="clustering"</code> computes no batch metric and says so with
-a <code>UserWarning</code> (<code>task="all"</code> adds ASW_batch / GC / iLISI).</p>
+NOT alphabetical - or a list of paths in that order. Passing <code>batch=</code> with
+<code>metrics="clustering"</code> computes no batch metric and says so with a
+<code>UserWarning</code>; <code>metrics="all"</code> or <code>"batch"</code> without any batch vector
+raises <code>ValueError</code> (<code>batch labels required for metrics='all' ...</code>).</p>
 </div>
 </div>
 </div>
@@ -1545,8 +1557,9 @@ a <code>UserWarning</code> (<code>task="all"</code> adds ASW_batch / GC / iLISI)
   the keys it found (and says so when the file looks like a canonical
   <em>input</em> matrix - <code>matrix/data</code> - rather than an embedding).</li>
 <li><code>labels</code> / <code>batch</code> / <code>clustering</code> - a CSV path (header row; column <code>x</code>, the
-  only column, or the last of two behind a barcode index - pass <code>column=</code> when
-  the file is ambiguous), a <strong>list</strong> of CSV paths concatenated in that order,
+  only column, or the last of two behind a barcode index - for a file with
+  several columns pass the column itself, <code>pd.read_csv(p)["col"]</code>), a
+  <strong>list</strong> of CSV paths concatenated in that order,
   a dict as returned by <code>mtb.labels_for</code> (one entry, or several in the
   stacking order <code>labels_for</code> returns - otherwise <code>label_order=</code>), a 1-D
   array / <code>Series</code> / <code>Categorical</code> / list, a single-column DataFrame, or -
@@ -1568,35 +1581,34 @@ align. A <code>Series</code> with the default <code>RangeIndex</code> is positio
 </div>
 <div class="admonition note">
 <p class="admonition-title">Missing labels raises</p>
-<p><code>task="clustering"</code> without <code>labels</code> raises <code>ValueError</code>; <code>task="batch"</code> /
-<code>"all"</code> without <code>batch</code> (and without a multi-file <code>labels</code> list) raises
-<code>ValueError</code> too, and a length mismatch says exactly what it saw
-(<code>input length mismatch: emb has 2863 cells, celltype has 2864</code>). These are
-programmer errors, not missing <em>optional</em> metrics - see graceful
-degradation below for the latter.</p>
+<p><code>evaluate</code> without <code>labels</code> raises <code>ValueError</code> (every family scores
+against the cell types); <code>metrics="batch"</code> / <code>"all"</code> without <code>batch</code>
+(and without a multi-file <code>labels</code> list) raises <code>ValueError</code> too, and a
+length mismatch says exactly what it saw (<code>input length mismatch: emb has
+2863 cells, celltype has 2864</code>). These are programmer errors, not missing
+<em>optional</em> metrics - see graceful degradation below for the latter.</p>
 </div>
 <h3 id="restricting-what-is-computed">Restricting what is computed<a class="headerlink" href="#restricting-what-is-computed" title="Anchor link to this section">&para;</a></h3>
-<p><code>only=</code> names the metrics you want (a collection, not a bare string - that
-raises <code>TypeError</code>; an unknown name raises <code>ValueError</code> listing the
-vocabulary, <code>mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS</code>).
-Everything else is skipped, including the Leiden sweep when no requested
-metric needs it - ARI and NMI compare the derived clustering against the
-labels (pass <code>clustering=</code> to score your own and skip the sweep) and iF1
-scores every resolution of it, so those three run the sweep; ASW, iASW and
-cLISI do not:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">only</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ASW&quot;</span><span class="p">})</span>               <span class="c1"># no Leiden sweep, ~seconds</span>
+<p>A <code>metrics=[...]</code> list names the metrics you want (a list, not a bare code -
+<code>metrics="ARI"</code> raises <code>ValueError</code> pointing at <code>metrics=["ARI"]</code>; an unknown
+code raises <code>ValueError</code> listing the vocabulary, <code>mtb.plot.CLUSTERING_METRICS
++ mtb.plot.BATCH_METRICS</code>; an empty list raises). Everything else is skipped,
+including the Leiden sweep when no requested metric needs it - ARI and NMI
+compare the derived clustering against the labels (pass <code>clustering=</code> to
+score your own and skip the sweep) and iF1 scores every resolution of it, so
+those three run the sweep; ASW, iASW and cLISI do not:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ASW&quot;</span><span class="p">])</span>            <span class="c1"># no Leiden sweep, ~seconds</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="n">my_clusters</span><span class="p">,</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>             <span class="n">only</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">})</span>                                      <span class="c1"># your clustering, no sweep</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">batch</span><span class="p">,</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>             <span class="n">only</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW_batch&quot;</span><span class="p">,</span> <span class="s2">&quot;GC&quot;</span><span class="p">])</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>             <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;NMI&quot;</span><span class="p">])</span>                                   <span class="c1"># your clustering, no sweep</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">batch</span><span class="p">,</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>             <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ARI&quot;</span><span class="p">,</span> <span class="s2">&quot;ASW_batch&quot;</span><span class="p">,</span> <span class="s2">&quot;GC&quot;</span><span class="p">])</span>                       <span class="c1"># across both families</span>
 </span></code></pre></div>
-<p><code>only=</code> is validated against the task: a batch metric (<code>ASW_batch</code>, <code>GC</code>,
-<code>iLISI</code>, <code>kBET</code>) needs <code>task="all"</code> or <code>"batch"</code> plus <code>batch=</code> (or a
-multi-file <code>labels</code>) - under <code>task="clustering"</code> it raises
-<code>ValueError: GC is a batch metric: pass task="all" (or "batch") and
-batch=&lt;vector&gt;</code> instead of returning an empty frame; a clustering metric
-under <code>task="batch"</code> raises likewise; <code>kBET</code> needs <code>slow_metrics=True</code>.
-<code>slow_metrics=True</code> adds kBET (shells out to R; hours on large datasets).</p>
+<p>A listed batch metric (<code>ASW_batch</code>, <code>GC</code>, <code>iLISI</code>, <code>kBET</code>) needs <code>batch=</code>
+(or a multi-file <code>labels</code>): without one it raises <code>ValueError: batch labels
+required for batch metric(s) ['GC']: pass batch=&lt;vector&gt; ...</code> instead of
+returning an empty frame. <code>kBET</code> (shells out to R via <code>rpy2</code>; hours on large
+datasets) is never implicit - it is computed only when a list names it:
+<code>metrics=["ASW_batch", "GC", "iLISI", "kBET"]</code>.</p>
 <hr />
 <h2 id="are-my-numbers-comparable">Are my numbers comparable?<a class="headerlink" href="#are-my-numbers-comparable" title="Anchor link to this section">&para;</a></h2>
 <p>The metrics in the shipped tables and the metrics <code>evaluate</code> returns are
@@ -1632,7 +1644,7 @@ has - nothing is re-run:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">&quot;MYDATA&quot;</span><span class="p">,</span> <span class="s2">&quot;cross&quot;</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/&quot;</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>   <span class="c1"># at run time, or</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">res2</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">rescore</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>          <span class="c1"># on the stored outputs; batch_source becomes &#39;user&#39;</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;out_dir&quot;</span><span class="p">])</span> <span class="o">/</span> <span class="s2">&quot;embedding.h5&quot;</span><span class="p">,</span>               <span class="c1"># one stored output</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             <span class="n">task</span><span class="o">=</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="s2">&quot;batch&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="re-runs-are-stochastic">Re-runs are stochastic<a class="headerlink" href="#re-runs-are-stochastic" title="Anchor link to this section">&para;</a></h3>
 <p>Most methods are non-deterministic, so a re-run does not reproduce the stored
@@ -1668,14 +1680,14 @@ recorded as <code>NaN</code> with a warning, and every other metric still return
 </tr>
 <tr>
 <td><code>kBET</code></td>
-<td>R via <code>rpy2</code>, and <code>slow_metrics=True</code></td>
+<td>R via <code>rpy2</code>, and being named in <code>metrics=[...]</code></td>
 <td><code>NaN</code> + warning</td>
 </tr>
 </tbody>
 </table>
 <p>So on a machine without the LISI binary and without a compiler, a
-<code>task="clustering"</code> call still gives you real ARI, NMI, ASW, iASW, and iF1,
-only <code>cLISI</code> comes back <code>NaN</code>.</p>
+single-batch call still gives you real ARI, NMI, ASW, iASW, and iF1, only
+<code>cLISI</code> comes back <code>NaN</code>.</p>
 <hr />
 <h2 id="reading-the-result">Reading the result<a class="headerlink" href="#reading-the-result" title="Anchor link to this section">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">metrics</span>
@@ -1697,18 +1709,20 @@ directly:</p>
 methods and datasets, and to draw the scIB-style bubble table from the paper,
 reshape it to the <strong>long</strong> frame that <code>plot.bubble</code> and <code>load_results</code> use,
 with <code>mtb.to_long</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">value_df</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">category</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>            <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="n">needs_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">value_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>            <span class="n">clustering</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;user&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># columns: metric, value, method, dataset, category, clustering, source</span>
 </span></code></pre></div>
 <p><code>to_long</code> emits the same seven columns <code>load_results</code> returns - <code>source</code> is
 <code>"user"</code> unless you say otherwise, so your rows stay distinguishable after a
-<code>concat</code> - and maps each metric name to its canonical form (raising if two
-rows collapse onto the same name, so nothing is double-counted); <code>evaluate</code>
-already emits the canonical spelling, so the result lines up with
-<code>mtb.load_results</code> and can be concatenated with the stored tables without
-duplicate metric columns. <code>needs_labels=True</code> adds a <code>needs_labels</code> column
-that gives your (supervised) method the bubble table's <code>L</code> badge. It accepts
+<code>concat</code>; <code>method</code> is required and keyword-only, and an omitted <code>dataset</code> /
+<code>category</code> is written as <code>all</code> / <code>user</code> rather than left blank - and maps
+each metric name to its canonical form (raising if two rows collapse onto
+the same name, so nothing is double-counted); <code>evaluate</code> already emits the
+canonical spelling, so the result lines up with <code>mtb.load_results</code> and can
+be concatenated with the stored tables without duplicate metric columns. A
+<code>needs_labels</code> column you add to the frame (<code>mine["needs_labels"] = True</code>)
+gives your (supervised) method the bubble table's <code>L</code> badge. It accepts
 <code>evaluate</code>'s frame, a <code>Series</code>, or the CSV read back with a <code>metric</code> column;
 a frame that is already long, or one without a <code>Value</code> column, is rejected
 with a message naming the shape (and the <code>df.T.set_axis(["Value"], axis=1)</code>
@@ -1731,11 +1745,15 @@ tracks value, one <em>Overall</em> bar per metric family). See the
 <a href="../plot/">plotting tutorial</a> for the full set of options, including
 published vs re-run tables.</p>
 <div class="admonition note">
-<p class="admonition-title"><code>metric_set="scib"</code> is the only metric set</p>
-<p>Any other <code>metric_set</code> raises <code>ValueError</code> listing the one that exists;
-<code>task="registration"</code> raises <code>NotImplementedError</code> (its metrics are not
-wired into <code>evaluate</code> - see <a href="../run/#spatial-registration">Spatial registration</a>),
-and any other <code>task</code> token raises <code>ValueError</code> naming the vocabulary.</p>
+<p class="admonition-title">The scIB metrics are the only metrics</p>
+<p><code>metrics=</code> selects among the ten scIB codes and their two families -
+registration metrics are not wired into <code>evaluate</code> (see
+<a href="../run/#spatial-registration">Spatial registration</a>), and any other
+token raises <code>ValueError</code> naming the vocabulary. The 0.2 <code>task=</code> /
+<code>family=</code> / <code>only=</code> spellings still work for one release with a
+<code>DeprecationWarning</code>; <code>slow_metrics=</code>, <code>metric_set=</code> and <code>column=</code> raise
+<code>TypeError</code> naming the replacement - see the
+<a href="../../api/#deprecated-in-030">API reference</a>.</p>
 </div>
 <hr />
 <p>Next: turn these numbers into a figure in <a href="../plot/">Load &amp; plot results</a>.</p>

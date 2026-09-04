@@ -630,6 +630,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#upgrading-from-021" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading from 0.2.1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1302,6 +1313,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#upgrading-from-021" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading from 0.2.1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1549,7 +1571,7 @@ need R, scBridge / Portal / uniPort each pin their own PyTorch line, and these
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">&quot;clustering&quot;</span><span class="p">,</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="s2">&quot;SCALEX&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">,</span>
 </span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;rna&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D28/rna.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;atac_gas&quot;</span><span class="p">:</span> <span class="s2">&quot;data/D28/atac_gas.h5&quot;</span><span class="p">},</span>   <span class="c1"># mtb.data.fetch(&quot;D28&quot;) downloads it</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;runs/scalex_d28&quot;</span><span class="p">,</span>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span>
@@ -1614,14 +1636,17 @@ methods), so combinations cost less than their sum. <code>env doctor</code> is s
 run any time; <code>env install</code> skips environments that already exist, so it
 resumes after interruption. <code>env status</code> tags each method's env with how
 hard it is to <em>build</em> (<code>easy</code>, <code>old-scvi</code>, <code>old-tensorflow</code>, <code>R</code>,
-<code>verified</code>, <code>blocked-script</code>; the legend goes to stderr and
-<code>mtb.env.DIFFICULTY</code> holds the definitions). <code>multibench env recipe
-&lt;method&gt;</code> / <code>env yml &lt;method&gt;</code> print the conda commands / an
+<code>verified</code>, <code>blocked-script</code>; the legend goes to stderr). <code>multibench env
+recipe &lt;method&gt;</code> / <code>env yml &lt;method&gt;</code> print the conda commands / an
 <code>environment.yml</code> for one method, naming the env exactly as <code>scan</code>'s <code>env</code>
 column, <code>method_info(m)["env"]</code> and <code>env doctor</code> do (<code>matilda</code> for Matilda,
 <code>scmb_r</code> for the R methods), so a recipe pasted into a build job yields an
 env the package recognises. Every command writes its table or commands to
-stdout and its progress / <code># dry run</code> / <code>warning:</code> notes to stderr.
+stdout and its progress / <code># dry run</code> / <code>warning:</code> notes to stderr. The same
+five operations exist in Python as <code>mtb.env.status</code> / <code>plan</code> / <code>install</code> /
+<code>doctor</code> / <code>recipe</code> - <code>mtb.env.install(["Matilda"])</code> returns the plan
+(<code>dry_run=True</code> is the default; <code>dry_run=False</code> installs and returns the
+per-env outcome) and is what the CLI calls.
 <code>mtb.env.plan()</code> rows carry <code>availability</code>: SPIRAL needs a script that is
 not published (<code>benchmark-host-only</code>), so its env builds but the method
 cannot run off the benchmark host; GPSA runs through the package driver and
@@ -1668,6 +1693,55 @@ any of it under that data path, or anywhere else and pass <code>data_path=</code
 <p><code>mtb.evaluate(...)</code> computes scIB metrics on a run output. Since v0.2, <code>scib</code>
 and <code>scanpy</code> install with the package - no extra step. (<code>pip install -e
 ".[eval]"</code> remains accepted for compatibility; it is now a no-op.)</p>
+<h2 id="upgrading-from-021">Upgrading from 0.2.1<a class="headerlink" href="#upgrading-from-021" title="Anchor link to this section">&para;</a></h2>
+<p>0.3.0 renamed a few entry points and folded the metric selectors into one
+knob. The old spellings still run for one release with a
+<code>DeprecationWarning</code>; the removed keywords raise <code>TypeError</code> naming the
+replacement - the full old -&gt; new table, with every error text, is in the
+<a href="../api/#deprecated-in-030">API reference</a>.</p>
+<table>
+<thead>
+<tr>
+<th>0.2.1</th>
+<th>0.3.0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mtb.plan(...)</code>, <code>mtb.plan_commands(...)</code></td>
+<td><code>mtb.scan(...)</code> - one frame, now with the <code>command</code> column</td>
+</tr>
+<tr>
+<td><code>mtb.command_preview(...)</code></td>
+<td><code>mtb.run(..., dry_run=True)</code></td>
+</tr>
+<tr>
+<td><code>mtb.runtime_hint(m)</code></td>
+<td><code>mtb.method_info(m)["runtime"]</code></td>
+</tr>
+<tr>
+<td><code>mtb.inputs_for(dataset, method, category)</code>, <code>labels_for(...)</code></td>
+<td><code>(dataset, category, method)</code> - the <code>scan</code> / <code>run_all</code> order; the old order raises</td>
+</tr>
+<tr>
+<td><code>evaluate(task= / family= / only= / slow_metrics=)</code>, <code>load_results(task= / family= / method= / metric=)</code>, <code>recommend(task= / family=)</code></td>
+<td>one <code>metrics=</code> knob: <code>None</code> | <code>"clustering"</code> | <code>"batch"</code> | <code>"all"</code> | <code>["ARI", "NMI"]</code> (kBET only when named)</td>
+</tr>
+<tr>
+<td><code>mtb.plot.plot_bubble</code></td>
+<td><code>mtb.plot.bubble</code></td>
+</tr>
+<tr>
+<td><code>mtb.io.from_mudata</code>, <code>mtb.io.write_labels</code></td>
+<td><code>mtb.io.export_dataset(mdata, ..., rna="rna", labels="rna:celltype")</code>; label CSVs are written by <code>export_dataset</code></td>
+</tr>
+<tr>
+<td><code>multibench evaluate --only</code></td>
+<td><code>multibench evaluate --metrics</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Anchor link to this section">&para;</a></h2>
 <div class="admonition question">
@@ -1701,7 +1775,7 @@ tools on macOS):</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>g++<span class="w"> </span>-std<span class="o">=</span>c++11<span class="w"> </span>-O3<span class="w"> </span>-o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.o<span class="w"> </span>&lt;site-packages&gt;/scib/knn_graph/knn_graph.cpp
 </span></code></pre></div>
 <p>Everything else still computes. <code>kBET</code> is separate: it needs R via
-<code>rpy2</code> and <code>slow_metrics=True</code>.</p>
+<code>rpy2</code> and is computed only when <code>metrics=[...]</code> names it.</p>
 </dd>
 <dt><strong><code>conda</code> solver hangs for &gt;2 minutes</strong></dt>
 <dd>
