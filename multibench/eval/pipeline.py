@@ -7,21 +7,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import io
-from .. import config
+from . import io, _compat
 from ..data import catalog
-
-# "DR and clustering" are ONE metric group in the benchmark paper, so a
-# dimension_reduction request is served by the clustering metrics.
-_SCIB_TASKS = {"clustering", "dimension_reduction", "batch", "all"}
 
 #: the seven columns of the tidy long frame (pinned to
 #: multibench.data.results.COLUMNS by tests/test_eval_reshape.py)
 LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
 
 
-def to_long(value_df, method, dataset, category, *, clustering: str = "default",
-            source: str = "user", needs_labels: bool | None = None) -> pd.DataFrame:
+def to_long(value_df, *, method: str, dataset: str | None = None,
+            category: str | None = None, clustering: str = "default",
+            source: str = "user") -> pd.DataFrame:
     """Reshape :func:`evaluate`'s wide frame into the tidy long results frame.
 
     The long frame has the same seven columns :func:`multibench.load_results`
@@ -39,32 +35,32 @@ def to_long(value_df, method, dataset, category, *, clustering: str = "default",
         column and a ``Value`` column). Metric names are canonicalised
         (``ari`` -> ``ARI``, ``kbet`` -> ``kBET``); rows whose name is blank
         are dropped.
-    method : str
+    method : str, keyword-only
         Method id written into every row (your own name is fine; the bubble
         figure shows ``?`` for a name the registry does not know).
-    dataset : str
-        Dataset id written into every row.
-    category : str
+    dataset : str, keyword-only, optional
+        Dataset id written into every row. ``None`` (default) writes
+        ``"all"`` - the placeholder the plotting layer uses for a frame
+        without datasets - so the column is never blank.
+    category : str, keyword-only, optional
         Integration category written into every row (``"vertical"``,
-        ``"diagonal"``, ``"mosaic"``, ``"cross"``).
+        ``"diagonal"``, ``"mosaic"``, ``"cross"``). ``None`` (default) writes
+        ``"user"``, the value ``load_results`` gives a user file without a
+        category column.
     clustering : str, keyword-only
         Value of the ``clustering`` column (default ``"default"``; the
         published tables use ``"louvain"`` / ``"kmeans"`` for their variants).
     source : str, keyword-only
         Value of the ``source`` column (default ``"user"``, which is what
         ``load_results(result_path=file, source="user")`` filters on).
-    needs_labels : bool, keyword-only, optional
-        When given, an extra boolean ``needs_labels`` column is appended.
-        ``True`` marks the method as supervised for ``mtb.plot.bubble``'s
-        ``L`` badge - the only way to badge a method the registry does not
-        know. Absent (default) the frame has exactly the seven columns and
-        the badge follows the registry.
 
     Returns
     -------
     pandas.DataFrame
-        Columns ``metric, value, method, dataset, category, clustering,
-        source`` (plus ``needs_labels`` when requested).
+        Exactly the seven columns ``metric, value, method, dataset,
+        category, clustering, source``. (The 0.2.x ``needs_labels=`` keyword
+        was removed; to badge a method of your own as supervised add a
+        boolean ``needs_labels`` column to the frame yourself.)
 
     Raises
     ------
@@ -80,7 +76,7 @@ def to_long(value_df, method, dataset, category, *, clustering: str = "default",
 
     Examples
     --------
-    >>> wide = mtb.evaluate(emb, labels=labels, only={"ARI", "NMI"})
+    >>> wide = mtb.evaluate(emb, labels=labels, metrics=["ARI", "NMI"])
     >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11", category="vertical")
     >>> pd.concat([mtb.load_results("vertical", dataset="D11", source="rerun"), mine]).to_csv("all.csv", index=False)
     >>> mtb.load_results(result_path="all.csv", source="user")      # your rows only
@@ -122,15 +118,11 @@ def to_long(value_df, method, dataset, category, *, clustering: str = "default",
             f"{sorted(set(out.loc[dup, 'metric']))} - the input names two rows that "
             f"map to the same canonical metric (e.g. 'ari' and 'ARI'); drop one")
     out["method"] = method
-    out["dataset"] = dataset
-    out["category"] = category
+    out["dataset"] = "all" if dataset is None else dataset
+    out["category"] = "user" if category is None else category
     out["clustering"] = clustering
     out["source"] = source
-    cols_out = list(LONG_COLUMNS)
-    if needs_labels is not None:
-        out["needs_labels"] = bool(needs_labels)
-        cols_out.append("needs_labels")
-    return out[cols_out].reset_index(drop=True)
+    return out[list(LONG_COLUMNS)].reset_index(drop=True)
 
 
 def _metric_families() -> tuple[list, list]:
@@ -145,81 +137,6 @@ def _metric_families() -> tuple[list, list]:
 def _known_metrics() -> list:
     clu, bat = _metric_families()
     return clu + bat
-
-
-def _validate_only(only, task: str = "all", slow_metrics: bool = True):
-    """Normalise ``only=`` to a set and refuse a request that could select nothing.
-
-    ``evaluate(task='clustering', only={'GC'})`` used to run the whole
-    clustering pipeline (Leiden sweep included) and then return an EMPTY
-    (0, 1) frame - every requested name was filtered out silently because GC
-    is a batch metric. A request that the chosen ``task`` cannot serve is an
-    error here, before anything is computed.
-
-    Parameters
-    ----------
-    only
-        ``None`` (everything), or a collection of metric names.
-    task
-        The ``task`` evaluate() was called with; ``'dimension_reduction'`` is
-        the clustering family.
-    slow_metrics
-        Whether kBET will be computed; ``only={'kBET'}`` without it would
-        select nothing.
-
-    Returns
-    -------
-    set or None
-        The validated set of names, or ``None`` when ``only`` was ``None``.
-
-    Raises
-    ------
-    TypeError
-        ``only`` is a bare string (``set('ARI') == {'A', 'R', 'I'}``).
-    ValueError
-        an unknown name (lists the valid ones); a batch metric under
-        ``task='clustering'``; a clustering metric under ``task='batch'``;
-        kBET without ``slow_metrics=True``.
-    """
-    if only is None:
-        return None
-    if isinstance(only, str):
-        # set("ARI") == {'A','R','I'} silently matched nothing and returned an
-        # empty frame; a bare string is always a mistake here
-        raise TypeError(
-            f"only= must be a collection of metric names, e.g. only={{{only!r}}}; "
-            f"got the string {only!r}")
-    clu, bat = _metric_families()
-    known = clu + bat
-    # alias / case tolerant like every other metric argument in the package
-    # ('ari' -> ARI, 'kbet' -> kBET); an unknown name keeps its own spelling
-    # in the error so the caller recognises it
-    only = {catalog.canonical_metric(m) or m for m in only}
-    unknown = only - set(known)
-    if unknown:
-        raise ValueError(
-            f"unknown metric(s) {sorted(map(str, unknown))}; choose from {known}")
-    group = "clustering" if task == "dimension_reduction" else task
-    if group == "clustering":
-        bad = [m for m in bat if m in only]
-        if bad:
-            verb = "is a batch metric" if len(bad) == 1 else "are batch metrics"
-            raise ValueError(
-                f"{', '.join(bad)} {verb}: pass task=\"all\" (or \"batch\") and "
-                f"batch=<vector> (task={task!r} computes only {clu})")
-    elif group == "batch":
-        bad = [m for m in clu if m in only]
-        if bad:
-            verb = "is a clustering metric" if len(bad) == 1 else "are clustering metrics"
-            raise ValueError(
-                f"{', '.join(bad)} {verb}: pass task=\"all\" (or \"clustering\") "
-                f"(task='batch' computes only {bat})")
-    if "kBET" in only and not slow_metrics:
-        raise ValueError(
-            "kBET is computed only with slow_metrics=True (it shells out to R and "
-            "takes hours on large datasets); pass slow_metrics=True or drop it "
-            "from only=")
-    return only
 
 
 def _validate_category(category):
@@ -334,22 +251,148 @@ def _labels_from_dict(d: dict, label_order) -> list:
     return [d[k] for k in order]
 
 
+def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
+    """Turn the ``metrics=`` knob into what :func:`multibench.eval.scib.compute` needs.
+
+    Parameters
+    ----------
+    metrics
+        The ``metrics`` argument of :func:`evaluate` (``None`` / family token /
+        list of codes).
+    has_batch : bool
+        Whether a batch vector is available (given, or derived from a list of
+        label files), i.e. whether batch metrics are computable.
+    batch_given : bool
+        Whether ``batch=`` itself was passed (drives the "batch changes
+        nothing" warning).
+
+    Returns
+    -------
+    tuple
+        ``(group, only, slow)`` - the compute group (``"clustering"`` /
+        ``"batch"`` / ``"all"``), the set of codes to compute (``None`` =
+        every metric of the group) and whether kBET is among them.
+
+    Raises
+    ------
+    ValueError
+        A family token / code that needs batch labels when none are
+        available, or a code evaluate() cannot compute (``PCR``).
+    """
+    clu, bat = _metric_families()
+    sel = catalog.metric_selection(metrics)
+    if sel.explicit:
+        outside = [c for c in sel.codes if c not in clu and c not in bat]
+        if outside:
+            raise ValueError(
+                f"evaluate() cannot compute {outside}; it computes the scIB "
+                f"families only: {clu + bat}")
+        want_bat = [c for c in sel.codes if c in bat]
+        want_clu = [c for c in sel.codes if c in clu]
+        if want_bat and not has_batch:
+            raise ValueError(
+                f"batch labels required for batch metric(s) {want_bat}: pass "
+                f"batch=<vector> (or labels as a list of two or more files, whose "
+                f"file of origin then serves as the batch)")
+        group = "all" if (want_bat and want_clu) else ("batch" if want_bat else "clustering")
+        only, slow = set(sel.codes), "kBET" in sel.codes
+    elif sel.family == "all":
+        if metrics is None:
+            # every applicable metric: the batch family joins in when a batch
+            # vector exists to score it against
+            group = "all" if has_batch else "clustering"
+        else:
+            if not has_batch:
+                raise ValueError(
+                    "batch labels required for metrics='all' (batch family "
+                    f"{bat}): pass batch=<vector>, or metrics='clustering'")
+            group = "all"
+        only, slow = None, False
+    elif sel.family == "batch":
+        if not has_batch:
+            raise ValueError(
+                f"batch labels required for metrics='batch' ({bat}): pass "
+                f"batch=<vector> (or labels as a list of two or more files)")
+        group, only, slow = "batch", None, False
+    else:
+        group, only, slow = "clustering", None, False
+    if group == "clustering" and batch_given:
+        warnings.warn(
+            f"batch= was given but metrics={metrics!r} computes no batch metric "
+            f"({bat}); pass metrics='all' (or 'batch', or name a batch metric in "
+            f"the list) to compute them - batch changes nothing here",
+            UserWarning, stacklevel=4)
+    return group, only, slow
+
+
+def _legacy_evaluate_kwargs(kw: dict) -> dict:
+    """0.2.x spellings of :func:`evaluate`'s keywords: map or refuse.
+
+    ``task=`` / ``family=`` become ``metrics=<token>`` and ``only=[...]``
+    becomes ``metrics=[...]`` (each with a ``DeprecationWarning``);
+    ``slow_metrics``, ``column`` and ``metric_set`` are gone and raise
+    ``TypeError`` naming the replacement.
+    """
+    removed = {
+        "slow_metrics": "pass metrics=[...] without cLISI/iLISI (kBET is computed "
+                        "only when it is named in that list)",
+        "column": "pass the Series/column itself as labels= / batch= / clustering=",
+        "metric_set": "only the scIB metric set exists - drop the argument",
+    }
+    for name, fix in removed.items():
+        if name in kw:
+            raise TypeError(f"evaluate() got {name}=, removed in 0.3.0: {fix}")
+    legacy = {n: kw.pop(n) for n in ("task", "family", "only") if n in kw}
+    if not legacy:
+        return kw
+    if "metrics" in kw:
+        raise TypeError(
+            f"evaluate() got metrics= together with the deprecated "
+            f"{sorted(legacy)}; pass metrics= only")
+    token = legacy.get("family", legacy.get("task"))
+    if "family" in legacy and "task" in legacy and legacy["family"] != legacy["task"]:
+        token = legacy["family"]          # family won over task in 0.2.x
+    if token == "dimension_reduction":
+        token = "clustering"              # one metric group in the paper
+    for name in ("task", "family"):
+        if name in legacy:
+            _compat.warn(f"evaluate({name}=...)", f"metrics={token!r}", stacklevel=4)
+    if "only" in legacy:
+        only = legacy["only"]
+        if isinstance(only, str):
+            raise TypeError(
+                f"only= must be a collection of metric names, e.g. only={{{only!r}}}; "
+                f"got the string {only!r} (and only= is deprecated: pass metrics=[...])")
+        codes = [catalog.canonical_metric(m) or m for m in only]
+        if isinstance(only, (set, frozenset)):
+            codes = sorted(codes)          # a set has no order to preserve
+        _compat.warn("evaluate(only=...)", f"metrics={codes!r}", stacklevel=4)
+        if token not in (None, "all"):
+            clu, bat = _metric_families()
+            fam = clu if token == "clustering" else bat
+            bad = [c for c in codes if c in (clu + bat) and c not in fam]
+            if bad:
+                raise ValueError(
+                    f"{', '.join(bad)} not in the {token!r} family: pass "
+                    f"metrics={codes!r} alone (the family token is deprecated)")
+        kw["metrics"] = codes
+    else:
+        kw["metrics"] = token
+    return kw
+
+
+@_compat.legacy_kwargs(_legacy_evaluate_kwargs)
 def evaluate(
     output,
-    category: str | None = None,
-    task: str = "clustering",
     labels=None,
-    clustering=None,
-    batch=None,
-    metric_set: str = "scib",
-    slow_metrics: bool = False,
-    only=None,
     *,
+    category: str | None = None,
+    batch=None,
+    metrics=None,
+    clustering=None,
     obsm: str = "X_emb",
-    column: str | None = None,
     label_order=None,
-    family: str | None = None,
-    verbose: bool | None = None,
+    verbose: bool = True,
 ) -> pd.DataFrame:
     """Compute scIB metrics for a run output (an embedding) against cell-type labels.
 
@@ -357,14 +400,14 @@ def evaluate(
     canonical spelling ``load_results`` uses - ``ARI, NMI, ASW, iASW, iF1,
     cLISI, ASW_batch, GC, iLISI, kBET`` - one column ``Value``); reshape with
     :func:`multibench.to_long` for plotting. The frame is never empty: a
-    request that would select no metric raises instead (see ``only``).
+    request that would select no metric raises instead.
 
     COST. ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
     Leiden sweep (10 resolutions on a kNN graph of the embedding): tens of
     seconds for a few thousand cells, minutes for ~10^4. Pass ``clustering=``
-    (a precomputed assignment) or ``only={...}`` naming metrics that do not
-    need it (``ASW``, ``iASW``, ``cLISI``, the batch family) to skip it. One
-    line on stderr announces the sweep when it starts on more than 2,000
+    (a precomputed assignment) or ``metrics=[...]`` naming metrics that do
+    not need it (``ASW``, ``iASW``, ``cLISI``, the batch family) to skip it.
+    One line on stderr announces the sweep when it starts on more than 2,000
     cells (``verbose``).
 
     Parameters
@@ -378,21 +421,6 @@ def evaluate(
         ``.csv``/``.tsv``. An AnnData (``obs_names``) or a DataFrame with a
         non-default index CARRIES CELL IDS, which ``labels``/``batch``/
         ``clustering`` given as an indexed Series are aligned against (below).
-    category : str, optional
-        One of :func:`multibench.list_categories` (``vertical``, ``diagonal``,
-        ``mosaic``, ``cross``). Validated when given and otherwise unused -
-        the metrics do not depend on it - so it may be omitted; it is
-        accepted so a call can mirror ``run()``'s arguments.
-    task : str
-        Metric FAMILY to compute (the documented spelling is ``family=``;
-        ``task`` is kept as an alias and ignored when ``family`` is given):
-        ``'clustering'`` (default; also serves ``'dimension_reduction'`` - one
-        metric group in the paper) computes ``ARI, NMI, ASW, iASW, iF1,
-        cLISI``; ``'batch'`` computes ``ASW_batch, GC, iLISI`` (+ ``kBET``
-        with ``slow_metrics``); ``'all'`` both. Anything else raises
-        ``ValueError`` (``"unknown family 'clusterin'; valid: ..."``). A
-        ``batch=`` given under ``task='clustering'`` changes nothing and
-        triggers a ``UserWarning`` pointing at ``task='all'``.
     labels
         Ground-truth cell types, one per cell. Any of: a CSV path (header row;
         column ``x`` / the only column / the last of two with a barcode index -
@@ -405,7 +433,8 @@ def evaluate(
         OTHER order needs ``label_order=`` (a one-entry dict has no order to
         get wrong) - a 1-D ``ndarray``/``Series``/``Categorical``/list, a
         single-column DataFrame, or - when ``output`` is an AnnData - the
-        name of an ``obs`` column.
+        name of an ``obs`` column. A multi-column CSV/DataFrame raises: pass
+        the one column (``df["celltype"]``) itself.
 
         ORDER. Arrays/lists/files are matched POSITIONALLY to the rows of
         ``output``. A ``Series``/``DataFrame`` with a non-default index is
@@ -415,108 +444,81 @@ def evaluate(
         When ``output`` is a bare array there is nothing to align against: the
         Series is matched positionally and a ``UserWarning`` says so (pass
         ``labels.to_numpy()`` to silence it).
-    clustering
+    category : str, keyword-only, optional
+        One of :func:`multibench.list_categories` (``vertical``, ``diagonal``,
+        ``mosaic``, ``cross``). Validated when given and otherwise unused -
+        the metrics do not depend on it - so it may be omitted; it is
+        accepted so a call can mirror ``run()``'s arguments.
+    batch : keyword-only, optional
+        Batch labels, one per cell (same forms and the same alignment rule as
+        ``labels``; obs column name for AnnData). Needed for the batch family
+        (``ASW_batch, GC, iLISI, kBET``) EXCEPT when ``labels`` is a list of
+        two or more files (or a dict with ``label_order``), in which case the
+        file of origin (1, 2, ...) is used as the batch - the same rule
+        :func:`multibench.run_all` applies. Given together with a
+        ``metrics`` selection that has no batch metric it changes nothing,
+        and a ``UserWarning`` says so.
+    metrics : None, str or list of str, keyword-only
+        THE metric-selection knob. ``None`` (default) computes every
+        applicable metric: the clustering family, plus the batch family when
+        a batch vector is available (``batch=`` or a list of label files);
+        kBET is never included by default - it shells out to R and takes
+        hours on large datasets. ``"clustering"`` computes ``ARI, NMI, ASW,
+        iASW, iF1, cLISI``; ``"batch"`` computes ``ASW_batch, GC, iLISI``;
+        ``"all"`` both (each needs the batch vector or raises). A LIST of
+        codes computes exactly those (case/alias tolerant, ``["ari"]``
+        works), including the Leiden sweep only when a requested metric
+        needs it (ARI, NMI, iF1 do - ``["ASW"]`` on 10^4 cells returns in
+        seconds); ``"kBET"`` in the list turns kBET on. An unknown code
+        raises ``ValueError`` listing the valid ones; a bare code string
+        (``metrics="ARI"``) raises and points at the list form. Valid codes:
+        ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS``.
+        (``task=``, ``family=`` and ``only=`` are the deprecated 0.2.x
+        spellings of this knob; ``slow_metrics=`` is gone.)
+    clustering : keyword-only, optional
         Optional precomputed cluster assignment (same forms and the same
         alignment rule as ``labels``; an ``.h5`` path is read from
         ``/obs/cluster_leiden``). When omitted the scIB optimal-resolution
         Leiden sweep derives one from the embedding - the expensive step (10
         resolutions; minutes for ~10^4 cells); passing one skips it for
-        ``ARI``/``NMI`` (``iF1`` still sweeps unless excluded via ``only``).
-    batch
-        Batch labels, one per cell (same forms and the same alignment rule as
-        ``labels``; obs column name for AnnData). Required for
-        ``task='batch'``/``'all'`` EXCEPT when ``labels`` is a list of two or
-        more files (or a dict with ``label_order``), in which case the file of
-        origin (1, 2, ...) is used as the batch - the same rule
-        :func:`multibench.run_all` applies.
-    metric_set : str
-        Only ``'scib'`` exists; an unknown token raises ``ValueError``
-        listing the valid ones.
-    slow_metrics : bool
-        Also compute kBET (shells out to R; hours on large datasets).
-    only
-        Collection of metric names to compute (e.g. ``{'ARI', 'NMI'}``;
-        case/alias tolerant, ``{'ari'}`` works); everything else is skipped,
-        including the Leiden sweep when no requested metric needs it (ARI,
-        NMI and iF1 do - ``only={'ASW'}`` on 10^4 cells returns in seconds,
-        ``only={'ARI'}`` takes minutes). Validated against what ``task`` can
-        produce: an unknown name raises listing the valid ones; a batch metric
-        under ``task='clustering'`` raises (``'GC is a batch metric: pass
-        task="all" (or "batch") and batch=<vector>'``); a clustering metric
-        under ``task='batch'`` raises; ``kBET`` without ``slow_metrics=True``
-        raises; a bare string raises ``TypeError``. Valid names:
-        ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS``.
-    obsm : str
+        ``ARI``/``NMI`` (``iF1`` still sweeps unless excluded via ``metrics``).
+    obsm : str, keyword-only
         ``.obsm`` key to use when ``output`` is an AnnData / ``.h5ad``
         (default ``'X_emb'``; ``'X'`` means ``.X``).
-    column : str, optional
-        Column to take when ``labels`` is a CSV/DataFrame with several columns.
     label_order : list of str, keyword-only
         Only for a ``labels`` dict with several entries: the dict keys in the
         order the method stacked the cells (the benchmark's convention is
         numbered files ascending - ``cty1, cty2, ...`` - and ``rna`` before
-        ``atac``; :func:`multibench.labels_for` ``(ds, method=, category=)``
+        ``atac``; :func:`multibench.labels_for` ``(ds, category, method)``
         returns the files in that order, so ``label_order=list(d)`` trusts
         it). A subset of the keys selects those files only. Unknown or
         repeated keys raise; ``label_order`` with a non-dict ``labels`` raises
         ``TypeError``.
-    family : str, keyword-only
-        The documented name of ``task``: ``'clustering'`` (=
-        ``'dimension_reduction'``), ``'batch'`` or ``'all'``. Wins over
-        ``task`` when both are given.
-    verbose : bool, keyword-only, optional
-        Whether to print one line on stderr when the Leiden resolution sweep
-        starts (``"scIB clustering metrics: Leiden resolution sweep over
-        11,014 cells ..."``). ``None`` (default) prints it only when the
-        embedding has more than 2,000 cells - the point at which the sweep
-        takes long enough to look like a hang - ``True`` always, ``False``
-        never.
+    verbose : bool, keyword-only
+        ``True`` (default) prints one line on stderr when the Leiden
+        resolution sweep starts on more than 2,000 cells - the point at
+        which it takes long enough to look like a hang (``"scIB clustering
+        metrics: Leiden resolution sweep over 11,014 cells ..."``); ``False``
+        never prints.
 
     Raises
     ------
     ValueError
-        missing labels/batch, unknown category, family, metric_set or metric
-        name, a metric the family cannot produce, length mismatches
-        (``'input length mismatch: emb has N cells, celltype has M'``),
-        cell-id mismatches when aligning, ambiguous label files, a
+        missing labels, a batch metric / family requested without batch
+        labels, unknown category, ``metrics`` token or code, length
+        mismatches (``'input length mismatch: emb has N cells, celltype has
+        M'``), cell-id mismatches when aligning, ambiguous label files, a
         multi-entry labels dict in a non-stacking order without
         ``label_order``, an ``.h5`` output without dataset ``data``.
     FileNotFoundError
         an ``output`` / label path that does not exist (the message names
         the path and the working directory).
     TypeError
-        unsupported input types (``only='ARI'``, non-array ``labels``,
-        ``label_order`` with non-dict labels, ...).
+        unsupported input types (non-array ``labels``, ``label_order`` with
+        non-dict labels, ...), and the removed 0.2.x keywords
+        ``slow_metrics`` / ``column`` / ``metric_set``.
     """
-    # metric_set: config owns the vocabulary, so a typo gets the same
-    # "unknown metric_set 'scibb'; valid: ['scib']" everywhere; the
-    # NotImplementedError is reserved for a token config declares but this
-    # evaluator does not compute (none today)
-    config.metric_set_dir(metric_set)
-    if metric_set != "scib":
-        raise NotImplementedError(
-            f"metric_set={metric_set!r} is declared but evaluate() computes "
-            f"only 'scib' metrics.")
-    if family is not None:
-        task = family
-    if task not in _SCIB_TASKS:
-        kw = "family" if family is not None else "task"
-        try:
-            from ..engine.registry import list_tasks
-            declared = list_tasks()
-        except Exception:
-            declared = []
-        if task in declared:
-            # a real benchmark task (imputation, classification, registration)
-            # whose metrics evaluate() does not compute: not a typo
-            raise NotImplementedError(
-                f"evaluate({kw}={task!r}): metrics for the {task!r} task are "
-                f"not wired; evaluate() computes the scIB families "
-                f"{sorted(_SCIB_TASKS)} only")
-        raise ValueError(
-            f"unknown family {task!r} (given as {kw}=); valid: "
-            f"{sorted(_SCIB_TASKS)} ('dimension_reduction' computes the "
-            f"'clustering' family)")
+    _validate_category(category)
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
     # a labels_for() dict becomes the list of paths in cell order FIRST, so the
@@ -532,16 +534,9 @@ def evaluate(
     # `clustering` is optional: when omitted it is derived from the embedding
     # inside scib.compute() via optimal-resolution Leiden.
     batch_from_files = batch is None and _is_label_path_list(labels) and len(labels) > 1
-    if task in {"batch", "all"} and batch is None and not batch_from_files:
-        raise ValueError("batch labels required for batch/all metrics")
-    if task not in {"batch", "all"} and batch is not None:
-        warnings.warn(
-            f"batch= was given but task={task!r} computes no batch metric "
-            f"({_metric_families()[1]}); pass task='all' (or 'batch') to "
-            f"compute them - batch changes nothing under task={task!r}",
-            UserWarning, stacklevel=2)
-    _validate_category(category)
-    only = _validate_only(only, task=task, slow_metrics=slow_metrics)
+    group, only, slow = _plan_metrics(
+        metrics, has_batch=batch is not None or batch_from_files,
+        batch_given=batch is not None)
 
     if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
         import anndata as ad      # read ONCE; keeps obs_names and obs columns
@@ -552,11 +547,11 @@ def evaluate(
     if _is_label_path_list(labels):
         # several label files: concatenate IN THE GIVEN ORDER; remember the
         # sizes so the file of origin can serve as the batch below
-        parts = [np.asarray(io.read_labels(p, column=column)) for p in labels]
+        parts = [np.asarray(io.read_labels(p)) for p in labels]
         ct = np.concatenate(parts)
     else:
         parts = None
-        ct = _obs_or_vector(labels, adata, what="labels", column=column, ids=ids)
+        ct = _obs_or_vector(labels, adata, what="labels", ids=ids)
     # Orient to cells x dims. read_embedding() already does this for h5 inputs;
     # do the same for everything else so a caller can pass run().output (dims x
     # cells for many methods) directly. Use the label count as the truth: only
@@ -575,7 +570,7 @@ def evaluate(
         cl = _obs_or_vector(clustering, adata, what="clustering", ids=ids)
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids)
-    elif batch_from_files and task in {"batch", "all"}:
+    elif batch_from_files and group in {"batch", "all"}:
         # batch = which label FILE each cell came from (1-based, as run_all)
         ba = np.concatenate([np.full(len(v), i + 1) for i, v in enumerate(parts)])
     else:
@@ -584,11 +579,8 @@ def evaluate(
         ba = np.zeros(emb.shape[0], dtype=int)
 
     from . import scib as escib  # imported lazily so non-scib paths don't require it
-    # "DR and clustering" are one metric group in the benchmark paper,
-    # so dimension_reduction is evaluated with the clustering metrics.
-    group = "clustering" if task == "dimension_reduction" else task
-    out = escib.compute(emb, ct, cl, ba, group=group,
-                        slow_metrics=slow_metrics, only=only, verbose=verbose)
+    out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
+                        verbose=None if verbose else False)
     # The names compute() emits ARE the canonical ones, but make that a
     # property of evaluate() rather than a coincidence: a frame that reaches
     # to_long()/pd.concat with the published tables must never carry a second
@@ -596,9 +588,8 @@ def evaluate(
     out.index = pd.Index([catalog.canonical_metric(m) for m in out.index],
                          name=out.index.name)
     if out.empty:
-        # unreachable after _validate_only; kept so a future metric family
+        # unreachable after _plan_metrics; kept so a future metric family
         # mismatch fails loudly instead of handing back a (0, 1) frame
         raise ValueError(
-            f"evaluate(task={task!r}, only={sorted(only) if only else None}) "
-            f"selected no metric - nothing to return")
+            f"evaluate(metrics={metrics!r}) selected no metric - nothing to return")
     return out

@@ -62,7 +62,8 @@ def test_d11_vertical_figure_badges_matilda_not_scmomat():
 def test_needs_labels_column_overrides_registry():
     d11 = _d11()
     mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]),
-                       "MySupervised", "D11", "vertical", needs_labels=True)
+                       method="MySupervised", dataset="D11", category="vertical"
+                       ).assign(needs_labels=True)
     tbl = B.build_table(pd.concat([d11, mine]), na="skip")
     assert tbl.needs_labels == {"MySupervised": True}
     _, texts = _render_texts(tbl)
@@ -70,8 +71,8 @@ def test_needs_labels_column_overrides_registry():
     # the override beats the registry in the other direction too: scMoMaT is
     # supervised in mosaic, but an explicit False removes its badge
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    mosaic = pd.concat([mtb.to_long(w, "scMoMaT", "D45", "mosaic"),
-                        mtb.to_long(w * 0.5, "Cobolt", "D45", "mosaic")])
+    mosaic = pd.concat([mtb.to_long(w, method="scMoMaT", dataset="D45", category="mosaic"),
+                        mtb.to_long(w * 0.5, method="Cobolt", dataset="D45", category="mosaic")])
     assert B._method_needs_labels("scMoMaT", "mosaic") is True
     _, texts_ref = _render_texts(B.build_table(mosaic, na="skip"))
     assert texts_ref.count("L") == 1

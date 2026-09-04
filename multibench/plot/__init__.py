@@ -1,10 +1,13 @@
 """Plotting API.
 
 ``mtb.plot.bubble(long_df, ...)`` draws the paper-style bubble table and
-``mtb.plot.bar(long_df, ...)`` the across-dataset summary bars. The bubble
-pipeline's halves are exposed too: ``mtb.plot.build_table`` (numbers, a
-:class:`BubbleTable`) and ``mtb.plot.render`` (figure). ``help(mtb.plot.bubble)``
-documents every parameter and the visual encoding.
+``mtb.plot.bar(long_df, ...)`` the across-dataset summary bars;
+``mtb.plot.build_table`` returns the numbers behind a bubble figure (a
+:class:`BubbleTable`) so the ranks can be audited before drawing.
+``help(mtb.plot.bubble)`` documents every parameter and the visual encoding.
+The figure half, ``render``, and the per-family block ``FamilyBlock`` stay
+importable but are not part of the public listing; ``plot_bubble`` is the
+deprecated 0.2.x name of ``bubble``.
 """
 from . import bubble as _bubble_module
 from . import style
@@ -24,5 +27,12 @@ bubble.style = style
 bubble.__module__ = "multibench.plot"
 del _n
 
-__all__ = ["bar", "bubble", "plot_bubble", "build_table", "render", "BubbleTable",
-           "FamilyBlock", "FAMILIES", "style", "CLUSTERING_METRICS", "BATCH_METRICS"]
+__all__ = ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
+           "CLUSTERING_METRICS", "BATCH_METRICS"]
+
+
+def __dir__() -> list[str]:
+    """``dir(mtb.plot)`` lists the public names and the dunders only (PEP
+    562): ``render``, ``FamilyBlock``, ``style`` and the deprecated
+    ``plot_bubble`` stay accessible but out of the listing."""
+    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})

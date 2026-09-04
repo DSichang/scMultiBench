@@ -33,7 +33,7 @@ def test_clustering_variant_changes_values(result_dir):
 
 def test_metric_filter(result_dir):
     df = results.load_results(category="diagonal", dataset="D27",
-                              metric=["ARI", "NMI"], result_path=result_dir)
+                              metrics=["ARI", "NMI"], result_path=result_dir)
     assert set(df["metric"].unique()) <= {"ARI", "NMI"}
 
 
@@ -105,65 +105,54 @@ def test_zero_row_filter_warns(result_dir):
     # a KNOWN method with no rows: empty frame + warning that answers the
     # "where are its rows then?" question (results_coverage says rerun has D11)
     with pytest.warns(UserWarning, match="no published rows for method 'Concerto'") as rec:
-        df = results.load_results("vertical", dataset="D11", method="Concerto",
+        df = results.load_results("vertical", dataset="D11", methods="Concerto",
                                   result_path=result_dir)
     assert len(df) == 0 and list(df.columns) == COLS
     msg = str(rec[0].message)
     assert "rerun has 1 dataset(s) (D11)" in msg and "pass source='rerun'" in msg
     # a KNOWN metric absent from the tables: still the empty-frame-plus-warning
     with pytest.warns(UserWarning, match="kBET"):
-        df = results.load_results("vertical", dataset="D11", metric="kBET",
+        df = results.load_results("vertical", dataset="D11", metrics=["kBET"],
                                   result_path=result_dir)
     assert len(df) == 0
     # an UNKNOWN metric code is a typo: ValueError listing both vocabularies
     with pytest.raises(ValueError, match=r"unknown metric\(s\) \['ZZZ'\]; valid codes: \['ARI'") as e:
-        results.load_results("vertical", dataset="D11", metric="ZZZ", result_path=result_dir)
+        results.load_results("vertical", dataset="D11", metrics=["ZZZ"], result_path=result_dir)
     assert "present in this frame: ['ARI'" in str(e.value)
     with pytest.raises(ValueError, match=r"unknown metric\(s\) \['NOPE'\]"):
-        results.load_results("vertical", dataset="D11", metric=["ARI", "NOPE"],
+        results.load_results("vertical", dataset="D11", metrics=["ARI", "NOPE"],
                              result_path=result_dir)
 
 
-def test_method_filter_accepts_list_and_aliases(result_dir):
-    df = results.load_results("diagonal", dataset="D27", method=["scbridge", "Seurat v3"],
+def test_methods_filter_accepts_list_and_aliases(result_dir):
+    df = results.load_results("diagonal", dataset="D27", methods=["scbridge", "Seurat v3"],
                               result_path=result_dir)
     assert set(df.method) == {"scBridge", "Seurat_v3"}
-    df2 = results.load_results("diagonal", dataset="D27", methods=["scBridge"],
+    df2 = results.load_results("diagonal", dataset="D27", methods="scBridge",
                                result_path=result_dir)
     assert set(df2.method) == {"scBridge"}
-    with pytest.raises(ValueError, match="either method= or methods="):
-        results.load_results("diagonal", dataset="D27", method="scBridge",
-                             methods=["scBridge"], result_path=result_dir)
 
 
-def test_task_filters_by_family(result_dir):
+def test_metrics_filters_by_family(result_dir):
     full = results.load_results("diagonal", dataset="D28", result_path=result_dir)
-    b = results.load_results("diagonal", dataset="D28", task="batch", result_path=result_dir)
+    b = results.load_results("diagonal", dataset="D28", metrics="batch", result_path=result_dir)
     assert set(b.metric) <= set(mtb.plot.BATCH_METRICS) and len(b)
-    c = results.load_results("diagonal", dataset="D28", task="clustering", result_path=result_dir)
+    c = results.load_results("diagonal", dataset="D28", metrics="clustering", result_path=result_dir)
     assert set(c.metric) <= set(mtb.plot.CLUSTERING_METRICS) and len(c)
     assert len(b) + len(c) == len(full)      # the two families partition the frame
-    with pytest.raises(ValueError, match=r"unknown family 'bogus' \(given as task=\); valid: None"):
-        results.load_results("diagonal", dataset="D28", task="bogus", result_path=result_dir)
-    # family= is the documented name and means the same thing
-    pd.testing.assert_frame_equal(
-        results.load_results("diagonal", dataset="D28", family="batch", result_path=result_dir), b)
-    with pytest.raises(ValueError, match=r"unknown family 'bogus' \(given as family=\)"):
-        results.load_results("diagonal", dataset="D28", family="bogus", result_path=result_dir)
-    with pytest.raises(ValueError, match="pass either family= or task="):
-        results.load_results("diagonal", dataset="D28", task="batch", family="clustering",
-                             result_path=result_dir)
-    # a list_tasks() token in the family slot is explained, not just rejected
+    with pytest.raises(ValueError, match=r"unknown metrics= token 'bogus'; valid: 'all', 'clustering', 'batch'"):
+        results.load_results("diagonal", dataset="D28", metrics="bogus", result_path=result_dir)
+    # a list_tasks() token in the metrics slot is explained, not just rejected
     with pytest.raises(ValueError, match="selects a METRIC FAMILY, not a mtb.list_tasks"):
-        results.load_results("diagonal", task="dimension_reduction", result_path=result_dir)
-    # the positional slip load_results('vertical', 'D11') names the slot
-    with pytest.raises(ValueError, match=r"did you mean dataset='D11'"):
+        results.load_results("diagonal", metrics="dimension_reduction", result_path=result_dir)
+    # everything after category is keyword-only: the positional slip is a TypeError
+    with pytest.raises(TypeError):
         results.load_results("vertical", "D11", result_path=result_dir)
-    # default task=None == task='all' == today's frame (positional call, as api_verify does)
-    pos = results.load_results("diagonal", None, "scib", "D28", result_path=result_dir)
-    pd.testing.assert_frame_equal(pos, full)
+    # None == 'all' == today's frame
     pd.testing.assert_frame_equal(
-        results.load_results("diagonal", dataset="D28", task="all", result_path=result_dir), full)
+        results.load_results("diagonal", dataset="D28", metrics="all", result_path=result_dir), full)
+    pd.testing.assert_frame_equal(
+        results.load_results("diagonal", dataset="D28", metrics=None, result_path=result_dir), full)
 
 
 def test_result_path_single_csv(tmp_path, result_dir):
@@ -236,8 +225,7 @@ def _quiet_rerun(*a, **k):
 
 def test_concat_to_csv_reload_keeps_provenance(tmp_path, result_dir):
     rr = results.load_results("vertical", dataset="D11", source="rerun", result_path=result_dir)
-    mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]),
-                       "MyMethod", "D11", "vertical")
+    mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]), method="MyMethod", dataset="D11", category="vertical")
     f = tmp_path / "all.csv"
     pd.concat([rr, mine]).to_csv(f, index=False)
     back = results.load_results(result_path=f)            # default keeps every row
@@ -288,23 +276,23 @@ def test_dataset_list_validates_every_element(result_dir):
 
 def test_method_list_validates_every_element(result_dir):
     with pytest.raises(KeyError, match=r"unknown method 'Matlida'; did you mean 'Matilda'\?"):
-        results.load_results("vertical", method="Matlida", result_path=result_dir)
+        results.load_results("vertical", methods="Matlida", result_path=result_dir)
     with pytest.raises(KeyError, match="unknown method 'Nope'"):
-        results.load_results("vertical", method=["Matilda", "Nope"], result_path=result_dir)
+        results.load_results("vertical", methods=["Matilda", "Nope"], result_path=result_dir)
     # case-folded names resolve (registry id 'totalVI')
-    df = _quiet_rerun("vertical", method="totalvi", source="rerun", result_path=result_dir)
+    df = _quiet_rerun("vertical", methods="totalvi", source="rerun", result_path=result_dir)
     assert set(df.method) == {"totalVI"}
     # a name that exists only in a user file is accepted for that file
-    long = mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]), "MyMethod", "D1", "vertical")
+    long = mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]), method="MyMethod", dataset="D1", category="vertical")
 
 
 def test_user_method_name_accepted_in_file(tmp_path):
-    long = mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]), "MyMethod", "D1", "vertical")
+    long = mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]), method="MyMethod", dataset="D1", category="vertical")
     f = tmp_path / "mine.csv"
     long.to_csv(f, index=False)
-    assert set(results.load_results(result_path=f, method="mymethod").method) == {"MyMethod"}
+    assert set(results.load_results(result_path=f, methods="mymethod").method) == {"MyMethod"}
     with pytest.raises(KeyError, match="unknown method 'MyMethd'; did you mean 'MyMethod'"):
-        results.load_results(result_path=f, method="MyMethd")
+        results.load_results(result_path=f, methods="MyMethd")
 
 
 def test_degenerate_rerun_rows_are_flagged(result_dir):
@@ -317,7 +305,7 @@ def test_degenerate_rerun_rows_are_flagged(result_dir):
     with warnings.catch_warnings():
         warnings.simplefilter("error", DegenerateRerunWarning)
         results.load_results("diagonal", dataset="D28", result_path=result_dir)
-        results.load_results("diagonal", dataset="D28", source="rerun", method="iNMF",
+        results.load_results("diagonal", dataset="D28", source="rerun", methods="iNMF",
                              result_path=result_dir)
         results.load_results("diagonal", dataset="D28s", source="rerun", result_path=result_dir)
     # results_coverage is a WHERE scan and stays quiet
@@ -367,8 +355,7 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     # still matched by source='rerun' (prefix) and parsed into attrs
     old = rr.assign(source="rerun-0.1.0")
     f = tmp_path / "old.csv"
-    pd.concat([old, mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]),
-                                "MyMethod", "D11", "vertical")]).to_csv(f, index=False)
+    pd.concat([old, mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]), method="MyMethod", dataset="D11", category="vertical")]).to_csv(f, index=False)
     back = results.load_results(result_path=f, source="rerun")
     assert set(back.source) == {"rerun-0.1.0"} and back.attrs["rerun_version"] == "0.1.0"
     assert set(results.load_results(result_path=f, source="user").method) == {"MyMethod"}
