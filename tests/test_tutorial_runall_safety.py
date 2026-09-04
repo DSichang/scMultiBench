@@ -171,10 +171,14 @@ def test_reference_scan_table_shows_files_ok_rows_with_env_columns(cat):
 
 
 @pytest.mark.parametrize("cat", CATS)
-def test_batch_metrics_prose_names_task_all(cat):
+def test_batch_metrics_prose_names_the_metrics_knob(cat):
+    """The one selector is metrics= (0.3.0): the prose shows the family form
+    and says what the default None computes; the 0.2 task= never returns."""
     md = _markdown(cat)
-    assert 'labels=mtb.labels_for(DATASET), task="all")' in md
-    assert 'batch\nmetrics need `task="all"`' in md or 'batch metrics need `task="all"`' in md
+    assert 'labels=mtb.labels_for(DATASET), metrics="all")' in md
+    assert "`None` (the default) computes every\napplicable metric" in md \
+        or "`None` (the default) computes every applicable metric" in md
+    assert 'task="all"' not in md and 'task="clustering"' not in md
 
 
 @pytest.mark.parametrize("cat", CATS)

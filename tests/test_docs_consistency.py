@@ -210,8 +210,9 @@ def test_retired_phrases_absent_from_docs_surfaces(path):
 
 def test_printed_examples_match_the_live_package():
     """The README / quickstart examples the fresh installer re-ran: labels_for
-    returns a dict, runtime_hint carries 'source' inside 'observed', the
-    diagonal rna+atac list includes scBridge, registration is three methods."""
+    returns a dict, method_info(m)['runtime'] carries 'source' inside
+    'observed', the diagonal rna+atac list includes scBridge, registration is
+    three methods."""
     import multibench as mtb
     assert set(mtb.labels_for("D11")) == {"cty"}
     hint = mtb.method_info("SCALEX")["runtime"]
