@@ -55,7 +55,7 @@ def test_to_long_rejects_colliding_metric_names():
                                  "clustering", "source"]
     # a named index (e.g. read back from CSV) still becomes 'metric'
     df = pd.DataFrame({"Value": [0.5]}, index=pd.Index(["ARI"], name="Metric"))
-    assert to_long(df, "M", "D", "vertical")["metric"].tolist() == ["ARI"]
+    assert to_long(df, method="M", dataset="D", category="vertical")["metric"].tolist() == ["ARI"]
 
 
 # --- P08: full 7-column schema, provenance overrides, input validation ------
@@ -66,49 +66,52 @@ def test_to_long_columns_pin_results_columns():
     from multibench.data.results import COLUMNS
     from multibench.eval.pipeline import LONG_COLUMNS
     w = pd.DataFrame({"Value": [0.5]}, index=["ARI"])
-    assert to_long(w, "M", "D", "vertical").columns.tolist() == COLUMNS == LONG_COLUMNS
+    assert to_long(w, method="M", dataset="D", category="vertical").columns.tolist() == COLUMNS == LONG_COLUMNS
 
 
-def test_to_long_provenance_override_and_positional_call():
+def test_to_long_provenance_override_and_keyword_only_call():
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    out = to_long(w, "M", "D", "vertical", clustering="louvain", source="mine")
+    out = to_long(w, method="M", dataset="D", category="vertical",
+                  clustering="louvain", source="mine")
     assert set(out.clustering) == {"louvain"} and set(out.source) == {"mine"}
-    pos = to_long(w, "M", "D", "vertical")           # positional still works
-    assert pos.source.tolist() == ["user", "user"]
-    with pytest.raises(TypeError):                   # provenance is keyword-only
-        to_long(w, "M", "D", "vertical", "louvain")
+    kw = to_long(w, method="M", dataset="D", category="vertical")
+    assert kw.source.tolist() == ["user", "user"]
+    with pytest.raises(TypeError):                   # everything after value_df is keyword-only
+        to_long(w, "M", "D", "vertical")
+    with pytest.raises(TypeError):
+        to_long(w, "M", dataset="D", category="vertical")
 
 
-def test_to_long_needs_labels_column():
+def test_to_long_dataset_and_category_default_to_placeholders():
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    assert "needs_labels" not in to_long(w, "M", "D", "vertical").columns
-    out = to_long(w, "M", "D", "vertical", needs_labels=True)
-    assert out.columns.tolist()[-1] == "needs_labels" and out.needs_labels.dtype == bool
-    assert out.needs_labels.all() and len(out.columns) == 8
+    out = to_long(w, method="M")
+    assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
+                                    "clustering", "source"]
+    assert set(out.dataset) == {"all"} and set(out.category) == {"user"}
 
 
 def test_to_long_rejects_already_long_frame():
     w = pd.DataFrame({"Value": [0.5]}, index=["ARI"])
-    long = to_long(w, "M", "D", "vertical")
+    long = to_long(w, method="M", dataset="D", category="vertical")
     with pytest.raises(ValueError, match="already long frame"):
-        to_long(long, "M2", "D", "vertical")
+        to_long(long, method="M2", dataset="D", category="vertical")
 
 
 def test_to_long_rejects_wide_one_row_frame_with_hint():
     wide = pd.DataFrame([[0.5, 0.6]], columns=["ARI", "NMI"])       # RangeIndex row
     with pytest.raises(ValueError, match=r"expects evaluate\(\)'s frame") as e:
-        to_long(wide, "M", "D", "vertical")
+        to_long(wide, method="M", dataset="D", category="vertical")
     assert "df.T.set_axis(['Value'], axis=1)" in str(e.value)
     # the hint is accepted, for a RangeIndex row and a named row alike
-    ok = to_long(wide.T.set_axis(["Value"], axis=1), "M", "D", "vertical")
+    ok = to_long(wide.T.set_axis(["Value"], axis=1), method="M", dataset="D", category="vertical")
     assert ok.metric.tolist() == ["ARI", "NMI"]
     named = pd.DataFrame([[0.5, 0.6]], columns=["ARI", "NMI"], index=["M"])
     with pytest.raises(ValueError, match="expects evaluate"):
-        to_long(named, "M", "D", "vertical")
-    assert to_long(named.T.set_axis(["Value"], axis=1), "M", "D", "vertical").value.tolist() == [0.5, 0.6]
+        to_long(named, method="M", dataset="D", category="vertical")
+    assert to_long(named.T.set_axis(["Value"], axis=1), method="M", dataset="D", category="vertical").value.tolist() == [0.5, 0.6]
     # an empty frame names the expected shape too, not a KeyError
     with pytest.raises(ValueError, match="expects evaluate"):
-        to_long(pd.DataFrame(), "M", "D", "vertical")
+        to_long(pd.DataFrame(), method="M", dataset="D", category="vertical")
 
 
 def test_to_long_accepts_csv_readback_and_series(tmp_path):
@@ -116,14 +119,14 @@ def test_to_long_accepts_csv_readback_and_series(tmp_path):
     f = tmp_path / "wide.csv"
     w.to_csv(f)                                    # what `multibench evaluate --out` writes
     back = pd.read_csv(f)                          # columns ['metric', 'Value'], RangeIndex
-    out = to_long(back, "M", "D", "vertical")
+    out = to_long(back, method="M", dataset="D", category="vertical")
     assert out.columns.tolist().count("metric") == 1
     assert out.metric.tolist() == ["ARI", "NMI"] and out.value.tolist() == [0.5, 0.6]
     ser = pd.Series({"ARI": 0.5, "NMI": 0.6})
-    assert to_long(ser, "M", "D", "vertical").metric.tolist() == ["ARI", "NMI"]
+    assert to_long(ser, method="M", dataset="D", category="vertical").metric.tolist() == ["ARI", "NMI"]
 
 
 def test_to_long_all_blank_names_raises():
     w = pd.DataFrame({"Value": [0.5, 0.1]}, index=["", ""])
     with pytest.raises(ValueError, match="no metric name in the index canonicalises"):
-        to_long(w, "M", "D", "vertical")
+        to_long(w, method="M", dataset="D", category="vertical")

@@ -63,7 +63,7 @@ def test_plot_bubble_save(tmp_path):
     import matplotlib
     matplotlib.use("Agg")
     out = tmp_path / "b.png"
-    fig = bubble.plot_bubble(_toy_long(), metrics=["ARI", "NMI"], save=out)
+    fig = bubble(_toy_long(), metrics=["ARI", "NMI"], save=out)
     assert out.exists()
 
 
@@ -113,7 +113,7 @@ def test_summary_bars_carry_no_error_bars():
     # method C exists in ONE dataset only -> must get no whisker
     rows += [{"method": "C", "metric": "ARI", "value": 0.3, "dataset": "DS1"},
              {"method": "C", "metric": "NMI", "value": 0.3, "dataset": "DS1"}]
-    fig = bubble.plot_bubble(pd.DataFrame(rows), aggregate="summary")
+    fig = bubble(pd.DataFrame(rows), aggregate="summary")
     ax = fig.axes[0]
     whiskers = [l for l in ax.lines if l.get_gid() == "whisker"]
     assert whiskers == [], f"expected no whisker artists, got {len(whiskers)}"
@@ -158,8 +158,8 @@ def test_bubble_attribute_aliases(tmp_path):
     import multibench as mtb
     assert mtb.plot.bubble.build_table is mtb.plot.build_table
     assert mtb.plot.bubble.render is mtb.plot.render
-    assert mtb.plot.bubble.plot_bubble is mtb.plot.bubble
-    assert mtb.plot.plot_bubble is mtb.plot.bubble
+    assert mtb.plot.bubble.plot_bubble is mtb.plot.plot_bubble     # the deprecated alias
+    assert mtb.plot.plot_bubble.__wrapped__ is mtb.plot.bubble
     from multibench.plot import bubble as b
     tbl = b.build_table(_toy_long(), metrics=["ARI", "NMI"])
     assert isinstance(tbl, b.BubbleTable)
