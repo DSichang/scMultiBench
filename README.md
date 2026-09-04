@@ -30,8 +30,9 @@ mtb.list_methods()                 # the 40-method registry
 mtb.method_info("Matilda")         # everything known about one method (env, labels, reference, variants)
 mtb.recommend("vertical", modalities=["rna", "adt"])   # ranked from the stored tables, with coverage
 mtb.data.fetch("D11")              # reference CITE-seq dataset, 11 MB -> mtb.config.DEFAULT.data_path
-mtb.scan("D11", "vertical")        # two-gate preflight: files_ok / env_ok per method, with reasons
-mtb.plan("D11", "vertical")        # the run plan (= run_all(dry_run=True)); blocked rows stay, with reasons
+mtb.scan("D11", "vertical")        # preflight per method variant: files_ok / env_ok with reasons, plus the exact
+                                   # `command` run() would execute (= run_all(dry_run=True)); blocked rows stay
+mtb.inputs_for("D11", "vertical", "Matilda")   # (dataset, category, method) -> {'rna': ..., 'adt': ..., 'cty': ...}
 res = mtb.run_all("D11", "vertical", out_dir="out/")   # run + score
 res.plot()                         # the paper-style bubble panel
 
@@ -42,10 +43,17 @@ mtb.io.export_dataset(adata, "data/MYCITE", rna="X", adt="obsm:protein", labels=
 mtb.scan("MYCITE", "vertical", data_path="data")
 
 # stored results, evaluation and figures need no conda environment
-df = mtb.load_results("vertical", dataset="D11", source="rerun")        # or source="published"
-m = mtb.evaluate(my_embedding, labels=mtb.labels_for("D11"))            # scIB metrics; labels_for is in the cells' stacking order
-mtb.plot.bubble(pd.concat([df, mtb.to_long(m, "MyMethod", "D11", "vertical")]), save="d11.pdf")
+df = mtb.load_results("vertical", dataset="D11", source="rerun")        # or source="published"; metrics=["ARI", "NMI"] for a subset
+m = mtb.evaluate(my_embedding, labels=mtb.labels_for("D11"))            # every applicable scIB metric; metrics="clustering" | "batch" | "all" | ["ARI", "NMI"]
+mtb.plot.bubble(pd.concat([df, mtb.to_long(m, method="MyMethod", dataset="D11", category="vertical")]), save="d11.pdf")
 ```
+
+Upgrading from 0.2.1? `scan` absorbed the run plan (its `command` column),
+`method_info(m)["runtime"]` the runtime table, `inputs_for` / `labels_for`
+take `(dataset, category, method)`, and `evaluate` / `load_results` /
+`recommend` select metrics through the one `metrics=` knob - the old
+spellings warn for one release; every old -> new pair is in the
+[API reference](https://dsichang.github.io/scMultiBench/api/#deprecated-in-030).
 
 Running methods needs their conda environments, which are linux-64 only
 (`env install --run` refuses on macOS / Windows unless `--force`); everything
@@ -68,8 +76,8 @@ multibench scan D11 --category vertical               # preflight table: files_o
 multibench find --category vertical --modalities rna,adt --needs-labels false
 multibench params Matilda                              # the hyperparameters --param accepts, per variant
 multibench run --method Matilda --category vertical --input rna=<data_path>/D11/rna.h5 --input adt=<data_path>/D11/adt.h5 --input cty=<data_path>/D11/cty.csv --out-dir out/Matilda --dry-run   # one method: prints the exact `conda run -n matilda python ...` line; drop --dry-run to execute
-multibench run-all D11 --category vertical --out-dir out/ --dry-run   # the plan + the command per variant; nothing runs
-multibench evaluate --output out/Matilda/embedding.h5 --labels <data_path>/D11/cty.csv --only ARI,NMI   # mtb.labels_for("D11") returns {'cty': <that path>}
+multibench run-all D11 --category vertical --out-dir out/ --dry-run   # the scan table + the command per variant; nothing runs
+multibench evaluate --output out/Matilda/embedding.h5 --labels <data_path>/D11/cty.csv --metrics ARI,NMI   # mtb.labels_for("D11") returns {'cty': <that path>}
 multibench plot bubble --category vertical --dataset D11 --source rerun --out d11.pdf
 multibench plot bubble --input mine.csv --category vertical --dataset D11 --source rerun --out d11.pdf   # your rows next to the stored table
 multibench cite Matilda MOFA2                          # BibTeX for the benchmark + each method
@@ -95,10 +103,10 @@ Multitask benchmarking of single-cell multimodal omics integration methods.
 
 Every method you run is third-party software with its own paper - please cite
 it alongside the benchmark. `print(mtb.cite("Matilda", "MOFA2"))` - or
-`print(mtb.cite(res.summary.method))` after a sweep, or `multibench cite
-Matilda MOFA2` - prints the benchmark's BibTeX entry followed by one entry per
-method; `mtb.method_info(name)` carries the same reference, repository and
-version.
+`print(mtb.cite(res.summary.method))` after a sweep - prints the benchmark's
+reference followed by one line per method (`fmt="bibtex"` for the `.bib`
+entries; `multibench cite Matilda MOFA2` prints BibTeX by default);
+`mtb.method_info(name)` carries the same reference, repository and version.
 
 This repository (`DSichang/scMultiBench`) is the API fork of
 [PYangLab/scMultiBench](https://github.com/PYangLab/scMultiBench), which holds
