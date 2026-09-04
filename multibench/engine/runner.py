@@ -170,26 +170,105 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     return vals, out
 
 
-def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
-        out_dir: str, params: dict | None = None, convert: bool = True,
-        cmd_template: str | None = None, repo_path: Path | None = None) -> RunResult:
+def _modality_roles(inputs: dict) -> set[str]:
+    """The roles of ``inputs`` that select a variant: everything but the
+    auxiliary roles and the label roles (anything containing ``cty`` /
+    ``label``, e.g. ``rna_cty`` / ``atac_cty``)."""
+    return {k for k in inputs if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
+
+
+def _repo_root_no_fetch() -> Path:
+    """Where :func:`run` looks for ``tools_scripts/`` - WITHOUT cloning it.
+
+    Mirrors ``config.ensure_repo``'s lookup order (configured ``repo_path``,
+    then the package root) but never fetches: a dry run must not touch the
+    network. When neither holds a checkout the configured path is returned,
+    which is where a real run will put the scripts on first use.
+    """
+    p = Path(config.DEFAULT.repo_path)
+    if (p / "tools_scripts").is_dir():
+        return p
+    root = Path(config.__file__).resolve().parent.parent
+    if (root / "tools_scripts").is_dir():
+        return root
+    return p
+
+
+def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
+          params: dict | None, cmd_template: str | None) -> list[str]:
+    """The exact argv a method run executes (shared by the run and the dry run).
+
+    Builds the command from the variant's argument spec, swaps in the
+    package-side ``driver`` wrapper when the variant declares one, applies
+    the opt-in pseudo-tty wrap and finally the ``cmd_template`` (default
+    ``conda run -n <env>`` with the env :func:`multibench.env.group_for`
+    would provision).
+    """
+    # Pass out_dir with a trailing separator: many method scripts build their
+    # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
+    # etc.), so a missing slash writes a SIBLING file instead of into out_dir.
+    cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
+    # entrypoint is relative to the reference repo. A variant may declare a
+    # package-side `driver`: a wrapper script (shipped with the package) that
+    # source()s the UNMODIFIED upstream entrypoint and calls its function. When
+    # set, run the driver instead and hand it the upstream script's dir via
+    # --script_dir (so the driver can source it in place; the method script
+    # stays byte-identical to upstream).
+    if getattr(variant, "driver", None):
+        pkg_root = Path(__file__).resolve().parents[1]      # .../multibench
+        driver_abs = pkg_root / variant.driver
+        script_dir = (repo / variant.entrypoint).parent
+        cmd = [cmd[0], str(driver_abs), "--script_dir", str(script_dir)] + cmd[2:]
+    else:
+        cmd[1] = str(repo / cmd[1])
+    if cmd_template is None:
+        # Resolve conda's full path when available (CONDA_EXE is set by an
+        # initialized conda) so the default works even when bare `conda` is not
+        # on the spawned subprocess's PATH; fall back to `conda`.
+        conda = os.environ.get("CONDA_EXE", "conda")
+        # Resolve the env via the same group system that provisioning builds
+        # (mtb.env.plan/create/create_group), so "the env you provision is the
+        # env you run". group_for() returns a method's shared group env, or its
+        # own scmb_<method> env if it is not grouped.
+        cmd_template = f"{conda} run -n {envs.group_for(method)} {{cmd}}"
+    # Opt-in pseudo-tty: some upstream scripts read the terminal size
+    # (os.popen('stty size')) to draw a progress bar and crash without a tty
+    # (scJoint's util/utils.py). Wrap the method command in `script`, which
+    # allocates a pty, forwards the child's output to captured stdout, and (-e)
+    # propagates the child's exit code so the returncode check below still fires.
+    # This must be INNERMOST -- inside the conda-run wrap -- so the method
+    # process's own stdin is the pty; conda run otherwise redirects stdio and
+    # `stty size` still fails. Hence wrap BEFORE wrap_command. Default off ->
+    # no other method affected.
+    if getattr(variant, "pty", False):
+        cmd = ["script", "-q", "-e", "-c",
+               " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
+    return wrap_command(cmd, cmd_template)
+
+
+def run(method: str, category: str, *, inputs: dict, out_dir: str,
+        params: dict | None = None, task: str | None = None, convert: bool = True,
+        cmd_template: str | None = None, repo_path: Path | None = None,
+        dry_run: bool = False):
     """Run a method and load its output. Method scripts are never modified.
 
-    Variant selection currently depends only on ``category`` and the supplied
+    Variant selection depends only on ``category`` and the supplied
     modalities; ``task`` is accepted and ignored.
 
     Parameters
     ----------
-    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
-    category : integration category of the variant to run.
-    task : accepted for forward compatibility and currently ignored (see
-        above).
-    inputs : ``{role: path-or-AnnData}``; the non-auxiliary, non-label roles
+    method : str
+        Registry id (``KeyError`` with a did-you-mean hint otherwise).
+    category : str
+        Integration category of the variant to run.
+    inputs : dict, keyword-only
+        ``{role: path-or-AnnData}``; the non-auxiliary, non-label roles
         select the variant. See ``inputs_for`` / ``method_info(m)['supports']``.
         Paths may be relative: they are made absolute (and ``data_dir`` gets a
         trailing separator) before the argv is built, because the method
         runs with ``cwd=out_dir`` - see :func:`normalize_paths`.
-    out_dir : directory the method writes into (created; ``inputs/`` holds the
+    out_dir : path, keyword-only
+        Directory the method writes into (created; ``inputs/`` holds the
         canonical .h5 copies when ``convert=True``, or - for a registration
         method fed a ``data_dir`` of slices - the sorted, zero-padded symlinks
         the script is pointed at, with ``slices_manifest.json`` beside it
@@ -197,15 +276,39 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
         :func:`stage_slices`; a ``data_dir`` method that stages nothing gets
         no ``inputs/`` at all). Made absolute the same way; ``RunResult.out_dir``
         is that absolute path.
-    params : overrides merged over the variant's default hyperparameters.
-    convert : convert modality inputs to the canonical .h5 layout (default True).
-    cmd_template : wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``.
+    params : dict, keyword-only, optional
+        Overrides merged over the variant's default hyperparameters.
+    task : str, keyword-only, optional
+        Accepted for forward compatibility and currently ignored.
+    convert : bool, keyword-only
+        Convert modality inputs to the canonical .h5 layout (default True).
+    cmd_template : str, keyword-only, optional
+        Wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``.
         Default: ``conda run -n <env>`` with the env ``mtb.env.group_for(method)``
         would provision. When left as None the env is PREFLIGHTED: if conda lists
         envs and the method's env is not among them, ``EnvironmentError`` is
         raised before any file is written, naming the install command. Pass a
         cmd_template to take over env control (no preflight).
-    repo_path : checkout holding ``tools_scripts/`` (default: auto-provisioned).
+    repo_path : path, keyword-only, optional
+        Checkout holding ``tools_scripts/`` (default: auto-provisioned; on a
+        dry run it is located but never fetched).
+    dry_run : bool, keyword-only
+        ``True`` returns the argv list the call WOULD execute - built from the
+        same pieces (variant selection, ``engine.builder.build_command``, the
+        ``driver`` / ``pty`` wrapping, the default ``conda run -n <env>``
+        template) - and creates nothing: no ``out_dir``, no ``inputs/`` copies,
+        no env preflight, no fetch of the reference checkout. The inputs are
+        shown absolutized, exactly as the run passes them (a real run first
+        copies non-canonical inputs to ``<out_dir>/inputs/<role>.h5``;
+        canonical ``.h5`` files pass through unchanged, so for a laid-out
+        dataset the preview is exact). ``shlex.join`` it for a shell line.
+        (This replaces the 0.2 ``command_preview``, which is deprecated.)
+
+    Returns
+    -------
+    RunResult or list of str
+        :class:`RunResult` with the primary output loaded; the argv list when
+        ``dry_run=True``.
 
     Note on auxiliary-role coupling: for methods whose args reference auxiliary
     roles (e.g. scBridge's ``data_dir``/``source_data``/``target_data``/
@@ -217,9 +320,14 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # Label roles (anything containing "cty"/"label", e.g. rna_cty/atac_cty)
     # are auxiliary too: they are method inputs but not modalities for variant
     # selection (consistent with resolve.py treating them as .csv labels).
-    modalities = {k for k in inputs
-                  if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
-    variant = spec.select(category, modalities)
+    variant = spec.select(category, _modality_roles(inputs))
+
+    if dry_run:
+        # the preview: absolute paths as the run passes them, the checkout
+        # located but never fetched, nothing written
+        values, out_str = normalize_paths(inputs, out_dir)
+        repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
+        return _argv(variant, method, values, out_str, repo, params, cmd_template)
 
     # Env preflight: the default cmd_template is `conda run -n <env> ...`, and
     # conda's own "EnvironmentLocationNotFound" only arrives AFTER inputs were
@@ -228,7 +336,6 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # written. Skipped when the caller controls the env via cmd_template, and
     # when the probe returns nothing (conda absent/broken -> cannot evidence,
     # let the subprocess report as before).
-    env_name = None
     if cmd_template is None:
         env_name = envs.group_for(method)
         have = envs.installed_envs()
@@ -236,7 +343,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
             raise EnvironmentError(
                 f"conda env {env_name!r} ({method}) is not installed - run "
                 f"`multibench env install --methods {method} --packed --run` "
-                f"(or mtb.env.create_env({env_name!r})); see mtb.env.doctor()")
+                f"(or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()")
 
     # Absolute paths + trailing separator on directory roles BEFORE conversion,
     # so canonical passthrough files are absolute too; converted copies live
@@ -249,7 +356,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
     # File-role methods keep their inputs/ (canonical copies land there); a
     # directory-fed method used to get an EMPTY inputs/ - now it holds the
     # staged slice links, or is not created at all (scBridge).
-    if any(k not in _AUX_ROLES and "cty" not in k and "label" not in k for k in inputs):
+    if _modality_roles(inputs):
         inputs_dir.mkdir(parents=True, exist_ok=True)
     manifest = None
     if "data_dir" in inputs and variant.output.kind == "coords":
@@ -279,48 +386,7 @@ def run(method: str, category: str, task: str = "clustering", *, inputs: dict,
             npath = inputs_dir / f"{role}_normpeaks.h5"
             values[role] = str(ingest.normalize_peak_names(values[role], npath))
     repo = Path(config.ensure_repo(repo_path))
-    # Pass out_dir with a trailing separator: many method scripts build their
-    # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
-    # etc.), so a missing slash writes a SIBLING file instead of into out_dir.
-    cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
-    # entrypoint is relative to the reference repo. A variant may declare a
-    # package-side `driver`: a wrapper script (shipped with the package) that
-    # source()s the UNMODIFIED upstream entrypoint and calls its function. When
-    # set, run the driver instead and hand it the upstream script's dir via
-    # --script_dir (so the driver can source it in place; the method script
-    # stays byte-identical to upstream).
-    if getattr(variant, "driver", None):
-        pkg_root = Path(__file__).resolve().parents[1]      # .../multibench
-        driver_abs = pkg_root / variant.driver
-        script_dir = (repo / variant.entrypoint).parent
-        cmd = [cmd[0], str(driver_abs), "--script_dir", str(script_dir)] + cmd[2:]
-    else:
-        cmd[1] = str(repo / cmd[1])
-    if cmd_template is None:
-        # Resolve conda's full path when available (CONDA_EXE is set by an
-        # initialized conda) so the default works even when bare `conda` is not
-        # on the spawned subprocess's PATH; fall back to `conda`.
-        conda = os.environ.get("CONDA_EXE", "conda")
-        # Resolve the env via the same group system that provisioning builds
-        # (mtb.env.plan/create/create_group), so "the env you provision is the
-        # env you run". group_for() returns a method's shared group env, or its
-        # own scmb_<method> env if it is not grouped. (The legacy per-method
-        # methods.yaml `env:` field is no longer consulted here.)
-        env_name = env_name or envs.group_for(method)
-        cmd_template = f"{conda} run -n {env_name} {{cmd}}"
-    # Opt-in pseudo-tty: some upstream scripts read the terminal size
-    # (os.popen('stty size')) to draw a progress bar and crash without a tty
-    # (scJoint's util/utils.py). Wrap the method command in `script`, which
-    # allocates a pty, forwards the child's output to captured stdout, and (-e)
-    # propagates the child's exit code so the returncode check below still fires.
-    # This must be INNERMOST -- inside the conda-run wrap -- so the method
-    # process's own stdin is the pty; conda run otherwise redirects stdio and
-    # `stty size` still fails. Hence wrap BEFORE wrap_command. Default off ->
-    # no other method affected.
-    if getattr(variant, "pty", False):
-        cmd = ["script", "-q", "-e", "-c",
-               " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
-    cmd = wrap_command(cmd, cmd_template)
+    cmd = _argv(variant, method, values, out_str, repo, params, cmd_template)
 
     # Isolate the method env from user site-packages (~/.local): a broken or
     # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch

@@ -9,7 +9,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__all__ = ["Config", "DEFAULT", "category_folder", "metric_set_dir"]
+__all__ = ["Config", "DEFAULT"]
+
+
+def __dir__() -> list[str]:
+    """``dir(mtb.config)`` lists the public names (PEP 562).
+
+    ``category_folder`` / ``metric_set_dir`` stay importable for the package's
+    own modules but are internal token maps, not user-facing API, so tab
+    completion does not advertise them.
+    """
+    return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
 
 # token -> on-disk space-named folder
 _CATEGORY_FOLDERS = {
@@ -39,7 +49,24 @@ _BASE = _ROOT if _IN_REPO else (
 
 
 def category_folder(token: str) -> str:
-    """Map a category token to its space-named result folder."""
+    """Map a category token to its space-named result folder (internal).
+
+    Parameters
+    ----------
+    token : str
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``.
+
+    Returns
+    -------
+    str
+        The on-disk folder name, e.g. ``"vertical integration"``.
+
+    Raises
+    ------
+    ValueError
+        Unknown token; the message lists the valid ones (this is the
+        validator ``registry.check_category`` delegates to).
+    """
     try:
         return _CATEGORY_FOLDERS[token]
     except KeyError:
@@ -49,7 +76,23 @@ def category_folder(token: str) -> str:
 
 
 def metric_set_dir(token: str) -> str:
-    """Map a metric-set token to its top-level result dir name."""
+    """Map a metric-set token to its top-level result dir name (internal).
+
+    Parameters
+    ----------
+    token : str
+        Only ``"scib"`` is wired.
+
+    Returns
+    -------
+    str
+        The directory name under the result root (``"scib_metric"``).
+
+    Raises
+    ------
+    ValueError
+        Unknown token, listing the valid ones.
+    """
     try:
         return _METRIC_SET_DIRS[token]
     except KeyError:

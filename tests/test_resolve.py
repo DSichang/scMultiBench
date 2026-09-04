@@ -15,7 +15,7 @@ def _make_diag(tmp_path, files):
 def test_inputs_for_flat_layout_and_peak_alias(tmp_path):
     # Seurat_v5 (diagonal) uses roles rna + atac_peak; real file is peak.h5
     data = _make_diag(tmp_path, ["rna.h5", "peak.h5", "rna_cty.csv", "peak_cty.csv"])
-    inputs = resolve.inputs_for("D27", "Seurat_v5", category="diagonal", data_path=data)
+    inputs = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=data)
     assert set(inputs) == {"rna", "atac_peak"}
     assert inputs["rna"].endswith("/D27/rna.h5")        # flat: no category folder
     assert inputs["atac_peak"].endswith("/D27/peak.h5")  # alias atac_peak -> peak.h5
@@ -24,7 +24,7 @@ def test_inputs_for_flat_layout_and_peak_alias(tmp_path):
 def test_inputs_for_gene_activity_alias(tmp_path):
     # SCALEX (diagonal) uses atac_gas; real gene-activity file is atac.h5
     data = _make_diag(tmp_path, ["rna.h5", "atac.h5"])
-    inputs = resolve.inputs_for("D27", "SCALEX", category="diagonal", data_path=data)
+    inputs = resolve.inputs_for("D27", "diagonal", "SCALEX", data_path=data)
     assert set(inputs) == {"rna", "atac_gas"}
     assert inputs["atac_gas"].endswith("/D27/atac.h5")   # alias atac_gas -> atac.h5
 
@@ -32,14 +32,14 @@ def test_inputs_for_gene_activity_alias(tmp_path):
 def test_inputs_for_falls_back_to_canonical_name(tmp_path):
     # when no candidate file exists, fall back to <role>.h5 (best effort)
     data = _make_diag(tmp_path, ["rna.h5"])
-    inputs = resolve.inputs_for("D27", "SCALEX", category="diagonal", data_path=data)
+    inputs = resolve.inputs_for("D27", "diagonal", "SCALEX", data_path=data)
     assert inputs["atac_gas"].endswith("/D27/atac_gas.h5")
 
 
 def test_inputs_for_ambiguous_mosaic_raises(tmp_path):
     # Multigrate has multiple mosaic variants; no modalities -> ValueError.
     with pytest.raises(ValueError):
-        resolve.inputs_for("D1", "Multigrate", category="mosaic")
+        resolve.inputs_for("D1", "mosaic", "Multigrate")
 
 
 def test_inputs_for_mosaic_with_modalities_selects_variant(tmp_path):
@@ -47,7 +47,7 @@ def test_inputs_for_mosaic_with_modalities_selects_variant(tmp_path):
     d.mkdir(parents=True)
     for n in ["rna1.h5", "rna2.h5", "atac2.h5", "atac3.h5"]:
         (d / n).write_text("")
-    inputs = resolve.inputs_for("D1", "Multigrate", category="mosaic",
+    inputs = resolve.inputs_for("D1", "mosaic", "Multigrate",
                                 modalities=["rna1", "rna2", "atac2", "atac3"],
                                 data_path=tmp_path)
     assert set(inputs) == {"rna1", "rna2", "atac2", "atac3"}
@@ -80,24 +80,26 @@ def _make_labels_ds(tmp_path):
 
 def test_labels_for_accepts_method_and_category_positionally(tmp_path):
     data = _make_labels_ds(tmp_path)
-    a = resolve.labels_for("D27", "Seurat_v5", "diagonal", data_path=data)
+    a = resolve.labels_for("D27", "diagonal", "Seurat_v5", data_path=data)
     b = resolve.labels_for("D27", data_path=data)
     assert a == b and set(a) == {"rna_cty", "peak_cty"}
 
 
-def test_labels_for_positional_data_path_shim_warns(tmp_path):
+def test_labels_for_positional_data_path_is_refused(tmp_path):
+    """The 0.2 positional data_path (2nd slot) is category since 0.3.0: loud."""
     import warnings
     data = _make_labels_ds(tmp_path)
-    with pytest.warns(DeprecationWarning, match="data_path= by keyword"):
-        a = resolve.labels_for("D27", data)
-    with pytest.warns(DeprecationWarning):
-        b = resolve.labels_for("D27", str(data))
-    assert a == b == resolve.labels_for("D27", data_path=data)
-    # a bare method id (no separator, not a dir) is NOT mistaken for a path
+    with pytest.raises(TypeError, match="pass data_path= by keyword"):
+        resolve.labels_for("D27", data)
+    with pytest.raises(TypeError, match="is category since 0.3.0"):
+        resolve.labels_for("D27", str(data))
+    # a bare method id in the category slot is the old order: loud too
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(TypeError, match=r"labels_for argument order is \(dataset, category, method\)"):
             resolve.labels_for("D27", "Seurat_v5", data_path=tmp_path / "nowhere")
+        with pytest.raises(FileNotFoundError):
+            resolve.labels_for("D27", method="Seurat_v5", data_path=tmp_path / "nowhere")
 
 
 # --- P09: inputs_for validates tokens and accepts aliases ---------------------
@@ -106,18 +108,18 @@ def test_inputs_for_protein_alias_and_bad_category(tmp_path):
     d = tmp_path / "D11"; d.mkdir()
     for n in ["rna.h5", "adt.h5", "cty.csv"]:
         (d / n).write_text("")
-    a = resolve.inputs_for("D11", "totalVI", "vertical", modalities=["rna", "protein"],
+    a = resolve.inputs_for("D11", "vertical", "totalVI", modalities=["rna", "protein"],
                            data_path=tmp_path)
-    b = resolve.inputs_for("D11", "totalVI", "vertical", modalities=["rna", "adt"],
+    b = resolve.inputs_for("D11", "vertical", "totalVI", modalities=["rna", "adt"],
                            data_path=tmp_path)
     assert a == b and set(a) == {"rna", "adt"}
     with pytest.raises(ValueError, match="unknown category 'crosss'"):
-        resolve.inputs_for("D11", "totalVI", "crosss", data_path=tmp_path)
+        resolve.inputs_for("D11", "crosss", "totalVI", data_path=tmp_path)
     with pytest.raises(ValueError, match="unknown modality 'proteinx'"):
-        resolve.inputs_for("D11", "totalVI", "vertical", modalities=["rna", "proteinx"],
+        resolve.inputs_for("D11", "vertical", "totalVI", modalities=["rna", "proteinx"],
                            data_path=tmp_path)
     with pytest.raises(KeyError, match="did you mean 'StabMap'"):
-        resolve.inputs_for("D11", "Stabmap", "cross", data_path=tmp_path)
+        resolve.inputs_for("D11", "cross", "Stabmap", data_path=tmp_path)
 
 
 # --- P01 follow-up: content preflight in inputs_for(check=True) ---------------
@@ -138,15 +140,15 @@ def test_label_length_mismatch_reported(tmp_path):
     _h5(d / "rna.h5", 30, 60); _h5(d / "adt.h5", 5, 60)
     (d / "cty.csv").write_text("x\n" + "A\n" * 59)
     with pytest.raises(ValueError) as e:
-        resolve.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"],
+        resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"],
                            data_path=tmp_path, check=True)
     msg = str(e.value)
     assert "cty.csv has 59 labels" in msg and "60 cells" in msg and "describe_layout" in msg
     # check=None / False do not raise (best-effort paths)
-    resolve.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"],
+    resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=False)
     (d / "cty.csv").write_text("x\n" + "A\n" * 60)
-    resolve.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"],
+    resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=True)     # now fine
 
 
@@ -164,26 +166,26 @@ def test_atac_gas_peak_caveat(tmp_path):
     d = tmp_path / "PK"; d.mkdir()
     _h5(d / "rna.h5", 30, 50)
     _h5(d / "atac.h5", 40, 45, feats=[f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)])
-    got = resolve.inputs_for("PK", "Portal", "diagonal", data_path=tmp_path, check=True)
+    got = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path, check=True)
     assert got["atac_gas"].endswith("atac.h5")
     assert resolve._preflight_caveats(got) == [resolve.PEAK_IN_GAS_CAVEAT]
     assert "chr:start-end" in resolve.PEAK_IN_GAS_CAVEAT
     # a real atac_gas.h5 (gene names) -> no caveat; so does gene-named atac.h5
     _h5(d / "atac_gas.h5", 40, 45)
-    assert resolve._preflight_caveats(resolve.inputs_for("PK", "Portal", "diagonal",
+    assert resolve._preflight_caveats(resolve.inputs_for("PK", "diagonal", "Portal",
                                                          data_path=tmp_path)) == []
     (d / "atac_gas.h5").unlink()
     _h5(d / "atac.h5", 40, 45)
-    assert resolve._preflight_caveats(resolve.inputs_for("PK", "Portal", "diagonal",
+    assert resolve._preflight_caveats(resolve.inputs_for("PK", "diagonal", "Portal",
                                                          data_path=tmp_path)) == []
 
 
 def test_inputs_for_check_true_rejects_data_dir_without_slices(tmp_path):
     (tmp_path / "D11").mkdir()
     with pytest.raises(FileNotFoundError, match=">=2 .h5ad"):
-        resolve.inputs_for("D11", "PASTE", "cross", data_path=tmp_path, check=True)
+        resolve.inputs_for("D11", "cross", "PASTE", data_path=tmp_path, check=True)
     # default (warn-only) still hands back the directory
-    got = resolve.inputs_for("D11", "PASTE", "cross", data_path=tmp_path)
+    got = resolve.inputs_for("D11", "cross", "PASTE", data_path=tmp_path)
     assert got["data_dir"].rstrip("/").endswith("D11")
 
 

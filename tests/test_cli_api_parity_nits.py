@@ -1,7 +1,7 @@
 """CLI/API parity nits from the re-test, each with its evidence.
 
 * ``multibench scan D52`` without ``--category`` scans all four, like Python;
-* ``inputs_for('D52', 'cross', 'StabMap')`` says the 2nd/3rd arguments are swapped;
+* ``inputs_for('D52', 'StabMap', 'cross')`` (the 0.2 order) is refused, never accepted;
 * a lower-case dataset id is canonicalised to the on-disk folder name;
 * ``run_all(dry_run=True)`` returns the ``command`` column the CLI csv carries;
 * ``multibench cite A,B`` works like ``multibench cite A B``.
@@ -21,32 +21,32 @@ from multibench.engine import envs, registry, resolve
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
-# ----------------------------------------------------------------- swapped arguments
-def test_inputs_for_category_in_method_slot_names_the_swap():
-    with pytest.raises(KeyError) as e:
-        mtb.inputs_for("D52", "cross", "StabMap")
-    msg = str(e.value)
-    assert "unknown method 'cross'" in msg and "category token" in msg
-    assert "argument order is (dataset, method, category)" in msg
-    assert "unlike scan/plan/run_all(dataset, category, ...)" in msg
-    assert "inputs_for('D52', 'StabMap', 'cross')" in msg
+# ----------------------------------------------------------------- the 0.2 order is refused
+def test_inputs_for_old_order_is_a_typeerror():
+    with pytest.raises(TypeError) as e:
+        mtb.inputs_for("D52", "StabMap", "cross")
+    assert str(e.value) == ("inputs_for argument order is (dataset, category, method) "
+                            "since 0.3.0; you passed (dataset, method, category)")
 
 
-def test_inputs_for_method_in_category_slot_names_the_swap():
-    with pytest.raises(ValueError) as e:
-        mtb.inputs_for("D52", "StabMap", "StabMap")
-    msg = str(e.value)
-    assert "unknown category 'StabMap'" in msg and "method id" in msg
-    assert "inputs_for('D52', 'StabMap', 'StabMap')" in msg
-    assert resolve.SWAPPED_ARGS_HINT in msg
+def test_labels_for_old_order_is_a_typeerror():
+    with pytest.raises(TypeError) as e:
+        mtb.labels_for("D52", "StabMap", "cross")
+    assert str(e.value) == ("labels_for argument order is (dataset, category, method) "
+                            "since 0.3.0; you passed (dataset, method, category)")
+    with pytest.raises(TypeError, match="labels_for argument order"):
+        mtb.labels_for("D52", "StabMap")                 # method alone in the category slot
 
 
 def test_inputs_for_plain_typos_keep_their_messages():
     with pytest.raises(KeyError, match="did you mean 'StabMap'"):
-        mtb.inputs_for("D52", "Stabmap", "cross")
+        mtb.inputs_for("D52", "cross", "Stabmap")
     with pytest.raises(ValueError, match="unknown category 'cros'; valid"):
-        mtb.inputs_for("D52", "StabMap", "cros")
-    # a category token in the method slot with an unknown category is NOT a swap
+        mtb.inputs_for("D52", "cros", "StabMap")
+    # a method id in BOTH slots is a bad category, not a swap
+    with pytest.raises(ValueError, match="unknown category 'StabMap'"):
+        mtb.inputs_for("D52", "StabMap", "StabMap")
+    # a category token in the method slot with an unknown method is a bad id, not a swap
     with pytest.raises(KeyError) as e:
         mtb.inputs_for("D52", "cross", "nonsense")
     assert "argument order" not in str(e.value)
@@ -84,7 +84,7 @@ def test_scan_and_inputs_for_carry_the_on_disk_name(tmp_path, monkeypatch):
     assert (df["files_reason"].str.contains("/mycite")).sum() == 0
     assert len(df) == len(mtb.scan("MYCITE", "vertical", data_path=tmp_path))
     with pytest.warns(UserWarning, match="on-disk spelling"):
-        inp = mtb.inputs_for("mycite", "Matilda", "vertical", modalities=["rna", "adt"],
+        inp = mtb.inputs_for("mycite", "vertical", "Matilda", modalities=["rna", "adt"],
                              data_path=tmp_path)
     assert all("/MYCITE/" in p for p in inp.values())
     with pytest.warns(UserWarning, match="on-disk spelling"):
@@ -129,8 +129,8 @@ def test_run_all_dry_run_returns_the_cli_csv_command_column(capsys):
     assert ok["command"].str.contains("runs/Matilda_D11").all()
 
 
-def test_plan_without_out_dir_uses_the_placeholder():
-    plan = mtb.plan("D11", "vertical", methods=["Matilda"])
+def test_scan_without_out_dir_uses_the_placeholder():
+    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     ok = plan[plan["files_ok"]]
     assert ok["command"].str.contains(W.OUT_DIR_PLACEHOLDER + "/Matilda_D11").all()
     assert (plan[~plan["files_ok"]]["command"] == "").all()

@@ -10,11 +10,13 @@ Entry points (exposed as ``mtb.io``):
   ``modality=`` / ``layer=`` / ``obsm=`` / ``mod=`` selectors.
 * :func:`export_dataset` - a whole AnnData/MuData -> a canonical dataset folder
   (``rna.h5``, ``adt.h5``, ``atac_peak.h5``/``atac_gas.h5``, ``cty.csv``),
-  optionally split per batch (``rna1.h5`` ...).
-* :func:`from_mudata` - thin MuData alias of :func:`export_dataset`.
-* :func:`write_labels` - the single-column ``x`` label CSV the benchmark reads.
+  optionally split per batch (``rna1.h5`` ...). A MuData's modalities can be
+  named directly (``rna='rna'``); the 0.2 ``from_mudata`` alias is gone.
 * :func:`read_canonical` - the inverse (canonical ``.h5`` -> AnnData).
 * :func:`normalize_peak_names` - rewrite peak ids to ``chr:start-end``.
+
+The single-column ``x`` label CSV the benchmark reads is written by the
+private :func:`_write_labels` (``export_dataset`` calls it per batch).
 """
 from __future__ import annotations
 
@@ -27,8 +29,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-__all__ = ["to_canonical", "read_canonical", "normalize_peak_names",
-           "export_dataset", "from_mudata", "write_labels"]
+__all__ = ["export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"]
 
 
 def __dir__() -> list[str]:
@@ -497,21 +498,28 @@ def normalize_peak_names(src, dst):
 # dataset-level export
 # --------------------------------------------------------------------------
 
-def write_labels(labels, path: Path | str) -> Path:
+def _write_labels(labels, path: Path | str) -> Path:
     """Write cell-type labels as the single-column CSV the benchmark reads
     (header ``x``, one label per line) and return the path.
 
+    Private since 0.3.0 (the public ``write_labels`` was retired):
+    :func:`export_dataset` writes the label files of a dataset folder.
     This is exactly the shipped ``cty.csv`` format: ``workflow._read_cty``
     selects column ``x`` and ``eval.io.read_labels`` drops the header row and
     takes column 0.
 
     Parameters
     ----------
-    labels
+    labels : sequence
         Any 1-D sequence (list, ndarray, pandas Series / Categorical); values
         are written as strings.
-    path
+    path : path-like
         Destination ``.csv`` path (parent directories are created).
+
+    Returns
+    -------
+    pathlib.Path
+        ``path``.
     """
     import pandas as pd
     path = Path(path)
@@ -572,7 +580,7 @@ def _select_obs(data, spec, *, what):
             raise KeyError(f"{what}={spec!r}: mod {name!r} not in MuData; found: {list(data.mod)}")
         obj = data.mod[name]
     elif _is_mudata(data) and not rest.startswith("obs:"):
-        # from_mudata convenience: 'rna:celltype'
+        # MuData convenience: 'rna:celltype' = mod:rna.obs:celltype
         name, _, col = rest.partition(":")
         if name in data.mod and col:
             obj, rest = data.mod[name], f"obs:{col}"
@@ -760,9 +768,13 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     Parameters
     ----------
     data
-        AnnData, or MuData (then use ``'mod:<name>'`` selectors), or ``None``
-        when every modality is passed as an object (then the default
-        ``rna='X'`` means "no RNA": pass ``rna=<AnnData>``).
+        AnnData, or MuData - then a modality may be given as the bare
+        modality NAME (``rna='rna'``, ``atac='atac'`` = ``mdata.mod[name].X``)
+        or as a ``'mod:<name>'`` selector, and ``labels`` / ``batch`` as
+        ``'<mod>:<obs column>'`` (``'rna:celltype'``) or
+        ``'mod:<mod>.obs:<col>'`` - or ``None`` when every modality is passed
+        as an object (then the default ``rna='X'`` means "no RNA": pass
+        ``rna=<AnnData>``). (This folds the 0.2 ``from_mudata`` helper in.)
     dataset_dir
         Folder to create, e.g. ``<data_path>/MYDATA``. Its *name* is the dataset
         id you pass to ``scan`` / ``run_all`` with ``data_path=<parent>``.
@@ -823,6 +835,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
         rna = None                      # no data to select from: no RNA
+    if _is_mudata(data):
+        # a bare modality NAME selects mdata.mod[name].X (the from_mudata
+        # spelling); full 'mod:<name>[...]' selectors pass through
+        rna, adt, atac = (f"mod:{x}" if isinstance(x, str) and x in data.mod else x
+                          for x in (rna, adt, atac))
     if atac is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(
             f"atac={atac!r} needs atac_kind= one of {list(_ATAC_KINDS)} "
@@ -887,60 +904,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             if role == "atac_peak" and category is None:
                 _link_or_copy(p, out / f"atac{suf}.h5")
         if lab is not None:
-            write_labels(lab if mask is None else np.asarray(lab)[mask],
-                         out / f"cty{suf}.csv")
+            _write_labels(lab if mask is None else np.asarray(lab)[mask],
+                          out / f"cty{suf}.csv")
     return out
 
-
-def from_mudata(mdata, dataset_dir: Path | str, *, rna: str | None = "rna",
-                adt: str | None = None, atac: str | None = None,
-                atac_kind: str | None = None, labels: str | None = None,
-                batch: str | None = None, dtype: str = "float64",
-                compression: str | None = "gzip",
-                category: str | None = None) -> Path:
-    """MuData -> canonical dataset folder; thin alias of :func:`export_dataset`.
-
-    Parameters
-    ----------
-    mdata
-        A MuData object (or a path to ``.h5mu``).
-    dataset_dir
-        Folder to create (see :func:`export_dataset`).
-    rna, adt, atac
-        MuData modality *names* (``mdata.mod[name]``; ``.X`` is used), e.g.
-        ``rna='rna'``, ``atac='atac'``. Full ``'mod:<name>.obsm:<key>'``
-        selectors are accepted too. ``None`` skips.
-    atac_kind
-        ``'peak'`` or ``'gene_activity'`` - required with ``atac``.
-    labels, batch
-        ``'<mod>:<obs column>'`` (e.g. ``'rna:celltype'``) or the full
-        ``'mod:<mod>.obs:<col>'`` form.
-    dtype, compression
-        Forwarded to :func:`to_canonical`.
-    category
-        Forwarded to :func:`export_dataset` (``'vertical'`` -> the ATAC matrix
-        is written as plain ``atac.h5``).
-    """
-    if isinstance(mdata, (str, Path)):
-        mdata = _to_anndata(mdata)
-    if not _is_mudata(mdata):
-        raise TypeError(f"from_mudata expects a MuData, got {type(mdata).__name__}; "
-                        "use export_dataset for AnnData")
-
-    def _mod(spec):
-        if spec is None or spec.startswith("mod:"):
-            return spec
-        return f"mod:{spec}"
-
-    def _obs(spec):
-        if spec is None or spec.startswith("mod:"):
-            return spec
-        name, _, col = spec.partition(":")
-        if name in mdata.mod and col:
-            return f"mod:{name}.obs:{col}"
-        return spec
-
-    return export_dataset(mdata, dataset_dir, rna=_mod(rna), adt=_mod(adt),
-                          atac=_mod(atac), atac_kind=atac_kind,
-                          labels=_obs(labels), batch=_obs(batch),
-                          dtype=dtype, compression=compression, category=category)

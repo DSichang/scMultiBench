@@ -43,17 +43,51 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
     return True
 
 
-def find_methods(category: str | None = None, task: str | None = None,
+def find_methods(category: str | None = None, *, task: str | None = None,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
                  modalities: list[str] | set[str] | None = None,
                  runnable: bool | None = None,
                  tunable: bool | None = None,
-                 *, available: bool | None = None) -> list[str]:
+                 available: bool | None = None) -> list[str]:
     """Return method ids matching all supplied filters.
 
-    Every token is validated: a typo raises ``ValueError`` naming the valid
-    vocabulary instead of silently matching nothing.
+    ``category`` is the only positional argument; every filter is
+    keyword-only. Every token is validated: a typo raises ``ValueError``
+    naming the valid vocabulary instead of silently matching nothing.
+
+    Parameters
+    ----------
+    category : str, optional
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``.
+    task : str, keyword-only, optional
+        One of :func:`multibench.list_tasks` (method-level).
+    needs_labels : bool, keyword-only, optional
+        Per variant: ``True`` keeps methods with a matching variant that
+        takes a cell-type-label role as a REQUIRED input, ``False`` one that
+        takes none.
+    atac : str, keyword-only, optional
+        ``"peak"`` or ``"gene_activity"`` (aliases ``peaks`` / ``gas``): the
+        ATAC representation the upstream script expects.
+    modalities : list of str, keyword-only, optional
+        Base modality types a variant must consume ALL of, e.g.
+        ``["rna", "atac"]`` (``protein`` = ``adt``; role tokens reduce to
+        their base type).
+    runnable : bool, keyword-only, optional
+        ``True`` = methods with at least one variant; ``False`` = the stubs.
+    tunable : bool, keyword-only, optional
+        ``True`` = methods exposing at least one command-line hyperparameter.
+    available : bool, keyword-only, optional
+        ``True`` = ``availability == 'public'``; ``False`` = the
+        ``benchmark-host-only`` methods.
+
+    Returns
+    -------
+    list[str]
+        Method ids in registry order.
+
+    Notes
+    -----
 
     **Filters are evaluated per VARIANT**: a method matches when at least ONE
     of its variants satisfies ``category`` AND ``modalities`` AND
@@ -99,7 +133,7 @@ def find_methods(category: str | None = None, task: str | None = None,
     ``tunable=True`` keeps only methods that expose at least one hyperparameter
     on their command line (i.e. where ``run(params=...)`` can change anything) -
     the rest hardcode their settings upstream.
-    ``available`` (keyword-only; default ``None`` = no filter): ``True`` keeps
+    ``available`` (default ``None`` = no filter): ``True`` keeps
     methods whose scripts a public install can run
     (``method_info(m)['availability'] == 'public'``); ``False`` keeps the
     ``'benchmark-host-only'`` ones, whose entrypoint is an absolute path on the
@@ -153,6 +187,38 @@ def find_methods(category: str | None = None, task: str | None = None,
     return out
 
 
+def list_methods(category: str | None = None, **_removed) -> list[str]:
+    """Registry method ids, optionally restricted to one integration category.
+
+    Parameters
+    ----------
+    category : str, optional
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross`` or None (every
+        method). Keeps the methods that have a VARIANT wired for that
+        category - the same set ``scan`` / ``run_all`` /
+        ``find_methods(category=)`` dispatch. Validated: ``ValueError``
+        listing the valid tokens on a typo.
+
+    Returns
+    -------
+    list[str]
+        Method ids in registry order.
+
+    Raises
+    ------
+    TypeError
+        The ``task=`` / ``runnable=`` filters of the deprecated 0.2 signature
+        were passed; they are :func:`find_methods` filters now
+        (``find_methods(category, task=..., runnable=...)``).
+    """
+    if _removed:
+        keys = ", ".join(f"{k}=..." for k in _removed)
+        raise TypeError(
+            f"list_methods() only takes category since 0.3.0; {keys} are find_methods "
+            f"filters - use find_methods(category, {keys})")
+    return registry.list_methods(category)
+
+
 def _effective(v) -> dict:
     """Upstream argparse defaults overlaid with what the wrapper actually emits.
 
@@ -166,36 +232,51 @@ def _effective(v) -> dict:
     return eff
 
 
-def method_info(method: str, files_dir: Path | str | None = None, *,
-                verbose: bool = False) -> dict:
-    """Return a flat dict combining registry spec + provenance + (optional) catalog row.
+def method_info(method: str, *, verbose: bool = False) -> dict:
+    """Return a flat dict combining registry spec, provenance and observed runtime.
 
     Parameters
     ----------
-    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
-    files_dir : optional dir holding the benchmark's ``method.csv`` catalog; when
-        given, the paper-only columns ``deep_learning`` and ``output`` are added.
-    verbose : when True also return ``notes_long`` - the raw upstream-knob audit
+    method : str
+        Registry id (``KeyError`` with a did-you-mean hint otherwise).
+    verbose : bool, keyword-only
+        When True also return ``notes_long`` - the raw upstream-knob audit
         prose for this method (None for methods outside the audit; for a
         ``benchmark-host-only`` method one sentence saying why is appended) -
         and ``verification``, the per-method verification record (see below).
         The default ``notes`` is the short third-person summary from
         engine/references.yaml.
 
-    Keys
-    ----
-    id, language, categories, tasks, env, atac, needs_labels, status,
-    availability, setup_hint,
-    variants (distinct upstream entrypoints, in order), driver (package-side
-    wrapper actually executed, or None when the upstream script runs directly),
-    scripts_url (the benchmark's tools_scripts folder), repo_url, version,
-    reference ({doi, title, authors, journal, year} or None), notes,
-    supports (per variant: category, modalities, output_kind, n_tunable,
-    needs_labels, labels - the label roles the variant reads, e.g.
-    ``['cty']`` / ``['rna_cty']`` / ``[]``), params (per variant key
-    'category:mods': defaults, tunable,
-    effective), fixed_in_script, upstream_knobs, upstream_url;
-    with ``verbose=True`` also notes_long and verification.
+    Returns
+    -------
+    dict
+        Keys: id, language, categories, tasks, env, atac, needs_labels,
+        status, availability, setup_hint, variants (distinct upstream
+        entrypoints, in order), driver (package-side wrapper actually
+        executed, or None when the upstream script runs directly),
+        scripts_url (the benchmark's tools_scripts folder), repo_url,
+        version, reference ({doi, title, authors, journal, year} or None),
+        notes, supports (per variant: category, modalities, output_kind,
+        n_tunable, needs_labels, labels - the label roles the variant reads,
+        e.g. ``['cty']`` / ``['rna_cty']`` / ``[]``), params (per variant key
+        'category:mods': defaults, tunable, effective), fixed_in_script,
+        upstream_knobs, upstream_url, runtime; with ``verbose=True`` also
+        notes_long and verification. The paper-only catalog columns
+        (``deep_learning``, ``output``) are in ``mtb.catalog.methods()``
+        (the 0.2 ``files_dir=`` argument is gone).
+
+    ``runtime`` is what this method has been OBSERVED to cost, to help size
+    a sweep: ``{"tier", "worst_sec", "observed"}`` - ``tier`` is one of
+    ``fast`` (<5 min), ``medium`` (5-30 min), ``slow`` (30 min-2 h),
+    ``very_slow`` (>2 h) or ``unknown`` (never measured: ``worst_sec`` None,
+    ``observed`` empty), and ``observed`` lists the actual measurements as
+    ``{dataset, cells, sec, source}`` - ``source`` says where the number
+    came from (``manual``, ``summary_csv`` = the shipped re-run sweeps,
+    ``verification`` = the shipped verification table); ``cells`` is null
+    when not recorded. These are MEASUREMENTS on one shared machine, not
+    predictions: use them to choose a sensible ``run_all(timeout=...)``, not
+    to promise a finish time. (The 0.2 ``runtime_hint(m)`` returned exactly
+    this dict and is deprecated.)
 
     ``needs_labels`` is the METHOD-level flag: True when ANY variant takes a
     cell-type-label (``cty``) role as a required input ("needs labels in at
@@ -289,6 +370,8 @@ def method_info(method: str, files_dir: Path | str | None = None, *,
     # `notes` is the curated one-line summary; the audit's long first-person
     # prose is available on request as notes_long.
     info["notes"] = ref.get("summary") or None
+    # observed cost (engine/runtimes.yaml); the tier scan() reports per row
+    info["runtime"] = _runtime_hint(s.id)
     if verbose:
         notes_long = up["notes"]
         if s.availability != "public":
@@ -296,15 +379,34 @@ def method_info(method: str, files_dir: Path | str | None = None, *,
             notes_long = f"{notes_long.rstrip()} {why}" if notes_long else why
         info["notes_long"] = notes_long
         info["verification"] = verification_for(s.id)
-    if files_dir is not None:
-        from .data import catalog
-        cat = catalog.methods(files_dir)
-        match = cat[cat["canonical_id"] == s.id]
-        if len(match):
-            row = match.iloc[0]
-            info["deep_learning"] = row["deep_learning"]
-            info["output"] = row["output"]
     return info
+
+
+# ------------------------------------------------------------ observed runtimes
+_RUNTIMES_YAML = Path(__file__).resolve().parent / "engine" / "runtimes.yaml"
+
+
+@functools.lru_cache(maxsize=1)
+def _runtimes() -> dict:
+    """Observed per-method runtimes (reference data; see engine/runtimes.yaml)."""
+    if not _RUNTIMES_YAML.exists():
+        return {}
+    import yaml
+    with open(_RUNTIMES_YAML) as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def _runtime_hint(method: str) -> dict:
+    """``method_info(method)["runtime"]``: ``{"tier", "worst_sec", "observed"}``.
+
+    ``method`` must be a registry id: a typo raises ``KeyError`` with a
+    did-you-mean hint. A known but never-measured method (e.g. a declared
+    stub) returns tier ``"unknown"`` with ``worst_sec=None`` and an empty
+    ``observed`` list. See :func:`method_info` for the meaning of the fields.
+    """
+    registry.check_method(method)
+    return dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
+                                         "observed": []}))
 
 
 def _availability_sentence(spec) -> str:
@@ -547,24 +649,25 @@ def _format_entry(tag: str, ref: dict, fmt: str) -> str:
     return line
 
 
-def cite(*method_ids, fmt: str = "bibtex", methods=None) -> str:
+def cite(*methods, fmt: str = "text") -> str:
     """Citation text for the benchmark and (optionally) the methods you ran.
 
     Both spellings work: ``cite('Matilda', 'MOFA2')`` (one id per argument,
     like the CLI ``multibench cite Matilda MOFA2``) and
-    ``cite(['Matilda', 'MOFA2'])`` / ``cite(methods=[...])`` (one list).
+    ``cite(['Matilda', 'MOFA2'])`` (one list). The 0.2 ``methods=`` keyword
+    is deprecated and rejected (``TypeError``).
 
     Parameters
     ----------
-    *method_ids : method ids, each a ``str`` (``KeyError`` with a did-you-mean
-        hint for an unknown id); or a SINGLE list/tuple of ids; or ``"all"``
-        for every registry method; nothing -> the benchmark entry only. The
-        earlier positional ``cite(methods, fmt)`` form is still accepted.
-    fmt : keyword; ``"bibtex"`` (one ``@article`` per entry) or ``"text"``
-        (one "Authors. Title. Journal (year). https://doi.org/..." line per
-        entry). ``ValueError`` listing the two on anything else.
-    methods : keyword alias of the earlier signature (``cite(methods=[...])``);
-        not combinable with positional ids.
+    *methods : str or list of str
+        Method ids, each a ``str`` (``KeyError`` with a did-you-mean hint
+        for an unknown id); or a SINGLE list/tuple of ids; or ``"all"`` for
+        every registry method; nothing -> the benchmark entry only.
+    fmt : str, keyword-only
+        ``"text"`` (default; one "Authors. Title. Journal (year).
+        https://doi.org/..." line per entry) or ``"bibtex"`` (one
+        ``@article`` per entry). ``ValueError`` listing the two on anything
+        else.
 
     Returns
     -------
@@ -575,14 +678,7 @@ def cite(*method_ids, fmt: str = "bibtex", methods=None) -> str:
         (bibtex) / ``<id>: ... <repo_url>`` line (text) rather than silently
         dropped. Every DOI in the table was resolved against Crossref.
     """
-    args = list(method_ids)
-    # legacy positional form cite(methods, fmt): the 2nd positional is a format
-    if len(args) == 2 and args[1] in _CITE_FORMATS and not isinstance(args[0], str):
-        args, fmt = args[:1], args[1]
-    if methods is not None:
-        if args:
-            raise TypeError("cite(): pass method ids positionally OR as methods=, not both")
-        args = [methods]
+    args = list(methods)
     if fmt not in _CITE_FORMATS:
         raise ValueError(f"unknown fmt {fmt!r}; valid: {list(_CITE_FORMATS)}")
     if not args:

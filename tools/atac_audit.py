@@ -59,7 +59,7 @@ for m in sorted(mtb.list_methods()):
             if not len(row):
                 continue
             try:
-                inp = _resolve.inputs_for(ds, m, cat,
+                inp = _resolve.inputs_for(ds, cat, m,
                                           modalities=(str(row.iloc[0]["modalities"]).split("+")
                                                       if row.iloc[0]["modalities"] != "(data_dir)" else None),
                                           check=True)

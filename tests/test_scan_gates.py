@@ -18,7 +18,8 @@ from multibench.engine import envs, registry
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 OLD_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tunable",
                "runtime_tier", "observed_worst_sec", "caveat", "runnable", "reason"]
-NEW_COLUMNS = ["files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac"]
+NEW_COLUMNS = ["files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
+               "command"]
 
 
 def _h5(path, n_feat, n_cells, prefix="g"):
@@ -146,12 +147,15 @@ def test_scan_modalities_filter_accepts_protein_alias():
 
 
 def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
-    df = mtb.scan("D11", "vertical", verbose=True)
+    df = mtb.scan("D11", "vertical")                  # verbose=True is the default
     out = capsys.readouterr().out
     n = len(df)
     assert f"[scan] files OK for {int(df['files_ok'].sum())}/{n} method rows; 0/{n} envs installed" in out
-    # default is silent (run_all calls scan internally)
-    mtb.scan("D11", "vertical")
+    assert out.count("[scan]") == 1
+    # verbose=False is silent (run_all(verbose=False) passes it through)
+    mtb.scan("D11", "vertical", verbose=False)
+    assert capsys.readouterr().out == ""
+    mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
     assert capsys.readouterr().out == ""
 
 
@@ -240,10 +244,11 @@ def test_run_all_dry_run_never_returns_empty():
 def test_run_all_dry_run_equals_scan_with_methods():
     plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
                        methods=["Matilda", "totalVI"], dry_run=True, verbose=False)
-    # the plan is the scan frame plus the `command` column the CLI csv carries
-    assert list(plan.columns) == W.SCAN_COLUMNS + ["command"]
-    pd.testing.assert_frame_equal(plan.drop(columns="command"),
-                                  mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"]))
+    # the plan IS the scan frame (the `command` column included), rendered for out_dir
+    assert list(plan.columns) == W.SCAN_COLUMNS and plan.columns[-1] == "command"
+    pd.testing.assert_frame_equal(
+        plan, mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"],
+                       out_dir="/tmp/unused", verbose=False))
 
 
 def test_run_all_dry_run_unknown_method_still_keyerror():
@@ -261,12 +266,11 @@ def test_run_all_dry_run_missing_dataset_raises_filenotfound():
                     dry_run=True, verbose=False)
 
 
-def test_plan_is_the_dry_run_frame(no_envs):
-    from multibench.workflow import plan
-    a = plan("D11", "vertical", methods=["Matilda"])
+def test_scan_is_the_dry_run_frame(no_envs):
+    a = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     b = mtb.run_all("D11", "vertical", out_dir=None, methods=["Matilda"],
                     dry_run=True, verbose=False)
     pd.testing.assert_frame_equal(a, b)
     assert len(a) >= 1 and not a["runnable"].any()
-    with pytest.raises(ValueError):
-        plan("D28", "diagonal", methods=["Matilda"])
+    with pytest.raises(ValueError, match="no 'diagonal' variant matches"):
+        mtb.scan("D28", "diagonal", methods=["Matilda"], verbose=False)

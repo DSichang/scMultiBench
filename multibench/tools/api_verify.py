@@ -31,9 +31,9 @@ def _():
     a = mtb.list_methods(); b = mtb.list_methods(category="vertical")
     assert len(a) == 40 and 0 < len(b) < len(a); return f"{len(a)} all / {len(b)} vertical"
 
-@check("list_methods(runnable=)")
+@check("find_methods(runnable=)")
 def _():
-    r = mtb.list_methods(runnable=True); return f"{len(r)} runnable"
+    r = mtb.find_methods(runnable=True); return f"{len(r)} runnable"
 
 @check("list_tasks")
 def _():
@@ -52,10 +52,10 @@ def _():
 def _():
     i = mtb.method_info("Matilda"); assert i["env"] and "params" in i; return f"env={i['env']} variants={len(i['variants'])}"
 
-@check("method_info(files_dir=)")
+@check("method_info()['runtime']")
 def _():
-    i = mtb.method_info("Matilda", files_dir="/media/disk2/Sichang/scmbench_pkg/multibench/files")
-    return {k: i.get(k) for k in ("deep_learning", "output")}
+    i = mtb.method_info("Matilda")
+    return {k: i["runtime"].get(k) for k in ("tier", "worst_sec")}
 
 @check("params_for")
 def _():
@@ -70,11 +70,11 @@ def _():
 # ---------------- data resolution ----------------
 @check("inputs_for(check=True)")
 def _():
-    i = mtb.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"], check=True); return list(i)
+    i = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"], check=True); return list(i)
 
 @check("inputs_for(grouped roles / cross)")
 def _():
-    i = mtb.inputs_for("D52", "totalVI", "cross",
+    i = mtb.inputs_for("D52", "cross", "totalVI",
                        modalities=["rna1","rna2","rna3","adt1","adt2","adt3"], check=True)
     assert len(i) == 6; return f"{len(i)} roles"
 
@@ -129,7 +129,7 @@ def _():
         d = h["matrix/data"]; assert d.shape == (200, 300) and d.compression == "gzip", (d.shape, d.compression)
     return f"{d.shape} gzip, {os.path.getsize(dst)} bytes"
 
-@check("io.export_dataset + write_labels + scan on the folder")
+@check("io.export_dataset + scan on the folder")
 def _():
     import anndata as ad
     a = ad.AnnData(np.random.rand(40, 10)); a.obsm["protein"] = np.random.rand(40, 4)
@@ -137,7 +137,7 @@ def _():
     d = mtb.io.export_dataset(a, os.path.join(OUT, "data", "MYCITE"), rna="X",
                               adt="obsm:protein", labels="obs:ct")
     files = sorted(os.listdir(d)); assert files == ["adt.h5", "cty.csv", "rna.h5"], files
-    got = mtb.inputs_for("MYCITE", "Matilda", "vertical", modalities=["rna", "adt"],
+    got = mtb.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
                          data_path=os.path.join(OUT, "data"), check=True)
     return f"{files} -> {sorted(got)}"
 
@@ -215,13 +215,13 @@ def _emb_and_labels():
 @check("evaluate(ndarray)")
 def _():
     e, lab = _emb_and_labels()
-    v = mtb.evaluate(e, category="vertical", task="clustering", labels=lab)
+    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab)
     return {k: round(float(x), 3) for k, x in v["Value"].items() if pd.notna(x)}
 
 @check("evaluate(dims x cells auto-orient)")
 def _():
     e, lab = _emb_and_labels()
-    v = mtb.evaluate(e.T, category="vertical", task="clustering", labels=lab)
+    v = mtb.evaluate(e.T, category="vertical", metrics="clustering", labels=lab)
     return f"ARI={float(v['Value']['ARI']):.3f}"
 
 @check("evaluate(precomputed clustering)")
@@ -240,7 +240,7 @@ def _():
 @check("to_long")
 def _():
     e, lab = _emb_and_labels()
-    v = mtb.evaluate(e, category="vertical", task="clustering", labels=lab)
+    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab)
     return f"{mtb.to_long(v, method='Matilda', dataset='D11', category='vertical').shape}"
 
 # ---------------- plot ----------------

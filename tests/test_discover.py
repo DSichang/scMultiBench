@@ -1,3 +1,5 @@
+import pytest
+
 from multibench import discover
 
 
@@ -13,11 +15,15 @@ def test_find_methods_needs_labels_filter():
     assert "SCALEX" not in with_labels
 
 
-def test_method_info_returns_dict_with_catalog_fields(files_dir):
-    info = discover.method_info("Seurat_v5", files_dir=files_dir)
+def test_method_info_returns_dict_with_runtime(files_dir):
+    info = discover.method_info("Seurat_v5")
     assert info["id"] == "Seurat_v5"
     assert info["language"] == "R"
     assert "env" in info and "status" in info
+    assert set(info["runtime"]) == {"tier", "worst_sec", "observed"}
+    # the catalog's paper-only columns moved to catalog.methods(); files_dir= is gone
+    with pytest.raises(TypeError, match="files_dir"):
+        discover.method_info("Seurat_v5", files_dir=files_dir)
 
 
 def test_top_level_find_methods():
@@ -107,7 +113,7 @@ def test_method_info_needs_labels_matches_inputs_for(root):
              ("Matilda", "D11", "vertical", ["rna", "adt"])]
     for m, ds, cat, mods in cases:
         info = discover.method_info(m)
-        got = resolve.inputs_for(ds, m, cat, modalities=mods, data_path=data, check=False)
+        got = resolve.inputs_for(ds, cat, m, modalities=mods, data_path=data, check=False)
         assert info["needs_labels"] == any(is_label_role(k) for k in got), (m, got)
         assert all("needs_labels" in sup for sup in info["supports"])
     assert discover.method_info("scJoint")["needs_labels"] is True

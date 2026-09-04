@@ -14,7 +14,7 @@ import pytest
 
 import multibench as mtb
 from multibench import discover
-from multibench.workflow import _runtimes
+from multibench.discover import _runtimes
 
 ROOT = Path(__file__).resolve().parents[1]
 TIERS = (("fast", 300), ("medium", 1800), ("slow", 7200))
@@ -33,7 +33,7 @@ def test_worst_sec_covers_verification_wall_s():
         if not rec:
             continue
         wall = max(r["wall_s"] for r in rec if r["wall_s"] is not None)
-        hint = mtb.runtime_hint(m)
+        hint = mtb.method_info(m)["runtime"]
         assert hint["worst_sec"] is not None, f"{m} is verified but reports tier 'unknown'"
         assert hint["worst_sec"] >= wall, (m, hint["worst_sec"], wall)
         # the exact placeholder failure: a sub-5 s claim against a longer record
@@ -54,7 +54,7 @@ def test_tier_matches_worst_sec_and_docstring_thresholds():
     import inspect
     for m, rec in _runtimes().items():
         assert rec["tier"] == _tier(rec["worst_sec"]), (m, rec["tier"], rec["worst_sec"])
-    doc = inspect.getdoc(mtb.runtime_hint)
+    doc = inspect.getdoc(mtb.method_info)
     assert "<5 min" in doc and "5-30 min" in doc and "30 min-2 h" in doc
 
 
@@ -78,13 +78,15 @@ def test_summary_csv_run_sec_is_not_understated():
 
 
 def test_expected_tier_moves_after_regeneration():
+    def hint(m):
+        return mtb.method_info(m)["runtime"]
     for m in ("scBridge", "PASTE"):
-        assert mtb.runtime_hint(m)["tier"] == "medium", m
+        assert hint(m)["tier"] == "medium", m
     for m in ("PASTE2", "GPSA", "SPIRAL", "iPOLNG", "scMVP"):
-        assert mtb.runtime_hint(m)["tier"] == "slow", m
-    assert mtb.runtime_hint("scBridge")["worst_sec"] == 964     # summary_D28.csv, not the 170 s verification
+        assert hint(m)["tier"] == "slow", m
+    assert hint("scBridge")["worst_sec"] == 964     # summary_D28.csv, not the 170 s verification
     # keys of the public answer are unchanged; unmeasured methods stay 'unknown'
-    assert set(mtb.runtime_hint("StabMap")) == {"tier", "worst_sec", "observed"}
+    assert set(hint("StabMap")) == {"tier", "worst_sec", "observed"}
     unmeasured = [m for m in mtb.list_methods() if m not in _runtimes()]
     for m in unmeasured:
-        assert mtb.runtime_hint(m) == {"tier": "unknown", "worst_sec": None, "observed": []}
+        assert hint(m) == {"tier": "unknown", "worst_sec": None, "observed": []}

@@ -214,7 +214,7 @@ def test_printed_examples_match_the_live_package():
     diagonal rna+atac list includes scBridge, registration is three methods."""
     import multibench as mtb
     assert set(mtb.labels_for("D11")) == {"cty"}
-    hint = mtb.runtime_hint("SCALEX")
+    hint = mtb.method_info("SCALEX")["runtime"]
     assert hint["tier"] == "slow" and hint["worst_sec"] == 2233
     assert hint["observed"][0]["source"] == "manual"
     found = mtb.find_methods(category="diagonal", modalities=["rna", "atac"])

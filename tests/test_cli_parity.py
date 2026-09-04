@@ -191,7 +191,7 @@ def test_cli_cite(capsys, tmp_path):
     out = capsys.readouterr().out
     assert rc == 0
     assert out.strip() == multibench.cite(["SCALEX"], fmt="text").strip()
-    assert "scMultiBench" in multibench.cite(["SCALEX"]) and "Xiong" in out
+    assert "scMultiBench" in multibench.cite(["SCALEX"], fmt="bibtex") and "Xiong" in out
     rc = cli.main(["cite", "--out", str(tmp_path / "refs.bib")])
     assert rc == 0 and (tmp_path / "refs.bib").read_text().startswith("@article")
     with pytest.raises(SystemExit) as ei:
@@ -415,10 +415,10 @@ def test_cli_evaluate_npy_only_method_dataset(monkeypatch, tmp_path, capsys):
     pd.DataFrame({"x": list("ABABA")}).to_csv(labels, index=False)
     out = tmp_path / "long.csv"
     rc = cli.main(["evaluate", "--output", str(emb), "--labels", str(labels),
-                   "--category", "vertical", "--only", "ARI,NMI", "--method", "M",
+                   "--category", "vertical", "--metrics", "ARI,NMI", "--method", "M",
                    "--dataset", "D", "--out", str(out)])
     assert rc == 0
-    assert captured["only"] == ["ARI", "NMI"]
+    assert captured["metrics"] == ["ARI", "NMI"]
     assert captured["output"] == str(emb)
     df = pd.read_csv(out)
     assert list(df.columns) == ['metric', 'value', 'method', 'dataset', 'category', 'clustering', 'source']
@@ -461,11 +461,14 @@ def test_cli_evaluate_clustering_alias(monkeypatch):
         rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", flag, "x.h5"])
         assert rc == 0 and captured["clustering"] == "x.h5"
     assert "obsm" not in captured and "column" not in captured
+    assert captured["metrics"] == "clustering"          # --task's default family
     rc = cli.main(["evaluate", "--output", "e.h5ad", "--labels", "l.csv", "--obsm", "X_pca",
-                   "--column", "celltype", "--task", "all", "--batch", "b.csv"])
+                   "--task", "all", "--batch", "b.csv"])
     assert rc == 0
-    assert captured["obsm"] == "X_pca" and captured["column"] == "celltype"
-    assert captured["task"] == "all" and captured["batch"] == "b.csv"
+    assert captured["obsm"] == "X_pca" and "column" not in captured
+    assert captured["metrics"] == "all" and captured["batch"] == "b.csv"
+    rc = cli.main(["evaluate", "--output", "e.h5ad", "--labels", "l.csv", "--metrics", "batch"])
+    assert rc == 0 and captured["metrics"] == "batch"    # a family token, not a 1-list
 
 
 def test_cli_evaluate_real_npy_and_csv(tmp_path, capsys):
@@ -483,7 +486,7 @@ def test_cli_evaluate_real_npy_and_csv(tmp_path, capsys):
         rc = cli.main(["evaluate", "--output", str(tmp_path / emb_file),
                        "--labels", str(tmp_path / "cty.csv"),
                        "--clustering", str(tmp_path / "clu.csv"),
-                       "--only", "ARI,NMI", "--method", "Mine", "--dataset", "T",
+                       "--metrics", "ARI,NMI", "--method", "Mine", "--dataset", "T",
                        "--category", "vertical", "--out", str(tmp_path / "long.csv")])
         assert rc == 0, capsys.readouterr().err
         df = pd.read_csv(tmp_path / "long.csv")
@@ -491,13 +494,30 @@ def test_cli_evaluate_real_npy_and_csv(tmp_path, capsys):
         assert (df["value"] > 0.99).all()          # clustering == labels
 
 
-def test_cli_evaluate_unknown_only_exit_1(tmp_path, capsys):
+def test_cli_evaluate_unknown_metric_exit_1(tmp_path, capsys):
     np.save(tmp_path / "e.npy", np.zeros((4, 2)))
     pd.DataFrame({"x": list("ABAB")}).to_csv(tmp_path / "c.csv", index=False)
     rc = cli.main(["evaluate", "--output", str(tmp_path / "e.npy"),
-                   "--labels", str(tmp_path / "c.csv"), "--only", "ARI,BOGUS"])
+                   "--labels", str(tmp_path / "c.csv"), "--metrics", "ARI,BOGUS"])
     assert rc == 1
-    assert "unknown metric(s) ['BOGUS']" in capsys.readouterr().err
+    assert "BOGUS" in capsys.readouterr().err
+
+
+def test_cli_evaluate_only_is_a_hidden_deprecated_alias(monkeypatch, capsys):
+    """``--only`` still parses (hidden from --help) and maps to metrics=; a
+    deprecation line goes to stderr."""
+    captured = {}
+
+    def fake_eval(**kw):
+        captured.update(kw)
+        return _wide()
+    monkeypatch.setattr(multibench, "evaluate", fake_eval)
+    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", "--only", "ARI,NMI"])
+    cap = capsys.readouterr()
+    assert rc == 0 and captured["metrics"] == ["ARI", "NMI"] and "only" not in captured
+    assert "warning: --only is deprecated" in cap.err and "--metrics" in cap.err
+    sub = next(a for a in cli.build_parser()._actions if a.dest == "command").choices["evaluate"]
+    assert "--only" not in sub.format_help() and "--metrics" in sub.format_help()
 
 
 # ----------------------------------------------------------------- run / run-all
@@ -532,23 +552,18 @@ def test_cli_run_all_dry_run_and_summary(monkeypatch, tmp_path, capsys):
     class FakeRes:
         summary = pd.DataFrame({"method": ["SCALEX"], "status": ["ok"]})
 
-    def fake_run_all(dataset, category, **kw):
-        captured.clear(); captured.update(kw, dataset=dataset, category=category)
-        return FakeRes()
-
-    def fake_plan_commands(dataset, category, **kw):
-        captured.clear(); captured.update(kw, dataset=dataset, category=category)
-        return plan
+    def fake_run_all(dataset, category, out_dir=None, **kw):
+        captured.clear(); captured.update(kw, dataset=dataset, category=category,
+                                          out_dir=out_dir)
+        return plan if kw.get("dry_run") else FakeRes()   # dry_run -> the scan frame
     monkeypatch.setattr(multibench, "run_all", fake_run_all)
-    from multibench import workflow
-    monkeypatch.setattr(workflow, "plan_commands", fake_plan_commands)
     rc = cli.main(["run-all", "D27", "--category", "diagonal", "--out-dir", str(tmp_path),
                    "--dry-run", "--methods", "SCALEX,scBridge", "--timeout", "60",
                    "--skip-existing", "--no-evaluate", "--data-path", "d"])
     cap = capsys.readouterr()
     assert rc == 0 and "no env" in cap.out and "dry run" in cap.err
     assert "conda run -n scmb_torch x" in cap.out       # the command preview
-    assert captured["methods"] == ["SCALEX", "scBridge"]
+    assert captured["methods"] == ["SCALEX", "scBridge"] and captured["dry_run"] is True
     assert captured["data_path"] == "d" and captured["out_dir"] == str(tmp_path)
     rc = cli.main(["run-all", "D27", "--category", "diagonal", "--out", str(tmp_path),
                    "--timeout", "60", "--skip-existing", "--no-evaluate"])
@@ -571,7 +586,7 @@ def test_cli_env_install_packed_dry_run_labels(monkeypatch, capsys):
     monkeypatch.setattr(envs, "doctor", lambda **kw: _fake_env_rows())
     monkeypatch.setattr(envs, "create_all", lambda **kw: _fake_env_rows())
     monkeypatch.setattr(envs, "install_packed", lambda env: pytest.fail("must not download"))
-    monkeypatch.setattr(cli, "_packed_manifest", lambda: {"scmb_torch": "https://x/y.tar.gz"})
+    monkeypatch.setattr(envs, "packed_manifest", lambda: {"scmb_torch": "https://x/y.tar.gz"})
     rc = cli.main(["env", "install", "--packed"])
     cap = capsys.readouterr()
     out = cap.out
@@ -608,6 +623,7 @@ def test_cli_env_doctor_next_hint_and_strict(monkeypatch, capsys):
 
 
 def test_packed_manifest_reads_shipped_file():
-    mf = cli._packed_manifest()
+    from multibench.engine import envs
+    mf = envs.packed_manifest()
     assert isinstance(mf, dict) and len(mf) > 0
     assert all(v.startswith("http") for v in mf.values())

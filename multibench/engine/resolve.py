@@ -266,15 +266,25 @@ def _is_method_id(token) -> bool:
     return True
 
 
-#: appended to the error when inputs_for's 2nd and 3rd arguments look swapped
-SWAPPED_ARGS_HINT = ("inputs_for's argument order is (dataset, method, category) - "
-                     "unlike scan/plan/run_all(dataset, category, ...)")
+def _old_order_error(fn: str, dataset, category, method) -> None:
+    """Raise ``TypeError`` when ``(dataset, method, category)`` - the 0.2
+    order - was passed to an entry point whose order is
+    ``(dataset, category, method)`` since 0.3.0.
+
+    The guard fires when the category slot holds a registry method id and
+    the method slot holds a category token (or, for ``labels_for``, nothing).
+    The old order is never accepted silently.
+    """
+    if _is_method_id(category) and (method is None or _is_category_token(method)):
+        raise TypeError(
+            f"{fn} argument order is (dataset, category, method) since 0.3.0; "
+            f"you passed (dataset, method, category)")
 
 
-def inputs_for(dataset: str, method: str, category: str,
+def inputs_for(dataset: str, category: str, method: str, *,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
-               check: bool | None = None) -> dict:
+               check: bool | None = False) -> dict:
     """Return ``{modality_role: path}`` for a method's variant on a dataset.
 
     The dataset tree is **flat** (``<data_path>/<dataset>/<file>``). Each role is
@@ -287,32 +297,37 @@ def inputs_for(dataset: str, method: str, category: str,
     with the path separator. Use :func:`labels_for` to get the matching
     cell-type label CSVs.
 
+    The positional order is ``(dataset, category, method)`` - the same order
+    ``scan`` / ``run_all`` / ``labels_for`` use. The 0.2 order
+    ``(dataset, method, category)`` is deprecated and rejected with a
+    ``TypeError`` that says so (it is never accepted silently).
+
     Parameters
     ----------
-    dataset : dataset folder name under ``data_path``. A spelling that
-        differs from the folder only in case (``'d52'`` for ``D52`` on a
-        case-insensitive filesystem) is replaced by the on-disk spelling with
-        a ``UserWarning`` (:func:`canonical_dataset`).
-    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
-        When the id given here is a CATEGORY token and ``category`` is a
-        method id - the 2nd and 3rd arguments swapped, which the
-        ``scan``/``plan``/``run_all`` order ``(dataset, category, ...)``
-        invites - the ``KeyError`` says so and shows the corrected call.
-    category : ``vertical``/``diagonal``/``mosaic``/``cross`` (validated:
-        ``ValueError`` listing the valid tokens on a typo; the same
-        swapped-arguments hint when the token is a method id).
-    modalities : the variant's modality tokens (see
-        ``method_info(m)['supports']``); ``protein`` is accepted for ``adt``,
-        and ``atac`` for ANY ATAC representation role (``atac_gas`` /
-        ``atac_peak`` - the file is the same ``atac.h5`` on disk; the
-        representation the method wants is ``method_info(m)['atac']``).
-        Unknown tokens raise ``ValueError`` naming the vocabulary.
-    data_path : root that CONTAINS the dataset folder; default
+    dataset : str
+        Dataset folder name under ``data_path``. A spelling that differs
+        from the folder only in case (``'d52'`` for ``D52`` on a
+        case-insensitive filesystem) is replaced by the on-disk spelling
+        with a ``UserWarning`` (:func:`canonical_dataset`).
+    category : str
+        ``vertical``/``diagonal``/``mosaic``/``cross`` (validated:
+        ``ValueError`` listing the valid tokens on a typo).
+    method : str
+        Registry id (``KeyError`` with a did-you-mean hint otherwise).
+    modalities : list of str, keyword-only, optional
+        The variant's modality tokens (see ``method_info(m)['supports']``);
+        ``protein`` is accepted for ``adt``, and ``atac`` for ANY ATAC
+        representation role (``atac_gas`` / ``atac_peak`` - the file is the
+        same ``atac.h5`` on disk; the representation the method wants is
+        ``method_info(m)['atac']``). Unknown tokens raise ``ValueError``
+        naming the vocabulary.
+    data_path : path, keyword-only, optional
+        Root that CONTAINS the dataset folder; default
         ``config.DEFAULT.data_path``. A relative root is resolved against the
         current directory, so the returned paths are absolute.
-    check : what to do when a resolved path does not exist on disk.
-        ``None`` (default) - return the best-effort paths but emit a
-        ``UserWarning`` listing the missing ones; ``True`` - raise
+    check : bool or None, keyword-only
+        What to do when a resolved path does not exist on disk. ``False``
+        (default) - return the best-effort paths silently; ``True`` - raise
         ``FileNotFoundError`` and also run the content preflight: the
         matrix-orientation check (``ValueError`` for a cells x features file),
         the label-length check (``ValueError`` when a label CSV has a different
@@ -325,7 +340,8 @@ def inputs_for(dataset: str, method: str, category: str,
         variant declares in ``slice_obs`` - GPSA's ``Ground_Truth``; when
         scBridge's bare filenames are absent). This is what
         :func:`multibench.scan` reports per row as ``files_ok`` /
-        ``files_reason``; ``False`` - fully silent.
+        ``files_reason``. ``None`` - return the paths but emit a
+        ``UserWarning`` listing the missing ones.
 
     Variant selection:
       * If ``modalities`` is given, the variant matching
@@ -348,27 +364,17 @@ def inputs_for(dataset: str, method: str, category: str,
     dict
         ``{role: absolute path}`` - one entry per input role of the selected
         variant (``data_dir`` for the directory-fed methods).
+
+    Raises
+    ------
+    TypeError
+        The deprecated ``(dataset, method, category)`` order was used.
     """
+    _old_order_error("inputs_for", dataset, category, method)
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
-    try:
-        spec = registry.get(method)
-    except KeyError as e:
-        if _is_category_token(method) and _is_method_id(category):
-            raise KeyError(
-                f"unknown method {method!r}: that is a category token and "
-                f"{category!r} is a method id - {SWAPPED_ARGS_HINT}; did you mean "
-                f"inputs_for({dataset!r}, {category!r}, {method!r})?") from None
-        raise e
-    try:
-        registry.check_category(category)
-    except ValueError:
-        if _is_method_id(category):
-            raise ValueError(
-                f"unknown category {category!r}: that is a method id - "
-                f"{SWAPPED_ARGS_HINT}; did you mean "
-                f"inputs_for({dataset!r}, {category!r}, {method!r})?") from None
-        raise
+    spec = registry.get(method)
+    registry.check_category(category)
     dataset = canonical_dataset(base, dataset)
     ds_dir = base / dataset  # flat layout: data/<dataset>/<file>
     modalities = registry.normalize_modalities(modalities)
@@ -391,9 +397,6 @@ def inputs_for(dataset: str, method: str, category: str,
             if not ok:
                 raise FileNotFoundError(f"{method}/{dataset}/{category}: {why}")
     elif check is None and missing:
-        # The default used to hand back phantom paths in silence, so a typo in
-        # the dataset folder only surfaced minutes later inside the method's
-        # conda env. Warn here; check=True raises, check=False stays quiet.
         warnings.warn(
             f"{method}/{dataset}/{category}: {len(missing)} resolved input path(s) "
             f"do not exist: {missing}"
@@ -829,9 +832,9 @@ def _variant_label_rank(stems: list[str], variant) -> dict[str, tuple] | None:
     return rank
 
 
-def labels_for(dataset: str, method: str | None = None, category: str | None = None,
-               *, data_path: Path | str | None = None,
-               modalities: list[str] | set[str] | None = None) -> dict:
+def labels_for(dataset: str, category: str | None = None, method: str | None = None,
+               *, modalities: list[str] | set[str] | None = None,
+               data_path: Path | str | None = None) -> dict:
     """Return ``{name: path}`` of the cell-type label CSVs for a dataset, in
     the benchmark's cell-stacking order.
 
@@ -841,9 +844,8 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     reformats), keyed by filename stem.
 
     **Order of the returned dict** (it is NOT alphabetical): the order in which
-    the methods stack the labelled cells in their output, so that
-    ``list(labels_for(ds).values())`` can be handed to ``mtb.evaluate(labels=...)``
-    for a multi-file dataset -
+    the methods stack the labelled cells in their output, so that the dict
+    can be handed to ``mtb.evaluate(labels=...)`` for a multi-file dataset -
 
     1. ``cty`` (one file, cells already paired) first;
     2. numbered ``cty1, cty2, ..., cty10`` ascending NUMERICALLY (batch order);
@@ -853,7 +855,7 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
        ``D28`` returns ``{'rna_cty': ..., 'atac_cty': ...}``;
     4. any other ``*cty*`` file alphabetically, last.
 
-    When ``method`` AND ``category`` are given the variant's OWN argument
+    When ``category`` AND ``method`` are given the variant's OWN argument
     order decides instead (``modalities=`` disambiguates a method with several
     variants in that category; if it is still ambiguous the canonical order
     above is used): a label file is placed where the modality it labels sits
@@ -863,34 +865,57 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     in its stacking order. Raises ``FileNotFoundError`` if the dataset dir is
     absent. Paths are absolute.
 
+    The positional order is ``(dataset, category, method)``, like
+    ``inputs_for`` / ``scan`` / ``run_all``. The 0.2 order
+    ``(dataset, method, category)`` - and the 0.2 positional ``data_path`` in
+    the 2nd slot - are deprecated and rejected with a ``TypeError`` that says
+    so; neither is accepted silently.
+
     Parameters
     ----------
-    dataset : dataset folder name under ``data_path``.
-    method, category : optional. ``method`` is validated whenever given
-        (``KeyError`` with a did-you-mean hint on a typo). When BOTH are given
-        the files are ordered by that variant's modality order (see above;
-        the variant is chosen like ``inputs_for`` does - ``modalities=``,
-        else the one the folder's files satisfy); labels are per DATASET, so
-        the SET of files never depends on them.
-    data_path : keyword-only. Root that CONTAINS the dataset folder; default
-        ``config.DEFAULT.data_path``. For back-compat, a ``Path`` (or a string
-        containing a path separator / naming an existing directory) passed as
-        the 2nd positional argument is still treated as ``data_path`` - with a
-        ``DeprecationWarning``; a bare, non-existent relative name there is taken
-        as a method id and ignored.
-    modalities : keyword-only; the variant's modality tokens, used only with
-        ``method`` + ``category`` to pick one of several variants.
+    dataset : str
+        Dataset folder name under ``data_path``.
+    category : str, optional
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; validated
+        whenever given (``ValueError`` listing the four on a typo). With
+        ``method`` it selects the variant whose modality order ranks the
+        files; alone it changes nothing (labels are per DATASET).
+    method : str, optional
+        Registry id, validated whenever given (``KeyError`` with a
+        did-you-mean hint on a typo). With ``category`` the files are
+        ordered by that variant's modality order (the variant is chosen like
+        ``inputs_for`` does - ``modalities=``, else the one the folder's
+        files satisfy); the SET of files never depends on it.
+    modalities : list of str, keyword-only, optional
+        The variant's modality tokens, used only with ``category`` +
+        ``method`` to pick one of several variants.
+    data_path : path, keyword-only, optional
+        Root that CONTAINS the dataset folder; default
+        ``config.DEFAULT.data_path``.
+
+    Returns
+    -------
+    dict
+        ``{stem: absolute path}`` in cell-stacking order.
+
+    Raises
+    ------
+    TypeError
+        The deprecated ``(dataset, method, category)`` order, or a path in
+        the ``category`` slot (the deprecated positional ``data_path``).
+    FileNotFoundError
+        No dataset folder at ``<data_path>/<dataset>``.
     """
-    if method is not None and (
-            isinstance(method, Path)
-            or (isinstance(method, str) and (os.sep in method or Path(method).is_dir()))):
-        warnings.warn("labels_for: pass data_path= by keyword "
-                      "(the 2nd positional argument is now `method`)",
-                      DeprecationWarning, stacklevel=2)
-        data_path, method = method, None
+    if category is not None and (
+            isinstance(category, Path)
+            or (isinstance(category, str) and (os.sep in category or Path(category).is_dir()))):
+        raise TypeError(
+            "labels_for: pass data_path= by keyword; the 2nd positional argument "
+            "is category since 0.3.0 (order: (dataset, category, method))")
+    _old_order_error("labels_for", dataset, category, method)
+    if category is not None:
+        registry.check_category(category)
     if method is not None:
-        # validated whenever given (it used to be echoed back unchecked unless
-        # category was also passed): a typo raises KeyError with a did-you-mean
         registry.check_method(method)
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
@@ -903,7 +928,6 @@ def labels_for(dataset: str, method: str | None = None, category: str | None = N
     stems = sorted(files, key=_label_sort_key)
     if method is not None and category is not None:
         spec = registry.get(method)
-        registry.check_category(category)
         mods = registry.normalize_modalities(modalities)
         try:
             cand = select_variant(spec, category, mods, ds_dir=ds_dir)

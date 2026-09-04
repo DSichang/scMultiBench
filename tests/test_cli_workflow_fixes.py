@@ -73,7 +73,8 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
                         methods=["Stabmap"], verbose=False),
     lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
                         params={"Stabmap": {"k": 1}}, verbose=False),
-    lambda: mtb.plan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["Stabmap"]),
+    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["Stabmap"],
+                     out_dir="runs"),
 ])
 def test_unknown_method_raises_did_you_mean_before_filesystem(call):
     """A typo'd id must not surface as FileNotFoundError for the dataset folder
@@ -107,7 +108,8 @@ def test_cli_scan_default_table_is_compact(capsys):
 
 
 def test_cli_scan_columns_all_and_machine_formats_are_full(capsys):
-    full_cols = list(mtb.scan("D11", "vertical").columns)
+    full_cols = list(mtb.scan("D11", "vertical", verbose=False).columns)
+    assert "command" in full_cols                     # --columns all includes it
     rc = cli.main(["scan", "D11", "--category", "vertical", "--columns", "all"])
     out = capsys.readouterr().out
     assert rc == 0 and out.splitlines()[0].split() == full_cols
@@ -185,12 +187,11 @@ def test_run_all_dry_run_help_matches_behaviour():
     assert "command line" in help_txt and "execute" in help_txt
 
 
-def test_plan_commands_is_plan_plus_command_column():
-    df = workflow.plan_commands("D11", "vertical", out_dir="runs", methods=["Matilda"])
-    plan = mtb.plan("D11", "vertical", methods=["Matilda"])
-    # plan (= run_all(dry_run=True)) now carries `command` itself, rendered for
-    # the '<out_dir>' placeholder; plan_commands renders it for a real out_dir
-    assert list(df.columns) == list(plan.columns) == workflow.SCAN_COLUMNS + ["command"]
+def test_scan_command_column_renders_for_out_dir():
+    df = mtb.scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
+    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    # the '<out_dir>' placeholder by default; a real out_dir renders paste-ready lines
+    assert list(df.columns) == list(plan.columns) == workflow.SCAN_COLUMNS
     pd.testing.assert_frame_equal(df.drop(columns="command"), plan.drop(columns="command"))
     assert (plan[plan["files_ok"]]["command"].str.contains("<out_dir>/Matilda_D11")).all()
     assert (df[df["files_ok"]]["command"].str.contains("runs/Matilda_D11")).all()
@@ -199,19 +200,20 @@ def test_plan_commands_is_plan_plus_command_column():
     assert (df[~df["files_ok"]]["command"] == "").all()
 
 
-def test_command_preview_mirrors_run_builder():
-    inp = mtb.inputs_for("D11", "Matilda", "vertical", modalities=["rna", "adt"])
-    argv = workflow.command_preview("Matilda", "vertical", inputs=inp, out_dir="o",
-                                    params={"epochs": 5})
+def test_run_dry_run_mirrors_run_builder():
+    inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
+    argv = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+                   params={"epochs": 5}, dry_run=True)
     assert argv[:4] == ["conda", "run", "-n", "matilda"] or argv[1:4] == ["run", "-n", "matilda"]
     assert "--epochs" in argv and argv[argv.index("--epochs") + 1] == "5"
     assert argv[argv.index("--save_path") + 1] == os.path.join(os.path.abspath("o"), "")
-    # a custom template is honoured verbatim, like run(cmd_template=)
-    argv2 = workflow.command_preview("Matilda", "vertical", inputs=inp, out_dir="o",
-                                     cmd_template="srun {cmd}")
+    assert not os.path.exists("o")                       # nothing created
+    # a custom template is honoured verbatim, like the real run
+    argv2 = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+                    cmd_template="srun {cmd}", dry_run=True)
     assert argv2[0] == "srun" and "conda" not in argv2
     with pytest.raises(KeyError, match="did you mean"):
-        workflow.command_preview("Matlda", "vertical", inputs=inp, out_dir="o")
+        mtb.run("Matlda", "vertical", inputs=inp, out_dir="o", dry_run=True)
 
 
 def test_cli_run_dry_run_prints_command(capsys):
