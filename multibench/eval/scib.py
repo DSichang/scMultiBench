@@ -368,7 +368,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             print(f"scIB clustering metrics: Leiden resolution sweep (10 "
                   f"resolutions) over {n:,} cells for {', '.join(needs)} - "
                   f"typically 30-60 s per 3,000 cells; pass clustering= or "
-                  f"only={{...}} without ARI/NMI/iF1 to skip it",
+                  f"metrics=[...] without ARI/NMI/iF1 to skip it",
                   file=sys.stderr, flush=True)
         with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
             warnings.simplefilter("ignore")

@@ -51,17 +51,17 @@ def test_read_clustering_decodes_bytes(tmp_path):
 def test_evaluate_rejects_non_scib():
     import pytest
     from multibench.eval import pipeline
-    with pytest.raises(NotImplementedError) as exc:
-        pipeline.evaluate(output="x.h5", category="mosaic", task="imputation",
+    with pytest.raises(ValueError) as exc:
+        pipeline.evaluate(output="x.h5", category="mosaic", metrics="imputation",
                           labels="c.csv")
-    assert "imputation" in str(exc.value)
+    assert "imputation" in str(exc.value) and "METRIC FAMILY" in str(exc.value)
 
 
 def test_evaluate_requires_labels_and_clustering(tmp_path):
     import pytest
     from multibench.eval import pipeline
     with pytest.raises(ValueError):
-        pipeline.evaluate(output="x.h5", category="vertical", task="clustering",
+        pipeline.evaluate(output="x.h5", category="vertical", metrics="clustering",
                           labels=None, clustering=None)
 
 
@@ -72,7 +72,7 @@ def test_evaluate_requires_batch_for_batch_task():
     cl = np.array([0, 0, 1, 1, 2, 2])
     ct = cl.copy()
     with pytest.raises(ValueError) as exc:
-        pipeline.evaluate(output=emb, category="vertical", task="batch",
+        pipeline.evaluate(output=emb, category="vertical", metrics="batch",
                           labels=ct, clustering=cl, batch=None)
     assert "batch labels required" in str(exc.value)
 
@@ -130,7 +130,7 @@ def _toy(n_per=45, seed=0):
 
 def _ari(**kw):
     from multibench.eval.pipeline import evaluate
-    df = evaluate(only={"ARI"}, **kw)
+    df = evaluate(metrics=["ARI"], **kw)
     return float(df.loc["ARI", "Value"])
 
 
@@ -220,11 +220,11 @@ def test_evaluate_anndata_labels_as_obs_key():
     a.obsm["X_emb"] = emb
     a.obs["celltype"] = pd.Categorical(ct)
     a.obs["sample"] = bat
-    df = evaluate(a, labels="celltype", batch="sample", task="all", only=["ARI", "GC"])
+    df = evaluate(a, labels="celltype", batch="sample", metrics=["ARI", "GC"])
     assert float(df.loc["ARI", "Value"]) == pytest.approx(1.0)
     assert float(df.loc["GC", "Value"]) == pytest.approx(1.0)
     with pytest.raises(ValueError) as exc:
-        evaluate(a, labels="cell_type", only={"ARI"})
+        evaluate(a, labels="cell_type", metrics=["ARI"])
     assert "neither an obs column" in str(exc.value) and "celltype" in str(exc.value)
 
 
@@ -242,14 +242,14 @@ def test_evaluate_list_of_label_paths_concatenates_in_order_and_builds_batch(tmp
     got = io.as_vector([p1, p2], what="labels")
     assert list(got) == list(ct)
     assert list(io.as_vector([p2, p1], what="labels")) == list(ct[30:]) + list(ct[:30])
-    # task='all' with batch=None -> batch = file of origin (1, 2), like run_all
-    df = evaluate(emb, task="all", labels=[p1, str(p2)], only=["ARI", "GC", "ASW_batch"])
-    ref = evaluate(emb, task="all", labels=ct, batch=np.array([1] * 30 + [2] * 60),
-                   only=["ARI", "GC", "ASW_batch"])
+    # batch=None with several files -> batch = file of origin (1, 2), like run_all
+    df = evaluate(emb, labels=[p1, str(p2)], metrics=["ARI", "GC", "ASW_batch"])
+    ref = evaluate(emb, labels=ct, batch=np.array([1] * 30 + [2] * 60),
+                   metrics=["ARI", "GC", "ASW_batch"])
     pd.testing.assert_frame_equal(df.sort_index(), ref.sort_index())
-    # a single file in a list still needs an explicit batch for task='all'
+    # a single file in a list still needs an explicit batch for metrics='all'
     with pytest.raises(ValueError) as exc:
-        evaluate(emb, task="all", labels=[tmp_path / "all.csv"], only={"ARI"})
+        evaluate(emb, metrics="all", labels=[tmp_path / "all.csv"])
     assert "batch labels required" in str(exc.value)
 
 
@@ -264,10 +264,10 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     # returns) is accepted as-is: the two files are concatenated in that order
     # (here both hold the same 90 cells, so the only complaint is the length)
     with pytest.raises(ValueError, match="length mismatch"):
-        evaluate(emb, labels={"cty1": str(p), "cty2": str(p)}, only={"ARI"})
+        evaluate(emb, labels={"cty1": str(p), "cty2": str(p)}, metrics=["ARI"])
     # any other order must be explicit
     with pytest.raises(ValueError) as exc:
-        evaluate(emb, labels={"cty2": str(p), "cty1": str(p)}, only={"ARI"})
+        evaluate(emb, labels={"cty2": str(p), "cty1": str(p)}, metrics=["ARI"])
     msg = str(exc.value)
     assert "2 label files" in msg and "cty1" in msg and "cty2" in msg
     assert "list of paths in cell order" in msg
@@ -316,12 +316,12 @@ def test_read_labels_ambiguous_multicolumn_raises_unless_column_given(tmp_path):
     with pytest.raises(ValueError) as exc:
         io.read_labels(p2, column="nope")
     assert "no column named 'nope'" in str(exc.value) and "celltype" in str(exc.value)
-    # column= flows through evaluate()
+    # evaluate() takes the column itself (its column= keyword is gone)
     pytest.importorskip("scib")
     emb, ct90, _ = _toy()
     p3 = tmp_path / "meta3.csv"
     pd.DataFrame({"celltype": ct90, "other": ct90[::-1]}).to_csv(p3, index=False)
-    assert _ari(output=emb, labels=p3, column="celltype") == pytest.approx(1.0)
+    assert _ari(output=emb, labels=pd.read_csv(p3)["celltype"]) == pytest.approx(1.0)
 
 
 def test_read_labels_tsv_and_numeric_labels(tmp_path):
@@ -330,17 +330,17 @@ def test_read_labels_tsv_and_numeric_labels(tmp_path):
     assert list(io.read_labels(p)) == [1, 2, 1]
 
 
-def test_evaluate_only_rejects_unknown_metric_and_bare_string():
+def test_evaluate_metrics_rejects_unknown_metric_and_bare_code_string():
     from multibench.eval.pipeline import evaluate
     emb, ct, _ = _toy()
     with pytest.raises(ValueError) as exc:
-        evaluate(emb, labels=ct, only=["ARI", "XYZ"])
+        evaluate(emb, labels=ct, metrics=["ARI", "XYZ"])
     msg = str(exc.value)
-    assert "unknown metric(s) ['XYZ']" in msg and "choose from" in msg
+    assert "unknown metric(s) ['XYZ']" in msg and "valid codes" in msg
     assert "ARI" in msg and "kBET" in msg
-    with pytest.raises(TypeError) as exc:
-        evaluate(emb, labels=ct, only="ARI")      # set('ARI') == {'A','R','I'}
-    assert "only= must be a collection of metric names" in str(exc.value)
+    with pytest.raises(ValueError) as exc:
+        evaluate(emb, labels=ct, metrics="ARI")      # a code is not a family token
+    assert "a single code goes in a list: metrics=['ARI']" in str(exc.value)
 
 
 def test_evaluate_rejects_unknown_category_and_allows_none():
@@ -348,11 +348,11 @@ def test_evaluate_rejects_unknown_category_and_allows_none():
     from multibench.eval.pipeline import evaluate
     emb, ct, _ = _toy()
     with pytest.raises(ValueError) as exc:
-        evaluate(emb, category="bogus", labels=ct, only={"ARI"})
+        evaluate(emb, category="bogus", labels=ct, metrics=["ARI"])
     msg = str(exc.value)
     assert "unknown category 'bogus'" in msg and "valid:" in msg and "vertical" in msg
-    assert float(evaluate(emb, labels=ct, only={"ARI"}).loc["ARI", "Value"]) == pytest.approx(1.0)
-    assert float(evaluate(emb, "vertical", labels=ct, only={"ARI"}).loc["ARI", "Value"]) == pytest.approx(1.0)
+    assert float(evaluate(emb, labels=ct, metrics=["ARI"]).loc["ARI", "Value"]) == pytest.approx(1.0)
+    assert float(evaluate(emb, ct, category="vertical", metrics=["ARI"]).loc["ARI", "Value"]) == pytest.approx(1.0)
 
 
 def test_evaluate_warns_on_transpose():
@@ -361,12 +361,12 @@ def test_evaluate_warns_on_transpose():
     emb, ct, _ = _toy()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        evaluate(emb.T, labels=ct, only={"ASW"})
+        evaluate(emb.T, labels=ct, metrics=["ASW"])
     hits = [str(x.message) for x in w if "transposed" in str(x.message)]
     assert hits and "dims x cells" in hits[0]
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        evaluate(emb, labels=ct, only={"ASW"})
+        evaluate(emb, labels=ct, metrics=["ASW"])
     assert not [x for x in w if "transposed" in str(x.message)]
 
 
@@ -375,10 +375,10 @@ def test_evaluate_clustering_accepts_csv_and_arraylike(tmp_path):
     from multibench.eval.pipeline import evaluate
     emb, ct, _ = _toy()
     p = tmp_path / "cluster.csv"; _write_cty(p, ct)
-    ref = evaluate(emb, labels=ct, clustering=ct, only={"ARI"})
+    ref = evaluate(emb, labels=ct, clustering=ct, metrics=["ARI"])
     assert float(ref.loc["ARI", "Value"]) == pytest.approx(1.0)
     for cl in (p, pd.Series(ct), list(ct)):
-        got = evaluate(emb, labels=ct, clustering=cl, only={"ARI"})
+        got = evaluate(emb, labels=ct, clustering=cl, metrics=["ARI"])
         assert float(got.loc["ARI", "Value"]) == float(ref.loc["ARI", "Value"])
 
 

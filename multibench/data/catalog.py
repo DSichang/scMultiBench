@@ -194,6 +194,116 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
     return out
 
 
+# --- the one ``metrics=`` selector -----------------------------------------
+#: family tokens the ``metrics=`` knob accepts (besides None and a list of codes)
+_METRIC_TOKENS = ("all", "clustering", "batch")
+
+
+class MetricSelection:
+    """What a ``metrics=`` argument resolved to (see :func:`metric_selection`).
+
+    ``family`` is ``"all"``, ``"clustering"`` or ``"batch"``: the token that
+    was given, or - for an explicit list - the smallest family holding every
+    code. ``codes`` is ``None`` for "no restriction" (``None`` / ``"all"``)
+    and otherwise the canonical codes selected, in request order. ``explicit``
+    is ``True`` when a list of codes was given.
+    """
+    __slots__ = ("family", "codes", "explicit")
+
+    def __init__(self, family: str, codes, explicit: bool):
+        self.family, self.codes, self.explicit = family, codes, explicit
+
+    def __repr__(self) -> str:
+        return f"MetricSelection(family={self.family!r}, codes={self.codes!r}, explicit={self.explicit})"
+
+
+def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelection:
+    """Resolve the ``metrics=`` knob shared by ``evaluate``, ``load_results`` and ``recommend``.
+
+    Parameters
+    ----------
+    metrics
+        ``None`` (no restriction), a family token (``"clustering"``,
+        ``"batch"``, ``"all"``) or a list of metric codes (case/alias
+        tolerant: ``["ari", "kbet"]`` -> ``ARI, kBET``).
+    extra : collection of str, keyword-only
+        Codes accepted on top of :func:`known_metrics` - the metrics present
+        in a frame, so a user's own metric name in a long file can still be
+        selected; they are listed in the error too.
+    kw : str, keyword-only
+        The keyword the value arrived through, named in the errors.
+
+    Returns
+    -------
+    MetricSelection
+
+    Raises
+    ------
+    ValueError
+        A string that is not a family token (``"unknown metrics= token
+        'ARI'; valid: 'all', 'clustering', 'batch' - or a list of codes"``;
+        a :func:`multibench.list_tasks` token gets an extra sentence saying
+        the slot selects a metric family), an unknown code in a list
+        (listing the valid codes), an empty list, or a list that names the
+        same metric twice after canonicalisation.
+    TypeError
+        Anything that is neither ``None``, a string nor a collection.
+    """
+    from ..plot.bar import BATCH_METRICS, CLUSTERING_METRICS   # families live in plot
+    fams = {"clustering": list(CLUSTERING_METRICS), "batch": list(BATCH_METRICS)}
+    if metrics is None or (isinstance(metrics, str) and metrics == "all"):
+        return MetricSelection("all", None, False)
+    if isinstance(metrics, str):
+        if metrics in fams:
+            return MetricSelection(metrics, fams[metrics], False)
+        hint = ""
+        try:
+            from ..engine.registry import list_tasks
+            tasks = list_tasks()
+        except Exception:
+            tasks = []
+        if metrics in tasks:
+            hint = (f" - {kw}= selects a METRIC FAMILY, not a mtb.list_tasks() token; "
+                    f"'dimension_reduction' and 'clustering' share the 'clustering' "
+                    f"family, and the scIB families are the only metrics computed")
+        elif canonical_metric(metrics) in known_metrics():
+            hint = f" - a single code goes in a list: {kw}=[{canonical_metric(metrics)!r}]"
+        raise ValueError(
+            f"unknown {kw}= token {metrics!r}; valid: 'all', 'clustering', 'batch' "
+            f"(or a list of metric codes, e.g. {kw}=['ARI', 'NMI']){hint}")
+    if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
+        raise TypeError(
+            f"{kw}= must be None, a family token ('all', 'clustering', 'batch') or "
+            f"a list of metric codes; got {type(metrics).__name__}")
+    wanted = list(metrics)
+    if not wanted:
+        raise ValueError(
+            f"{kw}=[] selects nothing; pass None for every metric, a family token, "
+            f"or a non-empty list of codes")
+    valid = list(known_metrics())
+    present = sorted(set(map(str, extra)))
+    codes, unknown = [], []
+    for m in wanted:
+        c = canonical_metric(m)
+        if c is None or (c not in valid and c not in present):
+            unknown.append(m)
+        else:
+            codes.append(c)
+    if unknown:
+        raise ValueError(
+            f"unknown metric(s) {unknown}; valid codes: {valid}"
+            + (f"; present in this frame: {present}" if present else ""))
+    dup = sorted({c for c in codes if codes.count(c) > 1})
+    if dup:
+        raise ValueError(
+            f"{kw}= names the same metric twice after canonicalisation: {dup}")
+    in_clu = any(c in fams["clustering"] for c in codes)
+    in_bat = any(c in fams["batch"] for c in codes)
+    family = "all" if (in_clu and in_bat) or not (in_clu or in_bat) else (
+        "clustering" if in_clu else "batch")
+    return MetricSelection(family, codes, True)
+
+
 # --- tables ----------------------------------------------------------------
 def _split_multivalue(cell: object) -> list[str]:
     if pd.isna(cell):
