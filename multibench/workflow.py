@@ -45,9 +45,6 @@ from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
 __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout",
            "load_batch", "sweep"]
 
-#: internal alias of ``method_info(m)["runtime"]`` (the public ``mtb.runtime_hint``
-#: is the deprecated, warning spelling)
-runtime_hint = _runtime_hint
 
 
 def load_batch(out_dir) -> "BatchResult":
@@ -844,35 +841,6 @@ def _order_confidence(cands) -> float | None:
     return round(max(0.0, (best - second) / best), 4)
 
 
-def _accepts_metrics(fn) -> bool:
-    """Does ``fn`` take the 0.3 ``metrics=`` knob (or ``**kwargs``)?"""
-    import inspect
-    try:
-        params = inspect.signature(fn).parameters
-    except (TypeError, ValueError):
-        return True
-    return "metrics" in params or any(
-        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
-
-
-def _evaluate_compat(fn, emb, *, metrics=None, batch=None, **kw):
-    """Call an ``evaluate`` with the ONE metric-selection knob ``metrics=``.
-
-    Transitional: when ``fn`` predates the 0.3 signature (no ``metrics``
-    parameter) the request is translated to its ``task=`` / ``only=`` pair -
-    a family token becomes ``task``, a list of codes becomes ``only`` under
-    ``task='all'`` (batch given) or ``'clustering'``. Drop this shim once
-    ``eval/`` carries ``metrics=``.
-    """
-    if _accepts_metrics(fn):
-        return fn(output=emb, metrics=metrics, batch=batch, **kw)
-    if isinstance(metrics, str):
-        return fn(output=emb, task=metrics, batch=batch, **kw)
-    task = "all" if batch is not None else "clustering"
-    only = None if metrics is None else set(metrics)
-    return fn(output=emb, task=task, only=only, batch=batch, **kw)
-
-
 def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
     """Score each candidate label order, keep the best, return the full spread.
 
@@ -889,7 +857,7 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
         if batch is not None:
             bat = np.asarray(batch)
         grp = "all" if len(set(np.asarray(bat).tolist())) > 1 else "clustering"
-        return _evaluate_compat(_evaluate, emb, category=category, labels=lab,
+        return _evaluate(emb, category=category, labels=lab,
                                 verbose=False, batch=(bat if grp == "all" else None),
                                 clustering=clustering,
                                 metrics=(grp if metrics is None else metrics))
@@ -925,7 +893,7 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
     for names, lab, bat in cands:
         try:
             if sweep_adata is None:      # fall back to a self-contained screen
-                val = _evaluate_compat(_evaluate, emb, category=category, verbose=False,
+                val = _evaluate(emb, category=category, verbose=False,
                                        labels=lab, metrics=["ARI"])
                 scored.append((float(val["Value"]["ARI"]), names, lab, bat, None))
                 continue

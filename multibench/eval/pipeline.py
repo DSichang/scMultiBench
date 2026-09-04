@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import io, _compat
+from . import io
+from .. import _compat
 from ..data import catalog
 
 #: the seven columns of the tidy long frame (pinned to

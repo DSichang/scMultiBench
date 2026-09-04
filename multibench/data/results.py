@@ -35,7 +35,7 @@ from pathlib import Path
 import pandas as pd
 
 from .. import config
-from ..eval import _compat
+from .. import _compat
 from . import catalog
 
 __all__ = ["load_results", "available_datasets", "fetchable", "results_coverage",
@@ -1040,14 +1040,8 @@ def results_coverage(
 
 
 def _runtime(method_id: str, method_info) -> dict:
-    """``method_info(m)["runtime"]`` (``{"tier", "worst_sec", "observed"}``);
-    falls back to the 0.2.x ``runtime_hint`` while ``method_info`` predates
-    the ``runtime`` key (the discover side of the 0.3.0 cut adds it)."""
-    rt = method_info(method_id).get("runtime")
-    if rt is None:
-        from ..workflow import runtime_hint
-        rt = runtime_hint(method_id)
-    return dict(rt)
+    """``method_info(m)["runtime"]`` (``{"tier", "worst_sec", "observed"}``)."""
+    return dict(method_info(method_id)["runtime"])
 
 
 def _legacy_recommend_kwargs(kw: dict) -> dict:

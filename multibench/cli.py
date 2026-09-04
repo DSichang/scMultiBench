@@ -760,7 +760,6 @@ def _cmd_evaluate(args) -> int:
     ``load_results`` speak.
     """
     import multibench
-    from .workflow import _evaluate_compat
     long_mode = args.method is not None or args.dataset is not None
     if long_mode:
         missing = [f for f, v in (("--method", args.method), ("--dataset", args.dataset),
@@ -791,7 +790,7 @@ def _cmd_evaluate(args) -> int:
     if args.obsm is not None:
         kw["obsm"] = args.obsm
     with _quiet_stdout():                     # library progress -> stderr
-        df = _evaluate_compat(multibench.evaluate, args.output, metrics=metrics, **kw)
+        df = multibench.evaluate(output=args.output, metrics=metrics, **kw)
     if long_mode:
         df = multibench.to_long(df, method=args.method, dataset=args.dataset,
                                 category=args.category)

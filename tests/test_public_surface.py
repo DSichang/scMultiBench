@@ -70,7 +70,6 @@ def test_config_all_is_exactly_the_contract():
     assert "category_folder" not in dir(mtb.config) and "metric_set_dir" not in dir(mtb.config)
 
 
-@pytest.mark.xfail(strict=False, reason="plot lands in wp/B_eval_results_plot")
 def test_plot_all_is_exactly_the_contract():
     assert set(mtb.plot.__all__) == PLOT_ALL
     assert _leaks(mtb.plot) == set()
