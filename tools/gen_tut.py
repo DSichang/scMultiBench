@@ -71,15 +71,14 @@ def published_note(cat, dataset):
 
 def env_size_text(category=None, methods=None, short=False):
     """One phrase describing the conda envs a category / method set needs,
-    derived from mtb.env.plan() x mtb.env.packed_sizes() at generation time
-    (env count, the download total of the archives measured so far, and the
-    CLI line that prints the per-env sizes) - never a hand-written GB figure.
-    ``short=True`` keeps only the count and the total, for a code comment."""
+    derived from the dry-run plan ``mtb.env.install(methods, category=...)``
+    returns at generation time (env count, the download total of the archives
+    measured so far, and the CLI line that prints the per-env sizes) - never a
+    hand-written GB figure. ``short=True`` keeps only the count and the total,
+    for a code comment."""
     import multibench as mtb
-    rows = mtb.env.plan(category=category, methods=methods)
-    sizes = mtb.env.packed_sizes()
-    known = [sizes.get(r["env"], {}).get("archive_bytes") for r in rows]
-    known = [b for b in known if b]
+    rows = mtb.env.install(methods, category=category)      # dry_run=True: the plan, nothing built
+    known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
     n = len(rows)
     flag = f"--category {category}" if category else f"--methods {','.join(methods)}"
     s = f"{n} env{'s' if n != 1 else ''}"
@@ -228,7 +227,9 @@ SCEN = {
 # dataset folder in the layout describe_layout(CATEGORY) prints. export_dataset
 # covers the one-AnnData layouts (vertical; cross via batch=); the two layouts
 # whose batches hold DIFFERENT cells or DIFFERENT modality sets (diagonal,
-# mosaic) are written file by file with to_canonical + write_labels.
+# mosaic) are written file by file: to_canonical per matrix, and the label CSV
+# (one header line `x`, one label per cell) with pandas - the public label
+# writer was retired in 0.3.0 (export_dataset writes label files itself).
 EXPORT_DEMO = {
  "vertical": """import anndata as ad, numpy as np, scipy.sparse as sp, tempfile, os
 rng = np.random.default_rng(0)
@@ -244,8 +245,8 @@ folder = mtb.io.export_dataset(demo, os.path.join(tmp, "MYCITE"),
 print(sorted(os.listdir(folder)))
 # 10x multiome held as MuData (peaks in mdata["atac"]) - category="vertical" writes the plain atac.h5
 # the vertical roles read (whatever the ATAC representation; check method_info(m)["atac"] for what each wants):
-#   mtb.io.from_mudata(mdata, ".../MYMULTIOME", rna="rna", atac="atac", atac_kind="peak",
-#                      labels="rna:celltype", category="vertical")
+#   mtb.io.export_dataset(mdata, ".../MYMULTIOME", rna="rna", atac="atac", atac_kind="peak",
+#                         labels="rna:celltype", category="vertical")
 sc = mtb.scan("MYCITE", CATEGORY, data_path=tmp)
 print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate (the rest want an ATAC matrix too)")""",
  "diagonal": """import anndata as ad, numpy as np, tempfile, os
@@ -256,11 +257,14 @@ atac = ad.AnnData(X=rng.poisson(0.5, size=(90, 40)).astype(float));  atac.var_na
 rna.obs["celltype"]  = rng.choice(["T", "B", "NK"], 120)
 atac.obs["celltype"] = rng.choice(["T", "B", "NK"], 90)
 
+def write_cty(labels, path):                                  # the label file: one header line ("x"), one label per cell
+    pd.Series(np.asarray(labels), name="x").to_csv(path, index=False)
+
 folder = os.path.join(tempfile.mkdtemp(), "MYDIAG"); os.makedirs(folder)
 mtb.io.to_canonical(rna,  folder, modality="rna")        # -> rna.h5
 mtb.io.to_canonical(atac, folder, modality="atac_gas")   # -> atac_gas.h5 (never a plain atac.h5, which methods read as PEAKS)
-mtb.io.write_labels(rna.obs["celltype"],  os.path.join(folder, "rna_cty.csv"))
-mtb.io.write_labels(atac.obs["celltype"], os.path.join(folder, "atac_cty.csv"))
+write_cty(rna.obs["celltype"],  os.path.join(folder, "rna_cty.csv"))
+write_cty(atac.obs["celltype"], os.path.join(folder, "atac_cty.csv"))
 print(sorted(os.listdir(folder)))
 sc = mtb.scan("MYDIAG", CATEGORY, data_path=os.path.dirname(folder))
 print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate (the rest want a peak matrix too)")""",
@@ -275,10 +279,13 @@ b1.uns["protein_names"] = [f"CD{i}" for i in range(12)]
 b2.obsm["peaks"]   = rng.poisson(0.3, size=(80, 50)).astype(float)            #   batch 2 = RNA + ATAC, batch 3 = RNA only
 b2.uns["peaks_names"] = [f"chr1:{100 * i}-{100 * i + 50}" for i in range(50)]
 
+def write_cty(labels, path):                                                   # the label file: one header line ("x"), one label per cell
+    pd.Series(np.asarray(labels), name="x").to_csv(path, index=False)
+
 folder = os.path.join(tempfile.mkdtemp(), "MYMOSAIC"); os.makedirs(folder)
 for i, a in enumerate([b1, b2, b3], start=1):
     mtb.io.to_canonical(a, os.path.join(folder, f"rna{i}.h5"))
-    mtb.io.write_labels(a.obs["celltype"], os.path.join(folder, f"cty{i}.csv"))
+    write_cty(a.obs["celltype"], os.path.join(folder, f"cty{i}.csv"))
 mtb.io.to_canonical(b1, os.path.join(folder, "adt1.h5"),  modality="adt",  obsm="protein")
 mtb.io.to_canonical(b2, os.path.join(folder, "atac2.h5"), modality="atac", obsm="peaks")
 print(sorted(os.listdir(folder)))
@@ -499,11 +506,14 @@ peaks - because the wrong one runs to completion and returns a plausible but
 wrong embedding. The shipped label files, as `evaluate` will read them - the
 dict comes back in the benchmark's **cell-stacking order** (`cty`; `cty1, cty2,
 ...` numerically; `rna_cty` before `atac_cty`), so
-`mtb.evaluate(embedding, labels=mtb.labels_for(DATASET), task="all")` scores a
-multi-file dataset directly, with each cell's file of origin as its batch (the
-default `task="clustering"` computes the clustering family only - batch
-metrics need `task="all"` or `"batch"`); a dict you built in any other order
-must say so with `label_order=[...]`:""")
+`mtb.evaluate(embedding, labels=mtb.labels_for(DATASET), metrics="all")` scores a
+multi-file dataset directly, with each cell's file of origin as its batch.
+`metrics=` is the one selection knob: `None` (the default) computes every
+applicable metric - the clustering family, plus the batch family whenever a
+batch vector exists; `"clustering"` / `"batch"` / `"all"` name a family, and a
+list of codes (`["ARI", "NMI"]`) names exactly those (batch metrics need
+`batch=` or a multi-file `labels`). A dict you built in any other order must
+say so with `label_order=[...]`:""")
     code("""labels = mtb.labels_for(DATASET)            # {stem: path} in cell-stacking order - what the metrics are scored against
 print({k: Path(v).name for k, v in labels.items()})
 print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")""")
@@ -542,8 +552,8 @@ mine.summary''')
     code("""mine.plot()""")
     md(f"""{s['own_note']} For your real data the only work is producing the
 canonical files - `mtb.io.export_dataset` from an AnnData / MuData, or
-`to_canonical` + `write_labels` file by file as above - and these same three
-calls do the rest.""")
+`to_canonical` per matrix plus a one-column `x` CSV per label set, as above -
+and these same three calls do the rest.""")
 
     # ------------------------------------------------------------- figures
     batch_note = (
@@ -569,9 +579,9 @@ fig''')
     md(f"""`run_all(DATASET, CATEGORY, out_dir=...)` without `methods=` writes the
 same `summary.csv` and `long.csv` for your own data; `mtb.load_batch(out_dir)`
 reads them back. A single `mtb.evaluate` frame becomes the same seven-column
-long frame with `mtb.to_long(metrics, method, dataset, category)`
-(`source="user"`; `needs_labels=True` gives your own supervised method the
-`L` badge), so `pd.concat([long, mine])` plots next to the stored sweep.
+long frame with `mtb.to_long(metrics, method=..., dataset=..., category=...)`
+(`source="user"`), so `pd.concat([long, mine])` plots next to the stored
+sweep.
 
 **Across datasets.** A summary needs every method to have results on every
 dataset it averages over, or absence and performance blur into the same bar. Two
@@ -603,9 +613,10 @@ the exact reason (missing file, missing environment, wrong layout). Nothing
 executes. From the shell, `multibench scan DATASET --category CATEGORY` prints
 the compact table (method, modalities, runnable, files_ok, env_ok,
 runtime_tier, reason); `--columns all` or `--format csv|tsv|json` gives every
-column, and `multibench run-all ... --dry-run` prints the plan plus the exact
-command line per variant whose inputs resolve - the line to paste into a
-scheduler job. Below, the rows the **data** admits (`files_ok`), with the
+column - including `command`, the exact shell line `run()` would execute for
+every variant whose inputs resolve (the line to paste into a scheduler job;
+`multibench run-all ... --dry-run` prints the same table). Below, the rows the
+**data** admits (`files_ok`), with the
 environment gate next to them: `env_ok` is what this machine has, `env_reason`
 the install line for what it lacks, and `runnable` (both gates) stays empty
 until the environments exist.""")
@@ -642,7 +653,7 @@ per variant), and `verbose=True` adds the long audit notes plus
 `mtb.cite` emits the benchmark entry plus one per method you ran.""")
     code(f'''info = mtb.method_info("{fastm}", verbose=True)
 {{k: info[k] for k in ("id", "env", "availability", "needs_labels", "atac", "notes", "repo_url", "version", "reference", "verification")}}''')
-    code(f'''print(mtb.cite({trio!r}, fmt="text"))   # fmt="bibtex" for the .bib entries''')
+    code(f'''print(mtb.cite({trio!r}))   # one line per entry; fmt="bibtex" for the .bib entries''')
     md("""### The metrics
 
 Two families, matching the paper's grouping. All are **higher = better**, on
@@ -654,8 +665,9 @@ Two families, matching the paper's grouping. All are **higher = better**, on
 | batch correction | `ASW_batch`, `GC`, `iLISI` (+ opt-in `kBET`) | are the batches mixed within each cell type? |
 
 Batch metrics appear only when the dataset has real batches - their absence on a
-single-batch dataset is correct, not missing data. `kBET` is opt-in
-(`mtb.evaluate(..., slow_metrics=True)`) because it is much slower than the rest.""")
+single-batch dataset is correct, not missing data. `kBET` is computed only when
+named (`mtb.evaluate(..., metrics=["ASW_batch", "GC", "iLISI", "kBET"])`)
+because it is much slower than the rest.""")
     md(f"""### Coverage of the paper
 
 `scan()` answers "what runs on this dataset"; this answers how many of the
@@ -769,7 +781,7 @@ per method.""")
     code("""info = mtb.method_info("Matilda")
 {k: info[k] for k in ("id", "language", "env", "availability", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
-    code("""print(mtb.cite(["Matilda"], fmt="text"))""")
+    code("""print(mtb.cite(["Matilda"]))   # one line per entry; fmt="bibtex" for the .bib entries""")
     md("""## Load shipped results and draw the standard figures
 
 The package ships the paper's tables (`source="published"`) and its own

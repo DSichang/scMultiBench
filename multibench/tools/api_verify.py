@@ -101,10 +101,11 @@ def _(): return f"{mtb.catalog.metrics().shape}"
 def _(): return mtb.catalog.canonical_id("totalvi")
 @check("catalog.canonical_metric")
 def _(): return mtb.catalog.canonical_metric("ARI")
-@check("config.category_folder")
-def _(): return mtb.config.category_folder("vertical")
-@check("config.metric_set_dir")
-def _(): return mtb.config.metric_set_dir("scib")
+@check("config.__all__ (Config, DEFAULT only)")
+def _():
+    assert mtb.config.__all__ == ["Config", "DEFAULT"], mtb.config.__all__
+    assert "category_folder" not in dir(mtb.config)
+    return "category_folder / metric_set_dir hidden (internal-only since 0.3.0)"
 @check("config.DEFAULT")
 def _(): return str(mtb.config.DEFAULT.data_path)
 
@@ -150,52 +151,33 @@ def _():
         g.create_dataset("features", data=np.array([b"chr1_1_200", b"chr1_300_400", b"chr2_5_9"]))
     mtb.io.normalize_peak_names(src, dst); return os.path.exists(dst)
 
-# ---------------- env ----------------
-@check("env.group_for / groups")
-def _(): return f"{mtb.env.group_for('Matilda')} / {len(mtb.env.groups())} groups"
-@check("env.default_env_name")
-def _(): return mtb.env.default_env_name("Matilda")
-@check("env.installed_envs")
-def _(): return f"{len(mtb.env.installed_envs())} installed"
-@check("env.lockfile")
-def _(): return str(mtb.env.lockfile(mtb.env.group_for("Matilda")))
-@check("env.required_envs")
-def _(): return f"{len(mtb.env.required_envs())} required"
+# ---------------- env (the five public names; the rest left env.__all__ in 0.3.0) ----------------
+@check("env.__all__ / dir")
+def _():
+    assert mtb.env.__all__ == ["status", "plan", "install", "doctor", "recipe"], mtb.env.__all__
+    assert "group_for" not in dir(mtb.env) and callable(mtb.env.group_for)   # importable, not advertised
+    return "status, plan, install, doctor, recipe"
 @check("env.recipe")
 def _(): return list(mtb.env.recipe("Matilda"))[:4]
 @check("env.plan")
 def _(): return f"{len(mtb.env.plan())} entries"
+@check("env.plan(as_frame)")
+def _(): return f"{mtb.env.plan(category='vertical', as_frame=True).shape}"
 @check("env.status")
 def _(): return f"{len(mtb.env.status())} entries"
 @check("env.doctor")
 def _():
-    d = mtb.env.doctor(); miss = [x for x in d if not x.get("installed", True)]
+    d = mtb.env.doctor(); miss = [x for x in d if not x.get("exists", True)]
     return f"{len(d)} envs, {len(miss)} missing"
-@check("env.environment_yml")
-def _(): return f"{len(mtb.env.environment_yml('Matilda'))} chars"
-@check("env.create_commands")
-def _(): return f"{len(mtb.env.create_commands('Matilda'))} cmds"
-@check("env.group_create_commands")
-def _(): return f"{len(mtb.env.group_create_commands(mtb.env.group_for('Matilda')))} cmds"
-@check("env.create(dry_run)")
-def _(): return str(mtb.env.create("Matilda", dry_run=True))[:60]
-@check("env.create_env(dry_run)")
-def _(): return str(mtb.env.create_env(mtb.env.group_for("Matilda"), dry_run=True))[:60]
-
-@check("env.create_env(unknown env -> clear error)")
+@check("env.install(dry_run=True) - the plan, nothing built")
 def _():
-    try:
-        mtb.env.create_env("scmb_definitely_not_a_real_env", dry_run=True)
-    except FileNotFoundError as e:
-        assert "no lockfile" in str(e); return "raises FileNotFoundError as designed"
-    raise AssertionError("expected FileNotFoundError")
-@check("env.create_group(dry_run)")
-def _(): return str(mtb.env.create_group(mtb.env.group_for("Matilda"), dry_run=True))[:60]
-@check("env.create_all(dry_run)")
-def _(): return f"{len(mtb.env.create_all(methods=['Matilda'], dry_run=True))} planned"
-@check("env.freeze(temp)")
+    rows = mtb.env.install(["Matilda"])
+    assert rows and rows[0]["env"] == mtb.method_info("Matilda")["env"], rows
+    return f"{rows[0]['env']}: {rows[0]['state']}"
+@check("env.install(dry_run=True, packed=False)")
 def _():
-    p = mtb.env.freeze(mtb.env.group_for("Matilda"), out_dir=OUT); return os.path.basename(str(p))
+    rows = mtb.env.install(["Matilda"], packed=False)
+    return f"{rows[0]['env']}: {rows[0]['state']}, {len(rows[0]['cmds'])} cmds"
 
 # ---------------- results ----------------
 @check("load_results")
@@ -228,13 +210,32 @@ def _():
 def _():
     e, lab = _emb_and_labels()
     cl = pd.Series(lab).astype("category").cat.codes.to_numpy()
-    v = mtb.evaluate(e, category="vertical", task="clustering", labels=lab, clustering=cl)
+    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab, clustering=cl)
     return f"ARI={float(v['Value']['ARI']):.3f}"
+
+@check("evaluate(metrics=[...]) - list of codes, no Leiden sweep")
+def _():
+    e, lab = _emb_and_labels()
+    v = mtb.evaluate(e, category="vertical", metrics=["ASW", "cLISI"], labels=lab)
+    assert list(v.index) == ["ASW", "cLISI"], list(v.index)
+    return f"ASW={float(v['Value']['ASW']):.3f}"
+
+@check("evaluate(task=) - the ONE deliberate deprecated-alias check")
+def _():
+    # The 0.2 spelling must still work for one release and warn; every other
+    # call in this script uses metrics=.
+    e, lab = _emb_and_labels()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        v = mtb.evaluate(e, category="vertical", task="clustering", labels=lab)
+    msgs = [str(x.message) for x in w if issubclass(x.category, DeprecationWarning)]
+    assert any("metrics='clustering'" in m for m in msgs), msgs
+    return f"warned: {msgs[0][:60]}"
 
 @check("eval.evaluate / eval.to_long (module aliases)")
 def _():
     e, lab = _emb_and_labels()
-    v = mtb.eval.evaluate(e, category="vertical", task="clustering", labels=lab)
+    v = mtb.eval.evaluate(e, category="vertical", metrics="clustering", labels=lab)
     return f"{mtb.eval.to_long(v, method='M', dataset='D11', category='vertical').shape}"
 
 @check("to_long")
@@ -254,17 +255,18 @@ def _():
     lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
     t = mtb.plot.build_table(lng); assert isinstance(t, mtb.plot.BubbleTable); return "instance ok"
 
-@check("plot.render")
+@check("plot.__all__ / dir (render, FamilyBlock importable but unlisted)")
 def _():
-    lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
-    fig = mtb.plot.render(mtb.plot.build_table(lng), title="render")
-    p = f"{OUT}/render.png"; fig.savefig(p); return os.path.getsize(p)
+    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
+                                "CLUSTERING_METRICS", "BATCH_METRICS"], mtb.plot.__all__
+    assert "render" not in dir(mtb.plot) and callable(mtb.plot.render)
+    return "seven names"
 
-@check("plot.plot_bubble(save=)")
+@check("plot.bubble(save=)")
 def _():
     lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
-    p = f"{OUT}/plot_bubble.png"
-    mtb.plot.plot_bubble(lng, title="plot_bubble", save=p); return os.path.getsize(p)
+    p = f"{OUT}/bubble_saved.png"
+    mtb.plot.bubble(lng, title="bubble", save=p); return os.path.getsize(p)
 
 @check("plot.bubble (namespace call)")
 def _():
