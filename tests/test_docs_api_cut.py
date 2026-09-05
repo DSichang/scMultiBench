@@ -46,6 +46,8 @@ STALE = {
     r"\b(inputs_for|labels_for)\(\s*(\"D\d+s?\"|DATASET)\s*,\s*\"(?!vertical|diagonal|mosaic|cross)\w+\"":
         "(dataset, category, method) order",
     r"17 columns|18 columns\b(?! - )|plan_commands adds": "scan's frame is SCAN_COLUMNS + command",
+    # Colab speed round: the packed archives run without a conda binary
+    r"(?i)\bcondacolab\b": "no condacolab: mtb.env.install(..., packed=True, dry_run=False) needs no conda binary",
 }
 
 
