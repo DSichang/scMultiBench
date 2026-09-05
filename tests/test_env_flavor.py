@@ -215,6 +215,7 @@ def test_install_packed_auto_follows_the_host(envs_dir, tmp_path, monkeypatch, f
 
 def test_install_packed_cpu_falls_back_with_one_warning(envs_dir, tmp_path, monkeypatch,
                                                         fake_tables):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)   # 'auto' must mean cpu here, even on a GPU host
     fetched = _fetch(monkeypatch, _tiny_archive(tmp_path / "a.tar.gz"))
     # no CPU key at all
     with pytest.warns(UserWarning) as rec:

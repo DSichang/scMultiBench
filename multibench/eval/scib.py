@@ -183,6 +183,25 @@ def igraph_flavor_available() -> bool:
 
 
 _fallback_warned = False
+_flavor_kw: bool | None = None
+
+
+def _scanpy_has_flavor_kw() -> bool:
+    """Does this scanpy accept ``sc.tl.leiden(flavor=...)`` at all (>= 1.10)?
+
+    Older releases forward the unknown keyword to leidenalg's partition class
+    (``TypeError: ... unexpected keyword argument 'flavor'``); newer ones warn
+    about the future default unless the flavor is spelled out. Probed once.
+    """
+    global _flavor_kw
+    if _flavor_kw is None:
+        try:
+            from importlib.metadata import version
+            from packaging.version import Version
+            _flavor_kw = Version(version("scanpy")) >= Version("1.10")
+        except Exception:  # noqa: BLE001
+            _flavor_kw = False
+    return _flavor_kw
 
 
 def _resolve_flavor(flavor) -> str:
@@ -237,8 +256,11 @@ def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
         # scanpy has to say still surfaces.
         warnings.filterwarnings("ignore", message=".*igraph.*implementation of leiden.*",
                                 category=UserWarning)
-        sc.tl.leiden(adata, resolution=resolution, key_added=key_added,
-                     flavor="leidenalg")
+        # spell the backend out where scanpy understands it (>= 1.10; silences
+        # its future-default FutureWarning); an older scanpy forwards the
+        # unknown keyword to leidenalg's partition class (TypeError 'flavor')
+        kw = {"flavor": "leidenalg"} if _scanpy_has_flavor_kw() else {}
+        sc.tl.leiden(adata, resolution=resolution, key_added=key_added, **kw)
 
 
 def _build_adata(emb, celltype, cluster, batch):

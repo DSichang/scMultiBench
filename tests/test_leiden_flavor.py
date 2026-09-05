@@ -159,3 +159,21 @@ def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
 def test_igraph_probe_reads_scanpy_version(monkeypatch):
     monkeypatch.setattr(S, "_igraph_support", None)
     assert S.igraph_flavor_available() is True      # this venv: scanpy >= 1.10 + igraph
+
+
+def test_leidenalg_path_passes_no_flavor_keyword(monkeypatch):
+    """scanpy < 1.10 has no flavor= parameter; the leidenalg branch must not
+    send it (the benchmark host's scanpy 1.9.8 raised TypeError 'flavor')."""
+    import scanpy as sc
+    calls = []
+    monkeypatch.setattr(sc.tl, "leiden", lambda adata, **kw: calls.append(kw))
+    monkeypatch.setattr(S, "_flavor_kw", False)            # an old scanpy
+    S._leiden(object(), 0.5, "k", "leidenalg")
+    assert calls and "flavor" not in calls[0] and calls[0]["resolution"] == 0.5
+    calls.clear()
+    monkeypatch.setattr(S, "_flavor_kw", True)             # scanpy >= 1.10
+    S._leiden(object(), 0.5, "k", "leidenalg")
+    assert calls[0]["flavor"] == "leidenalg"
+    calls.clear()
+    S._leiden(object(), 0.5, "k", "igraph")
+    assert calls[0]["flavor"] == "igraph"
