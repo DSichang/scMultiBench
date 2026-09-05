@@ -16,12 +16,20 @@
   "archive_bytes": 2077412003,
   "unpacked_bytes": null
  },
+ "env_sciPENN-cpu": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
  "glue": {
   "archive_bytes": 3212148440,
   "unpacked_bytes": null
  },
  "matilda": {
   "archive_bytes": 3043807507,
+  "unpacked_bytes": null
+ },
+ "matilda-cpu": {
+  "archive_bytes": null,
   "unpacked_bytes": null
  },
  "paste_envi": {
@@ -68,12 +76,20 @@
   "archive_bytes": 4225270409,
   "unpacked_bytes": null
  },
+ "scmb_scjoint-cpu": {
+  "archive_bytes": null,
+  "unpacked_bytes": null
+ },
  "scmb_scmdc": {
   "archive_bytes": 4251894509,
   "unpacked_bytes": null
  },
  "scmb_scmm2": {
   "archive_bytes": 1118430485,
+  "unpacked_bytes": null
+ },
+ "scmb_scmm2-cpu": {
+  "archive_bytes": null,
   "unpacked_bytes": null
  },
  "scmb_scmsi": {
@@ -98,6 +114,10 @@
  },
  "scmb_torch": {
   "archive_bytes": 4537398808,
+  "unpacked_bytes": null
+ },
+ "scmb_torch-cpu": {
+  "archive_bytes": null,
   "unpacked_bytes": null
  },
  "scmb_torch_v2": {

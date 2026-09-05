@@ -176,6 +176,181 @@ def _as_frame(rows: list[dict], as_frame: bool):
     import pandas as pd
     return pd.DataFrame(rows)
 
+
+# --- archive flavours (CPU-only vs CUDA builds) ----------------------------
+#: The accepted ``flavor=`` values of :func:`install_packed` / :func:`install`.
+FLAVORS = ("auto", "cpu", "gpu")
+
+#: One-word record of which archive an unpacked prefix came from, written
+#: by :func:`install_packed` as ``<prefix>/.multibench_flavor`` and read by
+#: :func:`installed_flavor` (``env status`` / ``doctor`` / ``plan``).
+FLAVOR_FILE = ".multibench_flavor"
+
+#: The kernel's NVIDIA driver record; its presence means a GPU driver is
+#: loaded even where ``nvidia-smi`` is not on PATH. Module-level so tests can
+#: point it at a temporary file.
+_NVIDIA_PROC = Path("/proc/driver/nvidia/version")
+
+
+def check_flavor(flavor) -> str:
+    """``flavor`` when it is one of :data:`FLAVORS`, else ``ValueError``.
+
+    Parameters
+    ----------
+    flavor : str
+        ``'auto'``, ``'cpu'`` or ``'gpu'``.
+
+    Returns
+    -------
+    str
+        The value as given.
+
+    Raises
+    ------
+    ValueError
+        ``"flavor='cuda': choose one of 'auto', 'cpu', 'gpu'"`` - listing the
+        accepted values, so a typo never reaches a download.
+    """
+    if flavor not in FLAVORS:
+        raise ValueError(f"flavor={flavor!r}: choose one of "
+                         + ", ".join(repr(f) for f in FLAVORS))
+    return flavor
+
+
+@functools.lru_cache(maxsize=1)
+def host_has_gpu() -> bool:
+    """Is an NVIDIA GPU visible on this host?
+
+    ``True`` when ``nvidia-smi`` is on ``PATH`` and ``nvidia-smi -L`` exits
+    0 printing at least one line, or when ``/proc/driver/nvidia/version``
+    exists (the driver is loaded but the tool is not on ``PATH``). Nothing
+    else counts: a torch install, ``CUDA_VISIBLE_DEVICES`` or a CUDA
+    library on disk say nothing about the machine. Cached per process
+    (``host_has_gpu.cache_clear()`` re-probes); module-level so tests
+    monkeypatch it either way.
+
+    Returns
+    -------
+    bool
+        ``True`` when a GPU is visible; ``False`` on a CPU-only host - the
+        ``flavor='auto'`` decision of :func:`install_packed`.
+    """
+    smi = shutil.which("nvidia-smi")
+    if smi:
+        try:
+            proc = subprocess.run([smi, "-L"], capture_output=True, text=True,
+                                  timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            proc = None
+        if proc is not None and proc.returncode == 0 and any(
+                line.strip() for line in proc.stdout.splitlines()):
+            return True
+    return _NVIDIA_PROC.exists()
+
+
+def resolve_flavor(flavor: str = "auto") -> str:
+    """``'cpu'`` or ``'gpu'`` for a ``flavor=`` value (``'auto'`` decided here).
+
+    Parameters
+    ----------
+    flavor : str
+        One of :data:`FLAVORS` (``ValueError`` otherwise).
+
+    Returns
+    -------
+    str
+        ``'cpu'`` / ``'gpu'`` as given, or for ``'auto'``: ``'cpu'`` when
+        :func:`host_has_gpu` is ``False``, else ``'gpu'``.
+    """
+    check_flavor(flavor)
+    if flavor == "auto":
+        return "gpu" if host_has_gpu() else "cpu"
+    return flavor
+
+
+def archive_key(env: str, flavor: str) -> str:
+    """The ``packed_urls.json`` / ``packed_sizes.json`` key of an env's archive.
+
+    ``'<env>-cpu'`` for ``'cpu'``, ``'<env>'`` for ``'gpu'`` - a pure name
+    rule; :func:`archive_for` says whether that archive is published.
+    """
+    return f"{env}-cpu" if flavor == "cpu" else env
+
+
+def archive_for(env: str, flavor: str = "auto", *, manifest: dict | None = None,
+                sizes: dict | None = None) -> tuple[str, str]:
+    """Which published archive serves ``env`` for a flavour: ``(key, flavour)``.
+
+    Parameters
+    ----------
+    env : str
+        The real env name (:func:`group_for`), e.g. ``'env_sciPENN'``.
+    flavor : str
+        One of :data:`FLAVORS`; ``'auto'`` resolves through
+        :func:`resolve_flavor`.
+    manifest, sizes : dict, keyword-only, optional
+        Stand-ins for :func:`packed_manifest` / :func:`packed_sizes`.
+
+    Returns
+    -------
+    tuple of (str, str)
+        ``('<env>-cpu', 'cpu')`` when the CPU archive is *published*: its
+        key is in ``packed_urls.json`` AND ``packed_sizes.json`` carries a
+        measured ``archive_bytes`` for it (the maintainer tool records the
+        size right after the upload, so an entry with a ``null`` size is a
+        placeholder for an archive that is not there yet - picking it would
+        send a CPU host to a 404 and from there into a lockfile build).
+        Otherwise ``('<env>', 'gpu')`` - the CUDA build every env has.
+    """
+    wanted = resolve_flavor(flavor)
+    if wanted == "cpu":
+        key = archive_key(env, "cpu")
+        manifest = packed_manifest() if manifest is None else manifest
+        sizes = packed_sizes() if sizes is None else sizes
+        if key in manifest and (sizes.get(key) or {}).get("archive_bytes") is not None:
+            return key, "cpu"
+    return env, "gpu"
+
+
+def _cpu_fallback_warning(env: str, manifest: dict, sizes: dict) -> str:
+    """The one ``UserWarning`` a CPU request that lands on the GPU build emits."""
+    size = _gb((sizes.get(env) or {}).get("archive_bytes"))
+    msg = f"no CPU archive for {env}; installing the GPU build ({size})"
+    key = archive_key(env, "cpu")
+    if key in manifest:
+        msg += (f" - {key} is listed in packed_urls.json but has no measured size "
+                f"in packed_sizes.json (not published yet; tools/packed_sizes.py "
+                f"records it after the upload)")
+    return msg
+
+
+def installed_flavor(env: str, conda: str | None = None) -> str | None:
+    """Which archive flavour an installed env came from, or ``None``.
+
+    Parameters
+    ----------
+    env : str
+        The real env name (:func:`group_for`).
+    conda : str, optional
+        conda/mamba executable :func:`env_prefix` may ask.
+
+    Returns
+    -------
+    str or None
+        The word in ``<prefix>/.multibench_flavor`` (``'cpu'`` / ``'gpu'``,
+        written by :func:`install_packed`); ``None`` when the env is not
+        installed, was built from a lockfile or by conda (no record), or the
+        file holds anything else.
+    """
+    prefix = env_prefix(env, conda)
+    if prefix is None:
+        return None
+    try:
+        words = (prefix / FLAVOR_FILE).read_text().split()
+    except OSError:
+        return None
+    return words[0] if words and words[0] in ("cpu", "gpu") else None
+
 _GROUPS_YAML = Path(__file__).resolve().parent / "env_groups.yaml"
 # Committed per-env lockfiles (`conda env export --no-builds`). These capture the
 # ACTUAL working envs (versions + pip section) and are the reproducible install
@@ -444,12 +619,14 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     Returns
     -------
     list of dict or pandas.DataFrame
-        ``[{env, shared, methods, availability}]``, largest env first.
-        ``shared`` - the env serves several methods (an ``env_groups.yaml``
-        group); ``availability`` - ``'public'``, or ``'benchmark-host-only'``
-        when EVERY method the env serves needs a script that is not
-        published (SPIRAL): the env builds, the method still cannot run off
-        the benchmark host.
+        ``[{env, shared, methods, availability, flavor}]``, largest env
+        first. ``shared`` - the env serves several methods (an
+        ``env_groups.yaml`` group); ``availability`` - ``'public'``, or
+        ``'benchmark-host-only'`` when EVERY method the env serves needs a
+        script that is not published (SPIRAL): the env builds, the method
+        still cannot run off the benchmark host; ``flavor`` - ``'cpu'`` /
+        ``'gpu'`` when the env is installed here from a packed archive
+        (:func:`installed_flavor`), else ``None``.
     """
     _check_methods(methods)
     if methods is None:
@@ -465,7 +642,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
          # method still cannot run off the benchmark host
          "availability": ("benchmark-host-only"
                           if all(registry.get(m).availability != "public" for m in ms)
-                          else "public")}
+                          else "public"),
+         "flavor": installed_flavor(env)}
         for env, ms in sorted(buckets.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     ]
     return _as_frame(rows, as_frame)
@@ -590,7 +768,8 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
 
 
 def install_packed(env: str, *, envs_dir: Path | str | None = None,
-                   conda: str | None = None, force: bool = False) -> bool:
+                   conda: str | None = None, force: bool = False,
+                   flavor: str = "auto") -> bool:
     """Provision ``env`` from a prebuilt conda-pack archive, if one is published.
 
     Downloads the archive named in ``packed_urls.json`` (else
@@ -617,6 +796,19 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     force : bool, keyword-only
         The archives are linux-64; on any other host ``RuntimeError`` is
         raised BEFORE the download unless ``force=True``.
+    flavor : str, keyword-only
+        Which archive: ``'gpu'`` - the ``'<env>'`` archive (the CUDA build
+        every env has); ``'cpu'`` - the ``'<env>-cpu'`` archive (the same
+        env without the CUDA libraries, 3-4x smaller) when it is published
+        (:func:`archive_for`), else the GPU build with ONE ``UserWarning``
+        ``"no CPU archive for <env>; installing the GPU build (<size>)"``;
+        ``'auto'`` (default) - ``'cpu'`` when :func:`host_has_gpu` is
+        ``False``, else ``'gpu'``. Whatever the flavour, the prefix is
+        ``<envs_dir>/<env>`` - the env NAME never changes, so the runner
+        and the registry are untouched - and the flavour installed is
+        recorded in ``<prefix>/.multibench_flavor`` (:data:`FLAVOR_FILE`,
+        one word) for ``env status`` / ``doctor``. Anything else:
+        ``ValueError`` listing the three.
 
     Returns
     -------
@@ -628,7 +820,9 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     import tarfile
     import urllib.error
     import urllib.request
+    import warnings
 
+    check_flavor(flavor)                  # a typo fails before the platform check
     _require_linux(force)                 # fail closed before any bytes land
     if envs_dir is not None:
         envs_root = Path(envs_dir)
@@ -642,12 +836,17 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     # A shipped manifest maps env -> archive URL, so archives can live where
     # their size dictates (GitHub release assets up to 2 GiB, Zenodo beyond);
     # envs without an entry fall back to the release-asset convention.
-    url = packed_manifest().get(env) or f"{PACKED_URL}/{env}.tar.gz"
+    manifest, sizes = packed_manifest(), packed_sizes()
+    key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
+    if resolve_flavor(flavor) == "cpu" and installed == "gpu":
+        warnings.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning,
+                      stacklevel=2)
+    url = manifest.get(key) or f"{PACKED_URL}/{key}.tar.gz"
     try:
         tgz, _ = urllib.request.urlretrieve(url)
     except urllib.error.HTTPError:
         return False
-    print(f"[env] unpacking prebuilt {env} -> {dest} ...", flush=True)
+    print(f"[env] unpacking prebuilt {env} ({installed} build) -> {dest} ...", flush=True)
     from ..data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
@@ -661,6 +860,9 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         # prefixes, so move first, then unpack
         part.rename(dest)
         _conda_unpack(dest)
+        # the record env status / doctor / plan show; written last, so a
+        # prefix that failed to unpack never claims a flavour
+        (dest / FLAVOR_FILE).write_text(installed + "\n")
         _conda_prefixes.cache_clear()
         return True
     except Exception as e:  # noqa: BLE001 - degrade to the lockfile build
@@ -734,17 +936,19 @@ def status(conda: str | None = None, *, as_frame: bool = False):
     -------
     list of dict or pandas.DataFrame
         One entry per registry method: ``{method, env, group, own_env,
-        exists, has_lock, difficulty, verified_working, has_recipe}``.
-        ``env`` and ``group`` are both the env the package uses for the
-        method (:func:`default_env_name` == :func:`group_for`); ``own_env``
-        is the singleton ``scmb_<method>`` name, reported installed too when
-        present; ``has_lock`` says a shipped lockfile can build ``env``
-        (the ``[L]`` of :data:`MARK_LEGEND`, shared with :func:`doctor`).
-        ``difficulty`` is one of the :data:`DIFFICULTY` tags
-        (``easy`` / ``old-scvi`` / ``old-tensorflow`` / ``R`` / ``verified``
-        / ``blocked-script``; ``unknown`` without a recipe) and
+        exists, has_lock, difficulty, verified_working, has_recipe,
+        flavor}``. ``env`` and ``group`` are both the env the package uses
+        for the method (:func:`default_env_name` == :func:`group_for`);
+        ``own_env`` is the singleton ``scmb_<method>`` name, reported
+        installed too when present; ``has_lock`` says a shipped lockfile can
+        build ``env`` (the ``[L]`` of :data:`MARK_LEGEND`, shared with
+        :func:`doctor`). ``difficulty`` is one of the :data:`DIFFICULTY`
+        tags (``easy`` / ``old-scvi`` / ``old-tensorflow`` / ``R`` /
+        ``verified`` / ``blocked-script``; ``unknown`` without a recipe) and
         ``verified_working`` is the ``*`` of ``env status``
-        (:data:`VERIFIED_STAR`).
+        (:data:`VERIFIED_STAR`). ``flavor`` is ``'cpu'`` / ``'gpu'`` when
+        the installed env came from a packed archive
+        (:func:`installed_flavor`), else ``None``.
     """
     have = set(installed_envs(conda))
     out = []
@@ -752,13 +956,16 @@ def status(conda: str | None = None, *, as_frame: bool = False):
         r = s.env_spec or {}
         grp = group_for(s.id)
         own = own_env_name(s.id)
+        exists = grp in have or own in have
         out.append({
             "method": s.id, "env": grp, "group": grp, "own_env": own,
-            "exists": grp in have or own in have,
+            "exists": exists,
             "has_lock": lockfile(grp) is not None,
             "difficulty": r.get("difficulty", "unknown"),
             "verified_working": bool(r.get("verified_working", False)),
             "has_recipe": bool(r),
+            "flavor": (installed_flavor(grp, conda) or installed_flavor(own, conda)
+                       if exists else None),
         })
     return _as_frame(out, as_frame)
 
@@ -986,7 +1193,7 @@ def packed_manifest() -> dict:
 
 def install(methods: list[str] | None = None, *, category: str | None = None,
             packed: bool = True, dry_run: bool = True, conda: str | None = None,
-            force: bool = False) -> list[dict]:
+            force: bool = False, flavor: str = "auto") -> list[dict]:
     """Install the conda envs a selection of methods needs - the Python face of
     ``multibench env install`` (the CLI calls this function).
 
@@ -1018,17 +1225,33 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         The archives and lockfiles are linux-64; ``dry_run=False`` on
         macOS/Windows raises ``RuntimeError`` BEFORE any download unless
         ``force=True``.
+    flavor : str, keyword-only
+        Which packed archive per env - ``'gpu'`` (the CUDA build), ``'cpu'``
+        (the ``'<env>-cpu'`` archive, 3-4x smaller, where published; the
+        GPU build with a ``UserWarning`` otherwise) or ``'auto'`` (default:
+        ``'cpu'`` when :func:`host_has_gpu` is ``False``, else ``'gpu'``) -
+        see :func:`install_packed`. The dry-run plan sizes and URL follow
+        the flavour, so a CPU host sees the CPU archives' download total.
+        Anything else: ``ValueError`` listing the three.
 
     Returns
     -------
     list of dict
         One entry per distinct env, largest first: ``{env, methods, exists,
-        has_lock, cmds, state, packed_url, archive_bytes, unpacked_bytes}``
-        (``cmds`` = the lockfile commands run, or that would run; the last
-        three are ``None`` unless ``packed`` and known).
+        has_lock, cmds, state, packed_url, archive_bytes, unpacked_bytes,
+        flavor}`` (``cmds`` = the lockfile commands run, or that would run;
+        ``packed_url`` / ``archive_bytes`` / ``unpacked_bytes`` are ``None``
+        unless ``packed`` and known - a ``null`` in ``packed_sizes.json`` is
+        unknown, same as a missing entry). ``flavor``: for an installed env
+        the archive it came from (:func:`installed_flavor`; ``None`` when
+        unrecorded), for a missing env the flavour the packed path would
+        install (``'cpu'`` / ``'gpu'`` after the per-env fallback), ``None``
+        when ``packed=False`` (a lockfile build has no flavour).
 
     Raises
     ------
+    ValueError
+        ``flavor`` not in :data:`FLAVORS` - before anything else is checked.
     RuntimeError
         ``dry_run=False`` only: a non-Linux host without ``force``; a failed
         build; or no conda/mamba on the host while a missing env needs a
@@ -1037,6 +1260,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         skipped a published archive, ``"... has no packed archive - install
         conda first"`` when none exists. Both are raised before any download.
     """
+    check_flavor(flavor)
     _check_methods(methods)
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
@@ -1060,7 +1284,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     f"archive - install conda first")
         if packed:
             for r in missing:
-                if install_packed(r["env"], conda=conda, force=force):
+                if install_packed(r["env"], conda=conda, force=force, flavor=flavor):
                     unpacked.add(r["env"])
     # a RuntimeError (no conda here, a failed build, a non-Linux host)
     # propagates: the CLI prints it as "error: ..." on stderr, exit 1
@@ -1083,10 +1307,19 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                          else "no archive - NO-LOCK")
         else:
             state = "build(dry-run)" if r["has_lock"] else "NO-LOCK"
-        sz = sizes.get(env, {})
-        out.append({**r, "state": state, "packed_url": manifest.get(env),
+        # the archive the flavour selects for THIS env (its own fallback to
+        # the GPU build included): URL and sizes follow it, so the printed
+        # download total is the one this host would actually fetch
+        if packed:
+            key, eff = archive_for(env, flavor, manifest=manifest, sizes=sizes)
+        else:
+            key, eff = env, None
+        installed = installed_flavor(env, conda) if (r["exists"] or env in unpacked) else None
+        sz = sizes.get(key) or {}
+        out.append({**r, "state": state, "packed_url": manifest.get(key),
                     "archive_bytes": sz.get("archive_bytes"),
-                    "unpacked_bytes": sz.get("unpacked_bytes")})
+                    "unpacked_bytes": sz.get("unpacked_bytes"),
+                    "flavor": installed if (r["exists"] or env in unpacked) else eff})
     return out
 
 
@@ -1114,11 +1347,14 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     Returns
     -------
     list of dict or pandas.DataFrame
-        ``[{env, methods, exists, has_lock}]``, largest env first. ``exists``
-        - the env is installed (the ``[x]`` of :data:`MARK_LEGEND`);
-        ``has_lock`` - ``env_locks/<env>.yml`` is shipped, so ``env install
-        --run`` can build it (``[L]``); neither (``[!]``) means the recipe
-        path only. The same marks ``env status`` prints per method.
+        ``[{env, methods, exists, has_lock, flavor}]``, largest env first.
+        ``exists`` - the env is installed (the ``[x]`` of
+        :data:`MARK_LEGEND`); ``has_lock`` - ``env_locks/<env>.yml`` is
+        shipped, so ``env install --run`` can build it (``[L]``); neither
+        (``[!]``) means the recipe path only. The same marks ``env status``
+        prints per method. ``flavor`` - ``'cpu'`` / ``'gpu'`` when the
+        installed env came from a packed archive
+        (:func:`installed_flavor`), else ``None``.
     """
     _check_methods(methods)
     have = set(installed_envs(conda))
@@ -1128,7 +1364,8 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     for m in methods:
         by_env.setdefault(group_for(m), []).append(m)
     rows = [{"env": env, "methods": sorted(ms), "exists": env in have,
-             "has_lock": lockfile(env) is not None}
+             "has_lock": lockfile(env) is not None,
+             "flavor": installed_flavor(env, conda) if env in have else None}
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
     return _as_frame(rows, as_frame)
 

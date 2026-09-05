@@ -404,9 +404,9 @@ def test_install_packed_platform_guard_precedes_download(envs_dir, monkeypatch):
 def test_install_packed_signature():
     import inspect
     sig = inspect.signature(envs.install_packed)
-    assert list(sig.parameters) == ["env", "envs_dir", "conda", "force"]
+    assert list(sig.parameters) == ["env", "envs_dir", "conda", "force", "flavor"]
     assert all(sig.parameters[k].kind is inspect.Parameter.KEYWORD_ONLY
-               for k in ("envs_dir", "conda", "force"))
+               for k in ("envs_dir", "conda", "force", "flavor"))
 
 
 # ---------------------------------------------------------------- env.install without conda

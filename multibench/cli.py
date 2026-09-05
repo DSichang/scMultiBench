@@ -808,7 +808,8 @@ def _cmd_evaluate(args) -> int:
     return _EXIT_OK
 
 
-def _size_total_line(rows, sizes: dict, what: str = "download") -> str:
+def _size_total_line(rows, sizes: dict, what: str = "download", *,
+                     flavor: str | None = None) -> str:
     """``# total: X GB download, Y GB on disk (N archives; download size unknown for A, disk size unknown for B)`` for ``rows``.
 
     ``rows`` carry an ``env`` key; ``sizes`` is :func:`multibench.env.packed_sizes`.
@@ -817,13 +818,36 @@ def _size_total_line(rows, sizes: dict, what: str = "download") -> str:
     download size is known (the old single count covered the download column
     only and said ``0 of unknown size`` under 16 rows of ``? disk``) - so
     each total is a floor and says so.
+
+    Parameters
+    ----------
+    rows : list of dict
+        ``env`` per row; a ``flavor`` of ``'cpu'`` keys the row's size on
+        the ``'<env>-cpu'`` archive (``multibench.env.archive_key``), any
+        other value on ``'<env>'``.
+    sizes : dict
+        :func:`multibench.env.packed_sizes` (or a stand-in).
+    what : str
+        The verb after the download figure (``'download'`` / ``'to download'``).
+    flavor : str, keyword-only, optional
+        The flavour the caller asked for (``'auto'``, ``'cpu'``, ``'gpu'``):
+        when given, the line names which flavour it summed and how many
+        envs fell back to the GPU build; ``None`` keeps the pre-flavour
+        wording.
+
+    Returns
+    -------
+    str
+        The one ``# total`` line (stderr on the CLI).
     """
     from .engine import envs
     dl = disk = 0
     n = n_dl = n_disk = 0
+    fell_back = 0
     for r in rows:
         n += 1
-        sz = sizes.get(r["env"], {})
+        key = envs.archive_key(r["env"], r.get("flavor"))
+        sz = sizes.get(key) or {}
         a, u = sz.get("archive_bytes"), sz.get("unpacked_bytes")
         if a is not None:
             n_dl += 1
@@ -831,13 +855,31 @@ def _size_total_line(rows, sizes: dict, what: str = "download") -> str:
         if u is not None:
             n_disk += 1
             disk += u
+        if r.get("flavor") == "gpu" and flavor is not None \
+                and envs.resolve_flavor(flavor) == "cpu":
+            fell_back += 1
     unknown_dl, unknown_disk = n - n_dl, n - n_disk
     tail = (f" ({n} archive{'s' if n != 1 else ''}; download size unknown for "
             f"{unknown_dl}, disk size unknown for {unknown_disk})") if n else ""
     floor = " at least" if (unknown_dl or unknown_disk) else ""
+    note = ""
+    if flavor is not None:
+        eff = envs.resolve_flavor(flavor)
+        note = f"; summed the {eff} archives"
+        if flavor == "auto":
+            note += (" (auto: NVIDIA GPU visible on this host)" if eff == "gpu"
+                     else " (auto: no NVIDIA GPU visible on this host)")
+        if fell_back:
+            note += (f"; {fell_back} of {n} env{'s' if n != 1 else ''} have no CPU "
+                     f"archive yet, their GPU archive is counted")
     return (f"# total{floor}: {envs._gb(dl) if n_dl else '?'} {what}, "
-            f"{envs._gb(disk) if n_disk else '?'} on disk{tail}; "
+            f"{envs._gb(disk) if n_disk else '?'} on disk{tail}{note}; "
             f"sizes are the shipped snapshot engine/packed_sizes.json")
+
+
+def _flavor_token(flavor) -> str:
+    """`` flavor=cpu`` for a row whose installed flavour is recorded, else ``''``."""
+    return f" flavor={flavor}" if flavor in ("cpu", "gpu") else ""
 
 
 def _cmd_env(args) -> int:
@@ -868,7 +910,8 @@ def _cmd_env(args) -> int:
             tag = r["difficulty"] + ("*" if r["verified_working"] else "")
             if r["difficulty"] not in seen_tags:
                 seen_tags.append(r["difficulty"])
-            print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}")
+            print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}"
+                  f"{_flavor_token(r.get('flavor'))}")
         # the legend is a note, so stderr: stdout stays one line per method
         print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of BUILDING "
               "the env: " + "; ".join(f"{t} = {envs.DIFFICULTY.get(t, '?')}"
@@ -882,21 +925,30 @@ def _cmd_env(args) -> int:
         return _EXIT_OK
     if cmd == "plan":
         _mlist = _csv_list(getattr(args, "methods", None))
+        flavor = getattr(args, "flavor", "auto")
         sizes = envs.packed_sizes()
+        manifest = envs.packed_manifest()
         rows = envs.plan(category=getattr(args, "category", None), methods=_mlist)
+        # sizes follow the archive --flavor selects per env (its fallback to
+        # the GPU build included); the total line says which flavour it summed
+        summed = []
         for p in rows:
             tag = "shared" if p["shared"] else "own"
-            sz = sizes.get(p["env"], {})
+            key, eff = envs.archive_for(p["env"], flavor, manifest=manifest, sizes=sizes)
+            summed.append({**p, "flavor": eff})
+            sz = sizes.get(key) or {}
             print(f"{p['env']:18} [{tag:6}] {envs._gb(sz.get('archive_bytes')):>8} dl "
-                  f"{envs._gb(sz.get('unpacked_bytes')):>8} disk <- {', '.join(p['methods'])}")
-        print(_size_total_line(rows, sizes), file=sys.stderr)
+                  f"{envs._gb(sz.get('unpacked_bytes')):>8} disk <- {', '.join(p['methods'])}"
+                  f"{_flavor_token(p.get('flavor'))}")
+        print(_size_total_line(summed, sizes, flavor=flavor), file=sys.stderr)
         return _EXIT_OK
     if cmd == "doctor":
         _mlist = _csv_list(getattr(args, "methods", None))
         rows = envs.doctor(category=getattr(args, "category", None), methods=_mlist)
         for r in rows:
             mark = envs.env_mark(r["exists"], r["has_lock"])
-            print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}")
+            print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}"
+                  f"{_flavor_token(r.get('flavor'))}")
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"
@@ -914,18 +966,22 @@ def _cmd_env(args) -> int:
         do_run = getattr(args, "run", False)
         packed = getattr(args, "packed", False)
         force = getattr(args, "force", False)
+        flavor = getattr(args, "flavor", "auto")
         # mtb.env.install(): a RuntimeError (no conda here, a failed build, a
         # non-Linux host) propagates to main(): "error: ..." on stderr, exit 1
         # - never an error line on stdout; "[env] unpacking ..." -> stderr
         with _quiet_stdout():
             rows = envs.install(_mlist, category=getattr(args, "category", None),
-                                packed=packed, dry_run=not do_run, force=force)
+                                packed=packed, dry_run=not do_run, force=force,
+                                flavor=flavor)
         width = max([14] + [len(r["state"]) for r in rows])
         for r in rows:
             extra = ""
             if r["state"] == "packed archive published":
                 extra = (f" {envs._gb(r.get('archive_bytes')):>8} dl "
                          f"{envs._gb(r.get('unpacked_bytes')):>8} disk  {r['packed_url']}")
+            elif r["state"] in ("have", "PACKED"):
+                extra = _flavor_token(r.get("flavor"))
             print(f"{r['env']:18} [{r['state']:{width}}] <- {', '.join(r['methods'])}{extra}")
         if not do_run:
             print("# dry-run - add --run to create the missing envs"
@@ -933,8 +989,8 @@ def _cmd_env(args) -> int:
                      if packed else " from their lockfiles"), file=sys.stderr)
             if packed:
                 todo = [r for r in rows if not r["exists"] and r.get("packed_url")]
-                print(_size_total_line(todo, envs.packed_sizes(), what="to download"),
-                      file=sys.stderr)
+                print(_size_total_line(todo, envs.packed_sizes(), what="to download",
+                                       flavor=flavor), file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if getattr(args, "all", False):
@@ -1012,6 +1068,15 @@ _TASK_HELP = ("task within the category: clustering (default), batch, "
               "dimension_reduction, classification, imputation, registration "
               "(mtb.list_tasks())")
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
+_FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)
+_FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
+                "(the same env without the CUDA libraries, 3-4x smaller; the GPU build "
+                "with a warning where no CPU archive is published yet), 'gpu' = the "
+                "full CUDA build, 'auto' (default) = 'cpu' when no NVIDIA GPU is "
+                "visible on this host (nvidia-smi -L / /proc/driver/nvidia/version; "
+                "mtb.env.host_has_gpu), 'gpu' otherwise. The env is unpacked under "
+                "the same name whatever the flavour, and the flavour installed is "
+                "recorded in <prefix>/.multibench_flavor (shown by env status/doctor)")
 _FORCE_HELP = ("build even though this host is not linux-64 (the packed archives and "
                "lockfiles are; without --force a non-Linux host refuses before any "
                "download)")
@@ -1460,6 +1525,7 @@ def build_parser() -> argparse.ArgumentParser:
                                    "'# total' line on stderr sums them.")
     ep.add_argument("--category", help=_CATEGORY_HELP)
     ep.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
+    ep.add_argument("--flavor", choices=_FLAVORS, default="auto", help=_FLAVOR_HELP)
     ep.set_defaults(func=_cmd_env, _parser=ep)
     eg = ev.add_parser("create-group", help="create one shared group env (dry run unless --run)",
                        description="Create the shared conda env GROUP; without --run only "
@@ -1490,14 +1556,18 @@ def build_parser() -> argparse.ArgumentParser:
                     "size, unpacked size and URL (from engine/packed_sizes.json and "
                     "packed_urls.json; '?' = not measured) / 'no archive - lockfile "
                     "build', and a '# total' line on stderr. Add --run to do it. "
-                    "Method envs are linux-64 conda envs: on macOS/Windows a warning "
-                    "is printed first and --run refuses (--force overrides).")
+                    "--flavor picks the CPU-only or the CUDA archive (auto = by "
+                    "whether this host has an NVIDIA GPU); the env name is the same "
+                    "either way. Method envs are linux-64 conda envs: on "
+                    "macOS/Windows a warning is printed first and --run refuses "
+                    "(--force overrides).")
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ei.add_argument("--packed", action="store_true",
                     help="use prebuilt archives when published (URLs from "
                          "engine/packed_urls.json, default base mtb.env.PACKED_URL); "
                          "fall back to the lockfile build")
+    ei.add_argument("--flavor", choices=_FLAVORS, default="auto", help=_FLAVOR_HELP)
     ei.add_argument("--run", action="store_true",
                     help="actually create the envs; without it the command is a dry run")
     ei.add_argument("--force", action="store_true", help=_FORCE_HELP)
