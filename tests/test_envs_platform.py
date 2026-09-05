@@ -64,7 +64,7 @@ def test_create_all_run_passes_on_linux(on_linux, monkeypatch):
     assert ran
 
 
-def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch):
+def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch, tmp_path):
     import urllib.request
     monkeypatch.setattr(urllib.request, "urlretrieve",
                         lambda *a, **k: pytest.fail("download started on a non-Linux host"))
@@ -74,6 +74,8 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
     monkeypatch.setattr(envs, "_conda_bin", lambda prefer="mamba": "conda")
     monkeypatch.setattr(envs.shutil, "which", lambda c: "/usr/bin/conda")
     monkeypatch.setattr(envs, "_envs_dir", lambda b: Path("/nonexistent/envs"))
+    monkeypatch.setenv("MULTIBENCH_ENVS_DIR", str(tmp_path / "no-envs"))   # no prefix on disk ...
+    monkeypatch.setattr(envs, "env_prefix", lambda env, conda=None: None)  # ... and none via conda
     reached = []
 
     def _retrieve(url, *a, **k):
@@ -81,7 +83,7 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
         raise urllib.error.HTTPError(url, 404, "nope", {}, None)
     import urllib.error
     monkeypatch.setattr(urllib.request, "urlretrieve", _retrieve)
-    assert envs.install_packed("scmb_r", force=True) is False
+    assert envs.install_packed("scmb_r", force=True, envs_dir=tmp_path / "no-envs") is False
     assert reached and reached[0].endswith("scmb_r.tar.gz")
 
 
