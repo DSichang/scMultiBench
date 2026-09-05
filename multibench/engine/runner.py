@@ -58,6 +58,100 @@ def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
     return shlex.split(prefix) + cmd
 
 
+#: The environment variable that forces a run mode (``conda`` | ``prefix``).
+RUN_MODE_VAR = "MULTIBENCH_RUN_MODE"
+RUN_MODES = ("conda", "prefix")
+
+
+def run_mode(env: str) -> tuple[str, Path | None]:
+    """Which way the runner enters ``env`` for this call, and its prefix.
+
+    Parameters
+    ----------
+    env : str
+        The real env name (``mtb.env.group_for(method)``).
+
+    Returns
+    -------
+    tuple[str, Path or None]
+        ``("prefix", <prefix>)`` whenever ``mtb.env.env_prefix(env)`` finds
+        the env on disk - the default, needing no conda binary; else
+        ``("conda", None)``, today's ``conda run -n <env>``. The
+        ``MULTIBENCH_RUN_MODE`` environment variable forces either.
+
+    Raises
+    ------
+    OSError
+        ``MULTIBENCH_RUN_MODE=prefix`` with no prefix on disk; the message
+        names ``envs_dir`` and ``mtb.env.install``.
+    ValueError
+        ``MULTIBENCH_RUN_MODE`` set to anything but ``conda`` / ``prefix``.
+    """
+    forced = os.environ.get(RUN_MODE_VAR, "").strip().lower() or None
+    if forced is not None and forced not in RUN_MODES:
+        raise ValueError(
+            f"{RUN_MODE_VAR}={os.environ.get(RUN_MODE_VAR)!r}: expected one of "
+            f"{RUN_MODES}")
+    prefix = envs.env_prefix(env)
+    if forced == "prefix" and prefix is None:
+        raise OSError(
+            f"{RUN_MODE_VAR}=prefix but env {env!r} has no prefix under "
+            f"envs_dir {config.DEFAULT.envs_dir} (and conda reports none) - "
+            f"run mtb.env.install([<method>], dry_run=False) to unpack it, or "
+            f"point MULTIBENCH_ENVS_DIR / mtb.config.DEFAULT.envs_dir at it")
+    if forced == "conda":
+        return "conda", None
+    return ("prefix", prefix) if prefix is not None else ("conda", None)
+
+
+def prefix_activation(env: str, prefix: Path | str) -> str:
+    """The shell snippet that activates a conda prefix WITHOUT conda.
+
+    Sets ``CONDA_PREFIX`` and ``CONDA_DEFAULT_ENV``, puts ``<prefix>/bin``
+    first on ``PATH`` and sources every ``<prefix>/etc/conda/activate.d/*.sh``
+    (the R envs ship six; they assume ``CONDA_PREFIX`` is already set, hence
+    the order). ``python`` / ``Rscript`` in the wrapped argv then resolve
+    inside the env.
+
+    Parameters
+    ----------
+    env : str
+        The env name (``CONDA_DEFAULT_ENV``).
+    prefix : path
+        The env prefix (``CONDA_PREFIX``).
+
+    Returns
+    -------
+    str
+        One ``;``-separated bash snippet, every path quoted.
+    """
+    q = shlex.quote
+    p = str(prefix)
+    return (f"export CONDA_PREFIX={q(p)}; export CONDA_DEFAULT_ENV={q(env)}; "
+            f"export PATH={q(p + '/bin')}:\"$PATH\"; "
+            f"for _f in {q(p + '/etc/conda/activate.d')}/*.sh; do "
+            f"[ -e \"$_f\" ] && . \"$_f\"; done; unset _f")
+
+
+def wrap_prefix(cmd: list[str], env: str, prefix: Path | str) -> list[str]:
+    """``bash -c '<activate>; exec "$@"' -- <cmd>`` - the prefix-mode argv.
+
+    Parameters
+    ----------
+    cmd : list of str
+        The method argv (``python script.py ...`` / ``Rscript ...``).
+    env, prefix
+        As for :func:`prefix_activation`.
+
+    Returns
+    -------
+    list of str
+        The wrapped argv; ``bash`` execs the method, so the method IS the
+        child process (the process-group kill on a timeout is unchanged).
+    """
+    return ["bash", "-c", f"{prefix_activation(env, prefix)}; exec \"$@\"", "--", *cmd]
+
+
 # Auxiliary roles are passed through verbatim (never converted to canonical .h5)
 # and are excluded from the modality set used for variant selection.
 _AUX_ROLES = {"data_dir", "source_data", "target_data", "cty", "source_cty", "target_cty",
@@ -200,9 +294,11 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
 
     Builds the command from the variant's argument spec, swaps in the
     package-side ``driver`` wrapper when the variant declares one, applies
-    the opt-in pseudo-tty wrap and finally the ``cmd_template`` (default
-    ``conda run -n <env>`` with the env :func:`multibench.env.group_for`
-    would provision).
+    the opt-in pseudo-tty wrap and finally the env wrap: the ``cmd_template``
+    when given, else the mode :func:`run_mode` picks for the env
+    :func:`multibench.env.group_for` would provision - the ``bash -c``
+    prefix activation (:func:`wrap_prefix`) when the prefix is on disk,
+    ``conda run -n <env>`` otherwise.
     """
     # Pass out_dir with a trailing separator: many method scripts build their
     # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
@@ -221,16 +317,25 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
         cmd = [cmd[0], str(driver_abs), "--script_dir", str(script_dir)] + cmd[2:]
     else:
         cmd[1] = str(repo / cmd[1])
+    activate = None
     if cmd_template is None:
-        # Resolve conda's full path when available (CONDA_EXE is set by an
-        # initialized conda) so the default works even when bare `conda` is not
-        # on the spawned subprocess's PATH; fall back to `conda`.
-        conda = os.environ.get("CONDA_EXE", "conda")
         # Resolve the env via the same group system that provisioning builds
         # (mtb.env.plan/create/create_group), so "the env you provision is the
         # env you run". group_for() returns a method's shared group env, or its
         # own scmb_<method> env if it is not grouped.
-        cmd_template = f"{conda} run -n {envs.group_for(method)} {{cmd}}"
+        env_name = envs.group_for(method)
+        mode, prefix = run_mode(env_name)
+        if mode == "prefix":
+            # the prefix is on disk: activate it directly, no conda needed
+            # (the bash wrapper is applied last, outside the pty wrap)
+            activate = (env_name, prefix)
+            cmd_template = "{cmd}"
+        else:
+            # Resolve conda's full path when available (CONDA_EXE is set by an
+            # initialized conda) so the default works even when bare `conda` is
+            # not on the spawned subprocess's PATH; fall back to `conda`.
+            conda = os.environ.get("CONDA_EXE", "conda")
+            cmd_template = f"{conda} run -n {env_name} {{cmd}}"
     # Opt-in pseudo-tty: some upstream scripts read the terminal size
     # (os.popen('stty size')) to draw a progress bar and crash without a tty
     # (scJoint's util/utils.py). Wrap the method command in `script`, which
@@ -243,6 +348,8 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     if getattr(variant, "pty", False):
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
+    if activate is not None:
+        return wrap_prefix(cmd, *activate)
     return wrap_command(cmd, cmd_template)
 
 
@@ -283,20 +390,29 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     convert : bool, keyword-only
         Convert modality inputs to the canonical .h5 layout (default True).
     cmd_template : str, keyword-only, optional
-        Wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``.
-        Default: ``conda run -n <env>`` with the env ``mtb.env.group_for(method)``
-        would provision. When left as None the env is PREFLIGHTED: if conda lists
-        envs and the method's env is not among them, ``EnvironmentError`` is
-        raised before any file is written, naming the install command. Pass a
-        cmd_template to take over env control (no preflight).
+        Wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``; it
+        overrides everything below. Default (``None``): the env
+        ``mtb.env.group_for(method)`` would provision is entered in the mode
+        :func:`run_mode` picks per call - ``prefix`` whenever
+        ``mtb.env.env_prefix(env)`` finds the env on disk (a ``bash -c``
+        wrapper that sets ``CONDA_PREFIX`` / ``CONDA_DEFAULT_ENV``, puts
+        ``<prefix>/bin`` first on ``PATH`` and sources the env's
+        ``activate.d`` scripts; no conda binary needed), else ``conda``
+        (``conda run -n <env>``). ``MULTIBENCH_RUN_MODE=conda|prefix``
+        forces one (``prefix`` with no prefix on disk -> ``OSError`` naming
+        ``envs_dir`` and ``mtb.env.install``). When left as None the env is
+        also PREFLIGHTED: if envs are found on this machine and the method's
+        env is not among them, ``EnvironmentError`` is raised before any
+        file is written, naming the install command. Pass a cmd_template to
+        take over env control (no preflight).
     repo_path : path, keyword-only, optional
         Checkout holding ``tools_scripts/`` (default: auto-provisioned; on a
         dry run it is located but never fetched).
     dry_run : bool, keyword-only
         ``True`` returns the argv list the call WOULD execute - built from the
         same pieces (variant selection, ``engine.builder.build_command``, the
-        ``driver`` / ``pty`` wrapping, the default ``conda run -n <env>``
-        template) - and creates nothing: no ``out_dir``, no ``inputs/`` copies,
+        ``driver`` / ``pty`` wrapping, the real env wrap of :func:`run_mode`:
+        the prefix activation or ``conda run -n <env>``) - and creates nothing: no ``out_dir``, no ``inputs/`` copies,
         no env preflight, no fetch of the reference checkout. The inputs are
         shown absolutized, exactly as the run passes them (a real run first
         copies non-canonical inputs to ``<out_dir>/inputs/<role>.h5``;
@@ -329,16 +445,23 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
         return _argv(variant, method, values, out_str, repo, params, cmd_template)
 
-    # Env preflight: the default cmd_template is `conda run -n <env> ...`, and
-    # conda's own "EnvironmentLocationNotFound" only arrives AFTER inputs were
+    # Env preflight: the default env wrap is the prefix activation or `conda
+    # run -n <env> ...`, and a missing env only surfaces AFTER inputs were
     # converted and the subprocess spawned, buried in a stderr tail with no
-    # install hint. Check up front (same probe scan() uses), before anything is
-    # written. Skipped when the caller controls the env via cmd_template, and
-    # when the probe returns nothing (conda absent/broken -> cannot evidence,
+    # install hint. Check up front (same probe scan() uses: prefixes under
+    # envs_dir plus what conda lists), before anything is written. Skipped
+    # when the caller controls the env via cmd_template, and when the probe
+    # returns nothing (no prefixes, conda absent/broken -> cannot evidence,
     # let the subprocess report as before).
     if cmd_template is None:
         env_name = envs.group_for(method)
         have = envs.installed_envs()
+        if have and env_name not in have:
+            # conda's env list is cached per process; an env created outside
+            # this process since then is only missing from the cache, so
+            # re-probe once before refusing
+            envs._conda_prefixes.cache_clear()
+            have = envs.installed_envs()
         if have and env_name not in have:
             raise EnvironmentError(
                 f"conda env {env_name!r} ({method}) is not installed - run "
@@ -404,9 +527,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # cwd=out_dir. The out_dir is still passed via the --save_path arg, so
     # outputs land in the correct place regardless.
     exec_cwd = str((repo / variant.entrypoint).parent) if variant.cwd_at_script else str(workdir)
-    # The child is `conda run` and the actual method is its GRANDchild;
-    # killing only the direct child on a timeout left the method computing
-    # for hours. Own session -> one killpg reaps the whole tree.
+    # The child is `conda run` (or the prefix-mode bash, which execs the
+    # method) and the actual method may be its GRANDchild; killing only the
+    # direct child on a timeout left the method computing for hours. Own
+    # session -> one killpg reaps the whole tree.
     popen = subprocess.Popen(cmd, cwd=exec_cwd, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, env=run_env,
                              start_new_session=True)

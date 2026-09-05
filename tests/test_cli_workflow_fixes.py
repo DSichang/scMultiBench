@@ -157,7 +157,11 @@ def test_cli_run_all_dry_run_is_compact_too(capsys, tmp_path):
 
 
 # ------------------------------------------------------------------ J3: dry-run prints the commands
-def test_cli_run_all_dry_run_prints_commands(capsys, tmp_path):
+def test_cli_run_all_dry_run_prints_commands(capsys, tmp_path, monkeypatch):
+    # conda mode: the runner would print the bash prefix wrapper instead on a
+    # host where the matilda prefix is on disk (tests/test_prefix_mode.py
+    # pins that line); this test pins the conda line on every host
+    monkeypatch.setattr(envs, "env_prefix", lambda env, conda=None: None)
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path),
                    "--dry-run", "--methods", "Matilda,scMoMaT"])
     cap = capsys.readouterr()
@@ -460,6 +464,12 @@ def test_usage_errors_exit_2_on_stderr(argv, capsys):
 def test_env_install_runtime_error_is_on_stderr(monkeypatch, capsys):
     def boom(**kw):
         raise RuntimeError("conda/mamba not found on this machine")
+    # a Linux host with conda: install()'s own platform / no-conda prechecks
+    # (which run before create_all) stay quiet, so the build error is the one
+    # that surfaces
+    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "_find_conda", lambda: "/usr/bin/conda")
+    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     monkeypatch.setattr(envs, "create_all", boom)
     rc = cli.main(["env", "install", "--run", "--methods", "Matilda"])
     cap = capsys.readouterr()
