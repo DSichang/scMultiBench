@@ -47,7 +47,7 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
 
 
 
-def load_batch(out_dir) -> "BatchResult":
+def load_batch(out_dir, *, methods=None) -> "BatchResult":
     """Reload a :class:`BatchResult` that :meth:`BatchResult.save` wrote.
 
     ``run_all`` saves automatically, so after an overnight sweep you can come back
@@ -56,11 +56,39 @@ def load_batch(out_dir) -> "BatchResult":
         res = mtb.load_batch("out/")
         res.summary
         res.plot().savefig("compare.png")
+
+    Parameters
+    ----------
+    out_dir : path-like
+        The folder holding ``batch_result.json`` (plus ``long.csv`` when the
+        run produced metrics) - ``run_all(out_dir=...)``, or the tree
+        :func:`multibench.data.fetch_outputs` downloads.
+    methods : list of str, keyword-only, optional
+        Keep only these methods' records, in the order the tree ran them
+        (``mtb.load_batch(mtb.data.fetch_outputs("D11"), methods=trio)``).
+        ``None`` (default) keeps every record.
+
+    Returns
+    -------
+    BatchResult
+
+    Raises
+    ------
+    KeyError
+        A name in ``methods`` is not in the tree; the message lists the
+        methods that are.
     """
     d = Path(out_dir)
     with open(d / "batch_result.json") as fh:
         blob = json.load(fh)
     recs = blob["records"]
+    if methods is not None:
+        have = [r.get("method") for r in recs]
+        unknown = [m for m in methods if m not in have]
+        if unknown:
+            raise KeyError(f"no record for {unknown} in {d}; methods in the "
+                           f"tree: {have}")
+        recs = [r for r in recs if r.get("method") in set(methods)]
     lp = d / "long.csv"
     if lp.exists():
         lng = pd.read_csv(lp)
