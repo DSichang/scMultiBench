@@ -187,6 +187,10 @@ class Config:
     files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
     repo_path: Path = field(default_factory=lambda: _BASE / "scMultiBench_ref")
     data_path: Path = field(default_factory=lambda: _BASE / "data")
+    #: Leiden backend for the scIB resolution sweep in :func:`multibench.evaluate`:
+    #: ``"igraph"`` (scanpy's igraph implementation, several times faster) or
+    #: ``"leidenalg"`` (the backend the published tables were computed with).
+    leiden_flavor: str = "igraph"
     envs_dir: Path = _LazyEnvsDir()
 
 
