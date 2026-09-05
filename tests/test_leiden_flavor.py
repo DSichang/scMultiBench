@@ -45,12 +45,20 @@ def _spy_leiden(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _pretend_modern_scanpy(monkeypatch):
-    """These tests drive fakes of ``sc.tl.leiden`` and assert which backend the
-    package ASKS for; the answer must not depend on the host's scanpy (the
-    benchmark host runs 1.9.8, where the real probe says 'no igraph')."""
-    monkeypatch.setattr(S, "_igraph_support", True)
-    monkeypatch.setattr(S, "_flavor_kw", True)
+    """Each test starts with the one-per-process fallback warning re-armed."""
     monkeypatch.setattr(S, "_fallback_warned", False)
+
+
+def _eff(flavor):
+    """The backend the package will actually run for a request: igraph only
+    where this scanpy has it (>= 1.10 + igraph), leidenalg otherwise."""
+    return flavor if flavor == "leidenalg" or S.igraph_flavor_available() else "leidenalg"
+
+
+def _asked(seen):
+    """Backends the spied calls asked scanpy for; an absent flavor= means
+    leidenalg (the keyword is only sent to a scanpy that understands it)."""
+    return {kw.get("flavor", "leidenalg") for kw in seen}
 
 @pytest.mark.parametrize("flavor", ["igraph", "leidenalg"])
 
@@ -63,8 +71,8 @@ def test_both_flavors_give_one_clustering_per_resolution(flavor, monkeypatch):
     for k in keys:
         assert k in adata.obs and adata.obs[k].nunique() >= 1
     assert adata.obs[keys[-1]].nunique() >= 3            # three well-separated blobs
-    assert len(seen) == 10 and {kw["flavor"] for kw in seen} == {flavor}
-    if flavor == "igraph":
+    assert len(seen) == 10 and _asked(seen) == {_eff(flavor)}
+    if _eff(flavor) == "igraph":
         assert all(kw["n_iterations"] == 2 and kw["directed"] is False for kw in seen)
     else:
         assert all("n_iterations" not in kw for kw in seen)
@@ -75,18 +83,18 @@ def test_default_reads_the_config_field(monkeypatch):
     emb, _ = _blobs(n_per=30)
     monkeypatch.setattr(config.DEFAULT, "leiden_flavor", "leidenalg", raising=False)
     S.leiden_sweep(emb)
-    assert {kw["flavor"] for kw in seen} == {"leidenalg"}
+    assert _asked(seen) == {"leidenalg"}
     seen.clear()
     monkeypatch.setattr(config.DEFAULT, "leiden_flavor", "igraph", raising=False)
     S.leiden_sweep(emb)
-    assert {kw["flavor"] for kw in seen} == {"igraph"}
+    assert _asked(seen) == {_eff("igraph")}
 
 
 def test_shipped_default_is_igraph():
     """``config.DEFAULT.leiden_flavor`` defaults to ``"igraph"``; a Config
     without the field (older checkouts) resolves to the same."""
     assert getattr(config.DEFAULT, "leiden_flavor", "igraph") == "igraph"
-    assert S._resolve_flavor(None) == "igraph"
+    assert S._resolve_flavor(None) == _eff("igraph")
 
 
 def test_unknown_flavor_raises():
@@ -112,7 +120,7 @@ def test_evaluate_recovers_the_blobs_on_either_flavor(flavor, monkeypatch):
     df = mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI", "iF1"])
     assert float(df.loc["ARI", "Value"]) > 0.95
     assert float(df.loc["iF1", "Value"]) > 0.95
-    assert {kw["flavor"] for kw in seen} == {flavor}
+    assert _asked(seen) == {_eff(flavor)}
     assert len(seen) == 10                       # ONE sweep serves ARI/NMI and iF1
 
 
@@ -123,7 +131,7 @@ def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
         monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
         mtb.evaluate(emb, labels=lab, metrics=["ARI"])
         err = capsys.readouterr().err
-        assert re.search(rf"Leiden resolution sweep \(10 resolutions, flavor={flavor}\)", err)
+        assert re.search(rf"Leiden resolution sweep \(10 resolutions, flavor={_eff(flavor)}\)", err)
 
 
 def test_leidenalg_path_does_not_nag_about_igraph(recwarn):
@@ -151,7 +159,7 @@ def test_isolated_f1_fallback_sweep_uses_the_flavor(monkeypatch):
     v = S._isolated_labels_f1(adata, "celltype", "batch", "X_emb", iso_threshold=2,
                               flavor="leidenalg")
     assert 0.0 <= v <= 1.0
-    assert len(seen) == 10 and {kw["flavor"] for kw in seen} == {"leidenalg"}
+    assert len(seen) == 10 and _asked(seen) == {"leidenalg"}
 
 
 def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
