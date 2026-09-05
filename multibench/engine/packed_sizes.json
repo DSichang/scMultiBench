@@ -77,8 +77,8 @@
     "unpacked_bytes": null
   },
   "scmb_scjoint-cpu": {
-    "archive_bytes": null,
-    "unpacked_bytes": null
+    "archive_bytes": 641368911,
+    "unpacked_bytes": 2122277614
   },
   "scmb_scmdc": {
     "archive_bytes": 4251894509,
