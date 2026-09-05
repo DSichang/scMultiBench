@@ -85,7 +85,7 @@ def env_size_text(category=None, methods=None, short=False):
     hand-written GB figure. ``short=True`` keeps only the count and the total,
     for a code comment."""
     import multibench as mtb
-    rows = mtb.env.install(methods, category=category)      # dry_run=True: the plan, nothing built
+    rows = mtb.env.install(methods, category=category, flavor="cpu")   # dry_run=True: the plan for a CPU host (Colab), nothing built
     known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
     n = len(rows)
     flag = f"--category {category}" if category else f"--methods {','.join(methods)}"
