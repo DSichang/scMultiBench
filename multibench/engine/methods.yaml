@@ -83,6 +83,11 @@ methods:
     tasks: [clustering, batch, classification]
     atac: gene_activity
     status: verified
+    # GPU: main_scBridge.py:42 `ce_weight.cuda()` and :46 `Net(...).cuda()` are
+    # unconditional (no flag, no is_available() fallback; model_utils.py:52-219
+    # .cuda() throughout) -> refused up front on a host without a GPU.
+    requires_gpu: true
+    gpu_evidence: tools_scripts/scBridge/main_scBridge.py:46
     variants:
       # scBridge takes the dataset DIRECTORY plus BARE FILENAMES relative to it
       # (upstream: --data_path="../D27/" --source_data="rna.h5" --target_data="atac_gas.h5"
@@ -228,6 +233,11 @@ methods:
     # atac: upstream scMDC (ZINB on both views) was designed for gene-level ATAC; tools/atac_audit.py NEEDS_GENE_ACTIVITY
     atac: gene_activity
     status: verified
+    # CPU switch: main_scMDC.py:58 `--device` defaults to 'cuda' and :171/:191/:199
+    # call `.to(args.device)` unconditionally (scMDC_batch.py:164 gates only its
+    # own .to() on is_available()) -> `--device cpu`. Applied by the runner on a
+    # host without a GPU.
+    cpu_params: {device: cpu}
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/scMDC/main_scMDC.py
@@ -319,6 +329,11 @@ methods:
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
     status: verified
+    # GPU: every minibatch goes `.to('cuda')` unconditionally - main_moETM_rna_adt.py:109-111
+    # and main_moETM_rna_atac.py:124-126 - and the encoders are moved back with
+    # `.cuda()` (:130-131 / :145-146); neither script has a device flag.
+    requires_gpu: true
+    gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:109
     setup_hint: "runs in the `env_moETM` conda env. Verified end-to-end on D1 (rna+adt) -> (26169, 100) embedding."
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -460,6 +475,12 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: SMILE
+    # GPU: main_SMILE.py:120 calls ReferenceSMILE_trainer, which builds
+    # ContrastiveLoss (SMILE/SMILE.py:208) whose __init__ does
+    # `torch.tensor(temperature).cuda()` unconditionally (SMILE/SMILE.py:20,22);
+    # the trainer's own is_available() fallback (:207) never reaches that line.
+    requires_gpu: true
+    gpu_evidence: tools_scripts/SMILE/SMILE/SMILE.py:20
     language: python
     tasks: [batch, clustering]
     atac: peak
@@ -511,6 +532,11 @@ methods:
         params: {seed: 1}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: sciCAN
+    # GPU: main_sciCAN.py:46 calls Cycle_train_wolabel, which puts every network
+    # and minibatch on CUDA unconditionally (training.py:162-166, :193-198); the
+    # script only moves the trained extractor to CPU afterwards (:50). No flag.
+    requires_gpu: true
+    gpu_evidence: tools_scripts/sciCAN/training.py:162
     language: python
     tasks: [batch, clustering]
     atac: gene_activity
@@ -525,6 +551,13 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scJoint
+    # CPU switch: main_scJoint.py:21 declares `--use_cuda` with type=bool,
+    # default True - argparse's bool() is truthy for ANY non-empty string
+    # ("False" included), so only the EMPTY string turns it off; :53-56 then
+    # sets torch.device('cpu'). util/closs.py:57,108 gate their .cuda() on
+    # use_gpu (= use_cuda); closs._one_hot (:10) is unconditional but has no
+    # caller. Applied by the runner on a host without a GPU.
+    cpu_params: {use_cuda: ""}
     language: python
     tasks: [batch, classification, clustering]
     atac: gene_activity
@@ -627,6 +660,11 @@ methods:
   - id: UnitedNet
     language: python
     tasks: [clustering, classification]
+    # GPU: main_UnitedNet.py:32 hardcodes `device = "cuda:0"` (passed to
+    # UnitedNet(..., device=device) at :217, which .to()s the model onto it,
+    # src/interface.py:25); the argparse (:15-21) has no device flag.
+    requires_gpu: true
+    gpu_evidence: tools_scripts/UnitedNet/main_UnitedNet.py:32
     # atac: not in tools/atac_audit.py; inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
     atac: gene_activity
     status: verified
@@ -655,6 +693,12 @@ methods:
         extra_outputs:
           - {kind: labels, file: predict1.csv}
   - id: SPIRAL
+    # GPU: the published main_SPIRAL.py:211 does `torch.Tensor(...).float().cuda()`
+    # unconditionally and the spiral package it drives builds its model with
+    # `.cuda()` (spiral/main.py:57, :71-72; spiral/utils.py:365). The wired
+    # entrypoint is the benchmark host's copy of the same code (see below).
+    requires_gpu: true
+    gpu_evidence: tools_scripts/SPIRAL/main_SPIRAL.py:211
     status: verified
     language: python
     tasks: [registration]
@@ -713,6 +757,12 @@ methods:
           - {role: out_dir,  flag: "--save_dir"}
         output: {kind: coords, file: ""}
   - id: iPOLNG
+    # GPU: main_iPOLNG.py:12 picks the default tensor type with an
+    # is_available() fallback, but :41 then casts both inputs with
+    # `.type("torch.cuda.FloatTensor")` unconditionally, which a CPU-only torch
+    # cannot do ("Torch not compiled with CUDA enabled"). No flag.
+    requires_gpu: true
+    gpu_evidence: tools_scripts/iPOLNG/main_iPOLNG.py:41
     language: python
     tasks: [clustering]
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py

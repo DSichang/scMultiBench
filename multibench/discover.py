@@ -260,7 +260,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         n_tunable, needs_labels, labels - the label roles the variant reads,
         e.g. ``['cty']`` / ``['rna_cty']`` / ``[]``), params (per variant key
         'category:mods': defaults, tunable, effective), fixed_in_script,
-        upstream_knobs, upstream_url, runtime; with ``verbose=True`` also
+        upstream_knobs, upstream_url, runtime, cpu_params, requires_gpu,
+        gpu_evidence; with ``verbose=True`` also
         notes_long and verification. The paper-only catalog columns
         (``deep_learning``, ``output``) are in ``mtb.catalog.methods()``
         (the 0.2 ``files_dir=`` argument is gone).
@@ -298,6 +299,22 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     benchmark host and is not published - SPIRAL, GPSA; ``scan`` reports them
     not runnable, ``find_methods(available=True)`` drops them). Derived from
     the entrypoints, no hand flag.
+
+    ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` are the GPU/CPU
+    contract of the upstream script, read from its source. ``cpu_params``
+    (``{}`` for most methods) are the command-line values that turn CUDA
+    OFF in a script that has it on by default - ``{'use_cuda': ''}`` for
+    scJoint (its argparse ``--use_cuda`` is ``type=bool``, so only the
+    empty string is false), ``{'device': 'cpu'}`` for scMDC; ``run``
+    merges them into ``params`` on a host without an NVIDIA GPU
+    (``mtb.env.host_has_gpu()`` False) unless the caller set the key.
+    ``requires_gpu`` (default False) marks a script that calls CUDA
+    unconditionally - no flag, no ``torch.cuda.is_available()`` fallback -
+    and ``gpu_evidence`` is the ``file:line`` of that call (``None``
+    otherwise); on a GPU-less host ``run`` refuses such a method with
+    ``OSError`` before launching and ``scan`` reports it ``env_ok=False``.
+    Neither key says anything about the CPU archive of the method's env
+    (``mtb.env.install(..., flavor=...)``).
 
     ``verification`` (``verbose=True`` only) is the evidence behind
     ``status='verified'``: a list of dicts (one per recorded run of this
@@ -372,6 +389,11 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     info["notes"] = ref.get("summary") or None
     # observed cost (engine/runtimes.yaml); the tier scan() reports per row
     info["runtime"] = _runtime_hint(s.id)
+    # the GPU/CPU contract of the upstream script (methods.yaml, read from
+    # its source): what run() merges on a GPU-less host, and what it refuses
+    info["cpu_params"] = dict(s.cpu_params)
+    info["requires_gpu"] = bool(s.requires_gpu)
+    info["gpu_evidence"] = s.gpu_evidence or None
     if verbose:
         notes_long = up["notes"]
         if s.availability != "public":
