@@ -238,7 +238,8 @@ def test_env_install_is_the_cli_code_path(monkeypatch):
     with pytest.raises(KeyError, match="did you mean"):
         mtb.env.install(["Stabmap"])
     sig = inspect.signature(mtb.env.install)
-    assert list(sig.parameters) == ["methods", "category", "packed", "dry_run", "conda", "force"]
+    assert list(sig.parameters) == ["methods", "category", "packed", "dry_run", "conda",
+                                    "force", "flavor"]
     assert sig.parameters["dry_run"].default is True and sig.parameters["packed"].default is True
 
 
