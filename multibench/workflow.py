@@ -534,7 +534,15 @@ def scan(dataset: str, category: str | None = None, *,
         gate ALWAYS runs, whether or not any conda env is installed, so a
         laptop without envs still tells you whether your layout is right.
     ``env_ok`` / ``env_reason``
-        the method's conda env exists on this machine. The reason names the
+        the method's conda env exists on this machine - and, for a method
+        whose upstream script calls CUDA unconditionally
+        (``method_info(m)['requires_gpu']``), this machine has an NVIDIA GPU
+        (``mtb.env.host_has_gpu()``); otherwise ``env_reason`` carries the
+        sentence ``run`` would raise (``"<method> needs an NVIDIA GPU: the
+        upstream script calls CUDA unconditionally (<file>:<line>) ..."``).
+        The ``command`` column of such a row, like every row on a GPU-less
+        host, already carries the method's ``cpu_params`` (the flags that
+        turn CUDA off where a switch exists). The reason names the
         env and the one-method install command
         (``multibench env install --methods X --packed --run``).
 
@@ -706,6 +714,13 @@ def scan(dataset: str, category: str | None = None, *,
         if rec["env"] and rec["env"] not in installed:
             rec["env_ok"] = False
             rec["env_reason"] = _env_hint(rec["env"], spec.id, cat)
+        # ... and the host: a script that calls CUDA unconditionally cannot
+        # finish without an NVIDIA GPU, however complete the env - the same
+        # sentence run() raises as OSError, so the sweep never starts it.
+        if spec.requires_gpu and not envs.host_has_gpu():
+            rec["env_ok"] = False
+            rec["env_reason"] = "; ".join(
+                r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"])
         rec["reason"] = "; ".join(
             r for r in (_short_reason(rec["files_reason"], spec.id, dataset, cat),
