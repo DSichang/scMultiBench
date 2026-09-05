@@ -139,3 +139,21 @@ def test_isolated_f1_fallback_sweep_uses_the_flavor(monkeypatch):
                               flavor="leidenalg")
     assert 0.0 <= v <= 1.0
     assert len(seen) == 10 and {kw["flavor"] for kw in seen} == {"leidenalg"}
+
+
+def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
+    """scanpy < 1.10 has no flavor= (it forwards the keyword to leidenalg and
+    fails with TypeError); the resolver downgrades to leidenalg, warning once."""
+    monkeypatch.setattr(S, "_igraph_support", False)
+    monkeypatch.setattr(S, "_fallback_warned", False)
+    with pytest.warns(UserWarning, match=r"cannot run flavor='igraph' \(needs scanpy>=1.10"):
+        assert S._resolve_flavor("igraph") == "leidenalg"
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")           # second call: no repeat
+        assert S._resolve_flavor(None) == "leidenalg"
+    assert S._resolve_flavor("leidenalg") == "leidenalg"
+
+
+def test_igraph_probe_reads_scanpy_signature(monkeypatch):
+    monkeypatch.setattr(S, "_igraph_support", None)
+    assert S.igraph_flavor_available() is True      # this venv: scanpy >= 1.10 + igraph
