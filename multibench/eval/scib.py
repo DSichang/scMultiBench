@@ -158,20 +158,59 @@ def _lisi_helper_problem() -> str | None:
 LEIDEN_FLAVORS = ("igraph", "leidenalg")
 
 
+_igraph_support: bool | None = None     # probed once per process; tests may set it
+
+
+def igraph_flavor_available() -> bool:
+    """Can this scanpy run ``sc.tl.leiden(flavor="igraph")``?
+
+    scanpy accepts ``flavor=`` from 1.10 on (older releases forward the
+    unknown keyword to leidenalg, which raises ``TypeError``), and the backend
+    needs the ``igraph`` package. The answer is probed once per process.
+    """
+    global _igraph_support
+    if _igraph_support is None:
+        try:
+            import inspect
+            import igraph  # noqa: F401
+            import scanpy as sc
+            _igraph_support = "flavor" in inspect.signature(sc.tl.leiden).parameters
+        except Exception:  # noqa: BLE001 - any import/probe failure means "no"
+            _igraph_support = False
+    return _igraph_support
+
+
+_fallback_warned = False
+
+
 def _resolve_flavor(flavor) -> str:
-    """The Leiden backend to use: ``flavor`` itself, else the configured default.
+    """The Leiden backend that will actually run: ``flavor`` itself, else the
+    configured default, downgraded to ``"leidenalg"`` when this scanpy cannot
+    run the igraph backend.
 
     ``None`` reads ``config.DEFAULT.leiden_flavor`` (``"igraph"`` when the
     field is absent, e.g. an older ``Config``). Anything outside
     :data:`LEIDEN_FLAVORS` raises rather than silently running the slow
-    backend under a misspelt name.
+    backend under a misspelt name. ``"igraph"`` on a scanpy older than 1.10
+    (or without the igraph package) falls back to ``"leidenalg"`` with ONE
+    ``UserWarning`` per process - the metrics are the same, only slower.
     """
+    global _fallback_warned
     if flavor is None:
         from .. import config
         flavor = getattr(config.DEFAULT, "leiden_flavor", "igraph")
     if flavor not in LEIDEN_FLAVORS:
         raise ValueError(
             f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
+    if flavor == "igraph" and not igraph_flavor_available():
+        if not _fallback_warned:
+            import scanpy as sc
+            warnings.warn(
+                f"scanpy {getattr(sc, '__version__', '?')} cannot run flavor='igraph' "
+                f"(needs scanpy>=1.10 and the igraph package); using leidenalg for "
+                f"this process - same metrics, slower sweep", UserWarning, stacklevel=3)
+            _fallback_warned = True
+        return "leidenalg"
     return flavor
 
 
