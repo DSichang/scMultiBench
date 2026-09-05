@@ -160,6 +160,11 @@ def test_data_dir_only_non_slice_method_gets_no_empty_inputs_dir(tmp_path, monke
             self.returncode = 1                  # stop before any output is loaded
     monkeypatch.setattr(runner.subprocess, "Popen", FakePopen)
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["scmb_torch"])
+    # scBridge's script calls CUDA unconditionally (registry requires_gpu), so
+    # on a GPU-less host run() refuses it before Popen; this test is about the
+    # inputs/ layout, so pretend the host has a GPU (tests/test_gpu_requirements.py
+    # covers the refusal)
+    monkeypatch.setattr(runner.envs, "host_has_gpu", lambda: True)
     out = tmp_path / "out"
     with pytest.raises(RuntimeError, match="scBridge failed"):
         mtb.run("scBridge", "diagonal", inputs={"data_dir": str(tmp_path)}, out_dir=str(out))

@@ -92,14 +92,46 @@ def _parse_method(d: dict) -> MethodSpec:
         raise ValueError(
             f"methods.yaml: {d.get('id')!r} declares categories, but categories is "
             f"derived from the variants' when.category - remove the key")
+    variants = [_parse_variant(v, d["id"]) for v in d.get("variants", [])]
+    # params.yaml is keyed per variant and predates the cross variants of
+    # scMDC / scMM, which run the SAME script as their vertical variants -
+    # one argparse, one vocabulary. A variant with no entry inherits the
+    # tunables of a sibling that runs the same entrypoint, so run_all's
+    # params check (tunable | params) accepts the same keys for both.
+    for v in variants:
+        if not v.tunable:
+            for other in variants:
+                if other.tunable and other.entrypoint == v.entrypoint:
+                    v.tunable = dict(other.tunable)
+                    break
     spec = MethodSpec(
         id=d["id"], language=d.get("language", "python"),
         tasks=d.get("tasks", []),
         atac=d.get("atac"),
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
-        variants=[_parse_variant(v, d["id"]) for v in d.get("variants", [])],
+        variants=variants,
         env_spec=d.get("env_spec", {}) or {},
+        # GPU/CPU contract (schema.validate_gpu_fields runs in __post_init__:
+        # an absent key reads as none; any present value, dict or not, is
+        # handed over so a wrong shape is refused there, not coerced here)
+        cpu_params=d["cpu_params"] if d.get("cpu_params") is not None else {},
+        requires_gpu=d.get("requires_gpu", False),
+        gpu_evidence=d.get("gpu_evidence", "") or "",
     )
+    # A cpu_params flag the script does not accept would be emitted anyway
+    # (the runner merges it below the params check) and argparse would then
+    # refuse the whole run - so demand it is a param EVERY variant accepts:
+    # the upstream argparse vocabulary (`tunable`, from params.yaml) or a
+    # default the variant already emits (`params`).
+    for v in spec.variants:
+        accepted = set(v.tunable) | set(v.params)
+        bad = [k for k in spec.cpu_params if k not in accepted]
+        if bad:
+            raise ValueError(
+                f"methods.yaml: {spec.id!r} cpu_params names {bad}, which the "
+                f"{_variant_key(v.when)} variant does not accept (its params: "
+                f"{sorted(accepted)}); cpu_params must be command-line params the "
+                f"upstream script declares")
     # `atac:` is explicit on purpose (role names lie: moETM/scMM/iPOLNG take
     # `atac_gas` but consume peaks) - so make its ABSENCE loud rather than a
     # silent None that find_methods(atac=...) and describe_layout would omit.

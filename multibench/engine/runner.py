@@ -6,6 +6,7 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -353,6 +354,63 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     return wrap_command(cmd, cmd_template)
 
 
+def cpu_params_for(spec, params: dict | None) -> tuple[dict | None, dict]:
+    """The params a run on THIS host should emit, after the CPU switch.
+
+    On a host without an NVIDIA GPU (:func:`multibench.engine.envs.host_has_gpu`
+    is False) a method whose upstream script has CUDA on by default is
+    given its registry ``cpu_params`` - the command-line values that turn
+    CUDA off (scJoint's ``--use_cuda ""``, scMDC's ``--device cpu``) - so
+    the script does not die with "Torch not compiled with CUDA enabled".
+    A key the caller passed explicitly is never overridden: ``params``
+    wins, whatever the host.
+
+    Parameters
+    ----------
+    spec : MethodSpec
+        The method (``spec.cpu_params`` is the registry declaration).
+    params : dict or None
+        The caller's overrides.
+
+    Returns
+    -------
+    tuple[dict or None, dict]
+        ``(merged, applied)`` - ``merged`` is ``params`` with the applied
+        keys added (``params`` itself, untouched, when nothing applies);
+        ``applied`` is exactly the subset of ``cpu_params`` that was merged
+        (empty on a GPU host, for a method without ``cpu_params``, or when
+        the caller set every key).
+    """
+    if not spec.cpu_params or envs.host_has_gpu():
+        return params, {}
+    given = dict(params or {})
+    applied = {k: v for k, v in spec.cpu_params.items() if k not in given}
+    if not applied:
+        return params, {}
+    return {**applied, **given}, applied
+
+
+def check_gpu_requirement(spec) -> None:
+    """Refuse, before anything is launched, a method that cannot run here.
+
+    Parameters
+    ----------
+    spec : MethodSpec
+        The method about to run.
+
+    Raises
+    ------
+    OSError
+        ``spec.requires_gpu`` is True (the upstream script calls CUDA
+        unconditionally - no flag, no ``torch.cuda.is_available()``
+        fallback) and :func:`multibench.engine.envs.host_has_gpu` is
+        False. The message is ``spec.requires_gpu_reason`` - the same
+        sentence ``scan`` puts in ``env_reason``.
+    """
+    if spec.requires_gpu and not envs.host_has_gpu():
+        raise OSError(spec.requires_gpu_reason)
+
+
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
         params: dict | None = None, task: str | None = None, convert: bool = True,
         cmd_template: str | None = None, repo_path: Path | None = None,
@@ -384,7 +442,13 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         no ``inputs/`` at all). Made absolute the same way; ``RunResult.out_dir``
         is that absolute path.
     params : dict, keyword-only, optional
-        Overrides merged over the variant's default hyperparameters.
+        Overrides merged over the variant's default hyperparameters. On a
+        host without an NVIDIA GPU (``mtb.env.host_has_gpu()`` is False)
+        the method's registry ``cpu_params`` - the flags that turn CUDA off
+        in a script that has it on by default, ``method_info(m)['cpu_params']``
+        - are merged in first, so a key given here always wins; one line
+        ``[run] no GPU on this host: applying <method> cpu_params {...}``
+        goes to stderr when that happens (see :func:`cpu_params_for`).
     task : str, keyword-only, optional
         Accepted for forward compatibility and currently ignored.
     convert : bool, keyword-only
@@ -426,6 +490,18 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         :class:`RunResult` with the primary output loaded; the argv list when
         ``dry_run=True``.
 
+    Raises
+    ------
+    OSError
+        ``method_info(m)['requires_gpu']`` is True - the upstream script
+        calls CUDA unconditionally, with no switch - and this host has no
+        NVIDIA GPU (``mtb.env.host_has_gpu()`` is False). Raised before
+        anything is written or launched, with the message
+        ``"<method> needs an NVIDIA GPU: the upstream script calls CUDA
+        unconditionally (<file>:<line>); see method_info(m)["requires_gpu"]"``
+        - the same sentence ``scan`` reports as that row's ``env_reason``.
+        A dry run still returns the argv (a preview launches nothing).
+
     Note on auxiliary-role coupling: for methods whose args reference auxiliary
     roles (e.g. scBridge's ``data_dir``/``source_data``/``target_data``/
     ``source_cty``/``target_cty``), the caller must ALSO pass the modality roles
@@ -437,6 +513,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # are auxiliary too: they are method inputs but not modalities for variant
     # selection (consistent with resolve.py treating them as .csv labels).
     variant = spec.select(category, _modality_roles(inputs))
+    # The CPU switch of a CUDA-by-default script, on a host without a GPU
+    # (a caller's explicit key wins). Applied to the preview too, so
+    # dry_run / scan()['command'] show the flags the real run emits.
+    params, applied = cpu_params_for(spec, params)
 
     if dry_run:
         # the preview: absolute paths as the run passes them, the checkout
@@ -444,6 +524,14 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         values, out_str = normalize_paths(inputs, out_dir)
         repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
         return _argv(variant, method, values, out_str, repo, params, cmd_template)
+
+    # A script that calls CUDA unconditionally cannot finish on a GPU-less
+    # host: refuse here, with the file:line, instead of leaving the user a
+    # "Torch not compiled with CUDA enabled" traceback minutes later.
+    check_gpu_requirement(spec)
+    if applied:
+        print(f"[run] no GPU on this host: applying {method} cpu_params {applied}",
+              file=sys.stderr, flush=True)
 
     # Env preflight: the default env wrap is the prefix activation or `conda
     # run -n <env> ...`, and a missing env only surfaces AFTER inputs were
