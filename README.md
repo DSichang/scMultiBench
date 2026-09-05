@@ -55,7 +55,11 @@ take `(dataset, category, method)`, and `evaluate` / `load_results` /
 spellings warn for one release; every old -> new pair is in the
 [API reference](https://dsichang.github.io/scMultiBench/api/#deprecated-in-030).
 
-Running methods needs their conda environments, which are linux-64 only
+Running methods needs their environments - prebuilt linux-64 conda-pack
+archives that `env install --packed --run` unpacks into the envs dir
+(`$MULTIBENCH_ENVS_DIR`, else conda's envs dir when conda is present, else
+`~/.cache/multibench/envs`) and that `run`
+activates directly, so **no conda binary is required**, on Colab included
 (`env install --run` refuses on macOS / Windows unless `--force`); everything
 else - the registry, the stored results, `scan`'s file gate, `evaluate`, the
 figures - works on any machine. Install only the environments you need:
@@ -75,7 +79,7 @@ multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:c
 multibench scan D11 --category vertical               # preflight table: files_ok / env_ok / reason (--columns all: every column)
 multibench find --category vertical --modalities rna,adt --needs-labels false
 multibench params Matilda                              # the hyperparameters --param accepts, per variant
-multibench run --method Matilda --category vertical --input rna=<data_path>/D11/rna.h5 --input adt=<data_path>/D11/adt.h5 --input cty=<data_path>/D11/cty.csv --out-dir out/Matilda --dry-run   # one method: prints the exact `conda run -n matilda python ...` line; drop --dry-run to execute
+multibench run --method Matilda --category vertical --input rna=<data_path>/D11/rna.h5 --input adt=<data_path>/D11/adt.h5 --input cty=<data_path>/D11/cty.csv --out-dir out/Matilda --dry-run   # one method: prints the exact command line that would run; drop --dry-run to execute
 multibench run-all D11 --category vertical --out-dir out/ --dry-run   # the scan table + the command per variant; nothing runs
 multibench evaluate --output out/Matilda/embedding.h5 --labels <data_path>/D11/cty.csv --metrics ARI,NMI   # mtb.labels_for("D11") returns {'cty': <that path>}
 multibench plot bubble --category vertical --dataset D11 --source rerun --out d11.pdf
@@ -90,9 +94,16 @@ multibench cite Matilda MOFA2                          # BibTeX for the benchmar
 ## Try it without installing anything
 
 The [Colab quickstart](https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
-installs the API, explores the registry, and reproduces the benchmark figures
-from the shipped result tables - entirely in the browser. The full published
-rankings are browsable in the
+installs the API (pinning `numpy` / `pandas` to what Colab already has, so
+nothing is upgraded), explores the registry, and reproduces the benchmark
+figures from the shipped result tables - entirely in the browser, in about a
+minute; its last cell says where the time went. Each category tutorial opens
+in Colab too: with its `INSTALL_ENVS` flag left `False` nothing is downloaded
+and the run cells stand in the benchmark host's own `run_all` outputs (real
+embeddings, so `evaluate` and the figures are real); set it `True` to
+download the prebuilt environments (3-6 GB per tutorial, measured; no conda,
+no kernel restart) and run the methods on the Colab runtime. The full
+published rankings are browsable in the
 [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/).
 
 ## Citation
