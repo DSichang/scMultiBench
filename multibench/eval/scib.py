@@ -171,10 +171,12 @@ def igraph_flavor_available() -> bool:
     global _igraph_support
     if _igraph_support is None:
         try:
-            import inspect
             import igraph  # noqa: F401
-            import scanpy as sc
-            _igraph_support = "flavor" in inspect.signature(sc.tl.leiden).parameters
+            from importlib.metadata import version
+            from packaging.version import Version
+            # by version, not by signature: tests replace sc.tl.leiden with
+            # recorders whose signature says nothing about the real backend
+            _igraph_support = Version(version("scanpy")) >= Version("1.10")
         except Exception:  # noqa: BLE001 - any import/probe failure means "no"
             _igraph_support = False
     return _igraph_support
@@ -204,9 +206,9 @@ def _resolve_flavor(flavor) -> str:
             f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
     if flavor == "igraph" and not igraph_flavor_available():
         if not _fallback_warned:
-            import scanpy as sc
+            from importlib.metadata import version as _v
             warnings.warn(
-                f"scanpy {getattr(sc, '__version__', '?')} cannot run flavor='igraph' "
+                f"scanpy {_v('scanpy')} cannot run flavor='igraph' "
                 f"(needs scanpy>=1.10 and the igraph package); using leidenalg for "
                 f"this process - same metrics, slower sweep", UserWarning, stacklevel=3)
             _fallback_warned = True
