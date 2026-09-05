@@ -9,6 +9,8 @@ reads the config field, and that the sweep notice names the flavor.
 import re
 
 import numpy as np
+import warnings
+
 import pytest
 
 pytest.importorskip("scanpy")
@@ -154,6 +156,6 @@ def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
     assert S._resolve_flavor("leidenalg") == "leidenalg"
 
 
-def test_igraph_probe_reads_scanpy_signature(monkeypatch):
+def test_igraph_probe_reads_scanpy_version(monkeypatch):
     monkeypatch.setattr(S, "_igraph_support", None)
     assert S.igraph_flavor_available() is True      # this venv: scanpy >= 1.10 + igraph
