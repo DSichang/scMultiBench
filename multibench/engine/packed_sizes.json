@@ -89,8 +89,8 @@
     "unpacked_bytes": null
   },
   "scmb_scmm2-cpu": {
-    "archive_bytes": null,
-    "unpacked_bytes": null
+    "archive_bytes": 480594425,
+    "unpacked_bytes": 216867187
   },
   "scmb_scmsi": {
     "archive_bytes": 1115264987,
@@ -117,8 +117,8 @@
     "unpacked_bytes": null
   },
   "scmb_torch-cpu": {
-    "archive_bytes": null,
-    "unpacked_bytes": null
+    "archive_bytes": 922099761,
+    "unpacked_bytes": 2642831784
   },
   "scmb_torch_v2": {
     "archive_bytes": 5963709861,
