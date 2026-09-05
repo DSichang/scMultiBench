@@ -443,8 +443,9 @@ import warnings
 from pathlib import Path
 import anndata
 import pandas as pd
+from tqdm import TqdmWarning
 for _w in (FutureWarning, DeprecationWarning, pd.errors.PerformanceWarning,
-           anndata.ImplicitModificationWarning):   # library noise only - multibench's own warnings stay visible
+           anndata.ImplicitModificationWarning, TqdmWarning):   # library noise only - multibench's own warnings stay visible
     warnings.filterwarnings("ignore", category=_w)
 pd.set_option("display.max_colwidth", None)   # never truncate a `reason`
 pd.set_option("display.max_columns", None)    # never hide a metric column
