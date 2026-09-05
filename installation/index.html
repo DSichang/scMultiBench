@@ -603,6 +603,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#google-colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Colab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-the-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1286,6 +1297,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#google-colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Colab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-the-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1454,9 +1476,12 @@ that method. See <a href="#method-environments">Method environments</a> below.</
 <div class="admonition note">
 <p class="admonition-title">Why isolate?</p>
 <p>Even though <code>multibench</code>'s own footprint is small, a
-dedicated env keeps it cleanly separated from the per-method environments that
-the benchmark orchestrates via <code>conda run</code>. Conda is recommended because that
-orchestration relies on named conda envs.</p>
+dedicated env keeps it cleanly separated from the per-method environments
+the benchmark orchestrates. Those are prebuilt archives the package
+unpacks and activates by itself (or named conda envs, entered through
+<code>conda run</code>, when you build them from the lockfiles), so conda is a
+convenience for the API's own env, not a requirement: a <code>venv</code> - or a
+Colab runtime, which has no conda - runs everything, methods included.</p>
 </div>
 <hr />
 <h2 id="step-2-install-multibench">Step 2, Install multibench<a class="headerlink" href="#step-2-install-multibench" title="Anchor link to this section">&para;</a></h2>
@@ -1564,8 +1589,12 @@ need R, scBridge / Portal / uniPort each pin their own PyTorch line, and these
 <li>Resolves the method's command from the registry,</li>
 <li>Converts your inputs to the canonical scMultiBench <code>.h5</code> (unless
    <code>convert=False</code>),</li>
-<li>Executes the command <strong>inside that method's own conda env</strong> via a
-   <code>cmd_template</code>, default <code>"conda run -n {env} {cmd}"</code>,</li>
+<li>Executes the command <strong>inside that method's own environment</strong> - through
+   a <code>bash</code> wrapper that activates the env prefix directly when
+   <code>&lt;envs_dir&gt;/&lt;env&gt;</code> is on disk (what <code>env install --packed</code> unpacks; no
+   conda binary needed), else through <code>conda run -n &lt;env&gt;</code>; a custom
+   <code>cmd_template</code> overrides both, and <code>MULTIBENCH_RUN_MODE=prefix|conda</code>
+   forces one (see <a href="../api/#run-modes-prefix-and-conda">Run modes</a>),</li>
 <li>Loads the typed output back into a <code>RunResult</code>.</li>
 </ol>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
@@ -1581,7 +1610,8 @@ need R, scBridge / Portal / uniPort each pin their own PyTorch line, and these
 <p>The same call from the shell, checked before anything runs:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>data/D28/rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>data/D28/atac_gas.h5<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--out-dir<span class="w"> </span>runs/scalex_d28<span class="w"> </span>--dry-run<span class="w">      </span><span class="c1"># prints the exact `conda run -n scmb_torch python .../main_SCALEX.py ...` line</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--out-dir<span class="w"> </span>runs/scalex_d28<span class="w"> </span>--dry-run<span class="w">      </span><span class="c1"># prints the exact command line: `conda run -n scmb_torch python .../main_SCALEX.py ...`,</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">                                             </span><span class="c1"># or the prefix-activating `bash -c ...` wrapper when scmb_torch is unpacked on disk</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Create the method's env first</p>
@@ -1593,9 +1623,11 @@ themselves are <strong>never modified</strong> by <code>multibench</code>.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Custom orchestration</p>
-<p>Not using conda envs by name? Override how the command is launched with
-<code>cmd_template</code> (e.g. a container wrapper), or point <code>repo_path</code> at a local
-checkout of the method scripts. The default is <code>"conda run -n {env} {cmd}"</code>.</p>
+<p>Running the methods some other way? Override how the command is launched
+with <code>cmd_template</code> (e.g. a container wrapper), or point <code>repo_path</code> at a
+local checkout of the method scripts. Without it the package picks the
+wrapper per call: the prefix activation when <code>&lt;envs_dir&gt;/&lt;env&gt;</code> exists,
+<code>conda run -n {env} {cmd}</code> otherwise.</p>
 </div>
 <p>Every method in the registry is <strong>wired and run-verified</strong>: its command has
 been cross-checked against the real entrypoint and executed end-to-end on a
@@ -1624,6 +1656,44 @@ larger ones from Zenodo
 (<a href="https://doi.org/10.5281/zenodo.21928885">10.5281/zenodo.21928885</a>,
 <a href="https://doi.org/10.5281/zenodo.21928889">10.5281/zenodo.21928889</a>); if a
 download fails, the install falls back to the lockfile build automatically.</p>
+<p><strong>No conda binary is needed for the packed path.</strong> The archives are
+conda-pack archives, relocatable and carrying their own interpreters:
+<code>env install --packed --run</code> (<code>mtb.env.install(..., packed=True,
+dry_run=False)</code>) downloads one, extracts it into <code>&lt;envs_dir&gt;/&lt;env&gt;</code> and runs
+the archive's own <code>bin/conda-unpack</code>, and <code>run</code> then activates that prefix
+directly. <code>&lt;envs_dir&gt;</code> is <code>mtb.config.DEFAULT.envs_dir</code>: the
+<code>MULTIBENCH_ENVS_DIR</code> environment variable when set, else the first writable
+envs dir of the conda / mamba found on <code>PATH</code>, else
+<code>~/.cache/multibench/envs</code>. <code>env doctor</code> and <code>scan</code>'s <code>env_ok</code> count an env
+as installed whenever that prefix (with its <code>bin/</code>) is on disk - with or
+without conda. Only a <strong>lockfile build</strong> (<code>--packed</code> off, or an env without
+an archive) needs conda or mamba; on a host without one it raises before any
+download: <code>RuntimeError: no conda/mamba on this host; &lt;env&gt; has a packed
+archive - pass packed=True</code> or <code>... has no packed archive - install conda
+first</code>.</p>
+<p><strong><abbr title="Central Processing Unit">CPU</abbr> and <abbr title="Graphics Processing Unit">GPU</abbr> flavours.</strong> The tutorial torch environments (<code>env_sciPENN</code>,
+<code>matilda</code>, <code>scmb_scjoint</code>, <code>scmb_torch</code>, <code>scmb_scmm2</code>) are also published
+as <abbr title="Central Processing Unit">CPU</abbr>-only archives named <code>&lt;env&gt;-cpu</code> - the same environment without the
+CUDA libraries, roughly 3-4x smaller, which is what a Colab <abbr title="Central Processing Unit">CPU</abbr> runtime or
+a laptop actually needs. <code>env install --flavor cpu|gpu|auto</code> (default
+<code>auto</code>; <code>flavor=</code> on <code>mtb.env.install</code> / <code>install_packed</code>) picks one:
+<code>auto</code> takes the <abbr title="Central Processing Unit">CPU</abbr> archive when no NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> is visible on the host
+(<code>nvidia-smi -L</code> lists a device, or <code>/proc/driver/nvidia/version</code> exists -
+<code>mtb.env.host_has_gpu()</code>), the CUDA build otherwise; <code>cpu</code> on an env whose
+<abbr title="Central Processing Unit">CPU</abbr> archive is not published yet falls back to the CUDA build with one
+warning (<code>no CPU archive for &lt;env&gt;; installing the GPU build (&lt;size&gt;)</code>).
+Whatever the flavour, the archive is unpacked under the plain env name
+(<code>&lt;envs_dir&gt;/matilda</code>, never <code>matilda-cpu</code>), so <code>run</code>, <code>scan</code> and the
+registry are unchanged; the flavour that landed is recorded in
+<code>&lt;prefix&gt;/.multibench_flavor</code> and <code>env status</code> / <code>env doctor</code> / <code>env plan</code>
+print it as <code>flavor=cpu</code>. <code>env plan --flavor</code> and the dry-run
+<code>env install --packed</code> show the sizes of the flavour they would fetch, and
+their <code># total</code> line says which flavour it summed - so on a <abbr title="Central Processing Unit">CPU</abbr> host the
+download the tutorials print is the <abbr title="Central Processing Unit">CPU</abbr> archives' total. A <abbr title="Central Processing Unit">CPU</abbr> archive
+counts as published once <code>packed_urls.json</code> lists it <em>and</em>
+<code>packed_sizes.json</code> carries its measured size (the maintainer tool records
+that right after the upload); until then the entry is a placeholder and
+every host keeps taking the CUDA build.</p>
 <p><code>multibench env plan [--category C | --methods M,...]</code> prints, per env, the
 packed-archive download size (<code>dl</code>) and the unpacked size on disk (<code>disk</code>)
 from the shipped snapshot <code>multibench/engine/packed_sizes.json</code>, plus a
@@ -1651,6 +1721,39 @@ per-env outcome) and is what the CLI calls.
 not published (<code>benchmark-host-only</code>), so its env builds but the method
 cannot run off the benchmark host; GPSA runs through the package driver and
 is public, like PASTE and PASTE2.</p>
+<h3 id="google-colab">Google Colab<a class="headerlink" href="#google-colab" title="Anchor link to this section">&para;</a></h3>
+<p>Every notebook - the <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb">quickstart</a>
+and the four category tutorials - opens in Colab from its badge and runs on
+the free <abbr title="Central Processing Unit">CPU</abbr> runtime, which has no conda. Nothing provisions one - no
+conda bootstrap step, no kernel restart - and the install cell pins <code>numpy</code> and
+<code>pandas</code> to the versions the runtime already has, so pip never upgrades
+Colab's stack (<code>pip install "multibench-sc&gt;=0.3" numpy==&lt;yours&gt;
+pandas==&lt;yours&gt;</code>, about 30 s with a cold cache - the ~650 MB of scientific
+Python behind <code>scanpy</code> / <code>scib</code>; the wheel itself is 1.3 MB). The reference
+dataset of a tutorial is 11-290 MB (<code>mtb.data.fetch</code>).</p>
+<p>What the tutorials download beyond that is decided by one flag cell,
+<code>INSTALL_ENVS</code>:</p>
+<ul>
+<li><code>INSTALL_ENVS = False</code> (the default; <strong>Run all</strong> is safe for a room of
+  attendees): no environment is downloaded and no method executes. The run
+  cells stand in the benchmark host's own <code>run_all</code> outputs for the dataset
+  (<code>mtb.data.fetch_outputs</code>, a tarball with the <code>summary.csv</code> / <code>long.csv</code> /
+  <code>batch_result.json</code> and one embedding per method, reloaded with
+  <code>mtb.load_batch(..., methods=)</code>), so the summary, the <code>evaluate</code> cell and
+  the figures are real; offline, or before those outputs are published, the
+  package's stored metric table stands in and one printed line says so.</li>
+<li><code>INSTALL_ENVS = True</code> (Colab or any Linux host): the environments cell
+  prints the download the dry run measures, then
+  <code>mtb.env.install(trio, category=CATEGORY, packed=True, dry_run=False)</code>
+  unpacks the prebuilt archives for the notebook's methods into
+  <code>~/.cache/multibench/envs</code> and the run cells execute the methods on the
+  runtime. Measured archive totals per tutorial (each flag cell states its
+  own): cross 3.0 GB, diagonal 5.1 GB, mosaic 5.5 GB, vertical 6.2 GB;
+  <code>multibench env plan --methods ...</code> prints the per-env sizes.</li>
+</ul>
+<p>The last cell of every notebook prints a compact <em>where the time went</em>
+table - seconds per stage (install, data fetch, run-or-fetch, evaluate,
+plot, ...), recorded by the <code>tick(label)</code> calls the cells make.</p>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
 <p>The benchmark datasets are not part of the wheel or of the clone, and for the
 tutorials you do not need to fetch anything by hand: <strong>each tutorial
@@ -1749,10 +1852,25 @@ replacement - the full old -&gt; new table, with every error text, is in the
 <dl>
 <dt><strong><code>OSError: conda env '&lt;env&gt;' (&lt;method&gt;) is not installed</code></strong> from <code>mtb.run</code>, or <code>env_ok</code> False in <code>scan()</code></dt>
 <dd>
-<p>The method's conda env does not exist here. <code>multibench env install
---methods &lt;method&gt; --packed --run</code> builds it (the message carries the
-exact command), or pass a custom <code>cmd_template=</code> to <code>mtb.run(...)</code>
+<p>The method's environment does not exist here - neither as a prefix
+under <code>mtb.config.DEFAULT.envs_dir</code> nor as a conda env by that name.
+<code>multibench env install --methods &lt;method&gt; --packed --run</code> unpacks it
+(the message carries the exact command; no conda needed for the
+packed archive), or pass a custom <code>cmd_template=</code> to <code>mtb.run(...)</code>
 that launches the command another way.</p>
+</dd>
+<dt><strong><code>OSError</code> naming <code>envs_dir</code> and <code>mtb.env.install</code></strong> with <code>MULTIBENCH_RUN_MODE=prefix</code></dt>
+<dd>
+<p>Prefix mode was forced but <code>&lt;envs_dir&gt;/&lt;env&gt;</code> is not on disk. Unpack
+the packed archive (<code>env install --methods &lt;method&gt; --packed --run</code>),
+point <code>MULTIBENCH_ENVS_DIR</code> at the directory that holds the prefix,
+or unset the variable to let the package fall back to <code>conda run</code>.</p>
+</dd>
+<dt><strong><code>RuntimeError: no conda/mamba on this host; &lt;env&gt; has no packed archive - install conda first</code></strong></dt>
+<dd>
+<p>A lockfile build needs conda or mamba; the packed archives do not.
+Where the message says <code>has a packed archive - pass packed=True</code>,
+pass it (<code>--packed</code> on the command line) and no conda is required.</p>
 </dd>
 <dt><strong><code>ImportError: No module named scib</code></strong> when calling <code>mtb.evaluate</code></dt>
 <dd>

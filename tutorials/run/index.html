@@ -692,6 +692,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#how-the-environment-is-entered-prefix-and-conda-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the environment is entered: prefix and conda modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-or-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU or CPU?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#choosing-a-cmd_template" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1280,6 +1302,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#how-the-environment-is-entered-prefix-and-conda-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the environment is entered: prefix and conda modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-or-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU or CPU?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#choosing-a-cmd_template" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1418,14 +1462,17 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
    match is exact on the <em>set</em> of modality roles - <code>{"rna", "atac_gas"}</code> selects
    the diagonal <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + gene-activity variant, not the vertical one.</li>
 <li><strong>Preflight the environment</strong>: with the default <code>cmd_template</code>, a missing
-   conda env raises <code>OSError</code> naming the install command <em>before</em>
-   anything is written.</li>
+   environment - no prefix under <code>envs_dir</code>, no conda env by that name -
+   raises <code>OSError</code> naming the install command <em>before</em> anything is
+   written.</li>
 <li><strong>Convert inputs</strong> to the canonical scMultiBench <code>.h5</code> (unless
    <code>convert=False</code>) into a per-run <code>inputs/</code> folder.</li>
 <li><strong>Build the command</strong> - <code>[interpreter, entrypoint, *args, *params]</code> - with the
    entrypoint resolved against the reference <code>repo_path</code>.</li>
-<li><strong>Wrap and execute</strong> via <code>cmd_template</code> (default <code>conda run -n &lt;env&gt; {cmd}</code>)
-   in the per-run <code>out_dir</code> working directory.</li>
+<li><strong>Wrap and execute</strong> in the per-run <code>out_dir</code> working directory: the
+   prefix activation when the env is unpacked on disk, <code>conda run -n &lt;env&gt;
+   {cmd}</code> otherwise (<a href="#how-the-environment-is-entered-prefix-and-conda-modes">how the environment is entered</a>),
+   or your own <code>cmd_template</code>.</li>
 <li><strong>Load the output</strong> by its declared <code>kind</code> (e.g. an embedding <code>ndarray</code>) into a
    <code>RunResult</code>.</li>
 </ol>
@@ -1434,12 +1481,14 @@ handle. A single <code>mtb.run</code> call walks this path:</p>
 <p>The env each method needs is declared in the registry - for <code>SCALEX</code> it is
 <code>scmb_torch</code> (see <code>mtb.method_info("SCALEX")["env"]</code>, the same name
 <code>scan</code>'s <code>env</code> column, <code>env doctor</code> and <code>multibench env recipe / yml</code>
-use) - and it must exist on your machine. Build it from the committed
-lockfile (or a prebuilt archive) with <code>multibench env install --methods
-SCALEX --packed --run</code> (<code>mtb.env.install(["SCALEX"], dry_run=False)</code> from
-Python); <code>multibench env doctor</code> lists what exists and what is missing.
-<code>mtb.run</code> shells out with <code>conda run -n &lt;env&gt; ...</code>; if the env is
-missing the preflight raises <code>OSError</code> with that install command.
+use) - and it must exist on your machine. Unpack the prebuilt archive
+(no conda binary needed) or build it from the committed lockfile with
+<code>multibench env install --methods SCALEX --packed --run</code>
+(<code>mtb.env.install(["SCALEX"], dry_run=False)</code> from Python);
+<code>multibench env doctor</code> lists what exists and what is missing.
+<code>mtb.run</code> enters the env by activating its prefix, or with <code>conda run
+-n &lt;env&gt; ...</code> when the env is a named conda env only (below); if the env
+is missing the preflight raises <code>OSError</code> with that install command.
 <code>multibench run ... --dry-run</code> prints the exact command line without
 executing it (<code>--param KEY=VALUE</code> merges hyperparameters into it), the
 line an HPC job can carry; <code>mtb.run(method, category, inputs=...,
@@ -1605,9 +1654,9 @@ place. <code>run</code> therefore makes every path-valued input and <code>out_di
 absolute (symlinks preserved) before it builds the command - a directory
 role such as <code>data_dir</code> also gets its trailing separator - and
 <code>inputs_for</code> returns absolute paths; <code>RunResult.out_dir</code> is the absolute
-path. No <code>cmd_template</code> is needed: the default <code>conda run -n {env}
-{cmd}</code> fills <code>{env}</code> from the spec (<code>scmb_torch</code> for SCALEX), so the run
-lands in the right conda env automatically.</p>
+path. No <code>cmd_template</code> is needed: the wrapper fills the env from the
+spec (<code>scmb_torch</code> for SCALEX) - the prefix activation or <code>conda run -n
+scmb_torch</code> - so the run lands in the right environment automatically.</p>
 </div>
 <p><code>mtb.run</code> returns a <code>RunResult</code> dataclass:</p>
 <table>
@@ -1653,7 +1702,7 @@ lands in the right conda env automatically.</p>
 </table>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># numpy ndarray, shape (11014, 10), the joint embedding</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">res</span><span class="o">.</span><span class="n">extra</span>             <span class="c1"># {} for SCALEX (no extra outputs)</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>           <span class="c1"># [&lt;conda&gt;, &#39;run&#39;, &#39;-n&#39;]  -&gt; the cmd_template wrapper</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>           <span class="c1"># [&#39;bash&#39;, &#39;-c&#39;, &#39;&lt;activate&gt;; exec &quot;$@&quot;&#39;] in prefix mode; [&lt;conda&gt;, &#39;run&#39;, &#39;-n&#39;] in conda mode</span>
 </span></code></pre></div>
 <p>The embedding flows straight into evaluation and plotting. D28's labels are
 two files - one per modality, because the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells differ - and
@@ -1670,10 +1719,76 @@ in another order must pass <code>label_order=[...]</code> (or a list of paths in
 order). <code>run_all</code> finds that order for you and records it as
 <code>summary.label_order</code>.</p>
 <hr />
+<h2 id="how-the-environment-is-entered-prefix-and-conda-modes">How the environment is entered: prefix and conda modes<a class="headerlink" href="#how-the-environment-is-entered-prefix-and-conda-modes" title="Anchor link to this section">&para;</a></h2>
+<p>Without a <code>cmd_template</code>, <code>run</code> picks the wrapper per call from what is on
+disk - and nothing needs a conda binary once the env's prefix exists:</p>
+<ul>
+<li><strong>prefix mode</strong> (the default whenever <code>mtb.env.env_prefix(env)</code> finds one):
+  the argv is <code>bash -c '&lt;activate&gt;; exec "$@"' -- &lt;cmd&gt;</code>, where
+  <code>&lt;activate&gt;</code> sets <code>CONDA_PREFIX=&lt;prefix&gt;</code>, <code>CONDA_DEFAULT_ENV=&lt;env&gt;</code> and
+  <code>PATH=&lt;prefix&gt;/bin:$PATH</code>, and sources every
+  <code>&lt;prefix&gt;/etc/conda/activate.d/*.sh</code> (the R environments ship six; they
+  assume <code>CONDA_PREFIX</code>). <code>python</code> / <code>Rscript</code> in <code>&lt;cmd&gt;</code> then resolve
+  inside the env. The prefix is <code>&lt;envs_dir&gt;/&lt;env&gt;</code> when that folder has a
+  <code>bin/</code> - <code>envs_dir</code> being <code>mtb.config.DEFAULT.envs_dir</code>: the
+  <code>MULTIBENCH_ENVS_DIR</code> environment variable, else the first writable envs
+  dir of the conda / mamba on <code>PATH</code>, else <code>~/.cache/multibench/envs</code> -
+  which is where <code>multibench env install --packed --run</code> unpacks the
+  prebuilt archives (relocatable conda-pack archives with their own
+  interpreters; <code>install</code> runs their <code>bin/conda-unpack</code> itself), and
+  otherwise the prefix conda reports for that name when conda is found.</li>
+<li><strong>conda mode</strong> (the fallback when no prefix is on disk but a conda / mamba
+  binary is found): <code>conda run -n &lt;env&gt; &lt;cmd&gt;</code>.</li>
+</ul>
+<p><code>MULTIBENCH_RUN_MODE=conda|prefix</code> forces one mode for every call
+(<code>prefix</code> forced with no prefix on disk raises <code>OSError</code> naming <code>envs_dir</code>
+and <code>mtb.env.install</code>); <code>mtb.scan(...)["command"]</code> and <code>multibench run
+--dry-run</code> show the line the chosen mode would run, so a scheduler job can
+carry it verbatim. <code>env doctor</code> and <code>scan</code>'s <code>env_ok</code> count an env as
+installed exactly when <code>env_prefix</code> finds it - with or without conda.</p>
+<h2 id="gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?<a class="headerlink" href="#gpu-or-cpu" title="Anchor link to this section">&para;</a></h2>
+<p>Most method scripts pick a device themselves (<code>torch.cuda.is_available()</code>
+fallback, or a library that does the same), so on a <abbr title="Central Processing Unit">CPU</abbr>-only runtime - a
+Colab <abbr title="Central Processing Unit">CPU</abbr> session, a laptop - they simply run slower. Two exceptions are
+read from each script's source and recorded per method in the registry:</p>
+<ul>
+<li><strong><code>method_info(m)["cpu_params"]</code></strong> - the command-line values that turn
+  CUDA <em>off</em> in a script that has it on by default: <code>{'use_cuda': ''}</code> for
+  scJoint (its argparse <code>--use_cuda</code> is <code>type=bool</code>, and <code>bool("False")</code> is
+  true, so only the empty string switches it off) and <code>{'device': 'cpu'}</code>
+  for scMDC. When <code>mtb.env.host_has_gpu()</code> is <code>False</code>, <code>run</code> merges them
+  into <code>params</code> before building the command - <code>run(..., dry_run=True)</code> and
+  <code>scan(...)["command"]</code> show the merged flags - and prints one line to
+  stderr, <code>[run] no GPU on this host: applying scJoint cpu_params
+  {'use_cuda': ''}</code>. A key you pass in <code>params</code> yourself always wins.</li>
+<li><strong><code>method_info(m)["requires_gpu"]</code></strong> - the script calls CUDA
+  unconditionally, with no switch (scBridge, moETM, SMILE, sciCAN,
+  UnitedNet, iPOLNG, SPIRAL); <code>method_info(m)["gpu_evidence"]</code> is the
+  <code>file:line</code> of that call. On a host without an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> <code>run</code> refuses
+  such a method with <code>OSError</code> <em>before</em> launching anything - <code>scBridge
+  needs an NVIDIA GPU: the upstream script calls CUDA unconditionally
+  (tools_scripts/scBridge/main_scBridge.py:46); see
+  method_info(m)["requires_gpu"]</code> - and <code>scan</code> / <code>run_all</code> report the same
+  sentence as that row's <code>env_reason</code> (<code>env_ok=False</code>, <code>runnable=False</code>),
+  so a sweep never starts it. On a <abbr title="Graphics Processing Unit">GPU</abbr> host nothing changes.</li>
+</ul>
+<p>Neither key says anything about the <em>environment</em>: the torch envs of the
+tutorial methods are published in a CUDA build and a <abbr title="Central Processing Unit">CPU</abbr>-only build
+(<code>&lt;env&gt;-cpu</code>), and <code>mtb.env.install(..., flavor="auto")</code> picks the <abbr title="Central Processing Unit">CPU</abbr>
+archive on a <abbr title="Graphics Processing Unit">GPU</abbr>-less host by itself - see
+<a href="../../api/#archive-flavours-cpu-and-gpu">Archive flavours</a>. A method that
+runs on <abbr title="Central Processing Unit">CPU</abbr> needs the <abbr title="Central Processing Unit">CPU</abbr> archive only to save the download; a
+<code>requires_gpu</code> method needs the CUDA build <em>and</em> a <abbr title="Graphics Processing Unit">GPU</abbr>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span> <span class="k">if</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">m</span><span class="p">)[</span><span class="s2">&quot;requires_gpu&quot;</span><span class="p">]]</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="p">[</span><span class="s1">&#39;scBridge&#39;</span><span class="p">,</span> <span class="s1">&#39;moETM&#39;</span><span class="p">,</span> <span class="s1">&#39;SMILE&#39;</span><span class="p">,</span> <span class="s1">&#39;sciCAN&#39;</span><span class="p">,</span> <span class="s1">&#39;UnitedNet&#39;</span><span class="p">,</span> <span class="s1">&#39;SPIRAL&#39;</span><span class="p">,</span> <span class="s1">&#39;iPOLNG&#39;</span><span class="p">]</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">&quot;scJoint&quot;</span><span class="p">)[</span><span class="s2">&quot;cpu_params&quot;</span><span class="p">]</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">{</span><span class="s1">&#39;use_cuda&#39;</span><span class="p">:</span> <span class="s1">&#39;&#39;</span><span class="p">}</span>
+</span></code></pre></div>
 <h2 id="choosing-a-cmd_template">Choosing a <code>cmd_template</code><a class="headerlink" href="#choosing-a-cmd_template" title="Anchor link to this section">&para;</a></h2>
 <p><code>cmd_template</code> decides <em>how</em> the built command is executed; <code>{cmd}</code> is the
-placeholder for the argv. The default targets the method's declared env:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">cmd_template</span> <span class="o">=</span> <span class="s2">&quot;conda run -n </span><span class="si">{env}</span><span class="s2"> </span><span class="si">{cmd}</span><span class="s2">&quot;</span>   <span class="c1"># default; {env} filled from the spec</span>
+placeholder for the argv. When you pass none, the two modes above target the
+method's declared env; the conda-mode wrapper spelled out is:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">cmd_template</span> <span class="o">=</span> <span class="s2">&quot;conda run -n </span><span class="si">{env}</span><span class="s2"> </span><span class="si">{cmd}</span><span class="s2">&quot;</span>   <span class="c1"># what conda mode runs; {env} filled from the spec</span>
 </span></code></pre></div>
 <p>Override it to run elsewhere, e.g. an explicit env name, a Singularity
 container, or an HPC scheduler wrapper (the env preflight is skipped - you
@@ -1681,15 +1796,15 @@ own the environment then):</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="explicit-conda-env" name="__tabbed_1" type="radio" /><input id="singularity--apptainer" name="__tabbed_1" type="radio" /><input id="run-in-the-current-env" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="explicit-conda-env">Explicit conda env</label><label for="singularity--apptainer">Singularity / Apptainer</label><label for="run-in-the-current-env">Run in the current env</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;singularity exec multibench.sif </span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;singularity exec multibench.sif </span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>   <span class="c1"># no wrapper, use the active interpreter</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">{cmd}</span><span class="s2">&quot;</span><span class="p">)</span>   <span class="c1"># no wrapper, use the active interpreter</span>
 </span></code></pre></div>
 </div>
 </div>
@@ -1729,8 +1844,8 @@ slices instead of modality files - the role is <code>data_dir</code> (<code>run<
 its trailing <code>/</code>), <code>scan()</code> shows their modalities as <code>(data_dir)</code>, and you
 pass no <code>modalities</code> to <code>run_all</code> / <code>inputs_for</code> (a <code>modalities=</code> filter
 keeps them with a <code>UserWarning</code>; <code>modalities=[]</code> selects exactly them):</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>&lt;data_path&gt;/MYVISIUM/            (or &lt;data_path&gt;/MYVISIUM/processed/)
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, &gt;= 2
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>&lt;data_path&gt;/MYVISIUM/            (or &lt;data_path&gt;/MYVISIUM/processed/)
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, &gt;= 2
 </span></code></pre></div>
 <p>Each <code>.h5ad</code> needs <code>.X</code> (expression, spots x genes) and <code>.obsm['spatial']</code>
 (spot coordinates, spots x 2). GPSA additionally reads <code>obs['Ground_Truth']</code>
@@ -1751,9 +1866,9 @@ metrics are not wired into <code>mtb.evaluate</code> in this version. <code>scan
 directory for &gt;= 2 <code>.h5ad</code> slices with <code>obsm['spatial']</code> (the <code>files_ok</code>
 gate), and <code>mtb.describe_layout("cross")</code> prints this contract in full
 (<code>describe_layout("spatial")</code> points there - it is a task, not a category).</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;PASTE&quot;</span><span class="p">,</span> <span class="s2">&quot;cross&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;data_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;/abs/path/data/MYVISIUM&quot;</span><span class="p">},</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>              <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/runs/paste&quot;</span><span class="p">)</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># path to the aligned slices</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;PASTE&quot;</span><span class="p">,</span> <span class="s2">&quot;cross&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;data_dir&quot;</span><span class="p">:</span> <span class="s2">&quot;/abs/path/data/MYVISIUM&quot;</span><span class="p">},</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>              <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;/abs/path/runs/paste&quot;</span><span class="p">)</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># path to the aligned slices</span>
 </span></code></pre></div>
 <hr />
 <p>Next: turn a run's output into scIB metrics in

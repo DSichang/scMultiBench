@@ -1068,6 +1068,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#where-the-time-went" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the time went
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1484,6 +1495,17 @@
     <span class="md-ellipsis">
       
         Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-time-went" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the time went
       
     </span>
   </a>
@@ -2291,7 +2313,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </style>
 <!-- End of mermaid configuration --><div class="jupyter-wrapper">
 <div class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=33c5a8a6">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7f23ee74">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2305,7 +2327,7 @@ reproduces.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=40b6bbd1">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f81be31e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2315,17 +2337,19 @@ reproduces.</p>
 method registry, the stored result tables, the env lockfiles and the reference
 metadata. The package alone runs this section, section 3 (<code>scan</code>) and sections
 4-5. Running methods (section 2, and <code>run_all</code> in section 3) additionally
-needs their conda environments on a <strong>Linux</strong> host. The flag cell decides:
-with <code>INSTALL_ENVS = False</code> (the default) <strong>Run all</strong> is safe anywhere -
-nothing is downloaded, and a run cell on a host without the environments
-prints one line and falls back to the package's stored sweep; set it <code>True</code>
-on Colab or a Linux machine to download the environments in section 2 and
-run the methods for real.</p>
+needs their environments - prebuilt linux-64 archives that need no conda
+binary - on a <strong>Linux</strong> host. The flag cell decides: with <code>INSTALL_ENVS = False</code> (the default) <strong>Run all</strong> is safe anywhere - nothing is downloaded,
+and a run cell on a host without the environments prints one line and
+stands in the benchmark host's own results; set it <code>True</code> on Colab or a
+Linux machine to download the environments in section 2 and run the methods
+for real. The install cell pins <code>numpy</code> / <code>pandas</code> to what the interpreter
+already has, so pip never upgrades a host's stack, and defines <code>tick</code>, the
+recorder behind the timing table at the end of the notebook.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=394a04c3">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7f3404ab">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2343,21 +2367,33 @@ run the methods for real.</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span><span class="o">,</span><span class="w"> </span><span class="nn">sys</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="o">,</span><span class="w"> </span><span class="nn">importlib.util</span><span class="o">,</span><span class="w"> </span><span class="nn">sys</span><span class="o">,</span><span class="w"> </span><span class="nn">time</span>
+<span class="n">_t</span><span class="p">,</span> <span class="n">TIMES</span> <span class="o">=</span> <span class="p">[</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()],</span> <span class="p">[]</span>                    <span class="c1"># "where the time went": tick(label) records the seconds since the previous tick</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tick</span><span class="p">(</span><span class="n">label</span><span class="p">):</span> <span class="n">TIMES</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">label</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">_t</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">)));</span> <span class="n">_t</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="s2">"multibench-sc&gt;=0.3"</span>   <span class="c1"># registry, stored tables, env lockfiles and references ship in the wheel - no clone needed</span>
+    <span class="c1"># pin numpy / pandas to what this interpreter already has, so pip never upgrades the host's stack (Colab pins pandas itself)</span>
+    <span class="n">pins</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s2">==</span><span class="si">{</span><span class="n">importlib</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">version</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">)</span> <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="n">p</span><span class="p">)]</span>
+    <span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="s2">"multibench-sc&gt;=0.3"</span> <span class="p">{</span><span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pins</span><span class="p">)}</span>   <span class="c1"># registry, stored tables, env lockfiles and references ship in the wheel - no clone needed</span>
+    <span class="n">importlib</span><span class="o">.</span><span class="n">invalidate_caches</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>        <span class="c1"># PyPI behind the docs? take the same code straight from GitHub</span>
-        <span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="s2">"git+https://github.com/DSichang/scMultiBench.git"</span>
+        <span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="s2">"git+https://github.com/DSichang/scMultiBench.git"</span> <span class="p">{</span><span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pins</span><span class="p">)}</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench already installed"</span><span class="p">)</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"install"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-1">import importlib.util, sys
+<div class="clipboard-copy-txt" id="cell-1">import importlib.metadata, importlib.util, sys, time
+_t, TIMES = [time.time()], []                    # "where the time went": tick(label) records the seconds since the previous tick
+def tick(label): TIMES.append((label, round(time.time() - _t[0], 1))); _t[0] = time.time()
 if importlib.util.find_spec("multibench") is None:
-    !{sys.executable} -m pip -q install "multibench-sc&gt;=0.3"   # registry, stored tables, env lockfiles and references ship in the wheel - no clone needed
+    # pin numpy / pandas to what this interpreter already has, so pip never upgrades the host's stack (Colab pins pandas itself)
+    pins = [f"{p}=={importlib.metadata.version(p)}" for p in ("numpy", "pandas") if importlib.util.find_spec(p)]
+    !{sys.executable} -m pip -q install "multibench-sc&gt;=0.3" {" ".join(pins)}   # registry, stored tables, env lockfiles and references ship in the wheel - no clone needed
+    importlib.invalidate_caches()
     if importlib.util.find_spec("multibench") is None:        # PyPI behind the docs? take the same code straight from GitHub
-        !{sys.executable} -m pip -q install "git+https://github.com/DSichang/scMultiBench.git"
+        !{sys.executable} -m pip -q install "git+https://github.com/DSichang/scMultiBench.git" {" ".join(pins)}
 else:
-    print("multibench already installed")</div>
+    print("multibench already installed")
+tick("install")</div>
 </div>
 </div>
 </div>
@@ -2377,7 +2413,7 @@ else:
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=9e06afc2">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=23b52b79">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2396,15 +2432,15 @@ else:
 </clipboard-copy>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># "Run all" switch. False (the default): nothing is downloaded and no method executes -</span>
-<span class="c1"># every section runs on any machine, and the run cells fall back to the package's stored sweep.</span>
-<span class="c1"># True: on Colab / Linux, provision conda and download the packed environments for the</span>
-<span class="c1"># methods this notebook runs (2 envs, at least 5.5 GB to download), then run them here for real.</span>
+<span class="c1"># every section runs on any machine, and the run cells stand in the benchmark host's results.</span>
+<span class="c1"># True: on Colab / any Linux host, download the prebuilt environments for the methods this</span>
+<span class="c1"># notebook runs (2 envs, at least 1.8 GB to download; no conda needed) and run them here for real.</span>
 <span class="n">INSTALL_ENVS</span> <span class="o">=</span> <span class="kc">False</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-2"># "Run all" switch. False (the default): nothing is downloaded and no method executes -
-# every section runs on any machine, and the run cells fall back to the package's stored sweep.
-# True: on Colab / Linux, provision conda and download the packed environments for the
-# methods this notebook runs (2 envs, at least 5.5 GB to download), then run them here for real.
+# every section runs on any machine, and the run cells stand in the benchmark host's results.
+# True: on Colab / any Linux host, download the prebuilt environments for the methods this
+# notebook runs (2 envs, at least 1.8 GB to download; no conda needed) and run them here for real.
 INSTALL_ENVS = False</div>
 </div>
 </div>
@@ -2412,7 +2448,7 @@ INSTALL_ENVS = False</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=32dc27d7">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8de0abbc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2435,8 +2471,9 @@ INSTALL_ENVS = False</div>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">anndata</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">TqdmWarning</span>
 <span class="k">for</span> <span class="n">_w</span> <span class="ow">in</span> <span class="p">(</span><span class="ne">FutureWarning</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">PerformanceWarning</span><span class="p">,</span>
-           <span class="n">anndata</span><span class="o">.</span><span class="n">ImplicitModificationWarning</span><span class="p">):</span>   <span class="c1"># library noise only - multibench's own warnings stay visible</span>
+           <span class="n">anndata</span><span class="o">.</span><span class="n">ImplicitModificationWarning</span><span class="p">,</span> <span class="n">TqdmWarning</span><span class="p">):</span>   <span class="c1"># library noise only - multibench's own warnings stay visible</span>
     <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="n">_w</span><span class="p">)</span>
 <span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.max_colwidth"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>   <span class="c1"># never truncate a `reason`</span>
 <span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.max_columns"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>    <span class="c1"># never hide a metric column</span>
@@ -2447,14 +2484,16 @@ INSTALL_ENVS = False</div>
 <span class="n">CATEGORY</span> <span class="o">=</span> <span class="s2">"mosaic"</span>
 <span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s1">'D45'</span><span class="p">,</span> <span class="s1">'D46'</span><span class="p">)</span>   <span class="c1"># reference data (290 MB, 97 MB) -&gt; mtb.config.DEFAULT.data_path; no-op when present</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"multibench"</span><span class="p">,</span> <span class="n">mtb</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"data fetch"</span><span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-3">%matplotlib inline
 import warnings
 from pathlib import Path
 import anndata
 import pandas as pd
+from tqdm import TqdmWarning
 for _w in (FutureWarning, DeprecationWarning, pd.errors.PerformanceWarning,
-           anndata.ImplicitModificationWarning):   # library noise only - multibench's own warnings stay visible
+           anndata.ImplicitModificationWarning, TqdmWarning):   # library noise only - multibench's own warnings stay visible
     warnings.filterwarnings("ignore", category=_w)
 pd.set_option("display.max_colwidth", None)   # never truncate a `reason`
 pd.set_option("display.max_columns", None)    # never hide a metric column
@@ -2464,7 +2503,8 @@ import multibench as mtb
 DATASET  = "D45"
 CATEGORY = "mosaic"
 mtb.data.fetch('D45', 'D46')   # reference data (290 MB, 97 MB) -&gt; mtb.config.DEFAULT.data_path; no-op when present
-print("multibench", mtb.__version__)</div>
+print("multibench", mtb.__version__)
+tick("data fetch")</div>
 </div>
 </div>
 </div>
@@ -2484,22 +2524,32 @@ print("multibench", mtb.__version__)</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=13a522d5">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ac953cb5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2-run-the-analysis">2. Run the analysis<a class="anchor-link" href="#2-run-the-analysis">¶</a></h2><h3 id="environments-only-if-you-will-run-methods-in-this-session">Environments - only if you will run methods in this session<a class="anchor-link" href="#environments-only-if-you-will-run-methods-in-this-session">¶</a></h3><p>Linux + conda; 2 envs, at least 5.5 GB to download (2 of 2 archives measured); <code>multibench env plan --methods StabMap,scMoMaT</code> prints the per-env sizes. Both cells below do
-nothing unless <code>INSTALL_ENVS = True</code>. On Colab the first then provisions
-conda and restarts the kernel once: afterwards re-run section 1 (the flag
-included), then continue here. Without the environments, section 3's <code>scan</code>
-and sections 4-5 work as they are.</p>
+<h2 id="2-run-the-analysis">2. Run the analysis<a class="anchor-link" href="#2-run-the-analysis">¶</a></h2><h3 id="environments-only-if-you-will-run-methods-in-this-session">Environments - only if you will run methods in this session<a class="anchor-link" href="#environments-only-if-you-will-run-methods-in-this-session">¶</a></h3><p>Linux; 2 envs, at least 1.8 GB to download (2 of 2 archives measured); <code>multibench env plan --methods StabMap,scMoMaT</code> prints the per-env sizes. The cell below does nothing
+unless <code>INSTALL_ENVS = True</code>; then it prints the download the dry run
+measures and installs the prebuilt archives for the methods this tutorial
+runs (StabMap, scMoMaT) under <code>mtb.config.DEFAULT.envs_dir</code>
+(<code>~/.cache/multibench/envs</code> on a host without conda - the archives carry
+their own interpreters, and <code>run</code> activates a prefix directly, so <strong>no
+conda binary is needed</strong>, on Colab included; with conda present the prefix
+goes to its envs dir and <code>conda run</code> is the fallback: <code>MULTIBENCH_RUN_MODE</code>
+in the API reference). <code>env.install</code> skips anything already present. Other
+tiers are one flag away on the command line: <code>multibench env install --category mosaic --packed --run</code> (6 envs, at least 15.6 GB to download (6 of 6 archives measured); <code>multibench env plan --category mosaic</code> prints the per-env sizes), or no
+flag for the whole benchmark (29 envs; <code>multibench env plan</code> totals them).
+The archives are linux-64: on macOS / Windows a real install refuses
+(<code>force=True</code> / <code>--force</code> overrides), which is why the cell checks the
+platform too. Without the environments, section 3's <code>scan</code> and sections 4-5
+work as they are.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ba88ca5a">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6c922744">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2517,117 +2567,31 @@ and sections 4-5 work as they are.</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Colab ships without conda; with INSTALL_ENVS = True this provisions it (the kernel restarts ONCE).</span>
-<span class="c1"># On a machine that already has conda, this cell does nothing.</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span><span class="o">,</span><span class="w"> </span><span class="nn">shutil</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">_has</span><span class="p">(</span><span class="n">mod</span><span class="p">):</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="n">mod</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>
-        <span class="k">return</span> <span class="kc">False</span>
-
-<span class="k">if</span> <span class="ow">not</span> <span class="n">INSTALL_ENVS</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"INSTALL_ENVS is False - conda is not provisioned and nothing is downloaded"</span><span class="p">)</span>
-<span class="k">elif</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">"conda"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">"mamba"</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"conda available - nothing to do"</span><span class="p">)</span>
-<span class="k">elif</span> <span class="n">_has</span><span class="p">(</span><span class="s2">"google.colab"</span><span class="p">):</span>
-    <span class="err">!</span><span class="n">pip</span> <span class="o">-</span><span class="n">q</span> <span class="n">install</span> <span class="n">condacolab</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">condacolab</span>
-    <span class="n">condacolab</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>   <span class="c1"># restarts the kernel; afterwards, re-run section 1 (INSTALL_ENVS = True again) and continue here</span>
-<span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"no conda found - install it first (mamba recommended); see the installation guide"</span><span class="p">)</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-4"># Colab ships without conda; with INSTALL_ENVS = True this provisions it (the kernel restarts ONCE).
-# On a machine that already has conda, this cell does nothing.
-import importlib.util, shutil
-
-def _has(mod):
-    try:
-        return importlib.util.find_spec(mod) is not None
-    except ModuleNotFoundError:
-        return False
-
-if not INSTALL_ENVS:
-    print("INSTALL_ENVS is False - conda is not provisioned and nothing is downloaded")
-elif shutil.which("conda") or shutil.which("mamba"):
-    print("conda available - nothing to do")
-elif _has("google.colab"):
-    !pip -q install condacolab
-    import condacolab
-    condacolab.install()   # restarts the kernel; afterwards, re-run section 1 (INSTALL_ENVS = True again) and continue here
-else:
-    print("no conda found - install it first (mamba recommended); see the installation guide")</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>INSTALL_ENVS is False - conda is not provisioned and nothing is downloaded
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bc555065">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Now the environments for the methods this tutorial runs
-(StabMap, scMoMaT). <code>--packed</code> downloads a prebuilt archive instead
-of solving one from scratch, and <code>env install</code> skips anything already
-present. Other tiers are one flag away: <code>--category mosaic</code>
-(6 envs, at least 20.8 GB to download (6 of 6 archives measured); <code>multibench env plan --category mosaic</code> prints the per-env sizes), or no flag for the whole benchmark (29 envs;
-<code>multibench env plan</code> totals them). Method environments are linux-64 conda
-envs: on macOS / Windows <code>env install --run</code> refuses (<code>--force</code> overrides),
-which is why the cell checks the platform too.</p>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=24ae8f90">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-5">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="k">if</span> <span class="ow">not</span> <span class="n">INSTALL_ENVS</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"INSTALL_ENVS is False - no environment is downloaded (sections 3-5 need none)"</span><span class="p">)</span>
 <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">!=</span> <span class="s2">"linux"</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"method environments are linux-64 conda envs - skipped on"</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"method environments are linux-64 archives - skipped on"</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="err">!</span><span class="p">{</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">}</span> <span class="o">-</span><span class="n">m</span> <span class="n">multibench</span> <span class="n">env</span> <span class="n">install</span> <span class="o">--</span><span class="n">methods</span> <span class="n">StabMap</span><span class="p">,</span><span class="n">scMoMaT</span> <span class="o">--</span><span class="n">packed</span> <span class="o">--</span><span class="n">run</span>
+    <span class="n">plan</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s1">'StabMap'</span><span class="p">,</span> <span class="s1">'scMoMaT'</span><span class="p">],</span> <span class="n">category</span><span class="o">=</span><span class="n">CATEGORY</span><span class="p">)</span>              <span class="c1"># dry_run=True: the plan, nothing downloaded</span>
+    <span class="n">todo</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">plan</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="p">[</span><span class="s2">"exists"</span><span class="p">]]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">todo</span><span class="p">)</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">plan</span><span class="p">)</span><span class="si">}</span><span class="s2"> envs to download, </span><span class="si">{</span><span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s1">'archive_bytes'</span><span class="p">]</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">todo</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e9</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> GB (measured archive sizes)"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s1">'StabMap'</span><span class="p">,</span> <span class="s1">'scMoMaT'</span><span class="p">],</span> <span class="n">category</span><span class="o">=</span><span class="n">CATEGORY</span><span class="p">,</span> <span class="n">packed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>   <span class="c1"># no conda binary needed</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">'env'</span><span class="p">]</span><span class="si">:</span><span class="s2">20s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">r</span><span class="p">[</span><span class="s1">'state'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"environments"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-5">import sys
+<div class="clipboard-copy-txt" id="cell-4">import sys
 if not INSTALL_ENVS:
     print("INSTALL_ENVS is False - no environment is downloaded (sections 3-5 need none)")
 elif sys.platform != "linux":
-    print("method environments are linux-64 conda envs - skipped on", sys.platform)
+    print("method environments are linux-64 archives - skipped on", sys.platform)
 else:
-    !{sys.executable} -m multibench env install --methods StabMap,scMoMaT --packed --run</div>
+    plan = mtb.env.install(['StabMap', 'scMoMaT'], category=CATEGORY)              # dry_run=True: the plan, nothing downloaded
+    todo = [r for r in plan if not r["exists"]]
+    print(f"{len(todo)} of {len(plan)} envs to download, {sum(r['archive_bytes'] or 0 for r in todo) / 1e9:.1f} GB (measured archive sizes)")
+    for r in mtb.env.install(['StabMap', 'scMoMaT'], category=CATEGORY, packed=True, dry_run=False):   # no conda binary needed
+        print(f"{r['env']:20s} {r['state']}")
+tick("environments")</div>
 </div>
 </div>
 </div>
@@ -2647,33 +2611,38 @@ else:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5603b707">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=041841b5">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h3 id="one-call">One call<a class="anchor-link" href="#one-call">¶</a></h3><p>One call is the whole pipeline: resolve each method's inputs, run it in its own
-conda env, load the embeddings, score them with scIB metrics. Here
+environment, load the embeddings, score them with scIB metrics. Here
 StabMap, scMoMaT (on <code>D46</code>, whose layout fits these methods; mosaic layouts vary per dataset). Both run in minutes to tens of minutes on D46 - <code>run_sec</code> in the summary is the measured time on our host. The cell first asks <code>scan</code> whether
 any of these methods has its environment here; where none does (a laptop,
-Colab with the flag off) it prints one line and stands in the package's own sweep of <code>D45</code>
+Colab with the flag off) it prints one line and stands in the benchmark
+host's own <code>run_all</code> outputs for <code>D46</code> - <code>mtb.data.fetch_outputs</code>
+downloads the tree <code>run_all</code> wrote there (summary, long table and one
+embedding per method) and <code>mtb.load_batch(..., methods=)</code> reloads it, so the
+statuses, run times and the evaluate cell below are real. Offline, or before
+those outputs are published, a second fallback stands in the package's own sweep of <code>D45</code>
 (<code>load_results(source="rerun")</code>, the package's re-execution of every wired
-method - the paper's own tables are <code>source="published"</code>), so every cell
-below still renders.</p>
+method - the paper's own tables are <code>source="published"</code>); either way one
+printed line says which path was taken and every cell below still renders.</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1f499732">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9dc090cd">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [6]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-6">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-5">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -2691,17 +2660,30 @@ below still renders.</p>
             <span class="k">for</span> <span class="n">m</span><span class="p">,</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">long</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"method"</span><span class="p">)]</span>
     <span class="k">return</span> <span class="n">mtb</span><span class="o">.</span><span class="n">BatchResult</span><span class="p">(</span><span class="n">recs</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">)</span>
 
+<span class="k">def</span><span class="w"> </span><span class="nf">stand_in</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">methods</span><span class="p">,</span> <span class="n">stored</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""What a host without the method environments shows instead of `run_all`'s result: the benchmark</span>
+<span class="sd">    host's real `run_all` outputs for `dataset` (`mtb.data.fetch_outputs` - embeddings included), else</span>
+<span class="sd">    the package's stored metric table (`stored_sweep(*stored)`). One line says which."""</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch_outputs</span><span class="p">(</span><span class="n">dataset</span><span class="p">),</span> <span class="n">methods</span><span class="o">=</span><span class="n">methods</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"stand-in: the benchmark host's run_all outputs for </span><span class="si">{</span><span class="n">dataset</span><span class="si">}</span><span class="s2"> (fetch_outputs) - real embeddings and run times"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>                                   <span class="c1"># offline, or the outputs are not published yet</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"stand-in: the package's stored metric table (</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> from fetch_outputs: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">stored_sweep</span><span class="p">(</span><span class="o">*</span><span class="n">stored</span><span class="p">)</span>
+
 <span class="n">check</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"D46"</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">'StabMap'</span><span class="p">,</span> <span class="s1">'scMoMaT'</span><span class="p">])</span>
 <span class="k">if</span> <span class="n">check</span><span class="o">.</span><span class="n">env_ok</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
     <span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"D46"</span><span class="p">,</span> <span class="n">CATEGORY</span><span class="p">,</span>
                       <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">'StabMap'</span><span class="p">,</span> <span class="s1">'scMoMaT'</span><span class="p">],</span>
                       <span class="n">out_dir</span><span class="o">=</span><span class="s2">"/tmp/tutorial_mosaic"</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"no method environment on this host - the run is skipped; the stored results below cover it"</span><span class="p">)</span>
-    <span class="n">res</span> <span class="o">=</span> <span class="n">stored_sweep</span><span class="p">(</span><span class="s2">"D45"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"no method environment on this host - the run is skipped; a stand-in computed elsewhere covers it"</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">stand_in</span><span class="p">(</span><span class="s2">"D46"</span><span class="p">,</span> <span class="p">[</span><span class="s1">'StabMap'</span><span class="p">,</span> <span class="s1">'scMoMaT'</span><span class="p">],</span> <span class="n">stored</span><span class="o">=</span><span class="p">(</span><span class="s2">"D45"</span><span class="p">,))</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"run-or-fetch"</span><span class="p">)</span>
 <span class="n">res</span><span class="o">.</span><span class="n">summary</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-6">def stored_sweep(dataset, methods=None):
+<div class="clipboard-copy-txt" id="cell-5">def stored_sweep(dataset, methods=None):
     """The package's own sweep of `dataset` (`load_results(source="rerun")`) as the object
     `run_all` returns, so `.summary` / `.plot()` work on a host that cannot run the methods."""
     long = mtb.load_results(CATEGORY, dataset=dataset, source="rerun", methods=methods)
@@ -2709,14 +2691,27 @@ below still renders.</p>
             for m, g in long.groupby("method")]
     return mtb.BatchResult(recs, dataset, CATEGORY)
 
+def stand_in(dataset, methods, stored):
+    """What a host without the method environments shows instead of `run_all`'s result: the benchmark
+    host's real `run_all` outputs for `dataset` (`mtb.data.fetch_outputs` - embeddings included), else
+    the package's stored metric table (`stored_sweep(*stored)`). One line says which."""
+    try:
+        res = mtb.load_batch(mtb.data.fetch_outputs(dataset), methods=methods)
+        print(f"stand-in: the benchmark host's run_all outputs for {dataset} (fetch_outputs) - real embeddings and run times")
+        return res
+    except Exception as e:                                   # offline, or the outputs are not published yet
+        print(f"stand-in: the package's stored metric table ({type(e).__name__} from fetch_outputs: {e})")
+        return stored_sweep(*stored)
+
 check = mtb.scan("D46", CATEGORY, methods=['StabMap', 'scMoMaT'])
 if check.env_ok.any():
     res = mtb.run_all("D46", CATEGORY,
                       methods=['StabMap', 'scMoMaT'],
                       out_dir="/tmp/tutorial_mosaic")
 else:
-    print("no method environment on this host - the run is skipped; the stored results below cover it")
-    res = stored_sweep("D45")
+    print("no method environment on this host - the run is skipped; a stand-in computed elsewhere covers it")
+    res = stand_in("D46", ['StabMap', 'scMoMaT'], stored=("D45",))
+tick("run-or-fetch")
 res.summary</div>
 </div>
 </div>
@@ -2743,7 +2738,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (85.1s) 0.574
+<pre>[run_all]   -&gt; CHAIN_OK (78.9s) 0.6402
 </pre>
 </div>
 </div>
@@ -2757,12 +2752,12 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (213.5s) 0.2817
+<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (205.1s) 0.2649
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[6]:</div>
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[5]:</div>
 <div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
 <div>
 <style scoped="">
@@ -2809,46 +2804,46 @@ res.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>85.1</td>
+<td>78.9</td>
 <td>embedding</td>
 <td>[21416, 50]</td>
 <td>0</td>
 <td>cty1.csv+cty2.csv+cty3.csv</td>
-<td>0.5517</td>
+<td>0.6197</td>
 <td>file_of_origin</td>
 <td>3</td>
-<td>0.5740</td>
-<td>0.7291</td>
+<td>0.6402</td>
+<td>0.7384</td>
 <td>0.5426</td>
 <td>0.5313</td>
-<td>0.4882</td>
+<td>0.4911</td>
 <td>0.9944</td>
 <td>0.8100</td>
-<td>0.9545</td>
-<td>0.0273</td>
+<td>0.9551</td>
+<td>0.0259</td>
 <td>None</td>
 </tr>
 <tr>
 <th>1</th>
 <td>scMoMaT</td>
 <td>CHAIN_OK_GRAPH_METHOD</td>
-<td>213.5</td>
+<td>205.1</td>
 <td>graph</td>
 <td>[21416, 2]</td>
 <td>0</td>
 <td>cty1.csv+cty2.csv+cty3.csv</td>
-<td>0.8356</td>
+<td>0.7693</td>
 <td>file_of_origin</td>
 <td>3</td>
-<td>0.2817</td>
-<td>0.5446</td>
+<td>0.2649</td>
+<td>0.5424</td>
 <td>0.4152</td>
 <td>0.3471</td>
-<td>0.3415</td>
+<td>0.3361</td>
 <td>0.9882</td>
 <td>0.4944</td>
 <td>0.4239</td>
-<td>0.1250</td>
+<td>0.1256</td>
 <td>None</td>
 </tr>
 </tbody>
@@ -2860,7 +2855,7 @@ res.summary</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=62f50c99">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=702adc06">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2868,14 +2863,137 @@ res.summary</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p><code>summary</code> is sorted by method name, whatever order <code>methods=</code> listed;
 <code>emb_shape</code> is the embedding each method produced and <code>batch_source</code> says which
-batch vector the batch metrics used; a stand-in from the stored sweep says
-<code>STORED</code> in <code>status</code> and leaves the run columns empty.  The
-result object plots itself in the paper's layout:</p>
+batch vector the batch metrics used; a stand-in from the benchmark host carries
+that host's <code>status</code> and <code>run_sec</code>, one from the stored metric table says
+<code>STORED</code> in <code>status</code> and leaves the run columns empty.
+The scoring step on its own - what <code>run_all</code> did per method - is one
+<code>mtb.evaluate</code> call on the embedding file a method wrote, with the label files
+in the order the method stacked its cells (<code>labels_for</code> returns them in the
+benchmark's stacking order; the record's <code>labels_used</code> is what <code>run_all</code>
+matched). ARI, NMI and iF1 need scIB's Leiden resolution sweep, the slow
+part; the sweep's flavor is the <code>mtb.config.DEFAULT.leiden_flavor</code> knob
+(<code>"igraph"</code>, the fast default, or <code>"leidenalg"</code>):</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d26af825">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cb01bd46">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [6]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="CodeMirror cm-s-jupyter">
+<div class="zeroclipboard-container">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-6">
+<div>
+<span class="notice" hidden="">Copied!</span>
+<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
+<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+</clipboard-copy>
+</div>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">m</span><span class="p">,</span> <span class="n">emb</span> <span class="o">=</span> <span class="s2">"StabMap"</span><span class="p">,</span> <span class="kc">None</span>
+<span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">out_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">emb</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">out_dir</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">m</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">res</span><span class="o">.</span><span class="n">dataset</span><span class="si">}</span><span class="s2">"</span> <span class="o">/</span> <span class="s2">"embedding.h5"</span>    <span class="c1"># what run_all (and the benchmark host) wrote for it</span>
+<span class="k">if</span> <span class="n">emb</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">emb</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"no embedding on this host (metric-table stand-in) - evaluate runs when a method ran here or fetch_outputs supplied the outputs"</span><span class="p">)</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">rec</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">"method"</span><span class="p">]</span> <span class="o">==</span> <span class="n">m</span><span class="p">)</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="p">[</span><span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">rec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"labels_used"</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]]</span> <span class="ow">or</span> <span class="kc">None</span>    <span class="c1"># the label files in the order the method stacked its cells</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">emb</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">dataset</span><span class="p">),</span> <span class="n">label_order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"evaluate"</span><span class="p">)</span>
+<span class="n">scores</span><span class="o">.</span><span class="n">T</span> <span class="k">if</span> <span class="n">scores</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+</pre></div>
+<div class="clipboard-copy-txt" id="cell-6">m, emb = "StabMap", None
+if res.out_dir is not None:
+    emb = Path(res.out_dir) / f"{m}_{res.dataset}" / "embedding.h5"    # what run_all (and the benchmark host) wrote for it
+if emb is None or not emb.is_file():
+    print("no embedding on this host (metric-table stand-in) - evaluate runs when a method ran here or fetch_outputs supplied the outputs")
+    scores = None
+else:
+    rec = next(r for r in res.results if r["method"] == m)
+    order = [Path(f).stem for f in rec.get("labels_used") or []] or None    # the label files in the order the method stacked its cells
+    scores = mtb.evaluate(emb, labels=mtb.labels_for(res.dataset), label_order=order, verbose=False)
+tick("evaluate")
+scores.T if scores is not None else None</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[6]:</div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+<thead>
+<tr style="text-align: right;">
+<th></th>
+<th>ARI</th>
+<th>NMI</th>
+<th>ASW</th>
+<th>iASW</th>
+<th>iF1</th>
+<th>cLISI</th>
+<th>ASW_batch</th>
+<th>GC</th>
+<th>iLISI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th>Value</th>
+<td>0.640244</td>
+<td>0.738435</td>
+<td>0.542599</td>
+<td>0.531259</td>
+<td>0.491055</td>
+<td>0.994376</td>
+<td>0.809971</td>
+<td>0.955078</td>
+<td>0.025946</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1c942539">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>The result object plots itself in the paper's layout:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fc4167ef">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2893,9 +3011,13 @@ result object plots itself in the paper's layout:</p>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">res</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"plot"</span><span class="p">)</span>
+<span class="n">fig</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-7">res.plot()</div>
+<div class="clipboard-copy-txt" id="cell-7">fig = res.plot()
+tick("plot")
+fig</div>
 </div>
 </div>
 </div>
@@ -2914,7 +3036,7 @@ result object plots itself in the paper's layout:</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=707f685b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ef1337db">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2930,7 +3052,7 @@ encodings.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=049948a9">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=6b64a220">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2942,7 +3064,7 @@ never seen. A dataset is a folder of flat files named by category:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=83995d87">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5691984e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3056,7 +3178,7 @@ Then:  mtb.scan('MYDATA')  -&gt;  mtb.run_all('MYDATA', '&lt;category&gt;', out_
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=aee021d3">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a2d5979c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3110,7 +3232,7 @@ say so with <code>label_order=[...]</code>:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=015ded85">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d2e1a21e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3158,7 +3280,7 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\n")
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=12e8ff03">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5021b5e8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3171,7 +3293,7 @@ same file gate <code>scan</code> applies to the shipped datasets:</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b7161f85">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d737e036">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3263,20 +3385,23 @@ print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file gate
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a39ac85f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=30d7e0a4">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Now a real dataset the package has never seen: a 60% cell subsample of
-<code>D46</code> under a new name, built with ordinary h5py/pandas code so the
-per-file rule (matching files keep the same cell index) is visible.</p>
+<p>Now a real dataset the package has never seen: a small slice of
+<code>D46</code> under a new name - a random 60% of the cells capped at 2,000,
+and at most 5,000 features per matrix - built with ordinary h5py/pandas code so
+the per-file rule (matching files keep the same cell index) is visible. The cap
+keeps the copy small enough to write in seconds on Colab (the full peak matrix
+of a mosaic dataset is several GB dense).</p>
 </div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=4d596c3f">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=a2a5516e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3299,12 +3424,15 @@ per-file rule (matching files keep the same cell index) is visible.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">subsample_dataset</span><span class="p">(</span><span class="n">src_dir</span><span class="p">,</span> <span class="n">dst_dir</span><span class="p">,</span> <span class="n">frac</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Copy a dataset to a new name, keeping a random fraction of the cells.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">subsample_dataset</span><span class="p">(</span><span class="n">src_dir</span><span class="p">,</span> <span class="n">dst_dir</span><span class="p">,</span> <span class="n">frac</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">max_cells</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">max_features</span><span class="o">=</span><span class="mi">5000</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Copy a dataset to a new name, keeping a random slice of it.</span>
 
+<span class="sd">    Cells: a random ``frac`` of each file's cells, capped at ``max_cells``.</span>
 <span class="sd">    Files sharing a cell count get the SAME kept-cell index, so modality files</span>
 <span class="sd">    and their label CSVs stay aligned - which is exactly the property your own</span>
-<span class="sd">    export pipeline must preserve. The output is the canonical layout:</span>
+<span class="sd">    export pipeline must preserve. Features: files with more than</span>
+<span class="sd">    ``max_features`` rows (peak matrices) keep a random subset, so the copy</span>
+<span class="sd">    stays small and fast to write. The output is the canonical layout:</span>
 <span class="sd">    matrix/data as features x cells, plus matrix/features and matrix/barcodes.</span>
 <span class="sd">    """</span>
     <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
@@ -3319,7 +3447,7 @@ per-file rule (matching files keep the same cell index) is visible.</p>
         <span class="k">elif</span> <span class="n">fn</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".csv"</span><span class="p">):</span>
             <span class="n">counts</span><span class="p">[</span><span class="n">fn</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">p</span><span class="p">))</span>
     <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">counts</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
-        <span class="n">k</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">frac</span><span class="p">))</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">frac</span><span class="p">)),</span> <span class="n">max_cells</span><span class="p">)</span>
         <span class="n">keep</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
     <span class="k">for</span> <span class="n">fn</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">counts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">sp</span><span class="p">,</span> <span class="n">dp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">src_dir</span><span class="p">,</span> <span class="n">fn</span><span class="p">),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">dst_dir</span><span class="p">,</span> <span class="n">fn</span><span class="p">)</span>
@@ -3329,9 +3457,12 @@ per-file rule (matching files keep the same cell index) is visible.</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">sp</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">,</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">dp</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">g</span><span class="p">:</span>
                 <span class="n">grp</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">create_group</span><span class="p">(</span><span class="s2">"matrix"</span><span class="p">)</span>
-                <span class="n">grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="s2">"matrix/data"</span><span class="p">])[:,</span> <span class="n">idx</span><span class="p">])</span>
+                <span class="n">n_feat</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="s2">"matrix/data"</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">fidx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_feat</span><span class="p">)</span> <span class="k">if</span> <span class="n">n_feat</span> <span class="o">&lt;=</span> <span class="n">max_features</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n_feat</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">max_features</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+                <span class="n">block</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="s2">"matrix/data"</span><span class="p">][</span><span class="n">fidx</span><span class="p">,</span> <span class="p">:]</span> <span class="k">if</span> <span class="n">n_feat</span> <span class="o">&gt;</span> <span class="n">max_features</span> <span class="k">else</span> <span class="n">f</span><span class="p">[</span><span class="s2">"matrix/data"</span><span class="p">][()]</span>   <span class="c1"># one fancy index per h5py read</span>
+                <span class="n">grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">block</span><span class="p">)[:,</span> <span class="n">idx</span><span class="p">])</span>
                 <span class="k">if</span> <span class="s2">"matrix/features"</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
-                    <span class="n">grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">"features"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="s2">"matrix/features"</span><span class="p">]))</span>
+                    <span class="n">grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">"features"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="s2">"matrix/features"</span><span class="p">])[</span><span class="n">fidx</span><span class="p">])</span>
                 <span class="k">if</span> <span class="s2">"matrix/barcodes"</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
                     <span class="n">grp</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">"barcodes"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">f</span><span class="p">[</span><span class="s2">"matrix/barcodes"</span><span class="p">])[</span><span class="n">idx</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">dst_dir</span>
@@ -3341,12 +3472,15 @@ import h5py
 import numpy as np
 import pandas as pd
 
-def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
-    """Copy a dataset to a new name, keeping a random fraction of the cells.
+def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0, max_cells=2000, max_features=5000):
+    """Copy a dataset to a new name, keeping a random slice of it.
 
+    Cells: a random ``frac`` of each file's cells, capped at ``max_cells``.
     Files sharing a cell count get the SAME kept-cell index, so modality files
     and their label CSVs stay aligned - which is exactly the property your own
-    export pipeline must preserve. The output is the canonical layout:
+    export pipeline must preserve. Features: files with more than
+    ``max_features`` rows (peak matrices) keep a random subset, so the copy
+    stays small and fast to write. The output is the canonical layout:
     matrix/data as features x cells, plus matrix/features and matrix/barcodes.
     """
     rng = np.random.default_rng(seed)
@@ -3361,7 +3495,7 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
         elif fn.endswith(".csv"):
             counts[fn] = len(pd.read_csv(p))
     for n in set(counts.values()):
-        k = max(50, int(n * frac))
+        k = min(max(50, int(n * frac)), max_cells)
         keep[n] = np.sort(rng.choice(n, size=k, replace=False))
     for fn, n in counts.items():
         sp, dp = os.path.join(src_dir, fn), os.path.join(dst_dir, fn)
@@ -3371,9 +3505,12 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
         else:
             with h5py.File(sp) as f, h5py.File(dp, "w") as g:
                 grp = g.create_group("matrix")
-                grp.create_dataset("data", data=np.asarray(f["matrix/data"])[:, idx])
+                n_feat = f["matrix/data"].shape[0]
+                fidx = np.arange(n_feat) if n_feat &lt;= max_features else np.sort(rng.choice(n_feat, size=max_features, replace=False))
+                block = f["matrix/data"][fidx, :] if n_feat &gt; max_features else f["matrix/data"][()]   # one fancy index per h5py read
+                grp.create_dataset("data", data=np.asarray(block)[:, idx])
                 if "matrix/features" in f:
-                    grp.create_dataset("features", data=np.asarray(f["matrix/features"]))
+                    grp.create_dataset("features", data=np.asarray(f["matrix/features"])[fidx])
                 if "matrix/barcodes" in f:
                     grp.create_dataset("barcodes", data=np.asarray(f["matrix/barcodes"])[idx])
     return dst_dir</div>
@@ -3383,7 +3520,7 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=61b25a3c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=da0d30a8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3399,7 +3536,7 @@ layout is right.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f7e803e9">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d949ac17">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3547,7 +3684,7 @@ sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9347cf2a">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3760cbf1">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3571,8 +3708,9 @@ sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)
                        <span class="n">out_dir</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">DATA_ROOT</span><span class="si">}</span><span class="s2">/out_mosaic"</span><span class="p">,</span>
                        <span class="n">data_path</span><span class="o">=</span><span class="n">DATA_ROOT</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"no method environment on this host - the run is skipped; the stored results below cover it"</span><span class="p">)</span>
-    <span class="n">mine</span> <span class="o">=</span> <span class="n">stored_sweep</span><span class="p">(</span><span class="s2">"D45s"</span><span class="p">)</span>   <span class="c1"># D45s: the package's own 60% subsample of D45, the construction above</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"no method environment on this host - the run is skipped; a stand-in computed elsewhere covers it"</span><span class="p">)</span>
+    <span class="n">mine</span> <span class="o">=</span> <span class="n">stored_sweep</span><span class="p">(</span><span class="s2">"D45s"</span><span class="p">)</span>   <span class="c1"># D45s: the package's own 60% subsample of D45 (the same construction, uncapped)</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"own data"</span><span class="p">)</span>
 <span class="n">mine</span><span class="o">.</span><span class="n">summary</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-13">if sc[sc.method.isin(['StabMap', 'scMoMaT'])].env_ok.any():
@@ -3581,8 +3719,9 @@ sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)
                        out_dir=f"{DATA_ROOT}/out_mosaic",
                        data_path=DATA_ROOT)
 else:
-    print("no method environment on this host - the run is skipped; the stored results below cover it")
-    mine = stored_sweep("D45s")   # D45s: the package's own 60% subsample of D45, the construction above
+    print("no method environment on this host - the run is skipped; a stand-in computed elsewhere covers it")
+    mine = stored_sweep("D45s")   # D45s: the package's own 60% subsample of D45 (the same construction, uncapped)
+tick("own data")
 mine.summary</div>
 </div>
 </div>
@@ -3601,8 +3740,24 @@ mine.summary</div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>/media/disk2/Sichang/.conda/envs/scmbench_eval2/lib/python3.10/site-packages/scipy/sparse/_index.py:210: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_arrayXarray(i, j, x)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>/media/disk2/Sichang/.conda/envs/scmbench_eval2/lib/python3.10/site-packages/scipy/sparse/_index.py:210: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_arrayXarray(i, j, x)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (39.2s) 0.5597
+<pre>[run_all]   -&gt; CHAIN_OK (14.9s) 0.5926
 </pre>
 </div>
 </div>
@@ -3616,7 +3771,7 @@ mine.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (130.1s) 0.1995
+<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (91.8s) 0.1103
 </pre>
 </div>
 </div>
@@ -3668,46 +3823,46 @@ mine.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>39.2</td>
+<td>14.9</td>
 <td>embedding</td>
-<td>[12849, 50]</td>
+<td>[6000, 50]</td>
 <td>0</td>
 <td>cty1.csv+cty2.csv+cty3.csv</td>
-<td>0.5314</td>
+<td>0.7535</td>
 <td>file_of_origin</td>
 <td>3</td>
-<td>0.5597</td>
-<td>0.7285</td>
-<td>0.5388</td>
-<td>0.5288</td>
-<td>0.4869</td>
-<td>0.9920</td>
-<td>0.8071</td>
-<td>0.9588</td>
-<td>0.0500</td>
+<td>0.5926</td>
+<td>0.6545</td>
+<td>0.5051</td>
+<td>0.4920</td>
+<td>0.3745</td>
+<td>0.9815</td>
+<td>0.7449</td>
+<td>0.8779</td>
+<td>0.1663</td>
 <td>None</td>
 </tr>
 <tr>
 <th>1</th>
 <td>scMoMaT</td>
 <td>CHAIN_OK_GRAPH_METHOD</td>
-<td>130.1</td>
+<td>91.8</td>
 <td>graph</td>
-<td>[12849, 2]</td>
+<td>[6000, 2]</td>
 <td>0</td>
 <td>cty1.csv+cty2.csv+cty3.csv</td>
-<td>0.7053</td>
+<td>0.5014</td>
 <td>file_of_origin</td>
 <td>3</td>
-<td>0.1995</td>
-<td>0.5267</td>
-<td>0.3802</td>
-<td>0.3400</td>
-<td>0.3259</td>
-<td>0.9841</td>
-<td>0.4627</td>
-<td>0.4544</td>
-<td>0.1357</td>
+<td>0.1103</td>
+<td>0.4548</td>
+<td>0.2404</td>
+<td>0.2586</td>
+<td>0.2566</td>
+<td>0.9686</td>
+<td>0.3913</td>
+<td>0.3551</td>
+<td>0.2778</td>
 <td>None</td>
 </tr>
 </tbody>
@@ -3719,7 +3874,7 @@ mine.summary</div>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d8c03528">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4855543d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3758,7 +3913,7 @@ mine.summary</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3705bb88">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a23c236b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3772,7 +3927,7 @@ and these same three calls do the rest.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0181d124">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=80b6fc61">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3787,7 +3942,7 @@ back as the tidy frame <code>mtb.plot.bubble</code> takes, and every row says in
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c1c6ad04">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=88499b0d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3809,12 +3964,14 @@ back as the tidy frame <code>mtb.plot.bubble</code> takes, and every row says in
 <span class="nb">print</span><span class="p">(</span><span class="n">long</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">nunique</span><span class="p">(),</span> <span class="s2">"methods,"</span><span class="p">,</span> <span class="n">long</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
 <span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">long</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">set_dpi</span><span class="p">(</span><span class="mi">110</span><span class="p">)</span>
+<span class="n">tick</span><span class="p">(</span><span class="s2">"stored results"</span><span class="p">)</span>
 <span class="n">fig</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-15">long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")
 print(long.method.nunique(), "methods,", long.source.unique())
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
+tick("stored results")
 fig</div>
 </div>
 </div>
@@ -3841,7 +3998,7 @@ fig</div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=63f4f87f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5350818c">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3849,7 +4006,8 @@ fig</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p><code>run_all(DATASET, CATEGORY, out_dir=...)</code> without <code>methods=</code> writes the
 same <code>summary.csv</code> and <code>long.csv</code> for your own data; <code>mtb.load_batch(out_dir)</code>
-reads them back. A single <code>mtb.evaluate</code> frame becomes the same seven-column
+reads them back (<code>methods=</code> keeps a subset, as the stand-in above did). A
+single <code>mtb.evaluate</code> frame becomes the same seven-column
 long frame with <code>mtb.to_long(metrics, method=..., dataset=..., category=...)</code>
 (<code>source="user"</code>), so <code>pd.concat([long, mine])</code> plots next to the stored
 sweep.</p>
@@ -3865,7 +4023,7 @@ over the grand ranks. Both metric families appear because both datasets are mult
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fb8a5614">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=754bba47">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3917,7 +4075,7 @@ mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5639ff34">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ba7ce7a8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3932,7 +4090,7 @@ use the re-runs to check reproducibility; compare ranks, not decimals.
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=31e3e5e7">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=74adfa97">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3975,7 +4133,7 @@ Name: method, dtype: int64</pre>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=578f34a8">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=99250b6e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -3997,7 +4155,7 @@ until the environments exist.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7da96ab5">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2e9715c2">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4131,7 +4289,7 @@ avail[avail.files_ok][["method", "modalities", "env", "env_ok", "env_reason",
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6d4c434a">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=31c6b61d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4217,7 +4375,7 @@ not_ok.head(5) if len(not_ok) else "(every method's inputs resolve on this datas
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bc239272">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fbcb2808">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4231,7 +4389,7 @@ package never edits upstream code.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f9da9c7f">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=27d45e78">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4364,7 +4522,7 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fb01ee0c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3f36344e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4382,7 +4540,7 @@ per variant), and <code>verbose=True</code> adds the long audit notes plus
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4a4615ec">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7245b427">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4443,7 +4601,7 @@ per variant), and <code>verbose=True</code> adds the long audit notes plus
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a4e68c41">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8d8faf73">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4485,7 +4643,7 @@ Zhang Z, Sun H, Mariappan R, Chen X, Chen X, Jain MS, Efremova M, Teichmann SA, 
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=aa992f73">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d5d4f93b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4522,7 +4680,7 @@ because it is much slower than the rest.</p>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=94e3567b">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9b473e13">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4538,7 +4696,7 @@ here through a task the package does not run.</p>
 </div>
 </div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5d32eeab">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5ff4670b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4614,7 +4772,7 @@ if not missing:
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=82e282f9">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=93c3ea54">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -4678,6 +4836,112 @@ the full benchmark's rankings, browsable without installing anything</li>
 <li><code>mtb.recommend(CATEGORY, modalities=[...])</code> - stored-result ranking with coverage made explicit; methods wired for the category but absent from the chosen <code>source</code> appear with <code>grand_score</code> NaN rather than vanishing</li>
 <li><code>mtb.sweep(...)</code> - one method over a range of one hyperparameter</li>
 </ul>
+<h2 id="where-the-time-went">Where the time went<a class="anchor-link" href="#where-the-time-went">¶</a></h2><p>Seconds per stage, as <code>tick</code> recorded them (the install line is ~0 on a
+kernel that already had the package):</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a4ffab8d">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [24]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="CodeMirror cm-s-jupyter">
+<div class="zeroclipboard-container">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-24">
+<div>
+<span class="notice" hidden="">Copied!</span>
+<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
+<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+</clipboard-copy>
+</div>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">TIMES</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"stage"</span><span class="p">,</span> <span class="s2">"seconds"</span><span class="p">])</span>
+</pre></div>
+<div class="clipboard-copy-txt" id="cell-24">pd.DataFrame(TIMES, columns=["stage", "seconds"])</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[24]:</div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+<thead>
+<tr style="text-align: right;">
+<th></th>
+<th>stage</th>
+<th>seconds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th>0</th>
+<td>install</td>
+<td>0.0</td>
+</tr>
+<tr>
+<th>1</th>
+<td>data fetch</td>
+<td>0.6</td>
+</tr>
+<tr>
+<th>2</th>
+<td>environments</td>
+<td>0.0</td>
+</tr>
+<tr>
+<th>3</th>
+<td>run-or-fetch</td>
+<td>515.8</td>
+</tr>
+<tr>
+<th>4</th>
+<td>evaluate</td>
+<td>56.4</td>
+</tr>
+<tr>
+<th>5</th>
+<td>plot</td>
+<td>0.1</td>
+</tr>
+<tr>
+<th>6</th>
+<td>own data</td>
+<td>180.5</td>
+</tr>
+<tr>
+<th>7</th>
+<td>stored results</td>
+<td>0.4</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>

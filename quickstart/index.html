@@ -1444,21 +1444,22 @@ method scripts themselves are never modified.</strong></p>
 <p>The return value is a <code>RunResult</code> with fields <code>method</code>, <code>out_dir</code>, <code>cmd</code>,
 <code>output</code>, <code>extra</code>, <code>stdout</code>, and <code>stderr</code>.</p>
 <div class="admonition note">
-<p class="admonition-title">Each method runs in its own conda env</p>
-<p><code>run</code> orchestrates per-tool environments via the default
-<code>cmd_template="conda run -n {env} {cmd}"</code>, so the target env (for SCALEX,
-<code>scmb_torch</code>, from <code>method_info(...)["env"]</code>) must exist: <code>multibench env
-install --methods SCALEX --packed --run</code> builds it, and <code>run</code> raises
-<code>OSError</code> (<code>EnvironmentError</code> is its alias) with that command when it is
-missing. To run inside the
-current interpreter instead, pass <code>cmd_template="{cmd}"</code>. <code>inputs</code> and
+<p class="admonition-title">Each method runs in its own environment</p>
+<p><code>run</code> enters the method's environment for you - by activating its
+prefix when <code>multibench env install --packed --run</code> has unpacked the
+prebuilt archive (no conda binary needed), else with <code>conda run -n
+{env} {cmd}</code> - so the target env (for SCALEX, <code>scmb_torch</code>, from
+<code>method_info(...)["env"]</code>) must exist: that install line provides it,
+and <code>run</code> raises <code>OSError</code> (<code>EnvironmentError</code> is its alias) with the
+command when it is missing. To run inside the current interpreter
+instead, pass <code>cmd_template="{cmd}"</code>. <code>inputs</code> and
 <code>out_dir</code> may be relative: <code>run</code> makes every path absolute before it
 builds the command (the script runs with <code>out_dir</code> as its working
 directory), and <code>inputs_for</code> returns absolute paths. The same call from
 the shell, checked without executing anything:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>&lt;data_path&gt;/D28/rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>&lt;data_path&gt;/D28/atac_gas.h5<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span>--out-dir<span class="w"> </span>out/scalex_d28<span class="w"> </span>--dry-run<span class="w">     </span><span class="c1"># prints `conda run -n scmb_torch python .../main_SCALEX.py ...`; drop --dry-run to execute</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span>--out-dir<span class="w"> </span>out/scalex_d28<span class="w"> </span>--dry-run<span class="w">     </span><span class="c1"># prints the exact line (`conda run -n scmb_torch python .../main_SCALEX.py ...`, or the prefix wrapper); drop --dry-run to execute</span>
 </span></code></pre></div>
 </div>
 <p><strong>Your own data.</strong> <code>mtb.run_all(dataset, category, out_dir=...)</code> runs every

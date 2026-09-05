@@ -1252,6 +1252,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#mtbdatafetch_outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.data.fetch_outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1470,6 +1481,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#run-modes-prefix-and-conda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run modes: prefix and conda
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mtbenvstatus" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1496,6 +1518,28 @@
     <span class="md-ellipsis">
       
         mtb.env.install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archive-flavours-cpu-and-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archive flavours: cpu and gpu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-or-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU or CPU?
       
     </span>
   </a>
@@ -2004,6 +2048,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#mtbdatafetch_outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mtb.data.fetch_outputs
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2222,6 +2277,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#run-modes-prefix-and-conda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run modes: prefix and conda
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mtbenvstatus" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2248,6 +2314,28 @@
     <span class="md-ellipsis">
       
         mtb.env.install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archive-flavours-cpu-and-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archive flavours: cpu and gpu
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-or-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU or CPU?
       
     </span>
   </a>
@@ -2379,11 +2467,31 @@ into a handful of namespaces:</p>
 <li><strong><code>mtb.io.*</code></strong> - the canonical-format adapter
   (<a href="#mtbioexport_dataset"><code>export_dataset</code></a>, <a href="#mtbioto_canonical"><code>to_canonical</code></a>,
   <a href="#mtbioread_canonical"><code>read_canonical</code></a>, <code>normalize_peak_names</code>).</li>
-<li><strong><code>mtb.data.*</code></strong> - <a href="#mtbdatafetch"><code>fetch</code></a> the reference datasets.</li>
+<li><strong><code>mtb.data.*</code></strong> - <a href="#mtbdatafetch"><code>fetch</code></a> the reference datasets,
+  <a href="#mtbdatafetch_outputs"><code>fetch_outputs</code></a> the benchmark host's <code>run_all</code>
+  output trees for the tutorial datasets.</li>
 <li><strong><code>mtb.catalog.*</code></strong> - typed views of the benchmark's metadata tables.</li>
-<li><strong><code>mtb.config.*</code></strong> - resolved paths (<code>Config</code>, <code>DEFAULT</code>).</li>
-<li><strong><code>mtb.env.*</code></strong> - per-method conda environments: <a href="#mtbenv"><code>status</code>, <code>plan</code>, <code>install</code>, <code>doctor</code>, <code>recipe</code></a>.</li>
+<li><strong><code>mtb.config.*</code></strong> - resolved paths and knobs (<code>Config</code>, <code>DEFAULT</code>:
+  <code>data_path</code>, <a href="#mtbconfigconfig"><code>envs_dir</code>, <code>leiden_flavor</code></a> ...).</li>
+<li><strong><code>mtb.env.*</code></strong> - per-method environments: <a href="#mtbenv"><code>status</code>, <code>plan</code>, <code>install</code>,
+  <code>doctor</code>, <code>recipe</code></a>, and the <a href="#run-modes-prefix-and-conda">run modes</a>
+  (<code>env_prefix</code>, <code>MULTIBENCH_RUN_MODE</code>).</li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Backend and seed noise in the sweep metrics</p>
+<p>ARI / NMI come from scIB's optimal-resolution Leiden sweep, and that sweep
+is noisy by construction. Measured on the tutorial datasets' real embeddings
+(7 methods, D11 / D28 / D46): two <code>leidenalg</code> seeds differ by up to <strong>0.089
+ARI</strong> on the same embedding, and the <code>igraph</code> backend differs from
+<code>leidenalg</code> by up to <strong>0.097 ARI</strong> (mean 0.03) - the same magnitude. Running
+<code>igraph</code> to convergence (<code>n_iterations=-1</code>) does not narrow the gap, so the
+package keeps scanpy's documented two iterations. The speed difference is
+large: 0.3 s vs 9 s on 2.9k cells, 2 s vs 42-95 s on 11k cells. Treat
+differences below ~0.1 ARI between two runs, backends or seeds as noise;
+<code>mtb.config.DEFAULT.leiden_flavor = "leidenalg"</code> selects the backend the
+published tables were computed with, and a scanpy older than 1.10 falls
+back to it automatically (one warning).</p>
+</div>
 <p>The end-to-end story: <a href="#mtbioexport_dataset"><code>mtb.io.export_dataset</code></a> writes
 your data as a dataset folder, <a href="#mtbscan"><code>mtb.scan</code></a> says which methods can
 run on it, <a href="#mtbrun_all"><code>mtb.run_all</code></a> runs and scores them into a
@@ -2430,11 +2538,14 @@ runtime error (<code>error: ...</code> on stderr; <code>MULTIBENCH_DEBUG=1</code
 traceback), <code>2</code> a usage error.</p>
 <div class="admonition note">
 <p class="admonition-title">Method environments</p>
-<p>Running a method shells out to the conda environment it shares with other
-compatible tools via <code>conda run -n &lt;env&gt; &lt;cmd&gt;</code>, where <code>&lt;env&gt;</code> is
-<a href="#mtbmethod_info"><code>mtb.method_info(method)["env"]</code></a> - the same env
-<code>multibench env install</code> / <a href="#mtbenvinstall"><code>mtb.env.install</code></a>
-provisions (overridable through <code>cmd_template</code>).
+<p>Running a method shells out to the environment it shares with other
+compatible tools, <code>&lt;env&gt;</code> = <a href="#mtbmethod_info"><code>mtb.method_info(method)["env"]</code></a>
+- the same env <code>multibench env install</code> / <a href="#mtbenvinstall"><code>mtb.env.install</code></a>
+provisions. The wrapper is chosen per call: when the env prefix
+<code>&lt;envs_dir&gt;/&lt;env&gt;</code> is on disk (a packed archive unpacked there - no
+conda binary needed) a <code>bash -c</code> line activates it and <code>exec</code>s the
+command; otherwise <code>conda run -n &lt;env&gt; &lt;cmd&gt;</code>. See
+<a href="#run-modes-prefix-and-conda">Run modes</a>; <code>cmd_template</code> overrides both.
 The original method scripts are <strong>never modified</strong> - <code>multibench</code> only
 builds the command, converts inputs to the canonical <code>.h5</code>, and loads the
 typed output.</p>
@@ -2477,7 +2588,12 @@ rows first, with <strong>two independent gates</strong>:</p>
   not any conda env is installed - a laptop without environments still tells
   you whether your layout is right.</li>
 <li><code>env_ok</code> / <code>env_reason</code> - the method's conda env exists on this machine; the
-  reason names the env and the one-method install command.</li>
+  reason names the env and the one-method install command. A method whose
+  script calls CUDA unconditionally (<code>method_info(m)["requires_gpu"]</code>) also
+  needs <code>mtb.env.host_has_gpu()</code> to be <code>True</code>; otherwise <code>env_reason</code> carries
+  the sentence <code>run</code> would raise (<code>&lt;method&gt; needs an NVIDIA GPU: the upstream
+  script calls CUDA unconditionally (&lt;file&gt;:&lt;line&gt;); ...</code>), joined after the
+  install hint when the env is missing too. See <a href="#gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?</a>.</li>
 </ul>
 <p><code>runnable = files_ok &amp; env_ok</code>; <code>reason</code> joins the non-empty reasons (empty
 iff runnable) in a SHORT form - the exception class, the
@@ -2514,6 +2630,10 @@ nothing is fetched or written.</p>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">sc</span><span class="o">.</span><span class="n">command</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s2">&quot;conda run -n scmb_concerto python .../tools_scripts/Concerto/main_Concerto.py --path1 .../D11/rna.h5 --path2 .../D11/adt.h5 --save_path &#39;.../&lt;out_dir&gt;/Concerto_D11/&#39;&quot;</span>
 </span></code></pre></div>
+<p><code>command</code> is the real line for THIS host: <code>conda run -n &lt;env&gt; ...</code> as above
+when the env is not unpacked here, the prefix-activating <code>bash -c '...; exec
+"$@"' -- python ...</code> wrapper when <code>&lt;envs_dir&gt;/&lt;env&gt;</code> exists (see <a href="#run-modes-prefix-and-conda">Run
+modes</a>).</p>
 <p><strong>Parameters</strong></p>
 <ul>
 <li><code>dataset</code> (<code>str</code>) - folder NAME under <code>data_path</code> (not a path); a missing folder raises <code>FileNotFoundError</code> listing the folders that do exist.</li>
@@ -2564,10 +2684,15 @@ a requested method with no variant in the category raises <code>scan</code>'s <c
 <li><code>.save(out_dir=None) -&gt; Path</code> - writes <code>summary.csv</code>, <code>long.csv</code>, <code>failures.csv</code>, <code>batch_result.json</code> (<code>run_all</code> does this automatically).</li>
 </ul>
 <h3 id="mtbload_batch"><code>mtb.load_batch</code><a class="headerlink" href="#mtbload_batch" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BatchResult</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BatchResult</span>
 </span></code></pre></div>
 <p>Reload a <code>BatchResult</code> that <code>run_all</code> / <code>BatchResult.save</code> wrote, to re-plot,
-re-inspect or <code>rescore</code> without re-running anything.</p>
+re-inspect or <code>rescore</code> without re-running anything. <code>methods</code> (keyword-only)
+keeps only those methods' records - what the tutorials do with the benchmark
+host's output tree: <code>mtb.load_batch(mtb.data.fetch_outputs("D11"),
+methods=["Matilda", "sciPENN", "scMM"])</code> (see
+<a href="#mtbdatafetch_outputs"><code>fetch_outputs</code></a>); <code>None</code> (the default) keeps every
+record, as before.</p>
 <h3 id="mtbparams_for"><code>mtb.params_for</code><a class="headerlink" href="#mtbparams_for" title="Anchor link to this section">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">modalities</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>               <span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
@@ -2625,17 +2750,25 @@ or the argv list with <code>dry_run=True</code>.</p>
 <li><code>category</code> (<code>str</code>) - one of <code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>, <code>cross</code>; drives variant selection together with the supplied modalities. Everything after it is keyword-only (a third positional argument raises <code>TypeError</code>).</li>
 <li><code>inputs</code> (<code>dict</code>) - <code>{modality_role: path}</code>, e.g. <code>{"rna": ..., "atac_gas": ...}</code>; the non-auxiliary, non-label roles select the variant. Paths may be relative: every path-valued input is made absolute (symlinks preserved) and a directory role such as <code>data_dir</code> gets its trailing separator before the argv is built, because the method runs with <code>cwd=out_dir</code>.</li>
 <li><code>out_dir</code> (<code>str</code>) - working directory; created if missing, made absolute the same way (<code>RunResult.out_dir</code> is the absolute path).</li>
-<li><code>params</code> (<code>dict | None</code>) - extra method hyperparameters merged into the command.</li>
+<li><code>params</code> (<code>dict | None</code>) - extra method hyperparameters merged into the command. On a host without an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> the method's <code>cpu_params</code> (<code>method_info(m)["cpu_params"]</code>, the flags that turn CUDA off - scJoint's <code>--use_cuda ""</code>, scMDC's <code>--device cpu</code>) are merged in first, so a key given here wins; one line <code>[run] no GPU on this host: applying &lt;method&gt; cpu_params {...}</code> goes to stderr on a real run. See <a href="#gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?</a>.</li>
 <li><code>task</code> (<code>str | None</code>) - accepted and currently ignored: variant selection depends only on <code>category</code> and the supplied modalities.</li>
 <li><code>convert</code> (<code>bool</code>) - convert non-aux inputs to the canonical <code>.h5</code> (default <code>True</code>).</li>
-<li><code>cmd_template</code> (<code>str | None</code>) - command wrapper; <code>None</code> uses the method's env via <code>conda run -n {env} {cmd}</code> and <strong>preflights</strong> it (<code>OSError</code> naming the install command when the env is missing); a custom template skips the preflight.</li>
+<li><code>cmd_template</code> (<code>str | None</code>) - command wrapper; <code>None</code> picks the <a href="#run-modes-prefix-and-conda">run mode</a> for the method's env - the prefix activation when <code>&lt;envs_dir&gt;/&lt;env&gt;</code> is on disk, else <code>conda run -n {env} {cmd}</code> - and <strong>preflights</strong> it (<code>OSError</code> naming the install command when the env is missing); a custom template overrides both and skips the preflight.</li>
 <li><code>repo_path</code> (<code>Path | None</code>) - checkout holding <code>tools_scripts/</code>; default auto-provisioned (<code>config.DEFAULT.repo_path</code>).</li>
-<li><code>dry_run</code> (<code>bool</code>) - return the wrapped argv (a <code>list[str]</code>) that a real call would execute - inputs absolutized as above, the checkout located but never fetched, nothing created or written, no env preflight. The form behind <code>multibench run --dry-run</code> and <code>scan</code>'s <code>command</code> column.</li>
+<li><code>dry_run</code> (<code>bool</code>) - return the wrapped argv (a <code>list[str]</code>) that a real call would execute - inputs absolutized as above, the checkout located but never fetched, nothing created or written, no env preflight. The form behind <code>multibench run --dry-run</code> and <code>scan</code>'s <code>command</code> column; it shows the merged <code>cpu_params</code> and previews a <code>requires_gpu</code> method even on a <abbr title="Graphics Processing Unit">GPU</abbr>-less host.</li>
 </ul>
+<p><strong>Raises</strong> <code>OSError</code> before anything is written or launched when
+<code>method_info(m)["requires_gpu"]</code> is <code>True</code> and <code>mtb.env.host_has_gpu()</code> is
+<code>False</code>: <code>&lt;method&gt; needs an NVIDIA GPU: the upstream script calls CUDA
+unconditionally (&lt;file&gt;:&lt;line&gt;); see method_info(m)["requires_gpu"]</code> - the
+same sentence <code>scan</code> reports in <code>env_reason</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;Matilda&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">&quot;D11&quot;</span><span class="p">,</span> <span class="s2">&quot;vertical&quot;</span><span class="p">,</span> <span class="s2">&quot;Matilda&quot;</span><span class="p">),</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="o">...</span>         <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/Matilda&quot;</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">True</span><span class="p">)[:</span><span class="mi">6</span><span class="p">]</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="o">...</span>         <span class="n">out_dir</span><span class="o">=</span><span class="s2">&quot;out/Matilda&quot;</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">True</span><span class="p">)[:</span><span class="mi">6</span><span class="p">]</span>                       <span class="c1"># conda mode (no prefix on disk)</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="p">[</span><span class="s1">&#39;conda&#39;</span><span class="p">,</span> <span class="s1">&#39;run&#39;</span><span class="p">,</span> <span class="s1">&#39;-n&#39;</span><span class="p">,</span> <span class="s1">&#39;matilda&#39;</span><span class="p">,</span> <span class="s1">&#39;python&#39;</span><span class="p">,</span> <span class="s1">&#39;.../multibench/engine/drivers/run_matilda.py&#39;</span><span class="p">]</span>
 </span></code></pre></div>
+<p>With the <code>matilda</code> prefix unpacked under <code>envs_dir</code> the same call returns
+the prefix-mode argv, <code>['bash', '-c', '&lt;activate&gt;; exec "$@"', '--',
+'python', ...]</code>.</p>
 <h3 id="mtbevaluate"><code>mtb.evaluate</code><a class="headerlink" href="#mtbevaluate" title="Anchor link to this section">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>             <span class="n">clustering</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">obsm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;X_emb&quot;</span><span class="p">,</span> <span class="n">label_order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
@@ -2646,8 +2779,12 @@ column; never empty - a request that selects no metric raises). <code>metrics=</
 is the one selection knob (see <a href="#the-metrics-vocabulary">the <code>metrics=</code> vocabulary</a>):
 <code>None</code> computes every applicable metric - the clustering family, plus the
 batch family whenever a batch vector exists. ARI, NMI and iF1 need scIB's
-Leiden resolution sweep: tens of seconds for a few thousand cells, minutes
-for ~10^4; one stderr line announces it above 2,000 cells (<code>verbose</code>), and
+Leiden resolution sweep - the slow part: with the default
+<code>mtb.config.DEFAULT.leiden_flavor = "igraph"</code> (scanpy's <code>flavor="igraph"</code>,
+<code>n_iterations=2</code>, <code>directed=False</code>; measured 7.7x faster than <code>"leidenalg"</code>
+on 20k cells) seconds for ~10^4 cells, with <code>"leidenalg"</code> tens of seconds
+for a few thousand cells and minutes for ~10^4; one stderr line announces
+the sweep above 2,000 cells and names the flavor (<code>verbose</code>), and
 <code>clustering=</code> or a <code>metrics=[...]</code> list naming only metrics that do not need
 it skips it. <strong>Clustering metrics require <code>labels</code>; <code>clustering</code> is optional
 (omitted -&gt; scIB optimal-resolution Leiden, ten resolutions 0.2-2.0, highest
@@ -2899,7 +3036,14 @@ wrapper, or <code>None</code>), <code>scripts_url, repo_url, version, reference<
 title, authors, journal, year}</code> or <code>None</code>), <code>notes</code> (short summary),
 <code>supports</code> (per variant: <code>category, modalities, output_kind, n_tunable,
 needs_labels</code>), <code>params</code> (per variant: defaults, tunable, effective),
-<code>fixed_in_script, upstream_knobs, upstream_url</code>, and <strong><code>runtime</code></strong> (below).
+<code>fixed_in_script, upstream_knobs, upstream_url</code>, <strong><code>runtime</code></strong> (below) and
+the <abbr title="Graphics Processing Unit">GPU</abbr>/<abbr title="Central Processing Unit">CPU</abbr> contract of the upstream script - <code>cpu_params</code> (<code>{}</code> for most
+methods; <code>{'use_cuda': ''}</code> for scJoint, <code>{'device': 'cpu'}</code> for scMDC: the
+command-line values that turn CUDA off, merged by <code>run</code> on a <abbr title="Graphics Processing Unit">GPU</abbr>-less host),
+<code>requires_gpu</code> (<code>True</code> when the script calls CUDA unconditionally - scBridge,
+moETM, SMILE, sciCAN, UnitedNet, iPOLNG, SPIRAL - so <code>run</code> refuses it and
+<code>scan</code> reports <code>env_ok=False</code> without a <abbr title="Graphics Processing Unit">GPU</abbr>) and <code>gpu_evidence</code> (the
+<code>file:line</code> of that call, else <code>None</code>); see <a href="#gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?</a>.
 <code>env</code> is the conda env <a href="#mtbrun"><code>run</code></a> executes in - the <code>{env}</code> of the
 default <code>cmd_template</code>, the <code>env</code> column of <code>scan</code> and the name <code>env doctor</code>
 / <code>env recipe</code> use - e.g. <code>scmb_torch</code> for SCALEX, <code>scmb_cobolt3</code> for
@@ -3016,21 +3160,44 @@ dataset directory is absent.</p>
 repository's release assets if needed (<code>D11</code> 11 MB, <code>D28</code> 137 MB, <code>D45</code> 290
 MB, <code>D46</code> 97 MB, <code>D52</code> 179 MB); idempotent, returns the data root. An unknown
 id raises with the ids available.</p>
+<h3 id="mtbdatafetch_outputs"><code>mtb.data.fetch_outputs</code><a class="headerlink" href="#mtbdatafetch_outputs" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch_outputs</span><span class="p">(</span><span class="n">dataset</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>                       <span class="n">data_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">quiet</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+</span></code></pre></div>
+<p>Download the benchmark host's real <code>run_all</code> output tree for a tutorial
+dataset - exactly what <code>run_all</code> writes and <a href="#mtbload_batch"><code>load_batch</code></a>
+reads: <code>batch_result.json</code>, <code>long.csv</code>, <code>summary.csv</code> and one
+<code>&lt;method&gt;_&lt;dataset&gt;/</code> folder with the method's <code>embedding.h5</code> - and return
+the dataset folder, <code>&lt;data_path&gt;/outputs/&lt;dataset&gt;/</code>. The URLs come from the
+shipped manifest <code>multibench/engine/output_urls.json</code> (<code>{"&lt;dataset&gt;":
+"&lt;url&gt;"}</code>; the four tutorial datasets <code>D11</code>, <code>D28</code>, <code>D46</code>, <code>D52</code> under the
+<code>data-v1</code> release, <code>outputs-&lt;dataset&gt;.tar.gz</code>). Idempotent (a folder that
+already holds <code>batch_result.json</code> is not downloaded again), traversal-safe
+extraction, prints what it downloads unless <code>quiet</code>. <code>methods</code> restricts the
+tree the returned folder is read with - an unknown name raises <code>KeyError</code>
+listing the methods in the tree; the function returns the dataset folder
+either way, and <code>load_batch(path, methods=...)</code> applies the filter. An
+unknown <code>dataset</code> raises <code>ValueError</code> listing the manifest's ids. This is
+what the category tutorials stand in on a host without the method
+environments (real embeddings, so their <code>evaluate</code> cell scores one):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch_outputs</span><span class="p">(</span><span class="s2">&quot;D11&quot;</span><span class="p">),</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Matilda&quot;</span><span class="p">,</span> <span class="s2">&quot;sciPENN&quot;</span><span class="p">,</span> <span class="s2">&quot;scMM&quot;</span><span class="p">])</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="p">[[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="s2">&quot;run_sec&quot;</span><span class="p">]]</span>          <span class="c1"># the benchmark host&#39;s statuses and times</span>
+</span></code></pre></div>
 <hr />
 <h2 id="mtbplot"><code>mtb.plot.*</code><a class="headerlink" href="#mtbplot" title="Anchor link to this section">&para;</a></h2>
 <h3 id="mtbplotbubble"><code>mtb.plot.bubble</code><a class="headerlink" href="#mtbplotbubble" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">long_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span>
-</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>                <span class="n">cmap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_language</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>                <span class="n">require_complete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">overall</span><span class="o">=</span><span class="s2">&quot;rank&quot;</span><span class="p">,</span> <span class="n">na</span><span class="o">=</span><span class="s2">&quot;warn&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">long_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="s2">&quot;dataset&quot;</span><span class="p">,</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>                <span class="n">cmap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_language</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>                <span class="n">require_complete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">overall</span><span class="o">=</span><span class="s2">&quot;rank&quot;</span><span class="p">,</span> <span class="n">na</span><span class="o">=</span><span class="s2">&quot;warn&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span>
 </span></code></pre></div>
 <p>Paper-style bubble table of a tidy long results frame: methods are rows (best
 first), metrics are columns grouped into the benchmark's task families, each
 family preceded by an <em>Overall</em> bar. A plain function - <code>help(mtb.plot.bubble)</code>
 shows this signature. <code>mtb.plot.__all__</code> is <code>bubble, bar, build_table,
 BubbleTable, FAMILIES, CLUSTERING_METRICS, BATCH_METRICS</code>; the numbers half,</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">long_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>                     <span class="n">aggregate</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;dataset&quot;</span><span class="p">,</span> <span class="n">require_complete</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">overall</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rank&quot;</span><span class="p">,</span>
-</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>                     <span class="n">na</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;warn&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BubbleTable</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">long_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>                     <span class="n">aggregate</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;dataset&quot;</span><span class="p">,</span> <span class="n">require_complete</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">overall</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rank&quot;</span><span class="p">,</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>                     <span class="n">na</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;warn&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BubbleTable</span>
 </span></code></pre></div>
 <p>returns a <code>BubbleTable</code> with <code>methods</code> in row order, <code>overall</code>, <code>matrix</code> -
 the min-max fills, <code>norm</code> is the same frame -, <code>raw</code>, <code>ranks</code> - the
@@ -3059,9 +3226,9 @@ show_language=)</code>, stays importable but is not in <code>__all__</code>. Cir
 <code>evaluate()</code>'s wide output), unknown names, duplicate <code>(method[, dataset],
 metric)</code> rows (they would be silently averaged), bad <code>aggregate</code> / <code>overall</code>.</p>
 <h3 id="mtbplotbar"><code>mtb.plot.bar</code><a class="headerlink" href="#mtbplotbar" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">long_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">top</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>             <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Blues&quot;</span><span class="p">,</span> <span class="n">show_datasets</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>             <span class="n">save</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overall</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mean_overall&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">long_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">top</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>             <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cmap</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Blues&quot;</span><span class="p">,</span> <span class="n">show_datasets</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>             <span class="n">save</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overall</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mean_overall&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span>
 </span></code></pre></div>
 <p>Bar chart of each method's across-dataset Overall score. <code>group="clustering"</code>
 / <code>"batch"</code> selects a metric family (the benchmark's two summary panels;
@@ -3088,10 +3255,10 @@ and <code>write_labels</code> is private (<code>AttributeError</code> for both -
 header line <code>x</code> and one label per cell, <code>pd.Series(labels,
 name="x").to_csv(path, index=False)</code>).</p>
 <h3 id="mtbioexport_dataset"><code>mtb.io.export_dataset</code><a class="headerlink" href="#mtbioexport_dataset" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dataset_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>                      <span class="n">atac_kind</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>                      <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">,</span> <span class="n">compression</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span>
-</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>                      <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">adt_names</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dataset_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>                      <span class="n">atac_kind</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>                      <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">,</span> <span class="n">compression</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>                      <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">adt_names</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
 </span></code></pre></div>
 <p>Write an AnnData / MuData as a canonical benchmark dataset folder - <code>rna.h5</code>,
 <code>adt.h5</code>, <code>atac_peak.h5</code> (+ a hard-linked <code>atac.h5</code>) or <code>atac_gas.h5</code>, and
@@ -3104,8 +3271,8 @@ DataFrame or a 2-D array; <code>labels</code> / <code>batch</code> take a select
 (<code>rna="rna"</code>, <code>atac="atac"</code> = <code>mdata.mod[name].X</code>) and <code>labels</code> / <code>batch</code>
 accept <code>'&lt;mod&gt;:&lt;obs column&gt;'</code> (<code>labels="rna:celltype"</code>) - what the 0.2
 <code>from_mudata</code> did:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span>
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>   <span class="c1"># -&gt; rna.h5, atac.h5, cty.csv</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">&quot;data/MYMULTIOME&quot;</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">&quot;rna&quot;</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">&quot;atac&quot;</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">&quot;peak&quot;</span><span class="p">,</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">&quot;rna:celltype&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;vertical&quot;</span><span class="p">)</span>   <span class="c1"># -&gt; rna.h5, atac.h5, cty.csv</span>
 </span></code></pre></div>
 <p>Every modality is re-indexed to one master <code>obs_names</code> order
 (that of <code>data</code>), and a modality whose barcode set differs raises
@@ -3129,10 +3296,10 @@ link); <code>None</code> keeps today's names. All matrices are
 cells x features and written transposed; sparse matrices are streamed.
 Returns <code>dataset_dir</code>.</p>
 <h3 id="mtbioto_canonical"><code>mtb.io.to_canonical</code><a class="headerlink" href="#mtbioto_canonical" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">out</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">modality</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">convert</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>                    <span class="n">layer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">obsm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">mod</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>                    <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">,</span> <span class="n">compression</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span> <span class="n">block</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>                    <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">feature_names</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">out</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">modality</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">convert</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>                    <span class="n">layer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">obsm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">mod</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>                    <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">,</span> <span class="n">compression</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span> <span class="n">block</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a>                    <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">feature_names</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span>
 </span></code></pre></div>
 <p>Convert <code>src</code> to a canonical <code>.h5</code> and return its path. <code>src</code> is an AnnData,
 a MuData (<code>mod=</code> required), or a path to <code>.h5ad</code> / <code>.h5mu</code> / <code>.csv</code> / <code>.tsv</code>
@@ -3159,7 +3326,7 @@ are streamed without densifying, but <code>matrix/data</code> is stored <strong>
 a <code>UserWarning</code> states the size and the two mitigations - filter to
 HVGs / informative peaks first, or <code>dtype='float32'</code>, which halves it.</p>
 <h3 id="mtbioread_canonical"><code>mtb.io.read_canonical</code><a class="headerlink" href="#mtbioread_canonical" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sparse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sparse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AnnData</span>
 </span></code></pre></div>
 <p>Read a canonical <code>.h5</code> back into an <code>AnnData</code> (cells x genes), restoring
 <code>var_names</code> from <code>matrix/features</code> and <code>obs_names</code> from <code>matrix/barcodes</code>
@@ -3169,14 +3336,14 @@ HVGs / informative peaks first, or <code>dtype='float32'</code>, which halves it
 <p>Typed views of the benchmark's metadata CSVs, plus the canonicalisers used
 throughout the API.</p>
 <h3 id="mtbcatalogmethods"><code>mtb.catalog.methods</code><a class="headerlink" href="#mtbcatalogmethods" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">methods</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">methods</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
 </span></code></pre></div>
 <p>The methods table (<code>method</code>, <code>canonical_id</code>, <code>language</code>, <code>deep_learning</code>,
 <code>atac</code>, <code>output</code>, <code>needs_labels</code>, list-valued <code>categories</code> / <code>tasks</code>);
 <code>needs_labels</code> / <code>atac</code> / <code>categories</code> / <code>tasks</code> are overlaid from the registry
 at call time so they cannot drift. Defaults to <code>config.DEFAULT.files_path</code>.</p>
 <h3 id="mtbcatalogdatasets"><code>mtb.catalog.datasets</code><a class="headerlink" href="#mtbcatalogdatasets" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
 </span></code></pre></div>
 <p>The datasets table: the union of the paper's dataset table and every id with
 a stored result table (80 rows: the 71 catalogued ids plus nine that exist
@@ -3187,11 +3354,11 @@ subsamples, <code>D24</code>, <code>SD7</code>-<code>SD10</code> - appended in n
 paper-derived <code>assay</code> / <code>tissue</code> / <code>n_cells</code> / <code>n_batches</code> / <code>source</code>
 columns, currently empty.</p>
 <h3 id="mtbcatalogmetrics"><code>mtb.catalog.metrics</code><a class="headerlink" href="#mtbcatalogmetrics" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
 </span></code></pre></div>
 <p>The metric-details table (whitespace-normalised column names).</p>
 <h3 id="mtbcatalogcanonical_id"><code>mtb.catalog.canonical_id</code><a class="headerlink" href="#mtbcatalogcanonical_id" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>
 </span></code></pre></div>
 <p>Return the canonical registry method id for any known display or result-dir
 spelling (e.g. <code>"seurat v5"</code> -&gt; <code>"Seurat_v5"</code>, <code>"mofa+"</code> -&gt; <code>"MOFA2"</code>),
@@ -3201,7 +3368,7 @@ did-you-mean hint instead (what <code>load_results</code> uses).
 <code>mtb.catalog.known_metrics()</code> lists the metric codes the tables can carry
 (the ten scIB codes plus <code>PCR</code>).</p>
 <h3 id="mtbcatalogcanonical_metric"><code>mtb.catalog.canonical_metric</code><a class="headerlink" href="#mtbcatalogcanonical_metric" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
 </span></code></pre></div>
 <p>Canonicalise a raw metric short-code (e.g. <code>"ari"</code> -&gt; <code>"ARI"</code>, <code>"kbet"</code> -&gt;
 <code>"kBET"</code>); returns <code>None</code> for blank or empty codes (<code>strict=True</code> raises
@@ -3209,21 +3376,38 @@ did-you-mean hint instead (what <code>load_results</code> uses).
 <hr />
 <h2 id="mtbconfig"><code>mtb.config.*</code><a class="headerlink" href="#mtbconfig" title="Anchor link to this section">&para;</a></h2>
 <h3 id="mtbconfigconfig"><code>mtb.config.Config</code><a class="headerlink" href="#mtbconfigconfig" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="nd">@dataclass</span>
-</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
-</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>    <span class="n">result_path</span><span class="p">:</span> <span class="n">Path</span>   <span class="c1"># stored benchmark metric tables (scib_metric/ + rerun/)</span>
-</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>    <span class="n">files_path</span><span class="p">:</span> <span class="n">Path</span>    <span class="c1"># metadata CSVs (method/dataset/metric)</span>
-</span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>    <span class="n">repo_path</span><span class="p">:</span> <span class="n">Path</span>     <span class="c1"># reference scMultiBench repo (method entrypoints)</span>
-</span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>    <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span>     <span class="c1"># resolved input datasets</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
+</span><span id="__span-43-3"><a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>    <span class="n">result_path</span><span class="p">:</span> <span class="n">Path</span>   <span class="c1"># stored benchmark metric tables (scib_metric/ + rerun/)</span>
+</span><span id="__span-43-4"><a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>    <span class="n">files_path</span><span class="p">:</span> <span class="n">Path</span>    <span class="c1"># metadata CSVs (method/dataset/metric)</span>
+</span><span id="__span-43-5"><a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a>    <span class="n">repo_path</span><span class="p">:</span> <span class="n">Path</span>     <span class="c1"># reference scMultiBench repo (method entrypoints)</span>
+</span><span id="__span-43-6"><a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a>    <span class="n">data_path</span><span class="p">:</span> <span class="n">Path</span>     <span class="c1"># resolved input datasets</span>
+</span><span id="__span-43-7"><a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a>    <span class="n">envs_dir</span><span class="p">:</span> <span class="n">Path</span>      <span class="c1"># where the method env prefixes live (packed archives unpack here)</span>
+</span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a>    <span class="n">leiden_flavor</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># &quot;igraph&quot; (default) or &quot;leidenalg&quot;: evaluate&#39;s Leiden sweep</span>
 </span></code></pre></div>
-<p>Resolved filesystem paths. Override any field to point at custom locations. A
-module-level default instance is exposed as <code>mtb.config.DEFAULT</code>; callers may
-replace its fields in place. <code>mtb.config.__all__</code> is <code>Config, DEFAULT</code> -
-the on-disk token maps (<code>category_folder</code>, <code>metric_set_dir</code>) are internal
-since 0.3.0 (still importable, hidden from <code>dir(mtb.config)</code>).</p>
+<p>Resolved filesystem paths and two knobs. Override any field to point at
+custom locations. A module-level default instance is exposed as
+<code>mtb.config.DEFAULT</code>; callers may replace its fields in place
+(<code>mtb.config.DEFAULT.envs_dir = Path("/scratch/envs")</code>,
+<code>mtb.config.DEFAULT.leiden_flavor = "leidenalg"</code>). <code>mtb.config.__all__</code> is
+<code>Config, DEFAULT</code> - the on-disk token maps (<code>category_folder</code>,
+<code>metric_set_dir</code>) are internal since 0.3.0 (still importable, hidden from
+<code>dir(mtb.config)</code>).</p>
+<ul>
+<li><code>envs_dir</code> - resolution order: the <code>MULTIBENCH_ENVS_DIR</code> environment
+  variable; else the first writable conda envs dir when a conda / mamba
+  binary is found on <code>PATH</code>; else <code>~/.cache/multibench/envs</code>. <code>env install
+  --packed</code> extracts archives into <code>&lt;envs_dir&gt;/&lt;env&gt;</code>, and
+  <a href="#run-modes-prefix-and-conda"><code>env_prefix</code></a> looks there first.</li>
+<li><code>leiden_flavor</code> - the scanpy Leiden flavor behind
+  <a href="#mtbevaluate"><code>evaluate</code></a>'s resolution sweep (ARI / NMI / iF1):
+  <code>"igraph"</code> (default; <code>n_iterations=2</code>, <code>directed=False</code>, measured 7.7x
+  faster on 20k cells) or <code>"leidenalg"</code>. <code>mtb.eval.scib.leiden_sweep(emb,
+  flavor=None)</code> takes the same token per call; <code>None</code> reads this field.</li>
+</ul>
 <hr />
 <h2 id="mtbenv"><code>mtb.env.*</code><a class="headerlink" href="#mtbenv" title="Anchor link to this section">&para;</a></h2>
-<p>Helpers for the conda environments that <a href="#mtbrun"><code>mtb.run</code></a> orchestrates -
+<p>Helpers for the environments that <a href="#mtbrun"><code>mtb.run</code></a> orchestrates -
 <code>mtb.env.__all__</code> is <code>status, plan, install, doctor, recipe</code>, each behind
 the <code>multibench env</code> subcommand of the same name; everything else in the
 module is CLI plumbing (importable, not advertised). The CLI is the everyday
@@ -3232,67 +3416,166 @@ install line for the gaps), <code>multibench env plan --category vertical</code>
 envs with their download / disk sizes and a <code># total</code>), <code>multibench env
 status</code> (installed? plus a build-difficulty tag), <code>multibench env install
 --methods X --packed --run</code> (a dry run until <code>--run</code>; <code>--packed</code> downloads
-prebuilt archives and falls back to the lockfile build). The environments
+prebuilt archives and falls back to the lockfile build; <code>--flavor
+auto|cpu|gpu</code> picks the <abbr title="Central Processing Unit">CPU</abbr>-only or the CUDA archive, see
+<a href="#archive-flavours-cpu-and-gpu">archive flavours</a>). The environments
 are <strong>linux-64</strong> conda envs: on any other host the CLI prints a <code>warning:
 ... linux-64 ...</code> line first and <code>env install --run</code> refuses unless
 <code>--force</code> (<code>force=True</code> on <code>mtb.env.install</code>); dry runs work everywhere.</p>
+<h3 id="run-modes-prefix-and-conda">Run modes: prefix and conda<a class="headerlink" href="#run-modes-prefix-and-conda" title="Anchor link to this section">&para;</a></h3>
+<p>Nothing needs a conda binary once an env's prefix is on disk. Per call,
+<code>run</code> (and so <code>run_all</code>, and the <code>command</code> column of <code>scan</code>) picks one of
+two wrappers for the built command <code>&lt;cmd&gt;</code>:</p>
+<ul>
+<li><strong><code>prefix</code></strong> - the default whenever <code>env_prefix(env)</code> exists. The argv is
+  <code>bash -c '&lt;activate&gt;; exec "$@"' -- &lt;cmd&gt;</code>, where <code>&lt;activate&gt;</code> sets
+  <code>CONDA_PREFIX=&lt;prefix&gt;</code>, <code>CONDA_DEFAULT_ENV=&lt;env&gt;</code>,
+  <code>PATH=&lt;prefix&gt;/bin:$PATH</code> and sources every
+  <code>&lt;prefix&gt;/etc/conda/activate.d/*.sh</code> (the R environments ship six, and
+  they assume <code>CONDA_PREFIX</code> is set), so <code>python</code> / <code>Rscript</code> in <code>&lt;cmd&gt;</code>
+  resolve inside the env.</li>
+<li><strong><code>conda</code></strong> - the fallback when no prefix is on disk but a conda / mamba
+  binary is found: <code>conda run -n &lt;env&gt; &lt;cmd&gt;</code>, the only mode before 0.3.0's
+  speed round.</li>
+</ul>
+<p><code>MULTIBENCH_RUN_MODE=conda|prefix</code> forces one; <code>prefix</code> forced with no
+prefix on disk raises <code>OSError</code> naming <code>envs_dir</code> and <code>mtb.env.install</code>.
+<code>cmd_template=</code> still overrides everything. The pty opt-in and the
+process-group kill are the same in both modes.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">env_prefix</span><span class="p">(</span><span class="n">env</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+<p>The prefix <code>run</code> would activate for a registry env name: <code>&lt;envs_dir&gt;/&lt;env&gt;</code>
+when it contains <code>bin/</code> (<code>envs_dir</code> = <a href="#mtbconfigconfig"><code>mtb.config.DEFAULT.envs_dir</code></a>);
+else, when conda is found, the prefix conda reports for that name; else
+<code>None</code>. <code>installed_envs()</code> and <code>scan</code>'s <code>env_ok</code> gate count an env as
+installed exactly when this is not <code>None</code> - with or without conda.</p>
 <h3 id="mtbenvstatus"><code>mtb.env.status</code><a class="headerlink" href="#mtbenvstatus" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">status</span><span class="p">(</span><span class="n">conda</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">as_frame</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">status</span><span class="p">(</span><span class="n">conda</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">as_frame</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
 <p>One row per registry method - <code>{method, env, group, own_env, exists,
-has_lock, difficulty, verified_working, has_recipe}</code> (<code>as_frame=True</code> -&gt; a
-DataFrame); <code>difficulty</code> is the build tag <code>env status</code> prints (<code>easy</code>,
+has_lock, difficulty, verified_working, has_recipe, flavor}</code> (<code>as_frame=True</code>
+-&gt; a DataFrame); <code>difficulty</code> is the build tag <code>env status</code> prints (<code>easy</code>,
 <code>old-scvi</code>, <code>old-tensorflow</code>, <code>R</code>, <code>verified</code>, <code>blocked-script</code>, <code>unknown</code>;
-the legend goes to stderr).</p>
+the legend goes to stderr); <code>flavor</code> is <code>cpu</code> / <code>gpu</code> when the installed
+env came from a packed archive (the <code>&lt;prefix&gt;/.multibench_flavor</code> record,
+see <a href="#archive-flavours-cpu-and-gpu">archive flavours</a>), else <code>None</code>.</p>
 <h3 id="mtbenvplan"><code>mtb.env.plan</code><a class="headerlink" href="#mtbenvplan" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>             <span class="n">as_frame</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>             <span class="n">as_frame</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Which envs to build to cover a set of methods - <code>[{env, shared, methods,
-availability}]</code>, one entry per distinct env listing the methods it serves
-(build these few envs instead of one per method); <code>availability</code> is
+availability, flavor}]</code>, one entry per distinct env listing the methods it
+serves (build these few envs instead of one per method); <code>availability</code> is
 <code>benchmark-host-only</code> when every method the env serves needs an unpublished
 script - only SPIRAL's <code>spiral_environment</code> today (the env builds, the
-method still cannot run off the benchmark host) - else <code>public</code>. The CLI
-adds the packed-archive download size and the unpacked size per env (from
-the shipped <code>multibench/engine/packed_sizes.json</code> snapshot; <code>?</code> = not
-measured) and a <code># total</code> line.</p>
+method still cannot run off the benchmark host) - else <code>public</code>; <code>flavor</code>
+is the installed archive's flavour when recorded (<code>cpu</code> / <code>gpu</code>), else
+<code>None</code>. The CLI adds the packed-archive download size and the unpacked
+size per env (from the shipped <code>multibench/engine/packed_sizes.json</code>
+snapshot; <code>?</code> = not measured) for the archive <code>--flavor</code> selects, and a
+<code># total</code> line naming the flavour it summed.</p>
 <h3 id="mtbenvinstall"><code>mtb.env.install</code><a class="headerlink" href="#mtbenvinstall" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>                <span class="n">packed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">dry_run</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">conda</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>                <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a>                <span class="n">packed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">dry_run</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">conda</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a>                <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">flavor</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span>
 </span></code></pre></div>
 <p>The Python face of <code>multibench env install</code> (the CLI calls this function).
 Builds the install plan for the selection - <code>methods</code> and/or <code>category</code>,
 neither = the whole benchmark - and returns one dict per env: <code>{env,
 methods, exists, has_lock, cmds, state, packed_url, archive_bytes,
-unpacked_bytes}</code>, where <code>cmds</code> are the argv lists a lockfile build runs.
-<code>dry_run=True</code> (default) returns the plan and creates nothing - <code>state</code> is
-<code>have</code>, <code>packed archive published</code> (an archive exists; <code>packed_url</code> /
-<code>archive_bytes</code> say which and how big), <code>no archive - lockfile build</code>,
-<code>build(dry-run)</code> (<code>packed=False</code>), or <code>NO-LOCK</code>; <code>dry_run=False</code> installs -
-the packed archive when <code>packed</code> and one is published (falling back to the
-lockfile build when the download fails), the lockfile build otherwise -
-and <code>state</code> becomes <code>PACKED</code>, <code>BUILD</code>, <code>have</code> or <code>NO-LOCK</code>. Environments
-that already exist are skipped, so an interrupted install resumes. On a
-non-linux-64 host a real run raises unless <code>force=True</code>. <code>conda</code> overrides
-the conda executable.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">&quot;Matilda&quot;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>          <span class="c1"># dry run: the plan for one method&#39;s env</span>
-</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a><span class="p">{</span><span class="s1">&#39;env&#39;</span><span class="p">:</span> <span class="s1">&#39;matilda&#39;</span><span class="p">,</span> <span class="s1">&#39;methods&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Matilda&#39;</span><span class="p">],</span> <span class="s1">&#39;exists&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;has_lock&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;cmds&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="o">...</span><span class="p">],</span> <span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="p">[</span><span class="o">...</span><span class="p">]],</span>
-</span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a> <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;packed archive published&#39;</span><span class="p">,</span> <span class="s1">&#39;packed_url&#39;</span><span class="p">:</span> <span class="s1">&#39;https://zenodo.org/records/21928889/files/matilda.tar.gz?download=1&#39;</span><span class="p">,</span>
-</span><span id="__span-45-4"><a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a> <span class="s1">&#39;archive_bytes&#39;</span><span class="p">:</span> <span class="mi">3043807507</span><span class="p">,</span> <span class="s1">&#39;unpacked_bytes&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+unpacked_bytes, flavor}</code>, where <code>cmds</code> are the argv lists a lockfile build
+runs. <code>dry_run=True</code> (default) returns the plan and creates nothing -
+<code>state</code> is <code>have</code>, <code>packed archive published</code> (an archive exists;
+<code>packed_url</code> / <code>archive_bytes</code> say which and how big), <code>no archive -
+lockfile build</code>, <code>build(dry-run)</code> (<code>packed=False</code>), or <code>NO-LOCK</code>;
+<code>dry_run=False</code> installs - the packed archive when <code>packed</code> and one is
+published (falling back to the lockfile build when the download fails),
+the lockfile build otherwise - and <code>state</code> becomes <code>PACKED</code>, <code>BUILD</code>,
+<code>have</code> or <code>NO-LOCK</code>. Environments that already exist are skipped, so an
+interrupted install resumes. On a non-linux-64 host a real run raises
+unless <code>force=True</code>. <code>conda</code> overrides the conda executable. <strong>No conda
+binary is needed for the packed path</strong>: a packed archive is downloaded,
+extracted into <code>&lt;envs_dir&gt;/&lt;env&gt;</code> (<a href="#mtbconfigconfig"><code>Config.envs_dir</code></a>)
+and finished with the archive's own <code>bin/conda-unpack</code> (run with
+<code>&lt;prefix&gt;/bin</code> first on <code>PATH</code> - the archive carries its own python); the
+linux-64 guard and the traversal-safe extraction apply as before. A
+lockfile build on a host without conda / mamba raises <code>RuntimeError</code>
+BEFORE any download: <code>no conda/mamba on this host; &lt;env&gt; has a packed
+archive - pass packed=True</code> when an archive exists (<code>packed=False</code> was
+asked), <code>... has no packed archive - install conda first</code> when none does.</p>
+<p><code>flavor</code> picks the packed archive per env - <code>"gpu"</code> (the CUDA build every
+env has), <code>"cpu"</code> (the <code>&lt;env&gt;-cpu</code> archive where published, else the CUDA
+build with one <code>UserWarning</code>) or <code>"auto"</code> (default: <code>cpu</code> when
+<a href="#archive-flavours-cpu-and-gpu"><code>host_has_gpu</code></a> is false, else <code>gpu</code>);
+anything else raises <code>ValueError</code> listing the three. The dry-run rows'
+<code>packed_url</code> / <code>archive_bytes</code> / <code>unpacked_bytes</code> follow the flavour
+(a <code>null</code> size in the snapshot reads as unknown, like a missing entry), and
+<code>flavor</code> says which archive each env would get (<code>cpu</code> / <code>gpu</code> after the
+per-env fallback) - or, for an env already installed, the flavour recorded
+for it (<code>None</code> when it was built from a lockfile). <code>packed=False</code> rows
+carry <code>flavor=None</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">&quot;Matilda&quot;</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>          <span class="c1"># dry run: the plan for one method&#39;s env, on a GPU host</span>
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="p">{</span><span class="s1">&#39;env&#39;</span><span class="p">:</span> <span class="s1">&#39;matilda&#39;</span><span class="p">,</span> <span class="s1">&#39;methods&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;Matilda&#39;</span><span class="p">],</span> <span class="s1">&#39;exists&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">&#39;has_lock&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;cmds&#39;</span><span class="p">:</span> <span class="p">[[</span><span class="o">...</span><span class="p">],</span> <span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="p">[</span><span class="o">...</span><span class="p">]],</span>
+</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a> <span class="s1">&#39;state&#39;</span><span class="p">:</span> <span class="s1">&#39;packed archive published&#39;</span><span class="p">,</span> <span class="s1">&#39;packed_url&#39;</span><span class="p">:</span> <span class="s1">&#39;https://zenodo.org/records/21928889/files/matilda.tar.gz?download=1&#39;</span><span class="p">,</span>
+</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a> <span class="s1">&#39;archive_bytes&#39;</span><span class="p">:</span> <span class="mi">3043807507</span><span class="p">,</span> <span class="s1">&#39;unpacked_bytes&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">&#39;flavor&#39;</span><span class="p">:</span> <span class="s1">&#39;gpu&#39;</span><span class="p">}</span>
+</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">&quot;Matilda&quot;</span><span class="p">],</span> <span class="n">flavor</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;packed_url&quot;</span><span class="p">]</span>   <span class="c1"># the CPU archive, once published</span>
+</span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a><span class="s1">&#39;https://github.com/DSichang/scMultiBench/releases/download/envs-v1/matilda-cpu.tar.gz&#39;</span>
 </span></code></pre></div>
+<h3 id="archive-flavours-cpu-and-gpu">Archive flavours: cpu and gpu<a class="headerlink" href="#archive-flavours-cpu-and-gpu" title="Anchor link to this section">&para;</a></h3>
+<p>The tutorial torch environments (<code>env_sciPENN</code>, <code>matilda</code>, <code>scmb_scjoint</code>,
+<code>scmb_torch</code>, <code>scmb_scmm2</code>) are published twice: the CUDA build under the
+env name and a <abbr title="Central Processing Unit">CPU</abbr>-only build under <code>&lt;env&gt;-cpu</code>, the same environment
+without the CUDA libraries and roughly 3-4x smaller. Whatever the flavour,
+the archive is unpacked into <code>&lt;envs_dir&gt;/&lt;env&gt;</code> - the env <em>name</em> never
+changes, so <code>run</code>, <code>scan</code> and the registry are untouched - and
+<code>install_packed</code> writes the flavour that landed to
+<code>&lt;prefix&gt;/.multibench_flavor</code> (one word), which <code>status</code> / <code>plan</code> /
+<code>doctor</code> return as <code>flavor</code> and the CLI prints as <code>flavor=cpu</code>. A <abbr title="Central Processing Unit">CPU</abbr>
+archive counts as published once <code>packed_urls.json</code> lists it <em>and</em>
+<code>packed_sizes.json</code> carries its measured <code>archive_bytes</code> (the maintainer
+tool records that after the upload); a listed-but-unmeasured entry is a
+placeholder for an archive that is not there yet, and every flavour keeps
+taking the CUDA build until it is.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">host_has_gpu</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</span></code></pre></div>
+<p>Is an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> visible on this host - <code>True</code> when <code>nvidia-smi</code> is on
+<code>PATH</code> and <code>nvidia-smi -L</code> exits 0 listing at least one device, or when
+<code>/proc/driver/nvidia/version</code> exists; nothing else counts (a torch install
+or a CUDA library on disk says nothing about the machine). Cached per
+process (<code>host_has_gpu.cache_clear()</code> re-probes). This is the whole of the
+<code>flavor="auto"</code> decision. Importable from <code>mtb.env</code>, not part of
+<code>mtb.env.__all__</code>.</p>
+<h3 id="gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?<a class="headerlink" href="#gpu-or-cpu" title="Anchor link to this section">&para;</a></h3>
+<p>The archive flavour is about the <em>environment</em>; whether a method can run
+without a <abbr title="Graphics Processing Unit">GPU</abbr> is about its <em>script</em>, and the registry records that per
+method from the script's source. <code>method_info(m)["cpu_params"]</code> lists the
+command-line values that turn CUDA off in a script that has it on by
+default (<code>{'use_cuda': ''}</code> for scJoint - argparse <code>type=bool</code>, so only the
+empty string is false - and <code>{'device': 'cpu'}</code> for scMDC); when
+<code>host_has_gpu()</code> is <code>False</code>, <a href="#mtbrun"><code>run</code></a> merges them into <code>params</code>
+unless you set the key yourself, and <code>run(..., dry_run=True)</code> /
+<code>scan(...)["command"]</code> show the merged flags. <code>method_info(m)["requires_gpu"]</code>
+is <code>True</code> for a script that calls CUDA unconditionally (scBridge, moETM,
+SMILE, sciCAN, UnitedNet, iPOLNG, SPIRAL; <code>gpu_evidence</code> is the <code>file:line</code>);
+without a <abbr title="Graphics Processing Unit">GPU</abbr> <code>run</code> raises <code>OSError</code> before launching and
+<a href="#mtbscan"><code>scan</code></a> / <code>run_all</code> report the sentence in <code>env_reason</code>. Every
+other method either has no CUDA call or falls back to <abbr title="Central Processing Unit">CPU</abbr> on its own
+(<code>torch.cuda.is_available()</code>), and scMM / scMVP / scMSI keep the <abbr title="Central Processing Unit">CPU</abbr>
+treatment the registry already gave them (<code>--no_cuda</code> /
+<code>CUDA_VISIBLE_DEVICES=""</code>). On a <abbr title="Graphics Processing Unit">GPU</abbr> host none of this applies. The
+tutorial in <a href="../tutorials/run/#gpu-or-cpu">Run a method</a> shows the calls.</p>
 <h3 id="mtbenvdoctor"><code>mtb.env.doctor</code><a class="headerlink" href="#mtbenvdoctor" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">doctor</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>               <span class="n">conda</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">as_frame</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">doctor</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">methods</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>               <span class="n">conda</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">as_frame</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Preflight: per env needed to run the methods, is it present and is a lockfile
-available to build it - <code>[{env, methods, exists, has_lock}]</code>, coverage-sorted
-(<code>as_frame=True</code> -&gt; a DataFrame). The CLI legend: <code>[x]</code> installed, <code>[L]</code>
-missing with a lockfile ready, <code>[!]</code> missing and no lockfile, then the
-<code>multibench env install ...</code> line for the gaps.</p>
+available to build it - <code>[{env, methods, exists, has_lock, flavor}]</code>,
+coverage-sorted (<code>as_frame=True</code> -&gt; a DataFrame; <code>flavor</code> = the installed
+archive's flavour when recorded, else <code>None</code>). The CLI legend: <code>[x]</code>
+installed, <code>[L]</code> missing with a lockfile ready, <code>[!]</code> missing and no
+lockfile, then the <code>multibench env install ...</code> line for the gaps.</p>
 <h3 id="mtbenvrecipe"><code>mtb.env.recipe</code><a class="headerlink" href="#mtbenvrecipe" title="Anchor link to this section">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">recipe</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">recipe</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </span></code></pre></div>
 <p>The conda environment recipe for a method - <code>{python_version,
 conda_channels, conda_packages, pip_packages, pip_git, package_source}</code> -
@@ -3489,7 +3772,7 @@ only</code>).</p>
 <ul>
 <li><code>method</code> (<code>str</code>) - the method id that was run.</li>
 <li><code>out_dir</code> (<code>Path</code>) - the working directory the command ran in.</li>
-<li><code>cmd</code> (<code>list[str]</code>) - the fully wrapped argv that was executed (incl. the <code>conda run</code> prefix).</li>
+<li><code>cmd</code> (<code>list[str]</code>) - the fully wrapped argv that was executed (incl. the wrapper: <code>conda run -n &lt;env&gt;</code> in conda mode, <code>bash -c '&lt;activate&gt;; exec "$@"' --</code> in <a href="#run-modes-prefix-and-conda">prefix mode</a>).</li>
 <li><code>output</code> - the loaded primary output (e.g. the joint embedding <code>ndarray</code>; may be dims x cells - <code>evaluate</code> re-orients it).</li>
 <li><code>extra</code> (<code>dict</code>) - <code>{file: loaded_output}</code> for any declared extra outputs.</li>
 <li><code>stdout</code> (<code>str</code>) / <code>stderr</code> (<code>str</code>) - captured streams.</li>
@@ -3500,8 +3783,8 @@ rather than returning a <code>RunResult</code>; a missing conda env raises
 <hr />
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Anchor link to this section">&para;</a></h2>
 <p>The package version is available as <code>multibench.__version__</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">__version__</span>   <span class="c1"># the installed version string</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">__version__</span>   <span class="c1"># the installed version string</span>
 </span></code></pre></div>
 <hr />
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Anchor link to this section">&para;</a></h2>
