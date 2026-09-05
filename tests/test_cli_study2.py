@@ -285,7 +285,9 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
 
 def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    rc = cli.main(["env", "plan", "--methods", "UINMF,sciPENN,Matilda"])
+    # --flavor gpu: the GPU archive sizes are what this test pins; on a GPU-less
+    # host the default (auto) would show the CPU archives where they exist
+    rc = cli.main(["env", "plan", "--methods", "UINMF,sciPENN,Matilda", "--flavor", "gpu"])
     cap = capsys.readouterr()
     assert rc == 0
     lines = {l.split()[0]: l for l in cap.out.splitlines()}

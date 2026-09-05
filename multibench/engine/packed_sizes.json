@@ -1,143 +1,143 @@
 {
- "MOFA2_env": {
-  "archive_bytes": 9605113054,
-  "unpacked_bytes": 18000000000
- },
- "_meta": {
-  "measured": "2026-09-03 (archive: HEAD on scmb_r, env_sciPENN, scmb_scvi; unpacked: SETUP.md du -sh figures for MOFA2_env, unitednet, scmb_torch_v2)",
-  "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json (a HEAD request); unpacked_bytes = size on disk after conda-unpack. null = not measured yet; rerun the tool after republishing an archive.",
-  "written_by": "tools/packed_sizes.py"
- },
- "env_moETM": {
-  "archive_bytes": 4100293453,
-  "unpacked_bytes": null
- },
- "env_sciPENN": {
-  "archive_bytes": 2077412003,
-  "unpacked_bytes": null
- },
- "env_sciPENN-cpu": {
-  "archive_bytes": null,
-  "unpacked_bytes": null
- },
- "glue": {
-  "archive_bytes": 3212148440,
-  "unpacked_bytes": null
- },
- "matilda": {
-  "archive_bytes": 3043807507,
-  "unpacked_bytes": null
- },
- "matilda-cpu": {
-  "archive_bytes": null,
-  "unpacked_bytes": null
- },
- "paste_envi": {
-  "archive_bytes": 3292561028,
-  "unpacked_bytes": null
- },
- "scmb_cobolt3": {
-  "archive_bytes": 4466945677,
-  "unpacked_bytes": null
- },
- "scmb_concerto": {
-  "archive_bytes": 887587172,
-  "unpacked_bytes": null
- },
- "scmb_gpsa2": {
-  "archive_bytes": 5208247272,
-  "unpacked_bytes": null
- },
- "scmb_ipolng2": {
-  "archive_bytes": 2111740612,
-  "unpacked_bytes": null
- },
- "scmb_mira": {
-  "archive_bytes": 2643963495,
-  "unpacked_bytes": null
- },
- "scmb_multigrate2": {
-  "archive_bytes": 4411023372,
-  "unpacked_bytes": null
- },
- "scmb_multivi": {
-  "archive_bytes": 4383008901,
-  "unpacked_bytes": null
- },
- "scmb_r": {
-  "archive_bytes": 916953088,
-  "unpacked_bytes": null
- },
- "scmb_scican": {
-  "archive_bytes": 4951744411,
-  "unpacked_bytes": null
- },
- "scmb_scjoint": {
-  "archive_bytes": 4225270409,
-  "unpacked_bytes": null
- },
- "scmb_scjoint-cpu": {
-  "archive_bytes": null,
-  "unpacked_bytes": null
- },
- "scmb_scmdc": {
-  "archive_bytes": 4251894509,
-  "unpacked_bytes": null
- },
- "scmb_scmm2": {
-  "archive_bytes": 1118430485,
-  "unpacked_bytes": null
- },
- "scmb_scmm2-cpu": {
-  "archive_bytes": null,
-  "unpacked_bytes": null
- },
- "scmb_scmsi": {
-  "archive_bytes": 1115264987,
-  "unpacked_bytes": null
- },
- "scmb_scmvp4": {
-  "archive_bytes": 1145555088,
-  "unpacked_bytes": null
- },
- "scmb_scvi": {
-  "archive_bytes": 3215645570,
-  "unpacked_bytes": null
- },
- "scmb_seurat4b": {
-  "archive_bytes": 772890631,
-  "unpacked_bytes": null
- },
- "scmb_seurat5": {
-  "archive_bytes": 3478833518,
-  "unpacked_bytes": null
- },
- "scmb_torch": {
-  "archive_bytes": 4537398808,
-  "unpacked_bytes": null
- },
- "scmb_torch-cpu": {
-  "archive_bytes": null,
-  "unpacked_bytes": null
- },
- "scmb_torch_v2": {
-  "archive_bytes": 5963709861,
-  "unpacked_bytes": 9800000000
- },
- "scmb_vimcca": {
-  "archive_bytes": 725133485,
-  "unpacked_bytes": null
- },
- "scmb_vipcca27": {
-  "archive_bytes": 718808190,
-  "unpacked_bytes": null
- },
- "spiral_environment": {
-  "archive_bytes": 5162235528,
-  "unpacked_bytes": null
- },
- "unitednet": {
-  "archive_bytes": 7056427724,
-  "unpacked_bytes": 12000000000
- }
+  "MOFA2_env": {
+    "archive_bytes": 9605113054,
+    "unpacked_bytes": 18000000000
+  },
+  "_meta": {
+    "measured": "2026-09-03 (archive: HEAD on scmb_r, env_sciPENN, scmb_scvi; unpacked: SETUP.md du -sh figures for MOFA2_env, unitednet, scmb_torch_v2)",
+    "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json (a HEAD request); unpacked_bytes = size on disk after conda-unpack. null = not measured yet; rerun the tool after republishing an archive.",
+    "written_by": "tools/packed_sizes.py"
+  },
+  "env_moETM": {
+    "archive_bytes": 4100293453,
+    "unpacked_bytes": null
+  },
+  "env_sciPENN": {
+    "archive_bytes": 2077412003,
+    "unpacked_bytes": null
+  },
+  "env_sciPENN-cpu": {
+    "archive_bytes": 472787805,
+    "unpacked_bytes": 1504347712
+  },
+  "glue": {
+    "archive_bytes": 3212148440,
+    "unpacked_bytes": null
+  },
+  "matilda": {
+    "archive_bytes": 3043807507,
+    "unpacked_bytes": null
+  },
+  "matilda-cpu": {
+    "archive_bytes": 584704264,
+    "unpacked_bytes": 1880385956
+  },
+  "paste_envi": {
+    "archive_bytes": 3292561028,
+    "unpacked_bytes": null
+  },
+  "scmb_cobolt3": {
+    "archive_bytes": 4466945677,
+    "unpacked_bytes": null
+  },
+  "scmb_concerto": {
+    "archive_bytes": 887587172,
+    "unpacked_bytes": null
+  },
+  "scmb_gpsa2": {
+    "archive_bytes": 5208247272,
+    "unpacked_bytes": null
+  },
+  "scmb_ipolng2": {
+    "archive_bytes": 2111740612,
+    "unpacked_bytes": null
+  },
+  "scmb_mira": {
+    "archive_bytes": 2643963495,
+    "unpacked_bytes": null
+  },
+  "scmb_multigrate2": {
+    "archive_bytes": 4411023372,
+    "unpacked_bytes": null
+  },
+  "scmb_multivi": {
+    "archive_bytes": 4383008901,
+    "unpacked_bytes": null
+  },
+  "scmb_r": {
+    "archive_bytes": 916953088,
+    "unpacked_bytes": null
+  },
+  "scmb_scican": {
+    "archive_bytes": 4951744411,
+    "unpacked_bytes": null
+  },
+  "scmb_scjoint": {
+    "archive_bytes": 4225270409,
+    "unpacked_bytes": null
+  },
+  "scmb_scjoint-cpu": {
+    "archive_bytes": null,
+    "unpacked_bytes": null
+  },
+  "scmb_scmdc": {
+    "archive_bytes": 4251894509,
+    "unpacked_bytes": null
+  },
+  "scmb_scmm2": {
+    "archive_bytes": 1118430485,
+    "unpacked_bytes": null
+  },
+  "scmb_scmm2-cpu": {
+    "archive_bytes": null,
+    "unpacked_bytes": null
+  },
+  "scmb_scmsi": {
+    "archive_bytes": 1115264987,
+    "unpacked_bytes": null
+  },
+  "scmb_scmvp4": {
+    "archive_bytes": 1145555088,
+    "unpacked_bytes": null
+  },
+  "scmb_scvi": {
+    "archive_bytes": 3215645570,
+    "unpacked_bytes": null
+  },
+  "scmb_seurat4b": {
+    "archive_bytes": 772890631,
+    "unpacked_bytes": null
+  },
+  "scmb_seurat5": {
+    "archive_bytes": 3478833518,
+    "unpacked_bytes": null
+  },
+  "scmb_torch": {
+    "archive_bytes": 4537398808,
+    "unpacked_bytes": null
+  },
+  "scmb_torch-cpu": {
+    "archive_bytes": null,
+    "unpacked_bytes": null
+  },
+  "scmb_torch_v2": {
+    "archive_bytes": 5963709861,
+    "unpacked_bytes": 9800000000
+  },
+  "scmb_vimcca": {
+    "archive_bytes": 725133485,
+    "unpacked_bytes": null
+  },
+  "scmb_vipcca27": {
+    "archive_bytes": 718808190,
+    "unpacked_bytes": null
+  },
+  "spiral_environment": {
+    "archive_bytes": 5162235528,
+    "unpacked_bytes": null
+  },
+  "unitednet": {
+    "archive_bytes": 7056427724,
+    "unpacked_bytes": 12000000000
+  }
 }
