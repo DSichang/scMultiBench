@@ -11,6 +11,14 @@ Prose earns its place or it is cut: structured facts go in tables, every numeric
 claim is a measured value from the verification runs, and nothing is explained
 twice. The notebooks are regenerated from this file - never hand-edited - and
 executed on the benchmark host afterwards.
+
+Colab / laptop budget: the install cell pins numpy and pandas to what the
+interpreter already has (pip never upgrades a host's stack), no cell
+provisions conda on Colab (the packed method environments run without a
+conda binary, so there is no kernel restart), a host without environments stands in the benchmark host's real ``run_all``
+outputs (``mtb.data.fetch_outputs``) before falling back to the stored metric
+table, and every stage calls ``tick(label)`` so the last cell can print where
+the time went.
 """
 import nbformat as nbf
 import os
@@ -100,62 +108,49 @@ DS_MB = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB", "D46": "97 MB",
 # the stored result tables, the env lockfiles and the reference metadata, so no
 # clone is needed; evaluate() needs scib/scanpy, which pip brings in. The
 # find_spec guard keeps the cell idempotent and leaves a developer's editable
-# install alone. Conda (for running methods) is a separate opt-in cell.
+# install alone. numpy and pandas are pinned to the versions the running
+# interpreter already has, so pip never upgrades a host's stack (Colab pins
+# pandas itself; a mismatched upgrade there costs minutes and breaks imports).
+# The cell is also the notebook's setup: it defines the two-line tick(label)
+# recorder every later stage calls, so the last cell can print where the time
+# went - the install cell must record its own time, so the recorder lives here.
 INSTALL_CELLS = [
-"""import importlib.util, sys
+"""import importlib.metadata, importlib.util, sys, time
+_t, TIMES = [time.time()], []                    # "where the time went": tick(label) records the seconds since the previous tick
+def tick(label): TIMES.append((label, round(time.time() - _t[0], 1))); _t[0] = time.time()
 if importlib.util.find_spec("multibench") is None:
-    !{sys.executable} -m pip -q install "multibench-sc>=0.3"   # registry, stored tables, env lockfiles and references ship in the wheel - no clone needed
+    # pin numpy / pandas to what this interpreter already has, so pip never upgrades the host's stack (Colab pins pandas itself)
+    pins = [f"{p}=={importlib.metadata.version(p)}" for p in ("numpy", "pandas") if importlib.util.find_spec(p)]
+    !{sys.executable} -m pip -q install "multibench-sc>=0.3" {" ".join(pins)}   # registry, stored tables, env lockfiles and references ship in the wheel - no clone needed
+    importlib.invalidate_caches()
     if importlib.util.find_spec("multibench") is None:        # PyPI behind the docs? take the same code straight from GitHub
-        !{sys.executable} -m pip -q install "git+https://github.com/DSichang/scMultiBench.git"
+        !{sys.executable} -m pip -q install "git+https://github.com/DSichang/scMultiBench.git" {" ".join(pins)}
 else:
-    print("multibench already installed")""",
+    print("multibench already installed")
+tick("install")""",
 ]
 
-# The "Run all" switch (tests/test_tutorial_runall_safety.py pins it): every
-# download of a method environment - condacolab and `env install` - sits
-# behind INSTALL_ENVS, so the default is safe for thirty people on Colab at
-# once (the packed envs for three methods are a multi-GB download). The size
-# in the comment is measured at generation time, never hand-written.
+# The "Run all" switch (tests/test_tutorial_runall_safety.py pins it): the
+# one download of method environments - `mtb.env.install(..., dry_run=False)`
+# - sits behind INSTALL_ENVS, so the default is safe for thirty people on
+# Colab at once (the packed envs for three methods are a multi-GB download).
+# The size in the comment is measured at generation time, never hand-written.
 FLAG_CELL_TEMPLATE = """# "Run all" switch. False (the default): nothing is downloaded and no method executes -
-# every section runs on any machine, and the run cells fall back to the package's stored sweep.
-# True: on Colab / Linux, provision conda and download the packed environments for the
-# methods this notebook runs ({size}), then run them here for real.
+# every section runs on any machine, and the run cells stand in the benchmark host's results.
+# True: on Colab / any Linux host, download the prebuilt environments for the methods this
+# notebook runs ({size}; no conda needed) and run them here for real.
 INSTALL_ENVS = False"""
 
-# Opt-in, only for running methods: Colab ships without conda; this provisions
-# it (the kernel restarts ONCE) - on a machine that already has conda it does
-# nothing. Placed AFTER the pip cell: a package installed before the restart
-# stays importable afterwards.
-CONDA_OPTIN_CELL = """# Colab ships without conda; with INSTALL_ENVS = True this provisions it (the kernel restarts ONCE).
-# On a machine that already has conda, this cell does nothing.
-import importlib.util, shutil
-
-def _has(mod):
-    try:
-        return importlib.util.find_spec(mod) is not None
-    except ModuleNotFoundError:
-        return False
-
-if not INSTALL_ENVS:
-    print("INSTALL_ENVS is False - conda is not provisioned and nothing is downloaded")
-elif shutil.which("conda") or shutil.which("mamba"):
-    print("conda available - nothing to do")
-elif _has("google.colab"):
-    !pip -q install condacolab
-    import condacolab
-    condacolab.install()   # restarts the kernel; afterwards, re-run section 1 (INSTALL_ENVS = True again) and continue here
-else:
-    print("no conda found - install it first (mamba recommended); see the installation guide")"""
-
 # The one line a run cell prints on a host without method environments
-# (tests pin the phrase), before standing in the package's own sweep.
+# (tests pin the phrase), before standing in a result computed elsewhere.
 SKIP_LINE = ("no method environment on this host - the run is skipped; "
-             "the stored results below cover it")
+             "a stand-in computed elsewhere covers it")
 
-# Defined next to its first use: the fallback the run cells take when
+# Defined next to its first use: the LAST fallback the run cells take when
 # scan() finds no environment for the requested methods. A BatchResult built
 # from the stored sweep's rows has the same .summary / .plot() as run_all's,
-# so every later cell renders unchanged; status='STORED' says nothing ran.
+# so every later cell renders unchanged; status='STORED' says nothing ran and
+# nothing is on disk (no embedding to evaluate).
 STORED_SWEEP_FN = '''def stored_sweep(dataset, methods=None):
     """The package's own sweep of `dataset` (`load_results(source="rerun")`) as the object
     `run_all` returns, so `.summary` / `.plot()` work on a host that cannot run the methods."""
@@ -163,6 +158,46 @@ STORED_SWEEP_FN = '''def stored_sweep(dataset, methods=None):
     recs = [{"method": m, "status": "STORED", "metrics": g.set_index("metric")["value"].to_dict()}
             for m, g in long.groupby("method")]
     return mtb.BatchResult(recs, dataset, CATEGORY)'''
+
+# The FIRST fallback: the benchmark host's real run_all output tree for the
+# dataset (batch_result.json, long.csv, one <method>_<dataset>/ folder with
+# the embedding), downloaded by mtb.data.fetch_outputs and reloaded by
+# load_batch - so .summary carries the host's statuses and run times and the
+# evaluate cell scores a real embedding. It raises offline, or before the
+# assets are published (or on a package without fetch_outputs yet), and then
+# the stored metric table stands in; one printed line says which path was taken.
+STAND_IN_FN = '''def stand_in(dataset, methods, stored):
+    """What a host without the method environments shows instead of `run_all`'s result: the benchmark
+    host's real `run_all` outputs for `dataset` (`mtb.data.fetch_outputs` - embeddings included), else
+    the package's stored metric table (`stored_sweep(*stored)`). One line says which."""
+    try:
+        res = mtb.load_batch(mtb.data.fetch_outputs(dataset), methods=methods)
+        print(f"stand-in: the benchmark host's run_all outputs for {dataset} (fetch_outputs) - real embeddings and run times")
+        return res
+    except Exception as e:                                   # offline, or the outputs are not published yet
+        print(f"stand-in: the package's stored metric table ({type(e).__name__} from fetch_outputs: {e})")
+        return stored_sweep(*stored)'''
+
+# The scoring step on its own, on the embedding one method wrote - run_all's
+# tree and fetch_outputs' tree share the layout <out_dir>/<method>_<dataset>/
+# <output file>, and the record says which label files the method's cells
+# follow. Nothing to score on the stored-table stand-in (no file on disk).
+EVALUATE_CELL_TEMPLATE = '''m, emb = "{method}", None
+if res.out_dir is not None:
+    emb = Path(res.out_dir) / f"{{m}}_{{res.dataset}}" / "embedding.h5"    # what run_all (and the benchmark host) wrote for it
+if emb is None or not emb.is_file():
+    print("no embedding on this host (metric-table stand-in) - evaluate runs when a method ran here or fetch_outputs supplied the outputs")
+    scores = None
+else:
+    rec = next(r for r in res.results if r["method"] == m)
+    order = [Path(f).stem for f in rec.get("labels_used") or []] or None    # the label files in the order the method stacked its cells
+    scores = mtb.evaluate(emb, labels=mtb.labels_for(res.dataset), label_order=order, verbose=False)
+tick("evaluate")
+scores.T if scores is not None else None'''
+
+# The last cell of every notebook: the compact "where the time went" table
+# from the ticks - a Colab attendee sees at a glance what the budget went on.
+TIMING_CELL = '''pd.DataFrame(TIMES, columns=["stage", "seconds"])'''
 
 SCEN = {
  "vertical": dict(
@@ -377,20 +412,23 @@ shipped with these notebooks were produced on it, so every table here
 reproduces.""")
 
     # ---------------------------------------------------------------- install
-    live_methods = sorted({fastm, *s["own_trio"]})
-    mlist = ",".join(live_methods)
+    trio = s["own_trio"]
+    live_methods = sorted({fastm, *trio})
     md("""## 1. Install
 
 `pip install multibench-sc` is the whole install: the 1.3 MB wheel ships the
 method registry, the stored result tables, the env lockfiles and the reference
 metadata. The package alone runs this section, section 3 (`scan`) and sections
 4-5. Running methods (section 2, and `run_all` in section 3) additionally
-needs their conda environments on a **Linux** host. The flag cell decides:
-with `INSTALL_ENVS = False` (the default) **Run all** is safe anywhere -
-nothing is downloaded, and a run cell on a host without the environments
-prints one line and falls back to the package's stored sweep; set it `True`
-on Colab or a Linux machine to download the environments in section 2 and
-run the methods for real.""")
+needs their environments - prebuilt linux-64 archives that need no conda
+binary - on a **Linux** host. The flag cell decides: with `INSTALL_ENVS =
+False` (the default) **Run all** is safe anywhere - nothing is downloaded,
+and a run cell on a host without the environments prints one line and
+stands in the benchmark host's own results; set it `True` on Colab or a
+Linux machine to download the environments in section 2 and run the methods
+for real. The install cell pins `numpy` / `pandas` to what the interpreter
+already has, so pip never upgrades a host's stack, and defines `tick`, the
+recorder behind the timing table at the end of the notebook.""")
     for cell in INSTALL_CELLS:
         code(cell)
     code(FLAG_CELL_TEMPLATE.format(size=env_size_text(methods=live_methods, short=True)))
@@ -410,55 +448,69 @@ import multibench as mtb
 DATASET  = "{s['ds']}"
 CATEGORY = "{cat}"
 mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})   # reference data ({', '.join(DS_MB[d] for d in CAT_DATA[cat])}) -> mtb.config.DEFAULT.data_path; no-op when present
-print("multibench", mtb.__version__)''')
+print("multibench", mtb.__version__)
+tick("data fetch")''')
 
     # ------------------------------------------------------------ environments
     md(f"""## 2. Run the analysis
 
 ### Environments - only if you will run methods in this session
 
-Linux + conda; {env_size_text(methods=live_methods)}. Both cells below do
-nothing unless `INSTALL_ENVS = True`. On Colab the first then provisions
-conda and restarts the kernel once: afterwards re-run section 1 (the flag
-included), then continue here. Without the environments, section 3's `scan`
-and sections 4-5 work as they are.""")
-    code(CONDA_OPTIN_CELL)
-    md(f"""Now the environments for the methods this tutorial runs
-({', '.join(live_methods)}). `--packed` downloads a prebuilt archive instead
-of solving one from scratch, and `env install` skips anything already
-present. Other tiers are one flag away: `--category {cat}`
-({env_size_text(category=cat)}), or no flag for the whole benchmark (29 envs;
-`multibench env plan` totals them). Method environments are linux-64 conda
-envs: on macOS / Windows `env install --run` refuses (`--force` overrides),
-which is why the cell checks the platform too.""")
+Linux; {env_size_text(methods=live_methods)}. The cell below does nothing
+unless `INSTALL_ENVS = True`; then it prints the download the dry run
+measures and installs the prebuilt archives for the methods this tutorial
+runs ({', '.join(live_methods)}) under `mtb.config.DEFAULT.envs_dir`
+(`~/.cache/multibench/envs` on a host without conda - the archives carry
+their own interpreters, and `run` activates a prefix directly, so **no
+conda binary is needed**, on Colab included; with conda present the prefix
+goes to its envs dir and `conda run` is the fallback: `MULTIBENCH_RUN_MODE`
+in the API reference). `env.install` skips anything already present. Other
+tiers are one flag away on the command line: `multibench env install
+--category {cat} --packed --run` ({env_size_text(category=cat)}), or no
+flag for the whole benchmark (29 envs; `multibench env plan` totals them).
+The archives are linux-64: on macOS / Windows a real install refuses
+(`force=True` / `--force` overrides), which is why the cell checks the
+platform too. Without the environments, section 3's `scan` and sections 4-5
+work as they are.""")
     code(f"""import sys
 if not INSTALL_ENVS:
     print("INSTALL_ENVS is False - no environment is downloaded (sections 3-5 need none)")
 elif sys.platform != "linux":
-    print("method environments are linux-64 conda envs - skipped on", sys.platform)
+    print("method environments are linux-64 archives - skipped on", sys.platform)
 else:
-    !{{sys.executable}} -m multibench env install --methods {mlist} --packed --run""")
+    plan = mtb.env.install({trio!r}, category=CATEGORY)              # dry_run=True: the plan, nothing downloaded
+    todo = [r for r in plan if not r["exists"]]
+    print(f"{{len(todo)}} of {{len(plan)}} envs to download, {{sum(r['archive_bytes'] or 0 for r in todo) / 1e9:.1f}} GB (measured archive sizes)")
+    for r in mtb.env.install({trio!r}, category=CATEGORY, packed=True, dry_run=False):   # no conda binary needed
+        print(f"{{r['env']:20s}} {{r['state']}}")
+tick("environments")""")
 
     # ------------------------------------------------------------- run + plot
-    trio = s["own_trio"]
     params_note = f', params={{"{fastm}": {s["live"][1]}}}' if s["live"][1] != "None" else ""
     extra = (f' (on `{live_ds}`, whose layout fits these methods; mosaic layouts '
              f'vary per dataset)' if live_ds != s["ds"] else "")
     si_ds, si_methods = stand_in(cat, ds, trio)
-    si_args = f'"{si_ds}"' + (f", {si_methods!r}" if si_methods else "")
+    si_args = f'("{si_ds}",' + (f" {si_methods!r})" if si_methods else ")")
     si_what = (f"the same methods from the package's own sweep of `{si_ds}`"
                if si_methods else f"the package's own sweep of `{si_ds}`")
     md(f"""### One call
 
 One call is the whole pipeline: resolve each method's inputs, run it in its own
-conda env, load the embeddings, score them with scIB metrics. Here
+environment, load the embeddings, score them with scIB metrics. Here
 {', '.join(trio)}{extra}. {s['live'][2]}. The cell first asks `scan` whether
 any of these methods has its environment here; where none does (a laptop,
-Colab with the flag off) it prints one line and stands in {si_what}
+Colab with the flag off) it prints one line and stands in the benchmark
+host's own `run_all` outputs for `{live_ds}` - `mtb.data.fetch_outputs`
+downloads the tree `run_all` wrote there (summary, long table and one
+embedding per method) and `mtb.load_batch(..., methods=)` reloads it, so the
+statuses, run times and the evaluate cell below are real. Offline, or before
+those outputs are published, a second fallback stands in {si_what}
 (`load_results(source="rerun")`, the package's re-execution of every wired
-method - the paper's own tables are `source="published"`), so every cell
-below still renders.""")
+method - the paper's own tables are `source="published"`); either way one
+printed line says which path was taken and every cell below still renders.""")
     code(f'''{STORED_SWEEP_FN}
+
+{STAND_IN_FN}
 
 check = mtb.scan("{live_ds}", CATEGORY, methods={trio!r})
 if check.env_ok.any():
@@ -467,14 +519,26 @@ if check.env_ok.any():
                       out_dir="/tmp/tutorial_{cat}")
 else:
     print("{SKIP_LINE}")
-    res = stored_sweep({si_args})
+    res = stand_in("{live_ds}", {trio!r}, stored={si_args})
+tick("run-or-fetch")
 res.summary''')
     md(f"""`summary` is sorted by method name, whatever order `methods=` listed;
 `emb_shape` is the embedding each method produced and `batch_source` says which
-batch vector the batch metrics used; a stand-in from the stored sweep says
-`STORED` in `status` and leaves the run columns empty. {s['summary_note']} The
-result object plots itself in the paper's layout:""")
-    code("""res.plot()""")
+batch vector the batch metrics used; a stand-in from the benchmark host carries
+that host's `status` and `run_sec`, one from the stored metric table says
+`STORED` in `status` and leaves the run columns empty. {s['summary_note']}
+The scoring step on its own - what `run_all` did per method - is one
+`mtb.evaluate` call on the embedding file a method wrote, with the label files
+in the order the method stacked its cells (`labels_for` returns them in the
+benchmark's stacking order; the record's `labels_used` is what `run_all`
+matched). ARI, NMI and iF1 need scIB's Leiden resolution sweep, the slow
+part; the sweep's flavor is the `mtb.config.DEFAULT.leiden_flavor` knob
+(`"igraph"`, the fast default, or `"leidenalg"`):""")
+    code(EVALUATE_CELL_TEMPLATE.format(method=fastm))
+    md("""The result object plots itself in the paper's layout:""")
+    code("""fig = res.plot()
+tick("plot")
+fig""")
     md("""Each circle carries two encodings: its **size is the method's rank** in
 that column (largest = rank 1) and its **colour is the metric's value**, min-max
 scaled within the column (darker = higher). Columns are grouped by task family -
@@ -548,6 +612,7 @@ sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)
 else:
     print("{SKIP_LINE}")
     mine = stored_sweep({own_args})   # {own_ds}: the package's own 60% subsample of {own_ds[:-1]}, the construction above
+tick("own data")
 mine.summary''')
     code("""mine.plot()""")
     md(f"""{s['own_note']} For your real data the only work is producing the
@@ -575,10 +640,12 @@ back as the tidy frame `mtb.plot.bubble` takes, and every row says in its
 print(long.method.nunique(), "methods,", long.source.unique())
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
+tick("stored results")
 fig''')
     md(f"""`run_all(DATASET, CATEGORY, out_dir=...)` without `methods=` writes the
 same `summary.csv` and `long.csv` for your own data; `mtb.load_batch(out_dir)`
-reads them back. A single `mtb.evaluate` frame becomes the same seven-column
+reads them back (`methods=` keeps a subset, as the stand-in above did). A
+single `mtb.evaluate` frame becomes the same seven-column
 long frame with `mtb.to_long(metrics, method=..., dataset=..., category=...)`
 (`source="user"`), so `pd.concat([long, mine])` plots next to the stored
 sweep.
@@ -744,7 +811,13 @@ must actually run, so it is deliberately not offered."""
 - the hosted interactive explorer: <https://shiny.maths.usyd.edu.au/scMultiBench/> -
   the full benchmark's rankings, browsable without installing anything
 - `mtb.recommend(CATEGORY, modalities=[...])` - stored-result ranking with coverage made explicit; methods wired for the category but absent from the chosen `source` appear with `grand_score` NaN rather than vanishing
-- `mtb.sweep(...)` - one method over a range of one hyperparameter""")
+- `mtb.sweep(...)` - one method over a range of one hyperparameter
+
+## Where the time went
+
+Seconds per stage, as `tick` recorded them (the install line is ~0 on a
+kernel that already had the package):""")
+    code(TIMING_CELL)
     return C
 
 
@@ -757,16 +830,22 @@ def build_colab_quickstart():
 This notebook runs **entirely in Colab**: it installs the `multibench` API,
 explores the method registry, loads the shipped benchmark results, and draws
 the standard figures - `pip install multibench-sc` is the whole install (the
-wheel ships the registry, the stored tables and the references).
+wheel ships the registry, the stored tables and the references; the cell
+pins `numpy` / `pandas` to the versions Colab already has, so nothing is
+upgraded, and defines `tick`, the recorder behind the timing table at the
+end).
 
-One scope note: *executing* an integration method needs that method's conda
-environment (linux-64; `multibench env plan` prints the sizes) and reference
-data, which this notebook does not provision - for that, follow a category
-tutorial on your own Linux machine. Everything below runs here, now.""")
+One scope note: *executing* an integration method needs that method's
+environment (a prebuilt linux-64 archive - no conda binary needed;
+`multibench env plan` prints the sizes) and reference data, which this
+notebook does not download - for that, open a category tutorial and set its
+`INSTALL_ENVS` flag. Everything below runs here, now.""")
     for cell in INSTALL_CELLS:
         code(cell)
-    code("""import multibench as mtb
+    code("""%matplotlib inline
+import multibench as mtb
 import pandas as pd
+tick("import")
 
 print(len(mtb.list_methods()), "methods in the registry")
 mtb.list_methods(category="vertical")""")
@@ -790,16 +869,24 @@ reproduce here without running anything.""")
     code("""long = mtb.load_results("vertical", dataset="D11", source="rerun")
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
+tick("stored results")
 fig""")
     code("""pair = mtb.load_results("diagonal", dataset=["D28", "D28s"], source="rerun")
-mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
-                title="Summary of 2 diagonal datasets")""")
+fig = mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
+                      title="Summary of 2 diagonal datasets")
+tick("plot")
+fig""")
     md("""## Next steps
 
 - the four integration tutorials (vertical / diagonal / mosaic / cross) in the
   docs walk the full pipeline, including your own dataset
 - the hosted [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/)
-  has the complete published rankings""")
+  has the complete published rankings
+
+## Where the time went
+
+Seconds per stage, as `tick` recorded them:""")
+    code(TIMING_CELL)
     return C
 
 

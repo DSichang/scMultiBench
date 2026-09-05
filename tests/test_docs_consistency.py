@@ -69,24 +69,33 @@ def test_notebook_install_cells_identical():
     assert seen >= 5                     # four tutorials + colab quickstart
 
 
-def test_conda_cell_is_opt_in_after_pip():
-    """condacolab is an opt-in for running methods: it follows the pip cell,
-    its markdown says so, and the quickstart (which runs no method) has none."""
+def test_env_install_cell_is_opt_in_after_pip_and_needs_no_conda():
+    """The environment install is an opt-in for running methods: one cell
+    per tutorial, after the pip cell, introduced by a markdown cell that says
+    so, guarded by the linux check, calling ``mtb.env.install(..., packed=True,
+    dry_run=False)`` - the packed archives need no conda binary, so no
+    notebook provisions conda (condacolab) any more; the quickstart, which
+    runs no method, has no install of environments at all."""
     gen = _load_gen_tut()
-    conda = gen.CONDA_OPTIN_CELL.strip()
     pip = gen.INSTALL_CELLS[0].strip()
     for cat in gen.SCEN:
         nb = json.loads((ROOT / "notebooks" / f"tutorial_{cat}.ipynb").read_text())
         cells = nb["cells"]
         src = ["".join(c["source"]).strip() for c in cells]
-        i_pip, i_conda = src.index(pip), src.index(conda)
-        assert i_conda > i_pip, f"tutorial_{cat}: conda cell must come after the pip cell"
-        assert cells[i_conda - 1]["cell_type"] == "markdown"
-        assert "only if you will run methods" in src[i_conda - 1].lower(), f"tutorial_{cat}"
-        env_install = [c for c in src if "multibench env install" in c and "sys.platform" in c]
-        assert env_install, f"tutorial_{cat}: env-install cell must be guarded by a linux check"
-    quick = "\n".join(_code_cells(ROOT / "notebooks" / "colab_quickstart.ipynb"))
-    assert "condacolab" not in quick
+        env_cells = [i for i, c in enumerate(src) if "mtb.env.install(" in c and "dry_run=False" in c]
+        assert len(env_cells) == 1, f"tutorial_{cat}: exactly one env-install cell"
+        i_pip, i_env = src.index(pip), env_cells[0]
+        assert i_env > i_pip, f"tutorial_{cat}: the env cell must come after the pip cell"
+        assert cells[i_env - 1]["cell_type"] == "markdown"
+        assert "only if you will run methods" in src[i_env - 1].lower(), f"tutorial_{cat}"
+        assert "sys.platform" in src[i_env], f"tutorial_{cat}: env-install cell must be guarded by a linux check"
+        assert "packed=True" in src[i_env]
+        assert "condacolab" not in "\n".join(src).lower(), f"tutorial_{cat}: no condacolab anywhere"
+        assert "multibench env install" not in "\n".join(_code_cells(ROOT / "notebooks" / f"tutorial_{cat}.ipynb")), \
+            f"tutorial_{cat}: the notebook installs through the Python API, not a shell line"
+    quick = json.loads((ROOT / "notebooks" / "colab_quickstart.ipynb").read_text())
+    quick_text = "\n".join("".join(c["source"]) for c in quick["cells"])
+    assert "condacolab" not in quick_text.lower() and "dry_run=False" not in quick_text
 
 
 def test_readme_single_install_path():
@@ -179,6 +188,10 @@ BANNED_PHRASES = {
     "rerun-0.2.1": "the source column says 'rerun'; the sweep version is not part of the value",
     "IMPUTATION_ONLY": "coverage derives from method_info(m)['categories'] / ['tasks'], not a hand-written list",
     'warnings.filterwarnings("ignore")': "library-specific filters only; multibench's own UserWarnings must stay visible",
+    # Colab speed round: the packed archives run without a conda binary, so
+    # nothing provisions conda on Colab and no kernel restart is needed
+    "condacolab": "no condacolab: mtb.env.install(..., packed=True, dry_run=False) installs the packed archives without conda",
+    "restarts the kernel": "no kernel restart: nothing provisions conda on Colab any more",
 }
 
 
@@ -234,6 +247,41 @@ def test_printed_examples_match_the_live_package():
         if path.name == "quickstart.md":
             assert "'source': 'manual'" in path.read_text()
             assert "'scBridge'" in path.read_text()
+
+
+@pytest.mark.parametrize("path", _docs_md_files(), ids=lambda p: p.name)
+def test_docs_pages_carry_the_colab_speed_round(path):
+    """The docs site (when reachable) documents the Colab speed round: the
+    installation page's Colab section (no conda bootstrap, the INSTALL_ENVS
+    flag, the measured sizes, the stand-in), the API entries for
+    data.fetch_outputs / load_batch(methods=) / Config.envs_dir /
+    Config.leiden_flavor / MULTIBENCH_RUN_MODE / env_prefix, and run.md's
+    account of prefix mode."""
+    text = path.read_text()
+    if path.name == "installation.md":
+        assert "### Google Colab" in text
+        assert "INSTALL_ENVS = False" in text and "INSTALL_ENVS = True" in text
+        assert "mtb.data.fetch_outputs" in text and "packed=True, dry_run=False" in text
+        assert "cross 3.0 GB" in text and "vertical 6.2 GB" in text, "measured archive totals per tutorial"
+        assert "No conda binary is needed for the packed path" in text
+        assert "MULTIBENCH_ENVS_DIR" in text and "~/.cache/multibench/envs" in text
+        assert "no conda/mamba on this host; <env> has a packed" in text
+    if path.name == "api.md":
+        assert "### `mtb.data.fetch_outputs`" in text
+        assert ("mtb.data.fetch_outputs(dataset: str, methods: list[str] | None = None, *,\n"
+                "                       data_path=None, quiet: bool = False) -> Path") in text
+        assert "mtb.load_batch(out_dir, *, methods: list[str] | None = None) -> BatchResult" in text
+        assert "envs_dir: Path" in text and "leiden_flavor: str" in text
+        assert "### Run modes: prefix and conda" in text
+        assert "MULTIBENCH_RUN_MODE=conda|prefix" in text
+        assert "mtb.env.env_prefix(env: str) -> Path | None" in text
+        assert "output_urls.json" in text
+    if path.name == "run.md":
+        assert "## How the environment is entered: prefix and conda modes" in text
+        assert "MULTIBENCH_RUN_MODE" in text and "activate.d" in text
+        assert "the default `conda run" not in text, "conda run is the fallback, not the default"
+    if path.name == "quickstart.md":
+        assert 'default\n    `cmd_template="conda run' not in text
 
 
 def test_host_only_method_set_behind_the_docs_rule():
