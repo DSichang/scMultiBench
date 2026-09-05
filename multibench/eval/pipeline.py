@@ -409,7 +409,9 @@ def evaluate(
     (a precomputed assignment) or ``metrics=[...]`` naming metrics that do
     not need it (``ASW``, ``iASW``, ``cLISI``, the batch family) to skip it.
     One line on stderr announces the sweep when it starts on more than 2,000
-    cells (``verbose``).
+    cells (``verbose``). The sweep's Leiden backend is
+    ``mtb.config.DEFAULT.leiden_flavor``: ``"igraph"`` (default; several times
+    faster) or ``"leidenalg"`` (the classic backend scib itself runs).
 
     Parameters
     ----------

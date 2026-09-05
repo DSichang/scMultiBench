@@ -96,7 +96,8 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
     monkeypatch.setattr(mscib, "_SWEEP_NOTICE_CELLS", 0)  # every sweep now counts as long
     evaluate(emb, labels=lab, metrics=["ARI"])            # default verbose=True announces it
     err = capsys.readouterr().err
-    assert re.search(r"Leiden resolution sweep \(10 resolutions\) over 120 cells for ARI", err)
+    assert re.search(r"Leiden resolution sweep \(10 resolutions, flavor=(igraph|leidenalg)\) "
+                     r"over 120 cells for ARI", err)
     assert "pass clustering= or metrics=" in err
     evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
     assert "Leiden" not in capsys.readouterr().err
