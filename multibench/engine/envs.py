@@ -26,6 +26,7 @@ from pathlib import Path
 
 import yaml
 
+from .. import config
 from . import registry
 
 __all__ = ["status", "plan", "install", "doctor", "recipe"]
@@ -519,21 +520,100 @@ def _envs_dir(conda_bin: str) -> Path | None:
     return None
 
 
-def install_packed(env: str, conda: str | None = None, *, force: bool = False) -> bool:
+def _find_conda() -> str | None:
+    """Path of the conda (else mamba) binary on PATH, or ``None``.
+
+    The existence test every conda-free path keys on: prefix discovery,
+    ``installed_envs`` and ``install`` ask this, never ``_conda_bin`` (which
+    returns a bare name even when nothing is installed).
+    """
+    return shutil.which("conda") or shutil.which("mamba")
+
+
+@functools.lru_cache(maxsize=4)
+def _conda_prefixes(conda: str) -> tuple:
+    """``(prefix, ...)`` that ``<conda> env list --json`` reports (cached per
+    binary; ``()`` when the tool is absent or answers garbage). The cache is
+    cleared by the two places this module creates envs, so an env built in
+    the same process is seen."""
+    try:
+        out = subprocess.run([conda, "env", "list", "--json"],
+                             capture_output=True, text=True, check=True).stdout
+        prefixes = _json.loads(out).get("envs", [])
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError,
+            TypeError, AttributeError, OSError):
+        return ()
+    return tuple(str(p) for p in prefixes)
+
+
+def _prefixes_on_disk(envs_dir: Path) -> dict[str, Path]:
+    """``{env: prefix}`` for every ``<envs_dir>/<env>`` that carries ``bin/``."""
+    try:
+        return {p.name: p for p in sorted(envs_dir.iterdir())
+                if (p / "bin").is_dir()}
+    except OSError:
+        return {}
+
+
+def env_prefix(env: str, conda: str | None = None) -> Path | None:
+    """The on-disk prefix of a method environment, or ``None``.
+
+    Parameters
+    ----------
+    env : str
+        The real env name (:func:`group_for`), e.g. ``'matilda'``.
+    conda : str, optional
+        conda/mamba executable to ask when the prefix is not under
+        ``envs_dir``; default: the one on PATH, if any.
+
+    Returns
+    -------
+    Path or None
+        ``<config.DEFAULT.envs_dir>/<env>`` when that directory contains
+        ``bin/`` (a conda-pack archive unpacked there, or a conda-built env
+        in the same directory) - no conda needed; else, when a conda/mamba
+        binary is found, the prefix ``conda env list`` reports for that name;
+        else ``None``. This is what "installed" means everywhere
+        (:func:`installed_envs`, :func:`doctor`, ``scan()['env_ok']``) and
+        what the runner's prefix mode activates.
+    """
+    cand = Path(config.DEFAULT.envs_dir) / env
+    if (cand / "bin").is_dir():
+        return cand
+    bin_ = conda or _find_conda()
+    if bin_ is None:
+        return None
+    for p in _conda_prefixes(bin_):
+        if os.path.basename(p.rstrip("/")) == env:
+            return Path(p)
+    return None
+
+
+def install_packed(env: str, *, envs_dir: Path | str | None = None,
+                   conda: str | None = None, force: bool = False) -> bool:
     """Provision ``env`` from a prebuilt conda-pack archive, if one is published.
 
     Downloads the archive named in ``packed_urls.json`` (else
-    ``<PACKED_URL>/<env>.tar.gz``), unpacks it into the conda envs directory
-    and runs the archive's own ``bin/conda-unpack`` to rewrite the embedded
-    prefixes. This turns a 10-30 minute solve-and-download into a
-    download-bound couple of minutes.
+    ``<PACKED_URL>/<env>.tar.gz``), extracts it into ``<envs_dir>/<env>``
+    and runs the archive's own ``bin/conda-unpack`` with ``<prefix>/bin``
+    first on ``PATH`` (the archive carries its own python) to rewrite the
+    embedded prefixes. No conda binary is needed at any step: conda-pack
+    archives are relocatable, and the runner activates the prefix directly.
+    This turns a 10-30 minute solve-and-download into a download-bound
+    couple of minutes.
 
     Parameters
     ----------
     env : str
         The real conda env name (:func:`group_for`), e.g. ``'matilda'``.
-    conda : str, optional
-        conda/mamba executable; default: mamba if found, else conda.
+    envs_dir : path, keyword-only, optional
+        Where the prefix goes; default :attr:`multibench.config.Config.envs_dir`
+        (``MULTIBENCH_ENVS_DIR``, else conda's envs dir, else
+        ``~/.cache/multibench/envs``) - or, when only ``conda`` is given,
+        that tool's envs dir as before.
+    conda : str, keyword-only, optional
+        conda/mamba executable whose envs dir to unpack into when
+        ``envs_dir`` is not given. Not required.
     force : bool, keyword-only
         The archives are linux-64; on any other host ``RuntimeError`` is
         raised BEFORE the download unless ``force=True``.
@@ -541,40 +621,28 @@ def install_packed(env: str, conda: str | None = None, *, force: bool = False) -
     Returns
     -------
     bool
-        ``True`` on success (or when the env already exists), ``False`` when
-        no archive exists for this env or the unpack failed - the caller
+        ``True`` on success (or when the prefix already exists), ``False``
+        when no archive exists for this env or the unpack failed - the caller
         falls back to the lockfile build.
     """
-    import subprocess
     import tarfile
-    import tempfile
     import urllib.error
     import urllib.request
 
     _require_linux(force)                 # fail closed before any bytes land
-    bin_ = _conda_bin() if conda is None else conda
-    if shutil.which(bin_) is None:
-        return False
-    import json as _json
-    envs_root = _envs_dir(bin_)
-    if envs_root is None:
-        print(f"[env] could not locate the environments directory of {bin_}; "
-              "falling back to the lockfile build", flush=True)
-        return False
+    if envs_dir is not None:
+        envs_root = Path(envs_dir)
+    elif conda is not None and shutil.which(conda):
+        envs_root = _envs_dir(conda) or Path(config.DEFAULT.envs_dir)
+    else:
+        envs_root = Path(config.DEFAULT.envs_dir)
     dest = envs_root / env
     if dest.exists():
         return True
     # A shipped manifest maps env -> archive URL, so archives can live where
     # their size dictates (GitHub release assets up to 2 GiB, Zenodo beyond);
     # envs without an entry fall back to the release-asset convention.
-    _manifest = {}
-    _mf = Path(__file__).parent / "packed_urls.json"
-    if _mf.is_file():
-        try:
-            _manifest = _json.loads(_mf.read_text())
-        except Exception:
-            _manifest = {}
-    url = _manifest.get(env) or f"{PACKED_URL}/{env}.tar.gz"
+    url = packed_manifest().get(env) or f"{PACKED_URL}/{env}.tar.gz"
     try:
         tgz, _ = urllib.request.urlretrieve(url)
     except urllib.error.HTTPError:
@@ -587,19 +655,13 @@ def install_packed(env: str, conda: str | None = None, *, force: bool = False) -
         part.mkdir(parents=True)
         with tarfile.open(tgz) as t:
             safe_extract(t, part)
-        # conda-unpack's shebang expects a `python` on PATH, which a bare
-        # machine may not have - run it through the env's own interpreter.
-        py = part / "bin" / "python"
-        unpack = part / "bin" / "conda-unpack"
-        if not py.exists():
-            raise RuntimeError("archive did not contain bin/python")
+        if not (part / "bin").is_dir():
+            raise RuntimeError("archive did not contain bin/")
         # the env must carry its FINAL path before conda-unpack rewrites
         # prefixes, so move first, then unpack
         part.rename(dest)
-        if (dest / "bin" / "conda-unpack").exists():
-            subprocess.run([str(dest / "bin" / "python"),
-                            str(dest / "bin" / "conda-unpack")],
-                           check=True, capture_output=True)
+        _conda_unpack(dest)
+        _conda_prefixes.cache_clear()
         return True
     except Exception as e:  # noqa: BLE001 - degrade to the lockfile build
         shutil.rmtree(part, ignore_errors=True)
@@ -610,27 +672,51 @@ def install_packed(env: str, conda: str | None = None, *, force: bool = False) -
         return False
 
 
-def installed_envs(conda: str | None = None) -> list[str]:
-    """Names (basenames) of existing conda envs.
+def _conda_unpack(prefix: Path) -> None:
+    """Run ``<prefix>/bin/conda-unpack`` (a no-op when the archive has none).
 
-    Uses ``conda env list --json`` and returns the basename of each env prefix,
-    so path-only/prefix entries (e.g. basilisk caches) become clean names rather
-    than leaking raw filesystem paths.
+    ``<prefix>/bin`` goes first on ``PATH`` so the script's ``python``
+    shebang resolves to the env's own interpreter - a bare machine (Colab
+    without conda) has no other. A script that lost its executable bit is
+    handed to that interpreter explicitly.
     """
-    import json
-    import os
-    conda = conda or _conda_bin("conda")
-    try:
-        out = subprocess.run([conda, "env", "list", "--json"],
-                             capture_output=True, text=True, check=True).stdout
-        prefixes = json.loads(out).get("envs", [])
-    except (subprocess.CalledProcessError, FileNotFoundError, ValueError, TypeError):
-        return []
-    names: list[str] = []
-    for p in prefixes:
-        name = os.path.basename(str(p).rstrip("/"))
-        if name and name not in names:
-            names.append(name)
+    unpack = prefix / "bin" / "conda-unpack"
+    if not unpack.exists():
+        return
+    py = prefix / "bin" / "python"
+    argv = [str(unpack)] if os.access(unpack, os.X_OK) else [str(py), str(unpack)]
+    env = {**os.environ,
+           "PATH": f"{prefix / 'bin'}{os.pathsep}{os.environ.get('PATH', '')}"}
+    subprocess.run(argv, check=True, capture_output=True, env=env)
+
+
+def installed_envs(conda: str | None = None) -> list[str]:
+    """Names of the method environments present on this machine.
+
+    An env counts as installed when :func:`env_prefix` finds it: a
+    ``<envs_dir>/<env>/bin`` prefix on disk (no conda needed - this is what
+    ``install_packed`` produces on a conda-free host), or an env
+    ``conda env list --json`` reports when a conda/mamba binary is found.
+
+    Parameters
+    ----------
+    conda : str, optional
+        conda/mamba executable to ask; default: the one on PATH, if any.
+
+    Returns
+    -------
+    list of str
+        Basenames of the prefixes (path-only entries such as basilisk caches
+        become clean names rather than raw paths), prefixes on disk first,
+        no duplicates.
+    """
+    names = list(_prefixes_on_disk(Path(config.DEFAULT.envs_dir)))
+    bin_ = conda or _find_conda()
+    if bin_ is not None:
+        for p in _conda_prefixes(bin_):
+            name = os.path.basename(str(p).rstrip("/"))
+            if name and name not in names:
+                names.append(name)
     return names
 
 
@@ -924,7 +1010,10 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         otherwise - and returns the per-env outcome (``'PACKED'`` /
         ``'BUILD'`` / ``'have'`` / ``'NO-LOCK'``).
     conda : str, keyword-only, optional
-        conda/mamba executable; default: mamba if found, else conda.
+        conda/mamba executable; default: mamba if found, else conda. Not
+        needed for the packed path: archives unpack into
+        :attr:`multibench.config.Config.envs_dir` and the runner activates
+        the prefix directly (Colab, laptops without conda).
     force : bool, keyword-only
         The archives and lockfiles are linux-64; ``dry_run=False`` on
         macOS/Windows raises ``RuntimeError`` BEFORE any download unless
@@ -941,17 +1030,38 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     Raises
     ------
     RuntimeError
-        No conda here, a failed build, or a non-Linux host without ``force``
-        (``dry_run=False`` only).
+        ``dry_run=False`` only: a non-Linux host without ``force``; a failed
+        build; or no conda/mamba on the host while a missing env needs a
+        lockfile build - ``"no conda/mamba on this host; <env> has a packed
+        archive - pass packed=True"`` when ``packed=False`` would have
+        skipped a published archive, ``"... has no packed archive - install
+        conda first"`` when none exists. Both are raised before any download.
     """
     _check_methods(methods)
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
     unpacked: set[str] = set()
-    if packed and not dry_run:
-        for r in doctor(category=category, methods=methods, conda=conda):
-            if not r["exists"] and install_packed(r["env"], conda=conda, force=force):
-                unpacked.add(r["env"])
+    if not dry_run:
+        _require_linux(force)             # before conda is even asked anything
+        missing = [r for r in doctor(category=category, methods=methods, conda=conda)
+                   if not r["exists"]]
+        if (conda or _find_conda()) is None:
+            # No conda here: only the packed path can provision anything, and
+            # the answer must arrive BEFORE any archive is downloaded.
+            for r in missing:
+                if packed and r["env"] in manifest:
+                    continue
+                if r["env"] in packed_manifest():
+                    raise RuntimeError(
+                        f"no conda/mamba on this host; {r['env']} has a packed "
+                        f"archive - pass packed=True")
+                raise RuntimeError(
+                    f"no conda/mamba on this host; {r['env']} has no packed "
+                    f"archive - install conda first")
+        if packed:
+            for r in missing:
+                if install_packed(r["env"], conda=conda, force=force):
+                    unpacked.add(r["env"])
     # a RuntimeError (no conda here, a failed build, a non-Linux host)
     # propagates: the CLI prints it as "error: ..." on stderr, exit 1
     rows = create_all(category=category, methods=methods, conda=conda,
@@ -1308,3 +1418,4 @@ def _run_all(cmds: list[list[str]]) -> None:
             raise RuntimeError(
                 f"env command failed: {' '.join(c)}\nstderr tail:\n{proc.stderr[-2000:]}"
             )
+    _conda_prefixes.cache_clear()         # the env just built must be visible
