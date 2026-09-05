@@ -74,6 +74,79 @@ def modality_family(role: str) -> str:
     return role
 
 
+#: the per-method keys of the GPU/CPU contract in methods.yaml (see MethodSpec)
+GPU_FIELDS = ("cpu_params", "requires_gpu", "gpu_evidence")
+#: what a ``cpu_params`` value may be: a command-line token (``""`` included -
+#: scJoint's ``--use_cuda ""``), a number, or ``True`` for a bare flag
+_CPU_PARAM_VALUE_TYPES = (str, int, float, bool)
+
+
+def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence) -> None:
+    """Check the GPU/CPU contract of one method (``methods.yaml`` keys).
+
+    Parameters
+    ----------
+    method_id : str
+        The method the keys belong to (named in every message).
+    cpu_params : the ``cpu_params`` value - a mapping ``{flag: value}`` whose
+        keys are non-empty strings and whose values are strings (``""``
+        allowed), numbers or ``True``.
+    requires_gpu : the ``requires_gpu`` value - a bool.
+    gpu_evidence : the ``gpu_evidence`` value - a ``"<file>:<line>"`` string
+        naming the unconditional CUDA call; required when ``requires_gpu``
+        is True and forbidden otherwise.
+
+    Raises
+    ------
+    ValueError
+        With ``"<method>: ..."`` naming the offending key, when a value has
+        the wrong shape, when ``requires_gpu`` and ``cpu_params`` are both
+        set (a script cannot both need a GPU and have a switch that turns
+        CUDA off), or when ``gpu_evidence`` and ``requires_gpu`` disagree.
+    """
+    if not isinstance(cpu_params, dict):
+        raise ValueError(
+            f"{method_id}: cpu_params must be a mapping {{flag: value}}, got "
+            f"{type(cpu_params).__name__}")
+    for k, v in cpu_params.items():
+        if not isinstance(k, str) or not k:
+            raise ValueError(
+                f"{method_id}: cpu_params keys must be non-empty command-line "
+                f"param names, got {k!r}")
+        if v is None or v is False or not isinstance(v, _CPU_PARAM_VALUE_TYPES):
+            raise ValueError(
+                f"{method_id}: cpu_params[{k!r}] must be a command-line value "
+                f"(a string, '' included, a number, or True for a bare flag) - "
+                f"None/False are never emitted, so they cannot turn CUDA off; "
+                f"got {v!r}")
+    if not isinstance(requires_gpu, bool):
+        raise ValueError(
+            f"{method_id}: requires_gpu must be true or false, got {requires_gpu!r}")
+    if not isinstance(gpu_evidence, str):
+        raise ValueError(
+            f"{method_id}: gpu_evidence must be a '<file>:<line>' string, got "
+            f"{gpu_evidence!r}")
+    if requires_gpu and cpu_params:
+        raise ValueError(
+            f"{method_id}: requires_gpu and cpu_params are both set - a script "
+            f"that has a switch turning CUDA off does not require a GPU; keep one")
+    if requires_gpu and not gpu_evidence.strip():
+        raise ValueError(
+            f"{method_id}: requires_gpu is true but gpu_evidence is empty - name "
+            f"the unconditional CUDA call as '<file>:<line>' (it is quoted in "
+            f"the refusal the runner raises on a host without a GPU)")
+    if gpu_evidence.strip() and not requires_gpu:
+        raise ValueError(
+            f"{method_id}: gpu_evidence {gpu_evidence!r} is set but requires_gpu "
+            f"is false - remove it or set requires_gpu: true")
+    if requires_gpu:
+        path, sep, line = gpu_evidence.strip().rpartition(":")
+        if not sep or not path or not line.isdigit():
+            raise ValueError(
+                f"{method_id}: gpu_evidence must be '<file>:<line>', got "
+                f"{gpu_evidence!r}")
+
+
 @dataclass
 class ArgSpec:
     role: str = ""          # input role (e.g. 'rna') or 'out_dir'
@@ -234,10 +307,44 @@ class MethodSpec:
     # curated provenance (engine/references.yaml): repo_url, version, summary,
     # reference {doi, title, authors, journal, year}
     reference: dict = field(default_factory=dict)
+    # GPU/CPU contract of the UPSTREAM script (per method, not per variant;
+    # see `GPU_FIELDS`). `cpu_params` are the command-line params that turn
+    # CUDA OFF for a script that has it on by default ({flag: value}, emitted
+    # exactly like `params`: scJoint's argparse `--use_cuda` is `type=bool`,
+    # so only the EMPTY string is false -> {use_cuda: ""}). The runner merges
+    # them into a run's params when `envs.host_has_gpu()` is False, unless
+    # the caller passed the same key. `requires_gpu` marks a script that
+    # calls CUDA unconditionally (`.cuda()` / `torch.device('cuda')` with no
+    # switch and no `torch.cuda.is_available()` fallback); `gpu_evidence` is
+    # the `file:line` of that call, quoted in the refusal. A method may not
+    # carry both.
+    cpu_params: dict = field(default_factory=dict)
+    requires_gpu: bool = False
+    gpu_evidence: str = ""
 
     def __post_init__(self):
         if not self.categories:
             self.categories = self.wired_categories
+        validate_gpu_fields(self.id, self.cpu_params, self.requires_gpu,
+                            self.gpu_evidence)
+
+    @property
+    def requires_gpu_reason(self) -> str:
+        """Why this method cannot run on a host without an NVIDIA GPU, or
+        ``""`` when ``requires_gpu`` is False.
+
+        The ONE text the runner's ``OSError`` and ``scan``'s ``env_reason``
+        share, so a tutorial and a traceback read the same sentence::
+
+            scBridge needs an NVIDIA GPU: the upstream script calls CUDA
+            unconditionally (tools_scripts/scBridge/main_scBridge.py:46);
+            see method_info(m)["requires_gpu"]
+        """
+        if not self.requires_gpu:
+            return ""
+        return (f"{self.id} needs an NVIDIA GPU: the upstream script calls CUDA "
+                f"unconditionally ({self.gpu_evidence}); "
+                f'see method_info(m)["requires_gpu"]')
 
     @property
     def wired_categories(self) -> list[str]:
