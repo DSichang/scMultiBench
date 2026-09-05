@@ -42,7 +42,18 @@ def _spy_leiden(monkeypatch):
     return seen
 
 
+
+@pytest.fixture(autouse=True)
+def _pretend_modern_scanpy(monkeypatch):
+    """These tests drive fakes of ``sc.tl.leiden`` and assert which backend the
+    package ASKS for; the answer must not depend on the host's scanpy (the
+    benchmark host runs 1.9.8, where the real probe says 'no igraph')."""
+    monkeypatch.setattr(S, "_igraph_support", True)
+    monkeypatch.setattr(S, "_flavor_kw", True)
+    monkeypatch.setattr(S, "_fallback_warned", False)
+
 @pytest.mark.parametrize("flavor", ["igraph", "leidenalg"])
+
 def test_both_flavors_give_one_clustering_per_resolution(flavor, monkeypatch):
     from scib.metrics.clustering import get_resolutions
     seen = _spy_leiden(monkeypatch)
@@ -158,7 +169,9 @@ def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
 
 def test_igraph_probe_reads_scanpy_version(monkeypatch):
     monkeypatch.setattr(S, "_igraph_support", None)
-    assert S.igraph_flavor_available() is True      # this venv: scanpy >= 1.10 + igraph
+    from importlib.metadata import version
+    from packaging.version import Version
+    assert S.igraph_flavor_available() is (Version(version("scanpy")) >= Version("1.10"))
 
 
 def test_leidenalg_path_passes_no_flavor_keyword(monkeypatch):
