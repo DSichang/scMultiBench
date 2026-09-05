@@ -348,12 +348,15 @@ import h5py
 import numpy as np
 import pandas as pd
 
-def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
-    """Copy a dataset to a new name, keeping a random fraction of the cells.
+def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0, max_cells=2000, max_features=5000):
+    """Copy a dataset to a new name, keeping a random slice of it.
 
+    Cells: a random ``frac`` of each file's cells, capped at ``max_cells``.
     Files sharing a cell count get the SAME kept-cell index, so modality files
     and their label CSVs stay aligned - which is exactly the property your own
-    export pipeline must preserve. The output is the canonical layout:
+    export pipeline must preserve. Features: files with more than
+    ``max_features`` rows (peak matrices) keep a random subset, so the copy
+    stays small and fast to write. The output is the canonical layout:
     matrix/data as features x cells, plus matrix/features and matrix/barcodes.
     """
     rng = np.random.default_rng(seed)
@@ -368,7 +371,7 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
         elif fn.endswith(".csv"):
             counts[fn] = len(pd.read_csv(p))
     for n in set(counts.values()):
-        k = max(50, int(n * frac))
+        k = min(max(50, int(n * frac)), max_cells)
         keep[n] = np.sort(rng.choice(n, size=k, replace=False))
     for fn, n in counts.items():
         sp, dp = os.path.join(src_dir, fn), os.path.join(dst_dir, fn)
@@ -378,9 +381,12 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0):
         else:
             with h5py.File(sp) as f, h5py.File(dp, "w") as g:
                 grp = g.create_group("matrix")
-                grp.create_dataset("data", data=np.asarray(f["matrix/data"])[:, idx])
+                n_feat = f["matrix/data"].shape[0]
+                fidx = np.arange(n_feat) if n_feat <= max_features else np.sort(rng.choice(n_feat, size=max_features, replace=False))
+                block = f["matrix/data"][fidx, :] if n_feat > max_features else f["matrix/data"][()]   # one fancy index per h5py read
+                grp.create_dataset("data", data=np.asarray(block)[:, idx])
                 if "matrix/features" in f:
-                    grp.create_dataset("features", data=np.asarray(f["matrix/features"]))
+                    grp.create_dataset("features", data=np.asarray(f["matrix/features"])[fidx])
                 if "matrix/barcodes" in f:
                     grp.create_dataset("barcodes", data=np.asarray(f["matrix/barcodes"])[idx])
     return dst_dir'''
@@ -585,9 +591,12 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
 example - sparse matrices stream without densifying, and the folder passes the
 same file gate `scan` applies to the shipped datasets:""")
     code(EXPORT_DEMO[cat])
-    md(f"""Now a real dataset the package has never seen: a 60% cell subsample of
-`{s['own_src']}` under a new name, built with ordinary h5py/pandas code so the
-per-file rule (matching files keep the same cell index) is visible.""")
+    md(f"""Now a real dataset the package has never seen: a small slice of
+`{s['own_src']}` under a new name - a random 60% of the cells capped at 2,000,
+and at most 5,000 features per matrix - built with ordinary h5py/pandas code so
+the per-file rule (matching files keep the same cell index) is visible. The cap
+keeps the copy small enough to write in seconds on Colab (the full peak matrix
+of a mosaic dataset is several GB dense).""")
     code(SUBSAMPLE_FN)
     md("""`scan` checks two independent gates per method: `files_ok` - the folder
 itself (files present, features x cells orientation, one label per cell) - and
@@ -611,7 +620,7 @@ sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)
                        data_path=DATA_ROOT)
 else:
     print("{SKIP_LINE}")
-    mine = stored_sweep({own_args})   # {own_ds}: the package's own 60% subsample of {own_ds[:-1]}, the construction above
+    mine = stored_sweep({own_args})   # {own_ds}: the package's own 60% subsample of {own_ds[:-1]} (the same construction, uncapped)
 tick("own data")
 mine.summary''')
     code("""mine.plot()""")
