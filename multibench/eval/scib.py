@@ -154,6 +154,52 @@ def _lisi_helper_problem() -> str | None:
 
 
 
+#: Leiden backends ``leiden_sweep`` / ``compute`` accept
+LEIDEN_FLAVORS = ("igraph", "leidenalg")
+
+
+def _resolve_flavor(flavor) -> str:
+    """The Leiden backend to use: ``flavor`` itself, else the configured default.
+
+    ``None`` reads ``config.DEFAULT.leiden_flavor`` (``"igraph"`` when the
+    field is absent, e.g. an older ``Config``). Anything outside
+    :data:`LEIDEN_FLAVORS` raises rather than silently running the slow
+    backend under a misspelt name.
+    """
+    if flavor is None:
+        from .. import config
+        flavor = getattr(config.DEFAULT, "leiden_flavor", "igraph")
+    if flavor not in LEIDEN_FLAVORS:
+        raise ValueError(
+            f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
+    return flavor
+
+
+def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
+    """One Leiden clustering, on the backend ``flavor`` names.
+
+    ``"igraph"`` is scanpy's igraph backend (``n_iterations=2``,
+    ``directed=False`` - the settings scanpy documents for it; 7.7x faster
+    than leidenalg on 20k cells). ``"leidenalg"`` is the classic backend
+    scib's own ``cluster_optimal_resolution`` runs. Both write the labels to
+    ``adata.obs[key_added]``.
+    """
+    import scanpy as sc
+    if flavor == "igraph":
+        sc.tl.leiden(adata, resolution=resolution, key_added=key_added,
+                     flavor="igraph", n_iterations=2, directed=False)
+        return
+    with warnings.catch_warnings():
+        # scanpy nags every leidenalg call to switch to igraph; here leidenalg
+        # is an explicit choice (config.DEFAULT.leiden_flavor / flavor=), so
+        # that one message is noise. Only it is silenced - anything else
+        # scanpy has to say still surfaces.
+        warnings.filterwarnings("ignore", message=".*igraph.*implementation of leiden.*",
+                                category=UserWarning)
+        sc.tl.leiden(adata, resolution=resolution, key_added=key_added,
+                     flavor="leidenalg")
+
+
 def _build_adata(emb, celltype, cluster, batch):
     # anndata is an evaluation-only dependency: importing it lazily keeps
     # `import multibench` working on environments (e.g. Colab) that have
@@ -174,7 +220,7 @@ def _build_adata(emb, celltype, cluster, batch):
 
 
 
-def leiden_sweep(emb):
+def leiden_sweep(emb, *, flavor=None):
     """Run the scIB optimal-resolution Leiden sweep ONCE, reusably.
 
     ``cluster_optimal_resolution`` clusters the embedding at 10 resolutions and
@@ -184,14 +230,33 @@ def leiden_sweep(emb):
     sweep, not N. On D52 cross (6 candidate orderings, 23,478 cells) the per-
     candidate sweeps cost ~250s each and dominated the whole evaluation.
 
-    Returns ``(adata, keys)``. The caller assigns ``adata.obs["celltype"]`` and
-    scores with scib's OWN ``nmi``/``ari`` against each key, so the selection
-    protocol stays identical to ``cluster_optimal_resolution``'s rather than
-    being reimplemented.
+    Parameters
+    ----------
+    emb : array-like
+        Embedding, cells x dims.
+    flavor : {"igraph", "leidenalg"}, keyword-only, optional
+        Leiden backend. ``None`` (default) reads ``config.DEFAULT.leiden_flavor``
+        (``"igraph"``: scanpy's igraph backend with ``n_iterations=2``,
+        ``directed=False``; ``"leidenalg"``: the classic backend scib itself
+        runs).
+
+    Returns
+    -------
+    tuple
+        ``(adata, keys)``. The caller assigns ``adata.obs["celltype"]`` and
+        scores with scib's OWN ``nmi``/``ari`` against each key, so the
+        selection protocol stays identical to ``cluster_optimal_resolution``'s
+        rather than being reimplemented.
+
+    Raises
+    ------
+    ValueError
+        ``flavor`` is neither ``"igraph"`` nor ``"leidenalg"``.
     """
     import scanpy as sc
     from scib.metrics.clustering import get_resolutions
 
+    flavor = _resolve_flavor(flavor)
     # anndata is an evaluation-only dependency: importing it lazily keeps
     # `import multibench` working on environments (e.g. Colab) that have
     # no anndata installed and only use discovery + plotting.
@@ -202,13 +267,13 @@ def leiden_sweep(emb):
     keys = []
     for res in get_resolutions(n=10, max=2):
         key = f"_mb_res_{res}"
-        sc.tl.leiden(adata, resolution=res, key_added=key)
+        _leiden(adata, res, key, flavor)
         keys.append(key)
     return adata, keys
 
 
 def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
-                        precomputed_keys=None):
+                        precomputed_keys=None, flavor=None):
     """Isolated-label F1, identical to scib's but without the per-label re-clustering.
 
     ``scib.metrics.isolated_labels_f1`` calls ``cluster_optimal_resolution`` once
@@ -240,12 +305,13 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
         keys = list(precomputed_keys)
         _owned = False
     else:
+        flavor = _resolve_flavor(flavor)
         sc.pp.neighbors(adata, use_rep=embed)
         resolutions = get_resolutions(n=10, max=2)
         keys = []
         for res in resolutions:
             key = f"_mb_isof1_{res}"
-            sc.tl.leiden(adata, resolution=res, key_added=key)
+            _leiden(adata, res, key, flavor)
             keys.append(key)
         _owned = True
 
@@ -273,7 +339,7 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
 
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
             slow_metrics: bool = False, only=None, *,
-            verbose: bool | None = None) -> pd.DataFrame:
+            verbose: bool | None = None, flavor=None) -> pd.DataFrame:
     """Compute scib metrics for one embedding.
 
     Parameters
@@ -303,6 +369,9 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         Print one stderr line when the Leiden sweep starts. ``None``
         (default): only for embeddings with more than 2,000 cells; ``True``
         always; ``False`` never.
+    flavor : {"igraph", "leidenalg"}, keyword-only, optional
+        Leiden backend for the resolution sweep. ``None`` (default) reads
+        ``config.DEFAULT.leiden_flavor``; see :func:`leiden_sweep`.
 
     Returns
     -------
@@ -362,19 +431,21 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         # independently used to double the whole evaluation. Quietly: scanpy
         # narrates each resolution otherwise.
         from scib.metrics.clustering import get_resolutions
+        flavor = _resolve_flavor(flavor)
         if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
             import sys
             needs = [m for m in ("ARI", "NMI", "iF1") if only is None or m in only]
             print(f"scIB clustering metrics: Leiden resolution sweep (10 "
-                  f"resolutions) over {n:,} cells for {', '.join(needs)} - "
-                  f"typically 30-60 s per 3,000 cells; pass clustering= or "
-                  f"metrics=[...] without ARI/NMI/iF1 to skip it",
+                  f"resolutions, flavor={flavor}) over {n:,} cells for "
+                  f"{', '.join(needs)} - typically 30-60 s per 3,000 cells with "
+                  f"leidenalg, several times faster with igraph; pass "
+                  f"clustering= or metrics=[...] without ARI/NMI/iF1 to skip it",
                   file=sys.stderr, flush=True)
         with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
             warnings.simplefilter("ignore")
             for res in get_resolutions(n=10, max=2):
                 key = f"_mb_res_{res}"
-                sc.tl.leiden(adata, resolution=res, key_added=key)
+                _leiden(adata, res, key, flavor)
                 _sweep_keys.append(key)
             if cluster is None and _needs_clustering:
                 best_key, best_nmi = None, -1.0
@@ -435,7 +506,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
                                                  batch_key="batch", embed="X_emb",
                                                  iso_threshold=_iso,
-                                                 precomputed_keys=_sweep_keys or None))
+                                                 precomputed_keys=_sweep_keys or None,
+                                                 flavor=flavor))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))

@@ -24,6 +24,7 @@ RUNTIME_READ = [
     "engine/env_groups.yaml",
     "engine/packed_urls.json",
     "engine/packed_sizes.json",
+    "engine/output_urls.json",
     "engine/drivers/run_matilda.py",
     "engine/drivers/run_stabmap.R",
     "files/dataset.csv",
