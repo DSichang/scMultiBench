@@ -3062,10 +3062,13 @@ tolerance). The catalog columns (<code>deep_learning</code>, <code>output</code>
 <a href="#mtbcatalogmethods"><code>mtb.catalog.methods()</code></a>; <code>files_dir=</code> is gone
 (<code>TypeError</code>).</p>
 <p><strong><code>method_info(m)["runtime"]</code></strong> - what the method has been OBSERVED to cost
-(the 0.2 <code>runtime_hint(m)</code> dict, unchanged): <code>{"tier", "worst_sec",
-"observed"}</code> - <code>tier</code> in <code>fast</code> (&lt;5 min), <code>medium</code> (5-30 min), <code>slow</code> (30
-min-2 h), <code>very_slow</code> (&gt;2 h); <code>observed</code> lists the actual measurements on
-one shared machine as <code>{dataset, cells, sec, source}</code>, where <code>source</code> says
+(the 0.2 <code>runtime_hint(m)</code> dict plus two keys): <code>{"tier", "worst_sec",
+"observed", "host", "note"}</code> - <code>tier</code> in <code>fast</code> (&lt;5 min), <code>medium</code> (5-30 min),
+<code>slow</code> (30 min-2 h), <code>very_slow</code> (&gt;2 h); <code>host</code> is <code>"gpu"</code> and <code>note</code> spells
+out that every time was observed on the benchmark's NVIDIA RTX 4090 and that
+a <abbr title="Central Processing Unit">CPU</abbr>-only host can be many times slower (scMoMaT: 17 min there, 2 h on <abbr title="Central Processing Unit">CPU</abbr>);
+<code>observed</code> lists the actual measurements on
+that machine as <code>{dataset, cells, sec, source}</code>, where <code>source</code> says
 where the number came from (<code>manual</code>, <code>summary_csv</code> = the shipped re-run
 sweeps, <code>verification</code> = the shipped verification table) - the table keeps
 the longest time recorded per (method, dataset), rounded up, and <code>cells</code> is

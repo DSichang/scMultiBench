@@ -2308,7 +2308,11 @@ binary - on a <strong>Linux</strong> host. The flag cell decides: with <code>INS
 and a run cell on a host without the environments prints one line and
 stands in the benchmark host's own results; set it <code>True</code> on Colab or a
 Linux machine to download the environments in section 2 and run the methods
-for real. The install cell pins <code>numpy</code> / <code>pandas</code> to what the interpreter
+for real. On Colab pick a <strong>GPU runtime</strong> first (Runtime -&gt; Change runtime
+type -&gt; T4 GPU): the package detects the GPU and installs the GPU builds, and
+the training methods run many times faster than on the CPU runtime, where it
+installs the smaller CPU builds instead (<code>method_info(m)["runtime"]</code> times were
+observed on the benchmark's RTX 4090). The install cell pins <code>numpy</code> / <code>pandas</code> to what the interpreter
 already has, so pip never upgrades a host's stack, and defines <code>tick</code>, the
 recorder behind the timing table at the end of the notebook.</p>
 </div>
@@ -2401,12 +2405,18 @@ tick("install")</div>
 <span class="c1"># every section runs on any machine, and the run cells stand in the benchmark host's results.</span>
 <span class="c1"># True: on Colab / any Linux host, download the prebuilt environments for the methods this</span>
 <span class="c1"># notebook runs (3 envs, at least 1.5 GB to download; no conda needed) and run them here for real.</span>
+<span class="c1"># On Colab pick a GPU runtime first (Runtime -&gt; Change runtime type -&gt; T4 GPU): the package</span>
+<span class="c1"># then installs the GPU builds and the methods run many times faster; on a CPU runtime it</span>
+<span class="c1"># installs the smaller CPU builds, but training methods can take hours.</span>
 <span class="n">INSTALL_ENVS</span> <span class="o">=</span> <span class="kc">False</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-2"># "Run all" switch. False (the default): nothing is downloaded and no method executes -
 # every section runs on any machine, and the run cells stand in the benchmark host's results.
 # True: on Colab / any Linux host, download the prebuilt environments for the methods this
 # notebook runs (3 envs, at least 1.5 GB to download; no conda needed) and run them here for real.
+# On Colab pick a GPU runtime first (Runtime -&gt; Change runtime type -&gt; T4 GPU): the package
+# then installs the GPU builds and the methods run many times faster; on a CPU runtime it
+# installs the smaller CPU builds, but training methods can take hours.
 INSTALL_ENVS = False</div>
 </div>
 </div>

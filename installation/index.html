@@ -1731,6 +1731,15 @@ Colab's stack (<code>pip install "multibench-sc&gt;=0.3" numpy==&lt;yours&gt;
 pandas==&lt;yours&gt;</code>, about 30 s with a cold cache - the ~650 MB of scientific
 Python behind <code>scanpy</code> / <code>scib</code>; the wheel itself is 1.3 MB). The reference
 dataset of a tutorial is 11-290 MB (<code>mtb.data.fetch</code>).</p>
+<p><strong><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr> runtime?</strong> Colab opens on a <abbr title="Central Processing Unit">CPU</abbr> runtime. Before setting
+<code>INSTALL_ENVS = True</code>, switch to a <abbr title="Graphics Processing Unit">GPU</abbr> runtime (Runtime -&gt; Change runtime type
+-&gt; T4 <abbr title="Graphics Processing Unit">GPU</abbr>): <code>mtb.env.install</code> detects the <abbr title="Graphics Processing Unit">GPU</abbr> (<code>nvidia-smi</code>) and installs the
+<abbr title="Graphics Processing Unit">GPU</abbr> builds, and the training methods run many times faster. On a <abbr title="Central Processing Unit">CPU</abbr> runtime
+it installs the smaller <abbr title="Central Processing Unit">CPU</abbr> builds instead - the same code, a CUDA-free
+PyTorch - which is only ever chosen when no NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> is visible; the times
+in <code>method_info(m)["runtime"]</code> were observed on the benchmark's RTX 4090
+(<code>"host": "gpu"</code>), and a <abbr title="Central Processing Unit">CPU</abbr>-only host can be many times slower (scMoMaT:
+17 min there, 2 h on <abbr title="Central Processing Unit">CPU</abbr>).</p>
 <p>What the tutorials download beyond that is decided by one flag cell,
 <code>INSTALL_ENVS</code>:</p>
 <ul>
