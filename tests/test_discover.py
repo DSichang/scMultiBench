@@ -20,7 +20,7 @@ def test_method_info_returns_dict_with_runtime(files_dir):
     assert info["id"] == "Seurat_v5"
     assert info["language"] == "R"
     assert "env" in info and "status" in info
-    assert set(info["runtime"]) == {"tier", "worst_sec", "observed"}
+    assert set(info["runtime"]) == {"tier", "worst_sec", "observed", "host", "note"}
     # the catalog's paper-only columns moved to catalog.methods(); files_dir= is gone
     with pytest.raises(TypeError, match="files_dir"):
         discover.method_info("Seurat_v5", files_dir=files_dir)

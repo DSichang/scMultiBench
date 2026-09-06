@@ -86,7 +86,7 @@ def test_expected_tier_moves_after_regeneration():
         assert hint(m)["tier"] == "slow", m
     assert hint("scBridge")["worst_sec"] == 964     # summary_D28.csv, not the 170 s verification
     # keys of the public answer are unchanged; unmeasured methods stay 'unknown'
-    assert set(hint("StabMap")) == {"tier", "worst_sec", "observed"}
+    assert set(hint("StabMap")) == {"tier", "worst_sec", "observed", "host", "note"}
     unmeasured = [m for m in mtb.list_methods() if m not in _runtimes()]
     for m in unmeasured:
         assert hint(m) == {"tier": "unknown", "worst_sec": None, "observed": []}

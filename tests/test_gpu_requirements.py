@@ -412,3 +412,12 @@ def test_run_all_never_dispatches_a_requires_gpu_method(tmp_path, no_gpu, all_en
 
 def test_scan_docstring_documents_the_gate():
     assert "requires_gpu" in (mtb.scan.__doc__ or "")
+
+
+def test_runtime_hint_names_its_host():
+    """The observed times were taken on the GPU benchmark host; a CPU-only
+    user must be told so next to the numbers."""
+    import multibench as mtb
+    rt = mtb.method_info("scMoMaT")["runtime"]
+    assert rt["host"] == "gpu" and "RTX 4090" in rt["note"] and "CPU-only" in rt["note"]
+    assert set(rt) >= {"tier", "worst_sec", "observed", "host", "note"}
