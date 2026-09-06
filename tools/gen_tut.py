@@ -139,6 +139,9 @@ FLAG_CELL_TEMPLATE = """# "Run all" switch. False (the default): nothing is down
 # every section runs on any machine, and the run cells stand in the benchmark host's results.
 # True: on Colab / any Linux host, download the prebuilt environments for the methods this
 # notebook runs ({size}; no conda needed) and run them here for real.
+# On Colab pick a GPU runtime first (Runtime -> Change runtime type -> T4 GPU): the package
+# then installs the GPU builds and the methods run many times faster; on a CPU runtime it
+# installs the smaller CPU builds, but training methods can take hours.
 INSTALL_ENVS = False"""
 
 # The one line a run cell prints on a host without method environments
@@ -432,7 +435,11 @@ False` (the default) **Run all** is safe anywhere - nothing is downloaded,
 and a run cell on a host without the environments prints one line and
 stands in the benchmark host's own results; set it `True` on Colab or a
 Linux machine to download the environments in section 2 and run the methods
-for real. The install cell pins `numpy` / `pandas` to what the interpreter
+for real. On Colab pick a **GPU runtime** first (Runtime -> Change runtime
+type -> T4 GPU): the package detects the GPU and installs the GPU builds, and
+the training methods run many times faster than on the CPU runtime, where it
+installs the smaller CPU builds instead (`method_info(m)["runtime"]` times were
+observed on the benchmark's RTX 4090). The install cell pins `numpy` / `pandas` to what the interpreter
 already has, so pip never upgrades a host's stack, and defines `tick`, the
 recorder behind the timing table at the end of the notebook.""")
     for cell in INSTALL_CELLS:

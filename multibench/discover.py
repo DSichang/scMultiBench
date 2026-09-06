@@ -419,7 +419,7 @@ def _runtimes() -> dict:
 
 
 def _runtime_hint(method: str) -> dict:
-    """``method_info(method)["runtime"]``: ``{"tier", "worst_sec", "observed"}``.
+    """``method_info(method)["runtime"]``: ``{"tier", "worst_sec", "observed", "host", "note"}``.
 
     ``method`` must be a registry id: a typo raises ``KeyError`` with a
     did-you-mean hint. A known but never-measured method (e.g. a declared
@@ -427,8 +427,15 @@ def _runtime_hint(method: str) -> dict:
     ``observed`` list. See :func:`method_info` for the meaning of the fields.
     """
     registry.check_method(method)
-    return dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
-                                         "observed": []}))
+    rt = dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
+                                       "observed": []}))
+    # every observation was taken on the benchmark host (NVIDIA RTX 4090);
+    # a CPU-only host - Colab's default runtime, a laptop - can be many times
+    # slower for the training methods (scMoMaT: 17 min on the GPU host, 2 h on CPU)
+    rt["host"] = "gpu"
+    rt["note"] = ("times observed on the benchmark host (NVIDIA RTX 4090); on a "
+                  "CPU-only host expect training methods to take many times longer")
+    return rt
 
 
 def _availability_sentence(spec) -> str:

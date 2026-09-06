@@ -215,7 +215,7 @@ def test_method_info_runtime_validates_method_id():
     with pytest.raises(KeyError, match="did you mean 'StabMap'"):
         mtb.method_info("Stabmap")
     h = mtb.method_info("StabMap")["runtime"]
-    assert set(h) == {"tier", "worst_sec", "observed"}
+    assert set(h) == {"tier", "worst_sec", "observed", "host", "note"}
     from multibench.discover import _runtimes
     unmeasured = [m for m in mtb.list_methods() if m not in _runtimes()]
     if unmeasured:

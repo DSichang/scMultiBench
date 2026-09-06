@@ -109,7 +109,7 @@ def test_plan_commands_is_a_deprecated_alias_of_scan():
 def test_runtime_hint_is_a_deprecated_alias_of_method_info_runtime():
     ref = mtb.method_info("SCALEX")["runtime"]
     got, msg = _one_deprecation(mtb.runtime_hint, "SCALEX")
-    assert got == ref and set(got) == {"tier", "worst_sec", "observed"}
+    assert got == ref and set(got) == {"tier", "worst_sec", "observed", "host", "note"}
     assert "runtime_hint is deprecated since 0.3.0" in msg
     assert "use method_info(m)['runtime']" in msg
     assert "runtime_hint" not in dir(mtb)
@@ -166,7 +166,7 @@ def test_method_info_files_dir_is_gone_and_runtime_is_there():
     with pytest.raises(TypeError):
         mtb.method_info("Matilda", True)                  # verbose is keyword-only
     info = mtb.method_info("Matilda")
-    assert set(info["runtime"]) == {"tier", "worst_sec", "observed"}
+    assert set(info["runtime"]) == {"tier", "worst_sec", "observed", "host", "note"}
     assert "deep_learning" not in info and "output" not in info
 
 
