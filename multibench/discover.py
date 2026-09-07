@@ -50,46 +50,65 @@ def find_methods(category: str | None = None, *, task: str | None = None,
                  runnable: bool | None = None,
                  tunable: bool | None = None,
                  available: bool | None = None) -> list[str]:
-    """Return method ids matching all supplied filters.
+    """Return the method ids that match every supplied filter.
 
-    ``category`` is the only positional argument; every filter is
-    keyword-only. Every token is validated: a typo raises ``ValueError``
+    ``category`` is the only positional argument; every other filter is
+    keyword-only. Every token is validated, so a typo raises ``ValueError``
     naming the valid vocabulary instead of silently matching nothing.
 
     Parameters
     ----------
-    category : str, optional
-        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``.
-    task : str, keyword-only, optional
-        One of :func:`multibench.list_tasks` (method-level).
-    needs_labels : bool, keyword-only, optional
-        Per variant: ``True`` keeps methods with a matching variant that
-        takes a cell-type-label role as a REQUIRED input, ``False`` one that
-        takes none.
-    atac : str, keyword-only, optional
+    category : str | None
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; ``None`` (default)
+        = any category.
+    task : str | None, keyword-only
+        One of ``mtb.list_tasks()`` (a method-level filter); ``None`` = any.
+    needs_labels : bool | None, keyword-only
+        Per variant: ``True`` keeps methods with a matching variant that takes a
+        cell-type-label role as a REQUIRED input, ``False`` one that takes none;
+        ``None`` (default) = no filter.
+    atac : str | None, keyword-only
         ``"peak"`` or ``"gene_activity"`` (aliases ``peaks`` / ``gas``): the
-        ATAC representation the upstream script expects.
-    modalities : list of str, keyword-only, optional
+        ATAC representation the upstream script expects; ``None`` = no filter.
+    modalities : list[str] | set[str] | None, keyword-only
         Base modality types a variant must consume ALL of, e.g.
-        ``["rna", "atac"]`` (``protein`` = ``adt``; role tokens reduce to
-        their base type).
-    runnable : bool, keyword-only, optional
-        ``True`` = methods with at least one variant; ``False`` = the stubs.
-    tunable : bool, keyword-only, optional
-        ``True`` = methods exposing at least one command-line hyperparameter.
-    available : bool, keyword-only, optional
+        ``["rna", "atac"]`` (``protein`` = ``adt``; role tokens reduce to their
+        base type). A bare string raises ``TypeError``.
+    runnable : bool | None, keyword-only
+        ``True`` = methods with at least one variant; ``False`` = the stubs;
+        ``None`` (default) = both.
+    tunable : bool | None, keyword-only
+        ``True`` = methods exposing at least one command-line hyperparameter;
+        ``False`` = the rest; ``None`` (default) = both.
+    available : bool | None, keyword-only
         ``True`` = ``availability == 'public'``; ``False`` = the
-        ``benchmark-host-only`` methods.
+        ``benchmark-host-only`` methods; ``None`` (default) = both.
 
     Returns
     -------
     list[str]
         Method ids in registry order.
 
+    Raises
+    ------
+    ValueError
+        An unknown ``category`` / ``task`` / ``atac`` / modality token; the
+        message lists the valid vocabulary.
+    TypeError
+        ``modalities`` given as a bare string instead of a list.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.find_methods("vertical", modalities=["rna", "adt"])
+    >>> mtb.find_methods("vertical", modalities=["rna", "adt"], needs_labels=False)
+    >>> mtb.find_methods(atac="peak")                 # methods that want peak matrices
+    >>> mtb.find_methods(task="registration")         # the spatial slice-alignment methods
+    >>> mtb.find_methods(tunable=True, available=True)
+
     Notes
     -----
-
-    **Filters are evaluated per VARIANT**: a method matches when at least ONE
+    Filters are evaluated per VARIANT: a method matches when at least ONE
     of its variants satisfies ``category`` AND ``modalities`` AND
     ``needs_labels`` AND ``atac`` *together*. So
     ``find_methods(category='vertical', modalities=['rna', 'adt'],
@@ -101,13 +120,15 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     ``tunable`` and ``available`` are method-level.
 
     ``category`` is one of ``vertical``/``diagonal``/``mosaic``/``cross``;
-    ``task`` one of :func:`multibench.list_tasks`.
+    ``task`` one of ``mtb.list_tasks()``.
+
     ``needs_labels`` is derived from the variants' roles: ``True`` keeps methods
     with a matching variant that takes a cell-type-label (``cty``) role as a
     REQUIRED input, ``False`` one that takes none. Note the difference from
     ``method_info(m)['needs_labels']``, which is the METHOD-level "any variant
     needs labels" flag; the per-variant answer is
     ``method_info(m)['supports'][i]['needs_labels']``.
+
     ``atac`` is an exact match on the method's declared ATAC representation:
     ``"peak"`` or ``"gene_activity"`` (``"peaks"``/``"gas"`` accepted as aliases);
     it is the representation the UPSTREAM script expects, which is not always
@@ -115,6 +136,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     consume peaks). Only variants that actually consume an ATAC input can
     satisfy it (Multigrate declares ``atac: peak`` for its mosaic rna+atac
     variant; its vertical rna+adt variant does not match ``atac='peak'``).
+
     ``modalities`` keeps methods with a variant that consumes ALL of the
     requested base modality types (e.g. ``["rna", "atac"]``); ``"protein"`` is
     accepted for ``adt`` and role tokens (``atac_gas``, ``atac_peak``, ``rna1``
@@ -128,17 +150,27 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     they cannot be filtered by modality: they are KEPT and a ``UserWarning``
     names them - ``task='registration'`` (or ``category``) selects or
     excludes them deliberately.
+
     ``runnable=True`` restricts to methods with at least one variant (usable by
     ``inputs_for``/``run``); ``runnable=False`` returns only the stubs.
     ``tunable=True`` keeps only methods that expose at least one hyperparameter
     on their command line (i.e. where ``run(params=...)`` can change anything) -
     the rest hardcode their settings upstream.
+
     ``available`` (default ``None`` = no filter): ``True`` keeps
     methods whose scripts a public install can run
     (``method_info(m)['availability'] == 'public'``); ``False`` keeps the
     ``'benchmark-host-only'`` ones, whose entrypoint is an absolute path on the
     benchmark host and is not published (SPIRAL, GPSA) - they are wired and
     verified there, but ``scan`` reports them not runnable elsewhere.
+
+    See Also
+    --------
+    mtb.list_methods : the same ids filtered by ``category`` only.
+
+    mtb.method_info : the per-variant ``supports`` table these filters are read from.
+
+    mtb.scan : which of these methods can actually run on a given dataset.
     """
     if isinstance(modalities, str):
         raise TypeError(
@@ -188,16 +220,18 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
 
 def list_methods(category: str | None = None, **_removed) -> list[str]:
-    """Registry method ids, optionally restricted to one integration category.
+    """Return the registry method ids, optionally restricted to one category.
 
     Parameters
     ----------
-    category : str, optional
-        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross`` or None (every
-        method). Keeps the methods that have a VARIANT wired for that
-        category - the same set ``scan`` / ``run_all`` /
-        ``find_methods(category=)`` dispatch. Validated: ``ValueError``
-        listing the valid tokens on a typo.
+    category : str | None
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``, or ``None``
+        (default) for every method. Keeps the methods that have a VARIANT
+        wired for that category - the same set ``scan`` / ``run_all`` /
+        ``find_methods(category=)`` dispatch.
+    **_removed
+        Catch-all that rejects the retired 0.2 ``task=`` / ``runnable=``
+        filters with a ``TypeError`` naming ``find_methods``.
 
     Returns
     -------
@@ -206,10 +240,24 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
 
     Raises
     ------
+    ValueError
+        Unknown ``category``; the message lists the valid tokens.
     TypeError
         The ``task=`` / ``runnable=`` filters of the deprecated 0.2 signature
-        were passed; they are :func:`find_methods` filters now
+        were passed; they are ``mtb.find_methods`` filters now
         (``find_methods(category, task=..., runnable=...)``).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.list_methods()                 # every registry id
+    >>> mtb.list_methods("vertical")       # ids with a vertical variant
+
+    See Also
+    --------
+    mtb.find_methods : filter by task, modalities, labels, ATAC representation and more.
+
+    mtb.list_categories : the four category tokens with a description of each.
     """
     if _removed:
         keys = ", ".join(f"{k}=..." for k in _removed)
@@ -233,51 +281,77 @@ def _effective(v) -> dict:
 
 
 def method_info(method: str, *, verbose: bool = False) -> dict:
-    """Return a flat dict combining registry spec, provenance and observed runtime.
+    """Return everything known about one method as a flat dict.
+
+    Combines the registry spec (variants, env, labels, hyperparameters), the
+    provenance record (repository, version, paper) and the observed runtime.
+    Read ``supports`` for what the method can be dispatched for, ``runtime``
+    to size a sweep and ``params`` for what ``run(params=...)`` can change.
 
     Parameters
     ----------
     method : str
         Registry id (``KeyError`` with a did-you-mean hint otherwise).
     verbose : bool, keyword-only
-        When True also return ``notes_long`` - the raw upstream-knob audit
-        prose for this method (None for methods outside the audit; for a
-        ``benchmark-host-only`` method one sentence saying why is appended) -
-        and ``verification``, the per-method verification record (see below).
-        The default ``notes`` is the short third-person summary from
-        engine/references.yaml.
+        ``False`` (default) returns the keys below. ``True`` adds
+        ``notes_long`` (the raw upstream-knob audit prose; ``None`` for methods
+        outside the audit; for a ``benchmark-host-only`` method one sentence
+        saying why is appended) and ``verification`` (the per-method
+        verification record, see Notes).
 
     Returns
     -------
     dict
-        Keys: id, language, categories, tasks, env, atac, needs_labels,
-        status, availability, setup_hint, variants (distinct upstream
-        entrypoints, in order), driver (package-side wrapper actually
-        executed, or None when the upstream script runs directly),
-        scripts_url (the benchmark's tools_scripts folder), repo_url,
-        version, reference ({doi, title, authors, journal, year} or None),
-        notes, supports (per variant: category, modalities, output_kind,
-        n_tunable, needs_labels, labels - the label roles the variant reads,
-        e.g. ``['cty']`` / ``['rna_cty']`` / ``[]``), params (per variant key
-        'category:mods': defaults, tunable, effective), fixed_in_script,
-        upstream_knobs, upstream_url, runtime, cpu_params, requires_gpu,
-        gpu_evidence; with ``verbose=True`` also
-        notes_long and verification. The paper-only catalog columns
-        (``deep_learning``, ``output``) are in ``mtb.catalog.methods()``
-        (the 0.2 ``files_dir=`` argument is gone).
+        Keys: ``id``, ``language``, ``categories``, ``tasks``, ``env``, ``atac``,
+        ``needs_labels``, ``status``, ``availability``, ``setup_hint``,
+        ``variants``, ``driver``, ``scripts_url``, ``repo_url``, ``version``,
+        ``reference``, ``notes``, ``supports``, ``params``, ``fixed_in_script``,
+        ``upstream_knobs``, ``upstream_url``, ``runtime``, ``cpu_params``,
+        ``requires_gpu``, ``gpu_evidence``; with ``verbose=True`` also
+        ``notes_long`` and ``verification``. Each is described in Notes.
+
+    Raises
+    ------
+    KeyError
+        Unknown method id (with a did-you-mean hint).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> info = mtb.method_info("Matilda")
+    >>> info["supports"]                    # one entry per variant: category, modalities, labels ...
+    >>> info["runtime"]["tier"], info["runtime"]["worst_sec"]
+    >>> info["params"]["vertical:rna+adt"]["tunable"]
+    >>> mtb.method_info("scMoMaT", verbose=True)["verification"]
+
+    Notes
+    -----
+    ``variants`` lists the distinct upstream entrypoints, in order. ``driver``
+    is the package-side wrapper actually executed, or ``None`` when the
+    upstream script runs directly. ``scripts_url`` points at the benchmark's
+    ``tools_scripts`` folder for the method. ``reference`` is
+    ``{doi, title, authors, journal, year}`` or ``None``; ``notes`` is the
+    short third-person summary from engine/references.yaml. ``supports`` has
+    one entry per variant: ``category``, ``modalities``, ``output_kind``,
+    ``n_tunable``, ``needs_labels`` and ``labels`` - the label roles the
+    variant reads, e.g. ``['cty']`` / ``['rna_cty']`` / ``[]``. ``params`` is
+    keyed per variant as ``'category:mods'`` with ``defaults``, ``tunable``
+    and ``effective`` (see ``mtb.params_for``). The paper-only catalog columns
+    (``deep_learning``, ``output``) are in ``mtb.catalog.methods()`` (the 0.2
+    ``files_dir=`` argument is gone).
 
     ``runtime`` is what this method has been OBSERVED to cost, to help size
-    a sweep: ``{"tier", "worst_sec", "observed"}`` - ``tier`` is one of
-    ``fast`` (<5 min), ``medium`` (5-30 min), ``slow`` (30 min-2 h),
+    a sweep: ``{"tier", "worst_sec", "observed", "host", "note"}`` - ``tier``
+    is one of ``fast`` (<5 min), ``medium`` (5-30 min), ``slow`` (30 min-2 h),
     ``very_slow`` (>2 h) or ``unknown`` (never measured: ``worst_sec`` None,
     ``observed`` empty), and ``observed`` lists the actual measurements as
     ``{dataset, cells, sec, source}`` - ``source`` says where the number
     came from (``manual``, ``summary_csv`` = the shipped re-run sweeps,
     ``verification`` = the shipped verification table); ``cells`` is null
-    when not recorded. These are MEASUREMENTS on one shared machine, not
-    predictions: use them to choose a sensible ``run_all(timeout=...)``, not
-    to promise a finish time. (The 0.2 ``runtime_hint(m)`` returned exactly
-    this dict and is deprecated.)
+    when not recorded. These are MEASUREMENTS on one shared machine (the GPU
+    benchmark host; ``host`` / ``note`` say so), not predictions: use them to
+    choose a sensible ``run_all(timeout=...)``, not to promise a finish time.
+    (The 0.2 ``runtime_hint(m)`` returned exactly this dict and is deprecated.)
 
     ``needs_labels`` is the METHOD-level flag: True when ANY variant takes a
     cell-type-label (``cty``) role as a required input ("needs labels in at
@@ -329,6 +403,16 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ``verdict`` ``OK`` (reproduced) or ``DRIFT`` (ran, but the score moved
     away from the baseline - the method is still ``verified`` in the wiring
     sense; compare the two numbers before trusting either).
+
+    See Also
+    --------
+    mtb.params_for : the hyperparameters of one variant, with upstream defaults.
+
+    mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
+
+    mtb.cite : the paper to cite for a method.
+
+    mtb.env.recipe : the hand-written environment recipe of a method.
     """
     s = registry.get(method)
     ref = s.reference or {}
@@ -510,49 +594,38 @@ def params_for(method: str, category: str | None = None,
                data_path: Path | str | None = None) -> dict:
     """Return the hyperparameters of one method variant.
 
+    Use it before ``run(params=...)`` / ``run_all(params=...)`` / ``sweep`` to
+    see what a method accepts on its command line and what it would run with
+    when you pass nothing.
+
     Parameters
     ----------
-    method : registry id (``KeyError`` with a did-you-mean hint otherwise).
-    category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; selects
-        the variant exactly like ``run`` (validated). May be omitted when the
+    method : str
+        Registry id (``KeyError`` with a did-you-mean hint otherwise).
+    category : str | None
+        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; selects the
+        variant exactly like ``run`` (validated). May be omitted when the
         method has only one variant.
-    modalities : the variant's modality tokens; ``protein`` is accepted for
-        ``adt`` and ``atac`` for either ATAC representation role. May be
-        omitted when ``category`` alone selects one variant (the only way to
-        reach a ``data_dir`` variant such as scBridge's or PASTE's).
-    dataset : keyword-only. A dataset folder name; when the selection is
-        still ambiguous, the ONE variant whose input files are all present in
-        ``<data_path>/<dataset>`` is used (``params_for('Matilda',
-        dataset='D11')`` is the rna+adt variant). Nothing changes when the
-        folder settles nothing.
-    data_path : keyword-only; root containing the dataset folder (default
-        ``config.DEFAULT.data_path``).
+    modalities : list[str] | set[str] | None
+        The variant's modality tokens; ``protein`` is accepted for ``adt`` and
+        ``atac`` for either ATAC representation role. May be omitted when
+        ``category`` alone selects one variant (the only way to reach a
+        ``data_dir`` variant such as scBridge's or PASTE's).
+    dataset : str | None, keyword-only
+        A dataset folder name; when the selection is still ambiguous, the ONE
+        variant whose input files are all present in ``<data_path>/<dataset>``
+        is used (``params_for('Matilda', dataset='D11')`` is the rna+adt
+        variant). Nothing changes when the folder settles nothing.
+    data_path : Path | str | None, keyword-only
+        Root containing the dataset folder (default ``config.DEFAULT.data_path``).
 
     Returns
     -------
     dict
         ``{"method", "variant", "defaults", "tunable", "effective",
-        "fixed_in_script", "upstream_knobs", "upstream_url"}`` where:
-
-        * ``defaults`` - parameters the package emits on every run. Override
-          them with ``run(..., params={...})``; the override is merged over
-          these.
-        * ``tunable`` - documentation of the parameters the UPSTREAM script
-          accepts on its command line, as ``{name: {"default": ..., "type":
-          ...}}``. The ``default`` here is the upstream argparse default, NOT
-          necessarily what a wrapper run uses.
-        * ``effective`` - ``tunable`` defaults overlaid with ``defaults``: the
-          value each knob really takes when you pass no ``params``.
-        * ``fixed_in_script`` - the values the script pins, each with the
-          ``file:line`` that pins it.
-        * ``upstream_knobs`` - what the wrapped library documents (with its
-          own defaults), unreachable without editing the script.
-
-        An **empty** ``tunable`` means the upstream script exposes no
-        hyperparameters on its command line. Because this project never
-        modifies method scripts, such a method cannot be tuned through the
-        wrapper - but it is not parameterless, which is what the last two keys
-        say (both empty for methods outside the upstream audit).
+        "fixed_in_script", "upstream_knobs", "upstream_url"}``; each key is
+        explained in Notes. An **empty** ``tunable`` means the upstream script
+        exposes no hyperparameters on its command line.
 
     Raises
     ------
@@ -560,10 +633,52 @@ def params_for(method: str, category: str | None = None,
         Unknown method, a declared stub, or no variant for ``category`` /
         ``modalities``.
     ValueError
-        Several variants fit (:class:`AmbiguousVariantError`, which also
+        Several variants fit (``mtb.AmbiguousVariantError``, which also
         derives from ``KeyError`` for older callers); the message spells out
         the call that selects one, e.g. ``params_for('Matilda', 'vertical',
         ['rna', 'adt'])``.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> p = mtb.params_for("Matilda", "vertical", ["rna", "adt"])
+    >>> p["tunable"]["lr"], p["effective"]["lr"]      # upstream default vs what a run uses
+    >>> mtb.params_for("Matilda", dataset="D11")      # the folder picks the variant
+    >>> mtb.params_for("PASTE", "cross")              # a data_dir variant: no modalities
+
+    Notes
+    -----
+    ``defaults`` - parameters the package emits on every run. Override
+    them with ``run(..., params={...})``; the override is merged over
+    these.
+
+    ``tunable`` - documentation of the parameters the UPSTREAM script
+    accepts on its command line, as ``{name: {"default": ..., "type":
+    ...}}``. The ``default`` here is the upstream argparse default, NOT
+    necessarily what a wrapper run uses.
+
+    ``effective`` - ``tunable`` defaults overlaid with ``defaults``: the
+    value each knob really takes when you pass no ``params``.
+
+    ``fixed_in_script`` - the values the script pins, each with the
+    ``file:line`` that pins it.
+
+    ``upstream_knobs`` - what the wrapped library documents (with its
+    own defaults), unreachable without editing the script.
+
+    An **empty** ``tunable`` means the upstream script exposes no
+    hyperparameters on its command line. Because this project never
+    modifies method scripts, such a method cannot be tuned through the
+    wrapper - but it is not parameterless, which is what the last two keys
+    say (both empty for methods outside the upstream audit).
+
+    See Also
+    --------
+    mtb.method_info : the same ``params`` block for every variant at once.
+
+    mtb.sweep : run one method over a range of one of these hyperparameters.
+
+    mtb.AmbiguousVariantError : raised when several variants fit the selection.
     """
     s = registry.get(method)
     registry.check_category(category)
@@ -679,33 +794,59 @@ def _format_entry(tag: str, ref: dict, fmt: str) -> str:
 
 
 def cite(*methods, fmt: str = "text") -> str:
-    """Citation text for the benchmark and (optionally) the methods you ran.
+    """Return citation text for the benchmark and, optionally, the methods you ran.
 
     Both spellings work: ``cite('Matilda', 'MOFA2')`` (one id per argument,
     like the CLI ``multibench cite Matilda MOFA2``) and
-    ``cite(['Matilda', 'MOFA2'])`` (one list). The 0.2 ``methods=`` keyword
-    is deprecated and rejected (``TypeError``).
+    ``cite(['Matilda', 'MOFA2'])`` (one list).
 
     Parameters
     ----------
-    *methods : str or list of str
+    *methods : str | list[str]
         Method ids, each a ``str`` (``KeyError`` with a did-you-mean hint
         for an unknown id); or a SINGLE list/tuple of ids; or ``"all"`` for
         every registry method; nothing -> the benchmark entry only.
     fmt : str, keyword-only
         ``"text"`` (default; one "Authors. Title. Journal (year).
         https://doi.org/..." line per entry) or ``"bibtex"`` (one
-        ``@article`` per entry). ``ValueError`` listing the two on anything
-        else.
+        ``@article`` per entry).
 
     Returns
     -------
     str
         The benchmark entry first, then one entry per method in the order
-        given. Methods whose DOI is not curated in engine/references.yaml are
-        emitted as a ``% <id>: no verified reference; see <repo_url>`` comment
-        (bibtex) / ``<id>: ... <repo_url>`` line (text) rather than silently
-        dropped. Every DOI in the table was resolved against Crossref.
+        given.
+
+    Raises
+    ------
+    ValueError
+        ``fmt`` is neither ``"text"`` nor ``"bibtex"``; the message lists both.
+    KeyError
+        An unknown method id (with a did-you-mean hint).
+    TypeError
+        A non-string id, or the deprecated 0.2 ``methods=`` keyword.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> print(mtb.cite())                                  # the benchmark only
+    >>> print(mtb.cite("Matilda", "MOFA2"))
+    >>> print(mtb.cite(["Matilda", "MOFA2"], fmt="bibtex"))
+    >>> res = mtb.load_batch("out/")
+    >>> print(mtb.cite(list(res.summary.method)))          # everything a sweep ran
+
+    Notes
+    -----
+    The 0.2 ``methods=`` keyword is deprecated and rejected (``TypeError``).
+
+    Methods whose DOI is not curated in engine/references.yaml are
+    emitted as a ``% <id>: no verified reference; see <repo_url>`` comment
+    (bibtex) / ``<id>: ... <repo_url>`` line (text) rather than silently
+    dropped. Every DOI in the table was resolved against Crossref.
+
+    See Also
+    --------
+    mtb.method_info : carries the same ``reference``, ``repo_url`` and ``version`` per method.
     """
     args = list(methods)
     if fmt not in _CITE_FORMATS:

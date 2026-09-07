@@ -339,7 +339,23 @@ def get(method_id: str) -> MethodSpec:
 
 
 def list_tasks() -> list[str]:
-    """Return the sorted set of tasks declared across all method specs."""
+    """Return the sorted set of tasks declared across all method specs.
+
+    Returns
+    -------
+    list[str]
+        Sorted task names - the vocabulary ``mtb.find_methods(task=...)``
+        validates against
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.list_tasks()
+
+    See Also
+    --------
+    mtb.find_methods : filter methods by one of these tasks
+    """
     return sorted({t for s in load() for t in s.tasks})
 
 

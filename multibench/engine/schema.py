@@ -9,13 +9,35 @@ AVAILABILITY = ("public", "benchmark-host-only")
 
 
 class AmbiguousVariantError(ValueError, KeyError):
-    """A method has several variants that satisfy the selection and the caller
-    must say which one (``category=`` / ``modalities=``).
+    """Several variants of a method fit the selection; say which one.
 
-    It is a ``ValueError`` - the package reserves ``KeyError`` for unknown ids
-    (a typo in a method name) - but it still derives from ``KeyError`` so code
-    written against the earlier ``params_for`` / ``inputs_for`` contract keeps
-    catching it. ``str(exc)`` is the plain message (no ``KeyError`` quoting).
+    Raised by ``mtb.params_for``, ``mtb.inputs_for`` and ``mtb.labels_for``
+    when ``category=`` / ``modalities=`` (or the dataset folder) leave more
+    than one variant; the message spells out the call that selects one.
+
+    Examples
+    --------
+    >>> from multibench import params_for, AmbiguousVariantError
+    >>> params_for("Matilda")                              # raises: rna+adt or rna+atac?
+    >>> params_for("Matilda", "vertical", ["rna", "adt"])  # selects one
+
+    Notes
+    -----
+    It fires when a method has several variants that satisfy the selection
+    and the caller must say which one (``category=`` / ``modalities=``);
+    ``inputs_for`` and ``params_for(dataset=)`` first let the dataset folder
+    decide and raise only when the folder settles nothing, so the fix is to
+    pass ``modalities=`` (and ``category=``) exactly as the message shows.
+
+    It is a ``ValueError`` - the package reserves ``KeyError`` for unknown
+    ids (a typo in a method name) - but it still derives from ``KeyError``
+    so code written against the earlier ``params_for`` / ``inputs_for``
+    contract keeps catching it, and ``str(exc)`` is the plain message (no
+    ``KeyError`` quoting).
+
+    See Also
+    --------
+    mtb.method_info : ``supports`` lists every variant with its category and modalities
     """
 
     def __str__(self) -> str:
