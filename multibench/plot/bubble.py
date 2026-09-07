@@ -53,13 +53,84 @@ class FamilyBlock:
 
 @dataclass
 class BubbleTable:
-    """The numbers behind a bubble figure (what :func:`build_table` returns).
+    """The numbers behind a bubble figure (what ``mtb.plot.build_table`` returns).
 
     Rows are ``methods`` (best first); the per-family matrices live in
     ``blocks`` and are also exposed concatenated in figure order as
-    ``matrix`` (= ``norm``, per-column min-max values), ``raw`` and
-    ``ranks`` (per-column max-ranks, ``n`` = best; the legend's 1 = best is
-    ``methods.index(name) + 1`` for the overall position).
+    ``matrix`` / ``norm``, ``raw`` and ``ranks``. Build one to audit the
+    ranks before drawing, then hand it to ``mtb.plot.render``.
+
+    Attributes
+    ----------
+    methods : list of str
+        Row order, best first; the overall position of a method (the
+        figure's 1 = best) is ``methods.index(name) + 1``.
+    blocks : list of FamilyBlock
+        One block per metric family present, in paper order (DR and
+        clustering, batch correction, then "Other"); each holds its own
+        ``raw`` / ``norm`` / ``ranks`` frames and ``overall`` series.
+    matrix : pandas.DataFrame
+        All families' per-column min-max values (method x metric),
+        concatenated in figure order; the same object as ``norm``.
+    raw : pandas.DataFrame
+        The raw value matrix (method x metric) in figure order: metric means
+        under ``aggregate="dataset"``, mean within-dataset max-ranks under
+        ``"summary"``.
+    overall : pandas.Series
+        The combined Overall per method (mean of the family Overalls) that
+        fixed the row order.
+    aggregate : str
+        ``"dataset"`` (metric markers are circles) or ``"summary"`` (bars,
+        the paper's panel c). Default ``"dataset"``.
+    overall_basis : str
+        Formula behind the family Overall bars under ``"summary"``:
+        ``"rank"`` (default) or ``"mean_overall"``; see the ``overall=``
+        parameter of ``mtb.plot.bubble``.
+    datasets : tuple of str
+        Dataset ids present in the frame, sorted; ``()`` when the frame has
+        no ``dataset`` column.
+    coverage : pandas.Series or None
+        Number of datasets each method has rows in; ``"summary"`` only,
+        ``None`` otherwise.
+    method_datasets : dict or None
+        ``{method: [dataset, ...]}`` read from the frame; ``None`` without a
+        ``dataset`` column.
+    category : str or None
+        The one ``category`` value the frame held, else ``None`` (mixed or
+        absent); drives the supervised ``L`` badge of the figure.
+    needs_labels : dict or None
+        ``{method: bool}`` from an optional ``needs_labels`` column of the
+        frame; overrides the registry lookup behind the badge. Empty when
+        the column is absent.
+    na_cells : list of str or None
+        One line per method with ``n/a`` cells, in row order - the text
+        ``build_table(na="warn")`` warns with (see its ``na`` parameter).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> tbl = mtb.plot.build_table(mtb.load_results("vertical", dataset="D11"))
+    >>> tbl.methods[:3]                       # the best three methods
+    >>> tbl.ranks.loc[tbl.methods[0]]         # their per-metric max-ranks
+    >>> tbl.blocks[0].overall                 # first family's Overall per method
+    >>> fig = mtb.plot.render(tbl, title="D11")
+
+    Notes
+    -----
+    ``ranks`` and ``FamilyBlock.ranks`` store per-column max-ranks: ``n`` =
+    best, ties share the higher number (R's ``ties.method="max"``), a
+    method with no value in a column is NaN there and the column's ``n``
+    counts only the scored methods. The figure's *Rank* legend counts
+    1 = best instead.
+
+    ``matrix`` and ``norm`` are per-column min-max values in [0, 1]; a
+    constant (or all-NaN) column is all ones, as in the R code.
+
+    See Also
+    --------
+    mtb.plot.build_table : builds a table from a tidy long frame.
+    mtb.plot.render : draws a table as the paper-style figure.
+    mtb.plot.bubble : build and render in one call.
     """
     methods: list             # row order, best first
     blocks: list              # list[FamilyBlock], in FAMILIES order
@@ -78,15 +149,33 @@ class BubbleTable:
 
     @property
     def norm(self) -> pd.DataFrame:
-        """All families' per-column min-max values (method x metric), row order
-        = ``methods``, columns in figure order; an alias of ``matrix``."""
+        """All families' per-column min-max values, concatenated in figure order.
+
+        An alias of ``matrix``: rows are ``methods``, columns the metrics in
+        the order the figure draws them.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Method x metric frame of values scaled to [0, 1] per column.
+        """
         return self.matrix
 
     @property
     def ranks(self) -> pd.DataFrame:
-        """All families' per-column max-ranks concatenated in figure order
-        (row order = ``methods``).
+        """All families' per-column max-ranks, concatenated in figure order.
 
+        Rows are ``methods``; columns are the metrics in the order the
+        figure draws them.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Method x metric frame of max-ranks: ``n`` = best, NaN where the
+            method has no value for that metric.
+
+        Notes
+        -----
         Max-rank: ``n`` = best, ties share the higher number (R
         ``ties.method="max"``); a method with no value in a column is NaN
         there and the column's ``n`` counts only the scored methods. The
@@ -159,6 +248,84 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                 overall: str = "rank", na: str = "warn") -> BubbleTable:
     """Pivot tidy long results into per-family matrices plus a combined row order.
 
+    This is the numeric half of ``mtb.plot.bubble``: call it to inspect the
+    ranks, the Overall scores and the row order before (or instead of)
+    drawing. Everything after ``long_df`` is keyword-only.
+
+    Parameters
+    ----------
+    long_df : pandas.DataFrame
+        Tidy frame with at least ``method, metric, value``; an optional
+        ``dataset`` column is used by ``aggregate="summary"`` and for the
+        duplicate check, an optional boolean ``needs_labels`` column
+        overrides the registry's supervised badge per method. Rows whose
+        ``metric`` is NaN are dropped.
+    metrics : list of str | None, keyword-only
+        Metric codes to keep, drawn in THIS order within each family block
+        (the blocks themselves stay in paper order). Spellings are
+        canonicalised against the frame (``"ari"`` -> ``"ARI"``). Default
+        ``None``: every metric in the frame.
+    methods : list of str | None, keyword-only
+        Methods to keep, resolved against the frame's own labels (exact,
+        canonical or case-insensitive match). Default ``None``: all.
+    order : list of str | None, keyword-only
+        Row order for the listed methods; every other method is appended
+        best-first. Reorders ONLY - it never filters (use ``methods=``).
+        Default ``None``: best-first.
+    aggregate : {"dataset", "summary"}, keyword-only
+        ``"dataset"`` (default): raw values, one dataset (several are
+        averaged per method with a ``UserWarning``). ``"summary"``: the
+        paper's panel c - within-dataset max-ranks averaged across datasets.
+    require_complete : bool, keyword-only
+        With ``aggregate="summary"``: keep only methods present in EVERY
+        dataset of the frame. Default ``False`` keeps all methods and warns
+        when the matrix is incomplete.
+    overall : {"rank", "mean_overall"}, keyword-only
+        Formula for the per-family Overall under ``aggregate="summary"``
+        (the two formulas are spelled out under ``mtb.plot.bubble``).
+        Default ``"rank"`` reproduces the paper; ``"mean_overall"`` is what
+        ``mtb.plot.bar`` uses by default.
+    na : {"warn", "skip", "raise"}, keyword-only
+        What to do when a method has ``n/a`` cells (see Notes). ``"warn"``
+        (default): one ``UserWarning`` naming each such method; ``"skip"``:
+        silent; ``"raise"``: ``ValueError`` with the same text. The report
+        is also stored on the table as ``na_cells``.
+
+    Returns
+    -------
+    BubbleTable
+        ``methods`` (row order), ``blocks`` (one ``FamilyBlock`` per family
+        with ``raw / norm / ranks / overall``), the concatenated ``matrix``
+        (= ``norm``), ``raw`` and ``ranks`` (max-ranks, ``n`` = best),
+        ``overall`` (combined, drives the row order) and the bookkeeping
+        fields ``aggregate``, ``overall_basis``, ``datasets``, ``coverage``,
+        ``method_datasets``, ``category``, ``needs_labels``, ``na_cells``.
+
+    Raises
+    ------
+    ValueError
+        Missing columns (with a hint when the frame looks like
+        ``mtb.evaluate``'s wide output), unknown ``metrics`` / ``methods`` /
+        ``order`` names (with a did-you-mean hint and the values present),
+        duplicate ``(method[, dataset], metric)`` rows, a bad ``aggregate``
+        / ``overall`` / ``na`` value, an empty complete intersection under
+        ``require_complete=True``, an inconsistent ``needs_labels`` column
+        (both ``True`` and ``False`` rows for one method), or ``n/a`` cells
+        under ``na="raise"``.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> df = mtb.load_results("vertical", dataset="D11")
+    >>> tbl = mtb.plot.build_table(df, metrics=["ARI", "NMI", "ASW"])
+    >>> tbl.methods                      # rows, best first
+    >>> tbl.ranks                        # max-ranks per metric (n = best)
+    >>> multi = mtb.load_results("vertical", dataset=["D11", "D52"])
+    >>> tbl = mtb.plot.build_table(multi, aggregate="summary", require_complete=True)
+    >>> tbl.coverage                     # datasets per method
+
+    Notes
+    -----
     Missing-metric rule. A method may lack a value for some metric (a cell
     ``n/a``, drawn as a dash). Under ``aggregate="dataset"`` that cell is
     simply absent: the family *Overall* averages the ranks of the metrics
@@ -166,73 +333,30 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     is compared on those 3), and a column's ranks count only the methods
     scored in that column. Under ``aggregate="summary"`` the paper's rule
     applies instead: an ``n/a`` cell within a dataset is rank 0 there. Both
-    are silent by arithmetic, so ``na`` decides how loudly to say it.
+    are silent by arithmetic, so ``na`` decides how loudly to say it; the
+    warning text reads like ``"YukiNet: DR and clustering Overall over 3 of
+    4 metrics (cLISI n/a)"``.
 
-    Parameters
-    ----------
-    long_df : DataFrame
-        Tidy frame with at least ``method, metric, value``; an optional
-        ``dataset`` column is used by ``aggregate="summary"`` and for the
-        duplicate check; an optional boolean ``needs_labels`` column
-        (add it to your own frame) overrides the registry's
-        supervised badge per method. Rows whose ``metric`` is NaN are dropped.
-    metrics : list of str, optional
-        Metric codes to keep, drawn in THIS order within each family block
-        (family blocks themselves stay in paper order). Spellings are
-        canonicalised against the frame (``"ari"`` -> ``"ARI"``); an unknown
-        code raises ``ValueError`` listing the metrics present.
-    methods : list of str, optional
-        Methods to keep (case/alias tolerant, resolved against the frame's
-        own labels); unknown -> ``ValueError`` with a did-you-mean hint.
-    order : list of str, optional
-        Row order for the listed methods; every other method is appended
-        best-first. Reorders ONLY - it never filters (use ``methods=``);
-        unknown names raise ``ValueError``.
-    aggregate : {"dataset", "summary"}
-        ``"dataset"``: raw values (circles); several datasets in the frame
-        are averaged per method with a ``UserWarning``. ``"summary"``: the
-        paper's panel c - within-dataset max-ranks averaged across datasets
-        (bars). Anything else -> ``ValueError``.
-    require_complete : bool, keyword-only
-        With ``aggregate="summary"``: keep only methods present in EVERY
-        dataset of the frame (``ValueError`` if that leaves nothing). The
-        drop is never silent: one ``UserWarning`` names each dropped method
-        and the datasets it lacks (``"require_complete=True dropped 1
-        method(s) ...: MyRandom (missing D52s)"``). Default ``False`` keeps
-        all methods and warns when the matrix is incomplete.
-    overall : {"rank", "mean_overall"}, keyword-only
-        Formula for the per-family Overall under ``aggregate="summary"``
-        (see :data:`multibench.plot.style.OVERALL_DOC`). Default ``"rank"``
-        reproduces the paper; ``"mean_overall"`` is what ``plot.bar`` uses
-        by default.
-    na : {"warn", "skip", "raise"}, keyword-only
-        What to do when a method has ``n/a`` cells (see the rule above).
-        ``"warn"`` (default): one ``UserWarning`` naming each such method
-        (``"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI
-        n/a)"``); ``"skip"``: silent; ``"raise"``: ``ValueError`` with the
-        same text. The report is also stored on the table as ``na_cells``.
+    Duplicate rows for one ``(method[, dataset], metric)`` key raise rather
+    than being silently averaged: deduplicate, or name the variants
+    distinctly (as ``mtb.sweep`` does).
 
-    Returns
-    -------
-    BubbleTable
-        ``methods`` (row order), ``blocks`` (one ``FamilyBlock`` per family
-        with ``raw / norm / ranks / overall``), ``matrix`` (= ``norm``),
-        ``raw``, ``ranks`` (max-ranks, ``n`` = best, concatenated over the
-        blocks in figure order), ``overall`` (combined, drives the row
-        order), ``aggregate``, ``overall_basis``, ``datasets``, ``coverage``
-        (datasets per method, summary only), ``method_datasets``,
-        ``category``, ``needs_labels`` (per-method override dict) and
-        ``na_cells``.
+    ``require_complete=True`` never drops silently: one ``UserWarning``
+    names each dropped method and the datasets it lacks
+    (``"require_complete=True dropped 1 method(s) ...: MyRandom (missing
+    D52s)"``), and ``ValueError`` is raised if no method is complete.
 
-    Raises
-    ------
-    ValueError
-        Missing columns, unknown selector names, duplicate
-        ``(method[, dataset], metric)`` rows (they would otherwise be
-        silently averaged), bad ``aggregate`` / ``overall`` / ``na``, an
-        empty complete intersection, an inconsistent ``needs_labels`` column
-        (both ``True`` and ``False`` rows for one method), or ``n/a`` cells
-        under ``na="raise"``.
+    Row order: the combined Overall is the mean of the family Overalls,
+    sorted best-first with a stable sort, so tied methods keep alphabetical
+    order - the same tie-break ``mtb.plot.bar`` uses, so the two figures
+    agree under the same ``overall=``. Metrics outside the two paper
+    families are still shown, in a neutral purple "Other" block.
+
+    See Also
+    --------
+    mtb.plot.bubble : build and render in one call.
+    mtb.plot.render : draw a table returned by this function.
+    mtb.plot.BubbleTable : what is returned, field by field.
     """
     import warnings
     from ..data import catalog
@@ -804,117 +928,154 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     Methods are rows (best first), metrics are columns grouped into the
     benchmark's task families, each family preceded by an *Overall* bar.
-    ``mtb.plot.bubble(df)`` is the one call most users need; the two halves are
-    available as ``mtb.plot.build_table`` (numbers) and ``mtb.plot.render``
-    (figure) when you want to audit the ranks before drawing.
+    ``mtb.plot.bubble(df)`` is the one call most users need; the two halves
+    are available as ``mtb.plot.build_table`` (numbers) and
+    ``mtb.plot.render`` (figure) when you want to audit the ranks before
+    drawing. Everything after ``long_df`` is keyword-only.
 
     Parameters
     ----------
     long_df : pandas.DataFrame
         Tidy frame with columns ``method, metric, value`` (what
-        :func:`multibench.to_long`, :func:`multibench.load_results` and the
-        ``BatchResult.long`` property return); ``dataset``, ``category``
-        and a boolean ``needs_labels`` column are optional - ``dataset`` is
-        needed for ``aggregate="summary"``, ``category`` drives the
-        supervised badge, ``needs_labels`` overrides it. Rows whose
-        ``metric`` is NaN are dropped. Concatenate frames
+        ``mtb.to_long``, ``mtb.load_results`` and the
+        ``BatchResult.long`` property return); ``dataset``, ``category`` and a
+        boolean
+        ``needs_labels`` column are optional (see Notes). Concatenate frames
         (``pd.concat([published, mine])``) to compare your method with the
         benchmark's.
-    metrics : list of str, optional
+    metrics : list of str | None, keyword-only
         Metric codes to show, drawn in THIS order within each family block
-        (the blocks themselves keep the paper's order: DR & clustering, then
-        batch correction, then "Other"). Case/alias tolerant (``"ari"`` ->
-        ``"ARI"``); an unknown code raises ``ValueError`` naming the metrics
-        present in the frame. Default: every metric in the frame.
-    methods : list of str, optional
+        (the blocks themselves keep the paper's order). Case/alias tolerant
+        (``"ari"`` -> ``"ARI"``). Default ``None``: every metric in the frame.
+    methods : list of str | None, keyword-only
         Methods to show, resolved against the frame's own labels (exact,
-        canonical or case-insensitive match); unknown -> ``ValueError`` with
-        a did-you-mean hint. Default: all.
-    order : list of str, optional
+        canonical or case-insensitive match). Default ``None``: all.
+    order : list of str | None, keyword-only
         Row order for the listed methods; any method not listed is appended
         below them, best-first. This only REORDERS - it never filters rows
-        (use ``methods=``) - and ranks are still computed on the whole
-        (filtered) frame. Unknown names raise ``ValueError``.
-    aggregate : {"dataset", "summary"}
-        ``"dataset"`` (default): one dataset's raw values; metric markers are
-        circles. If the frame holds several datasets their values are averaged
-        per method and a ``UserWarning`` says so (row labels then carry the
-        dataset id). ``"summary"``: the paper's across-dataset panel -
-        within-dataset max-ranks averaged over datasets, drawn as bars; a
-        ``UserWarning`` lists methods missing from some datasets. Any other
-        value raises ``ValueError``.
-    cmap : str, optional
-        Matplotlib colormap name overriding the FIRST family's palette
-        (default blues / greens / purples per family).
-    title : str, optional
-        Figure title.
-    save : str or path-like, optional
-        If given, ``fig.savefig(save, bbox_inches="tight")`` - the suffix
-        picks the format (``.pdf``, ``.png``, ``.svg``).
-    show_language : bool
-        Draw the Py / R language chip left of each row (``?`` for methods not
-        in the registry, e.g. your own) and an ``L`` badge for methods that
-        consume cell-type labels (supervised; their scores are not comparable
-        with unsupervised rows), plus a one-line key under the legends
-        explaining the chips. The badge follows the variants of the frame's
-        single ``category`` (scMoMaT is supervised in mosaic only); an
-        optional boolean ``needs_labels`` column in the frame (add it to
-        your own frame) overrides the registry lookup
-        per method, which is the only way to badge a method the registry
-        does not know. Default ``True``.
-    require_complete : bool
+        (use ``methods=``). Default ``None``: best-first.
+    aggregate : {"dataset", "summary"}, keyword-only
+        ``"dataset"`` (default): one dataset's raw values, metric markers are
+        circles. ``"summary"``: the paper's across-dataset panel -
+        within-dataset max-ranks averaged over datasets, drawn as bars.
+    cmap : str | None, keyword-only
+        Matplotlib colormap name overriding the FIRST family's palette.
+        Default ``None``: blues / greens / purples per family.
+    title : str | None, keyword-only
+        Figure title. Default ``None``: none.
+    save : str or path-like | None, keyword-only
+        If given, ``fig.savefig(save, bbox_inches="tight")``; the suffix
+        picks the format (``.pdf``, ``.png``, ``.svg``). Default ``None``.
+    show_language : bool, keyword-only
+        Draw the Py / R language chip and the ``L`` (supervised) badge left
+        of each row, plus a one-line key under the legends (see Notes).
+        Default ``True``.
+    require_complete : bool, keyword-only
         With ``aggregate="summary"``: restrict to methods present in EVERY
         dataset instead of warning about the incomplete matrix; a
-        ``UserWarning`` names each dropped method and the datasets it lacks,
-        and ``ValueError`` is raised if no method is complete. Default
-        ``False``.
-    na : {"warn", "skip", "raise"}
-        How to report ``n/a`` cells (a method lacking a metric). Under
-        ``aggregate="dataset"`` the family Overall averages the metrics the
-        method HAS and a column's ranks count only the scored methods; under
-        ``"summary"`` an ``n/a`` cell is rank 0 in that dataset. ``"warn"``
-        (default) says so once per figure in a ``UserWarning`` naming each
-        method (``"YukiNet: DR and clustering Overall over 3 of 4 metrics
-        (cLISI n/a)"``), ``"skip"`` is silent, ``"raise"`` refuses.
-{OVERALL_DOC}
+        ``UserWarning`` names each dropped method and the datasets it lacks.
+        Default ``False``.
+    overall : {"rank", "mean_overall"}, keyword-only
+        How the across-dataset *Overall* score is formed.
 
-    Encoding
-    --------
-    * metric circle (``aggregate="dataset"``): RADIUS = within-column rank
-      fraction (largest = best, ``0.85 * sqrt(rank / n)`` with ``n`` = the
-      methods SCORED in that column, n/a cells excluded), FILL = min-max
-      scaled value along the family's colour ramp.
-    * metric bar (``aggregate="summary"``): LENGTH and fill = min-max scaled
-      mean rank.
-    * family *Overall* bar: length and fill = the family score (see
-      ``overall``), min-max scaled across the rows. Rows are ordered by the
-      MEAN of the family Overall scores. The *Rank* legend counts 1 = best,
-      whereas ``BubbleTable.ranks`` / ``FamilyBlock.ranks`` store max-ranks
-      (``n`` = best).
-    * a cell whose metric was not computed for that method shows a dash
-      (``n/a`` in the legend) instead of a marker; that metric is left out
-      of the method's Overall (``aggregate="dataset"``) or counts as rank 0
-      (``"summary"``) - see ``na``.
+        * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
+          max-rank(mean over datasets of within-dataset max-rank))`` - the
+          per-dataset ranks are averaged per metric, the mean ranks are
+          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          A method absent from a dataset scores rank 0 there (the paper's
+          summary rule), which pulls it down.
+        * ``"mean_overall"`` (bar's default): ``mean over datasets of
+          minmax(mean over metrics of within-dataset max-rank)`` - each
+          dataset gets its own min-max-scaled overall and those are averaged
+          over the datasets the method was actually run on (absence is
+          skipped, not penalised).
+
+        The two formulas can order methods differently on the same frame;
+        pass the same ``overall=`` to ``plot.bubble`` and ``plot.bar`` to get
+        the same ordering. The formula in use is printed on the figure.
+    na : {"warn", "skip", "raise"}, keyword-only
+        How to report ``n/a`` cells (a method lacking a metric; the rule is
+        in Notes). ``"warn"`` (default) says so once per figure in a
+        ``UserWarning`` naming each method, ``"skip"`` is silent,
+        ``"raise"`` refuses with ``ValueError``.
 
     Returns
     -------
     matplotlib.figure.Figure
+        The figure (one axes); already written to disk when ``save`` was
+        given.
 
     Raises
     ------
     ValueError
         Missing columns (with a hint when the frame looks like
-        ``evaluate()``'s wide output), unknown ``metrics`` / ``methods`` /
-        ``order`` names, duplicate ``(method[, dataset], metric)`` rows (they
-        would be silently averaged - deduplicate or name variants distinctly),
-        bad ``aggregate`` / ``overall``, or an empty complete intersection.
+        ``mtb.evaluate``'s wide output), unknown ``metrics`` / ``methods`` /
+        ``order`` names (with a did-you-mean hint), duplicate ``(method[,
+        dataset], metric)`` rows (they would be silently averaged -
+        deduplicate or name variants distinctly), a bad ``aggregate`` /
+        ``overall`` / ``na`` value, an empty complete intersection, or
+        ``n/a`` cells under ``na="raise"``.
 
     Examples
     --------
+    >>> import multibench as mtb
+    >>> import pandas as pd
     >>> pub = mtb.load_results("vertical", dataset="D11")
-    >>> mine = mtb.to_long(metrics, method="MyMethod", dataset="D11", category="vertical")
-    >>> fig = mtb.plot.bubble(pd.concat([pub, mine]), metrics=["ARI", "NMI", "ASW"],
-    ...                       title="D11 + MyMethod", save="d11.pdf")
+    >>> res = mtb.run_all("D11", "vertical", "out")        # your own runs
+    >>> fig = mtb.plot.bubble(pd.concat([pub, res.long]), metrics=["ARI", "NMI", "ASW"],
+    ...                       title="D11 + mine", save="d11.pdf")
+    >>> multi = mtb.load_results("vertical", dataset=["D11", "D52"])
+    >>> fig = mtb.plot.bubble(multi, aggregate="summary", require_complete=True)
+
+    Notes
+    -----
+    Input columns. ``dataset`` is needed for ``aggregate="summary"`` and
+    for the duplicate check; ``category`` drives the supervised badge;
+    ``needs_labels`` (boolean, add it to your own frame) overrides the
+    registry lookup behind the badge per method, which is the only way to
+    badge a method the registry does not know. Rows whose ``metric`` is NaN
+    are dropped. Under ``aggregate="dataset"`` a frame holding several
+    datasets is averaged per method with a ``UserWarning`` (row labels then
+    carry the dataset id); under ``"summary"`` a ``UserWarning`` lists the
+    methods missing from some datasets, and ``require_complete=True`` drops
+    them instead (``ValueError`` if no method is complete). ``order=`` only
+    reorders: ranks are still computed on the whole (filtered) frame.
+
+    Encoding. A metric circle (``aggregate="dataset"``) has RADIUS = the
+    within-column rank fraction (largest = best, ``0.85 * sqrt(rank / n)``
+    with ``n`` = the methods SCORED in that column, n/a cells excluded) and
+    FILL = the min-max scaled value along the family's colour ramp. A
+    metric bar (``aggregate="summary"``) has LENGTH and fill = the min-max
+    scaled mean rank. A family *Overall* bar has length and fill = the
+    family score (see ``overall``), min-max scaled across the rows; rows
+    are ordered by the MEAN of the family Overall scores. The *Rank* legend
+    counts 1 = best, whereas ``BubbleTable.ranks`` / ``FamilyBlock.ranks``
+    store max-ranks (``n`` = best). The formula in use is printed under
+    the figure.
+
+    Missing cells. A cell whose metric was not computed for that method
+    shows a dash (``n/a`` in the legend) instead of a marker. Under
+    ``aggregate="dataset"`` the family Overall averages the metrics the
+    method HAS and a column's ranks count only the scored methods; under
+    ``"summary"`` an ``n/a`` cell is rank 0 in that dataset (the paper's
+    rule). The ``na="warn"`` message names each method, e.g. ``"YukiNet:
+    DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
+
+    Chips and badge (``show_language``). The chip reads ``Py`` / ``R`` for
+    registry methods and ``?`` for methods the registry does not know (your
+    own, a sweep variant). The ``L`` badge marks methods that consume
+    cell-type labels - supervised, so their clustering scores are not
+    comparable with unsupervised rows; it follows the variants of the
+    frame's single ``category`` (scMoMaT is supervised in mosaic only) and
+    an explicit ``needs_labels`` column beats the registry.
+
+    See Also
+    --------
+    mtb.plot.build_table : the numbers behind the figure, to audit first.
+    mtb.plot.render : draw a ``BubbleTable`` (``cmap``, ``title``, ``show_language``).
+    mtb.plot.bar : one bar per method across datasets; same ``overall=`` math.
+    mtb.to_long : reshape ``mtb.evaluate``'s wide frame into the long frame.
+    mtb.load_results : the benchmark's published results as a long frame.
     """
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,
@@ -925,9 +1086,9 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     return fig
 
 
-# the `overall` parameter is documented once, in style.OVERALL_DOC, and
-# spliced into every docstring that accepts it (bubble, build_table, bar)
-bubble.__doc__ = bubble.__doc__.replace("{OVERALL_DOC}", style.OVERALL_DOC)
+# The `overall` parameter text is style.OVERALL_DOC, written out verbatim in
+# the docstrings of bubble and bar (a runtime splice is invisible to the
+# static docs build); tests/test_bubble.py and tests/test_bar.py pin parity.
 
 #: deprecated 0.2.x name of :func:`bubble` (DeprecationWarning; removed in 0.4)
 plot_bubble = _compat.deprecated_alias("mtb.plot.plot_bubble", "mtb.plot.bubble", bubble)

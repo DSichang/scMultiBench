@@ -148,9 +148,25 @@ def test_bubble_is_plain_function_with_signature_and_docstring():
               "show_language", "require_complete", "overall"):
         assert p in params
     assert "Parameters" in mtb.plot.bubble.__doc__
-    assert "mean_overall" in mtb.plot.bubble.__doc__      # OVERALL_DOC spliced in
+    assert "mean_overall" in mtb.plot.bubble.__doc__      # OVERALL_DOC written out
     txt = pydoc.render_doc(mtb.plot.bubble)
     assert "bubble(" in txt.replace("\b", "") and "long_df" in txt
+
+
+def test_bubble_overall_doc_matches_style():
+    # The `overall` parameter text is written out in bubble's docstring
+    # (the static docs build cannot see a runtime splice) and must not drift
+    # from style.OVERALL_DOC, the single source it shares with plot.bar.
+    from multibench.plot import style
+    body = style.OVERALL_DOC.split("\n", 1)[1]        # everything below the type line
+    # compare on normalised whitespace: the docstrings are re-wrapped and
+    # re-indented for the generated API reference, the WORDS are the pin
+    norm = lambda t: " ".join(t.split())
+    # `multibench.plot.bubble` is the function in this module's namespace and
+    # the submodule in the package's - reach the function unambiguously
+    import importlib
+    fn = importlib.import_module("multibench.plot.bubble").bubble
+    assert norm(body) in norm(fn.__doc__)
 
 
 def test_bubble_attribute_aliases(tmp_path):
