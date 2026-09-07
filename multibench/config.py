@@ -163,24 +163,68 @@ def metric_set_dir(token: str) -> str:
 
 @dataclass
 class Config:
-    """Resolved paths. Override fields to point at custom data locations.
+    """Resolved filesystem paths; override fields to point at custom locations.
+
+    ``mtb.config.DEFAULT`` is the instance every function reads. Set its
+    fields directly, or pass a path explicitly where a function takes
+    ``data_path=`` / ``result_path=``.
 
     Attributes
     ----------
-    result_path, files_path : Path
-        The shipped benchmark results and per-dataset files.
-    repo_path : Path
-        Checkout holding the upstream ``tools_scripts/`` (see :func:`ensure_repo`).
-    data_path : Path
-        Where ``mtb.data.fetch`` lays out datasets.
-    envs_dir : Path
+    result_path : pathlib.Path
+        The shipped benchmark result tables that ``mtb.load_results`` reads.
+        Default ``<package root>/multibench/result``.
+    files_path : pathlib.Path
+        The shipped per-dataset files (label CSVs and similar). Default
+        ``<package root>/multibench/files``.
+    repo_path : pathlib.Path
+        Checkout holding the upstream ``tools_scripts/`` (the method
+        scripts); cloned on first use when absent. Default
+        ``<base>/scMultiBench_ref`` (see Notes for ``<base>``).
+    data_path : pathlib.Path
+        Where ``mtb.data.fetch`` lays out datasets and where ``mtb.scan`` /
+        ``mtb.run_all`` look for ``<data_path>/<dataset>/``. Default
+        ``<base>/data``.
+    leiden_flavor : str
+        Leiden backend for the scIB resolution sweep in ``mtb.evaluate``:
+        ``"igraph"`` (default; scanpy's igraph implementation, several times
+        faster) or ``"leidenalg"`` (the backend the published tables were
+        computed with).
+    envs_dir : pathlib.Path
         Where the method environment prefixes live (``<envs_dir>/<env>``):
-        what ``install_packed`` unpacks into and what the runner's prefix mode
-        activates. Resolved lazily on first read, in this order: the
-        ``MULTIBENCH_ENVS_DIR`` environment variable; else the first writable
-        envs directory of the conda/mamba found on PATH; else
-        ``~/.cache/multibench/envs`` (``$XDG_CACHE_HOME`` honoured). Settable
-        like every other field: ``mtb.config.DEFAULT.envs_dir = Path(...)``.
+        what ``mtb.env.install`` unpacks packed archives into and what the
+        runner's prefix mode activates. Resolved lazily on first read, in
+        this order: the ``MULTIBENCH_ENVS_DIR`` environment variable; else
+        the first writable envs directory of the conda/mamba found on PATH;
+        else ``~/.cache/multibench/envs`` (``$XDG_CACHE_HOME`` honoured).
+        Settable like every other field.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> import multibench as mtb
+    >>> mtb.config.DEFAULT.data_path                            # where datasets are looked up
+    >>> mtb.config.DEFAULT.envs_dir = "/scratch/envs"           # before mtb.env.install(...)
+    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"          # match the published tables
+    >>> cfg = mtb.config.Config(data_path=Path("/data/mine"))   # a separate instance
+
+    Notes
+    -----
+    ``<base>`` is the repository root in a checkout or editable install
+    (``pyproject.toml`` next to the package) and the per-user cache
+    ``~/.cache/multibench`` (``$XDG_CACHE_HOME`` honoured) for a wheel
+    install, so ``site-packages`` never accumulates datasets or clones.
+
+    ``envs_dir`` is resolved by a descriptor, not a ``default_factory``:
+    ``conda info --json`` runs once per process, the first time the
+    directory is actually needed (``mtb.env.install``, the runner's prefix
+    mode), never at import. Assigning a value converts it to ``Path`` and
+    skips the probe.
+
+    See Also
+    --------
+    mtb.env.install : provisions the method envs under ``envs_dir``.
+    mtb.data.fetch : downloads reference datasets into ``data_path``.
     """
 
     result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result")

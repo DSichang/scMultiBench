@@ -39,56 +39,104 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         overall: str = "mean_overall"):
     """Bar chart of each method's overall score, aggregated across datasets.
 
+    The bubble table answers "how did each method do on THIS dataset"; this
+    answers "how does each method do overall", the summary the benchmark
+    reports. Everything after ``long_df`` is keyword-only.
+
     Parameters
     ----------
     long_df : pandas.DataFrame
         Tidy frame (``metric, value, method, dataset, category``) - the same
-        frame :func:`multibench.load_results`, :func:`multibench.to_long` and
-        the ``BatchResult.long`` property produce. Concatenate several
-        datasets' frames to summarise across them. An empty frame raises
-        ``ValueError`` saying so (``load_results`` may have returned nothing).
-    metrics : list of str, optional
+        frame ``mtb.load_results``, ``mtb.to_long`` and the
+        ``BatchResult.long`` property produce. Concatenate several datasets'
+        frames to summarise across them.
+    metrics : list of str | None, keyword-only
         Restrict to these metric codes (case/alias tolerant, ``"ari"`` ->
-        ``"ARI"``; an unknown code raises ``ValueError`` listing the metrics
-        present). Ignored when ``group`` is given.
-    group : {"clustering", "batch"}, optional
+        ``"ARI"``). Ignored when ``group`` is given. Default ``None``: all.
+    group : {"clustering", "batch"} | None, keyword-only
         Shorthand for that metric family, so you can produce the benchmark's
-        two summary panels.
-    top : int, optional
-        Keep only the N best methods.
-    title : str, optional
-        Figure title (default names the number of datasets).
-    cmap : str
-        Matplotlib colormap for the bars (``"Greens"`` is forced for
-        ``group="batch"`` to match the paper's family colours).
-    show_datasets : bool
+        two summary panels. Default ``None``: every metric in the frame.
+    top : int | None, keyword-only
+        Keep only the N best methods. Default ``None``: all.
+    title : str | None, keyword-only
+        Figure title. Default ``None`` names the number of datasets (and the
+        ``group``).
+    cmap : str, keyword-only
+        Matplotlib colormap for the bars; default ``"Blues"``. ``"Greens"``
+        is forced for ``group="batch"`` to match the paper's family colours.
+    show_datasets : bool, keyword-only
         Overlay one dot per dataset behind each bar, so a method that is
         uniformly good is distinguishable from one that averages well by
-        winning on a single dataset (only meaningful under
-        ``overall="mean_overall"``; the dots are omitted under ``"rank"``).
-    save : str, optional
-        Path to write the figure to (``fig.savefig``).
-{OVERALL_DOC}
+        winning on a single dataset. Default ``True``; only drawn under
+        ``overall="mean_overall"`` with more than one dataset.
+    save : str | None, keyword-only
+        Path to write the figure to (``fig.savefig``, 140 dpi, tight box).
+        Default ``None``: not saved.
+    overall : {"rank", "mean_overall"}, keyword-only
+        How the across-dataset *Overall* score is formed.
+
+        * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
+          max-rank(mean over datasets of within-dataset max-rank))`` - the
+          per-dataset ranks are averaged per metric, the mean ranks are
+          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          A method absent from a dataset scores rank 0 there (the paper's
+          summary rule), which pulls it down.
+        * ``"mean_overall"`` (bar's default): ``mean over datasets of
+          minmax(mean over metrics of within-dataset max-rank)`` - each
+          dataset gets its own min-max-scaled overall and those are averaged
+          over the datasets the method was actually run on (absence is
+          skipped, not penalised).
+
+        The two formulas can order methods differently on the same frame;
+        pass the same ``overall=`` to ``plot.bubble`` and ``plot.bar`` to get
+        the same ordering. The formula in use is printed on the figure.
         The default here is ``"mean_overall"``; ``plot.bubble`` defaults to
         ``"rank"``. Pass the same value to both to get the same ordering.
 
     Returns
     -------
     matplotlib.figure.Figure
-        Under ``overall="mean_overall"`` whiskers are the SD of the
-        per-dataset scores (methods present in a single dataset get none -
-        there is no spread to show) and the x label names the single dataset
-        or the formula. Because the score is rank-based, it is only
-        meaningful relative to the other methods in the same figure. A
-        method lacking a metric is compared on the metrics it has (the
-        within-dataset rank matrix skips NaN cells).
+        One horizontal bar per method, best on top; see Notes for the
+        whiskers and the x label.
 
     Raises
     ------
     ValueError
-        An empty or column-less frame, an unknown ``metrics`` code, a bad
-        ``group`` / ``overall``, or ``group="batch"`` on a frame without
-        batch metrics.
+        An empty or column-less frame (``mtb.load_results`` may have
+        returned nothing - see its ``UserWarning``), an unknown ``metrics``
+        code (the message lists the metrics present), a bad ``group`` /
+        ``overall``, or ``group="batch"`` on a frame without batch metrics.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> df = mtb.load_results("vertical")            # every dataset of the category
+    >>> fig = mtb.plot.bar(df, group="clustering", top=10, save="clustering.png")
+    >>> fig = mtb.plot.bar(df, group="batch")
+    >>> fig = mtb.plot.bar(df, overall="rank")       # orders like bubble(aggregate="summary")
+
+    Notes
+    -----
+    Under ``overall="mean_overall"`` the whiskers are the SD of the
+    per-dataset scores (methods present in a single dataset get none -
+    there is no spread to show) and the x label names the single dataset
+    or the formula; under ``overall="rank"`` the bar is not a mean of
+    per-dataset scores, so neither whiskers nor dataset dots are drawn.
+
+    Because the score is rank-based, it is only meaningful relative to the
+    other methods in the same figure. A method lacking a metric is compared
+    on the metrics it has (the within-dataset rank matrix skips NaN cells).
+    Batch metrics need a multi-batch dataset: a single-batch design has
+    none to compute, which is what the ``group="batch"`` error says.
+
+    Ties are broken the way ``mtb.plot.bubble`` breaks them (a stable sort,
+    alphabetical within a tie), so the two figures agree under the same
+    ``overall=``.
+
+    See Also
+    --------
+    mtb.plot.bubble : per-dataset (or rank-averaged) bubble table, same ``overall=`` math.
+    mtb.load_results : the benchmark's published results as a long frame.
     """
     import matplotlib.pyplot as plt
     from .bubble import _resolve
@@ -180,6 +228,3 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     if save:
         fig.savefig(save, dpi=140, bbox_inches="tight")
     return fig
-
-
-bar.__doc__ = bar.__doc__.replace("{OVERALL_DOC}", style.OVERALL_DOC)

@@ -59,3 +59,14 @@ def test_bar_overall_doc_and_default_basis():
     assert "mean_overall" in mtb.plot.bar.__doc__ and "rank" in mtb.plot.bar.__doc__
     import inspect
     assert inspect.signature(mtb.plot.bar).parameters["overall"].default == "mean_overall"
+
+
+def test_bar_overall_doc_matches_style():
+    # Same parity pin as test_bubble: the `overall` text is written out in
+    # bar's docstring and must stay identical to style.OVERALL_DOC.
+    from multibench.plot import style
+    body = style.OVERALL_DOC.split("\n", 1)[1]
+    # compare on normalised whitespace: the docstrings are re-wrapped and
+    # re-indented for the generated API reference, the WORDS are the pin
+    norm = lambda t: " ".join(t.split())
+    assert norm(body) in norm(mtb.plot.bar.__doc__)
