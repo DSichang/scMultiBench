@@ -6,7 +6,9 @@ notebooks or their generator; (b) every ``mtb.<name>`` the README and the
 docs quickstart mention exists in the live package and sits in the relevant
 ``__all__``; (c) every ``mtb.<fn>(...)`` call in a python fence of the README
 and the docs pages binds to the live signature (a keyword that no longer
-exists fails here before a reader hits the TypeError).
+exists fails here before a reader hits the TypeError). The signatures
+themselves are rendered from the docstrings (docs/reference/*.md); those
+pages are checked in test_docs_consistency.py.
 """
 import ast
 import inspect
@@ -81,21 +83,43 @@ def _mtb_tokens(text):
     return sorted(set(re.findall(r"\bmtb\.([A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*)", text)))
 
 
+# Documented as "importable, not in __all__" (the run-mode / archive-flavour
+# helpers the overview and the env reference page explain).
+DOCUMENTED_HIDDEN = {"mtb.env.env_prefix", "mtb.env.host_has_gpu"}
+
+REFERENCE_PAGES = ["reference/discover.md", "reference/inputs.md", "reference/run.md",
+                   "reference/score.md", "reference/compare.md", "reference/env.md",
+                   "reference/io.md", "reference/plot.md", "reference/data.md",
+                   "reference/catalog.md", "reference/config.md"]
+
+
 @pytest.mark.parametrize(
-    "path", [ROOT / "README.md"] + _docs_pages("quickstart.md"), ids=lambda p: p.name)
+    "path", [ROOT / "README.md"] + _docs_pages("quickstart.md", "api.md", *REFERENCE_PAGES),
+    ids=lambda p: p.name)
 def test_every_mtb_name_mentioned_is_public(path):
+    """Every ``mtb.<name>`` the README, the quickstart, the API overview and
+    the reference-page intros mention exists and sits in the relevant
+    ``__all__`` (dunders such as ``mtb.env.__all__`` and the two documented
+    hidden helpers excepted)."""
     import multibench as mtb
     text = _text(path)
+    # a "Deprecated in 0.3.0" section documents names that were RETIRED: the
+    # aliases and the removals are supposed to be named there, so the public
+    # check stops where that section starts
+    text = re.split(r"^#+ Deprecated in \d", text, maxsplit=1, flags=re.M)[0]
     tokens = _mtb_tokens(text)
     assert tokens, f"{path.name} mentions no mtb.<name>?"
     for tok in tokens:
         parts = tok.split(".")
+        if any(part.startswith("__") for part in parts):
+            continue          # mtb.__all__ / mtb.__version__: attributes, not public API entries
         obj = mtb
         assert parts[0] in mtb.__all__, f"{path.name}: mtb.{parts[0]} is not in mtb.__all__"
         obj = getattr(mtb, parts[0])
         for depth, part in enumerate(parts[1:], start=1):
             assert hasattr(obj, part), f"{path.name}: mtb.{tok} does not exist ({part!r})"
-            if depth == 1 and inspect.ismodule(obj) and getattr(obj, "__all__", None) is not None:
+            if (depth == 1 and inspect.ismodule(obj) and getattr(obj, "__all__", None) is not None
+                    and not part.startswith("__") and f"mtb.{parts[0]}.{part}" not in DOCUMENTED_HIDDEN):
                 assert part in obj.__all__, \
                     f"{path.name}: mtb.{'.'.join(parts[:2])} is not in {obj.__name__}.__all__"
             obj = getattr(obj, part)

@@ -7,7 +7,9 @@ two paper titles, a missing [project.urls]).
 """
 import ast
 import importlib.util
+import inspect
 import json
+import os
 import re
 from pathlib import Path
 
@@ -198,7 +200,6 @@ BANNED_PHRASES = {
 def _docs_md_files():
     """The docs site's .md pages when reachable: SCMULTIBENCH_DOCS=<docs dir>
     (the mkdocs source lives in a separate repository), else none."""
-    import os
     root = os.environ.get("SCMULTIBENCH_DOCS")
     return sorted(Path(root).rglob("*.md")) if root and Path(root).is_dir() else []
 
@@ -253,10 +254,15 @@ def test_printed_examples_match_the_live_package():
 def test_docs_pages_carry_the_colab_speed_round(path):
     """The docs site (when reachable) documents the Colab speed round: the
     installation page's Colab section (no conda bootstrap, the INSTALL_ENVS
-    flag, the measured sizes, the stand-in), the API entries for
-    data.fetch_outputs / load_batch(methods=) / Config.envs_dir /
-    Config.leiden_flavor / MULTIBENCH_RUN_MODE / env_prefix, and run.md's
-    account of prefix mode."""
+    flag, the measured sizes, the stand-in), the reference entries for
+    data.fetch_outputs / load_batch / Config, the env-variable table,
+    MULTIBENCH_RUN_MODE / env_prefix in the overview, and run.md's account of
+    prefix mode. The facts those entries used to spell out by hand (the
+    fetch_outputs manifest, Config's fields) are pinned on the live objects."""
+    import dataclasses
+    import multibench as mtb
+    assert "output_urls.json" in (mtb.data.fetch_outputs.__doc__ or "")
+    assert {"envs_dir", "leiden_flavor"} <= {f.name for f in dataclasses.fields(mtb.config.Config)}
     text = path.read_text()
     if path.name == "installation.md":
         assert "### Google Colab" in text
@@ -267,16 +273,26 @@ def test_docs_pages_carry_the_colab_speed_round(path):
         assert "MULTIBENCH_ENVS_DIR" in text and "~/.cache/multibench/envs" in text
         assert "no conda/mamba on this host; <env> has a packed" in text
     if path.name == "api.md":
-        assert "### `mtb.data.fetch_outputs`" in text
-        assert ("mtb.data.fetch_outputs(dataset: str, methods: list[str] | None = None, *,\n"
-                "                       data_path=None, quiet: bool = False) -> Path") in text
-        assert "mtb.load_batch(out_dir, *, methods: list[str] | None = None) -> BatchResult" in text
-        assert "envs_dir: Path" in text and "leiden_flavor: str" in text
+        # the signatures live on the generated reference pages now; the
+        # overview keeps the prose and links every entry point there
         assert "### Run modes: prefix and conda" in text
         assert "MULTIBENCH_RUN_MODE=conda|prefix" in text
-        assert "mtb.env.env_prefix(env: str) -> Path | None" in text
-        assert "output_urls.json" in text
-    if path.name == "run.md":
+        assert "reference/env.md#multibench.engine.envs.env_prefix" in text
+        assert "reference/data.md#multibench.data.fetch.fetch_outputs" in text
+        assert "reference/run.md#multibench.workflow.load_batch" in text
+        assert "reference/config.md#multibench.config.Config" in text
+    if path.parent.name == "reference":
+        directives = _directives(text)
+        if path.name == "data.md":
+            assert "multibench.data.fetch.fetch_outputs" in directives
+        if path.name == "run.md" and path.parent.name == "tutorials":
+            assert "multibench.workflow.load_batch" in directives
+        if path.name == "config.md":
+            assert "multibench.config.Config" in directives
+            assert "MULTIBENCH_ENVS_DIR" in text and "MULTIBENCH_RUN_MODE" in text
+        if path.name == "env.md":
+            assert "multibench.engine.envs.env_prefix" in directives
+    if path.name == "run.md" and path.parent.name == "tutorials":
         assert "## How the environment is entered: prefix and conda modes" in text
         assert "MULTIBENCH_RUN_MODE" in text and "activate.d" in text
         assert "the default `conda run" not in text, "conda run is the fallback, not the default"
@@ -291,3 +307,266 @@ def test_host_only_method_set_behind_the_docs_rule():
     assert mtb.find_methods(available=False) == ["SPIRAL"]
     assert mtb.method_info("GPSA")["availability"] == "public"
     assert mtb.method_info("GPSA")["driver"]
+
+
+# ---- the generated API reference (docs/reference/*.md, mkdocstrings) ---------
+# One ``:::`` directive per public name, at the canonical path of the object
+# (the path mkdocstrings renders; ``mtb.plot.bubble`` is the trap - the same
+# dotted name is also a module) with the heading set to the public spelling.
+# This table is the docstring contract's canonical-path table.
+REFERENCE = {
+    # public name: (reference page, ``:::`` path)
+    "mtb.list_methods": ("discover.md", "multibench.discover.list_methods"),
+    "mtb.find_methods": ("discover.md", "multibench.discover.find_methods"),
+    "mtb.method_info": ("discover.md", "multibench.discover.method_info"),
+    "mtb.params_for": ("discover.md", "multibench.discover.params_for"),
+    "mtb.describe_layout": ("discover.md", "multibench.workflow.describe_layout"),
+    "mtb.cite": ("discover.md", "multibench.discover.cite"),
+    "mtb.list_tasks": ("discover.md", "multibench.engine.registry.list_tasks"),
+    "mtb.list_categories": ("discover.md", "multibench.workflow.list_categories"),
+    "mtb.inputs_for": ("inputs.md", "multibench.engine.resolve.inputs_for"),
+    "mtb.labels_for": ("inputs.md", "multibench.engine.resolve.labels_for"),
+    "mtb.scan": ("run.md", "multibench.workflow.scan"),
+    "mtb.run": ("run.md", "multibench.engine.runner.run"),
+    "mtb.run_all": ("run.md", "multibench.workflow.run_all"),
+    "mtb.sweep": ("run.md", "multibench.workflow.sweep"),
+    "mtb.load_batch": ("run.md", "multibench.workflow.load_batch"),
+    "mtb.BatchResult": ("run.md", "multibench.workflow.BatchResult"),
+    "mtb.evaluate": ("score.md", "multibench.eval.pipeline.evaluate"),
+    "mtb.to_long": ("score.md", "multibench.eval.pipeline.to_long"),
+    "mtb.load_results": ("compare.md", "multibench.data.results.load_results"),
+    "mtb.available_datasets": ("compare.md", "multibench.data.results.available_datasets"),
+    "mtb.results_coverage": ("compare.md", "multibench.data.results.results_coverage"),
+    "mtb.recommend": ("compare.md", "multibench.data.results.recommend"),
+    "mtb.DegenerateRerunWarning": ("compare.md", "multibench.data.results.DegenerateRerunWarning"),
+    "mtb.AmbiguousVariantError": ("config.md", "multibench.engine.schema.AmbiguousVariantError"),
+    "mtb.env.status": ("env.md", "multibench.engine.envs.status"),
+    "mtb.env.plan": ("env.md", "multibench.engine.envs.plan"),
+    "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
+    "mtb.env.doctor": ("env.md", "multibench.engine.envs.doctor"),
+    "mtb.env.recipe": ("env.md", "multibench.engine.envs.recipe"),
+    "mtb.io.export_dataset": ("io.md", "multibench.engine.ingest.export_dataset"),
+    "mtb.io.to_canonical": ("io.md", "multibench.engine.ingest.to_canonical"),
+    "mtb.io.read_canonical": ("io.md", "multibench.engine.ingest.read_canonical"),
+    "mtb.io.normalize_peak_names": ("io.md", "multibench.engine.ingest.normalize_peak_names"),
+    "mtb.plot.bubble": ("plot.md", "multibench.plot.bubble.bubble"),
+    "mtb.plot.bar": ("plot.md", "multibench.plot.bar.bar"),
+    "mtb.plot.build_table": ("plot.md", "multibench.plot.bubble.build_table"),
+    "mtb.plot.BubbleTable": ("plot.md", "multibench.plot.bubble.BubbleTable"),
+    "mtb.data.fetch": ("data.md", "multibench.data.fetch.fetch"),
+    "mtb.data.fetch_outputs": ("data.md", "multibench.data.fetch.fetch_outputs"),
+    "mtb.data.fetchable": ("data.md", "multibench.data.results.fetchable"),
+    "mtb.catalog.methods": ("catalog.md", "multibench.data.catalog.methods"),
+    "mtb.catalog.datasets": ("catalog.md", "multibench.data.catalog.datasets"),
+    "mtb.catalog.metrics": ("catalog.md", "multibench.data.catalog.metrics"),
+    "mtb.catalog.canonical_id": ("catalog.md", "multibench.data.catalog.canonical_id"),
+    "mtb.catalog.canonical_metric": ("catalog.md", "multibench.data.catalog.canonical_metric"),
+    "mtb.catalog.known_metrics": ("catalog.md", "multibench.data.catalog.known_metrics"),
+    "mtb.config.Config": ("config.md", "multibench.config.Config"),
+}
+NAMESPACES = ("env", "io", "plot", "data", "catalog", "config")
+DOCSTRINGS_PENDING = pytest.mark.xfail(
+    strict=False,
+    reason="docstrings land in wp/A_docstrings_core, wp/B_docstrings_eval_data, wp/C_docstrings_plot_io_config")
+MKDOCS = Path(os.environ.get(
+    "SCMULTIBENCH_MKDOCS",
+    Path.home() / "Documents" / "multitask-omics" / "_work" / "venv" / "bin" / "mkdocs"))
+
+
+def _docs_root():
+    """The docs dir (SCMULTIBENCH_DOCS) or None; mkdocs.yml is its parent."""
+    root = os.environ.get("SCMULTIBENCH_DOCS")
+    return Path(root) if root and Path(root).is_dir() else None
+
+
+needs_docs = pytest.mark.skipif(_docs_root() is None, reason="SCMULTIBENCH_DOCS not set")
+
+
+def _directives(text):
+    """``{path: heading}`` of the ``:::`` directives in one reference page."""
+    out = {}
+    for m in re.finditer(r"^::: (\S+)\n((?:[ \t]+.*\n)*)", text, re.M):
+        opts = dict(re.findall(r"^\s+(\w+):\s*'([^']*)'\s*$", m.group(2), re.M))
+        out[m.group(1)] = opts.get("heading")
+    return out
+
+
+def _reference_directives(docs):
+    """``[(page, path, heading)]`` across docs/reference/*.md."""
+    return [(p.name, path, heading)
+            for p in sorted((docs / "reference").glob("*.md"))
+            for path, heading in _directives(p.read_text()).items()]
+
+
+def _public_names():
+    """``mtb.<name>`` for every callable / class in ``mtb.__all__`` and the
+    namespaces' ``__all__`` (constants and submodules are prose, not objects)."""
+    import multibench as mtb
+    names = {}
+    for n in mtb.__all__:
+        obj = getattr(mtb, n)
+        if inspect.isfunction(obj) or inspect.isclass(obj):
+            names[f"mtb.{n}"] = obj
+    for ns in NAMESPACES:
+        mod = getattr(mtb, ns)
+        for n in mod.__all__:
+            obj = getattr(mod, n)
+            if inspect.isfunction(obj) or inspect.isclass(obj):
+                names[f"mtb.{ns}.{n}"] = obj
+    return names
+
+
+def _resolve(path):
+    """The object a ``:::`` path names, the way mkdocstrings resolves it:
+    longest importable module prefix, then attributes."""
+    import importlib
+    parts = path.split(".")
+    for k in range(len(parts), 0, -1):
+        try:
+            obj = importlib.import_module(".".join(parts[:k]))
+        except ImportError:
+            continue
+        for part in parts[k:]:
+            obj = getattr(obj, part)
+        return obj
+    raise ImportError(path)
+
+
+def test_reference_table_covers_exactly_the_public_surface():
+    """The contract table above IS the public surface: a name added to an
+    ``__all__`` without a reference row (or the reverse) fails here."""
+    assert set(_public_names()) == set(REFERENCE)
+
+
+@needs_docs
+def test_every_public_name_has_one_reference_directive():
+    """(a) one ``:::`` entry per public name across docs/reference/*.md, at
+    the canonical path, headed by the public spelling, resolving to the very
+    object ``mtb`` exports - never to a module."""
+    docs = _docs_root()
+    public = _public_names()
+    entries = _reference_directives(docs)
+    for name, (page, path) in REFERENCE.items():
+        hits = [e for e in entries if e[2] == name]
+        assert len(hits) == 1, f"{name}: {len(hits)} directive(s) headed {name!r}: {hits}"
+        got_page, got_path, _ = hits[0]
+        assert got_page == page and got_path == path, f"{name}: {hits[0]} != ({page}, {path})"
+        assert _resolve(path) is public[name], f"{name}: {path} is not the exported object"
+    for page, path, heading in entries:
+        obj = _resolve(path)
+        assert not inspect.ismodule(obj), f"{page}: '::: {path}' renders a MODULE - name the object"
+        assert heading, f"{page}: '::: {path}' has no heading: option"
+
+
+def _pages_of(site):
+    """``{reference page name: built html}``."""
+    return {p.parent.name + ".md": p.read_text()
+            for p in sorted(site.glob("reference/*/index.html"))}
+
+
+@pytest.fixture(scope="module")
+def built_site(tmp_path_factory):
+    """Build the docs site with the venv mkdocs against THIS checkout's
+    docstrings (MULTIBENCH_SRC). Returns (strict_ok, log, site_dir): the site
+    dir comes from the strict build when it passes, else from a plain build
+    so the page checks can still run."""
+    import subprocess
+    docs = _docs_root()
+    if docs is None:
+        pytest.skip("SCMULTIBENCH_DOCS not set")
+    if not MKDOCS.is_file():
+        pytest.skip(f"{MKDOCS} not present (the docs venv with mkdocstrings)")
+    site = tmp_path_factory.mktemp("site")
+    env = {**os.environ, "MULTIBENCH_SRC": str(ROOT)}
+    cmd = [str(MKDOCS), "build", "--strict", "-d", str(site)]
+    proc = subprocess.run(cmd, cwd=docs.parent, env=env, capture_output=True, text=True)
+    log = proc.stdout + proc.stderr
+    strict_ok = proc.returncode == 0
+    if not strict_ok:
+        subprocess.run([str(MKDOCS), "build", "-d", str(site)], cwd=docs.parent, env=env,
+                       capture_output=True, text=True)
+    return strict_ok, log, site
+
+
+@DOCSTRINGS_PENDING
+def test_docs_build_strictly_with_mkdocstrings(built_site):
+    """(b) ``mkdocs build --strict`` passes - every griffe docstring-parse
+    warning (a documented parameter missing from the signature, a line the
+    numpy parser cannot read) aborts a strict build."""
+    strict_ok, log, _ = built_site
+    warnings = [l for l in log.splitlines() if "WARNING" in l and "Div at" not in l]
+    assert strict_ok, "strict build failed:\n" + "\n".join(warnings[-20:])
+
+
+def _stray_headings(page_html, path, obj):
+    """The render_check rule: headings inside an object's rendered block that
+    are neither numpydoc section titles nor members of a class."""
+    import html as html_mod
+    anchor = f'id="{path}"'
+    i = page_html.find(anchor)
+    if i < 0:
+        return None
+    j, pos = -1, i + 10
+    while True:
+        k = page_html.find('id="multibench.', pos)
+        if k < 0:
+            break
+        ident = page_html[k + 4:page_html.find('"', k + 4)]
+        if not (ident.startswith(path + ".") or ident.startswith(path + "-")):
+            j = k
+            break
+        pos = k + 10
+    block = page_html[i:j if j > 0 else len(page_html)]
+    heads = re.findall(r"<h[3-6][^>]*>(.*?)</h[3-6]>", block, re.S)
+    heads = [html_mod.unescape(re.sub(r"<[^>]+>", "", h)).strip() for h in heads]
+    known = {"Parameters", "Returns", "Raises", "Examples", "Notes", "See Also", "Attributes", "Warns", "Yields"}
+    members = set(dir(obj)) if inspect.isclass(obj) else set()
+    return [h for h in heads
+            if h.rstrip(":¶ ") not in known
+            and not h.startswith(path.rsplit(".", 1)[-1])
+            and h.split("(")[0].split(" ")[0] not in members]
+
+
+@DOCSTRINGS_PENDING
+def test_no_stray_heading_inside_any_rendered_object(built_site):
+    """(c) a dashed line inside a docstring body renders as a heading and
+    lands in the page's table of contents; none may survive."""
+    _, _, site = built_site
+    pages = _pages_of(site)
+    problems = []
+    for name, (page, path) in REFERENCE.items():
+        stray = _stray_headings(pages[page], path, _resolve(path))
+        if stray is None:
+            problems.append(f"{name}: not rendered on {page}")
+        elif stray:
+            problems.append(f"{name}: stray heading(s) {stray[:4]}")
+    assert not problems, "\n".join(problems)
+
+
+@needs_docs
+def test_reference_objects_are_rendered(built_site):
+    """Every contract row renders on its page as a heading with the public
+    spelling (a directive that resolves to nothing is silently dropped by
+    mkdocstrings only when show_if_no_docstring is false - so a missing
+    docstring shows up here)."""
+    _, _, site = built_site
+    pages = _pages_of(site)
+    for name, (page, path) in REFERENCE.items():
+        m = re.search(rf'<h[2-4] id="{re.escape(path)}"[^>]*>(.*?)</h[2-4]>', pages[page], re.S)
+        assert m, f"{name}: no heading with id {path!r} on {page}"
+        assert name in re.sub(r"<[^>]+>", "", m.group(1)), f"{name}: heading does not read {name!r}"
+
+
+@needs_docs
+def test_api_overview_links_every_entry_point_to_its_reference_anchor():
+    """(d) api.md links each public name to ``reference/<page>#<path>``, and
+    every reference anchor it links exists as a ``:::`` directive."""
+    docs = _docs_root()
+    text = (docs / "api.md").read_text()
+    directives = {(page, path) for page, path, _ in _reference_directives(docs)}
+    for name, (page, path) in REFERENCE.items():
+        link = f"[`{name}`](reference/{page}#{path})"
+        assert link in text, f"api.md does not link {name} as {link}"
+    for page, anchor in re.findall(r"\]\(reference/(\w+\.md)#([^)]+)\)", text):
+        assert (page, anchor) in directives, f"api.md links reference/{page}#{anchor}, which no directive renders"
+    assert "```python\nmtb." not in text, "api.md carries a hand-written signature block; the reference pages own them"
