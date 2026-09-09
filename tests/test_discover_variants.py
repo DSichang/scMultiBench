@@ -1,15 +1,13 @@
-"""find_methods filters per VARIANT; availability + verification in method_info.
+"""find_methods filters per VARIANT; availability in method_info.
 
 Workshop findings (Priya, Tomás, Aisha, Chen, Elena): needs_labels was the
 method-level OR over all variants so scMoMaT vanished from
 find_methods(vertical, rna+adt, needs_labels=False); category/modalities were
 not required to hold on the same variant so Multigrate showed up for vertical
 rna+atac; SPIRAL/GPSA were 'verified' with nothing saying their scripts are
-not public; status='verified' hid the verification evidence.
+not public.
 """
 from pathlib import Path
-
-import pytest
 
 import multibench as mtb
 from multibench import discover
@@ -139,38 +137,9 @@ def test_benchmark_host_only_reason_text(tmp_path):
     assert resolve.benchmark_host_only_reason(str(p)) == ""
 
 
-# ----------------------------------------------------------------- H7 verification
-def test_verification_record_is_exposed_with_verbose(root):
-    info = discover.method_info("VIMCCA", verbose=True)
-    rec = info["verification"]
-    assert isinstance(rec, list) and len(rec) == 1
-    r = rec[0]
-    assert set(r) == {"dataset", "category", "status", "wall_s", "ARI", "baseline", "verdict", "note"}
-    assert r["dataset"] == "D11" and r["category"] == "vertical"
-    assert r["status"] == "CHAIN_OK" and r["verdict"] == "DRIFT"
-    assert abs(r["ARI"] - 0.6953) < 1e-9 and abs(r["baseline"] - 0.599) < 1e-9
-    assert r["wall_s"] == 41
-    # a no-embedding method carries None for the scores, not 0 or ''
-    wnn = discover.method_info("Seurat_WNN", verbose=True)["verification"][0]
-    assert wnn["status"] == "RUN_OK_NO_EMBEDDING" and wnn["ARI"] is None and wnn["baseline"] is None
-    # non-verbose: not present; status values untouched
-    assert "verification" not in discover.method_info("VIMCCA")
-    assert discover.method_info("VIMCCA")["status"] == "verified"
-    # every verified method has a record
-    for m in mtb.list_methods():
-        if discover.method_info(m)["status"] == "verified":
-            assert discover.verification_for(m), m
-    with pytest.raises(KeyError):
-        discover.verification_for("NoSuchMethod")
-
-
-def test_verification_tsv_is_shipped_and_identical_to_the_notebook_record(root):
-    shipped = root / "multibench" / "files" / discover.VERIFICATION_TSV
-    assert shipped.is_file()
-    src = root / "notebooks" / "results" / "final_verification.tsv"
-    if src.is_file():      # repo checkout: the two copies must not drift
-        assert shipped.read_bytes() == src.read_bytes()
+def test_method_info_status_doc():
     import inspect
     doc = inspect.getdoc(discover.method_info)
     assert "cross-checked against the upstream entrypoint" in doc
-    assert "end to end" in doc and "DRIFT" in doc and "RUN_OK_NO_EMBEDDING" in doc
+    assert "end to end" in doc
+    assert discover.method_info("VIMCCA")["status"] == "verified"

@@ -296,8 +296,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         ``False`` (default) returns the keys below. ``True`` adds
         ``notes_long`` (the raw upstream-knob audit prose; ``None`` for methods
         outside the audit; for a ``benchmark-host-only`` method one sentence
-        saying why is appended) and ``verification`` (the per-method
-        verification record, see Notes).
+        saying why is appended).
 
     Returns
     -------
@@ -308,7 +307,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         ``reference``, ``notes``, ``supports``, ``params``, ``fixed_in_script``,
         ``upstream_knobs``, ``upstream_url``, ``runtime``, ``cpu_params``,
         ``requires_gpu``, ``gpu_evidence``; with ``verbose=True`` also
-        ``notes_long`` and ``verification``. Each is described in Notes.
+        ``notes_long``. Each is described in Notes.
 
     Raises
     ------
@@ -322,7 +321,6 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     >>> info["supports"]                    # one entry per variant: category, modalities, labels ...
     >>> info["runtime"]["tier"], info["runtime"]["worst_sec"]
     >>> info["params"]["vertical:rna+adt"]["tunable"]
-    >>> mtb.method_info("scMoMaT", verbose=True)["verification"]
 
     Notes
     -----
@@ -347,7 +345,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ``observed`` empty), and ``observed`` lists the actual measurements as
     ``{dataset, cells, sec, source}`` - ``source`` says where the number
     came from (``manual``, ``summary_csv`` = the shipped re-run sweeps,
-    ``verification`` = the shipped verification table); ``cells`` is null
+    ``recorded`` = the recorded end-to-end runs); ``cells`` is null
     when not recorded. These are MEASUREMENTS on one shared machine (the GPU
     benchmark host; ``host`` / ``note`` say so), not predictions: use them to
     choose a sensible ``run_all(timeout=...)``, not to promise a finish time.
@@ -364,8 +362,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     command template was cross-checked against the upstream entrypoint AND
     the method was executed end to end on a reference dataset (``'declared'``
     = wired but not run). It says nothing about where the script lives (see
-    ``availability``) nor about the numbers that run produced (see
-    ``verification``).
+    ``availability``).
 
     ``availability`` is ``'public'`` (every entrypoint lives in the public
     scMultiBench repository; a public install can run it) or
@@ -389,19 +386,6 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ``OSError`` before launching and ``scan`` reports it ``env_ok=False``.
     Neither key says anything about the CPU archive of the method's env
     (``mtb.env.install(..., flavor=...)``).
-
-    ``verification`` (``verbose=True`` only) is the evidence behind
-    ``status='verified'``: a list of dicts (one per recorded run of this
-    method) with ``dataset, category, status, wall_s, ARI, baseline, verdict,
-    note`` read from ``files/final_verification.tsv``; ``None`` when the
-    method has no recorded run. ``status`` there is the run outcome
-    (``CHAIN_OK`` = ran and its embedding was scored; ``CHAIN_OK_GRAPH_METHOD``
-    = ran, graph output scored via its UMAP; ``RUN_OK_NO_EMBEDDING`` = ran to
-    completion but produces no embedding to score - Seurat_WNN, MIRA and the
-    registration methods, so ``ARI`` is None), ``ARI`` the re-run's score,
-    ``baseline`` the score recorded for the same method and dataset when it was
-    first run here, and ``verdict`` ``OK`` (the re-run is within tolerance of
-    it) or ``DRIFT`` (outside).
 
     See Also
     --------
@@ -483,7 +467,6 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
             why = _availability_sentence(s)
             notes_long = f"{notes_long.rstrip()} {why}" if notes_long else why
         info["notes_long"] = notes_long
-        info["verification"] = verification_for(s.id)
     return info
 
 
@@ -529,56 +512,6 @@ def _availability_sentence(spec) -> str:
             f"was produced on and is not published in the scMultiBench repository, "
             f"so a public install cannot fetch or run it (scan reports it not "
             f"runnable; find_methods(available=True) omits it).")
-
-
-#: per-method verification log shipped with the package (files/*): one row per
-#: verified run - method, dataset, category, status, wall_s, ARI, baseline,
-#: verdict, note. A copy of notebooks/results/final_verification.tsv; the test
-#: suite pins the two byte-identical.
-VERIFICATION_TSV = "final_verification.tsv"
-_VERIFICATION_COLUMNS = ("dataset", "category", "status", "wall_s", "ARI",
-                         "baseline", "verdict", "note")
-
-
-@functools.lru_cache(maxsize=1)
-def _verification_table(path: str) -> dict[str, list[dict]]:
-    """``{method_id: [row, ...]}`` from the verification TSV (empty if absent)."""
-    import csv
-
-    p = Path(path)
-    if not p.is_file():
-        return {}
-    out: dict[str, list[dict]] = {}
-    with open(p, newline="") as fh:
-        for raw in csv.DictReader(fh, delimiter="\t"):
-            row = {}
-            for k in _VERIFICATION_COLUMNS:
-                val = (raw.get(k) or "").strip()
-                if k == "wall_s":
-                    row[k] = int(float(val)) if val else None
-                elif k in ("ARI", "baseline"):
-                    row[k] = float(val) if val else None
-                else:
-                    row[k] = val or None
-            out.setdefault((raw.get("method") or "").strip(), []).append(row)
-    return out
-
-
-def verification_for(method: str, files_dir: Path | str | None = None) -> list[dict] | None:
-    """The recorded end-to-end verification run(s) of ``method``.
-
-    Reads ``<files_dir>/final_verification.tsv`` (default: the package's
-    ``files/``; it is what ``method_info(m, verbose=True)['verification']``
-    returns). Each entry is ``{dataset, category, status, wall_s, ARI,
-    baseline, verdict, note}`` - see :func:`method_info` for the meaning of the
-    fields. ``None`` when the method has no recorded run (or the file is not
-    shipped). The method id is validated (``KeyError`` on a typo).
-    """
-    registry.check_method(method)
-    from . import config
-    base = Path(files_dir) if files_dir is not None else config.DEFAULT.files_path
-    rows = _verification_table(str(base / VERIFICATION_TSV)).get(method)
-    return [dict(r) for r in rows] if rows else None
 
 
 def _variant_key(v) -> str:

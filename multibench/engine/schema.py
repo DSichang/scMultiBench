@@ -415,7 +415,7 @@ class MethodSpec:
           ABSOLUTE path on the machine the benchmark was produced on (SPIRAL's
           and GPSA's working scripts are not published), so the script cannot
           be fetched and the method cannot run from a public install - whatever
-          ``status`` says about its verification there.
+          ``status`` says.
 
         Derived from the entrypoints (no hand-maintained flag): the rule is
         "any variant entrypoint is absolute". Stubs without variants are

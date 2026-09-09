@@ -117,11 +117,7 @@ def test_mira_block_is_declared_where_every_surface_reads_it():
     assert spec.env_spec["difficulty"] == "blocked-script"
     assert spec.variants[0].helpers == ["logger.py"]
     info = mtb.method_info("MIRA", verbose=True)
-    assert "logger.py" in info["setup_hint"] and "shim" in info["setup_hint"]
-    # the verification row IS real (D12, RUN_OK_NO_EMBEDDING) - the hint says how
-    ver = info["verification"]
-    assert ver and any(r["status"] == "RUN_OK_NO_EMBEDDING" for r in ver)
-    assert "RUN_OK_NO_EMBEDDING" in info["setup_hint"]
+    assert "logger.py" in info["setup_hint"]
     assert "setup_hint" in envs.DIFFICULTY["blocked-script"]
 
 

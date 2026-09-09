@@ -357,11 +357,10 @@ methods:
     tasks: [clustering]
     atac: peak
     status: verified
-    # `status: verified` is the benchmark host's run (files/final_verification.tsv:
-    # D12, RUN_OK_NO_EMBEDDING, verdict OK); it needed a local logger.py shim
-    # that upstream does not ship - hence env_specs' `blocked-script` tag and the
-    # `helpers` line below, which makes scan say so instead of failing at import.
-    setup_hint: "main_MIRA.py does `from logger import *` (line 9) but the public tools_scripts/MIRA/ holds only main_MIRA.py: from a fresh checkout the script ImportErrors at start. The benchmark host's verification run (D12, RUN_OK_NO_EMBEDDING) used a local logger.py shim beside the script; the env itself (scmb_mira: pip install mira-multiome scanpy) builds and runs fine. scan() reports the missing helper in files_reason; supply a logger.py next to main_MIRA.py to run it."
+    # main_MIRA.py needs a local logger.py that upstream does not ship - hence
+    # env_specs' `blocked-script` tag and the `helpers` line below, which makes
+    # scan say so instead of failing at import.
+    setup_hint: "main_MIRA.py does `from logger import *` (line 9) but the public tools_scripts/MIRA/ holds only main_MIRA.py: from a fresh checkout the script ImportErrors at start. The env itself (scmb_mira: pip install mira-multiome scanpy) builds and runs fine. scan() reports the missing helper in files_reason; supply a logger.py next to main_MIRA.py to run it."
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py

@@ -7,10 +7,9 @@ results back for the published figures. Reference material (scan, tunables,
 metric definitions, citations, coverage) sits at the end, where it is looked up
 rather than read through.
 
-Prose earns its place or it is cut: structured facts go in tables, every numeric
-claim is a measured value from the verification runs, and nothing is explained
-twice. The notebooks are regenerated from this file - never hand-edited - and
-executed on the benchmark host afterwards.
+Prose earns its place or it is cut: structured facts go in tables and nothing
+is explained twice. The notebooks are regenerated from this file - never
+hand-edited - and executed on the benchmark host afterwards.
 
 Colab / laptop budget: the install cell pins numpy and pandas to what the
 interpreter already has (pip never upgrades a host's stack), no cell
@@ -731,12 +730,10 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
 the run metadata - `availability` says whether a public install can run it
 (`'public'`, or `'benchmark-host-only'` for SPIRAL, the one method whose
 script is not published), `needs_labels` is the any-variant flag (`supports[i]` has it
-per variant), and `verbose=True` adds the long audit notes plus
-`verification`, the recorded end-to-end run(s) behind `status='verified'`
-(`{{dataset, category, status, wall_s, ARI, baseline, verdict, note}}`);
+per variant), and `verbose=True` adds the long audit notes;
 `mtb.cite` emits the benchmark entry plus one per method you ran.""")
     code(f'''info = mtb.method_info("{fastm}", verbose=True)
-{{k: info[k] for k in ("id", "env", "availability", "needs_labels", "atac", "notes", "repo_url", "version", "reference", "verification")}}''')
+{{k: info[k] for k in ("id", "env", "availability", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
     code(f'''print(mtb.cite({trio!r}))   # one line per entry; fmt="bibtex" for the .bib entries''')
     md("""### The metrics
 

@@ -1,9 +1,9 @@
 """engine/runtimes.yaml must never understate a run the package itself recorded.
 
 Five 1-second placeholders (scBridge and the four registration methods) once
-reported tier 'fast' while files/final_verification.tsv held 170-3729 s for
-the same runs; scan/recommend/run_all(timeout=) all surfaced them. The table
-is now the max over its three sources and these invariants pin it.
+reported tier 'fast' while 170-3729 s had been recorded for the same runs;
+scan/recommend/run_all(timeout=) all surfaced them. The table is now the max
+over its three sources and these invariants pin it.
 """
 import glob
 import math
@@ -13,7 +13,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import discover
 from multibench.discover import _runtimes
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,14 +26,14 @@ def _tier(sec):
     return "very_slow"
 
 
-def test_worst_sec_covers_verification_wall_s():
-    for m in mtb.list_methods():
-        rec = discover.verification_for(m)
-        if not rec:
+def test_worst_sec_covers_recorded_wall_s():
+    for m, rec in _runtimes().items():
+        wall = max((o["sec"] for o in rec["observed"] if o["source"] == "recorded"),
+                   default=None)
+        if wall is None:
             continue
-        wall = max(r["wall_s"] for r in rec if r["wall_s"] is not None)
         hint = mtb.method_info(m)["runtime"]
-        assert hint["worst_sec"] is not None, f"{m} is verified but reports tier 'unknown'"
+        assert hint["worst_sec"] is not None, f"{m} has a recorded run but reports tier 'unknown'"
         assert hint["worst_sec"] >= wall, (m, hint["worst_sec"], wall)
         # the exact placeholder failure: a sub-5 s claim against a longer record
         assert not (hint["worst_sec"] < 5 and wall > 5), m
@@ -47,7 +46,7 @@ def test_no_placeholder_observations_and_worst_is_max():
         assert min(secs) >= 5, (m, secs)
         assert rec["worst_sec"] == max(secs), m
         for o in rec["observed"]:
-            assert o["source"] in {"manual", "summary_csv", "verification"}, (m, o)
+            assert o["source"] in {"manual", "summary_csv", "recorded"}, (m, o)
 
 
 def test_tier_matches_worst_sec_and_docstring_thresholds():
@@ -84,7 +83,7 @@ def test_expected_tier_moves_after_regeneration():
         assert hint(m)["tier"] == "medium", m
     for m in ("PASTE2", "GPSA", "SPIRAL", "iPOLNG", "scMVP"):
         assert hint(m)["tier"] == "slow", m
-    assert hint("scBridge")["worst_sec"] == 964     # summary_D28.csv, not the 170 s verification
+    assert hint("scBridge")["worst_sec"] == 964     # summary_D28.csv, not the 170 s recorded run
     # keys of the public answer are unchanged; unmeasured methods stay 'unknown'
     assert set(hint("StabMap")) == {"tier", "worst_sec", "observed", "host", "note"}
     unmeasured = [m for m in mtb.list_methods() if m not in _runtimes()]
