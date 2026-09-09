@@ -399,10 +399,9 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     = ran, graph output scored via its UMAP; ``RUN_OK_NO_EMBEDDING`` = ran to
     completion but produces no embedding to score - Seurat_WNN, MIRA and the
     registration methods, so ``ARI`` is None), ``ARI`` the re-run's score,
-    ``baseline`` the benchmark's own figure for the same dataset and
-    ``verdict`` ``OK`` (reproduced) or ``DRIFT`` (ran, but the score moved
-    away from the baseline - the method is still ``verified`` in the wiring
-    sense; compare the two numbers before trusting either).
+    ``baseline`` the score recorded for the same method and dataset when it was
+    first run here, and ``verdict`` ``OK`` (the re-run is within tolerance of
+    it) or ``DRIFT`` (outside).
 
     See Also
     --------

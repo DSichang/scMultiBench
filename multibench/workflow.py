@@ -93,7 +93,7 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
 
     mtb.run_all : produces the folder this function reads.
 
-    mtb.data.fetch_outputs : downloads the benchmark's own run outputs in that layout.
+    mtb.data.fetch_outputs : downloads recorded run outputs in that layout.
     """
     d = Path(out_dir)
     with open(d / "batch_result.json") as fh:
