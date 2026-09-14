@@ -256,9 +256,13 @@ def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
         # scanpy has to say still surfaces.
         warnings.filterwarnings("ignore", message=".*igraph.*implementation of leiden.*",
                                 category=UserWarning)
-        # spell the backend out where scanpy understands it (>= 1.10; silences
-        # its future-default FutureWarning); an older scanpy forwards the
-        # unknown keyword to leidenalg's partition class (TypeError 'flavor')
+        # scanpy >= 1.11 says it on EVERY leidenalg call, explicit flavor or
+        # not, as a FutureWarning about the future default backend
+        warnings.filterwarnings("ignore", message=".*default backend for leiden will be igraph.*",
+                                category=FutureWarning)
+        # spell the backend out where scanpy understands it (>= 1.10); an
+        # older scanpy forwards the unknown keyword to leidenalg's partition
+        # class (TypeError 'flavor')
         kw = {"flavor": "leidenalg"} if _scanpy_has_flavor_kw() else {}
         sc.tl.leiden(adata, resolution=resolution, key_added=key_added, **kw)
 
