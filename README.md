@@ -7,7 +7,7 @@
 Multitask benchmarking of single-cell multimodal omics integration methods,
 with `multibench` - a typed Python API that runs the benchmark's 40 integration
 methods across four scenarios (vertical, diagonal, mosaic, cross), scores them
-with scIB metrics, and draws the paper's figures.
+with scIB metrics, and draws scIB-style bubble tables.
 
 **Documentation and tutorials:** <https://dsichang.github.io/scMultiBench/>
 
@@ -18,7 +18,7 @@ pip install multibench-sc          # the API (import name: multibench) - a 1.3 M
                                    # registry, the stored result tables, the env lockfiles and the references
 ```
 
-That is the whole install; the tutorials and the stored benchmark tables need
+That is the whole install; the tutorials and the stored result tables need
 no clone. Clone only to work on the package itself (edit the notebooks, run
 the test suite): `git clone https://github.com/DSichang/scMultiBench.git &&
 cd scMultiBench && pip install -e .`
@@ -95,9 +95,9 @@ multibench cite Matilda MOFA2                          # BibTeX for the benchmar
 
 The [Colab quickstart](https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb)
 installs the API (pinning `numpy` / `pandas` to what Colab already has, so
-nothing is upgraded), explores the registry, and reproduces the benchmark
-figures from the shipped result tables - entirely in the browser, in about a
-minute; its last cell says where the time went. Each category tutorial opens
+nothing is upgraded), explores the registry, and draws the bubble tables
+from the result tables shipped with the package - entirely in the browser, in
+about a minute; its last cell says where the time went. Each category tutorial opens
 in Colab too: with its `INSTALL_ENVS` flag left `False` nothing is downloaded
 and the run cells stand in the benchmark host's own `run_all` outputs (real
 embeddings, so `evaluate` and the figures are real); set it `True` to
