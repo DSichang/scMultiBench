@@ -2,13 +2,15 @@
 
 Two sources ship with the package (``multibench/result/``):
 
-* ``published`` - the benchmark's own scIB metric tables, one
+* ``published`` - scIB metric tables, one
   ``<category>/<dataset>/<method>/metric*.csv`` per run
-  (``result/scib_metric/``; mosaic has none). A few cross runs keep the
-  table one level deeper, in a run-configuration subfolder
-  (``D56/MOFA2/filtered3/metric.csv``, ``D56/MOFA2/kmeans/metric_kmeans.csv``,
-  ``D53/MOFA2/8000HVG/metric.csv``); those are read too (``kbet/`` folders,
-  which hold raw kBET output, are not metric tables and are skipped);
+  (``result/scib_metric/``; the package ships them for the demo datasets
+  vertical D11, diagonal D24/D25/D28 and cross D52; mosaic has none). A
+  table kept one level deeper, in a run-configuration subfolder
+  (``<dataset>/MOFA2/filtered3/metric.csv``,
+  ``<dataset>/MOFA2/kmeans/metric_kmeans.csv``), is read too (``kbet/``
+  folders, which hold raw kBET output, are not metric tables and are
+  skipped);
 * ``rerun`` - the package's re-run sweeps behind the tutorial figures
   (``result/rerun/long_all_<dataset>.csv``; D11/D11s, D28/D28s, D45/D45s,
   D52/D52s). The files are stamped ``rerun-<package version that produced
@@ -158,6 +160,11 @@ def _base_path(result_path) -> Path:
     return Path(result_path) if result_path is not None else config.DEFAULT.result_path
 
 
+#: appended to every "no table for <dataset>" error: the escape hatch for a
+#: results tree of the user's own
+_RESULT_PATH_HINT = " (pass result_path= for another results root)"
+
+
 def _published_missing_msg(root: Path, base: Path, category: str) -> str:
     return (
         f"no published scIB metric tables under {root}. The tables ship inside "
@@ -270,7 +277,8 @@ def _load_published(category: str, datasets: list | None, clustering: str,
             raise FileNotFoundError(
                 f"no published {_CLUSTERING_FILES[clustering]} for "
                 f"{category}/{datasets if len(datasets) > 1 else datasets[0]} "
-                f"under {root}; datasets with published tables: {have}")
+                f"under {root}{_RESULT_PATH_HINT}; datasets with published "
+                f"tables: {have}")
         raise FileNotFoundError(
             f"no {_CLUSTERING_FILES[clustering]} found under {root} "
             f"(clustering={clustering!r})")
@@ -331,8 +339,8 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
         pairs = [f"{c}/{d}" for c, d in avail.itertuples(index=False)]
         raise FileNotFoundError(
             f"no re-run sweep for {category or 'any category'}/"
-            f"{(datasets if len(datasets) > 1 else datasets[0]) if datasets else 'any dataset'}; "
-            f"available: {pairs}")
+            f"{(datasets if len(datasets) > 1 else datasets[0]) if datasets else 'any dataset'}"
+            f"{_RESULT_PATH_HINT}; available: {pairs}")
     out = pd.concat(frames, ignore_index=True)
     out.attrs["rerun_version"] = _version_attr(versions)
     return out
@@ -571,9 +579,9 @@ def load_results(
         loaded tables gives an EMPTY frame and a ``UserWarning`` (a typo is
         not an error there - concatenating several calls would otherwise
         break); under the default ``source="published"`` the warning also
-        says whether the re-run sweeps hold that method (``"rerun has 2
-        dataset(s) - pass source='rerun'"``), because the published tables
-        are partial (vertical: 7 of 18 methods). (``method=`` is the
+        says whether the re-run sweeps hold that method (``"rerun has 1
+        dataset(s) - pass source='rerun'"``), because a published table need
+        not score every method wired for its category. (``method=`` is the
         deprecated 0.2.x spelling.)
     metrics : None, str or list of str, keyword-only
         Which metrics to keep - the same vocabulary as
@@ -648,7 +656,8 @@ def load_results(
     ------
     FileNotFoundError
         No table for the requested category/dataset/source (any element of a
-        ``dataset`` list), with the path looked at and what IS available.
+        ``dataset`` list), with the path looked at, the datasets that DO
+        have tables and the ``result_path=`` escape hatch.
     KeyError
         An unknown method name in ``methods`` (did-you-mean hint).
     ValueError
@@ -749,8 +758,8 @@ def load_results(
                 avail = _list_datasets(category, base, source, clustering)
                 raise FileNotFoundError(
                     f"no {source} results for {category or 'any category'}/"
-                    f"{missing if len(missing) > 1 else missing[0]}; datasets with "
-                    f"{source} tables: {avail}")
+                    f"{missing if len(missing) > 1 else missing[0]}{_RESULT_PATH_HINT}; "
+                    f"datasets with {source} tables: {avail}")
         if source != "both":
             # a one-method table ranks nothing; say so when the OTHER source
             # would have given the user a real table for the same selection
@@ -941,11 +950,7 @@ def fetchable() -> list[str]:
     """Dataset ids :func:`multibench.data.fetch` can download.
 
     The companion of :func:`available_datasets`, which lists the ids that
-    ship STORED RESULTS: the two vocabularies overlap but are not the same
-    (``D12`` has published metric tables and no downloadable file; ``D46``
-    downloads and has no stored table). Read
-    from the fetcher's own asset table, so it cannot drift from what
-    ``fetch()`` accepts.
+    ship STORED RESULTS; the two vocabularies overlap but are not the same.
 
     Returns
     -------
@@ -956,7 +961,12 @@ def fetchable() -> list[str]:
     --------
     >>> mtb.data.results.fetchable()
     ['D11', 'D28', 'D45', 'D46', 'D52']
-    >>> set(mtb.data.results.fetchable()) <= set(mtb.available_datasets(source="both"))
+
+    Notes
+    -----
+    ``D24`` has published metric tables and no downloadable file, ``D46``
+    downloads and has no stored table; the list is read from the fetcher's
+    own asset table, so it always agrees with what ``fetch()`` accepts.
     """
     from .fetch import AVAILABLE
     return sorted(AVAILABLE, key=catalog._dataset_sort_key)
@@ -1076,41 +1086,9 @@ def recommend(
 ) -> pd.DataFrame:
     """Rank methods for a category from stored results, with coverage made explicit.
 
-    The score is the benchmark's own rule applied per dataset
-    (``overall="mean_overall"`` in :mod:`multibench.plot.style`: min-max
-    scaled mean of per-metric max-ranks within each dataset, then averaged
-    over the datasets the method was run on). Five honesty rules apply:
-
-    * only methods this package runs for the category are ranked - the set
-      ``mtb.list_methods(category=...)`` lists. The published cross table
-      also scores MOFA2 and Multigrate, which the package wires for other
-      categories only; such rows are dropped before ranking (they would
-      otherwise shape every other method's within-dataset rank) and named
-      in the warning (``"also scored in the published table but not run by
-      this package for cross: MOFA2, Multigrate"``) and in
-      ``frame.attrs["dropped_methods"]``. A name the registry does not know
-      at all (your own method in ``long_df``) is kept;
-    * a dataset holding fewer than ``min_methods`` methods is DROPPED - the
-      min-max of a single method is 1.0 by construction, so a lone method
-      would "win" such a dataset with authority it never earned;
-    * the returned ``n_datasets`` / ``n_datasets_total`` / ``coverage``
-      columns say how much of the matrix each score rests on;
-    * every method wired for the category (and ``modalities``) that has NO
-      rows in the chosen source is still listed - appended after the scored
-      rows with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0 -
-      so "not ranked" is never mistaken for "ranked last" (the published
-      tables are partial: vertical rna+adt scores 7 of 14 methods; the re-run
-      sweeps cover more - ``source="rerun"``). Their ids are also in
-      ``frame.attrs["not_scored"]``;
-    * registration methods (``output_kind == "coords"``: GPSA, PASTE,
-      PASTE2, SPIRAL in cross) produce aligned coordinates, not an
-      embedding, so no scIB metric applies and they are NOT rows of the
-      table; the warning names them with that reason and
-      ``frame.attrs["unranked_registration"]`` lists them.
-
-    One ``UserWarning`` with one line per finding summarises dropped
-    methods and datasets, partial coverage, the unscored methods and the
-    unranked registration methods.
+    The score is the benchmark's own rule applied per dataset and averaged
+    over the datasets a method was run on; five honesty rules (Notes) keep a
+    thin table from looking like a verdict.
 
     Parameters
     ----------
@@ -1146,9 +1124,8 @@ def recommend(
         Datasets with fewer methods than this are dropped (default 2).
     source : {"published", "rerun", "both"}, keyword-only
         Which stored tables to load when ``long_df`` is not given (default
-        ``"published"``; the published tables are PARTIAL - see above - and
-        ``"both"`` averages the 34 method/dataset/metric triples present in
-        both sources).
+        ``"published"``; ``"both"`` averages the method/dataset/metric
+        triples present in both sources).
     result_path : path-like, keyword-only
         Results root (see :func:`load_results`).
 
@@ -1172,7 +1149,9 @@ def recommend(
     Raises
     ------
     ValueError
-        No dataset has ``min_methods`` methods (nothing can be ranked), the
+        No dataset has ``min_methods`` methods (nothing can be ranked; when
+        the other stored source holds more methods for the category the
+        message says so - cross/D52: ``pass source='rerun'``), the
         frame has none of the requested metrics (the message lists the
         metrics it does have), every row belongs to a method the package
         does not run for the category, ``methods=`` leaves no rows, or an
@@ -1188,6 +1167,43 @@ def recommend(
     >>> r[r.grand_score.notna()]                    # the scored rows
     >>> r.attrs["not_scored"]                       # wired but no published rows
     >>> mtb.recommend("diagonal", metrics="batch", source="rerun")[["method", "grand_score", "coverage"]]
+
+    Notes
+    -----
+    The score is ``overall="mean_overall"`` of :mod:`multibench.plot.style`:
+    the min-max scaled mean of per-metric max-ranks within each dataset,
+    then averaged over the datasets the method was run on. The five rules:
+
+    * only methods this package runs for the category are ranked - the set
+      ``mtb.list_methods(category=...)`` lists. A cross table may also
+      score MOFA2 and Multigrate, which the package wires for other
+      categories only; such rows are dropped before ranking (they would
+      otherwise shape every other method's within-dataset rank) and named
+      in the warning (``"also scored in the published table but not run by
+      this package for cross: MOFA2, Multigrate"``) and in
+      ``frame.attrs["dropped_methods"]``. A name the registry does not know
+      at all (your own method in ``long_df``) is kept;
+    * a dataset holding fewer than ``min_methods`` methods is DROPPED - the
+      min-max of a single method is 1.0 by construction, so a lone method
+      would "win" such a dataset with authority it never earned;
+    * the returned ``n_datasets`` / ``n_datasets_total`` / ``coverage``
+      columns say how much of the matrix each score rests on;
+    * every method wired for the category (and ``modalities``) that has NO
+      rows in the chosen source is still listed - appended after the scored
+      rows with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0 -
+      so "not ranked" is never mistaken for "ranked last" (a published table
+      need not score every method wired for its category; the re-run sweeps
+      may cover more - ``source="rerun"``). Their ids are also in
+      ``frame.attrs["not_scored"]``;
+    * registration methods (``output_kind == "coords"``: GPSA, PASTE,
+      PASTE2, SPIRAL in cross) produce aligned coordinates, not an
+      embedding, so no scIB metric applies and they are NOT rows of the
+      table; the warning names them with that reason and
+      ``frame.attrs["unranked_registration"]`` lists them.
+
+    One ``UserWarning`` with one line per finding summarises dropped
+    methods and datasets, partial coverage, the unscored methods and the
+    unranked registration methods.
     """
     from ..plot import style
 
@@ -1254,11 +1270,23 @@ def recommend(
     degenerate = sorted(ds for ds, mat in parts.items() if len(mat.index) < min_methods)
     kept = {ds: mat for ds, mat in parts.items() if ds not in degenerate}
     if not kept:
+        hint = ""
+        if long_df_was_none and source != "both":
+            # the OTHER stored source may hold a real table for the category
+            # (cross: one published method for D52, eight re-run ones)
+            other = "rerun" if source == "published" else "published"
+            have = _other_source_methods(source, [category], None, "default",
+                                         _base_path(result_path))
+            if len(have) >= min_methods:
+                hint = (f" The {other} tables hold {len(have)} methods for {category} "
+                        f"({', '.join(sorted(have, key=str.lower))}): pass "
+                        f"source={other!r} (or 'both').")
         raise ValueError(
             f"no dataset in {category} holds >= {min_methods} methods "
             f"({len(parts)} dataset(s): {sorted(parts)}); a ranking over "
             f"single-method datasets is meaningless (min-max of one value is "
-            f"1.0). Pass long_df= with more methods, or lower min_methods.")
+            f"1.0).{hint} Otherwise pass long_df= with more methods, or lower "
+            f"min_methods.")
     per_ds = pd.DataFrame({ds: style.compute_overall(mat) for ds, mat in kept.items()})
     grand = per_ds.mean(axis=1)
     n_ds = per_ds.notna().sum(axis=1)
