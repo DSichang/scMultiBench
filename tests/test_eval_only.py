@@ -67,7 +67,7 @@ def test_best_order_still_returns_the_full_metric_set():
     assert {"ARI", "NMI", "ASW", "iASW", "iF1"} <= set(val.index), sorted(val.index)
 
 
-def test_shared_sweep_reproduces_the_standard_protocol_ari():
+def test_shared_sweep_gives_the_standard_protocol_ari():
     """The screening ARI must equal what a self-contained evaluation computes.
 
     Candidates are now ranked against ONE shared Leiden sweep instead of one

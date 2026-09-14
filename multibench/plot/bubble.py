@@ -283,7 +283,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     overall : {"rank", "mean_overall"}, keyword-only
         Formula for the per-family Overall under ``aggregate="summary"``
         (the two formulas are spelled out under ``mtb.plot.bubble``).
-        Default ``"rank"`` reproduces the paper; ``"mean_overall"`` is what
+        Default ``"rank"`` is the paper's panel rule; ``"mean_overall"`` is what
         ``mtb.plot.bar`` uses by default.
     na : {"warn", "skip", "raise"}, keyword-only
         What to do when a method has ``n/a`` cells (see Notes). ``"warn"``

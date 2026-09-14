@@ -1293,8 +1293,9 @@ def build_parser() -> argparse.ArgumentParser:
                                       "selects the stored table(s), with --input "
                                       "filters the frame")
     pp.add_argument("--source", choices=["published", "rerun"], default="published",
-                    help="stored table to load: published (the paper's numbers, "
-                         "default) or rerun (the package's own re-execution)")
+                    help="stored table to load: published (the scIB tables shipped "
+                         "with the package, default) or rerun (the package's re-run "
+                         "sweeps)")
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
                     help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "

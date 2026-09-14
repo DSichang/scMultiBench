@@ -404,8 +404,8 @@ def datasets(files_dir: Path | str | None = None, *,
           The rows are the union of ``dataset.csv`` and every id that has
           stored results (:func:`multibench.available_datasets` with
           ``source="both"``), so ``D11s``/``D28s``/``D45s``/``D52s`` (the
-          re-run subsamples) and ``SD7``-``SD10``/``D24`` (published tables
-          only) are listed even though the paper table does not name them;
+          re-run subsamples) and ``D24`` (published tables only) are listed
+          even though the paper table does not name them;
           ids missing from the CSV are appended after it, in natural order;
         * ``simulated`` - ``bool``, ids starting with ``SD``;
         * ``category`` - the integration category whose stored results
@@ -428,8 +428,8 @@ def datasets(files_dir: Path | str | None = None, *,
 
     # result-tree-derived columns: filled at call time, so the table can never
     # list fewer datasets than load_results can serve. Ids that ship results
-    # but are not in dataset.csv (the re-run subsampled D11s/D28s/D45s/D52s, the
-    # simulated SD7-SD10, D24) are APPENDED with the paper columns empty.
+    # but are not in dataset.csv (the re-run subsampled D11s/D28s/D45s/D52s,
+    # D24) are APPENDED with the paper columns empty.
     from . import results as _results
     cat_of: dict[str, list[str]] = {}
     for cat in ("cross", "diagonal", "mosaic", "vertical"):

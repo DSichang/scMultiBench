@@ -110,7 +110,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     Examples
     --------
     >>> import multibench as mtb
-    >>> df = mtb.load_results("vertical")            # every dataset of the category
+    >>> df = mtb.load_results("vertical")            # every dataset with a table in the category
     >>> fig = mtb.plot.bar(df, group="clustering", top=10, save="clustering.png")
     >>> fig = mtb.plot.bar(df, group="batch")
     >>> fig = mtb.plot.bar(df, overall="rank")       # orders like bubble(aggregate="summary")
