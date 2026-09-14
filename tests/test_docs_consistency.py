@@ -158,18 +158,61 @@ def test_evaluate_has_no_return_clustering_kwarg():
         mtb.evaluate(emb, labels=["a"] * 5 + ["b"] * 5, return_clustering=True)
 
 
-def test_clustering_variants_ship_per_category_as_documented():
-    """plot.md: diagonal ships louvain/kmeans for all 18 datasets; cross ships
-    them for D56 only (MOFA2's nested filtered3/metric_louvain.csv and
-    kmeans/metric_kmeans.csv, readable since the nested-layout loader)."""
+def _variant_files(root):
+    """``{category: {variant: {dataset ids}}}`` of the ``metric_<variant>.csv``
+    files under ``<root>/scib_metric`` - next to ``metric.csv`` or one level
+    down in a run-configuration folder - for every category folder present."""
+    out = {}
+    for cat_dir in sorted(p for p in (Path(root) / "scib_metric").iterdir() if p.is_dir()):
+        out[cat_dir.name.split()[0]] = {
+            variant: {f.parents[1].name for f in cat_dir.glob(f"*/*/metric_{variant}.csv")}
+                     | {f.parents[2].name for f in cat_dir.glob(f"*/*/*/metric_{variant}.csv")}
+            for variant in ("louvain", "kmeans")}
+    return out
+
+
+def test_clustering_variants_ship_per_category_as_documented(tmp_path):
+    """plot.md's "Which variants ship, per category" note follows the shipped
+    tree: each louvain / kmeans variant loads for exactly the datasets whose
+    ``metric_<variant>.csv`` ships (with the same methods as the default
+    table), a category without the file raises ``FileNotFoundError`` naming
+    it, and the note names exactly those dataset ids. The nested
+    run-configuration layout (``<method>/<config>/metric_louvain.csv``,
+    ``<method>/kmeans/metric_kmeans.csv``) is exercised on a synthetic tree."""
     import multibench as mtb
-    assert mtb.load_results("diagonal", clustering="louvain").dataset.nunique() == 18
-    assert mtb.load_results("diagonal", clustering="kmeans").dataset.nunique() == 18
+    shipped = _variant_files(mtb.config.DEFAULT.result_path)
+    hit = set()
+    for cat, variants in shipped.items():
+        for variant, datasets in variants.items():
+            if datasets:
+                df = mtb.load_results(cat, clustering=variant)
+                assert set(df.dataset) == datasets and set(df.clustering) == {variant}
+                default = mtb.load_results(cat, dataset=sorted(datasets))
+                assert set(df.method) == set(default.method)
+                hit.add("loaded")
+            else:
+                with pytest.raises(FileNotFoundError, match=f"metric_{variant}.csv"):
+                    mtb.load_results(cat, clustering=variant)
+                hit.add("raised")
+    assert hit == {"loaded", "raised"}, f"the shipped tree exercises only {hit}: {shipped}"
+    # the nested layout, on a synthetic cross tree: one method, one dataset
+    tree = tmp_path / "scib_metric" / "cross integration" / "D56" / "MOFA2"
+    for sub, name in (("filtered3", "metric.csv"), ("filtered3", "metric_louvain.csv"),
+                      ("kmeans", "metric_kmeans.csv")):
+        (tree / sub).mkdir(parents=True, exist_ok=True)
+        (tree / sub / name).write_text(",Value\nARI,0.3\nNMI,0.5\n")
+    assert _variant_files(tmp_path) == {"cross": {"louvain": {"D56"}, "kmeans": {"D56"}}}
     for variant in ("louvain", "kmeans"):
-        cross = mtb.load_results("cross", clustering=variant)
-        assert set(cross.dataset) == {"D56"} and set(cross.method) == {"MOFA2"}
-    with pytest.raises(FileNotFoundError):
-        mtb.load_results("vertical", clustering="kmeans")
+        nested = mtb.load_results("cross", clustering=variant, result_path=tmp_path)
+        assert set(nested.dataset) == {"D56"} and set(nested.method) == {"MOFA2"}
+        assert set(nested.clustering) == {variant}
+    # the docs note names exactly the ids that ship a variant, and no other
+    documented = {ds for variants in shipped.values() for ids in variants.values() for ds in ids}
+    for path in _docs_md_files():
+        if path.name == "plot.md" and path.parent.name == "tutorials":
+            marker = '!!! note "Which variants ship, per category"'
+            note = path.read_text().split(marker, 1)[1].split("\n\n", 1)[0]
+            assert set(re.findall(r"`(D\d+s?)`", note)) == documented, note
 
 
 # ---- phrases wave 4 retired (ordered labels_for dict, per-variant scan text,

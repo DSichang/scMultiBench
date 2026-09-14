@@ -3,7 +3,7 @@ and the Colab quickstart.
 
 Order follows what a reader actually does: install, run the analysis and get a
 figure, run the same three calls on their own data, and only then read stored
-results back for the published figures. Reference material (scan, tunables,
+results back for the figures. Reference material (scan, tunables,
 metric definitions, citations, coverage) sits at the end, where it is looked up
 rather than read through.
 
@@ -58,19 +58,19 @@ def stand_in(cat, dataset, methods):
 
 def published_note(cat, dataset):
     """One measured sentence on why every ``load_results`` call in a tutorial
-    names its ``source``: the paper's table for the reference dataset vs the
-    package's own sweep, counted from ``results_coverage`` at generation time."""
+    names its ``source``: the ``published`` table for the reference dataset vs
+    the package's own sweep, counted from ``results_coverage`` at generation time."""
     import multibench as mtb
     cov = mtb.results_coverage(cat)
     cov = cov[cov.dataset == dataset]
     n_pub = cov[cov.source == "published"].method.nunique()
     n_rerun = cov[cov.source.str.startswith("rerun")].method.nunique()
     if n_pub == 0:
-        return (f"The paper has no scIB tables for {cat} (`source=\"published\"` "
-                f"raises `FileNotFoundError` pointing at `\"rerun\"`), so the "
+        return (f"There are no scIB tables for {cat} under `source=\"published\"` "
+                f"(it raises `FileNotFoundError` pointing at `\"rerun\"`), so the "
                 f"package's sweep ({n_rerun} methods on `{dataset}`) is this "
                 f"category's only stored source.")
-    return (f"The paper's table for `{dataset}` holds {n_pub} method"
+    return (f"The `published` table for `{dataset}` holds {n_pub} method"
             f"{'s' if n_pub != 1 else ''} against {n_rerun} in the package's "
             f"sweep, so the default `source=\"published\"` would show "
             f"{n_pub} - every call in this notebook names its source.")
@@ -415,9 +415,8 @@ def build_tutorial(cat, s):
 
 {s['blurb']}
 
-**Reference dataset:** `{s['ds']}` ({s['cells']} cells). The stored results
-shipped with these notebooks were produced on it, so every table here
-reproduces.""")
+**Reference dataset:** `{s['ds']}` ({s['cells']} cells); the tables shipped
+with the package for this category were produced on it.""")
 
     # ---------------------------------------------------------------- install
     trio = s["own_trio"]
@@ -518,8 +517,8 @@ downloads the tree `run_all` wrote there (summary, long table and one
 embedding per method) and `mtb.load_batch(..., methods=)` reloads it, so the
 statuses, run times and the evaluate cell below are real. Offline, or before
 those outputs are published, a second fallback stands in {si_what}
-(`load_results(source="rerun")`, the package's re-execution of every wired
-method - the paper's own tables are `source="published"`); either way one
+(`load_results(source="rerun")`, the package's own sweep of every wired
+method); either way one
 printed line says which path was taken and every cell below still renders.""")
     code(f'''{STORED_SWEEP_FN}
 
@@ -647,9 +646,9 @@ and these same three calls do the rest.""")
         len(trio), f"{len(trio)} methods")
     md(f"""## 4. Reading stored results
 
-Section 2 ran {n_word}; the package ships the **full sweep** for `{ds}` -
-every wired method at default settings, hours of compute - so the paper's
-figures reproduce from stored results in seconds. `load_results` reads them
+Section 2 ran {n_word}; the package ships its own sweep of `{ds}` - every
+wired method at default settings - so the whole category's bubble table draws
+from stored results in seconds. `load_results` reads them
 back as the tidy frame `mtb.plot.bubble` takes, and every row says in its
 `source` column which sweep it came from. {published_note(cat, ds)}""")
     code(f'''long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")
@@ -678,10 +677,9 @@ over the grand ranks. {batch_note}""")
 print(pair.groupby("dataset").method.nunique().to_dict())
 mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
                 title=f"Summary of 2 {cat} datasets")''')
-    md(f"""**Published vs re-run.** The paper's own tables (`source="published"`)
-and the package's re-runs can differ for a method - methods are stochastic and
-the published sweep ran on other hardware - so cite the published numbers and
-use the re-runs to check reproducibility; compare ranks, not decimals.
+    md("""**Two stored sources.** `source="published"` and `source="rerun"` can hold
+different methods for this dataset, and where both hold a method the numbers
+differ (methods are stochastic) - compare ranks, not decimals.
 `results_coverage` says what exists for this dataset and where it came from:""")
     code('''cov = mtb.results_coverage(CATEGORY)
 cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
@@ -842,8 +840,9 @@ def build_colab_quickstart():
     md("""# scMultiBench API quickstart (Colab)
 
 This notebook runs **entirely in Colab**: it installs the `multibench` API,
-explores the method registry, loads the shipped benchmark results, and draws
-the standard figures - `pip install multibench-sc` is the whole install (the
+explores the method registry, loads the result tables shipped with the
+package, and draws the bubble tables - `pip install multibench-sc` is the
+whole install (the
 wheel ships the registry, the stored tables and the references; the cell
 pins `numpy` / `pandas` to the versions Colab already has, so nothing is
 upgraded, and defines `tick`, the recorder behind the timing table at the
@@ -875,11 +874,11 @@ per method.""")
 {k: info[k] for k in ("id", "language", "env", "availability", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
     code("""print(mtb.cite(["Matilda"]))   # one line per entry; fmt="bibtex" for the .bib entries""")
-    md("""## Load shipped results and draw the standard figures
+    md("""## Load the shipped tables and draw the figures
 
-The package ships the paper's tables (`source="published"`) and its own
-re-run sweeps (`source="rerun"`), one long table per dataset - so the figures
-reproduce here without running anything.""")
+The package ships result tables for the demo datasets - scIB tables
+(`source="published"`) and its own re-run sweeps (`source="rerun"`) - so the
+figures draw here without running anything.""")
     code("""long = mtb.load_results("vertical", dataset="D11", source="rerun")
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
