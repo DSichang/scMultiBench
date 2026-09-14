@@ -2,26 +2,26 @@ from multibench.data import results
 
 
 def test_load_results_returns_tidy_long_frame(result_dir):
-    df = results.load_results(category="diagonal", dataset="D27", result_path=result_dir)
+    df = results.load_results(category="diagonal", dataset="D28", result_path=result_dir)
     assert set(["metric", "value", "method", "dataset", "category"]).issubset(df.columns)
     assert (df["category"] == "diagonal").all()
-    assert (df["dataset"] == "D27").all()
+    assert (df["dataset"] == "D28").all()
 
 
 def test_known_value_matches_disk(result_dir):
-    df = results.load_results(category="diagonal", dataset="D27", result_path=result_dir)
+    df = results.load_results(category="diagonal", dataset="D28", result_path=result_dir)
     row = df[(df["method"] == "scBridge") & (df["metric"] == "ARI")]
     assert len(row) == 1
-    assert abs(float(row["value"].iloc[0]) - 0.84374879) < 1e-6
+    assert abs(float(row["value"].iloc[0]) - 0.61240856) < 1e-6
 
 
 def test_clustering_variant_changes_values(result_dir):
-    default = results.load_results(category="diagonal", dataset="D27",
+    default = results.load_results(category="diagonal", dataset="D28",
                                    clustering="default", result_path=result_dir)
-    louvain = results.load_results(category="diagonal", dataset="D27",
+    louvain = results.load_results(category="diagonal", dataset="D28",
                                    clustering="louvain", result_path=result_dir)
-    # ASW genuinely differs between default (corrected ~0.8478) and louvain
-    # (~0.8481): louvain must reflect its own file, not the default correction.
+    # ASW genuinely differs between default (corrected ~0.6973) and louvain
+    # (~0.7014): louvain must reflect its own file, not the default correction.
     d = float(default[(default.method == "scBridge") & (default.metric == "ASW")]["value"].iloc[0])
     lo = float(louvain[(louvain.method == "scBridge") & (louvain.metric == "ASW")]["value"].iloc[0])
     assert abs(lo - d) > 1e-6
@@ -32,7 +32,7 @@ def test_clustering_variant_changes_values(result_dir):
 
 
 def test_metric_filter(result_dir):
-    df = results.load_results(category="diagonal", dataset="D27",
+    df = results.load_results(category="diagonal", dataset="D28",
                               metrics=["ARI", "NMI"], result_path=result_dir)
     assert set(df["metric"].unique()) <= {"ARI", "NMI"}
 
@@ -88,12 +88,13 @@ def test_source_both_concat(result_dir):
     assert isinstance(mtb.plot.bubble(rr), Figure)
 
 
-def test_suffix_dir_splits_method_and_clustering(result_dir):
+def test_suffix_dir_splits_method_and_clustering(result_dir, layout_tree):
+    # vertical/D3 of the layout tree holds a Concerto_louvain directory
     lo = results.load_results("vertical", dataset="D3", clustering="louvain",
-                              result_path=result_dir)
+                              result_path=layout_tree)
     assert "Concerto" in set(lo.method)
     assert (lo[lo.method == "Concerto"].clustering == "louvain").all()
-    default = results.load_results("vertical", dataset="D3", result_path=result_dir)
+    default = results.load_results("vertical", dataset="D3", result_path=layout_tree)
     assert not any("_louvain" in m for m in default.method.unique())
     assert "Concerto" not in set(default.method)   # the dir IS the louvain variant
     for cat in ("vertical", "diagonal", "cross"):
@@ -125,10 +126,10 @@ def test_zero_row_filter_warns(result_dir):
 
 
 def test_methods_filter_accepts_list_and_aliases(result_dir):
-    df = results.load_results("diagonal", dataset="D27", methods=["scbridge", "Seurat v3"],
+    df = results.load_results("diagonal", dataset="D28", methods=["scbridge", "Seurat v3"],
                               result_path=result_dir)
     assert set(df.method) == {"scBridge", "Seurat_v3"}
-    df2 = results.load_results("diagonal", dataset="D27", methods="scBridge",
+    df2 = results.load_results("diagonal", dataset="D28", methods="scBridge",
                                result_path=result_dir)
     assert set(df2.method) == {"scBridge"}
 
@@ -203,12 +204,17 @@ def test_category_none_unions_everything(result_dir):
 
 
 def test_dataset_list_and_unknown_dataset(result_dir):
-    df = results.load_results("diagonal", dataset=["D27", "D28"], result_path=result_dir)
-    assert set(df.dataset) == {"D27", "D28"}
-    with pytest.raises(FileNotFoundError, match="D999"):
+    df = results.load_results("diagonal", dataset=["D24", "D28"], result_path=result_dir)
+    assert set(df.dataset) == {"D24", "D28"}
+    # an unknown id: the error names the datasets that DO have tables and the
+    # result_path= escape hatch, for either source
+    with pytest.raises(FileNotFoundError, match="D999") as e:
         results.load_results("diagonal", dataset="D999", result_path=result_dir)
-    with pytest.raises(FileNotFoundError, match="no re-run sweep"):
+    assert "datasets with published tables: ['D24', 'D25', 'D28']" in str(e.value)
+    assert "(pass result_path= for another results root)" in str(e.value)
+    with pytest.raises(FileNotFoundError, match="no re-run sweep") as e:
         results.load_results("diagonal", dataset="D999", source="rerun", result_path=result_dir)
+    assert "result_path=" in str(e.value) and "diagonal/D28" in str(e.value)
 
 
 # ---------------------------------------------------------------------------
@@ -260,15 +266,15 @@ def test_load_long_csv_fills_nan_provenance(tmp_path):
 
 
 def test_dataset_list_validates_every_element(result_dir):
-    with pytest.raises(FileNotFoundError, match=r"no published results for diagonal/D99;") as e:
-        results.load_results("diagonal", dataset=["D27", "D99"], result_path=result_dir)
+    with pytest.raises(FileNotFoundError, match=r"no published results for diagonal/D99 \(pass result_path= for another results root\);") as e:
+        results.load_results("diagonal", dataset=["D24", "D99"], result_path=result_dir)
     assert "datasets with published tables: ['D24'" in str(e.value)
     with pytest.raises(FileNotFoundError, match=r"no rerun results for diagonal/\['D98', 'D99'\]"):
         _quiet_rerun("diagonal", dataset=["D28", "D98", "D99"], source="rerun",
                      result_path=result_dir)
-    # source='both': an id present in ONE source is fine (D27 is published-only)
-    both = _quiet_rerun("diagonal", dataset=["D27", "D28"], source="both", result_path=result_dir)
-    assert set(both.dataset) == {"D27", "D28"}
+    # source='both': an id present in ONE source is fine (D24 is published-only)
+    both = _quiet_rerun("diagonal", dataset=["D24", "D28"], source="both", result_path=result_dir)
+    assert set(both.dataset) == {"D24", "D28"}
     # category=None: the union across categories must cover every id
     df = results.load_results(dataset=["D11", "D28"], result_path=result_dir)
     assert set(df.dataset) == {"D11", "D28"}
@@ -317,17 +323,27 @@ def test_degenerate_rerun_rows_are_flagged(result_dir):
         mtb.recommend("diagonal", source="rerun", result_path=result_dir)
 
 
-def test_catalog_datasets_covers_every_dataset_with_results(result_dir):
+def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_tree, monkeypatch):
     cat = mtb.catalog.datasets()
     have = set(mtb.available_datasets(source="both", result_path=result_dir))
     assert have <= set(cat.dataset)
-    extra = cat[cat.dataset.isin({"D11s", "D24", "D28s", "D45s", "D52s", "SD7", "SD8", "SD9", "SD10"})]
-    assert len(extra) == 9 and extra.has_results.all()
+    extra = cat[cat.dataset.isin({"D11s", "D24", "D28s", "D45s", "D52s"})]
+    assert len(extra) == 5 and extra.has_results.all()
     assert extra.set_index("dataset").loc["D11s", "category"] == "vertical"
-    assert extra.set_index("dataset").loc["SD7", "simulated"] == True   # noqa: E712
+    assert extra.set_index("dataset").loc["D24", "category"] == "diagonal"
     # the CSV rows come first, the appended ids after them in natural order
-    tail = cat.dataset.tolist()[-9:]
-    assert tail == ["D11s", "D24", "D28s", "D45s", "D52s", "SD7", "SD8", "SD9", "SD10"]
+    tail = cat.dataset.tolist()[-5:]
+    assert tail == ["D11s", "D24", "D28s", "D45s", "D52s"]
+    # the catalog reads the configured root: an id that tree holds but
+    # dataset.csv does not name is appended, an SD id is flagged simulated
+    monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
+    cat2 = mtb.catalog.datasets()
+    assert cat2.dataset.tolist()[-1] == "SD7"
+    row = cat2.set_index("dataset").loc["SD7"]
+    assert row.simulated == True and row.category == "diagonal" and row.has_results   # noqa: E712
+    assert set(cat2[cat2.has_results].dataset) == set(
+        mtb.available_datasets(source="both", result_path=layout_tree))
+    assert "D11s" not in set(cat2.dataset)          # no re-run sweep in that tree
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +384,7 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
         results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
 
 
-def test_single_method_table_warns_when_other_source_has_more(result_dir):
+def test_single_method_table_warns_when_other_source_has_more(result_dir, layout_tree):
     """The instructor got a silent 1-method cross/D52 table under the default
     source='published' (the CLI warns, the API did not)."""
     with pytest.warns(UserWarning, match=r"only one method \(scMoMaT\) in the published table "
@@ -381,30 +397,54 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir):
     assert "the rerun tables hold 8 methods for it" in msgs[0]
     assert "pass source='rerun' (or 'both')" in msgs[0]
     # source='rerun' / 'both' for the same selection are quiet; so is a
-    # published selection with >= 2 methods and a coverage scan
+    # published selection with >= 2 methods (D53 and the whole cross category
+    # of the layout tree) and a coverage scan
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         warnings.simplefilter("ignore", DegenerateRerunWarning)
         results.load_results("cross", dataset="D52", source="rerun", result_path=result_dir)
         results.load_results("cross", dataset="D52", source="both", result_path=result_dir)
-        results.load_results("cross", dataset="D53", result_path=result_dir)
-        results.load_results("cross", result_path=result_dir)
+        results.load_results("cross", dataset="D53", result_path=layout_tree)
+        results.load_results("cross", result_path=layout_tree)
         mtb.results_coverage("cross", result_path=result_dir)
         # the source the user asked for is the ONLY one with rows: no warning
-        # (D54 has a single published method and no re-run sweep)
-        results.load_results("cross", dataset="D54", result_path=result_dir)
+        # (D54 has a single published method and that tree has no re-run sweep)
+        results.load_results("cross", dataset="D54", result_path=layout_tree)
 
 
 def test_fetchable_lists_the_release_assets(result_dir):
     from multibench.data.fetch import AVAILABLE      # mtb.data.fetch is the function
     ids = results.fetchable()
     assert isinstance(ids, list) and ids == sorted(AVAILABLE, key=mtb.catalog._dataset_sort_key)
-    assert "D11" in ids and "D12" not in ids
+    assert "D11" in ids and "D24" not in ids
     # the two vocabularies overlap but are DIFFERENT (D46 downloads and has no
-    # stored results; D12 has published tables and no download) - which is
+    # stored results; D24 has published tables and no download) - which is
     # exactly why they are two functions; the docstring says which is which
     have = set(mtb.available_datasets(source="both", result_path=result_dir))
     assert set(ids) & have and set(ids) != have
-    assert "D46" in ids and "D46" not in have and "D12" in have and "D12" not in ids
+    assert "D46" in ids and "D46" not in have and "D24" in have and "D24" not in ids
     doc = mtb.available_datasets.__doc__
     assert "STORED RESULTS" in doc and "fetch" in doc and "NOT the datasets that can be downloaded" in doc
+
+
+def test_shipped_tree_is_consistent_across_the_api(result_dir):
+    """available_datasets, results_coverage, catalog.datasets()['has_results']
+    and the "no table" error all describe the same shipped tables."""
+    pub = {c: results.available_datasets(c, result_path=result_dir)
+           for c in ("vertical", "diagonal", "mosaic", "cross")}
+    assert pub == {"vertical": ["D11"], "diagonal": ["D24", "D25", "D28"],
+                   "mosaic": [], "cross": ["D52"]}
+    rr = results.available_datasets(source="rerun", result_path=result_dir)
+    assert rr == ["D11", "D11s", "D28", "D28s", "D45", "D45s", "D52", "D52s"]
+    cov = mtb.results_coverage(result_path=result_dir)
+    assert set(cov[cov.source == "published"].dataset) == set(sum(pub.values(), []))
+    assert set(cov[cov.source == "rerun"].dataset) == set(rr)
+    cat = mtb.catalog.datasets()
+    assert set(cat[cat.has_results].dataset) == set(
+        mtb.available_datasets(source="both", result_path=result_dir))
+    for c, ds in pub.items():
+        if not ds:
+            continue
+        with pytest.raises(FileNotFoundError, match="result_path=") as e:
+            results.load_results(c, dataset="D999", result_path=result_dir)
+        assert f"datasets with published tables: {ds}" in str(e.value)

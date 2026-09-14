@@ -291,7 +291,7 @@ def test_cli_plot_bar_from_input_csv(tmp_path, capsys):
     assert rc == 0 and png.exists()
     # stored-results path for bar
     png2 = tmp_path / "bar2.png"
-    rc = cli.main(["plot", "bar", "--category", "diagonal", "--dataset", "D27",
+    rc = cli.main(["plot", "bar", "--category", "diagonal", "--dataset", "D28",
                    "--out", str(png2)])
     assert rc == 0 and png2.exists()
     # bubble from the same csv with a title and --overall

@@ -20,6 +20,6 @@ def test_top_level_exposes_spec_symbols():
 
 def test_end_to_end_load_results(result_dir, monkeypatch):
     import multibench as mtb
-    df = mtb.load_results(category="diagonal", dataset="D27", result_path=result_dir)
+    df = mtb.load_results(category="diagonal", dataset="D28", result_path=result_dir)
     assert len(df) > 0
     assert "value" in df.columns

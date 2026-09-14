@@ -132,7 +132,7 @@ def test_datasets_lists_every_id_with_results(files_dir):
     import multibench as mtb
     df = catalog.datasets(files_dir)
     assert set(mtb.available_datasets(source="both")) <= set(df.dataset)
-    assert {"D11s", "D28s", "D45s", "D52s", "SD7", "SD10", "D24"} <= set(df.dataset)
+    assert {"D11s", "D28s", "D45s", "D52s", "D24"} <= set(df.dataset)
     assert df[df.dataset == "D52s"].category.iloc[0] == "cross"
     assert not df.dataset.duplicated().any()
 

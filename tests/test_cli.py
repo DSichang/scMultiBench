@@ -19,7 +19,7 @@ def test_cli_find_needs_labels(capsys):
 def test_cli_plot_bubble(tmp_path):
     import matplotlib; matplotlib.use("Agg")
     out = tmp_path / "fig.png"
-    rc = cli.main(["plot", "bubble", "--category", "diagonal", "--dataset", "D27",
+    rc = cli.main(["plot", "bubble", "--category", "diagonal", "--dataset", "D28",
                    "--metrics", "ARI,NMI", "--out", str(out)])
     assert rc == 0
     assert out.exists()

@@ -80,27 +80,27 @@ def test_load_results_and_evaluate_share_the_vocabulary(result_dir):
 
 # ---------------------------------------------------------------- deprecated aliases
 def test_deprecated_method_maps_to_methods(result_dir):
-    new = results.load_results("diagonal", dataset="D27", methods=["scBridge"],
+    new = results.load_results("diagonal", dataset="D28", methods=["scBridge"],
                                result_path=result_dir)
     with pytest.warns(DeprecationWarning, match=r"load_results\(method=\.\.\.\) is deprecated since 0.3.0.*use methods="):
-        old = results.load_results("diagonal", dataset="D27", method="scBridge",
+        old = results.load_results("diagonal", dataset="D28", method="scBridge",
                                    result_path=result_dir)
     pd.testing.assert_frame_equal(old, new)
     with pytest.raises(ValueError, match="either method= or methods="):
-        _quiet(results.load_results, "diagonal", dataset="D27", method="scBridge",
+        _quiet(results.load_results, "diagonal", dataset="D28", method="scBridge",
                methods=["scBridge"], result_path=result_dir)
 
 
 def test_deprecated_metric_maps_to_metrics(result_dir):
-    new = results.load_results("diagonal", dataset="D27", metrics=["ARI", "NMI"],
+    new = results.load_results("diagonal", dataset="D28", metrics=["ARI", "NMI"],
                                result_path=result_dir)
     with pytest.warns(DeprecationWarning, match=r"load_results\(metric=\.\.\.\) is deprecated.*use metrics=\['ARI', 'NMI'\]"):
-        old = results.load_results("diagonal", dataset="D27", metric=["ARI", "NMI"],
+        old = results.load_results("diagonal", dataset="D28", metric=["ARI", "NMI"],
                                    result_path=result_dir)
     pd.testing.assert_frame_equal(old, new)
     # a scalar was accepted too
     with pytest.warns(DeprecationWarning):
-        one = results.load_results("diagonal", dataset="D27", metric="ari", result_path=result_dir)
+        one = results.load_results("diagonal", dataset="D28", metric="ari", result_path=result_dir)
     assert set(one.metric) == {"ARI"}
 
 
