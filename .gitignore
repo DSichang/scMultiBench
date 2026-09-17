@@ -16,4 +16,6 @@ __pycache__/
 /scMultiBench_ref
 dist/
 build/
+# git bundles are transfer artefacts (host sync), never package content
+*.bundle
 *.egg-info/
