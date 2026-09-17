@@ -18,7 +18,7 @@ def test_categories_derived_from_variants():
         assert set(registry.list_methods(category=c)) == want
         assert set(discover.find_methods(category=c)) == want
         assert {r[0].id for r in workflow._variant_rows(c)} == want
-    # the three that had drifted
+    # the three that had diverged
     assert "Multigrate" not in mtb.list_methods(category="cross")
     for m in ("totalVI", "sciPENN"):
         assert m not in mtb.list_methods(category="mosaic")

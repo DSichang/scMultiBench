@@ -1,12 +1,12 @@
 """The plotting layer's metric families must match what the eval layer computes.
 
-These two lived apart and drifted: plot/bar.py filed iASW and iF1 under batch
+These two lived apart and diverged: plot/bar.py filed iASW and iF1 under batch
 correction while eval.scib.compute() emitted them for group="clustering". The
 same number was therefore labelled a different family depending on which module
 you asked, and a single-batch dataset like D11 - which legitimately has iASW/iF1
 and no batches whatsoever - rendered as if it carried batch-correction results.
 
-Pinning them to each other is what stops that drifting again.
+Pinning them to each other is what stops that happening again.
 """
 
 import numpy as np

@@ -88,7 +88,7 @@ def layout_tree(tmp_path):
     _metric_csv(cross / "D54" / "Concerto" / "metric.csv", **_clustering(0.4))
     _kbet_dir(cross / "D54" / "Concerto")
     d56 = cross / "D56" / "MOFA2"
-    _metric_csv(d56 / "filtered3" / "metric.csv", ARI=0.285746391962993, NMI=0.55,
+    _metric_csv(d56 / "filtered3" / "metric.csv", ARI=0.28, NMI=0.55,
                 ASW=0.47, iASW=0.5, iF1=0.5, cLISI=0.9)
     _metric_csv(d56 / "filtered3" / "metric_ari_nmi_batch.csv", ARI=0.99, NMI=0.99)
     _metric_csv(d56 / "filtered3" / "metric_louvain.csv", ARI=0.30, NMI=0.56, ASW=0.48)

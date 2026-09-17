@@ -1,6 +1,6 @@
 """The user-facing text matches the 0.3.0 public surface.
 
-Three mechanical checks, so the docs cannot drift back to the 0.2.1 spellings
+Three mechanical checks, so the docs cannot slip back to the 0.2.1 spellings
 the surface cut retired: (a) no retired spelling survives in the README, the
 notebooks or their generator; (b) every ``mtb.<name>`` the README and the
 docs quickstart mention exists in the live package and sits in the relevant

@@ -155,8 +155,8 @@ def test_bubble_is_plain_function_with_signature_and_docstring():
 
 def test_bubble_overall_doc_matches_style():
     # The `overall` parameter text is written out in bubble's docstring
-    # (the static docs build cannot see a runtime splice) and must not drift
-    # from style.OVERALL_DOC, the single source it shares with plot.bar.
+    # (the static docs build cannot see a runtime splice) and must stay in step
+    # with style.OVERALL_DOC, the single source it shares with plot.bar.
     from multibench.plot import style
     body = style.OVERALL_DOC.split("\n", 1)[1]        # everything below the type line
     # compare on normalised whitespace: the docstrings are re-wrapped and

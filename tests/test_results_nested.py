@@ -14,7 +14,7 @@ def test_d56_is_visible_everywhere(layout_tree, monkeypatch):
     assert "D56" in results.available_datasets("cross", result_path=layout_tree)
     df = results.load_results("cross", dataset="D56", result_path=layout_tree)
     assert set(df.method) == {"MOFA2"} and (df.clustering == "default").all()
-    assert abs(float(df[df.metric == "ARI"].value.iloc[0]) - 0.285746391962993) < 1e-9
+    assert abs(float(df[df.metric == "ARI"].value.iloc[0]) - 0.28) < 1e-9
     km = results.load_results("cross", dataset="D56", clustering="kmeans", result_path=layout_tree)
     assert set(km.method) == {"MOFA2"} and (km.clustering == "kmeans").all()
     assert abs(float(km[km.metric == "ARI"].value.iloc[0]) - 0.25) < 1e-9

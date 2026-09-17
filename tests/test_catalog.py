@@ -82,7 +82,7 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
 
 def test_catalog_columns_match_registry(files_dir):
     """needs_labels / atac / categories / tasks are OVERLAID from the registry
-    (the CSV hand columns had drifted on 37 of 40 rows)."""
+    (the CSV hand columns had diverged on 37 of 40 rows)."""
     df = catalog.methods(files_dir).set_index("canonical_id")
     specs = {s.id: s for s in registry.load()}
     for cid, spec in specs.items():

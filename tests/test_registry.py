@@ -98,7 +98,7 @@ def test_list_methods_filter():
     assert "SCALEX" in registry.list_methods(category="diagonal")
 
 
-# --- P06: needs_labels / atac are derived or enforced, never hand-drifted ---
+# --- P06: needs_labels / atac are derived or enforced, never hand-maintained ---
 
 def test_needs_labels_derived_from_cty_roles():
     from multibench.engine.schema import is_label_role
