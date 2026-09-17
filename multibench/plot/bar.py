@@ -110,7 +110,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     Examples
     --------
     >>> import multibench as mtb
-    >>> df = mtb.load_results("vertical")            # every dataset with a table in the category
+    >>> df = mtb.load_results("diagonal")            # every dataset with a table in the category
     >>> fig = mtb.plot.bar(df, group="clustering", top=10, save="clustering.png")
     >>> fig = mtb.plot.bar(df, group="batch")
     >>> fig = mtb.plot.bar(df, overall="rank")       # orders like bubble(aggregate="summary")
@@ -136,7 +136,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     See Also
     --------
     mtb.plot.bubble : per-dataset (or rank-averaged) bubble table, same ``overall=`` math.
-    mtb.load_results : the benchmark's published results as a long frame.
+    mtb.load_results : stored metric tables as a long frame.
     """
     import matplotlib.pyplot as plt
     from .bubble import _resolve

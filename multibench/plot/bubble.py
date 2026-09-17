@@ -320,7 +320,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     >>> tbl = mtb.plot.build_table(df, metrics=["ARI", "NMI", "ASW"])
     >>> tbl.methods                      # rows, best first
     >>> tbl.ranks                        # max-ranks per metric (n = best)
-    >>> multi = mtb.load_results("vertical", dataset=["D11", "D52"])
+    >>> multi = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
     >>> tbl = mtb.plot.build_table(multi, aggregate="summary", require_complete=True)
     >>> tbl.coverage                     # datasets per method
 
@@ -1024,7 +1024,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     >>> res = mtb.run_all("D11", "vertical", "out")        # your own runs
     >>> fig = mtb.plot.bubble(pd.concat([pub, res.long]), metrics=["ARI", "NMI", "ASW"],
     ...                       title="D11 + mine", save="d11.pdf")
-    >>> multi = mtb.load_results("vertical", dataset=["D11", "D52"])
+    >>> multi = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
     >>> fig = mtb.plot.bubble(multi, aggregate="summary", require_complete=True)
 
     Notes
@@ -1075,7 +1075,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     mtb.plot.render : draw a ``BubbleTable`` (``cmap``, ``title``, ``show_language``).
     mtb.plot.bar : one bar per method across datasets; same ``overall=`` math.
     mtb.to_long : reshape ``mtb.evaluate``'s wide frame into the long frame.
-    mtb.load_results : the benchmark's published results as a long frame.
+    mtb.load_results : stored metric tables as a long frame.
     """
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,

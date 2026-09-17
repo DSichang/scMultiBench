@@ -327,7 +327,7 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     ``categories`` and ``tasks`` are OVERLAID from the method registry
     (``registry.get(canonical_id)``) for every row whose id is registered, so
     the table cannot disagree with ``method_info`` / ``scan`` (the CSV's hand
-    columns had drifted on 37 of 40 rows). Rows without a registry entry keep
+    columns had diverged on 37 of 40 rows). Rows without a registry entry keep
     the CSV values. ``language`` is the CSV value (lower-cased), cross-checked
     against the registry's.
     """
@@ -399,7 +399,7 @@ def datasets(files_dir: Path | str | None = None, *,
     pandas.DataFrame
         One row per dataset id with columns
 
-        * ``dataset`` - the id (``D11``, ``SD7``, ...); ``dataset name`` is
+        * ``dataset`` - the id (``D11``, ``SD15``, ...); ``dataset name`` is
           kept as a duplicate column for one release (old callers read it).
           The rows are the union of ``dataset.csv`` and every id that has
           stored results (:func:`multibench.available_datasets` with

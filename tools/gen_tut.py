@@ -56,15 +56,28 @@ def stand_in(cat, dataset, methods):
     return dataset, (list(methods) if set(methods) <= stored else None)
 
 
+def stored_method_counts(cat, dataset):
+    """``(n_published, n_rerun)``: methods each stored source holds for the
+    dataset, counted from ``results_coverage`` at generation time."""
+    import multibench as mtb
+    cov = mtb.results_coverage(cat)
+    cov = cov[cov.dataset == dataset]
+    return (cov[cov.source == "published"].method.nunique(),
+            cov[cov.source.str.startswith("rerun")].method.nunique())
+
+
+def shipped_datasets_text(cat):
+    """The dataset ids with a stored table for the category, as inline code,
+    read from ``available_datasets`` at generation time."""
+    import multibench as mtb
+    return ", ".join(f"`{d}`" for d in mtb.available_datasets(cat, source="both"))
+
+
 def published_note(cat, dataset):
     """One measured sentence on why every ``load_results`` call in a tutorial
     names its ``source``: the ``published`` table for the reference dataset vs
     the package's own sweep, counted from ``results_coverage`` at generation time."""
-    import multibench as mtb
-    cov = mtb.results_coverage(cat)
-    cov = cov[cov.dataset == dataset]
-    n_pub = cov[cov.source == "published"].method.nunique()
-    n_rerun = cov[cov.source.str.startswith("rerun")].method.nunique()
+    n_pub, n_rerun = stored_method_counts(cat, dataset)
     if n_pub == 0:
         return (f"There are no scIB tables for {cat} under `source=\"published\"` "
                 f"(it raises `FileNotFoundError` pointing at `\"rerun\"`), so the "
@@ -415,8 +428,8 @@ def build_tutorial(cat, s):
 
 {s['blurb']}
 
-**Reference dataset:** `{s['ds']}` ({s['cells']} cells); the tables shipped
-with the package for this category were produced on it.""")
+**Reference dataset:** `{s['ds']}` ({s['cells']} cells). The tables shipped
+with the package for this category: {shipped_datasets_text(cat)}.""")
 
     # ---------------------------------------------------------------- install
     trio = s["own_trio"]
@@ -677,10 +690,14 @@ over the grand ranks. {batch_note}""")
 print(pair.groupby("dataset").method.nunique().to_dict())
 mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
                 title=f"Summary of 2 {cat} datasets")''')
-    md("""**Two stored sources.** `source="published"` and `source="rerun"` can hold
+    if stored_method_counts(cat, ds)[0]:
+        md("""**Two stored sources.** `source="published"` and `source="rerun"` can hold
 different methods for this dataset, and where both hold a method the numbers
-differ (methods are stochastic) - compare ranks, not decimals.
+differ (methods are stochastic), so name the source you read.
 `results_coverage` says what exists for this dataset and where it came from:""")
+    else:       # one stored source (mosaic): nothing to tell apart
+        md("""**What is stored.** `results_coverage` says what exists for this dataset and
+where it came from:""")
     code('''cov = mtb.results_coverage(CATEGORY)
 cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
 

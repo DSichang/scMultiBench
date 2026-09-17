@@ -234,7 +234,7 @@ def describe_layout(category: str | None = None) -> str:
 
     The lists of methods that need gene-activity vs peak ATAC matrices are
     built from the method registry at call time (``find_methods(atac=...)``),
-    so they cannot drift from what ``method_info`` / ``scan``'s ``atac``
+    so they always agree with what ``method_info`` / ``scan``'s ``atac``
     column say.
 
     See Also
@@ -283,10 +283,9 @@ def describe_layout(category: str | None = None) -> str:
     lines += ["",
               "!! ATAC: the role name does NOT guarantee the representation.",
               "   atac_gas resolves to atac_gas.h5 if present, otherwise FALLS BACK",
-              "   to atac.h5 - and in the shipped multiome datasets (D12-D17) atac.h5",
-              "   contains PEAKS, not gene activity. Only D27/D28 ship a real",
-              "   atac_gas.h5. Verified by feature names: 12 atac.h5 files are peaks",
-              "   (chr1:3094772-3095489), 2 atac_gas.h5 files are gene activity.",
+              "   to atac.h5 - and a multiome atac.h5 usually holds PEAKS, not gene",
+              "   activity. Check the feature names: chr1:3094772-3095489 is a peak,",
+              "   a gene symbol is gene activity.",
               "   atac_peak resolves to atac_peak.h5, else peak.h5.",
               "   This matters because methods disagree (lists from the registry;",
               "   see mtb.find_methods(atac=...) / mtb.method_info(m)['atac']):",

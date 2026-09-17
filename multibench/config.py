@@ -172,8 +172,8 @@ class Config:
     Attributes
     ----------
     result_path : pathlib.Path
-        The shipped benchmark result tables that ``mtb.load_results`` reads.
-        Default ``<package root>/multibench/result``.
+        The result tables shipped with the package, which
+        ``mtb.load_results`` reads. Default ``<package root>/multibench/result``.
     files_path : pathlib.Path
         The shipped per-dataset files (label CSVs and similar). Default
         ``<package root>/multibench/files``.
