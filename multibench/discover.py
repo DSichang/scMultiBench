@@ -161,8 +161,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     methods whose scripts a public install can run
     (``method_info(m)['availability'] == 'public'``); ``False`` keeps the
     ``'benchmark-host-only'`` ones, whose entrypoint is an absolute path on the
-    benchmark host and is not published (SPIRAL, GPSA) - they are wired and
-    verified there, but ``scan`` reports them not runnable elsewhere.
+    benchmark host and is not published (SPIRAL) - it is wired and
+    run there, but ``scan`` reports it not runnable elsewhere.
 
     See Also
     --------
@@ -367,8 +367,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ``availability`` is ``'public'`` (every entrypoint lives in the public
     scMultiBench repository; a public install can run it) or
     ``'benchmark-host-only'`` (an entrypoint is an absolute path on the
-    benchmark host and is not published - SPIRAL, GPSA; ``scan`` reports them
-    not runnable, ``find_methods(available=True)`` drops them). Derived from
+    benchmark host and is not published - SPIRAL; ``scan`` reports it
+    not runnable, ``find_methods(available=True)`` drops it). Derived from
     the entrypoints, no hand flag.
 
     ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` are the GPU/CPU

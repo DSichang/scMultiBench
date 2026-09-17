@@ -302,11 +302,17 @@ def test_user_method_name_accepted_in_file(tmp_path):
 
 
 def test_degenerate_rerun_rows_are_flagged(result_dir):
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(rerun-0.2.1 ARI 0.0004 vs published 0.27\)") as rec:
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(rerun-0.2.1 ARI 0.0004\)") as rec:
         rr = results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
     assert "Conos" in set(rr.method)          # flagged, never dropped silently
     msg = str(rec[0].message)
     assert "df[df.method != 'Conos']" in msg and "ARI < 0.01" in msg
+    # the message names the trigger and the re-run value, never a score pair
+    assert "published table scored > 0.2" in msg and " vs " not in msg
+    # the detection still reads both sides of the trigger
+    bad = results._degenerate_rerun_rows(rr, result_dir)
+    assert bad[["category", "dataset", "method"]].values.tolist() == [["diagonal", "D28", "Conos"]]
+    assert bad.rerun_ARI.iloc[0] < 0.01 and bad.published_ARI.iloc[0] > 0.2
     # published-only loads and a filter that removes the row are silent
     with warnings.catch_warnings():
         warnings.simplefilter("error", DegenerateRerunWarning)
@@ -414,6 +420,16 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
         # the source the user asked for is the ONLY one with rows: no warning
         # (D54 has a single published method and that tree has no re-run sweep)
         results.load_results("cross", dataset="D54", result_path=layout_tree)
+    # ... and the same when re-run sweeps exist but none covers the dataset:
+    # a different FileNotFoundError inside the lookup, the same silence
+    import shutil
+    shutil.copytree(result_dir / "rerun", layout_tree / "rerun")
+    with pytest.raises(FileNotFoundError, match="no re-run sweep for cross/D54"):
+        results._load_rerun("cross", ["D54"], layout_tree)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        one = results.load_results("cross", dataset="D54", result_path=layout_tree)
+    assert set(one.method) == {"Concerto"}
 
 
 def test_fetchable_lists_the_release_assets(result_dir):

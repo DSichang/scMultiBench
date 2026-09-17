@@ -436,7 +436,7 @@ with the package for this category: {shipped_datasets_text(cat)}.""")
     live_methods = sorted({fastm, *trio})
     md("""## 1. Install
 
-`pip install multibench-sc` is the whole install: the 1.3 MB wheel ships the
+`pip install multibench-sc` is the whole install: the ~0.5 MB wheel ships the
 method registry, the stored result tables, the env lockfiles and the reference
 metadata. The package alone runs this section, section 3 (`scan`) and sections
 4-5. Running methods (section 2, and `run_all` in section 3) additionally
@@ -530,8 +530,8 @@ downloads the tree `run_all` wrote there (summary, long table and one
 embedding per method) and `mtb.load_batch(..., methods=)` reloads it, so the
 statuses, run times and the evaluate cell below are real. Offline, or before
 those outputs are published, a second fallback stands in {si_what}
-(`load_results(source="rerun")`, the package's own sweep of every wired
-method); either way one
+(`load_results(source="rerun")`, the package's own sweep at default
+settings); either way one
 printed line says which path was taken and every cell below still renders.""")
     code(f'''{STORED_SWEEP_FN}
 
@@ -659,9 +659,9 @@ and these same three calls do the rest.""")
         len(trio), f"{len(trio)} methods")
     md(f"""## 4. Reading stored results
 
-Section 2 ran {n_word}; the package ships its own sweep of `{ds}` - every
-wired method at default settings - so the whole category's bubble table draws
-from stored results in seconds. `load_results` reads them
+Section 2 ran {n_word}; the package ships its own sweep of `{ds}` at
+default settings, so its bubble table draws from stored results in seconds.
+`load_results` reads them
 back as the tidy frame `mtb.plot.bubble` takes, and every row says in its
 `source` column which sweep it came from. {published_note(cat, ds)}""")
     code(f'''long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")

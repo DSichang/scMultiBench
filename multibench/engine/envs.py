@@ -681,7 +681,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     rows = [
         {"env": env, "shared": env in shared, "methods": sorted(ms),
          # 'benchmark-host-only' when every method the env serves needs a
-         # script that is not published (SPIRAL, GPSA): the env builds, the
+         # script that is not published (SPIRAL): the env builds, the
          # method still cannot run off the benchmark host
          "availability": ("benchmark-host-only"
                           if all(registry.get(m).availability != "public" for m in ms)

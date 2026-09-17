@@ -14,7 +14,7 @@ with scIB metrics, and draws scIB-style bubble tables.
 ## Quick start
 
 ```bash
-pip install multibench-sc          # the API (import name: multibench) - a 1.3 MB wheel that ships the method
+pip install multibench-sc          # the API (import name: multibench) - a ~0.5 MB wheel that ships the method
                                    # registry, the stored result tables, the env lockfiles and the references
 ```
 

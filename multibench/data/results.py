@@ -484,8 +484,8 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
     def _stamp(src) -> str:
         return _rerun_tag(rerun_version) if src == _rerun_source() else str(src)
 
-    items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)} ARI {r.rerun_ARI:.4f} vs "
-                      f"published {r.published_ARI:.2f})" for r in bad.itertuples())
+    items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)} ARI {r.rerun_ARI:.4f})"
+                      for r in bad.itertuples())
     warnings.warn(
         f"degenerate re-run row(s) - ARI < {_DEGENERATE_RERUN_ARI} where the "
         f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. The "

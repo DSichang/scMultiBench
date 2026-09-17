@@ -941,8 +941,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         ``BatchResult.long`` property return); ``dataset``, ``category`` and a
         boolean
         ``needs_labels`` column are optional (see Notes). Concatenate frames
-        (``pd.concat([published, mine])``) to compare your method with the
-        benchmark's.
+        (``pd.concat([published, mine])``) to draw your method next to the
+        stored table.
     metrics : list of str | None, keyword-only
         Metric codes to show, drawn in THIS order within each family block
         (the blocks themselves keep the paper's order). Case/alias tolerant

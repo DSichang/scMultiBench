@@ -67,8 +67,8 @@ broken method rather than a provisioning gap.
   Without it UINMF fails with "there is no package called 'rliger'" *after* a clean build.
 - `matilda` — the working env has it as an editable install from a local checkout.
   Restored from PyPI as `matilda-sc==0.2.1`. **The working env has 0.2.0**, which PyPI
-  does not publish, and the checkout's git remote is private. It runs and reproduces the
-  recorded ARI (0.924) but is not byte-identical.
+  does not publish, and the checkout's git remote is private. 0.2.1 runs the method; the
+  two installs are not byte-identical.
 - `scMVP` — installed from public upstream `bm2-lab/scMVP` at a pinned commit; the
   working copy lives outside this repository.
 
@@ -97,5 +97,5 @@ mtb.scan("D11", category="vertical")                       # files_ok 14 of 25 r
 mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/check")
 ```
 
-Matilda on D11 should reach `CHAIN_OK` with ARI ≈ 0.924 in well under a minute. If it
+Matilda on D11 should reach `CHAIN_OK` in well under a minute. If it
 builds but fails to import its own package, the post-install did not run.

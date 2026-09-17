@@ -483,7 +483,7 @@ def benchmark_host_only_reason(entrypoint) -> str:
 
     Such an entrypoint names one machine's filesystem - the benchmark host -
     so no download can supply it (``MethodSpec.availability ==
-    'benchmark-host-only'``; SPIRAL, GPSA). This is the ``files_reason`` text
+    'benchmark-host-only'``; SPIRAL). This is the ``files_reason`` text
     ``scan`` should report for those rows; it starts with the machine-readable
     prefix :data:`BENCHMARK_HOST_ONLY`. Returns ``""`` when the path is
     relative or actually exists (then the script IS reachable).

@@ -205,7 +205,7 @@ class Config:
     >>> import multibench as mtb
     >>> mtb.config.DEFAULT.data_path                            # where datasets are looked up
     >>> mtb.config.DEFAULT.envs_dir = "/scratch/envs"           # before mtb.env.install(...)
-    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"          # match the published tables
+    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"          # the leidenalg backend, not igraph
     >>> cfg = mtb.config.Config(data_path=Path("/data/mine"))   # a separate instance
 
     Notes
