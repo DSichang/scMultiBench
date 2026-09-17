@@ -571,6 +571,27 @@ def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported la
     return df
 
 
+#: ``load_results`` names its keywords in its messages; this command's
+#: spelling of the same hatches is the flags. Ordered: longest pattern first.
+_API_TO_FLAGS = (
+    (r"result_path= / mtb\.config\.DEFAULT\.result_path", "--result-path"),
+    (r"result_path=<file>", "--result-path <file>"),
+    (r"result_path=", "--result-path"),
+    (r"\b(source|category)=['\"](\w+)['\"]", r"--\1 \2"),
+    (r"\(or '(\w+)'\)", r"(or \1)"),
+)
+
+
+def _cli_spelling(message: str) -> str:
+    """A ``load_results`` message with its keywords spelled as ``multibench
+    plot`` flags (``result_path=`` -> ``--result-path``, ``source='rerun'``
+    -> ``--source rerun``)."""
+    import re
+    for pattern, flag in _API_TO_FLAGS:
+        message = re.sub(pattern, flag, message)
+    return message
+
+
 def _cmd_plot(args) -> int:
     """``multibench plot {bubble,bar}``: draw a results table to ``--out``.
 
@@ -594,7 +615,6 @@ def _cmd_plot(args) -> int:
     frames = []
     if args.category is not None:
         from . import load_results
-        from .data.results import _RESULT_PATH_HINT
         kw = dict(category=args.category, dataset=_csv_list(args.dataset),
                   source=args.source)
         if args.result_path:
@@ -602,9 +622,8 @@ def _cmd_plot(args) -> int:
         try:
             frames.append(load_results(**kw))
         except FileNotFoundError as e:
-            # the API names its keyword; this command's spelling is the flag
-            cli_hint = _RESULT_PATH_HINT.replace("result_path=", "--result-path")
-            raise FileNotFoundError(str(e).replace(_RESULT_PATH_HINT, cli_hint)) from e
+            # the API names its keywords; this command's spelling is the flags
+            raise FileNotFoundError(_cli_spelling(str(e))) from e
     own_rows = 0
     for path in inputs:
         own = _load_long_input(path)

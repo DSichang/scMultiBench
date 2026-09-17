@@ -376,6 +376,21 @@ def test_cli_plot_result_path_reads_another_results_root(tmp_path, layout_tree, 
     assert rc == 1
     assert "pass --result-path for another results root" in err
     assert "result_path=" not in err
+    # a category without published tables: the same hatches, in flag spelling
+    rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",
+                   "--out", str(tmp_path / "x.png")])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "use --source rerun" in err and "--result-path <file>" in err
+    assert "check --result-path (currently " in err
+    for api_spelling in ("result_path=", "source='", "category='", "mtb.config"):
+        assert api_spelling not in err, err
+    # ... and the flag it names works
+    swept = tmp_path / "d45.png"
+    rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",
+                   "--source", "rerun", "--out", str(swept)])
+    assert rc == 0 and swept.stat().st_size > 0
+    capsys.readouterr()
     out = tmp_path / "d53.png"
     rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
                    "--result-path", str(layout_tree), "--out", str(out)])
