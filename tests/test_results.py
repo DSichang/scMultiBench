@@ -335,10 +335,11 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     tail = cat.dataset.tolist()[-5:]
     assert tail == ["D11s", "D24", "D28s", "D45s", "D52s"]
     # the catalog reads the configured root: an id that tree holds but
-    # dataset.csv does not name is appended, an SD id is flagged simulated
+    # dataset.csv does not name is appended (natural order: SD7 before SD10,
+    # which a plain string sort would reverse), an SD id is flagged simulated
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
     cat2 = mtb.catalog.datasets()
-    assert cat2.dataset.tolist()[-1] == "SD7"
+    assert cat2.dataset.tolist()[-2:] == ["SD7", "SD10"]
     row = cat2.set_index("dataset").loc["SD7"]
     assert row.simulated == True and row.category == "diagonal" and row.has_results   # noqa: E712
     assert set(cat2[cat2.has_results].dataset) == set(
@@ -396,6 +397,9 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
     assert len(msgs) == 1
     assert "the rerun tables hold 8 methods for it" in msgs[0]
     assert "pass source='rerun' (or 'both')" in msgs[0]
+    # without a dataset filter the selection is named as the category
+    with pytest.warns(UserWarning, match=r"in the published table for cross; ranks"):
+        results.load_results("cross", result_path=result_dir)
     # source='rerun' / 'both' for the same selection are quiet; so is a
     # published selection with >= 2 methods (D53 and the whole cross category
     # of the layout tree) and a coverage scan

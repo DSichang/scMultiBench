@@ -72,8 +72,7 @@ class DegenerateRerunWarning(UserWarning):
     """A re-run row scored ARI ~0 where the published table scored well.
 
     Emitted by :func:`load_results` (``source="rerun"`` / ``"both"``) so a
-    silently failed re-run (Conos on D28: ARI 0.0004 vs published 0.27) can
-    never enter a ranking unnoticed. Filter with
+    silently failed re-run can never enter a ranking unnoticed. Filter with
     ``warnings.simplefilter("ignore", mtb.data.results.DegenerateRerunWarning)``
     once you have decided how to treat those rows.
     """
@@ -492,8 +491,8 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
         f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. The "
         f"re-run most likely failed silently (a collapsed embedding or a wrong "
         f"label order), so the row says nothing about the method; drop it "
-        f"before ranking (df[df.method != {bad.method.iloc[0]!r}]) or compare "
-        f"with source='published'.", DegenerateRerunWarning, stacklevel=stacklevel)
+        f"before ranking (df[df.method != {bad.method.iloc[0]!r}]).",
+        DegenerateRerunWarning, stacklevel=stacklevel)
 
 
 def _legacy_load_results_kwargs(kw: dict) -> dict:
@@ -605,8 +604,8 @@ def load_results(
         requested (so no method id ever ends in ``_louvain``/``_kmeans``). The
         re-run sweeps are ``"default"`` only.
     source : str, keyword-only
-        For a results ROOT one of ``"published"`` (default: the benchmark's
-        scIB tables under ``result_path/scib_metric``; none for mosaic),
+        For a results ROOT one of ``"published"`` (default: the scIB tables
+        under ``result_path/scib_metric``; none for mosaic),
         ``"rerun"`` (the package's re-run sweeps
         ``result_path/rerun/long_all_<dataset>.csv``: vertical D11/D11s,
         diagonal D28/D28s, mosaic D45/D45s, cross D52/D52s) or ``"both"``
@@ -625,9 +624,9 @@ def load_results(
         When the selected category/dataset(s) hold only ONE method in the
         chosen source while the other source holds more, a ``UserWarning``
         says so (``"only one method (scMoMaT) in the published table for
-        cross/D52 ... pass source='rerun' (or 'both')"``): the default
-        ``"published"`` cross tables are that sparse, and a one-method table
-        yields meaningless ranks. No warning when the other source has
+        cross/D52 ... pass source='rerun' (or 'both')"``): the published
+        cross table holds one method, and a one-method table yields
+        meaningless ranks. No warning when the other source has
         nothing more.
     result_path : path-like, keyword-only
         A results ROOT (holding ``scib_metric/`` and/or ``rerun/``; default
@@ -833,8 +832,9 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
     if len(have) <= n:
         return
     other = "rerun" if source == "published" else "published"
-    sel = (datasets[0] if len(datasets) == 1 else list(datasets)) if datasets else "any dataset"
-    where = f"{category or '/'.join(cats)}/{sel}"
+    where = category or "/".join(cats)
+    if datasets:          # no dataset filter: the selection IS the category
+        where += f"/{datasets[0] if len(datasets) == 1 else list(datasets)}"
     warnings.warn(
         f"only one method ({out['method'].iloc[0]}) in the {source} table for "
         f"{where}; ranks and Overall bars are not meaningful with a single "
@@ -1086,9 +1086,7 @@ def recommend(
 ) -> pd.DataFrame:
     """Rank methods for a category from stored results, with coverage made explicit.
 
-    The score is the benchmark's own rule applied per dataset and averaged
-    over the datasets a method was run on; five honesty rules (Notes) keep a
-    thin table from looking like a verdict.
+    Scoring and coverage rules: see Notes.
 
     Parameters
     ----------

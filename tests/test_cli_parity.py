@@ -366,6 +366,22 @@ def test_cli_plot_source_and_methods_forwarded(tmp_path, monkeypatch):
     assert "overall" not in calls["bubble"]          # library default kept
 
 
+def test_cli_plot_result_path_reads_another_results_root(tmp_path, layout_tree, capsys):
+    """`multibench plot` names a hatch its own flags offer: a dataset without a
+    stored table is reported with --result-path (the CLI spelling of
+    result_path=), and --result-path reads that other results root."""
+    rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
+                   "--out", str(tmp_path / "x.png")])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "pass --result-path for another results root" in err
+    assert "result_path=" not in err
+    out = tmp_path / "d53.png"
+    rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
+                   "--result-path", str(layout_tree), "--out", str(out)])
+    assert rc == 0 and out.stat().st_size > 0
+
+
 def test_cli_plot_input_run_all_dir(tmp_path, monkeypatch):
     """--input may be a run_all output dir: it is reloaded via load_batch()."""
     import matplotlib; matplotlib.use("Agg")

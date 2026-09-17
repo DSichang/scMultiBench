@@ -579,9 +579,11 @@ def _cmd_plot(args) -> int:
     ``--dataset``, ``--source``). Given BOTH, the own rows are concatenated
     onto the stored table - the shell equivalent of ``pd.concat`` - so a
     method evaluated with ``multibench evaluate --method/--dataset`` is drawn
-    next to the benchmark's; a ``# overlay: ...`` note on stderr says how
+    next to the stored table; a ``# overlay: ...`` note on stderr says how
     many rows came from where. ``--methods`` restricts the rows in every
     case; ``--dataset`` selects the stored table(s) and filters the inputs.
+    ``--result-path`` is ``load_results(result_path=...)``: another results
+    root, named in that spelling when a stored table is missing.
     """
     import pandas as pd
     from . import plot as plot_ns
@@ -592,8 +594,17 @@ def _cmd_plot(args) -> int:
     frames = []
     if args.category is not None:
         from . import load_results
-        frames.append(load_results(category=args.category, dataset=_csv_list(args.dataset),
-                                   source=args.source))
+        from .data.results import _RESULT_PATH_HINT
+        kw = dict(category=args.category, dataset=_csv_list(args.dataset),
+                  source=args.source)
+        if args.result_path:
+            kw["result_path"] = args.result_path
+        try:
+            frames.append(load_results(**kw))
+        except FileNotFoundError as e:
+            # the API names its keyword; this command's spelling is the flag
+            cli_hint = _RESULT_PATH_HINT.replace("result_path=", "--result-path")
+            raise FileNotFoundError(str(e).replace(_RESULT_PATH_HINT, cli_hint)) from e
     own_rows = 0
     for path in inputs:
         own = _load_long_input(path)
@@ -1277,12 +1288,12 @@ def build_parser() -> argparse.ArgumentParser:
     pp = sub.add_parser(
         "plot", help="draw the bubble table or summary bars of a results frame "
                      "(mtb.plot.bubble / mtb.plot.bar)",
-        description="Plot stored benchmark results (--category [--dataset] [--source]), "
+        description="Plot stored result tables (--category [--dataset] [--source]), "
                     "your own long table (--input long.csv or a run_all output "
                     "dir, as written by `multibench evaluate --method/--dataset` "
                     "and `multibench run-all`), or BOTH: --input together with "
                     "--category concatenates your rows onto the stored table, so "
-                    "your method is drawn next to the benchmark's.")
+                    "your method is drawn next to the stored table.")
     pp.add_argument("kind", choices=["bubble", "bar"],
                     help="bubble: paper-style bubble table (methods x metrics, best "
                          "first, Overall bars per family) | bar: one bar per method "
@@ -1296,6 +1307,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="stored table to load: published (the scIB tables shipped "
                          "with the package, default) or rerun (the package's re-run "
                          "sweeps)")
+    pp.add_argument("--result-path", dest="result_path", metavar="DIR",
+                    help="with --category: another results root to read the stored "
+                         "tables from (holding scib_metric/ and/or rerun/; default: "
+                         "the tables shipped with the package)")
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
                     help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "
@@ -1419,7 +1434,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "--dataset and --category the table is written in the long "
                     "format (metric,value,method,dataset,category,clustering,source) that `multibench "
                     "plot --input` reads, so your method can be plotted next to the "
-                    "benchmark's.")
+                    "stored table.")
     pe.add_argument("--output", required=True,
                     help="the embedding, cells x dims: .h5 (dataset 'data', the "
                          "benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "

@@ -64,15 +64,16 @@ _D53 = {
 
 @pytest.fixture
 def layout_tree(tmp_path):
-    """A results root laid out like the full benchmark tree (git 157f6fc),
-    exercising every published layout ``load_results`` reads: single-method
-    datasets (cross D52/D54/D58/D59), a table kept one level down in a
-    run-configuration folder (D53 ``MOFA2/8000HVG``, D56 ``MOFA2/filtered3``
-    + ``MOFA2/kmeans``, D57 ``MOFA2/filtered5``), raw ``kbet/`` folders,
+    """A results root exercising every published layout ``load_results``
+    reads: single-method datasets (cross D52/D54/D58/D59), a table kept one
+    level down in a run-configuration folder (D53 ``MOFA2/8000HVG``, D56
+    ``MOFA2/filtered3`` + ``MOFA2/kmeans``, D57 ``MOFA2/filtered5``), raw
+    ``kbet/`` folders,
     method folders without a metric table (D53 StabMap/totalVI), methods the
     registry does not list for cross (MOFA2, Multigrate), a
     ``<method>_louvain`` variant directory (vertical D3 ``Concerto_louvain``)
-    and a simulated id (diagonal SD7). No ``rerun/`` sweeps."""
+    and two simulated ids whose natural and lexicographic orders differ
+    (diagonal SD7, SD10). No ``rerun/`` sweeps."""
     root = tmp_path / "results"
     cross = root / "scib_metric" / "cross integration"
     for ds in ("D52", "D58", "D59"):
@@ -102,6 +103,7 @@ def layout_tree(tmp_path):
     for meth, v in (("Multigrate", 0.6), ("moETM", 0.5), ("scMM", 0.55), ("scMSI", 0.5),
                     ("scMoMaT", 0.45), ("sciPENN", 0.65)):
         _metric_csv(vert / meth / "metric.csv", ARI=v, NMI=v, ASW=v, iASW=v, iF1=v)
-    _metric_csv(root / "scib_metric" / "diagonal integration" / "SD7" / "GLUE" / "metric.csv",
-                **_clustering(0.5))
+    for ds in ("SD7", "SD10"):
+        _metric_csv(root / "scib_metric" / "diagonal integration" / ds / "GLUE" / "metric.csv",
+                    **_clustering(0.5))
     return root
