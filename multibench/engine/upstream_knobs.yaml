@@ -543,16 +543,16 @@ MultiVI:
     happens to be the same 1e-3 (line 32), so behaviour is correct today, but the assignment
     on line 72 has no effect and editing it alone would change nothing. The effective learning
     rate is 1e-3, which is 10x the scvi-tools default of 1e-4. 2. More hyperparameters are
-    fixed one level down in the helper module, /private/tmp/claude-502/-Users-sdin3712-Documents-multitask-omics/be2bdaf3-2a80-434e-af99-9bee332d50d9/scratchpad/upstream/tools_scripts/MultiVI/util.py,
-    which main_MultiVI.py imports on line 14. I list them here rather than in `hardcoded`
-    so every line number in that array stays checkable against main_MultiVI.py itself: - util.py:186
-    `def train_multivi_model(model, adata, n_epochs=400, lr=1e-3, use_cuda=True):` — a DIFFERENT
-    epoch default (400) that is overridden to 500 by the caller; the two files disagree. -
-    util.py:188-192 ` model.train(\n max_epochs=n_epochs,\n lr=lr,\n #accelerator=accelerator\n
-    )` — accelerator is commented out, so the use_cuda argument is inert and device selection
-    falls back to scvi''s "auto"; batch_size, weight_decay, early_stopping, adversarial_mixing
-    and n_epochs_kl_warmup are all left at library defaults. - util.py:182 ` return scvi.model.MULTIVI(adata,
-    n_genes=n_rna, n_regions=n_atac)` — the entire architecture (n_latent, n_hidden, n_layers_encoder/decoder,
+    fixed one level down in the helper module, tools_scripts/MultiVI/util.py, which main_MultiVI.py
+    imports on line 14. I list them here rather than in `hardcoded` so every line number in
+    that array stays checkable against main_MultiVI.py itself: - util.py:186 `def train_multivi_model(model,
+    adata, n_epochs=400, lr=1e-3, use_cuda=True):` — a DIFFERENT epoch default (400) that
+    is overridden to 500 by the caller; the two files disagree. - util.py:188-192 ` model.train(\n
+    max_epochs=n_epochs,\n lr=lr,\n #accelerator=accelerator\n )` — accelerator is commented
+    out, so the use_cuda argument is inert and device selection falls back to scvi''s "auto";
+    batch_size, weight_decay, early_stopping, adversarial_mixing and n_epochs_kl_warmup are
+    all left at library defaults. - util.py:182 ` return scvi.model.MULTIVI(adata, n_genes=n_rna,
+    n_regions=n_atac)` — the entire architecture (n_latent, n_hidden, n_layers_encoder/decoder,
     dropout_rate, modality_weights, modality_penalty, gene_likelihood) is library-default
     and unreachable. CLI surface is I/O only: --path1, --path2, --pair_path1, --pair_path2,
     --save_path (lines 18-22). Defaults cited from scvi-tools main branch source (scvi/model/_multivi.py);
