@@ -17,15 +17,6 @@ CLUSTERING_METRICS = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
 BATCH_METRICS = ["ASW_batch", "GC", "iLISI", "kBET"]
 
 
-def _score_per_dataset(long_df: pd.DataFrame, metrics=None) -> pd.DataFrame:
-    """Per (method, dataset) overall score, using the benchmark's rank rule
-    (``style.compute_overall`` of the within-dataset max-rank matrix). Thin
-    wrapper over :func:`multibench.plot.style.per_dataset_ranks`, the math
-    shared with ``plot.bubble``."""
-    parts = style.per_dataset_ranks(long_df, metrics)
-    return pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
-
-
 def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         top: int | None = None, title: str | None = None, cmap: str = "Blues",
         show_datasets: bool = True, save: str | None = None,
