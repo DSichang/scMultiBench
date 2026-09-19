@@ -1,23 +1,20 @@
-"""Generate multibench/engine/upstream_knobs.yaml from the audited source.
+"""Generate multibench/engine/upstream_knobs.yaml from upstream_knobs_audit.json.
 
-`params_for` reports what a method's script accepts on its COMMAND LINE, and
-for most methods that is nothing: the benchmark scripts fix their
-hyperparameters in the source, and hard rule #1 forbids editing them. Reporting
-an empty `tunable` is honest but leaves the user with the wrong conclusion -
-that the method has no hyperparameters at all. This file records the other two
-halves of the truth, per method:
+`params_for` reports what a method's script accepts on its command line. For
+most methods that is nothing: the benchmark scripts fix their hyperparameters
+in the source, and this package never edits them. An empty `tunable` alone
+reads as "the method has no hyperparameters", so this file adds, per method:
 
-  fixed_in_script - the hyperparameter values the script pins, each with the
-                    file:line that pins it, so a reader can check the claim
-  upstream_knobs  - what the wrapped library documents, which is what the user
-                    was expecting to see, marked as unreachable from the CLI
+  fixed_in_script - the hyperparameter values the script fixes, each with the
+                    file:line that fixes it
+  upstream_knobs  - what the wrapped library documents but the script does not
+                    expose on the command line
 
 Regenerate with:  python tools/gen_upstream_knobs.py [path/to/scMultiBench]
 
-Every fixed_in_script entry is re-verified against the checked-out upstream
-script before it is written: an entry whose cited line no longer contains the
-cited code is DROPPED, not silently carried forward, so upstream drift shows up
-as missing facts rather than wrong ones.
+Every fixed_in_script entry is checked against the upstream checkout before it
+is written. An entry whose cited line does not contain the cited code is
+dropped, so an upstream change shows up as a missing fact, not a wrong one.
 """
 import json
 import pathlib
@@ -35,7 +32,7 @@ HEADER = """\
 #
 # Why a method reports zero tunable parameters. `params_for` lists what the
 # upstream script accepts on its command line; these are the hyperparameters it
-# FIXES in its source (with the file:line that fixes them), plus the knobs the
+# fixes in its source (with the file:line that fixes them), plus the knobs the
 # wrapped library documents but the script never exposes. Changing the latter
 # requires editing tools_scripts/, which this package never does.
 #
