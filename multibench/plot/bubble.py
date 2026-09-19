@@ -763,7 +763,6 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         r = colvals.rank(ascending=True, method="max") / max(int(n), 1)
         rad = 0.85 * np.sqrt(r.to_numpy(dtype=float))
         return pd.Series(np.maximum(rad, 0.12), index=colvals.index)
-        return pd.Series(0.15 + 0.70 * (r - lo) / (hi - lo), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
     n_na = 0          # NaN metric cells drawn as a dash (legend added if any)
