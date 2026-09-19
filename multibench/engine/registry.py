@@ -78,24 +78,22 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
 
 def _parse_method(d: dict) -> MethodSpec:
     if "needs_labels" in d:
-        # The flag used to be hand-maintained and drifted (scJoint/Seurat_v3/
-        # UnitedNet/scMoMaT all took cty roles while declaring False). It is now
-        # derived from the variants' roles; refuse the key so it cannot come back.
+        # Derived from the variants' roles (MethodSpec.needs_labels); a hand
+        # key could disagree with them, so refuse it.
         raise ValueError(
             f"methods.yaml: {d.get('id')!r} declares needs_labels, but needs_labels "
             f"is derived from the variants' label roles (cty/label) - remove the key")
     if "categories" in d:
-        # Same story: the hand key drifted (Multigrate declared cross, totalVI
-        # and sciPENN mosaic, with no such variant), so list_methods(category=)
-        # and `env ... --category` disagreed with scan/find_methods/run_all,
-        # which all derive from the variants. MethodSpec derives it now.
+        # Likewise derived (MethodSpec.wired_categories): a hand key naming a
+        # category with no variant makes list_methods(category=) and
+        # `env ... --category` disagree with scan/find_methods/run_all.
         raise ValueError(
             f"methods.yaml: {d.get('id')!r} declares categories, but categories is "
             f"derived from the variants' when.category - remove the key")
     variants = [_parse_variant(v, d["id"]) for v in d.get("variants", [])]
-    # params.yaml is keyed per variant and predates the cross variants of
-    # scMDC / scMM, which run the SAME script as their vertical variants -
-    # one argparse, one vocabulary. A variant with no entry inherits the
+    # params.yaml is keyed per variant and has no entry for cross variants that
+    # run the same script as their vertical variants (e.g. scMDC, scMM) - one
+    # argparse, one vocabulary. A variant with no entry inherits the
     # tunables of a sibling that runs the same entrypoint, so run_all's
     # params check (tunable | params) accepts the same keys for both.
     for v in variants:
@@ -120,7 +118,7 @@ def _parse_method(d: dict) -> MethodSpec:
     )
     # A cpu_params flag the script does not accept would be emitted anyway
     # (the runner merges it below the params check) and argparse would then
-    # refuse the whole run - so demand it is a param EVERY variant accepts:
+    # refuse the whole run - so demand it is a param every variant accepts:
     # the upstream argparse vocabulary (`tunable`, from params.yaml) or a
     # default the variant already emits (`params`).
     for v in spec.variants:
@@ -132,9 +130,9 @@ def _parse_method(d: dict) -> MethodSpec:
                 f"{_variant_key(v.when)} variant does not accept (its params: "
                 f"{sorted(accepted)}); cpu_params must be command-line params the "
                 f"upstream script declares")
-    # `atac:` is explicit on purpose (role names lie: moETM/scMM/iPOLNG take
-    # `atac_gas` but consume peaks) - so make its ABSENCE loud rather than a
-    # silent None that find_methods(atac=...) and describe_layout would omit.
+    # `atac:` is an explicit key (see MethodSpec.atac), so its absence is an
+    # error rather than a silent None that find_methods(atac=...) and
+    # describe_layout would omit.
     if spec.atac is not None and spec.atac not in ATAC_VALUES:
         raise ValueError(
             f"methods.yaml: {spec.id!r} has atac={spec.atac!r}; valid: {list(ATAC_VALUES)}")
@@ -155,8 +153,8 @@ _ENV_SPECS = Path(__file__).resolve().parent / "env_specs.yaml"
 
 @functools.lru_cache(maxsize=1)
 def _references() -> dict:
-    """Parsed engine/references.yaml. Missing file -> loud error, not {}: a wheel
-    that silently ships without it would return None for every repo_url/DOI."""
+    """Parsed engine/references.yaml. A missing file raises instead of returning
+    {}: a wheel shipped without it would return None for every repo_url/DOI."""
     if not _REFERENCES.is_file():
         raise FileNotFoundError(
             f"{_REFERENCES} is missing - the package data is incomplete "
@@ -234,10 +232,8 @@ def resolve_method_id(name: str) -> str:
 
     Notes
     -----
-    This is the resolver ``catalog.canonical_id`` / ``load_results`` should
-    share, so a lower-case spelling is accepted everywhere or nowhere.
     ``check_method`` stays strict on purpose (it validates ids at the entry
-    points); use this where a spelling from a file or a table is normalised.
+    points); use this where a spelling from a file or a table is normalized.
     """
     ids = [s.id for s in load()]
     key = str(name).strip()
@@ -254,7 +250,7 @@ def check_category(category: str | None) -> str | None:
 
     ``None`` passes through. Otherwise raises ``ValueError`` "unknown category
     ...; valid: [...]" - the same validator (and message) scan/run_all/load_results
-    already use via ``config.category_folder``.
+    use via ``config.category_folder``.
     """
     if category is None:
         return None
@@ -345,7 +341,7 @@ def list_tasks() -> list[str]:
     -------
     list[str]
         Sorted task names - the vocabulary ``mtb.find_methods(task=...)``
-        validates against
+        validates against.
 
     Examples
     --------
@@ -354,7 +350,7 @@ def list_tasks() -> list[str]:
 
     See Also
     --------
-    mtb.find_methods : filter methods by one of these tasks
+    mtb.find_methods : filter methods by one of these tasks.
     """
     return sorted({t for s in load() for t in s.tasks})
 
@@ -370,7 +366,7 @@ def list_methods(category: str | None = None, task: str | None = None,
     Parameters
     ----------
     category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross`` or None.
-        Keeps the methods that have a VARIANT wired for that category - the
+        Keeps the methods that have a variant wired for that category - the
         same set ``scan`` / ``run_all`` / ``find_methods(category=)`` dispatch
         (``MethodSpec.categories`` is derived from the variants, never
         declared). Validated: ``ValueError`` listing the valid tokens on a typo.
