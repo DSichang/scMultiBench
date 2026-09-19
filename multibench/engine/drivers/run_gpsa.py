@@ -50,26 +50,20 @@ def load_slices_h5ad(data_dir):
     file_paths = glob.glob(data_dir + "*.h5ad")
     for file_path in file_paths:
         slice_i = sc.read_h5ad(file_path)
-        
+
         if scipy.sparse.issparse(slice_i.X):
             slice_i.X = slice_i.X.toarray()
-        
+
         Ground_Truth = slice_i.obs['Ground_Truth']
         slice_i.obs = pd.DataFrame({'Ground_Truth': Ground_Truth})
         slices.append(slice_i)
-    
+
     return slices
 
 # %%
 # https://github.com/andrewcharlesjones/spatial-alignment/blob/main/experiments/expression/st/st_alignment.py
 def process_data(adata, n_top_genes=2000):
     adata.var_names_make_unique()
-    # adata.var["mt"] = adata.var_names.str.startswith("MT-")
-    # sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], inplace=True)
-
-    # sc.pp.filter_cells(adata, min_counts=100)
-    # sc.pp.filter_cells(adata, max_counts=35000)
-    # adata = adata[adata.obs["pct_counts_mt"] < 20]
     sc.pp.filter_genes(adata, min_cells=10)
 
     sc.pp.normalize_total(adata, inplace=True)
@@ -88,13 +82,11 @@ def process1(N_GENES,data_dir,n_views):
 
     use_gpu=True
 
-  
-  
+
     processed_slices = []
     for slice_data in slices:
         processed_data = process_data(slice_data, n_top_genes=3000)
         processed_slices.append(processed_data)
-    ## Save original data
     plt.figure(figsize=(20, 6))
 
 
@@ -102,16 +94,13 @@ def process1(N_GENES,data_dir,n_views):
     for i, slice_i in enumerate(processed_slices):
         slice_i.obs['batch'] = int(i)
 
-    # Concatenate the AnnData objects
-    #only keep the shared genes
+    # Concatenate the AnnData objects, keeping only the shared genes
     data = anndata.concat(processed_slices, merge='unique', index_unique='-')
     shared_gene_names = data.var.index.values
     data_knn = processed_slices[1][:, shared_gene_names]
     X_knn = data_knn.obsm["spatial"]
     Y_knn = data_knn.X
     Y_knn = (Y_knn - Y_knn.mean(0)) / Y_knn.std(0)
-    # nbrs = NearestNeighbors(n_neighbors=2).fit(X_knn)
-    # distances, indices = nbrs.kneighbors(X_knn)
     knn = KNeighborsRegressor(n_neighbors=10, weights="uniform").fit(X_knn, Y_knn)
     preds = knn.predict(X_knn)
     r2_vals = r2_score(Y_knn, preds, multioutput="raw_values")
@@ -193,9 +182,9 @@ def create_binary_matrix(slice, n_categories):
 
 def calculate_PAA(slices, n_categories):
     total_accuracy = 0
-    num_pairs = 0  
+    num_pairs = 0
     for i in range(len(slices)):
-        for j in range(i + 1, len(slices)):  
+        for j in range(i + 1, len(slices)):
             binary_matrix_i = create_binary_matrix(slices[i], n_categories)
             binary_matrix_j = create_binary_matrix(slices[j], n_categories)
 
@@ -205,14 +194,12 @@ def calculate_PAA(slices, n_categories):
             cost_matrix = ot.dist(Z, Z_prime, metric='euclidean')
             ot_plan = ot.emd([], [], cost_matrix)
             total_accuracy += np.sum(ot_plan * matched_pairs)
-            num_pairs += 1  
+            num_pairs += 1
 
-    ave_accuracy = total_accuracy / num_pairs  
+    ave_accuracy = total_accuracy / num_pairs
     print(ave_accuracy)
     return ave_accuracy
 ###################### Metric 1 PAA ##############################
-
-
 
 
 ###################### Metric 2 SCS ##############################
@@ -287,7 +274,6 @@ def spatial_entropy(g, labels):
     return H
 
 
-
 def spatial_coherence_score(graph, labels):
     g, l = graph, labels
     true_entropy = spatial_entropy(g, l)
@@ -343,14 +329,6 @@ def compute_average_ltari(slices, k=1):
 ###################### Metric 3 LTARI #############################
 
 
-
-
-
-
-
-
-
-
 # %%
 # https://github.com/andrewcharlesjones/spatial-alignment/blob/main/experiments/expression/st/st_alignment.py
 def whole_process(data_dir,save_dir,num_slices,n_labels):
@@ -369,7 +347,6 @@ def whole_process(data_dir,save_dir,num_slices,n_labels):
     ###############################################
     N_EPOCHS = 5000
     PRINT_EVERY = 25
-    #x, slices,data_dict,data = process1(N_GENES,data_dir,file_names,num_slices,mapping_dict)
     x, slices,data_dict,data = process1(N_GENES,data_dir,n_views)
     model = VariationalGPSA(
     data_dict,
@@ -389,20 +366,15 @@ def whole_process(data_dir,save_dir,num_slices,n_labels):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 
 
-
     for t in range(N_EPOCHS):
         loss, G_means =  train(model, model.loss_fn, optimizer,x,view_idx,Ns,data_dict)
         if t % PRINT_EVERY == 0:
                 print("Iter: {0:<10} LL {1:1.3e}".format(t, -loss), flush=True)
                 curr_aligned_coords = G_means["expression"].detach().cpu().numpy()
-        
+
                 if model.n_latent_gps["expression"] is not None:
                     curr_W = model.W_dict["expression"].detach().numpy()
                     pd.DataFrame(curr_W).to_csv("./out/W_st.csv")
-
-
-
-
 
 
     # Convert the tensor to a numpy array on the CPU
@@ -417,13 +389,10 @@ def whole_process(data_dir,save_dir,num_slices,n_labels):
         slice_i.obsm['spatial'] = G_means_expression[slice_indices, :]
 
 
-
-
     original_slices = load_slices_h5ad(data_dir)
 
     for original_slice, updated_slice in zip(original_slices, slices):
         original_slice.obsm['spatial'] = updated_slice.obsm['spatial']
-
 
 
     save_dir = os.path.join(save_dir, "GPSA_aligned_slices")
@@ -434,8 +403,7 @@ def whole_process(data_dir,save_dir,num_slices,n_labels):
         sc.write(save_path, slice)
 
 
-
-    #EVALUATION
+    # Evaluation
     print("PAA of this model is:")
     PAA = calculate_PAA(original_slice,n_labels)
     print("LTARI of this model is:")
@@ -445,8 +413,7 @@ def whole_process(data_dir,save_dir,num_slices,n_labels):
     SCS = average_spatial_coherence_score(original_slice)
 
 
-
-        # save metrics
+    # save metrics
     metrics_data = [
             {"Metric": "PAA", "Value": PAA},
             {"Metric": "SCS", "Value": SCS},
@@ -464,12 +431,10 @@ def whole_process(data_dir,save_dir,num_slices,n_labels):
 # %%
 def combine(data_dir,save_dir):
 
-    # file_names = [f for f in os.listdir(data_dir) if f.endswith('.h5ad') and os.path.isfile(os.path.join(data_dir, f))]
-    
     slices = load_slices_h5ad(data_dir)
     num_slices=len(slices)
     unique_layers = set()
-    
+
     for slice in slices:
         unique_layers.update(slice.obs['Ground_Truth'].unique())
 
@@ -479,6 +444,3 @@ def combine(data_dir,save_dir):
 
 # %%
 aligned_slices = combine(args.data_dir, args.save_dir)
-
-
-# python GPSA.py --data_dir '../unified_data/DLPFC/donor1/' --save_dir './aligned_slices/'

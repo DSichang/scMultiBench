@@ -6,12 +6,11 @@
 #   reference           - {doi, title, authors, journal, year}; every DOI here
 #                         was resolved against the Crossref registry
 #                         (api.crossref.org/works/<doi>) and the returned title
-#                         checked against the method. NEVER add a DOI from memory.
+#                         checked against the method. Never add a DOI from memory.
 #   _benchmark          - the benchmark's own citation (scMultiBench CITATION.cff)
 #
-# A method without `reference:` has no DOI we could verify yet (see
-# tests/test_references.py::UNREFERENCED for the list) - add it with its
-# Crossref check, do not guess.
+# A method without `reference:` has no verified DOI yet (listed in
+# tests/test_references.py::UNREFERENCED); add one only with its Crossref check.
 
 _benchmark:
   doi: 10.1038/s41592-025-02856-3

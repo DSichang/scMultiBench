@@ -1,19 +1,16 @@
-# Observed method runtimes - REFERENCE DATA, not a prediction.
+# Observed method runtimes: reference data, not a prediction.
 #
-# Measured on ONE shared machine (2x RTX 4090, 64 cores, often contended) on the
-# datasets listed. Your runtime will differ with hardware, cell count and load.
+# Measured on one shared machine (2x RTX 4090, 64 cores, often under load) on the
+# datasets listed; runtime varies with hardware, cell count and load. Every value
+# is rounded up, so a listed time is never shorter than the run took. Use it to
+# size run_all(timeout=...), with headroom.
 #
-# Every value is rounded UP, so a recorded time is never SHORTER than the run
-# actually took. Use it to size run_all(timeout=...), and still add headroom.
-#
-# tier:  fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h
-# Merged from three sources, keeping the LONGEST time per (method, dataset):
-# the earlier hand-kept rows (source: manual), notebooks/results/summary_D*.csv
-# run_sec rounded up (source: summary_csv) and the wall time of the recorded
-# end-to-end runs (source: recorded). cells is null where no run recorded the
-# count.
-# tests/test_runtime_table.py pins these invariants - update all three
-# sources together rather than editing a number here.
+# tier:   fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h
+# source: manual (hand-kept row) | summary_csv (run_sec in
+#         notebooks/results/summary_D*.csv) | recorded (wall time of a recorded
+#         end-to-end run). The longest time per (method, dataset) is kept.
+# cells is null where no run recorded the count.
+# tests/test_runtime_table.py pins these invariants.
 Cobolt:
   observed:
   - cells: 32151

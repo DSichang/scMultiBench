@@ -58,12 +58,11 @@ methods:
     atac: peak
     status: verified
     variants:
-      # Bridge/anchor integration via Seurat v5 (env scmb_seurat5, Seurat 5.4.0). Needs
-      # LD_PRELOAD for the R CXXABI (else "namespace load failed for Seurat"), and
-      # sctransform exports ~520MiB of globals to `future` workers, over the 500MiB
-      # default -> raise R_FUTURE_GLOBALS_MAXSIZE (the `future` pkg reads this env
-      # var at load). D27 peaks are colon-format (chr:start-end) so no normalize.
-      # RUN-VERIFIED on D27.
+      # Bridge integration. LD_PRELOAD supplies the R CXXABI (else "namespace load
+      # failed for Seurat"). sctransform exports ~520 MiB of globals to `future`
+      # workers, over the 500 MiB default, so R_FUTURE_GLOBALS_MAXSIZE is raised
+      # (`future` reads it at load). D27's peak ids are already chr:start-end, so
+      # no normalize_peaks.
       - when: {category: diagonal, modalities: [rna, atac_peak]}
         entrypoint: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd
         language: R
@@ -89,14 +88,11 @@ methods:
     requires_gpu: true
     gpu_evidence: tools_scripts/scBridge/main_scBridge.py:46
     variants:
-      # scBridge takes the dataset DIRECTORY plus BARE FILENAMES relative to it
-      # (upstream: --data_path="../D27/" --source_data="rna.h5" --target_data="atac_gas.h5"
-      # --source_cty "rna_cty.csv" --target_cty "atac_cty.csv"), NOT absolute paths.
-      # So the four file roles are `const` bare names (inputs_for skips const args)
-      # and only `data_dir` is resolved -> the sole input is the dataset dir, which
-      # leaves the modality set empty, hence `modalities: []` (same shape the
-      # spatial-registration data_dir methods use). source = labelled RNA reference,
-      # target = ATAC query. RUN-VERIFIED on D28 (which has all four files).
+      # scBridge takes the dataset directory plus bare file names relative to it
+      # (upstream: --data_path="../D27/" --source_data="rna.h5" ...), not absolute
+      # paths. The four file roles are therefore `const` names, which inputs_for
+      # skips; only `data_dir` is resolved, so the modality set is empty, as for
+      # the registration methods. source = labelled RNA reference, target = ATAC query.
       - when: {category: diagonal, modalities: []}
         entrypoint: tools_scripts/scBridge/main_scBridge.py
         language: python
@@ -110,9 +106,8 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
         extra_outputs:
           - {kind: labels, file: Prediction.csv}
-        params: {umap_plot: true}    # action=store_false: passing this DISABLES the in-script figure save, which would otherwise crash on data-path-derived filename
+        params: {umap_plot: true}    # store_false flag: passing it disables the in-script figure save, which crashes on its data-path-derived file name
 
-  # ---- declared stubs (discoverable; not yet wired) ----
   - id: totalVI
     language: python
     tasks: [batch, clustering]
@@ -140,12 +135,8 @@ methods:
     atac: peak
     status: verified
     variants:
-      # Mosaic layout = 3 batches: RNA-only, paired (multiome) RNA+ATAC, ATAC-only.
-      # On D45-family data those are rna1 / (rna2,atac2) / atac3. Use the concrete
-      # file-name roles (like Cobolt/Multigrate below) so inputs_for resolves them
-      # directly; the flag names preserve the upstream RNA/ATAC/pair semantics.
-      # Upstream main_MultiVI.py canonical D45 cmd: --path1 rna1 --path2 atac3
-      # --pair_path1 rna2 --pair_path2 atac2.
+      # Mosaic layout = 3 batches: RNA-only, paired multiome (RNA + ATAC), ATAC-only;
+      # in the D45 family these are rna1 / (rna2, atac2) / atac3.
       - when: {category: mosaic, modalities: [rna1, atac3, rna2, atac2]}
         entrypoint: tools_scripts/MultiVI/main_MultiVI.py
         language: python
@@ -179,10 +170,9 @@ methods:
     atac: peak
     status: verified
     variants:
-      # scMVP's torch (1.9.1+cu102 in scmb_scmvp4) has no sm_89 kernels, so on this
-      # host's RTX 4090 it dies with "CUDA error: no kernel image is available"
-      # inside multi_vae_attention. Force CPU (same treatment as scMSI; scMM does the
-      # equivalent with its own --no_cuda flag). RUN-VERIFIED on D15.
+      # The env's torch 1.9.1+cu102 has no sm_89 kernels: on such a GPU (e.g. RTX 4090)
+      # multi_vae_attention fails with "CUDA error: no kernel image is available".
+      # Forced to CPU, as for scMSI (scMM does the same with its own --no_cuda flag).
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/scMVP/main_scMVP.py
         language: python
@@ -196,7 +186,7 @@ methods:
   - id: scMM
     language: python
     tasks: [batch, clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
     status: verified
     variants:
@@ -247,7 +237,7 @@ methods:
           - {role: adt, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-        params: {nbatch: 1}    # single h5 source -> 1 batch one-hot col; default args.nbatch=2 produces 10797-vs-10796 dim mismatch
+        params: {nbatch: 1}    # one input file -> one batch one-hot column; the default nbatch=2 fails with a dimension mismatch
       - when: {category: vertical, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/scMDC/main_scMDC.py
         language: python
@@ -317,8 +307,8 @@ methods:
           - {roles: ["=None", atac2, "=None"], flag: "--path3"}
           - {roles: [cty1, cty2, cty3], flag: "--cty_path"}
           - {role: out_dir, flag: "--save_path"}
-        # scMoMaT's primary product is a kNN GRAPH, not an embedding; the 2-D UMAP
-        # is a secondary output. Same as its vertical/cross variants.
+        # scMoMaT's primary output is a kNN graph, not an embedding; the 2-D UMAP
+        # is secondary. Same as its vertical/cross variants.
         output: {kind: graph, file: knn_indices.h5, dataset: data}
         extra_outputs:
           - {kind: graph, file: knn_dists.h5, dataset: data}
@@ -326,7 +316,7 @@ methods:
   - id: moETM
     language: python
     tasks: [clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
     status: verified
     # GPU: every minibatch goes `.to('cuda')` unconditionally - main_moETM_rna_adt.py:109-111
@@ -334,7 +324,7 @@ methods:
     # `.cuda()` (:130-131 / :145-146); neither script has a device flag.
     requires_gpu: true
     gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:109
-    setup_hint: "runs in the `env_moETM` conda env. Verified end-to-end on D1 (rna+adt) -> (26169, 100) embedding."
+    setup_hint: "Runs in the `env_moETM` conda env."
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/moETM/main_moETM_rna_adt.py
@@ -360,11 +350,11 @@ methods:
     # main_MIRA.py needs a local logger.py that upstream does not ship - hence
     # env_specs' `blocked-script` tag and the `helpers` line below, which makes
     # scan say so instead of failing at import.
-    setup_hint: "main_MIRA.py does `from logger import *` (line 9) but the public tools_scripts/MIRA/ holds only main_MIRA.py: from a fresh checkout the script ImportErrors at start. The env itself (scmb_mira: pip install mira-multiome scanpy) builds and runs fine. scan() reports the missing helper in files_reason; supply a logger.py next to main_MIRA.py to run it."
+    setup_hint: "main_MIRA.py does `from logger import *` (line 9), but the public tools_scripts/MIRA/ holds only main_MIRA.py, so from a fresh checkout the script fails at import. The env (scmb_mira: pip install mira-multiome scanpy) builds normally. scan() reports the missing helper in files_reason; supply a logger.py next to main_MIRA.py to run it."
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py
-        helpers: [logger.py]          # local module the script imports; NOT in the public repo
+        helpers: [logger.py]          # local module the script imports; not in the public repo
         language: python
         args:
           - {role: rna, flag: "--rna", repeat: true}
@@ -399,17 +389,13 @@ methods:
     tasks: [classification, clustering, dimension_reduction]
     atac: gene_activity
     status: verified
-    setup_hint: "Uses Matilda's supported object API (`matilda-sc`, import `matilda`) via the package driver engine/drivers/run_matilda.py, per https://pyanglab.github.io/Matilda/. The upstream main_matilda_train.py only ran the TRAIN stage and emitted no embedding; the driver trains once then runs dim_reduce + classification in ONE engine pass. Env `matilda` (matilda-sc 0.2.0, torch 2.1.2)."
+    setup_hint: "Runs through the package driver engine/drivers/run_matilda.py, which uses Matilda's object API (`matilda-sc`, import `matilda`; https://pyanglab.github.io/Matilda/). The upstream main_matilda_train.py only trains and writes no embedding; the driver trains once, then runs dimension reduction + classification in one pass."
     variants:
-      # Matilda is a MULTI-TASK model: one shared latent space drives classification,
-      # dimension reduction, feature selection and simulation. The driver calls
-      # matilda.train() then the combinable matilda.task(dim_reduce=True,
-      # classification=True) in a single pass, writing the integrated latent space
-      # (cells x z_dim=100) to embedding.h5 + per-cell predictions to predict.csv.
-      # Mode auto-detects from the modalities passed: rna+adt = CITE-seq,
-      # rna+atac = SHARE-seq, rna+adt+atac = TEA-seq (driver supports all).
-      # No upstream method script is modified.
-      # --- CITE-seq (rna + adt). RUN-VERIFIED on D1 (26169 cells, 17 types). ---
+      # The driver calls matilda.train(), then matilda.task(dim_reduce=True,
+      # classification=True) in one pass: latent space (cells x z_dim) ->
+      # embedding.h5, per-cell predictions -> predict.csv. Matilda picks the mode
+      # from the modalities passed: rna+adt = CITE-seq, rna+atac = SHARE-seq.
+      # --- CITE-seq (rna + adt) ---
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/Matilda/main_matilda_train.py
         driver: engine/drivers/run_matilda.py
@@ -423,7 +409,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
         extra_outputs:
           - {kind: labels, file: predict.csv}
-      # --- SHARE-seq (rna + atac). ---
+      # --- SHARE-seq (rna + atac) ---
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/Matilda/main_matilda_train.py
         driver: engine/drivers/run_matilda.py
@@ -485,11 +471,8 @@ methods:
     atac: peak
     status: verified
     variants:
-      # SMILE mosaic = reference (paired multiome) + query (RNA-only, ATAC-only).
-      # On D45-family data: reference = (rna2, atac2), query = (rna1, atac3). Use the
-      # concrete file-name roles so inputs_for resolves them directly; the flag names
-      # preserve the ref/query semantics. Upstream main_SMILE.py canonical D45 cmd:
-      # --ref_path1 rna2 --ref_path2 atac2 --query_path1 rna1 --query_path2 atac3.
+      # Mosaic = reference (paired multiome) + query (RNA-only, ATAC-only); in the
+      # D45 family: reference = (rna2, atac2), query = (rna1, atac3).
       - when: {category: mosaic, modalities: [rna2, atac2, rna1, atac3]}
         entrypoint: tools_scripts/SMILE/main_SMILE.py
         language: python
@@ -551,8 +534,8 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scJoint
     # CPU switch: main_scJoint.py:21 declares `--use_cuda` with type=bool,
-    # default True - argparse's bool() is truthy for ANY non-empty string
-    # ("False" included), so only the EMPTY string turns it off; :53-56 then
+    # default True - argparse's bool() is truthy for any non-empty string
+    # ("False" included), so only the empty string turns it off; :53-56 then
     # sets torch.device('cpu'). util/closs.py:57,108 gate their .cuda() on
     # use_gpu (= use_cuda); closs._one_hot (:10) is unconditional but has no
     # caller. Applied by the runner on a host without a GPU.
@@ -562,17 +545,13 @@ methods:
     atac: gene_activity
     status: verified
     variants:
-      # Diagonal integration: RNA + gene-activity ATAC with RNA cell-type labels
-      # (transfers labels to ATAC via a shared encoder + KNN). Imports
-      # config/process_db/util as siblings -> cwd_at_script. util/utils.py
-      # progress_bar reads os.popen('stty size') and crashes without a terminal
-      # -> pty: true (runner wraps in `script -q -e -c`). Feature dim / #classes
-      # are derived from the data at runtime (args override Config), so no dims
-      # are hardcoded here; requires GENE-ALIGNED atac_gas (== rna feature dim,
-      # shared encoder) -> D28 (D27's atac_gas is not aligned). Writes intermediate
-      # scriptdir/output/<name>_embeddings.txt then the final save_path/embedding.h5
-      # dataset "data" = concat(rna_emb, atac_emb) (rna cells then atac cells).
-      # RUN-VERIFIED on D28 (rna + atac_gas + rna_cty).
+      # RNA + gene-activity ATAC with RNA labels (label transfer through a shared
+      # encoder + KNN). Imports config/process_db/util as siblings -> cwd_at_script.
+      # util/utils.py progress_bar reads os.popen('stty size') and crashes without a
+      # terminal -> pty (the runner wraps the command in `script -q -e -c`). Input
+      # size and class count are set from the data at run time. The shared encoder
+      # needs atac_gas gene-aligned to rna (same feature dimension): D28 is, D27 is
+      # not. embedding.h5 holds the rna cells, then the atac cells.
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/scJoint/main_scJoint.py
         language: python
@@ -589,7 +568,7 @@ methods:
     tasks: [batch, clustering]
     atac: peak
     status: verified
-    setup_hint: "runs in the `glue` env (scglue); GLUE_human.py reads a gencode GTF by RELATIVE name (gencode.v43.*.annotation.gtf.gz), so it must sit in the process cwd -> cwd_at_script:true runs in the GLUE script dir where the GTF is symlinked. Runner's PYTHONNOUSERSITE=1 is required (else the broken ~/.local torch egg shadows the env's torch 2.4.1 and libcudnn.so.8 is missing). RUN-VERIFIED on D28 (rna+atac_peak)."
+    setup_hint: "Runs in the `glue` env (scglue). GLUE_human.py reads a gencode GTF by relative name (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz), so the file must sit in the GLUE script directory, which `cwd_at_script: true` makes the working directory."
     variants:
       - when: {category: diagonal, modalities: [rna, atac_peak]}
         entrypoint: tools_scripts/GLUE/GLUE_human.py
@@ -641,11 +620,11 @@ methods:
     tasks: [clustering]
     status: verified
     variants:
-      # scMSI's torch 1.9.1+cu102 has no sm_89 kernels -> forcing CPU via
+      # The env's torch 1.9.1+cu102 has no sm_89 kernels -> forced to CPU with
       # CUDA_VISIBLE_DEVICES="" (the model gates on torch.cuda.is_available()).
-      # Env scmb_scmsi also needs pandas<2 (pandas 2 breaks torch.tensor(obs['batch'])
-      # positional indexing). D7 avoids the D1 batch=1 -> BatchNorm issue.
-      # RUN-VERIFIED on D7.
+      # The env also needs pandas<2 (pandas 2 breaks the positional indexing in
+      # torch.tensor(obs['batch'])). D1 fails in BatchNorm on a batch of one cell;
+      # D7's cell count avoids it.
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/scMSI/main_scMSI.py
         language: python
@@ -668,15 +647,10 @@ methods:
     atac: gene_activity
     status: verified
     variants:
-      # Supervised paired RNA+ATAC integration (needs matched cells + labels).
-      # main_UnitedNet.py imports src/ (from src.configs / src.interface) -> cwd_at_script.
-      # commandArgs: --train_path1/2 (rna/atac) --train_cty_path (labels)
-      #              --test_path1/2 (rna/atac to embed) --save_path [--index].
-      # Encoders size themselves from adata.shape[1], so no hardcoded dims. For a
-      # single paired dataset train == test on the same data -> joint embedding of
-      # all cells. Path args are nargs='+' (repeat) -> multi-batch cross possible later.
-      # Output embedding{index}.h5 (default index=1) dataset "data" (cells x dim) +
-      # predict1.csv (predicted labels). RUN-VERIFIED on D27 (paired multiome, 10717 cells).
+      # Supervised paired RNA + ATAC integration (matched cells + labels).
+      # main_UnitedNet.py imports its local src/ package -> cwd_at_script. For one
+      # paired dataset train == test, so every cell is embedded. Outputs carry
+      # --index (default 1): embedding1.h5 and predict1.csv.
       - when: {category: vertical, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/UnitedNet/main_UnitedNet.py
         language: python
@@ -705,28 +679,28 @@ methods:
       - when: {category: cross}
         entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/SPIRAL_latest/main_SPIRAL_ori.py
         language: python
-        cwd_at_script: true            # needs cwd=SPIRAL_latest (local Process/spiral imports + ./txt_file/ intermediates); main_SPIRAL.py upstream is broken, _ori is intact.
-                                       # benchmark-host-only for now: a package-driver port (0.3.0 attempt) ran the full training but failed at the
-                                       # post-mclust stage on a CLEAN txt_file/ ("<slice-prefixed barcodes> not in index"), i.e. the verified run
-                                       # depends on intermediates cached in SPIRAL_latest/txt_file. Port again once that dependency is understood.
+        cwd_at_script: true            # local Process/spiral imports and ./txt_file/ intermediates resolve from the script directory.
+                                       # Benchmark-host-only: the published main_SPIRAL.py is broken, and a package-driver port trains fully
+                                       # but fails after mclust on an empty txt_file/ ("<slice-prefixed barcodes> not in index"), so the
+                                       # working run depends on intermediates cached in the host's txt_file/.
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}
         output: {kind: coords, file: ""}
-        run_env: {R_PROFILE_USER: /media/disk2/Sichang/scmbench_pkg/spiral_mclust_shim.Rprofile, OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # mclust dimnames fix: shim binds data to an R symbol before Mclust (rpy2 closure-call breaks mclust 6.x dimnames<-); thread caps for shared host
+        run_env: {R_PROFILE_USER: /media/disk2/Sichang/scmbench_pkg/spiral_mclust_shim.Rprofile, OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # mclust dimnames fix: the shim binds the data to an R symbol before Mclust (rpy2's closure call breaks mclust 6.x `dimnames<-`); thread caps for a shared host
   - id: GPSA
     status: verified
     language: python
     tasks: [registration]
     variants:
       - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
-        entrypoint: tools_scripts/GPSA/main_GPSA.py      # upstream file writes only an elapsed time; the package DRIVER below writes the aligned slices
+        entrypoint: tools_scripts/GPSA/main_GPSA.py      # upstream file writes only an elapsed time; the package driver below writes the aligned slices
         driver: engine/drivers/run_gpsa.py                # the benchmark's working GPSA script, shipped with the package
         language: python
-        cwd_at_script: true            # globs *.h5ad from --data_dir; variational-GP spatial alignment (gpsa+gpytorch, torch CUDA), HVG=3000
+        cwd_at_script: true            # globs *.h5ad from --data_dir; variational-GP spatial alignment (gpsa + gpytorch), 3000 HVGs
         slice_obs: [Ground_Truth]      # the driver reads obs['Ground_Truth'] from every slice at load; scan's file gate checks it
         args:
-          - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files (obs[Ground_Truth] + obsm[spatial])
+          - {role: data_dir, flag: "--data_dir"}   # directory of spatial slice .h5ad files (obs[Ground_Truth] + obsm[spatial])
           - {role: out_dir,  flag: "--save_dir"}    # writes aligned_slice_*.h5ad into save_dir
         output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
   - id: PASTE
@@ -734,14 +708,14 @@ methods:
     language: python
     tasks: [registration]
     variants:
-      - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
+      - when: {category: cross}
         entrypoint: tools_scripts/PASTE/main_PASTE_pairwise.py
         language: python
-        cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT align (paste-bio). RUN-VERIFIED on D60 from the PUBLISHED script: 12 aligned slices, every coordinate moved
+        cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT alignment (paste-bio), run from the published script
         args:
-          - {role: data_dir, flag: "--data_dir"}   # DIRECTORY of spatial slice .h5ad files
-          - {role: out_dir,  flag: "--save_dir"}    # writes aligned_slice_*.h5ad into save_dir
-        output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
+          - {role: data_dir, flag: "--data_dir"}
+          - {role: out_dir,  flag: "--save_dir"}
+        output: {kind: coords, file: ""}
   - id: PASTE2
     status: verified
     language: python
@@ -750,7 +724,7 @@ methods:
       - when: {category: cross}
         entrypoint: tools_scripts/PASTE2/main_PASTE2.py
         language: python
-        cwd_at_script: true            # RUN-VERIFIED on D60 from the PUBLISHED script: 12 aligned slices, every coordinate moved
+        cwd_at_script: true            # run from the published script
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}
@@ -764,7 +738,7 @@ methods:
     gpu_evidence: tools_scripts/iPOLNG/main_iPOLNG.py:41
     language: python
     tasks: [clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome PEAK matrix (D15/atac.h5) - see tools/atac_audit.py
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
     status: verified
     variants:
@@ -782,11 +756,10 @@ methods:
     atac: peak
     status: verified
     variants:
-      # Cross integration. main_StabMap.Rmd has NO top-level call (defines
-      # run_StabMap + helpers, sources util.R), so it is run via the package
-      # driver engine/drivers/run_stabmap.R which source()s the UNMODIFIED .Rmd
-      # then calls run_StabMap(file_paths, save_path, reference). RUN-VERIFIED on
-      # D52 (3 rna + 3 adt batches, reference=data3) -> embedding.h5 (23478x50).
+      # Cross integration. main_StabMap.Rmd only defines run_StabMap() and helpers
+      # (no top-level call), so the package driver engine/drivers/run_stabmap.R
+      # source()s the unmodified .Rmd and calls run_StabMap(file_paths, save_path,
+      # reference).
       - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
         entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
         language: R
@@ -802,7 +775,7 @@ methods:
           - {role: out_dir, flag: "--save_path"}
           - {role: reference, flag: "--reference", const: data3}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-      # Mosaic integration. Same driver as cross; run_stabmap.R already accepts
+      # Mosaic integration. Same driver as cross; run_stabmap.R accepts
       # repeatable --rna/--adt/--atac, and util.R names datasets data1..dataN one
       # per batch. D46 is rna1+adt1 | rna2+atac2 | rna3, so data1 is a bridge
       # batch carrying two modalities.
@@ -850,20 +823,17 @@ methods:
           - {role: adt2}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-      # NO mosaic variant, deliberately. Two independent blockers, both verified:
-      #  1. main_UINMF_cross.Rmd computes the SECOND batch's unshared features
-      #     from the FIRST batch's Seurat object (`adt2_top2000 <- VariableFeatures(se1)`).
-      #     Harmless when both unshared blocks are the same modality (the intended
-      #     cross case), but on a mosaic layout where batch 2's unshared block is
-      #     ATAC, the ADT feature names are absent from the peak matrix and it dies
-      #     with "Not all features passed are found in dataset rna1". Hard rule #1
-      #     forbids editing tools_scripts/, so it cannot be fixed here.
-      #  2. The script takes exactly two batches, each needing RNA plus its own
-      #     unshared block, so a genuine mosaic run needs >=2 batches sharing the
-      #     SAME unshared modality type plus >=1 batch lacking it. No dataset on
-      #     disk has that layout.
-      # Offering a variant anyway would make scan() call it runnable and then fail
-      # every time, which is worse than not offering it.
+      # No mosaic variant, for two independent reasons:
+      #  1. main_UINMF_cross.Rmd takes the second batch's unshared features from
+      #     the first batch's Seurat object (`adt2_top2000 <- VariableFeatures(se1)`).
+      #     That is harmless when both unshared blocks are the same modality (the
+      #     cross case), but when batch 2's unshared block is ATAC the ADT names
+      #     are absent from the peak matrix: "Not all features passed are found in
+      #     dataset rna1". Upstream scripts are not edited, so it stays.
+      #  2. The script takes exactly two batches, each with RNA plus its own
+      #     unshared block; a mosaic run needs >=2 batches sharing one unshared
+      #     modality plus >=1 batch lacking it, a layout no benchmark dataset has.
+      # A variant would make scan() report it runnable and then fail every run.
 
   - id: iNMF
     language: R
@@ -914,13 +884,10 @@ methods:
     tasks: [clustering]
     status: verified
     variants:
-      # Vertical joint-embedding via MOFA2 for matched multimodal data (e.g. RNA+ADT).
-      # The Rmd sources util.R (cwd_at_script) and run_mofa(use_basilisk=FALSE) bridges
-      # to mofapy2 through reticulate -> RETICULATE_PYTHON must point at an env with
-      # mofapy2 installed (mofa_env_gpu). LD_PRELOAD supplies the R CXXABI.
-      # commandArgs are POSITIONAL: <rna...> <adt...> <batch_num> <num=#modalities> <save_path>
-      # (script slices by count; num==2 -> 1 rna + 1 adt for a single batch).
-      # RUN-VERIFIED on D2 (rna+adt) -> embedding.h5 (dataset "data").
+      # The Rmd sources util.R -> cwd_at_script. run_mofa(use_basilisk=FALSE) reaches
+      # mofapy2 through reticulate, so RETICULATE_PYTHON must point at a Python with
+      # mofapy2 installed. LD_PRELOAD supplies the R CXXABI. Arguments are positional:
+      # <rna...> <adt...> <batch_num> <num = number of modalities> <save_path>.
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
         language: R
@@ -941,12 +908,10 @@ methods:
     atac: peak
     status: verified
     variants:
-      # Diagonal transfer-anchor integration. Self-contained Rmd with commandArgs
-      # (6 positional: rna, atac_peak, atac_gas, rna_cty, atac_cty, save_path).
-      # Needs Seurat 4.3 + SeuratObject 4.1.x (5.x v5 objects break RunCCA) -> env
-      # scmb_seurat4b; LD_PRELOAD for Rtsne CXXABI. Signac CreateChromatinAssay
-      # needs chr:start-end peak ids -> normalize_peaks rewrites atac_peak names.
-      # RUN-VERIFIED on D28 (unpaired rna/atac) -> embedding.h5 (11014 x 50).
+      # Transfer-anchor integration. Needs Seurat 4.3 + SeuratObject 4.1.x (v5
+      # objects break RunCCA), hence its own env; LD_PRELOAD supplies the CXXABI
+      # Rtsne needs. Signac's CreateChromatinAssay needs chr:start-end peak ids ->
+      # normalize_peaks rewrites the atac_peak names.
       - when: {category: diagonal, modalities: [rna, atac_peak, atac_gas]}
         entrypoint: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd
         language: R
