@@ -55,7 +55,7 @@ def _probe_lisi_binary(exe) -> str | None:
     except OSError as exc:
         return f"{exe} cannot be executed here ({type(exc).__name__}: {exc})"
     except subprocess.TimeoutExpired:
-        return None                      # it started; that is all we asked
+        return None                      # it started, which is all the probe checks
     # It ran if it exited cleanly or wrote anything to stdout (a bare
     # invocation prints the usage line). Matching the usage text instead would
     # turn a wording change into a false alarm that drops two metrics; this
@@ -187,8 +187,9 @@ def _scanpy_has_flavor_kw() -> bool:
     """Does this scanpy accept ``sc.tl.leiden(flavor=...)`` at all (>= 1.10)?
 
     Older releases forward the unknown keyword to leidenalg's partition class
-    (``TypeError: ... unexpected keyword argument 'flavor'``); newer ones warn
-    about the future default unless the flavor is spelled out. Probed once.
+    (``TypeError: ... unexpected keyword argument 'flavor'``). Where the keyword
+    exists it is spelled out, so a future change of scanpy's default backend to
+    igraph cannot switch the backend silently. Probed once.
     """
     global _flavor_kw
     if _flavor_kw is None:

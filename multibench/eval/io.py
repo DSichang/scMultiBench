@@ -283,7 +283,7 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
            else "pass the paths as a list in that order")
     return (
         f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
-        f"fix the cell order, and the order MUST be the method's stacking order "
+        f"fix the cell order, and the order must be the method's stacking order "
         f"(the order the method concatenated its input cells: numbered files "
         f"ascending, cty1, cty2, ...; rna before atac) - NOT alphabetical. "
         f"{fix}, or a list of paths in cell order. "

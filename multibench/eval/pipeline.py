@@ -59,9 +59,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     -------
     pandas.DataFrame
         Exactly the seven columns ``metric, value, method, dataset,
-        category, clustering, source``. (The 0.2.x ``needs_labels=`` keyword
-        was removed; to badge a method of your own as supervised add a
-        boolean ``needs_labels`` column to the frame yourself.)
+        category, clustering, source``.
 
     Raises
     ------
@@ -81,6 +79,11 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11", category="vertical")
     >>> pd.concat([mtb.load_results("vertical", dataset="D11", source="rerun"), mine]).to_csv("all.csv", index=False)
     >>> mtb.load_results(result_path="all.csv", source="user")      # your rows only
+
+    Notes
+    -----
+    The 0.2.x ``needs_labels=`` keyword was removed. To badge a method of your
+    own as supervised, add a boolean ``needs_labels`` column to the frame.
     """
     if isinstance(value_df, pd.Series):
         value_df = value_df.to_frame("Value")
@@ -90,7 +93,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
             "to_long() got an already long frame (columns metric, value, method"
             f"{', ...' if len(cols) > 3 else ''}); pass it to mtb.plot.bubble / "
             "pd.concat / load_results consumers directly - to_long reshapes "
-            "evaluate()'s WIDE frame (metrics as the index, one column 'Value')")
+            "evaluate()'s wide frame (metrics as the index, one column 'Value')")
     if "Value" not in cols:
         idx = list(map(str, list(value_df.index)[:5]))
         raise ValueError(
@@ -249,7 +252,7 @@ def _labels_from_dict(d: dict, label_order) -> list:
 
 
 def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
-    """Turn the ``metrics=`` knob into what :func:`multibench.eval.scib.compute` needs.
+    """Turn the ``metrics=`` argument into what :func:`multibench.eval.scib.compute` needs.
 
     Parameters
     ----------
@@ -458,7 +461,7 @@ def evaluate(
         spellings of this argument; ``slow_metrics=`` was removed.
     clustering : keyword-only, optional
         Precomputed cluster assignment (same forms and the same alignment
-        rule as ``labels``; an ``.h5`` path is read from
+        rule as ``labels``; an ``.h5`` path given as a ``str`` is read from
         ``/obs/cluster_leiden``). When omitted, the scIB optimal-resolution
         Leiden sweep derives one from the embedding (its cost is in Notes);
         passing one skips the sweep for ``ARI``/``NMI`` (``iF1`` still sweeps
@@ -507,9 +510,10 @@ def evaluate(
     -----
     Cost. ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
     Leiden sweep (10 resolutions on a kNN graph of the embedding): tens of
-    seconds for a few thousand cells, minutes for ~10^4. To skip it, pass
-    ``metrics=[...]`` naming metrics that do not need it (``ASW``, ``iASW``,
-    ``cLISI``, the batch family) or, for ``ARI``/``NMI``, ``clustering=``.
+    seconds for a few thousand cells, minutes for ~10^4. To skip it, name
+    only metrics that do not need it in ``metrics=[...]`` (``ASW``, ``iASW``,
+    ``cLISI``, the batch family). ``clustering=`` removes the need for
+    ``ARI``/``NMI`` only; ``iF1`` always sweeps.
     The sweep's Leiden backend is ``mtb.config.DEFAULT.leiden_flavor``:
     ``"igraph"`` (default; several times faster) or ``"leidenalg"`` (the
     classic backend scib itself runs).
