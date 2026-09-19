@@ -24,7 +24,7 @@ class RunResult:
     out_dir : directory holding everything the method wrote. The primary file is
         named by the variant's ``output.file`` (usually ``embedding.h5``).
     cmd : the exact argv that was executed - useful for reproducing a run by hand.
-    output : the primary output ALREADY LOADED. For an embedding method this is a
+    output : the primary output, already loaded. For an embedding method this is a
         numpy array; pass it straight to :func:`multibench.evaluate`. Note it may be
         dims x cells rather than cells x dims - ``evaluate`` re-orients a raw array
         against the label count for you.
@@ -77,7 +77,7 @@ def run_mode(env: str) -> tuple[str, Path | None]:
     tuple[str, Path or None]
         ``("prefix", <prefix>)`` whenever ``mtb.env.env_prefix(env)`` finds
         the env on disk - the default, needing no conda binary; else
-        ``("conda", None)``, today's ``conda run -n <env>``. The
+        ``("conda", None)`` (``conda run -n <env>``). The
         ``MULTIBENCH_RUN_MODE`` environment variable forces either.
 
     Raises
@@ -106,13 +106,12 @@ def run_mode(env: str) -> tuple[str, Path | None]:
 
 
 def prefix_activation(env: str, prefix: Path | str) -> str:
-    """The shell snippet that activates a conda prefix WITHOUT conda.
+    """The shell snippet that activates a conda prefix without conda.
 
     Sets ``CONDA_PREFIX`` and ``CONDA_DEFAULT_ENV``, puts ``<prefix>/bin``
     first on ``PATH`` and sources every ``<prefix>/etc/conda/activate.d/*.sh``
-    (the R envs ship six; they assume ``CONDA_PREFIX`` is already set, hence
-    the order). ``python`` / ``Rscript`` in the wrapped argv then resolve
-    inside the env.
+    (the scripts assume ``CONDA_PREFIX`` is already set, hence the order).
+    ``python`` / ``Rscript`` in the wrapped argv then resolve inside the env.
 
     Parameters
     ----------
@@ -147,7 +146,7 @@ def wrap_prefix(cmd: list[str], env: str, prefix: Path | str) -> list[str]:
     Returns
     -------
     list of str
-        The wrapped argv; ``bash`` execs the method, so the method IS the
+        The wrapped argv; ``bash`` execs the method, so the method is the
         child process (the process-group kill on a timeout is unchanged).
     """
     return ["bash", "-c", f"{prefix_activation(env, prefix)}; exec \"$@\"", "--", *cmd]
@@ -168,16 +167,15 @@ def stage_slices(data_dir, staged_dir) -> dict:
 
     The registration scripts (PASTE, PASTE2, GPSA's driver, SPIRAL) load
     ``glob.glob(data_dir + "*.h5ad")`` and write ``aligned_slice_<i>.h5ad``
-    for the ``i``-th file that glob returned - directory order, which is
-    filesystem-dependent and sorted nowhere by the scripts - and PASTE strips
-    every ``obs`` column at load, so nothing in an output slice says which
-    input it came from. Staging gives the scripts a directory whose names sort
-    as ``00_<name>.h5ad, 01_<name>.h5ad, ...`` (the numbering the user chose,
-    as ``sorted()`` orders it) and records the order the glob actually
-    returns in that directory - the order the script will load - so the
-    manifest is the ground truth even on a filesystem whose listing is not
-    sorted. The ``NN_`` prefix is unique per slice, which also satisfies
-    SPIRAL's unique-leading-token rule.
+    for the ``i``-th file the glob returned - filesystem order, which the
+    scripts never sort - and PASTE strips every ``obs`` column at load, so
+    nothing in an output slice says which input it came from. Staging gives
+    the scripts a directory whose names sort as ``00_<name>.h5ad,
+    01_<name>.h5ad, ...`` (the source names in ``sorted()`` order) and records
+    the order the glob actually returns there - the order the script loads -
+    so the manifest holds even on a filesystem whose listing is not sorted.
+    The ``NN_`` prefix is unique per slice, which also satisfies SPIRAL's
+    unique-leading-token rule.
 
     Parameters
     ----------
@@ -232,9 +230,9 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     a trailing separator.
 
     The method runs with ``cwd=out_dir`` (or the script's own directory), so a
-    relative ``data/MYCITE/rna.h5`` would be looked up relative to the wrong
-    place - the child saw ``exists=False`` and a relative ``--save_path
-    out/x/`` made it write ``out/x/out/x/embedding.h5``. Many upstream scripts
+    relative ``data/MYCITE/rna.h5`` would be looked up in the wrong place and
+    a relative ``--save_path out/x/`` would write
+    ``out/x/out/x/embedding.h5``. Many upstream scripts
     also string-concatenate ``data_dir + "*.h5ad"``, hence the separator on
     directory values. ``os.path.abspath`` (not ``Path.resolve``) keeps symlinked
     data roots as the user wrote them.
@@ -273,7 +271,7 @@ def _modality_roles(inputs: dict) -> set[str]:
 
 
 def _repo_root_no_fetch() -> Path:
-    """Where :func:`run` looks for ``tools_scripts/`` - WITHOUT cloning it.
+    """Where :func:`run` looks for ``tools_scripts/`` - without cloning it.
 
     Mirrors ``config.ensure_repo``'s lookup order (configured ``repo_path``,
     then the package root) but never fetches: a dry run must not touch the
@@ -303,14 +301,12 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     """
     # Pass out_dir with a trailing separator: many method scripts build their
     # output path by string-concatenation (R paste0(save_path,"embedding.h5"),
-    # etc.), so a missing slash writes a SIBLING file instead of into out_dir.
+    # etc.), so a missing slash writes a sibling file instead of into out_dir.
     cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
     # entrypoint is relative to the reference repo. A variant may declare a
-    # package-side `driver`: a wrapper script (shipped with the package) that
-    # source()s the UNMODIFIED upstream entrypoint and calls its function. When
-    # set, run the driver instead and hand it the upstream script's dir via
-    # --script_dir (so the driver can source it in place; the method script
-    # stays byte-identical to upstream).
+    # package-side `driver` that source()s/imports the unmodified upstream
+    # entrypoint and calls its function: run the driver instead and pass the upstream
+    # script's directory via --script_dir, so the script is sourced in place.
     if getattr(variant, "driver", None):
         pkg_root = Path(__file__).resolve().parents[1]      # .../multibench
         driver_abs = pkg_root / variant.driver
@@ -320,10 +316,10 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
         cmd[1] = str(repo / cmd[1])
     activate = None
     if cmd_template is None:
-        # Resolve the env via the same group system that provisioning builds
-        # (mtb.env.plan/create/create_group), so "the env you provision is the
-        # env you run". group_for() returns a method's shared group env, or its
-        # own scmb_<method> env if it is not grouped.
+        # Resolve the env through the group system provisioning uses
+        # (mtb.env.plan/create/create_group), so the env that is provisioned
+        # is the env that runs: group_for() returns a method's shared group
+        # env, or its own scmb_<method> env if it is not grouped.
         env_name = envs.group_for(method)
         mode, prefix = run_mode(env_name)
         if mode == "prefix":
@@ -339,13 +335,10 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
             cmd_template = f"{conda} run -n {env_name} {{cmd}}"
     # Opt-in pseudo-tty: some upstream scripts read the terminal size
     # (os.popen('stty size')) to draw a progress bar and crash without a tty
-    # (scJoint's util/utils.py). Wrap the method command in `script`, which
-    # allocates a pty, forwards the child's output to captured stdout, and (-e)
-    # propagates the child's exit code so the returncode check below still fires.
-    # This must be INNERMOST -- inside the conda-run wrap -- so the method
-    # process's own stdin is the pty; conda run otherwise redirects stdio and
-    # `stty size` still fails. Hence wrap BEFORE wrap_command. Default off ->
-    # no other method affected.
+    # (scJoint's util/utils.py). `script` allocates a pty, forwards the child's
+    # output to captured stdout and (-e) propagates its exit code. It must be
+    # innermost - inside the conda-run wrap, hence before wrap_command - so the
+    # method's own stdin is the pty; conda run redirects stdio otherwise.
     if getattr(variant, "pty", False):
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
@@ -355,7 +348,7 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
 
 
 def cpu_params_for(spec, params: dict | None) -> tuple[dict | None, dict]:
-    """The params a run on THIS host should emit, after the CPU switch.
+    """The params a run on this host should emit, after the CPU switch.
 
     On a host without an NVIDIA GPU (:func:`multibench.engine.envs.host_has_gpu`
     is False) a method whose upstream script has CUDA on by default is
@@ -440,8 +433,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         holds is described in Notes.
     params : dict | None, keyword-only
         Overrides merged over the variant's default hyperparameters (default
-        ``None``). On a host without an NVIDIA GPU the method's ``cpu_params``
-        are merged in first, so a key given here always wins - see Notes.
+        ``None``). A key given here also wins over the ``cpu_params`` applied
+        on a host without an NVIDIA GPU - see Notes.
     task : str | None, keyword-only
         Accepted for forward compatibility and currently ignored.
     convert : bool, keyword-only
@@ -455,7 +448,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         Checkout holding ``tools_scripts/`` (default ``None``:
         auto-provisioned; on a dry run it is located but never fetched).
     dry_run : bool, keyword-only
-        ``True`` returns the argv list the call WOULD execute and creates
+        ``True`` returns the argv list the call would execute and creates
         nothing (default False); see Notes.
 
     Returns
@@ -471,11 +464,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         ``method_info(m)['requires_gpu']`` is True - the upstream script
         calls CUDA unconditionally, with no switch - and this host has no
         NVIDIA GPU (``mtb.env.host_has_gpu()`` is False). Raised before
-        anything is written or launched, with the message
-        ``"<method> needs an NVIDIA GPU: the upstream script calls CUDA
-        unconditionally (<file>:<line>); see method_info(m)["requires_gpu"]"``
-        - the same sentence ``scan`` reports as that row's ``env_reason``.
-        A dry run still returns the argv (a preview launches nothing).
+        anything is written or launched, with the sentence ``scan`` reports
+        as that row's ``env_reason``; a dry run still returns the argv.
         Also raised when ``MULTIBENCH_RUN_MODE=prefix`` is forced but no
         prefix is on disk.
     EnvironmentError
@@ -522,13 +512,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     the env's ``activate.d`` scripts; no conda binary needed), else ``conda``
     (``conda run -n <env>``). ``MULTIBENCH_RUN_MODE=conda|prefix`` forces one
     (``prefix`` with no prefix on disk -> ``OSError`` naming ``envs_dir`` and
-    ``mtb.env.install``). When left as None the env is also PREFLIGHTED: if
-    envs are found on this machine and the method's env is not among them,
-    ``EnvironmentError`` is raised before any file is written, naming the
-    install command. Pass a ``cmd_template`` to take over env control (no
-    preflight).
+    ``mtb.env.install``). The env is also preflighted: if envs are found on
+    this machine and the method's env is not among them, ``EnvironmentError``
+    is raised (see Raises). Pass a ``cmd_template`` to take over env control
+    (no preflight).
 
-    ``dry_run=True`` returns the argv list the call WOULD execute - built
+    ``dry_run=True`` returns the argv list the call would execute - built
     from the same pieces (variant selection, ``engine.builder.build_command``,
     the ``driver`` / ``pty`` wrapping, the real env wrap: the prefix
     activation or ``conda run -n <env>``) - and creates nothing: no
@@ -537,15 +526,14 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     passes them (a real run first copies non-canonical inputs to
     ``<out_dir>/inputs/<role>.h5``; canonical ``.h5`` files pass through
     unchanged, so for a laid-out dataset the preview is exact).
-    ``shlex.join`` it for a shell line. (This replaces the 0.2
-    ``command_preview``, which is deprecated.)
+    ``shlex.join`` it for a shell line. (It replaces the 0.2
+    ``command_preview``, which was removed.)
 
-    Auxiliary-role coupling: for methods whose args reference auxiliary
-    roles (e.g. scBridge's ``data_dir``/``source_data``/``target_data``/
-    ``source_cty``/``target_cty``), the caller must ALSO pass the modality
-    roles used for variant selection (e.g. ``rna``, ``atac_gas``). Aux-role
-    inputs are passed through verbatim and are NOT converted to the
-    canonical .h5.
+    Auxiliary roles (e.g. scBridge's ``data_dir``/``source_data``/
+    ``target_data``/``source_cty``/``target_cty``) are passed through verbatim
+    and are not converted to the canonical .h5. A ``data_dir`` variant
+    declares no modalities, so it is selected by ``category`` alone: pass no
+    modality roles with it.
 
     See Also
     --------
@@ -558,9 +546,6 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     mtb.evaluate : scores ``RunResult.output``.
     """
     spec = registry.get(method)
-    # Label roles (anything containing "cty"/"label", e.g. rna_cty/atac_cty)
-    # are auxiliary too: they are method inputs but not modalities for variant
-    # selection (consistent with resolve.py treating them as .csv labels).
     variant = spec.select(category, _modality_roles(inputs))
     # The CPU switch of a CUDA-by-default script, on a host without a GPU
     # (a caller's explicit key wins). Applied to the preview too, so
@@ -582,14 +567,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         print(f"[run] no GPU on this host: applying {method} cpu_params {applied}",
               file=sys.stderr, flush=True)
 
-    # Env preflight: the default env wrap is the prefix activation or `conda
-    # run -n <env> ...`, and a missing env only surfaces AFTER inputs were
-    # converted and the subprocess spawned, buried in a stderr tail with no
-    # install hint. Check up front (same probe scan() uses: prefixes under
-    # envs_dir plus what conda lists), before anything is written. Skipped
-    # when the caller controls the env via cmd_template, and when the probe
-    # returns nothing (no prefixes, conda absent/broken -> cannot evidence,
-    # let the subprocess report as before).
+    # Env preflight: without it a missing env only surfaces after inputs were
+    # converted and the subprocess spawned, in a stderr tail with no install
+    # hint. Same probe scan() uses (prefixes under envs_dir plus what conda
+    # lists). Skipped when the caller controls the env via cmd_template, and
+    # when the probe finds nothing (no prefixes, conda absent or broken): the
+    # subprocess then reports the failure.
     if cmd_template is None:
         env_name = envs.group_for(method)
         have = envs.installed_envs()
@@ -605,7 +588,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
                 f"`multibench env install --methods {method} --packed --run` "
                 f"(or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()")
 
-    # Absolute paths + trailing separator on directory roles BEFORE conversion,
+    # Absolute paths + trailing separator on directory roles before conversion,
     # so canonical passthrough files are absolute too; converted copies live
     # under the (absolute) inputs_dir and come out absolute by construction.
     inputs, out_str = normalize_paths(inputs, out_dir)
@@ -613,9 +596,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     workdir = out
     workdir.mkdir(parents=True, exist_ok=True)
     inputs_dir = workdir / "inputs"
-    # File-role methods keep their inputs/ (canonical copies land there); a
-    # directory-fed method used to get an EMPTY inputs/ - now it holds the
-    # staged slice links, or is not created at all (scBridge).
+    # inputs/ holds the canonical copies of a file-role method or the staged
+    # slice links of a registration method; a data_dir method that stages
+    # nothing (scBridge) gets none.
     if _modality_roles(inputs):
         inputs_dir.mkdir(parents=True, exist_ok=True)
     manifest = None
@@ -653,10 +636,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # egg breaking anndata imports). PYTHONNOUSERSITE=1 makes the env hermetic.
     run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **{k: str(v) for k, v in (variant.run_env or {}).items()}}
     # A Jupyter kernel exports MPLBACKEND=module://matplotlib_inline.backend_inline,
-    # which leaks through `conda run` into the METHOD's env, where matplotlib_inline
+    # which leaks through `conda run` into the method's env, where matplotlib_inline
     # does not exist - so any method that imports matplotlib dies at import when
-    # run_all is called from a notebook (Portal was the first to hit it). Agg is
-    # the safe headless backend for a subprocess that at most saves figures.
+    # run_all is called from a notebook. Agg is the safe headless backend for a
+    # subprocess that at most saves figures.
     if "MPLBACKEND" not in (variant.run_env or {}):
         run_env["MPLBACKEND"] = "Agg"
     # Some scripts source/import local files relative to the entrypoint dir,
@@ -665,9 +648,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # outputs land in the correct place regardless.
     exec_cwd = str((repo / variant.entrypoint).parent) if variant.cwd_at_script else str(workdir)
     # The child is `conda run` (or the prefix-mode bash, which execs the
-    # method) and the actual method may be its GRANDchild; killing only the
-    # direct child on a timeout left the method computing for hours. Own
-    # session -> one killpg reaps the whole tree.
+    # method) and the actual method may be its grandchild; killing only the
+    # direct child on a timeout would leave the method running. Own session
+    # -> one killpg reaps the whole tree.
     popen = subprocess.Popen(cmd, cwd=exec_cwd, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, env=run_env,
                              start_new_session=True)
@@ -686,11 +669,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     if proc.returncode != 0:
         raise RuntimeError(
             f"{method} failed (exit {proc.returncode}).\n"
-            # stdout FIRST, stderr LAST. Callers truncate this message from the
-            # left (a traceback's payload is its tail), so whatever is most
-            # diagnostic has to sit at the end - and that is stderr. Ordering it
-            # the other way meant a left-truncated message kept conda's
-            # "see above for error" summary and discarded the error it referred to.
+            # stdout first, stderr last: callers truncate this message from the
+            # left, so the most diagnostic part - stderr - has to sit at the end
+            # (the other order keeps conda's "see above for error" summary and
+            # cuts the error it refers to).
             f"stdout tail:\n{proc.stdout[-1500:]}\n"
             f"stderr tail:\n{proc.stderr[-2500:]}"
         )

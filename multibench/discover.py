@@ -24,7 +24,7 @@ def _modality_types(spec) -> set[str]:
 
 
 def _variant_matches(v, category, want, needs_labels, atac) -> bool:
-    """Does ONE variant satisfy every per-variant filter at once?
+    """Whether one variant satisfies every per-variant filter at once.
 
     ``v`` may be ``None`` for a declared-but-unwired stub (no variants): it
     satisfies only the filters that ask for nothing a variant could supply
@@ -65,21 +65,22 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         One of ``mtb.list_tasks()`` (a method-level filter); ``None`` = any.
     needs_labels : bool | None, keyword-only
         Per variant: ``True`` keeps methods with a matching variant that takes a
-        cell-type-label role as a REQUIRED input, ``False`` one that takes none;
+        cell-type-label role as a required input, ``False`` one that takes none;
         ``None`` (default) = no filter.
     atac : str | None, keyword-only
         ``"peak"`` or ``"gene_activity"`` (aliases ``peaks`` / ``gas``): the
         ATAC representation the upstream script expects; ``None`` = no filter.
     modalities : list[str] | set[str] | None, keyword-only
-        Base modality types a variant must consume ALL of, e.g.
+        Base modality types a variant must consume all of, e.g.
         ``["rna", "atac"]`` (``protein`` = ``adt``; role tokens reduce to their
         base type). A bare string raises ``TypeError``.
     runnable : bool | None, keyword-only
         ``True`` = methods with at least one variant; ``False`` = the stubs;
         ``None`` (default) = both.
     tunable : bool | None, keyword-only
-        ``True`` = methods exposing at least one command-line hyperparameter;
-        ``False`` = the rest; ``None`` (default) = both.
+        ``True`` = methods exposing at least one command-line hyperparameter
+        (where ``run(params=...)`` can change something); ``False`` = the rest,
+        which hardcode their settings upstream; ``None`` (default) = both.
     available : bool | None, keyword-only
         ``True`` = ``availability == 'public'``; ``False`` = the
         ``benchmark-host-only`` methods; ``None`` (default) = both.
@@ -108,61 +109,37 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
     Notes
     -----
-    Filters are evaluated per VARIANT: a method matches when at least ONE
-    of its variants satisfies ``category`` AND ``modalities`` AND
-    ``needs_labels`` AND ``atac`` *together*. So
-    ``find_methods(category='vertical', modalities=['rna', 'adt'],
-    needs_labels=False)`` keeps scMoMaT (its vertical rna+adt variant takes no
-    labels; only its mosaic variant does) and drops Multigrate from
-    ``find_methods(category='vertical', modalities=['rna', 'atac'])`` (rna+atac
-    exists only as a mosaic variant; ``inputs_for(..., 'vertical',
+    Filters are evaluated per VARIANT: a method matches when at least one
+    of its variants satisfies ``category``, ``modalities``, ``needs_labels``
+    and ``atac`` together. So ``find_methods('vertical', modalities=['rna',
+    'adt'], needs_labels=False)`` keeps scMoMaT (its vertical rna+adt variant
+    takes no labels; only its mosaic variant does), and
+    ``find_methods('vertical', modalities=['rna', 'atac'])`` drops Multigrate
+    (rna+atac exists only as a mosaic variant; ``inputs_for(..., 'vertical',
     modalities=['rna','atac'])`` would raise). ``task``, ``runnable``,
     ``tunable`` and ``available`` are method-level.
 
-    ``category`` is one of ``vertical``/``diagonal``/``mosaic``/``cross``;
-    ``task`` one of ``mtb.list_tasks()``.
-
-    ``needs_labels`` is derived from the variants' roles: ``True`` keeps methods
-    with a matching variant that takes a cell-type-label (``cty``) role as a
-    REQUIRED input, ``False`` one that takes none. Note the difference from
-    ``method_info(m)['needs_labels']``, which is the METHOD-level "any variant
-    needs labels" flag; the per-variant answer is
+    ``needs_labels`` differs from ``method_info(m)['needs_labels']``, the
+    method-level "any variant needs labels" flag; the per-variant answer is
     ``method_info(m)['supports'][i]['needs_labels']``.
 
-    ``atac`` is an exact match on the method's declared ATAC representation:
-    ``"peak"`` or ``"gene_activity"`` (``"peaks"``/``"gas"`` accepted as aliases);
-    it is the representation the UPSTREAM script expects, which is not always
-    what its role name suggests (moETM/scMM/iPOLNG take role ``atac_gas`` but
-    consume peaks). Only variants that actually consume an ATAC input can
-    satisfy it (Multigrate declares ``atac: peak`` for its mosaic rna+atac
+    ``atac`` is the representation the upstream script expects, which is not
+    always what its role name suggests (moETM/scMM/iPOLNG take role
+    ``atac_gas`` but consume peaks). Only variants that consume an ATAC input
+    can satisfy it (Multigrate declares ``atac: peak`` for its mosaic rna+atac
     variant; its vertical rna+adt variant does not match ``atac='peak'``).
 
-    ``modalities`` keeps methods with a variant that consumes ALL of the
-    requested base modality types (e.g. ``["rna", "atac"]``); ``"protein"`` is
-    accepted for ``adt`` and role tokens (``atac_gas``, ``atac_peak``, ``rna1``
-    ...) are reduced to their base type, so ``["rna", "atac_gas"]`` means
-    ``["rna", "atac"]``. Because modality info is derived from a method's
-    variants, this filter implicitly excludes the declared-but-unwired stub
-    methods (those without variants). A method fed a DIRECTORY is judged by
-    the bare filenames its variant names (scBridge's ``rna.h5`` /
-    ``atac_gas.h5`` make it an rna+atac method); the spatial-registration
-    variants name nothing (their ``data_dir`` holds ``.h5ad`` slices), so
-    they cannot be filtered by modality: they are KEPT and a ``UserWarning``
-    names them - ``task='registration'`` (or ``category``) selects or
-    excludes them deliberately.
+    ``modalities`` is judged from a method's variants, so it excludes the
+    declared-but-unwired stub methods (those without variants). A method fed
+    a directory is judged by the bare filenames its variant names (scBridge's
+    ``rna.h5`` / ``atac_gas.h5`` make it an rna+atac method); the
+    spatial-registration variants name nothing (their ``data_dir`` holds
+    ``.h5ad`` slices), so they cannot be filtered by modality: they are KEPT
+    and a ``UserWarning`` names them - ``task='registration'`` (or
+    ``category``) selects or excludes them deliberately.
 
-    ``runnable=True`` restricts to methods with at least one variant (usable by
-    ``inputs_for``/``run``); ``runnable=False`` returns only the stubs.
-    ``tunable=True`` keeps only methods that expose at least one hyperparameter
-    on their command line (i.e. where ``run(params=...)`` can change anything) -
-    the rest hardcode their settings upstream.
-
-    ``available`` (default ``None`` = no filter): ``True`` keeps
-    methods whose scripts a public install can run
-    (``method_info(m)['availability'] == 'public'``); ``False`` keeps the
-    ``'benchmark-host-only'`` ones, whose entrypoint is an absolute path on the
-    benchmark host and is not published (SPIRAL) - it is wired and
-    run there, but ``scan`` reports it not runnable elsewhere.
+    ``available`` reads ``method_info(m)['availability']``; ``mtb.method_info``
+    explains the two values.
 
     See Also
     --------
@@ -226,7 +203,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     ----------
     category : str | None
         ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``, or ``None``
-        (default) for every method. Keeps the methods that have a VARIANT
+        (default) for every method. Keeps the methods that have a variant
         wired for that category - the same set ``scan`` / ``run_all`` /
         ``find_methods(category=)`` dispatch.
     **_removed
@@ -270,7 +247,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
 def _effective(v) -> dict:
     """Upstream argparse defaults overlaid with what the wrapper actually emits.
 
-    ``tunable[k]['default']`` stays the UPSTREAM default (documented contract);
+    ``tunable[k]['default']`` stays the upstream default (documented contract);
     ``defaults`` is what the package passes on the command line; ``effective`` is
     the merge - the value the script will really run with when the caller
     passes no ``params``.
@@ -338,7 +315,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     (``deep_learning``, ``output``) are in ``mtb.catalog.methods()`` (the 0.2
     ``files_dir=`` argument is gone).
 
-    ``runtime`` is what this method has been OBSERVED to cost, to help size
+    ``runtime`` is what this method has been observed to cost, to help size
     a sweep: ``{"tier", "worst_sec", "observed", "host", "note"}`` - ``tier``
     is one of ``fast`` (<5 min), ``medium`` (5-30 min), ``slow`` (30 min-2 h),
     ``very_slow`` (>2 h) or ``unknown`` (never measured: ``worst_sec`` None,
@@ -346,20 +323,20 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ``{dataset, cells, sec, source}`` - ``source`` says where the number
     came from (``manual``, ``summary_csv`` = the shipped re-run sweeps,
     ``recorded`` = the recorded end-to-end runs); ``cells`` is null
-    when not recorded. These are MEASUREMENTS on one shared machine (the GPU
+    when not recorded. These are measurements on one shared machine (the GPU
     benchmark host; ``host`` / ``note`` say so), not predictions: use them to
     choose a sensible ``run_all(timeout=...)``, not to promise a finish time.
     (The 0.2 ``runtime_hint(m)`` returned exactly this dict and is deprecated.)
 
     ``needs_labels`` is the METHOD-level flag: True when ANY variant takes a
     cell-type-label (``cty``) role as a required input ("needs labels in at
-    least one variant"). It is NOT per category: scMoMaT is True because its
+    least one variant"). It is not per category: scMoMaT is True because its
     mosaic variant takes ``cty1..3``, while its vertical/cross variants take no
     labels. For the per-variant answer read ``supports[i]['needs_labels']``
     (``find_methods(needs_labels=...)`` filters per variant).
 
     ``status`` is the registry's wiring status: ``'verified'`` means the
-    command template was cross-checked against the upstream entrypoint AND
+    command template was cross-checked against the upstream entrypoint and
     the method was executed end to end on a reference dataset (``'declared'``
     = wired but not run). It says nothing about where the script lives (see
     ``availability``).
@@ -374,7 +351,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` are the GPU/CPU
     contract of the upstream script, read from its source. ``cpu_params``
     (``{}`` for most methods) are the command-line values that turn CUDA
-    OFF in a script that has it on by default - ``{'use_cuda': ''}`` for
+    off in a script that has it on by default - ``{'use_cuda': ''}`` for
     scJoint (its argparse ``--use_cuda`` is ``type=bool``, so only the
     empty string is false), ``{'device': 'cpu'}`` for scMDC; ``run``
     merges them into ``params`` on a host without an NVIDIA GPU
@@ -411,13 +388,12 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         # distinct entrypoints, in declaration order (several variants may share
         # one script)
         "variants": list(dict.fromkeys(v.entrypoint for v in s.variants)),
-        # package-relative wrapper the runner executes INSTEAD of the entrypoint
+        # package-relative wrapper the runner executes instead of the entrypoint
         # (it source()s/imports the unmodified upstream script); None = the
         # upstream script itself is run
         "driver": next((v.driver for v in s.variants if v.driver), None),
-        # Where this method's UNMODIFIED upstream scripts live - the folder
-        # carries the method's own imports/reference; the practical citation
-        # pointer the README promises.
+        # folder of this method's unmodified upstream scripts in the
+        # scMultiBench repository
         "scripts_url": (
             "https://github.com/PYangLab/scMultiBench/tree/main/"
             + "/".join(s.variants[0].entrypoint.split("/")[:2])
@@ -429,7 +405,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         "version": ref.get("version"),
         "reference": dict(ref["reference"]) if ref.get("reference") else None,
         # What this method can actually be dispatched for. Methods like Multigrate
-        # support several integration categories, each with its OWN modality
+        # support several integration categories, each with its own modality
         # combination - this is the list to pass to run()/inputs_for().
         "supports": [{"category": v.when.get("category"),
                       "modalities": list(v.when.get("modalities", [])),
@@ -444,15 +420,15 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
                                      "effective": _effective(v)}
                    for v in s.variants},
     }
-    # An empty `tunable` says the SCRIPT exposes nothing, not that the method
-    # has no hyperparameters - so ship what it pins and what its library
-    # documents, or the honest answer reads as a false one.
+    # An empty `tunable` means the script exposes nothing on its command line,
+    # not that the method has no hyperparameters: also report what the script
+    # pins and what its library documents.
     up = upstream.knobs_for(s.id)
     info["fixed_in_script"] = up["fixed_in_script"]
     info["upstream_knobs"] = up["upstream_knobs"]
     info["upstream_url"] = up["upstream_url"]
-    # `notes` is the curated one-line summary; the audit's long first-person
-    # prose is available on request as notes_long.
+    # `notes` is the curated one-line summary; verbose=True adds the long
+    # audit notes as notes_long.
     info["notes"] = ref.get("summary") or None
     # observed cost (engine/runtimes.yaml); the tier scan() reports per row
     info["runtime"] = _runtime_hint(s.id)
@@ -495,9 +471,7 @@ def _runtime_hint(method: str) -> dict:
     registry.check_method(method)
     rt = dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
                                        "observed": []}))
-    # every observation was taken on the benchmark host (NVIDIA RTX 4090);
-    # a CPU-only host - Colab's default runtime, a laptop - can be many times
-    # slower for the training methods (scMoMaT: 17 min on the GPU host, 2 h on CPU)
+    # every observation in runtimes.yaml was taken on the GPU benchmark host
     rt["host"] = "gpu"
     rt["note"] = ("times observed on the benchmark host (NVIDIA RTX 4090); on a "
                   "CPU-only host expect training methods to take many times longer")
@@ -544,7 +518,7 @@ def params_for(method: str, category: str | None = None,
         ``category`` alone selects one variant (the only way to reach a
         ``data_dir`` variant such as scBridge's or PASTE's).
     dataset : str | None, keyword-only
-        A dataset folder name; when the selection is still ambiguous, the ONE
+        A dataset folder name; when the selection is still ambiguous, the one
         variant whose input files are all present in ``<data_path>/<dataset>``
         is used (``params_for('Matilda', dataset='D11')`` is the rna+adt
         variant). Nothing changes when the folder settles nothing.
@@ -556,8 +530,7 @@ def params_for(method: str, category: str | None = None,
     dict
         ``{"method", "variant", "defaults", "tunable", "effective",
         "fixed_in_script", "upstream_knobs", "upstream_url"}``; each key is
-        explained in Notes. An **empty** ``tunable`` means the upstream script
-        exposes no hyperparameters on its command line.
+        explained in Notes.
 
     Raises
     ------
@@ -584,9 +557,9 @@ def params_for(method: str, category: str | None = None,
     them with ``run(..., params={...})``; the override is merged over
     these.
 
-    ``tunable`` - documentation of the parameters the UPSTREAM script
+    ``tunable`` - documentation of the parameters the upstream script
     accepts on its command line, as ``{name: {"default": ..., "type":
-    ...}}``. The ``default`` here is the upstream argparse default, NOT
+    ...}}``. The ``default`` here is the upstream argparse default, not
     necessarily what a wrapper run uses.
 
     ``effective`` - ``tunable`` defaults overlaid with ``defaults``: the
@@ -647,7 +620,7 @@ def params_for(method: str, category: str | None = None,
             v = s.variants[0]
     elif modalities is None:
         # category alone is enough whenever it selects exactly one variant. This is
-        # the ONLY way to reach a data_dir variant (scBridge, the spatial methods),
+        # the only way to reach a data_dir variant (scBridge, the spatial methods),
         # which has no modalities to pass.
         cands = [x for x in s.variants if x.when.get("category") == category]
         if not cands:
@@ -736,7 +709,7 @@ def cite(*methods, fmt: str = "text") -> str:
     ----------
     *methods : str | list[str]
         Method ids, each a ``str`` (``KeyError`` with a did-you-mean hint
-        for an unknown id); or a SINGLE list/tuple of ids; or ``"all"`` for
+        for an unknown id); or a single list/tuple of ids; or ``"all"`` for
         every registry method; nothing -> the benchmark entry only.
     fmt : str, keyword-only
         ``"text"`` (default; one "Authors. Title. Journal (year).
@@ -756,7 +729,7 @@ def cite(*methods, fmt: str = "text") -> str:
     KeyError
         An unknown method id (with a did-you-mean hint).
     TypeError
-        A non-string id, or the deprecated 0.2 ``methods=`` keyword.
+        A non-string id, or the removed 0.2 ``methods=`` keyword.
 
     Examples
     --------
@@ -769,8 +742,6 @@ def cite(*methods, fmt: str = "text") -> str:
 
     Notes
     -----
-    The 0.2 ``methods=`` keyword is deprecated and rejected (``TypeError``).
-
     Methods whose DOI is not curated in engine/references.yaml are
     emitted as a ``% <id>: no verified reference; see <repo_url>`` comment
     (bibtex) / ``<id>: ... <repo_url>`` line (text) rather than silently
