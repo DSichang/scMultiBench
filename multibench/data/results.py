@@ -493,7 +493,7 @@ def _legacy_load_results_kwargs(kw: dict) -> dict:
 
     ``method=`` -> ``methods=``, ``metric=`` -> ``metrics=[...]``, ``task=`` /
     ``family=`` -> ``metrics=<token>`` (each with a ``DeprecationWarning``);
-    ``metric_set=`` is gone and raises ``TypeError``.
+    ``metric_set=`` was removed in 0.3.0 and raises ``TypeError``.
     """
     if "metric_set" in kw:
         raise TypeError(
@@ -882,13 +882,13 @@ def available_datasets(
     source: str = "published",
     result_path: Path | str | None = None,
 ) -> list[str]:
-    """Dataset ids that ship stored results, not the ones that can be downloaded.
+    """Dataset ids that ship stored results, not the datasets that can be downloaded.
 
     Stored results are the metric tables :func:`load_results` reads. Only a
     few of the benchmark's datasets are downloadable: the release assets of
-    :func:`multibench.data.fetch`, listed by :func:`fetchable`. An id
-    returned here but not by ``fetchable()`` has metric tables to plot and
-    rank against, and no data file this package can obtain.
+    :func:`multibench.data.fetch`, listed by ``mtb.data.fetchable()``. An id
+    returned here but not there has metric tables to plot and rank against,
+    and no data file this package can obtain.
 
     Parameters
     ----------
@@ -909,8 +909,7 @@ def available_datasets(
     Returns
     -------
     list of str
-        Sorted dataset ids (result-table ids; see :func:`fetchable` for the
-        downloadable ones).
+        Sorted dataset ids.
 
     Raises
     ------
@@ -950,7 +949,7 @@ def fetchable() -> list[str]:
 
     Examples
     --------
-    >>> mtb.data.results.fetchable()
+    >>> mtb.data.fetchable()
     ['D11', 'D28', 'D45', 'D46', 'D52']
 
     Notes
@@ -974,8 +973,8 @@ def results_coverage(
     One row per distinct ``category, dataset, method, clustering, source``;
     the published tree is scanned for every clustering variant (default,
     louvain, kmeans), so a method that only exists as e.g. a ``_louvain``
-    directory shows up under ``clustering="louvain"``. Nothing is raised for
-    a category that has no tables - it simply has no rows.
+    directory shows up under ``clustering="louvain"``. A category that has no
+    tables raises nothing; it has no rows.
 
     Parameters
     ----------

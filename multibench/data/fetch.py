@@ -11,10 +11,11 @@ def safe_extract(tar: tarfile.TarFile, dest) -> None:
 
     A crafted archive could otherwise write outside ``dest``; every tarball
     the package opens (datasets, packed envs) goes through here. Where
-    ``tarfile`` has the extraction filters (3.8.17+/3.9.17+/3.12+) the
-    ``'data'`` filter is passed as well: the archives are plain data, and the
-    bare call raises ``DeprecationWarning`` on 3.12/3.13 and changes behaviour
-    on 3.14. Older interpreters keep the bare call behind the guard.
+    ``tarfile`` has the extraction filters (PEP 706: 3.12+ and the security
+    releases of the older series) the ``'data'`` filter is passed as well:
+    the archives are plain data, and the bare call raises
+    ``DeprecationWarning`` on 3.12/3.13 and changes behaviour on 3.14.
+    Interpreters without the filters keep the bare call behind the guard.
     """
     import os
     dest = Path(dest).resolve()

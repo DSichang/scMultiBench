@@ -444,7 +444,7 @@ def test_fetchable_lists_the_release_assets(result_dir):
     assert set(ids) & have and set(ids) != have
     assert "D46" in ids and "D46" not in have and "D24" in have and "D24" not in ids
     doc = mtb.available_datasets.__doc__
-    assert "ship stored results" in doc and "fetch" in doc and "not the ones that can be downloaded" in doc
+    assert "ship stored results" in doc and "fetch" in doc and "not the datasets that can be downloaded" in doc
 
 
 def test_shipped_tree_is_consistent_across_the_api(result_dir):

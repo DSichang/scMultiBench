@@ -2,14 +2,16 @@ Catalog tables read by multibench.catalog (multibench/data/catalog.py).
 
 method.csv - one row per method of the registry (multibench/engine/methods.yaml).
   Columns: Methods = the registry id (MOFA2 is shown as MOFA+, Seurat_WNN as
-  Seurat(WNN)), Programming Language = language, Peak/Gene Activity = atac,
-  CellType Information Required = needs_labels, Integration Categories /
-  Task Categories = categories / tasks joined with ';'.
+  Seurat(WNN)), Programming Language = language, Deep Learning =
+  deep_learning, Peak/Gene Activity = atac, Output = output, CellType
+  Information Required = needs_labels, Integration Categories / Task
+  Categories = categories / tasks joined with ';'.
   catalog.methods() overlays needs_labels, atac ('peak' | 'gene_activity' |
   None), categories and tasks from the registry at call time for every
   registered id, so those CSV columns are informational and may lag. The
   registry derives needs_labels from the variants' label roles and validates
-  atac. Deep Learning and Output exist only in the CSV.
+  atac. language, deep_learning and output are read from the CSV and not
+  overlaid; the registry has no deep-learning field.
 
 dataset.csv - the dataset ids of the benchmark's dataset tree (SD* = simulated).
   dataset      The id. catalog.datasets() also reads the older header
@@ -29,6 +31,8 @@ dataset.csv - the dataset ids of the benchmark's dataset tree (SD* = simulated).
                dataset. Ids with stored results but no CSV row (D24, D11s,
                ...) are appended.
 
-metric_full.csv - the canonical scIB metric codes with short descriptions.
+metric_full.csv - one row per scIB metric of the clustering and batch
+  families, with a short description. PCR, which catalog.known_metrics() also
+  lists, has no row.
 
 An official scMultiBench file with the same columns can replace any of these.
