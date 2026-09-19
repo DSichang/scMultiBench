@@ -56,12 +56,12 @@ for s in registry.load():
 
 hdr = ("# AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_params.py\n"
        "#\n"
-       "# DOC-ONLY tunable hyperparameters, extracted from each UPSTREAM method\n"
-       "# script's own argparse. These are NEVER added to a command line by the\n"
+       "# Doc-only tunable hyperparameters, extracted from each upstream method\n"
+       "# script's own argparse. These are never added to a command line by the\n"
        "# package; they document what `run(..., params={...})` may override, and\n"
        "# are surfaced by `multibench.params_for(method, category, modalities)`.\n"
        "#\n"
-       "# A method absent from this file exposes NO command-line hyperparameters\n"
+       "# A method absent from this file exposes no command-line hyperparameters\n"
        "# (they are hardcoded in its source). Since method scripts are never\n"
        "# modified, such a method is not tunable through the wrapper.\n")
 import yaml

@@ -391,7 +391,7 @@ def _cmd_convert(args) -> int:
         if args.rna is None and args.adt is None and args.atac is None \
                 and args.labels is None:
             _usage_error(args, "dataset export needs at least one of --rna, "
-                         "--adt, --atac, --labels (note: --rna has NO default "
+                         "--adt, --atac, --labels (note: --rna has no default "
                          "on the command line; pass --rna X to export adata.X)")
         data = ingest._to_anndata(args.src)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
@@ -935,7 +935,7 @@ def _cmd_env(args) -> int:
             print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}"
                   f"{_flavor_token(r.get('flavor'))}")
         # the legend is a note, so stderr: stdout stays one line per method
-        print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of BUILDING "
+        print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of building "
               "the env: " + "; ".join(f"{t} = {envs.DIFFICULTY.get(t, '?')}"
                                        for t in seen_tags)
               + f";  {envs.VERIFIED_STAR}", file=sys.stderr)
@@ -974,7 +974,7 @@ def _cmd_env(args) -> int:
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"
-              + (f"; NO lockfile for: {', '.join(nolock)}" if nolock else ""))
+              + (f"; no lockfile for: {', '.join(nolock)}" if nolock else ""))
         print(f"# legend: {envs.MARK_LEGEND}")
         if missing:
             miss_methods = sorted({m for r in missing for m in r["methods"]})
@@ -1135,7 +1135,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- find
     pf = sub.add_parser(
         "find", help="find methods by category/modalities/labels/ATAC (mtb.find_methods)",
-        description="Print method ids matching ALL given filters, one per line. "
+        description="Print method ids matching all given filters, one per line. "
                     "Every filter is optional; with none, every method is listed.")
     pf.add_argument("--category", help=_CATEGORY_HELP)
     pf.add_argument("--task", help=_TASK_HELP)
@@ -1146,7 +1146,7 @@ def build_parser() -> argparse.ArgumentParser:
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods that consume cell-type "
                          "labels (supervised); false: only label-free methods; absent: "
-                         "no filter. NOTE: the optional value must come right after "
+                         "no filter. Note: the optional value must come right after "
                          "the flag")
     pf.add_argument("--atac", choices=["peak", "gene_activity"],
                     help="filter by the ATAC representation the method consumes: "
@@ -1199,7 +1199,7 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--category", help=_CATEGORY_HELP + " (default: every category, "
                                                         "exactly like mtb.scan(dataset))")
     ps.add_argument("--data-path", dest="data_path",
-                    help="folder that CONTAINS the dataset folder (default: the "
+                    help="folder that contains the dataset folder (default: the "
                          "package data path, see mtb.config)")
     ps.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown "
                                                       "id -> did-you-mean error)")
@@ -1218,7 +1218,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- layout
     play = sub.add_parser(
-        "layout", help="how to lay out YOUR dataset on disk (mtb.describe_layout)",
+        "layout", help="how to lay out your dataset on disk (mtb.describe_layout)",
         description="Print the directory layout and role -> filename contract the "
                     "package expects, optionally for one category.")
     play.add_argument("category", nargs="?", help=_CATEGORY_HELP + " (optional: "
@@ -1301,7 +1301,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Plot stored result tables (--category [--dataset] [--source]), "
                     "your own long table (--input long.csv or a run_all output "
                     "dir, as written by `multibench evaluate --method/--dataset` "
-                    "and `multibench run-all`), or BOTH: --input together with "
+                    "and `multibench run-all`), or both: --input together with "
                     "--category concatenates your rows onto the stored table, so "
                     "your method is drawn next to the stored table.")
     pp.add_argument("kind", choices=["bubble", "bar"],
@@ -1340,7 +1340,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "the same ordering)")
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
-                         "EVERY dataset instead of warning")
+                         "every dataset instead of warning")
     pp.add_argument("--group", choices=["clustering", "batch"],
                     help="bar only: metric family shorthand (overrides --metrics)")
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")
@@ -1352,7 +1352,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- run
     pr = sub.add_parser(
-        "run", help="run ONE method on explicit input files (mtb.run)",
+        "run", help="run one method on explicit input files (mtb.run)",
         description="Run one method in its conda env on the given role=path inputs "
                     "and write its outputs under --out-dir. Use `multibench scan` "
                     "first to see which roles a method needs and whether its env is "
@@ -1401,7 +1401,7 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--modalities", help="comma-separated modalities to restrict the "
                                           "method variants to, e.g. rna,adt")
     pra.add_argument("--data-path", dest="data_path",
-                     help="folder that CONTAINS the dataset folder (default: the "
+                     help="folder that contains the dataset folder (default: the "
                           "package data path)")
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
                      help="print the plan - the mtb.scan frame run_all(dry_run=True) "
@@ -1498,7 +1498,7 @@ def build_parser() -> argparse.ArgumentParser:
                        description="One line per method: [x] installed / [ ] not, the "
                                    "env the package uses for it (the same name scan/run/"
                                    "doctor/recipe use) and a difficulty tag saying how "
-                                   "hard the env is to BUILD from its recipe - "
+                                   "hard the env is to build from its recipe - "
                                    + "; ".join(f"{k} = {v}" for k, v in _DIFF.items())
                                    + f". {_STAR}. A legend line is printed on stderr.")
     es.add_argument("--category", help=_CATEGORY_HELP + " (only its methods)")
@@ -1531,7 +1531,7 @@ def build_parser() -> argparse.ArgumentParser:
     ey.add_argument("--name", help=_NAME_HELP)
     ey.add_argument("--out", help="write the yml here instead of stdout")
     ey.set_defaults(func=_cmd_env, _parser=ey)
-    ec = ev.add_parser("create", help="create ONE method's env (dry run unless --run)",
+    ec = ev.add_parser("create", help="create one method's env (dry run unless --run)",
                        description="Create the conda environment for METHOD from its "
                                    "committed lockfile (falling back to the recipe when "
                                    "none is captured), under the name scan/run expect; "
