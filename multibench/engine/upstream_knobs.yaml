@@ -11,51 +11,51 @@
 Concerto:
   fixed_in_script:
   - name: preprocessing_rna min_features (ADT/protein)
-    source: tools_scripts/Concerto/bgi/bert/tokenizers.py:184
+    source: tools_scripts/Concerto/main_Concerto.py:184
     value: '0'
   - name: preprocessing_rna is_hvg (ADT/protein)
-    source: tools_scripts/Concerto/bgi/bert/tokenizers.py:184
+    source: tools_scripts/Concerto/main_Concerto.py:184
     value: 'False'
   - name: preprocessing_rna min_features (RNA)
-    source: tools_scripts/Concerto/bgi/bert/optimizers.py:185
+    source: tools_scripts/Concerto/main_Concerto.py:185
     value: '0'
   - name: preprocessing_rna is_hvg (RNA) — HVG selection disabled, so n_top_features=2000
       never applies
-    source: tools_scripts/Concerto/bgi/bert/optimizers.py:185
+    source: tools_scripts/Concerto/main_Concerto.py:185
     value: 'False'
   - name: train super_parameters (batch_size / epoch_pretrain / lr / drop_rate)
-    source: tools_scripts/Concerto/bgi/clustering/iic/graphs.py:202
+    source: tools_scripts/Concerto/main_Concerto.py:202
     value: batch_size=64, epoch_pretrain=5, lr=1e-4, drop_rate=0.1
   - name: inference super_parameters (batch_size / epoch_pretrain / lr / drop_rate) and n_cells_for_sample
-    source: tools_scripts/Concerto/bgi/clustering/iic/models_iic.py:208
+    source: tools_scripts/Concerto/main_Concerto.py:208
     value: batch_size=128, epoch_pretrain=1, lr=1e-4, drop_rate=0.1, n_cells_for_sample=None
   - name: saved_weight_path (which epoch checkpoint to use; None = last epoch)
     source: tools_scripts/Concerto/main_Concerto.py:207
     value: None
   - name: encoder embedding_dims
-    source: tools_scripts/Concerto/bgi/bert/tokenizers.py:43
+    source: tools_scripts/Concerto/main_Concerto.py:43
     value: '128'
   - name: encoder attention head widths head_1 / head_2 / head_3
-    source: tools_scripts/Concerto/bgi/clustering/iic/data.py:46
+    source: tools_scripts/Concerto/main_Concerto.py:46
     value: 128 / 128 / 128
   - name: decoder embedding_dims
-    source: tools_scripts/Concerto/bgi/bert/backend.py:52
+    source: tools_scripts/Concerto/main_Concerto.py:52
     value: '128'
   - name: LR-schedule horizon multiplier (total_update_steps = 300 x epochs)
-    source: tools_scripts/Concerto/bgi/bert/snippets.py:71
+    source: tools_scripts/Concerto/main_Concerto.py:71
     value: '300'
   - name: PolynomialDecay end_learning_rate factor / power
-    source: tools_scripts/Concerto/bgi/bert/layers.py:72
+    source: tools_scripts/Concerto/main_Concerto.py:72
     value: lr*1e-2, power=1
   - name: dataset shuffle_size
-    source: tools_scripts/Concerto/bgi/layers/gene_embedding.py:87
+    source: tools_scripts/Concerto/main_Concerto.py:87
     value: '10000'
   - name: SimCLR contrastive loss temperature
-    source: tools_scripts/Concerto/bgi/bert/layers.py:110
+    source: tools_scripts/Concerto/main_Concerto.py:110
     value: '0.1'
   - name: super_parameters None-fallback inside the script's own copy of concerto_train_multimodal
       (dead in practice — line 202 always passes explicit values)
-    source: tools_scripts/Concerto/bgi/clustering/iic/graphs.py:34
+    source: tools_scripts/Concerto/main_Concerto.py:34
     value: batch_size=64, epoch_pretrain=3, lr=1e-4, drop_rate=0.1
   notes: 'Only one candidate entrypoint exists (main_Concerto.py); concerto_function5_3.py
     and bgi/ are the vendored library. Everything on the command line is I/O only (--path1,
@@ -591,7 +591,7 @@ MultiVI:
 PASTE:
   fixed_in_script:
   - name: use_gpu
-    source: tools_scripts/PASTE/main_PASTE_center.py:33
+    source: tools_scripts/PASTE/main_PASTE_pairwise.py:33
     value: 'True'
   - name: backend
     source: tools_scripts/PASTE/main_PASTE_pairwise.py:35
@@ -828,7 +828,7 @@ SMILE:
     source: tools_scripts/SMILE/main_SMILE.py:60
     value: '90'
   - name: atac_idf_percentile (query copy)
-    source: tools_scripts/SMILE/SMILE/SMILE.py:79
+    source: tools_scripts/SMILE/main_SMILE.py:79
     value: '90'
   - name: target_sum (normalize_total, reference RNA)
     source: tools_scripts/SMILE/main_SMILE.py:86
@@ -1451,13 +1451,13 @@ moETM:
     value: 'scanpy defaults (seurat flavor: min_mean=0.0125, max_mean=3, min_disp=0.5) — feature
       count is data-dependent, not fixed'
   - name: KL warm-up schedule (calc_weight cutoff_ratio, warmup_ratio, min_weight, max_weight)
-    source: tools_scripts/moETM/dataloader.py:106
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:106
     value: 0, 1/3, 0, 1e-4
   - name: embedding-extraction interval (epochs)
-    source: tools_scripts/moETM/dataloader.py:120
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:120
     value: '10'
   - name: Total_epoch
-    source: tools_scripts/moETM/dataloader.py:135
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:135
     value: '500'
   - name: num_topic (latent topic dimension)
     source: tools_scripts/moETM/main_moETM_rna_adt.py:177
@@ -1466,7 +1466,7 @@ moETM:
     source: tools_scripts/moETM/main_moETM_rna_adt.py:178
     value: '400'
   - name: n_batches (batch labels generated)
-    source: tools_scripts/moETM/dataloader.py:191
+    source: tools_scripts/moETM/main_moETM_rna_adt.py:191
     value: '1'
   - name: batch_size
     source: tools_scripts/moETM/main_moETM_rna_adt.py:192
@@ -1817,7 +1817,7 @@ scMoMaT:
 sciCAN:
   fixed_in_script:
   - name: normalize_total.target_sum (RNA)
-    source: tools_scripts/sciCAN/Center_loss_pytorch.py:31
+    source: tools_scripts/sciCAN/main_sciCAN.py:31
     value: 1e4
   - name: normalize_total.target_sum (ATAC gene-activity)
     source: tools_scripts/sciCAN/main_sciCAN.py:40
