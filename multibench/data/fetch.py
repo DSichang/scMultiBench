@@ -9,13 +9,13 @@ from pathlib import Path
 def safe_extract(tar: tarfile.TarFile, dest) -> None:
     """extractall with a path-traversal guard (absolute paths, .., links out).
 
-    A crafted archive could otherwise write outside ``dest``; every tarball we
-    open (datasets, packed envs) goes through here. On a Python whose
-    ``tarfile`` has the extraction filters (3.8.17+/3.9.17+/3.12+) the
-    ``'data'`` filter is passed as well - the archives are plain data, and
-    the bare call raises ``DeprecationWarning`` on 3.12/3.13 and changes
-    behaviour on 3.14; older interpreters keep the bare call (the guard
-    above is what they have).
+    A crafted archive could otherwise write outside ``dest``; every tarball
+    the package opens (datasets, packed envs) goes through here. Where
+    ``tarfile`` has the extraction filters (PEP 706: 3.12+ and the security
+    releases of the older series) the ``'data'`` filter is passed as well:
+    the archives are plain data, and the bare call raises
+    ``DeprecationWarning`` on 3.12/3.13 and changes behaviour on 3.14.
+    Interpreters without the filters keep the bare call behind the guard.
     """
     import os
     dest = Path(dest).resolve()
@@ -66,7 +66,7 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
     """Ensure the named reference datasets exist locally, downloading if needed.
 
     Idempotent: datasets already present under the data root are left alone.
-    Returns the data root. The full 65-dataset collection is linked from the
+    Returns the data root. The full collection is linked from the
     scMultiBench README; this helper covers the tutorial reference sets.
     """
     import shutil as _shutil

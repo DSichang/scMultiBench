@@ -1,12 +1,38 @@
-These catalog tables (method.csv, dataset.csv, metric_full.csv) are DERIVED from the scmbench registry (scmbench/run/methods.yaml) and the real dataset tree (data/dataset_final/) by api_verify/_gen_catalog.py.
-method.csv: one row per registry method (Matilda stub excluded) -> 40 rows; columns map id->Methods (MOFA2 shown as MOFA+, Seurat_WNN as Seurat(WNN)), language->Programming Language, atac->Peak/Gene Activity, needs_labels->CellType Information Required, categories/tasks joined with ';'.
-  catalog.methods() OVERLAYS needs_labels / atac ('peak'|'gene_activity'|None) / categories / tasks from the method registry (multibench/engine/methods.yaml via registry.get(canonical_id)) at call time for every registered id - the registry derives needs_labels from the variants' label roles and validates atac, so those CSV columns are informational only and may lag. deep_learning and output are CSV-only.
-dataset.csv: dataset ids present under data/dataset_final/ (SD* = simulated). Column provenance, per column:
-  - dataset            TREE-DERIVED (data/dataset_final/ listing). The id. (Header was 'dataset name' before 0.3; catalog.datasets() still exposes a 'dataset name' duplicate column for one release.)
-  - simulated          TREE-DERIVED (catalog.datasets() computes it: id starts with 'SD'). Not stored in the CSV.
-  - category           RESULTS-DERIVED AT CALL TIME (catalog.datasets() fills it from multibench.available_datasets(cat, source='both'), i.e. which category's published/re-run metric tables contain the dataset). Not stored in the CSV, so it cannot go stale.
-  - has_results        RESULTS-DERIVED AT CALL TIME (same source). Not stored in the CSV.
-  - assay, tissue, n_cells, n_batches, source
-                       PAPER-DERIVED, NULLABLE. These must be transcribed from the scMultiBench paper's supplementary dataset table; nothing in this repository or in scMultiBench_ref holds them, so they ship EMPTY. Do not fill them from the data tree (n_cells of a processed file is not the paper's n_cells). When transcribed, record the supplementary-table version here.
-metric_full.csv: canonical scIB metrics with short descriptions.
-If official scMultiBench files are located, they can replace these verbatim.
+Catalog tables read by multibench.catalog (multibench/data/catalog.py).
+
+method.csv - one row per method of the registry (multibench/engine/methods.yaml).
+  Columns: Methods = the registry id (MOFA2 is shown as MOFA+, Seurat_WNN as
+  Seurat(WNN)), Programming Language = language, Deep Learning =
+  deep_learning, Peak/Gene Activity = atac, Output = output, CellType
+  Information Required = needs_labels, Integration Categories / Task
+  Categories = categories / tasks joined with ';'.
+  catalog.methods() overlays needs_labels, atac ('peak' | 'gene_activity' |
+  None), categories and tasks from the registry at call time for every
+  registered id, so those CSV columns are informational and may lag. The
+  registry derives needs_labels from the variants' label roles and validates
+  atac. language, deep_learning and output are read from the CSV and not
+  overlaid; the registry has no deep-learning field.
+
+dataset.csv - the dataset ids of the benchmark's dataset tree (SD* = simulated).
+  dataset      The id. catalog.datasets() also reads the older header
+               'dataset name' and exposes a duplicate column of that name for
+               one release.
+  assay, tissue, n_cells, n_batches, source
+               To be transcribed from the dataset table in the scMultiBench
+               paper's supplement; nothing in this repository holds them, so
+               they ship empty. Do not fill them from the data tree (n_cells
+               of a processed file is not the paper's n_cells). When
+               transcribed, record the supplementary-table version here.
+  Computed by catalog.datasets() at call time, not stored in the CSV:
+  simulated    The id starts with 'SD'.
+  category, has_results
+               From multibench.available_datasets(category, source='both'):
+               which category's published / re-run metric tables contain the
+               dataset. Ids with stored results but no CSV row (D24, D11s,
+               ...) are appended.
+
+metric_full.csv - one row per scIB metric of the clustering and batch
+  families, with a short description. PCR, which catalog.known_metrics() also
+  lists, has no row.
+
+An official scMultiBench file with the same columns can replace any of these.
