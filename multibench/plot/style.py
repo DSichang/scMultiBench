@@ -1,6 +1,6 @@
 """Numeric helpers ported from the R bubble-plot code (helpers.R / scIB_knit_table.R).
 
-This module is also the SINGLE source of truth for the cross-dataset summary
+This module is also the single source of truth for the cross-dataset summary
 math shared by :func:`multibench.plot.bubble` and :func:`multibench.plot.bar`:
 :func:`per_dataset_ranks`, :func:`mean_rank_matrix` and
 :func:`overall_by_basis`. Both figures call these, so passing the same
@@ -13,7 +13,7 @@ import pandas as pd
 
 
 def minmax(x: np.ndarray) -> np.ndarray:
-    """Scale to [0,1]; constant or all-NaN -> all ones (matches R behavior)."""
+    """Scale to [0,1]; constant or all-NaN -> all ones (matches R behaviour)."""
     x = np.asarray(x, dtype=float)
     lo = np.nanmin(x)
     hi = np.nanmax(x)
@@ -49,7 +49,7 @@ OVERALL_DOC = """\
         * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
           max-rank(mean over datasets of within-dataset max-rank))`` - the
           per-dataset ranks are averaged per metric, the mean ranks are
-          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          re-ranked across methods, averaged over metrics and min-max scaled.
           A method absent from a dataset scores rank 0 there (the paper's
           summary rule), which pulls it down.
         * ``"mean_overall"`` (bar's default): ``mean over datasets of
@@ -67,11 +67,11 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     """Within-dataset max-ranks: ``{dataset: DataFrame(method x metric)}``.
 
     For each dataset the frame is pivoted to method x metric (mean over
-    duplicate rows), metrics that dataset never computed are dropped
-    (``dropna(axis=1, how="all")``), and every remaining column is replaced by
-    its max-rank (1 = worst ... n = best, ties share the maximum rank). A
-    frame without a ``dataset`` column is treated as one dataset named
-    ``"all"``. Datasets whose pivot is empty are skipped.
+    duplicate rows), metrics that dataset never computed are dropped, and
+    every remaining column is replaced by its max-rank (1 = worst ... n =
+    best, ties share the maximum rank). A frame without a ``dataset`` column
+    is treated as one dataset named ``"all"``. Datasets whose pivot is empty
+    are skipped.
     """
     d = long_df.copy()
     if metrics:
@@ -96,9 +96,10 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
 def mean_rank_matrix(parts: dict) -> pd.DataFrame:
     """Average the per-dataset rank matrices from :func:`per_dataset_ranks`.
 
-    Rows are the union of methods; a method absent from a dataset scores rank
-    0 there (as in the paper's summary), but only for the metrics that dataset
-    actually computed - each metric is averaged over the datasets that have it.
+    Rows are the union of methods; a method absent from a dataset, or lacking
+    a metric there, scores rank 0 (as in the paper's summary), but only for
+    the metrics that dataset computed - each metric is averaged over the
+    datasets that have it.
     """
     mats = list(parts.values())
     if not mats:

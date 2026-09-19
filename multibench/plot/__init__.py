@@ -15,11 +15,10 @@ from .bubble import (bubble, plot_bubble, build_table, render, BubbleTable,
                      FamilyBlock, FAMILIES)
 from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS
 
-# back-compat: ``bubble`` used to be a callable namespace object, so
-# ``from multibench.plot import bubble; bubble.build_table(...)`` and
-# ``mtb.plot.bubble.render(...)`` worked. ``bubble`` is now a plain function
-# (so help()/inspect.signature show its real parameters); the old attribute
-# paths are kept as attributes on the function for one release (drop in 0.4).
+# back-compat: ``bubble`` was a callable namespace object, so
+# ``mtb.plot.bubble.build_table(...)`` / ``.render(...)`` worked. It is a plain
+# function now (help()/inspect.signature show its real parameters); the old
+# attribute paths stay as attributes on the function until 0.4.
 for _n in ("build_table", "render", "plot_bubble", "BubbleTable", "FamilyBlock",
            "FAMILIES", "NA_MARK", "_resolve", "_pivot"):
     setattr(bubble, _n, getattr(_bubble_module, _n))

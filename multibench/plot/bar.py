@@ -1,8 +1,4 @@
-"""Summary bar chart: one bar per method, aggregated ACROSS datasets.
-
-The bubble chart answers "how did each method do on THIS dataset". This answers
-"how does each method do overall", which is the summary the benchmark reports.
-"""
+"""Summary bar chart: one bar per method, aggregated across datasets."""
 from __future__ import annotations
 
 import numpy as np
@@ -11,15 +7,12 @@ import pandas as pd
 from . import style
 from .style import compute_overall, minmax, rank_max
 
-# scIB metric families, so a summary can be split the way the benchmark reports it
-# These must agree with the groups eval.scib.compute() actually emits - see
-# tests/test_metric_groups.py, which pins them together. iASW and iF1 are
-# ISOLATED-LABEL scores: scib files them under bio conservation, alongside
-# ARI/NMI/ASW/cLISI, not under batch correction. They used to sit in
-# BATCH_METRICS here while compute() emitted them for group="clustering", so the
-# same number was labelled a different family depending on which module you
-# asked - and a single-batch dataset like D11, which legitimately has iASW/iF1
-# and no batches at all, rendered as though it had batch-correction results.
+# scIB metric families, so a summary can be split the way the benchmark reports
+# it. They must agree with the groups eval.scib.compute() emits
+# (tests/test_metric_groups.py pins them together). iASW and iF1 are
+# isolated-label scores: scIB files them under bio conservation with
+# ARI/NMI/ASW/cLISI, not under batch correction, so a single-batch dataset has
+# them without having any batch-correction result.
 CLUSTERING_METRICS = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
 BATCH_METRICS = ["ASW_batch", "GC", "iLISI", "kBET"]
 
@@ -39,14 +32,15 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         overall: str = "mean_overall"):
     """Bar chart of each method's overall score, aggregated across datasets.
 
-    The bubble table answers "how did each method do on THIS dataset"; this
+    The bubble table answers "how did each method do on this dataset"; this
     answers "how does each method do overall", the summary the benchmark
     reports. Everything after ``long_df`` is keyword-only.
 
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Tidy frame (``metric, value, method, dataset, category``) - the same
+        Tidy frame with columns ``method, metric, value``; ``dataset`` is
+        optional (without it the frame counts as one dataset) - the same
         frame ``mtb.load_results``, ``mtb.to_long`` and the
         ``BatchResult.long`` property produce. Concatenate several datasets'
         frames to summarise across them.
@@ -78,7 +72,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
           max-rank(mean over datasets of within-dataset max-rank))`` - the
           per-dataset ranks are averaged per metric, the mean ranks are
-          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          re-ranked across methods, averaged over metrics and min-max scaled.
           A method absent from a dataset scores rank 0 there (the paper's
           summary rule), which pulls it down.
         * ``"mean_overall"`` (bar's default): ``mean over datasets of
@@ -90,8 +84,6 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         The two formulas can order methods differently on the same frame;
         pass the same ``overall=`` to ``plot.bubble`` and ``plot.bar`` to get
         the same ordering. The formula in use is printed on the figure.
-        The default here is ``"mean_overall"``; ``plot.bubble`` defaults to
-        ``"rank"``. Pass the same value to both to get the same ordering.
 
     Returns
     -------
@@ -124,10 +116,12 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     per-dataset scores, so neither whiskers nor dataset dots are drawn.
 
     Because the score is rank-based, it is only meaningful relative to the
-    other methods in the same figure. A method lacking a metric is compared
-    on the metrics it has (the within-dataset rank matrix skips NaN cells).
-    Batch metrics need a multi-batch dataset: a single-batch design has
-    none to compute, which is what the ``group="batch"`` error says.
+    other methods in the same figure. Under ``overall="mean_overall"`` a
+    method lacking a metric is compared on the metrics it has (the
+    within-dataset mean skips NaN cells); under ``"rank"`` the missing cell
+    is rank 0 in that dataset. Batch metrics need a multi-batch dataset: a
+    single-batch design has none to compute, which is what the
+    ``group="batch"`` error says.
 
     Ties are broken the way ``mtb.plot.bubble`` breaks them (a stable sort,
     alphabetical within a tie), so the two figures agree under the same
