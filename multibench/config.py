@@ -32,18 +32,16 @@ _CATEGORY_FOLDERS = {
     "cross": "cross integration",
 }
 
-# metric-set token -> top-level result dir. Only "scib" is wired in v1
-# (load_results raises NotImplementedError otherwise); other metric sets are not
-# yet exposed here rather than advertising tokens with no working loader.
+# metric-set token -> top-level result dir; only the scIB metric set exists
 _METRIC_SET_DIRS = {
     "scib": "scib_metric",
 }
 
-_ROOT = Path(__file__).resolve().parent.parent  # <ROOT>
-# Where the package lives decides where large client-side artefacts go. In a
-# repository checkout (source tree / editable install) they sit next to the
-# package, as always; installed as a wheel, _ROOT lands inside site-packages,
-# which must not accumulate datasets or clones - use a per-user cache dir.
+_ROOT = Path(__file__).resolve().parent.parent
+# Large client-side artefacts (datasets, the upstream clone) sit next to the
+# package in a repository checkout or editable install. In a wheel install
+# _ROOT is inside site-packages, which must not accumulate them, so they go to
+# a per-user cache dir.
 _IN_REPO = (_ROOT / "pyproject.toml").is_file()
 _CACHE = (Path(_os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
           / "multibench")
@@ -57,9 +55,9 @@ ENVS_DIR_VAR = "MULTIBENCH_ENVS_DIR"
 def _conda_envs_dir() -> Path | None:
     """The first writable envs dir of the conda/mamba on PATH, or ``None``.
 
-    One ``info --json`` subprocess per process (cached): it is only asked
-    when :attr:`Config.envs_dir` is first read without ``MULTIBENCH_ENVS_DIR``
-    set, never at import. Tests that fake or hide conda clear this cache.
+    One ``info --json`` subprocess per process (cached), run only when
+    :attr:`Config.envs_dir` is first read without ``MULTIBENCH_ENVS_DIR`` set.
+    Tests that fake or hide conda clear this cache.
     """
     exe = _shutil.which("mamba") or _shutil.which("conda")
     if exe is None:
@@ -84,10 +82,9 @@ class _LazyEnvsDir:
 
     A plain ``default_factory`` would run ``conda info --json`` every time a
     ``Config`` is built - including ``config.DEFAULT`` at import - on every
-    host that has conda. The descriptor keeps the field a normal, settable
-    dataclass field (``cfg.envs_dir = Path(...)``) while paying for the probe
-    only when someone actually needs the directory (``env_prefix``,
-    ``install_packed``, the runner's prefix mode).
+    host that has conda. The descriptor keeps the field settable
+    (``cfg.envs_dir = Path(...)``) and runs the probe only when the directory
+    is needed (``env_prefix``, ``install_packed``, the runner's prefix mode).
     """
 
     def __set_name__(self, owner, name):
@@ -215,10 +212,8 @@ class Config:
     ``~/.cache/multibench`` (``$XDG_CACHE_HOME`` honoured) for a wheel
     install, so ``site-packages`` never accumulates datasets or clones.
 
-    ``envs_dir`` is resolved by a descriptor, not a ``default_factory``:
-    ``conda info --json`` runs once per process, the first time the
-    directory is actually needed (``mtb.env.install``, the runner's prefix
-    mode), never at import. Assigning a value converts it to ``Path`` and
+    The first read of ``envs_dir`` may run ``conda info --json`` (once per
+    process, never at import); assigning a value converts it to ``Path`` and
     skips the probe.
 
     See Also
@@ -231,9 +226,6 @@ class Config:
     files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
     repo_path: Path = field(default_factory=lambda: _BASE / "scMultiBench_ref")
     data_path: Path = field(default_factory=lambda: _BASE / "data")
-    #: Leiden backend for the scIB resolution sweep in :func:`multibench.evaluate`:
-    #: ``"igraph"`` (scanpy's igraph implementation, several times faster) or
-    #: ``"leidenalg"`` (the backend the published tables were computed with).
     leiden_flavor: str = "igraph"
     envs_dir: Path = _LazyEnvsDir()
 
@@ -248,9 +240,9 @@ def ensure_repo(path=None):
     Resolution order: the given (or configured) ``repo_path``; the package root
     itself (the merged-repository layout, where ``tools_scripts/`` sits next to
     ``multibench/``); otherwise a one-time shallow clone of the public
-    scMultiBench repository into the configured location - which is what makes
-    method execution work on a fresh machine or Colab, where the wrapper's
-    clone does not carry the 3 GB of upstream method scripts.
+    scMultiBench repository into the configured location, so methods run on a
+    fresh machine or Colab, where the package does not carry the upstream
+    method scripts.
     """
     import subprocess
     from pathlib import Path as _P
@@ -262,7 +254,7 @@ def ensure_repo(path=None):
         return _ROOT
     if p.exists():
         # a directory without tools_scripts is most likely an interrupted
-        # clone; refuse to guess and never delete something we did not make
+        # clone; refuse to guess and never delete a directory not created here
         raise RuntimeError(
             f"{p} exists but has no tools_scripts/ - remove it (or point "
             f"repo_path elsewhere) and the method scripts will be fetched "

@@ -1,8 +1,8 @@
 """Deprecation shims shared by every namespace of the package.
 
-The 0.3.0 public-surface cut renamed a handful of entry points. Each old
-spelling is kept for ONE release as a thin alias that warns and forwards, so
-a 0.2.1 script keeps working while saying what to change.
+0.3.0 renamed a handful of entry points. Each old spelling is kept for one
+release as a thin alias that warns and forwards, so a 0.2 script keeps
+working and says what to change.
 """
 from __future__ import annotations
 

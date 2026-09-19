@@ -4,7 +4,7 @@ Every subcommand is a thin wrapper around one public Python function, with the
 same parameter names where a flag exists (``--category``, ``--metrics``,
 ``--out-dir`` ...). The end-to-end story mirrors the Python one::
 
-    multibench layout vertical                         # how to lay out MY data
+    multibench layout vertical                         # how to lay out my data
     multibench convert my.h5ad data/MYCITE --rna X --adt obsm:protein --labels obs:celltype
     multibench scan MYCITE --category vertical --data-path data
     multibench params Matilda                          # what --param accepts
@@ -21,11 +21,11 @@ as ``error: ...`` on stderr; set ``MULTIBENCH_DEBUG=1`` to get the traceback);
 ``2`` a usage error (argparse: unknown flag, missing required flag, bad
 choice, or a flag combination the subcommand rejects).
 
-DATA goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
-lines); DIAGNOSTICS go to stderr (``error: ...``, ``warning: ...``, progress
+Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
+lines); diagnostics go to stderr (``error: ...``, ``warning: ...``, progress
 such as ``[run_all] ...`` and ``# dry run ...`` notes), so
 ``multibench scan ... --format tsv > plan.tsv`` captures a clean table and
-``2>/dev/null`` silences the chatter. Tables default to a compact column set
+``2>/dev/null`` silences the rest. Tables default to a compact column set
 (``--columns all`` for everything, ``--format csv|tsv|json`` for scripts).
 
 ``multibench <command> --help`` documents every flag of every command.
@@ -73,12 +73,11 @@ def _tri_state(value) -> bool | None:
 
 
 #: The columns ``scan`` / ``run-all --dry-run`` print by default in table
-#: mode: the verdict, the two gates and the (truncated) reason. The full
-#: 17-column frame is ~1450 characters wide - unreadable on a terminal; it is
-#: still there via ``--columns all`` or any machine format (csv/tsv/json).
+#: mode. The full frame is too wide for a terminal; ``--columns all`` or a
+#: machine format (csv/tsv/json) prints every column.
 _COMPACT_PLAN_COLUMNS = ["method", "modalities", "runnable", "files_ok", "env_ok",
                          "runtime_tier", "reason"]
-#: Free-text columns clipped to this many characters in TABLE mode (never in
+#: Free-text columns clipped to this many characters in table mode (never in
 #: csv/tsv/json, never with an explicit ``--columns`` list).
 _TRUNCATE_WIDTH = 80
 _TRUNCATE_COLUMNS = ("reason", "files_reason", "env_reason", "caveat", "command", "error")
@@ -94,10 +93,10 @@ def _resolve_columns(df, columns, fmt: str, compact=None) -> list | None:
     """Which columns to print: an explicit list, ``all``, or the default.
 
     The default is the ``compact`` set in table mode (a readable terminal
-    width) and EVERY column for csv/tsv/json (a script wants the data, not a
-    pretty page). ``columns=["all"]`` is every column in any format. Compact
-    columns absent from the frame are skipped silently (a mocked or older
-    frame); an unknown explicit name is an error naming the available ones.
+    width) and every column for csv/tsv/json. ``columns=["all"]`` is every
+    column in any format. Compact columns absent from the frame are skipped
+    silently (a mocked or older frame); an unknown explicit name is an error
+    naming the available ones.
     """
     if columns and [c.lower() for c in columns] == ["all"]:
         return None
@@ -120,9 +119,9 @@ def _print_frame(df, columns=None, fmt: str = "table", file=None, *,
 
     ``columns`` restricts (and orders) the printed columns (``["all"]`` = every
     column); an unknown name is an error naming the columns the frame actually
-    has, so a concurrently added column never needs a CLI change to be
-    selectable. ``compact`` is the default column list for TABLE mode (csv/
-    tsv/json print everything unless ``columns`` is given). ``truncate``
+    has, so a column added to the frame is selectable without a CLI change.
+    ``compact`` is the default column list for table mode (csv/tsv/json print
+    everything unless ``columns`` is given). ``truncate``
     clips the long free-text columns (:data:`_TRUNCATE_COLUMNS`) to
     :data:`_TRUNCATE_WIDTH` characters with ``...`` - by default only in table
     mode without an explicit ``columns`` list; machine formats are never
@@ -153,7 +152,7 @@ def _print_frame(df, columns=None, fmt: str = "table", file=None, *,
 
 
 def _quiet_stdout():
-    """Route a library call's stdout chatter (``[run_all] ...`` progress,
+    """Route a library call's stdout progress lines (``[run_all] ...``,
     ``[env] unpacking ...``) to stderr so stdout stays data-only for pipes."""
     return contextlib.redirect_stdout(sys.stderr)
 
@@ -240,9 +239,9 @@ def _platform_note() -> str | None:
     """Print ``warning: ...`` on stderr when method envs cannot be built here.
 
     The method envs are linux-64 conda envs; on macOS/Windows ``env install
-    --run`` refuses (``--force`` overrides). Said ONCE, first, on stderr - so
-    stdout stays the table and a user reads it before, not after, a 3 GB
-    download would have started. Returns the problem text (or ``None``).
+    --run`` refuses (``--force`` overrides). Printed once, first, on stderr,
+    so stdout stays the table and the user reads it before a multi-GB
+    download starts. Returns the problem text (or ``None``).
     """
     from .engine import envs
     problem = envs.host_platform_problem()
@@ -288,7 +287,7 @@ def _cmd_scan(args) -> int:
     Whatever columns ``scan`` returns are printed (no hard-coded list); use
     ``--columns`` to pick some and ``--format csv`` to pipe into other tools.
     ``--category`` is optional, exactly as in ``mtb.scan(dataset)``: without
-    it every category is scanned (it used to be a usage error).
+    it every category is scanned.
     """
     import multibench
     from .engine import registry
@@ -325,11 +324,7 @@ _EXPORT_FLAGS = ("rna", "adt", "atac", "atac_kind", "labels", "batch")
 def _rewrite_canonical(src, out, dtype: str) -> bool:
     """Copy the canonical ``.h5`` ``src`` to ``out``, storing ``matrix/data`` as ``dtype``.
 
-    ``to_canonical`` passes an already-canonical file through untouched
-    (correct for ``run()``, which only needs a readable path), so ``multibench
-    convert data/D11/adt.h5 scratch/adt.h5`` used to print ``wrote
-    data/D11/adt.h5`` and write nothing. Here the file IS written to ``out``:
-    a byte copy when the stored dtype already matches (fast, exact), else a
+    A byte copy when the stored dtype already matches (fast, exact), else a
     block-wise rewrite that casts ``matrix/data`` (features x cells stays as
     is) and copies ``matrix/features`` / ``matrix/barcodes`` verbatim.
 
@@ -368,7 +363,7 @@ def _cmd_convert(args) -> int:
     * No ``--rna/--adt/--atac/--labels/--batch`` flag: ``SRC`` -> ``OUT`` via
       :func:`multibench.io.to_canonical` (``--modality`` picks the filename when
       ``OUT`` is a directory; ``--layer/--obsm/--mod`` select the matrix). A
-      ``SRC`` that is ALREADY canonical is copied to ``OUT`` (``--dtype``
+      ``SRC`` that is already canonical is copied to ``OUT`` (``--dtype``
       honoured by re-encoding ``matrix/data``) and reported as ``copied``;
       when ``OUT`` is ``SRC`` itself nothing is written and the line says so.
       The word ``wrote`` is printed only for a file this command produced.
@@ -396,7 +391,7 @@ def _cmd_convert(args) -> int:
         if args.rna is None and args.adt is None and args.atac is None \
                 and args.labels is None:
             _usage_error(args, "dataset export needs at least one of --rna, "
-                         "--adt, --atac, --labels (note: --rna has NO default "
+                         "--adt, --atac, --labels (note: --rna has no default "
                          "on the command line; pass --rna X to export adata.X)")
         data = ingest._to_anndata(args.src)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
@@ -410,9 +405,10 @@ def _cmd_convert(args) -> int:
         _usage_error(args, "--layer and --obsm are mutually exclusive")
     src = Path(args.src)
     if src.is_file() and ingest._is_canonical_h5(src):
-        # to_canonical() passes a canonical file through and returns SRC; the
-        # CLI's job is to put a file at OUT, so copy (re-encoding for --dtype)
-        # and never say 'wrote' for a path this command did not write.
+        # to_canonical() passes a canonical file through and returns SRC
+        # (enough for run(), which only needs a readable path); the CLI must
+        # put a file at OUT, so copy (re-encoding for --dtype) and never say
+        # 'wrote' for a path this command did not write.
         out = Path(args.out)
         dir_like = out.is_dir() or str(args.out).endswith(("/", os.sep))
         if dir_like:
@@ -443,8 +439,8 @@ def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
 
     The Python function needs the variant pinned down and raises ``KeyError``
     for a multi-variant method called without ``category``; on the command
-    line that meant three round trips (Ben, study 2). Here an unspecified
-    selector simply means "every matching variant", one block each.
+    line an unspecified selector means "every matching variant", one block
+    each, so one call is enough.
     """
     from . import discover
     from .engine import registry, upstream
@@ -555,8 +551,7 @@ def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported la
     p = Path(path)
     if p.is_dir():
         from .workflow import load_batch
-        # BatchResult.long is a PROPERTY; the old ``.long()`` call raised
-        # "'DataFrame' object is not callable" on every real run_all directory
+        # BatchResult.long is a property, not a method
         return load_batch(p).long
     if not p.is_file():
         raise FileNotFoundError(
@@ -571,8 +566,8 @@ def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported la
     return df
 
 
-#: ``load_results`` names its keywords in its messages; this command's
-#: spelling of the same hatches is the flags. Ordered: longest pattern first.
+#: ``load_results`` names its keywords in its messages; on the command line
+#: the same options are flags. Ordered: longest pattern first.
 _API_TO_FLAGS = (
     (r"result_path= / mtb\.config\.DEFAULT\.result_path", "--result-path"),
     (r"result_path=<file>", "--result-path <file>"),
@@ -597,11 +592,11 @@ def _cmd_plot(args) -> int:
 
     The frame comes from ``--input`` (a long.csv / run_all dir; repeatable)
     and/or from :func:`multibench.load_results` (``--category``,
-    ``--dataset``, ``--source``). Given BOTH, the own rows are concatenated
-    onto the stored table - the shell equivalent of ``pd.concat`` - so a
-    method evaluated with ``multibench evaluate --method/--dataset`` is drawn
-    next to the stored table; a ``# overlay: ...`` note on stderr says how
-    many rows came from where. ``--methods`` restricts the rows in every
+    ``--dataset``, ``--source``). Given both, the ``--input`` rows are
+    concatenated onto the stored table - the shell equivalent of
+    ``pd.concat`` - so a method evaluated with ``multibench evaluate
+    --method/--dataset`` is drawn next to the stored table; a
+    ``# overlay: ...`` note on stderr says how many rows came from where. ``--methods`` restricts the rows in every
     case; ``--dataset`` selects the stored table(s) and filters the inputs.
     ``--result-path`` is ``load_results(result_path=...)``: another results
     root, named in that spelling when a stored table is missing.
@@ -622,7 +617,7 @@ def _cmd_plot(args) -> int:
         try:
             frames.append(load_results(**kw))
         except FileNotFoundError as e:
-            # the API names its keywords; this command's spelling is the flags
+            # respell the API keywords as this command's flags
             raise FileNotFoundError(_cli_spelling(str(e))) from e
     own_rows = 0
     for path in inputs:
@@ -644,7 +639,7 @@ def _cmd_plot(args) -> int:
     methods = _csv_list(args.methods)
     if methods and args.kind == "bar":
         # plot.bar has no methods=; filter here with the same "unknown name"
-        # discipline bubble applies
+        # error bubble raises
         present = sorted(df["method"].astype(str).unique())
         unknown = [m for m in methods if m not in present]
         if unknown:
@@ -738,11 +733,10 @@ def _cmd_run_all(args) -> int:
     files_ok, env_ok, reason; compact columns - ``--columns all`` for every
     column) and, in table mode, the command line each variant would run (in
     csv/tsv/json it is the ``command`` column); nothing is executed or
-    created. Otherwise the
-    summary table is printed and everything is saved under ``--out-dir``
-    (reload with ``multibench plot bubble --input OUT_DIR``). Progress lines
-    go to stderr; tables to stdout. ``--param METHOD:KEY=VALUE`` (repeatable)
-    becomes ``params={METHOD: {KEY: value}}``.
+    created. Otherwise the summary table is printed and everything is saved
+    under ``--out-dir`` (reload with ``multibench plot bubble --input
+    OUT_DIR``). Progress lines go to stderr; tables to stdout. ``--param
+    METHOD:KEY=VALUE`` (repeatable) becomes ``params={METHOD: {KEY: value}}``.
     """
     import multibench
     params = _parse_params(args.param, args) or None
@@ -784,10 +778,10 @@ def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file.
 
     Default output is the wide ``metric.csv`` shape (index = metric, one
-    ``Value`` column). With ``--method`` AND ``--dataset`` (and ``--category``)
+    ``Value`` column). With ``--method`` and ``--dataset`` (and ``--category``)
     the frame is reshaped with :func:`multibench.to_long` to the tidy
-    ``metric,value,method,dataset,category,clustering,source`` table that ``plot --input`` and
-    ``load_results`` speak.
+    ``metric,value,method,dataset,category,clustering,source`` table that
+    ``plot --input`` reads and ``load_results`` returns.
     """
     import multibench
     long_mode = args.method is not None or args.dataset is not None
@@ -798,7 +792,7 @@ def _cmd_evaluate(args) -> int:
             _usage_error(args, f"--method/--dataset write a long table and need "
                          f"all of --method, --dataset, --category; missing "
                          f"{', '.join(missing)}")
-    # ONE metric-selection knob: --metrics (a family token or a comma list of
+    # one metric-selection knob: --metrics (a family token or a comma list of
     # codes); --only is the hidden 0.2 spelling of the list form
     metrics = _csv_list(args.metrics)
     if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
@@ -808,7 +802,7 @@ def _cmd_evaluate(args) -> int:
         if metrics is None:
             metrics = _csv_list(args.only)
     if metrics is None:
-        # the --task family (default clustering) selects the family, as before
+        # without --metrics, --task (default clustering) selects the family
         metrics = {"dimension_reduction": "clustering"}.get(args.task, args.task)
     labels = args.labels
     if args.column is not None and labels is not None:
@@ -840,13 +834,12 @@ def _cmd_evaluate(args) -> int:
 
 def _size_total_line(rows, sizes: dict, what: str = "download", *,
                      flavor: str | None = None) -> str:
-    """``# total: X GB download, Y GB on disk (N archives; download size unknown for A, disk size unknown for B)`` for ``rows``.
+    """The ``# total: ...`` line for ``rows``: download and on-disk sums.
 
-    ``rows`` carry an ``env`` key; ``sizes`` is :func:`multibench.env.packed_sizes`.
-    Envs without a measured size are counted as unknown PER COLUMN, never as
-    zero - a row printing ``? disk`` is one disk unknown even when its
-    download size is known (the old single count covered the download column
-    only and said ``0 of unknown size`` under 16 rows of ``? disk``) - so
+    Shape: ``# total: X GB download, Y GB on disk (N archives; download size
+    unknown for A, disk size unknown for B)``. Envs without a measured size
+    are counted as unknown per column, never as zero - a row printing
+    ``? disk`` is one disk unknown even when its download size is known - so
     each total is a floor and says so.
 
     Parameters
@@ -862,8 +855,7 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     flavor : str, keyword-only, optional
         The flavour the caller asked for (``'auto'``, ``'cpu'``, ``'gpu'``):
         when given, the line names which flavour it summed and how many
-        envs fell back to the GPU build; ``None`` keeps the pre-flavour
-        wording.
+        envs fell back to the GPU build; ``None`` omits that note.
 
     Returns
     -------
@@ -943,7 +935,7 @@ def _cmd_env(args) -> int:
             print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}"
                   f"{_flavor_token(r.get('flavor'))}")
         # the legend is a note, so stderr: stdout stays one line per method
-        print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of BUILDING "
+        print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of building "
               "the env: " + "; ".join(f"{t} = {envs.DIFFICULTY.get(t, '?')}"
                                        for t in seen_tags)
               + f";  {envs.VERIFIED_STAR}", file=sys.stderr)
@@ -982,7 +974,7 @@ def _cmd_env(args) -> int:
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"
-              + (f"; NO lockfile for: {', '.join(nolock)}" if nolock else ""))
+              + (f"; no lockfile for: {', '.join(nolock)}" if nolock else ""))
         print(f"# legend: {envs.MARK_LEGEND}")
         if missing:
             miss_methods = sorted({m for r in missing for m in r["methods"]})
@@ -1046,9 +1038,8 @@ def _cmd_env(args) -> int:
             print(f"created group env {args.group}")
         return _EXIT_OK
     method = getattr(args, "method", None)
-    # ONE resolver for every per-method env command: the name scan()['env'],
-    # run(), env doctor/plan/install/create expect. A recipe that built
-    # scmb_matilda while everything else looked for matilda was the bug.
+    # one resolver for every per-method env command, so recipe/yml/create build
+    # the env name that scan()['env'], run() and env doctor/plan/install expect
     expected = envs.default_env_name(method)      # KeyError (did-you-mean) on a typo
     name = getattr(args, "name", None) or expected
     if name == expected:
@@ -1090,9 +1081,9 @@ def _cmd_env(args) -> int:
 
 # ----------------------------------------------------------------- parser
 _CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
-                  "SAME cells, e.g. CITE-seq), diagonal (modalities measured in DIFFERENT "
+                  "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
-                  "modality) or cross (several batches with ALL modalities; batch-effect "
+                  "modality) or cross (several batches with all modalities; batch-effect "
                   "removal, incl. spatial slice registration)")
 _TASK_HELP = ("task within the category: clustering (default), batch, "
               "dimension_reduction, classification, imputation, registration "
@@ -1144,7 +1135,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- find
     pf = sub.add_parser(
         "find", help="find methods by category/modalities/labels/ATAC (mtb.find_methods)",
-        description="Print method ids matching ALL given filters, one per line. "
+        description="Print method ids matching all given filters, one per line. "
                     "Every filter is optional; with none, every method is listed.")
     pf.add_argument("--category", help=_CATEGORY_HELP)
     pf.add_argument("--task", help=_TASK_HELP)
@@ -1155,7 +1146,7 @@ def build_parser() -> argparse.ArgumentParser:
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods that consume cell-type "
                          "labels (supervised); false: only label-free methods; absent: "
-                         "no filter. NOTE: the optional value must come right after "
+                         "no filter. Note: the optional value must come right after "
                          "the flag")
     pf.add_argument("--atac", choices=["peak", "gene_activity"],
                     help="filter by the ATAC representation the method consumes: "
@@ -1208,7 +1199,7 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--category", help=_CATEGORY_HELP + " (default: every category, "
                                                         "exactly like mtb.scan(dataset))")
     ps.add_argument("--data-path", dest="data_path",
-                    help="folder that CONTAINS the dataset folder (default: the "
+                    help="folder that contains the dataset folder (default: the "
                          "package data path, see mtb.config)")
     ps.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown "
                                                       "id -> did-you-mean error)")
@@ -1227,7 +1218,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- layout
     play = sub.add_parser(
-        "layout", help="how to lay out YOUR dataset on disk (mtb.describe_layout)",
+        "layout", help="how to lay out your dataset on disk (mtb.describe_layout)",
         description="Print the directory layout and role -> filename contract the "
                     "package expects, optionally for one category.")
     play.add_argument("category", nargs="?", help=_CATEGORY_HELP + " (optional: "
@@ -1310,7 +1301,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Plot stored result tables (--category [--dataset] [--source]), "
                     "your own long table (--input long.csv or a run_all output "
                     "dir, as written by `multibench evaluate --method/--dataset` "
-                    "and `multibench run-all`), or BOTH: --input together with "
+                    "and `multibench run-all`), or both: --input together with "
                     "--category concatenates your rows onto the stored table, so "
                     "your method is drawn next to the stored table.")
     pp.add_argument("kind", choices=["bubble", "bar"],
@@ -1349,7 +1340,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "the same ordering)")
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
-                         "EVERY dataset instead of warning")
+                         "every dataset instead of warning")
     pp.add_argument("--group", choices=["clustering", "batch"],
                     help="bar only: metric family shorthand (overrides --metrics)")
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")
@@ -1361,7 +1352,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- run
     pr = sub.add_parser(
-        "run", help="run ONE method on explicit input files (mtb.run)",
+        "run", help="run one method on explicit input files (mtb.run)",
         description="Run one method in its conda env on the given role=path inputs "
                     "and write its outputs under --out-dir. Use `multibench scan` "
                     "first to see which roles a method needs and whether its env is "
@@ -1410,7 +1401,7 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--modalities", help="comma-separated modalities to restrict the "
                                           "method variants to, e.g. rna,adt")
     pra.add_argument("--data-path", dest="data_path",
-                     help="folder that CONTAINS the dataset folder (default: the "
+                     help="folder that contains the dataset folder (default: the "
                           "package data path)")
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
                      help="print the plan - the mtb.scan frame run_all(dry_run=True) "
@@ -1507,7 +1498,7 @@ def build_parser() -> argparse.ArgumentParser:
                        description="One line per method: [x] installed / [ ] not, the "
                                    "env the package uses for it (the same name scan/run/"
                                    "doctor/recipe use) and a difficulty tag saying how "
-                                   "hard the env is to BUILD from its recipe - "
+                                   "hard the env is to build from its recipe - "
                                    + "; ".join(f"{k} = {v}" for k, v in _DIFF.items())
                                    + f". {_STAR}. A legend line is printed on stderr.")
     es.add_argument("--category", help=_CATEGORY_HELP + " (only its methods)")
@@ -1540,7 +1531,7 @@ def build_parser() -> argparse.ArgumentParser:
     ey.add_argument("--name", help=_NAME_HELP)
     ey.add_argument("--out", help="write the yml here instead of stdout")
     ey.set_defaults(func=_cmd_env, _parser=ey)
-    ec = ev.add_parser("create", help="create ONE method's env (dry run unless --run)",
+    ec = ev.add_parser("create", help="create one method's env (dry run unless --run)",
                        description="Create the conda environment for METHOD from its "
                                    "committed lockfile (falling back to the recipe when "
                                    "none is captured), under the name scan/run expect; "

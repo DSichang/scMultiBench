@@ -1,11 +1,11 @@
 # AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_params.py
 #
-# DOC-ONLY tunable hyperparameters, extracted from each UPSTREAM method
-# script's own argparse. These are NEVER added to a command line by the
+# Doc-only tunable hyperparameters, extracted from each upstream method
+# script's own argparse. These are never added to a command line by the
 # package; they document what `run(..., params={...})` may override, and
 # are surfaced by `multibench.params_for(method, category, modalities)`.
 #
-# A method absent from this file exposes NO command-line hyperparameters
+# A method absent from this file exposes no command-line hyperparameters
 # (they are hardcoded in its source). Since method scripts are never
 # modified, such a method is not tunable through the wrapper.
 Cobolt:

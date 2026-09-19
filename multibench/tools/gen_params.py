@@ -1,6 +1,6 @@
 """Generate engine/params.yaml: doc-only tunable hyperparams per method variant,
-extracted from each UPSTREAM script's argparse (python) / commandArgs (R).
-Never emitted on a command line - surfaced by multibench.params_for()."""
+extracted from the ``add_argument`` calls of each upstream script. The recorded
+defaults are never put on a command line; multibench.params_for() surfaces them."""
 import warnings, os, re, json; warnings.filterwarnings("ignore")
 from multibench.engine import registry
 
@@ -56,12 +56,12 @@ for s in registry.load():
 
 hdr = ("# AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_params.py\n"
        "#\n"
-       "# DOC-ONLY tunable hyperparameters, extracted from each UPSTREAM method\n"
-       "# script's own argparse. These are NEVER added to a command line by the\n"
+       "# Doc-only tunable hyperparameters, extracted from each upstream method\n"
+       "# script's own argparse. These are never added to a command line by the\n"
        "# package; they document what `run(..., params={...})` may override, and\n"
        "# are surfaced by `multibench.params_for(method, category, modalities)`.\n"
        "#\n"
-       "# A method absent from this file exposes NO command-line hyperparameters\n"
+       "# A method absent from this file exposes no command-line hyperparameters\n"
        "# (they are hardcoded in its source). Since method scripts are never\n"
        "# modified, such a method is not tunable through the wrapper.\n")
 import yaml
