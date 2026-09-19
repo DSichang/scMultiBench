@@ -17,10 +17,10 @@ def build_command(variant: Variant, values: dict, out_dir: str,
         if a.const is not None:
             items = [a.const]
         elif a.roles:
-            # An entry written "=VALUE" is a LITERAL, not an input role. Upstream
+            # An entry written "=VALUE" is a literal, not an input role. Upstream
             # scripts that take one slot per batch need a placeholder for batches
-            # lacking that modality - scMoMaT documents `None` for exactly this -
-            # and without it a mosaic layout cannot be expressed.
+            # lacking that modality (scMoMaT documents `None`); without it a
+            # mosaic layout cannot be expressed.
             missing = [r for r in a.roles
                        if not str(r).startswith("=") and r not in vals]
             if missing:
