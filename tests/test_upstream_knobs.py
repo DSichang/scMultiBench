@@ -56,3 +56,66 @@ def test_unaudited_method_returns_empty_lists_not_an_error():
     out = upstream.knobs_for("NoSuchMethod")
     assert out == {"fixed_in_script": [], "upstream_knobs": [],
                    "upstream_url": None, "notes": None}
+
+
+# --- the generator's verification step --------------------------------------
+# The table above is only as honest as the check that admits entries to it.
+
+def _load_generator():
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "tools" / "gen_upstream_knobs.py"
+    spec = importlib.util.spec_from_file_location("gen_upstream_knobs", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture()
+def clone(tmp_path):
+    script = tmp_path / "tools_scripts" / "M" / "main_M.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("import scanpy as sc\n"
+                      "\n"
+                      "sc.pp.normalize_total(adata, target_sum=1e4)\n"
+                      "model = build(\n"
+                      "    n_latent=20,\n"
+                      ")\n")
+    return tmp_path
+
+
+def _entry(line, evidence):
+    return {"name": "x", "value": "1", "evidence": evidence,
+            "source": f"tools_scripts/M/main_M.py:{line}"}
+
+
+def test_generator_keeps_an_entry_whose_cited_line_holds_the_evidence(clone):
+    gen = _load_generator()
+    ev = "sc.pp.normalize_total(adata,  target_sum=1e4)"   # whitespace differs
+    assert gen.is_verified(_entry(3, ev), clone)
+
+
+def test_generator_drops_an_entry_citing_a_blank_line(clone):
+    """A blank line is a substring of every evidence string, so it must not
+    count as containing it - that is how a citation of the wrong file at the
+    right line number used to pass."""
+    gen = _load_generator()
+    ev = "sc.pp.normalize_total(adata, target_sum=1e4)"
+    assert not gen.is_verified(_entry(2, ev), clone)
+
+
+def test_generator_drops_an_entry_citing_a_trivial_line(clone):
+    """The same hole one character wide: a lone ')' occurs inside the evidence
+    without being the cited code."""
+    gen = _load_generator()
+    ev = "sc.pp.normalize_total(adata, target_sum=1e4)"
+    assert not gen.is_verified(_entry(6, ev), clone)
+
+
+def test_generator_drops_a_missing_file_a_bad_line_and_empty_evidence(clone):
+    gen = _load_generator()
+    ev = "sc.pp.normalize_total(adata, target_sum=1e4)"
+    gone = dict(_entry(3, ev), source="tools_scripts/M/other.py:3")
+    assert not gen.is_verified(gone, clone)
+    assert not gen.is_verified(_entry(99, ev), clone)
+    assert not gen.is_verified(_entry(3, ""), clone)
