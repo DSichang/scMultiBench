@@ -281,7 +281,7 @@ def archive_for(env: str, flavor: str = "auto", *, manifest: dict | None = None,
     Parameters
     ----------
     env : str
-        The real env name (:func:`group_for`), e.g. ``'env_sciPENN'``.
+        The env name (:func:`group_for`), e.g. ``'env_sciPENN'``.
     flavor : str
         One of :data:`FLAVORS`; ``'auto'`` resolves through
         :func:`resolve_flavor`.
@@ -326,7 +326,7 @@ def installed_flavor(env: str, conda: str | None = None) -> str | None:
     Parameters
     ----------
     env : str
-        The real env name (:func:`group_for`).
+        The env name (:func:`group_for`).
     conda : str, optional
         conda/mamba executable :func:`env_prefix` may ask.
 
@@ -548,7 +548,7 @@ def groups() -> dict:
     merged = _merged_groups()
     covered = {m for g in merged.values() for m in g.get("members", [])}
     out = {name: {**g, "shared": True} for name, g in merged.items()}
-    # explicit method->real-env overrides: ensure each target env is a group too
+    # method_env overrides: ensure each target env is a group too
     for method, env in _method_env().items():
         g = out.setdefault(env, {"members": [], "shared": True})
         g.setdefault("members", [])
@@ -592,8 +592,10 @@ def group_create_commands(group: str, env_name: str | None = None,
 def _check_methods(methods):
     """Raise ``KeyError`` for an unknown id in ``methods``.
 
-    Delegates to :func:`registry.check_method` so the error carries the same
-    did-you-mean hint as every other entry point (``'Stabmap'`` -> ``'StabMap'``).
+    Without it a typo resolves through :func:`group_for` to a made-up
+    ``scmb_<typo>`` env and gets a row instead of an error. Delegates to
+    :func:`registry.check_method` so the error carries the same did-you-mean
+    hint as every other entry point (``'Stabmap'`` -> ``'StabMap'``).
     """
     if not methods:
         return
@@ -765,7 +767,7 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
     Parameters
     ----------
     env : str
-        The real env name (:func:`group_for`), e.g. ``'matilda'``.
+        The env name (:func:`group_for`), e.g. ``'matilda'``.
     conda : str, optional
         conda/mamba executable to ask when the prefix is not under
         ``envs_dir``; default: the one on PATH, if any.
@@ -809,7 +811,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     Parameters
     ----------
     env : str
-        The real conda env name (:func:`group_for`), e.g. ``'matilda'``.
+        The conda env name (:func:`group_for`), e.g. ``'matilda'``.
     envs_dir : path, keyword-only, optional
         Where the prefix goes; default :attr:`multibench.config.Config.envs_dir`
         (``MULTIBENCH_ENVS_DIR``, else conda's envs dir, else
@@ -1025,7 +1027,7 @@ def lockfile(env_name: str) -> Path | None:
 
 def required_envs(category: str | None = None,
                   methods: list[str] | None = None) -> list[str]:
-    """The distinct real conda envs needed to run the given methods (or all).
+    """The distinct conda envs needed to run the given methods (or all).
 
     The env names ``run()`` activates (:func:`group_for`), i.e. what a fresh
     machine must provision.
@@ -1095,8 +1097,10 @@ def post_install(env_name: str):
 
     Restores what a lockfile cannot: packages installed inside the env by a
     language-native installer (``install.packages()``, ``install_github()``),
-    which ``conda env export`` never records (rliger in ``scmb_r``), and pip
-    packages that are on no index (:data:`_NOT_ON_PYPI`).
+    which ``conda env export`` never records (rliger in ``scmb_r``); pip
+    packages that are on no index (:data:`_NOT_ON_PYPI`); and packages the
+    working env loads from a local checkout, such as the editable installs
+    :func:`freeze` skips (matilda, scMVP).
     """
     p = _LOCKS_DIR / f"{env_name}.post.sh"
     return p if p.is_file() else None
@@ -1104,7 +1108,7 @@ def post_install(env_name: str):
 
 def create_env(env_name: str, conda: str | None = None,
                dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
-    """Create one real env from its committed lockfile (the reproducible path).
+    """Create one env from its committed lockfile (the reproducible path).
 
     The env is built under the name ``run()`` uses.
 
@@ -1470,7 +1474,7 @@ _CONDA_TO_PYPI = {
 # Not on PyPI under any name: installed from git or from source in the working
 # env and recorded by `pip freeze` as a bare `name==version` no index can
 # satisfy. Stripped from the pip section and restored by <env>.post.sh, which
-# names the real source (a git URL + commit, or a path inside this repo).
+# names the source (a git URL + commit, or a path inside this repo).
 _NOT_ON_PYPI = frozenset({"cobolt", "spiral", "multimap"})
 # conda's own installer machinery: importable in a conda env, so `pip freeze`
 # lists it, but distributed only through conda channels, so the pip install
@@ -1503,8 +1507,9 @@ def sanitize_lock(text: str) -> str:
       of pinning it.
 
     Pip entries no index can supply (:data:`_CONDA_ONLY_PIP`,
-    :data:`_NOT_ON_PYPI`) are dropped as well, and conda-only names are mapped
-    to their PyPI names (:data:`_CONDA_TO_PYPI`).
+    :data:`_NOT_ON_PYPI`) are dropped as well, and a package that ``pip freeze``
+    lists under its conda-forge name is renamed to its PyPI name
+    (:data:`_CONDA_TO_PYPI`, ``python-graphviz`` -> ``graphviz``).
 
     The pip block is located by indentation rather than a fixed prefix: conda's
     own export indents entries six spaces while freeze()'s fallback path writes
