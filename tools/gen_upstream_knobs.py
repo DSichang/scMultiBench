@@ -15,6 +15,7 @@ Regenerate with:  python tools/gen_upstream_knobs.py [path/to/scMultiBench]
 Every fixed_in_script entry is checked against the upstream checkout before it
 is written. An entry whose cited line does not contain the cited code is
 dropped, so an upstream change shows up as a missing fact, not a wrong one.
+Each drop is named on stderr.
 """
 import json
 import pathlib
@@ -45,6 +46,29 @@ def norm(s: str) -> str:
     return re.sub(r"\s+", " ", str(s)).strip()
 
 
+def is_verified(h: dict, clone: pathlib.Path) -> bool:
+    """Does the line `h["source"]` cites still hold the code `h["evidence"]` quotes?
+
+    Evidence may be the line trimmed (a trailing comment cut) or the line plus
+    its continuation, so containment is accepted either way round - but only
+    when the contained string is most of the containing one. A bare substring
+    test is vacuous at the short end: a blank line is "contained" in every
+    evidence string, and so is a lone ")", which is how a citation of the wrong
+    file at the right line number verifies.
+    """
+    rel, _, ln = h.get("source", "").rpartition(":")
+    f = clone / rel
+    if not (f.is_file() and ln.isdigit()):
+        return False
+    lines = f.read_text(errors="ignore").splitlines()
+    i = int(ln)
+    if not 1 <= i <= len(lines):
+        return False
+    short, long_ = sorted((norm(lines[i - 1]), norm(h.get("evidence", ""))),
+                          key=len)
+    return bool(short) and short in long_ and 2 * len(short) >= len(long_)
+
+
 def main(clone: pathlib.Path) -> int:
     audit = json.loads(AUDIT.read_text())
     out: dict[str, dict] = {}
@@ -52,22 +76,14 @@ def main(clone: pathlib.Path) -> int:
     for m in sorted(audit, key=lambda x: x["method"]):
         fixed = []
         for h in m.get("hardcoded", []):
-            src = h.get("source", "")
-            rel, _, ln = src.rpartition(":")
-            f = clone / rel
-            if not (f.is_file() and ln.isdigit()):
+            if not is_verified(h, clone):
                 dropped += 1
-                continue
-            lines = f.read_text(errors="ignore").splitlines()
-            i = int(ln)
-            actual = norm(lines[i - 1]) if 1 <= i <= len(lines) else ""
-            ev = norm(h.get("evidence", ""))
-            if not ev or not (ev in actual or actual in ev):
-                dropped += 1
+                print(f"dropped {m['method']}: {h.get('name')} "
+                      f"@ {h.get('source')}", file=sys.stderr)
                 continue
             kept += 1
             fixed.append({"name": h["name"], "value": str(h["value"]),
-                          "source": src})
+                          "source": h["source"]})
         knobs = [{"name": k["name"],
                   "default": str(k.get("library_default") or "(undocumented)"),
                   "effect": k["effect"]}
