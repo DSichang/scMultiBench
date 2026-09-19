@@ -88,7 +88,7 @@
    },
    {
     "evidence": "        super_parameters = {'batch_size': 64, 'epoch_pretrain': 3, 'lr': 1e-4,'drop_rate': 0.1}",
-    "name": "super_parameters None-fallback inside the script's own copy of concerto_train_multimodal (dead in practice \u2014 line 202 always passes explicit values)",
+    "name": "super_parameters None-fallback inside the script's own copy of concerto_train_multimodal (unused: line 202 always passes explicit values)",
     "source": "tools_scripts/Concerto/main_Concerto.py:34",
     "value": "batch_size=64, epoch_pretrain=3, lr=1e-4, drop_rate=0.1"
    }
@@ -131,7 +131,7 @@
     "name": "temperature (simclr_loss)"
    },
    {
-    "effect": "feature selection, cell/gene filtering and normalisation applied before TFRecord creation",
+    "effect": "feature selection, cell/gene filtering and normalization applied before TFRecord creation",
     "library_default": "is_hvg=False, n_top_features=2000, min_features=600, min_cells=3, target_sum=10000, log=True",
     "name": "preprocessing_rna: is_hvg / n_top_features / min_features / min_cells / target_sum / log"
    }
@@ -169,13 +169,13 @@
    },
    {
     "evidence": "  con$buildGraph(k=15, k.self=5, k.self.weigh=0.01, ncomps=30, n.odgenes=5e3, space='PCA') ",
-    "name": "k (inter-sample neighbourhood)",
+    "name": "k (inter-sample neighborhood)",
     "source": "tools_scripts/Conos/main_Conos.Rmd:64",
     "value": "15"
    },
    {
     "evidence": "  con$buildGraph(k=15, k.self=5, k.self.weigh=0.01, ncomps=30, n.odgenes=5e3, space='PCA') ",
-    "name": "k.self (within-sample neighbourhood)",
+    "name": "k.self (within-sample neighborhood)",
     "source": "tools_scripts/Conos/main_Conos.Rmd:64",
     "value": "5"
    },
@@ -225,12 +225,12 @@
   "language": "R",
   "library_knobs": [
    {
-    "effect": "size of the inter-sample neighbourhood, i.e. how many cross-dataset cell-to-cell links each cell gets",
+    "effect": "size of the inter-sample neighborhood, i.e. how many cross-dataset cell-to-cell links each cell gets",
     "library_default": "15",
     "name": "k"
    },
    {
-    "effect": "size of the within-sample neighbourhood",
+    "effect": "size of the within-sample neighborhood",
     "library_default": "10",
     "name": "k.self"
    },
@@ -255,7 +255,7 @@
     "name": "space"
    },
    {
-    "effect": "single dial for how aggressively distinct subpopulations are forced together, in place of hand-tuning k1/k",
+    "effect": "how strongly distinct subpopulations are forced together; an alternative to setting k1/k by hand",
     "library_default": "NULL (equivalent to 0)",
     "name": "alignment.strength"
    },
@@ -266,7 +266,7 @@
    }
   ],
   "method": "Conos",
-  "notes": "main_Conos.Rmd takes only positional arguments: the input paths followed by save_path (lines 82-88); main_Conos_classification.Rmd is the classification variant. Line 64 spells the argument k.self.weigh, which R partial matching resolves to k.self.weight; its value 0.01 is a tenth of the library default 0.1. embedGraph alpha=1/2 (line 66) is five times the default 0.1; method='largeVis', target.dims=2 and seed=1 stay at their defaults, and the script never calls set.seed(). The pagoda2 preprocessing on line 62 changes two basicP2proc defaults: nPcs=30 (default 100) and min.transcripts.per.cell=0 (default 100, so no cells are filtered); n.odgenes=3e3 and min.cells.per.gene=0 equal the defaults. n.odgenes=3e3 on line 62 (pagoda2, per-dataset overdispersed genes) and n.odgenes=5e3 on line 64 (conos, per-pair alignment) are different parameters. runConos() reads the global variable num (line 48) instead of using its path_list argument, and line 49 reads the third input with a different h5 layout (h5_to_matrix2), so the function depends on the script's top-level context.",
+  "notes": "main_Conos.Rmd takes only positional arguments: the input paths followed by save_path (lines 82-88); main_Conos_classification.Rmd is the classification variant. Line 64 spells the argument k.self.weigh, which R partial matching resolves to k.self.weight; its value 0.01 is a tenth of the library default 0.1. embedGraph alpha=1/2 (line 66) is five times the default 0.1; method='largeVis', target.dims=2 and seed=1 stay at their defaults, and the script never calls set.seed(). The pagoda2 preprocessing on line 62 changes two basicP2proc defaults: nPcs=30 (default 100) and min.transcripts.per.cell=0 (default 100, so no cells are filtered); n.odgenes=3e3 and min.cells.per.gene=0 equal the defaults. n.odgenes=3e3 on line 62 (pagoda2, per-dataset overdispersed genes) and n.odgenes=5e3 on line 64 (conos, per-pair alignment) are different parameters. runConos() reads the global variable num (line 48) instead of using its path_list argument, and lines 49-51 read the third input with a different h5 layout (h5_to_matrix2), so the function depends on the script's top-level context.",
   "upstream_url": "https://github.com/kharchenkolab/conos/blob/main/R/conclass.R"
  },
  {
@@ -336,7 +336,7 @@
   "language": "python",
   "library_knobs": [
    {
-    "effect": "dimensionality of the shared GLUE latent embedding (the actual benchmark output)",
+    "effect": "dimensionality of the shared GLUE latent embedding (the benchmark output)",
     "library_default": "50",
     "name": "latent_dim"
    },
@@ -371,7 +371,7 @@
     "name": "lr"
    },
    {
-    "effect": "training length and early-stopping behaviour (SCGLUEModel.fit)",
+    "effect": "training length and early-stopping behavior (SCGLUEModel.fit)",
     "library_default": "AUTO (heuristic from dataset size; paired with patience=AUTO, reduce_lr_patience=AUTO)",
     "name": "max_epochs"
    }
@@ -566,7 +566,7 @@
    }
   ],
   "method": "GPSA",
-  "notes": "main_GPSA.py exposes only --data_dir and --save_dir (lines 26-27). The n_top_genes=2000 default on line 52 is never used: the only call (line 75) passes 3000. N_GENES=20 (line 166) sets how many genes the model sees: after the r2>0.3 spatial-autocorrelation screen the panel is cut to the 20 best-ranked genes (lines 98-104). Line 88 uses slice index 1 as the reference for that screen, matching fixed_view_idx=1 (line 169); both assume at least two slices. N_SAMPLES=None (line 167) is assigned and never used. The n_latent_gps branch (lines 205-207) writes ./out/W_st.csv but is unreachable while N_LATENT_GPS['expression'] is None. --save_dir is written as a file holding only the elapsed time (line 240) although line 234 treats it as a directory, and the aligned slices returned by combine() (line 243) are never written to disk. S=5 (line 151) compares with the library's forward() default of 1.",
+  "notes": "main_GPSA.py exposes only --data_dir and --save_dir (lines 26-27). The n_top_genes=2000 default on line 52 is never used: the only call (line 75) passes 3000. N_GENES=20 (line 166) sets how many genes the model sees: after the r2>0.3 spatial-autocorrelation screen the panel is cut to the 20 best-ranked genes (lines 98-104). Line 88 uses slice index 1 as the reference for that screen, matching fixed_view_idx=1 (line 169); both assume at least two slices. N_SAMPLES=None (line 167) is assigned and never used. The n_latent_gps branch (lines 205-207) writes ./out/W_st.csv but is unreachable while N_LATENT_GPS['expression'] is None. --save_dir is written as a file holding only the elapsed time (line 240) although line 234 treats it as a directory, and the aligned slices returned by combine() (line 243) are never written to disk. S=5 (line 151) is five times the library's forward() default of 1. N_EPOCHS=5000 and PRINT_EVERY=25 equal upstream's experiments/expression/st/st_alignment.py; the README quickstart uses 3000 and 100, with the same lr=1e-2 and S=5.",
   "upstream_url": "https://github.com/andrewcharlesjones/spatial-alignment/blob/main/gpsa/models/vgpsa.py"
  },
  {
@@ -656,12 +656,12 @@
     "name": "strengths"
    },
    {
-    "effect": "neighbours per cell in the MultiGraph, setting how local the manifold is",
+    "effect": "neighbors per cell in the MultiGraph, setting how local the manifold is",
     "library_default": "None -> 15 x number of input datasets",
     "name": "n_neighbors"
    },
    {
-    "effect": "target cross-dataset neighbourhood cardinality used to calibrate the between-dataset edge weights",
+    "effect": "target cross-dataset neighborhood cardinality used to calibrate the between-dataset edge weights",
     "library_default": "None -> log2(n_neighbors)",
     "name": "cardinality"
    },
@@ -676,7 +676,7 @@
     "name": "min_dist"
    },
    {
-    "effect": "RNG seed for the spectral initialisation and stochastic layout optimisation",
+    "effect": "RNG seed for the spectral initialization and stochastic layout optimization",
     "library_default": "0",
     "name": "seed / random_state"
    },
@@ -686,7 +686,7 @@
     "name": "scale (Integration)"
    },
    {
-    "effect": "number of LSI components computed from the binarised, TF-IDF-transformed ATAC peak matrix",
+    "effect": "number of LSI components computed from the binarized, TF-IDF-transformed ATAC peak matrix",
     "library_default": "50",
     "name": "n_comps (TFIDF_LSI)"
    }
@@ -807,7 +807,7 @@
   "language": "python",
   "library_knobs": [
    {
-    "effect": "trade-off between spatial-distance and gene-expression terms in the FGW objective \u2014 the single most consequential PASTE knob",
+    "effect": "trade-off between the spatial-distance and gene-expression terms in the FGW objective",
     "library_default": "0.1",
     "name": "alpha"
    },
@@ -817,7 +817,7 @@
     "name": "dissimilarity"
    },
    {
-    "effect": "rescales spatial distances so neighbouring spots sit at distance 1, making alpha comparable across platforms/resolutions",
+    "effect": "rescales spatial distances so neighboring spots sit at distance 1, making alpha comparable across platforms/resolutions",
     "library_default": "False",
     "name": "norm"
    },
@@ -832,7 +832,7 @@
     "name": "use_rep"
    },
    {
-    "effect": "warm-start transport plan, e.g. from a spatial heuristic, which changes which local optimum FGW lands in",
+    "effect": "warm-start transport plan, e.g. from a spatial heuristic, changing which local optimum the solver reaches",
     "library_default": "None (uniform mapping)",
     "name": "G_init"
    },
@@ -880,7 +880,7 @@
    },
    {
     "evidence": "        sc.pp.normalize_total(slice_i, target_sum=1e4)",
-    "name": "target_sum (library-size normalisation)",
+    "name": "target_sum (library-size normalization)",
     "source": "tools_scripts/PASTE2/main_PASTE2.py:38",
     "value": "1e4"
    }
@@ -918,7 +918,7 @@
     "name": "a_distribution / b_distribution"
    },
    {
-    "effect": "selects the expression cost: 'euclidean'/'euc', 'kl', 'gkl', 'selection_kl', 'pca', 'glmpca' \u2014 the script pins 'pca'",
+    "effect": "selects the expression cost: 'euclidean'/'euc', 'kl', 'gkl', 'selection_kl', 'pca', 'glmpca' \u2014 the script sets 'pca'",
     "library_default": "'glmpca'",
     "name": "dissimilarity (full option set)"
    }
@@ -1238,17 +1238,17 @@
   "language": "R",
   "library_knobs": [
    {
-    "effect": "number of multimodal neighbours retained in the weighted-NN graph",
+    "effect": "number of multimodal neighbors retained in the weighted-NN graph",
     "library_default": "20",
     "name": "k.nn (FindMultiModalNeighbors)"
    },
    {
-    "effect": "per-modality dimensions fed into the weighted nearest-neighbour computation",
+    "effect": "per-modality dimensions fed into the weighted nearest-neighbor computation",
     "library_default": "no default \u2014 required argument",
     "name": "dims.list"
    },
    {
-    "effect": "size of the approximate-neighbour candidate pool searched per cell",
+    "effect": "size of the approximate-neighbor candidate pool searched per cell",
     "library_default": "200",
     "name": "knn.range"
    },
@@ -1263,7 +1263,7 @@
     "name": "sd.scale"
    },
    {
-    "effect": "whether modality scores are smoothed across each modality's own neighbours",
+    "effect": "whether modality scores are smoothed across each modality's own neighbors",
     "library_default": "FALSE",
     "name": "smooth"
    },
@@ -1273,7 +1273,7 @@
     "name": "resolution (FindClusters)"
    },
    {
-    "effect": "modularity optimiser: 1 Louvain, 2 Louvain with multilevel refinement, 3 SLM, 4 Leiden",
+    "effect": "modularity optimizer: 1 Louvain, 2 Louvain with multilevel refinement, 3 SLM, 4 Leiden",
     "library_default": "1",
     "name": "algorithm (FindClusters)"
    }
@@ -1341,17 +1341,17 @@
     "name": "dims (FindTransferAnchors)"
    },
    {
-    "effect": "neighbourhood size used to call a mutual-nearest-neighbour anchor pair",
+    "effect": "neighborhood size used to call a mutual-nearest-neighbor anchor pair",
     "library_default": "5",
     "name": "k.anchor"
    },
    {
-    "effect": "neighbourhood size used to discard low-confidence anchors",
+    "effect": "neighborhood size used to discard low-confidence anchors",
     "library_default": "NA",
     "name": "k.filter"
    },
    {
-    "effect": "neighbourhood size used to score each anchor's consistency",
+    "effect": "neighborhood size used to score each anchor's consistency",
     "library_default": "30",
     "name": "k.score"
    },
@@ -1440,7 +1440,7 @@
     "name": "laplacian.reduction.dims"
    },
    {
-    "effect": "supervised reduction used to harmonise the bridge with the query",
+    "effect": "supervised reduction used to harmonize the bridge with the query",
     "library_default": "c(\"slsi\", \"spca\", NULL) \u2014 first value \"slsi\" is used",
     "name": "supervised.reduction"
    },
@@ -1524,7 +1524,7 @@
     "name": "labels_list"
    },
    {
-    "effect": "re-centres each dataset to zero mean before projection",
+    "effect": "re-centers each dataset to zero mean before projection",
     "library_default": "TRUE",
     "name": "scale.center"
    },
@@ -1601,7 +1601,7 @@
     "name": "nCores"
    },
    {
-    "effect": "variance threshold used by rliger's own unshared-feature selection (the alternative to the Seurat vst top-2000 path this script hardcodes)",
+    "effect": "variance threshold used by rliger's own unshared-feature selection (the alternative to the Seurat vst top-2000 selection this script uses)",
     "library_default": "0.1",
     "name": "selectGenes unsharedThresh"
    },
@@ -1650,12 +1650,12 @@
   "language": "python",
   "library_knobs": [
    {
-    "effect": "number of training passes over the data (script pins 50)",
+    "effect": "number of training passes over the data (the script sets 50)",
     "library_default": "30",
     "name": "epochs"
    },
    {
-    "effect": "encoder/decoder layer widths; last entry is the joint latent dimensionality (script pins 8 latent dims)",
+    "effect": "encoder/decoder layer widths; last entry is the joint latent dimensionality (the script sets 8 latent dimensions)",
     "library_default": "[128, 64, 32, 5]",
     "name": "hidden_layers"
    },
@@ -1737,7 +1737,7 @@
   "language": "python",
   "library_knobs": [
    {
-    "effect": "number of training passes for the CVAE (script pins 20, i.e. 5x shorter than the library default)",
+    "effect": "number of training passes for the CVAE (the script sets 20, a fifth of the library default)",
     "library_default": "100",
     "name": "epochs"
    },
@@ -1778,7 +1778,7 @@
    }
   ],
   "method": "VIPCCA",
-  "notes": "main_VIPCCA.py is the diagonal-integration RNA + ATAC gene-activity script; argparse exposes only --path1, --path2 and --save_path. split_by=\"_batch\" (line 42) names an obs column the script creates on lines 33 and 35, and res_path='./atac_result/' (line 40) is a relative output directory, not args.save_path. tl.preprocessing (line 38) is called with defaults, so n_top_genes=2000, hvg=True, min_cells=1, min_genes=1, mt_ratio=0.8 and lognorm=True are fixed implicitly; n_top_genes is therefore listed under the library knobs. mode='CVAE' equals the library default; epochs (20, default 100), lambda_regulizer (2, default 5.0), batch_input_size (64, default 128) and batch_input_size2 (14, default 16) differ from it. Upstream is the standalone vipcca package (jhu99/vipcca), not scbean.",
+  "notes": "main_VIPCCA.py is the diagonal-integration RNA + ATAC gene-activity script; argparse exposes only --path1, --path2 and --save_path. split_by=\"_batch\" (line 42) names an obs column the script creates on lines 33 and 35, and res_path='./atac_result/' (line 40) is a relative output directory, not args.save_path. tl.preprocessing (line 38) is called with defaults, so n_top_genes=2000, hvg=True, min_cells=1, min_genes=1, mt_ratio=0.8 and lognorm=True are fixed implicitly; n_top_genes is therefore listed under the library knobs. mode='CVAE' equals the library default; epochs (20, default 100), lambda_regulizer (2, default 5.0), batch_input_size (64, default 128) and batch_input_size2 (14, default 16) differ from it. Upstream is the standalone vipcca package (jhu99/vipcca), not scbean; the scbean-hosted documentation lists epochs=1000, the vipcca source 100.",
   "upstream_url": "https://vipcca.readthedocs.io/en/latest/api.html"
  },
  {
@@ -1904,7 +1904,7 @@
     "name": "num_topics"
    },
    {
-    "effect": "learning rate of the stochastic variational inference optimiser; the README advises lowering it to 0.01 or 0.001 on sparser data",
+    "effect": "learning rate of the stochastic variational inference optimizer; the README advises lowering it to 0.01 or 0.001 on sparser data",
     "library_default": "0.1",
     "name": "lr"
    },
@@ -1914,7 +1914,7 @@
     "name": "integrated_epochs"
    },
    {
-    "effect": "SVI epochs for the per-modality PoLNG warm-up that initialises the joint fit",
+    "effect": "SVI epochs for the per-modality PoLNG warm-up that initializes the joint fit",
     "library_default": "3000",
     "name": "warmup_epochs"
    },
@@ -2040,7 +2040,7 @@
    }
   ],
   "method": "moETM",
-  "notes": "main_moETM_rna_adt.py is described. main_moETM_rna_atac.py fixes the same values (num_topic=100 line 192, emd_dim=400 line 193, Total_epoch=500 and batch_size=2000 line 150, calc_weight(..., 0, 1/3, 0, 1e-4) line 121, epoch%10 line 135, target_sum=1e4 lines 67 and 79) and runs highly_variable_genes on both modalities (lines 69 and 81), whereas the ADT script runs it on RNA only (line 69) and keeps all proteins. batch_size=2000 is passed explicitly on line 192 of the ADT script and left to the default on line 207 of the ATAC script. Eval_kwargs (lines 144-149) set clustering_method='louvain' and a 20-point resolution grid, but the evaluate() call that would use them is commented out (line 127). batch_names has one element (line 191) and get_adata_mod zips it with the file lists (line 57), so only the first RNA/ADT file pair is loaded, labelled 'batch0', although --path1 and --path2 accept several files. The training loop runs train_num // batch_size iterations per epoch (line 108), so a dataset under 2000 cells gets no gradient steps and a remainder under 2000 cells is dropped each epoch. The local Train_moETM (line 80) shadows the function of the same name imported from moETM.train (line 22). moETM is a research repository without a documented API; the listed defaults come from its source files (moETM/build_model.py, utils.py, main_intergration_rna_protein.py), and the vendored build_model.py and utils.py carry the same values.",
+  "notes": "main_moETM_rna_adt.py is described. main_moETM_rna_atac.py fixes the same values (num_topic=100 line 192, emd_dim=400 line 193, Total_epoch=500 and batch_size=2000 line 150, calc_weight(..., 0, 1/3, 0, 1e-4) line 121, epoch%10 line 135, target_sum=1e4 lines 67 and 79) and runs highly_variable_genes on both modalities (lines 69 and 81), whereas the ADT script runs it on RNA only (line 69) and keeps all proteins. batch_size=2000 is passed explicitly on line 192 of the ADT script and left to the default on line 207 of the ATAC script. Eval_kwargs (lines 144-149) set clustering_method='louvain' and a 20-point resolution grid, but the evaluate() call that would use them is commented out (line 127). batch_names has one element (line 191) and get_adata_mod zips it with the file lists (line 57), so only the first RNA/ADT file pair is loaded, labeled 'batch0', although --path1 and --path2 accept several files. The training loop runs train_num // batch_size iterations per epoch (line 108), so a dataset under 2000 cells gets no gradient steps and a remainder under 2000 cells is dropped each epoch. The local Train_moETM (line 80) shadows the function of the same name imported from moETM.train (line 22). moETM is a research repository without a documented API; the listed defaults come from its source files (moETM/build_model.py, utils.py, main_intergration_rna_protein.py), and the vendored build_model.py and utils.py carry the same values.",
   "upstream_url": "https://github.com/manqizhou/moETM"
  },
  {
@@ -2067,7 +2067,7 @@
     "name": "lambda"
    },
    {
-    "effect": "number of passes over the full dataset, the main compute/convergence trade-off for the online solver",
+    "effect": "number of passes over the full dataset, trading compute against convergence in the online solver",
     "library_default": "5",
     "name": "maxEpochs"
    },
@@ -2154,7 +2154,7 @@
     "name": "lr"
    },
    {
-    "effect": "minibatch size; the script halves it to 128 and its own comment flags this as the knob to tune when training goes NaN",
+    "effect": "minibatch size; the script sets 128, and its comment says to change it if a NaN error occurs",
     "library_default": "256 (in train); None in get_latent_representation",
     "name": "batch_size"
    },
@@ -2174,7 +2174,7 @@
     "name": "gene_dispersion"
    },
    {
-    "effect": "fraction of cells used for training; the remaining 10% is silently held out for validation",
+    "effect": "fraction of cells used for training; the remaining cells (10% at the default) are held out for validation",
     "library_default": "0.9",
     "name": "train_size"
    },
@@ -2345,7 +2345,7 @@
    },
    {
     "evidence": "    lamb = 0.001 ",
-    "name": "lamb (regularisation lambda)",
+    "name": "lamb (regularization lambda)",
     "source": "tools_scripts/scMoMaT/main_scMoMaT.py:72",
     "value": "0.001"
    },
@@ -2387,7 +2387,7 @@
    },
    {
     "evidence": "    r = None",
-    "name": "r (neighbourhood radius for post-graph)",
+    "name": "r (neighborhood radius for post-graph)",
     "source": "tools_scripts/scMoMaT/main_scMoMaT.py:88",
     "value": "None"
    },
@@ -2412,12 +2412,12 @@
     "name": "K"
    },
    {
-    "effect": "weight of the scMoMaT regularisation term in the matrix-tri-factorisation objective",
+    "effect": "weight of the scMoMaT regularization term in the matrix-tri-factorization objective",
     "library_default": "0.001",
     "name": "lamb"
    },
    {
-    "effect": "number of optimisation iterations in the first training stage",
+    "effect": "number of optimization iterations in the first training stage",
     "library_default": "4000 (train_func default)",
     "name": "T"
    },
@@ -2432,17 +2432,17 @@
     "name": "batch_size"
    },
    {
-    "effect": "random seed for factor initialisation and sampling",
+    "effect": "random seed for factor initialization and sampling",
     "library_default": "0",
     "name": "seed"
    },
    {
-    "effect": "neighbourhood size of the post-processed kNN graph that is the method's actual output",
+    "effect": "neighborhood size of the post-processed kNN graph that is the method's output",
     "library_default": "no default \u2014 required positional argument; README recommends 30~50",
     "name": "n_neighbors (calc_post_graph)"
    },
    {
-    "effect": "radius parameter (0-1) bounding neighbourhood size as an alternative to a fixed k",
+    "effect": "radius parameter (0-1) bounding neighborhood size as an alternative to a fixed k",
     "library_default": "None",
     "name": "r (calc_post_graph)"
    }
@@ -2535,7 +2535,7 @@
    },
    {
     "evidence": "        batch_key=\"batch\"",
-    "name": "batch_key (setup_anndata) \u2014 batch is synthesised as one batch per input file",
+    "name": "batch_key (setup_anndata) \u2014 batch is synthesized as one batch per input file",
     "source": "tools_scripts/totalVI/main_totalVI.py:75",
     "value": "\"batch\""
    }

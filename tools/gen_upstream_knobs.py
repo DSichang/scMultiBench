@@ -34,7 +34,7 @@ HEADER = """\
 # Why a method reports zero tunable parameters. `params_for` lists what the
 # upstream script accepts on its command line; these are the hyperparameters it
 # fixes in its source (with the file:line that fixes them), plus the knobs the
-# wrapped library documents but the script never exposes. Changing the latter
+# wrapped library documents but the script never exposes. Changing either
 # requires editing tools_scripts/, which this package never does.
 #
 # Every fixed_in_script entry was verified against the upstream file at
@@ -47,14 +47,13 @@ def norm(s: str) -> str:
 
 
 def is_verified(h: dict, clone: pathlib.Path) -> bool:
-    """Does the line `h["source"]` cites still hold the code `h["evidence"]` quotes?
+    """Whether the line `h["source"]` cites still holds the code `h["evidence"]` quotes.
 
-    Evidence may be the line trimmed (a trailing comment cut) or the line plus
-    its continuation, so containment is accepted either way round - but only
-    when the contained string is most of the containing one. A bare substring
-    test is vacuous at the short end: a blank line is "contained" in every
-    evidence string, and so is a lone ")", which is how a citation of the wrong
-    file at the right line number verifies.
+    Evidence may be the line with a trailing comment cut, or the line plus its
+    continuation, so containment is accepted either way round, but only when
+    the shorter string is at least half the longer one. Without that bound a
+    blank line or a lone ")" is contained in every evidence string, and a
+    citation of the wrong file at the right line number would verify.
     """
     rel, _, ln = h.get("source", "").rpartition(":")
     f = clone / rel

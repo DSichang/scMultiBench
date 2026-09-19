@@ -3,7 +3,7 @@
 # Why a method reports zero tunable parameters. `params_for` lists what the
 # upstream script accepts on its command line; these are the hyperparameters it
 # fixes in its source (with the file:line that fixes them), plus the knobs the
-# wrapped library documents but the script never exposes. Changing the latter
+# wrapped library documents but the script never exposes. Changing either
 # requires editing tools_scripts/, which this package never does.
 #
 # Every fixed_in_script entry was verified against the upstream file at
@@ -53,8 +53,8 @@ Concerto:
   - name: SimCLR contrastive loss temperature
     source: tools_scripts/Concerto/main_Concerto.py:110
     value: '0.1'
-  - name: super_parameters None-fallback inside the script's own copy of concerto_train_multimodal
-      (dead in practice — line 202 always passes explicit values)
+  - name: 'super_parameters None-fallback inside the script''s own copy of concerto_train_multimodal
+      (unused: line 202 always passes explicit values)'
     source: tools_scripts/Concerto/main_Concerto.py:34
     value: batch_size=64, epoch_pretrain=3, lr=1e-4, drop_rate=0.1
   notes: 'The command line takes only --path1, --path2 and --save_path. main_Concerto.py redefines
@@ -92,7 +92,7 @@ Concerto:
     name: temperature (simclr_loss)
   - default: is_hvg=False, n_top_features=2000, min_features=600, min_cells=3, target_sum=10000,
       log=True
-    effect: feature selection, cell/gene filtering and normalisation applied before TFRecord
+    effect: feature selection, cell/gene filtering and normalization applied before TFRecord
       creation
     name: 'preprocessing_rna: is_hvg / n_top_features / min_features / min_cells / target_sum
       / log'
@@ -111,10 +111,10 @@ Conos:
   - name: min.cells.per.gene (pagoda2 gene filter)
     source: tools_scripts/Conos/main_Conos.Rmd:62
     value: '0'
-  - name: k (inter-sample neighbourhood)
+  - name: k (inter-sample neighborhood)
     source: tools_scripts/Conos/main_Conos.Rmd:64
     value: '15'
-  - name: k.self (within-sample neighbourhood)
+  - name: k.self (within-sample neighborhood)
     source: tools_scripts/Conos/main_Conos.Rmd:64
     value: '5'
   - name: k.self.weight (spelled k.self.weigh; R partial matching)
@@ -148,16 +148,16 @@ Conos:
     so no cells are filtered); n.odgenes=3e3 and min.cells.per.gene=0 equal the defaults.
     n.odgenes=3e3 on line 62 (pagoda2, per-dataset overdispersed genes) and n.odgenes=5e3
     on line 64 (conos, per-pair alignment) are different parameters. runConos() reads the
-    global variable num (line 48) instead of using its path_list argument, and line 49 reads
-    the third input with a different h5 layout (h5_to_matrix2), so the function depends on
-    the script''s top-level context.'
+    global variable num (line 48) instead of using its path_list argument, and lines 49-51
+    read the third input with a different h5 layout (h5_to_matrix2), so the function depends
+    on the script''s top-level context.'
   upstream_knobs:
   - default: '15'
-    effect: size of the inter-sample neighbourhood, i.e. how many cross-dataset cell-to-cell
+    effect: size of the inter-sample neighborhood, i.e. how many cross-dataset cell-to-cell
       links each cell gets
     name: k
   - default: '10'
-    effect: size of the within-sample neighbourhood
+    effect: size of the within-sample neighborhood
     name: k.self
   - default: '0.1'
     effect: weight multiplier on intra-sample edges relative to inter-sample edges, trading
@@ -174,8 +174,8 @@ Conos:
       genes, PCA, CCA, PMA
     name: space
   - default: NULL (equivalent to 0)
-    effect: single dial for how aggressively distinct subpopulations are forced together,
-      in place of hand-tuning k1/k
+    effect: how strongly distinct subpopulations are forced together; an alternative to setting
+      k1/k by hand
     name: alignment.strength
   - default: '1.0'
     effect: granularity of the Leiden clustering, i.e. how many communities are returned
@@ -224,7 +224,7 @@ GLUE:
     link).'
   upstream_knobs:
   - default: '50'
-    effect: dimensionality of the shared GLUE latent embedding (the actual benchmark output)
+    effect: dimensionality of the shared GLUE latent embedding (the benchmark output)
     name: latent_dim
   - default: '2'
     effect: number of hidden layers in the per-modality encoders and the discriminator
@@ -246,7 +246,7 @@ GLUE:
     effect: optimizer learning rate (SCGLUEModel.compile)
     name: lr
   - default: AUTO (heuristic from dataset size; paired with patience=AUTO, reduce_lr_patience=AUTO)
-    effect: training length and early-stopping behaviour (SCGLUEModel.fit)
+    effect: training length and early-stopping behavior (SCGLUEModel.fit)
     name: max_epochs
   upstream_url: https://raw.githubusercontent.com/gao-lab/GLUE/master/scglue/models/scglue.py
 GPSA:
@@ -329,8 +329,9 @@ GPSA:
     branch (lines 205-207) writes ./out/W_st.csv but is unreachable while N_LATENT_GPS[''expression'']
     is None. --save_dir is written as a file holding only the elapsed time (line 240) although
     line 234 treats it as a directory, and the aligned slices returned by combine() (line
-    243) are never written to disk. S=5 (line 151) compares with the library''s forward()
-    default of 1.'
+    243) are never written to disk. S=5 (line 151) is five times the library''s forward()
+    default of 1. N_EPOCHS=5000 and PRINT_EVERY=25 equal upstream''s experiments/expression/st/st_alignment.py;
+    the README quickstart uses 3000 and 100, with the same lr=1e-2 and S=5.'
   upstream_knobs:
   - default: no default (required positional argument of VariationalGPSA.__init__)
     effect: number of inducing locations per view in the warp GP layer, trading alignment
@@ -433,10 +434,10 @@ MultiMAP:
     effect: relative contribution of each dataset to the layout of the joint embedding
     name: strengths
   - default: None -> 15 x number of input datasets
-    effect: neighbours per cell in the MultiGraph, setting how local the manifold is
+    effect: neighbors per cell in the MultiGraph, setting how local the manifold is
     name: n_neighbors
   - default: None -> log2(n_neighbors)
-    effect: target cross-dataset neighbourhood cardinality used to calibrate the between-dataset
+    effect: target cross-dataset neighborhood cardinality used to calibrate the between-dataset
       edge weights
     name: cardinality
   - default: '2'
@@ -446,13 +447,13 @@ MultiMAP:
     effect: minimum separation of points in the low-dimensional layout, i.e. cluster tightness
     name: min_dist
   - default: '0'
-    effect: RNG seed for the spectral initialisation and stochastic layout optimisation
+    effect: RNG seed for the spectral initialization and stochastic layout optimization
     name: seed / random_state
   - default: 'True'
     effect: whether each dataset is scaled to N(0,1) before the cross-dataset PCAs are computed
     name: scale (Integration)
   - default: '50'
-    effect: number of LSI components computed from the binarised, TF-IDF-transformed ATAC
+    effect: number of LSI components computed from the binarized, TF-IDF-transformed ATAC
       peak matrix
     name: n_comps (TFIDF_LSI)
   upstream_url: https://github.com/Teichlab/MultiMAP/blob/master/MultiMAP/__init__.py
@@ -540,14 +541,13 @@ PASTE:
     it initializes the center from slices[0] (line 35).'
   upstream_knobs:
   - default: '0.1'
-    effect: trade-off between spatial-distance and gene-expression terms in the FGW objective
-      — the single most consequential PASTE knob
+    effect: trade-off between the spatial-distance and gene-expression terms in the FGW objective
     name: alpha
   - default: '''kl'''
     effect: expression dissimilarity metric between spots ('kl' or 'euclidean')
     name: dissimilarity
   - default: 'False'
-    effect: rescales spatial distances so neighbouring spots sit at distance 1, making alpha
+    effect: rescales spatial distances so neighboring spots sit at distance 1, making alpha
       comparable across platforms/resolutions
     name: norm
   - default: '200'
@@ -558,8 +558,8 @@ PASTE:
       dissimilarity
     name: use_rep
   - default: None (uniform mapping)
-    effect: warm-start transport plan, e.g. from a spatial heuristic, which changes which
-      local optimum FGW lands in
+    effect: warm-start transport plan, e.g. from a spatial heuristic, changing which local
+      optimum the solver reaches
     name: G_init
   - default: None (uniform over spots)
     effect: per-spot mass distributions, useful when spots carry unequal cell counts
@@ -583,7 +583,7 @@ PASTE2:
   - name: subset (HVG selection)
     source: tools_scripts/PASTE2/main_PASTE2.py:40
     value: True (slices are destructively subset to the 2000 HVGs)
-  - name: target_sum (library-size normalisation)
+  - name: target_sum (library-size normalization)
     source: tools_scripts/PASTE2/main_PASTE2.py:38
     value: 1e4
   notes: 'main_PASTE2.py exposes only --data_dir and --save_dir (lines 16-17). It preprocesses
@@ -619,7 +619,7 @@ PASTE2:
     name: a_distribution / b_distribution
   - default: '''glmpca'''
     effect: 'selects the expression cost: ''euclidean''/''euc'', ''kl'', ''gkl'', ''selection_kl'',
-      ''pca'', ''glmpca'' — the script pins ''pca'''
+      ''pca'', ''glmpca'' — the script sets ''pca'''
     name: dissimilarity (full option set)
   upstream_url: https://raw.githubusercontent.com/raphael-group/paste2/main/src/paste2/PASTE2.py
 Portal:
@@ -825,13 +825,13 @@ Seurat_WNN:
     = 3000 and npcs = 50 are library defaults.
   upstream_knobs:
   - default: '20'
-    effect: number of multimodal neighbours retained in the weighted-NN graph
+    effect: number of multimodal neighbors retained in the weighted-NN graph
     name: k.nn (FindMultiModalNeighbors)
   - default: no default — required argument
-    effect: per-modality dimensions fed into the weighted nearest-neighbour computation
+    effect: per-modality dimensions fed into the weighted nearest-neighbor computation
     name: dims.list
   - default: '200'
-    effect: size of the approximate-neighbour candidate pool searched per cell
+    effect: size of the approximate-neighbor candidate pool searched per cell
     name: knn.range
   - default: 1/15
     effect: Jaccard cutoff below which SNN edges are dropped before clustering
@@ -840,13 +840,13 @@ Seurat_WNN:
     effect: scaling of the kernel bandwidth used when computing per-cell modality weights
     name: sd.scale
   - default: 'FALSE'
-    effect: whether modality scores are smoothed across each modality's own neighbours
+    effect: whether modality scores are smoothed across each modality's own neighbors
     name: smooth
   - default: '0.8'
     effect: granularity of community detection — higher yields more clusters
     name: resolution (FindClusters)
   - default: '1'
-    effect: 'modularity optimiser: 1 Louvain, 2 Louvain with multilevel refinement, 3 SLM,
+    effect: 'modularity optimizer: 1 Louvain, 2 Louvain with multilevel refinement, 3 SLM,
       4 Leiden'
     name: algorithm (FindClusters)
   upstream_url: https://satijalab.org/seurat/reference/findmultimodalneighbors
@@ -887,13 +887,13 @@ Seurat_v3:
     effect: how many dimensions of the shared space are searched for anchor pairs
     name: dims (FindTransferAnchors)
   - default: '5'
-    effect: neighbourhood size used to call a mutual-nearest-neighbour anchor pair
+    effect: neighborhood size used to call a mutual-nearest-neighbor anchor pair
     name: k.anchor
   - default: NA
-    effect: neighbourhood size used to discard low-confidence anchors
+    effect: neighborhood size used to discard low-confidence anchors
     name: k.filter
   - default: '30'
-    effect: neighbourhood size used to score each anchor's consistency
+    effect: neighborhood size used to score each anchor's consistency
     name: k.score
   - default: '50'
     effect: number of anchors weighted per query cell when transferring labels or expression
@@ -948,7 +948,7 @@ Seurat_v5:
       modalities
     name: laplacian.reduction.dims
   - default: c("slsi", "spca", NULL) — first value "slsi" is used
-    effect: supervised reduction used to harmonise the bridge with the query
+    effect: supervised reduction used to harmonize the bridge with the query
     name: supervised.reduction
   - default: c("SCT", "LogNormalize") — first value "SCT" is used
     effect: normalization applied to reference and bridge before dimensionality reduction
@@ -1008,7 +1008,7 @@ StabMap:
       LDA
     name: labels_list
   - default: 'TRUE'
-    effect: re-centres each dataset to zero mean before projection
+    effect: re-centers each dataset to zero mean before projection
     name: scale.center
   - default: 'TRUE'
     effect: re-scales each dataset to unit standard deviation before projection
@@ -1061,7 +1061,7 @@ UINMF:
     name: nCores
   - default: '0.1'
     effect: variance threshold used by rliger's own unshared-feature selection (the alternative
-      to the Seurat vst top-2000 path this script hardcodes)
+      to the Seurat vst top-2000 selection this script uses)
     name: selectGenes unsharedThresh
   - default: 'NULL'
     effect: target number of variable genes per dataset, auto-tuning the variance threshold
@@ -1096,11 +1096,11 @@ VIMCCA:
     require instantiating scbean.model.vimcca.VIMCCA directly.'
   upstream_knobs:
   - default: '30'
-    effect: number of training passes over the data (script pins 50)
+    effect: number of training passes over the data (the script sets 50)
     name: epochs
   - default: '[128, 64, 32, 5]'
-    effect: encoder/decoder layer widths; last entry is the joint latent dimensionality (script
-      pins 8 latent dims)
+    effect: encoder/decoder layer widths; last entry is the joint latent dimensionality (the
+      script sets 8 latent dimensions)
     name: hidden_layers
   - default: '5'
     effect: relative weight of the second modality's reconstruction loss in the shared-latent
@@ -1152,11 +1152,12 @@ VIPCCA:
     lognorm=True are fixed implicitly; n_top_genes is therefore listed under the library knobs.
     mode='CVAE' equals the library default; epochs (20, default 100), lambda_regulizer (2,
     default 5.0), batch_input_size (64, default 128) and batch_input_size2 (14, default 16)
-    differ from it. Upstream is the standalone vipcca package (jhu99/vipcca), not scbean.
+    differ from it. Upstream is the standalone vipcca package (jhu99/vipcca), not scbean;
+    the scbean-hosted documentation lists epochs=1000, the vipcca source 100.
   upstream_knobs:
   - default: '100'
-    effect: number of training passes for the CVAE (script pins 20, i.e. 5x shorter than the
-      library default)
+    effect: number of training passes for the CVAE (the script sets 20, a fifth of the library
+      default)
     name: epochs
   - default: '5.0'
     effect: weight on the KL/regularization term relative to reconstruction, i.e. how strongly
@@ -1265,14 +1266,14 @@ iPOLNG:
     effect: number of latent factors/topics, i.e. the embedding dimensionality
     name: num_topics
   - default: '0.1'
-    effect: learning rate of the stochastic variational inference optimiser; the README advises
+    effect: learning rate of the stochastic variational inference optimizer; the README advises
       lowering it to 0.01 or 0.001 on sparser data
     name: lr
   - default: '3000'
     effect: SVI epochs for the joint iPoLNG fit
     name: integrated_epochs
   - default: '3000'
-    effect: SVI epochs for the per-modality PoLNG warm-up that initialises the joint fit
+    effect: SVI epochs for the per-modality PoLNG warm-up that initializes the joint fit
     name: warmup_epochs
   - default: '1'
     effect: shape parameter of the inverse-gamma prior on the factor scales
@@ -1323,7 +1324,7 @@ moETM:
     the ATAC script. Eval_kwargs (lines 144-149) set clustering_method='louvain' and a 20-point
     resolution grid, but the evaluate() call that would use them is commented out (line 127).
     batch_names has one element (line 191) and get_adata_mod zips it with the file lists (line
-    57), so only the first RNA/ADT file pair is loaded, labelled 'batch0', although --path1
+    57), so only the first RNA/ADT file pair is loaded, labeled 'batch0', although --path1
     and --path2 accept several files. The training loop runs train_num // batch_size iterations
     per epoch (line 108), so a dataset under 2000 cells gets no gradient steps and a remainder
     under 2000 cells is dropped each epoch. The local Train_moETM (line 80) shadows the function
@@ -1383,8 +1384,8 @@ online_iNMF:
       tighter cross-dataset alignment
     name: lambda
   - default: '5'
-    effect: number of passes over the full dataset, the main compute/convergence trade-off
-      for the online solver
+    effect: number of passes over the full dataset, trading compute against convergence in
+      the online solver
     name: maxEpochs
   - default: '5000'
     effect: cells per minibatch, setting the memory footprint and gradient noise of each update
@@ -1440,8 +1441,8 @@ scMSI:
     effect: Adam learning rate for the variational training loop
     name: lr
   - default: 256 (in train); None in get_latent_representation
-    effect: minibatch size; the script halves it to 128 and its own comment flags this as
-      the knob to tune when training goes NaN
+    effect: minibatch size; the script sets 128, and its comment says to change it if a NaN
+      error occurs
     name: batch_size
   - default: '"nb"'
     effect: count distribution for the RNA decoder, negative binomial vs zero-inflated NB
@@ -1454,8 +1455,8 @@ scMSI:
     effect: whether the NB dispersion is shared per gene or varies per batch/label/cell
     name: gene_dispersion
   - default: '0.9'
-    effect: fraction of cells used for training; the remaining 10% is silently held out for
-      validation
+    effect: fraction of cells used for training; the remaining cells (10% at the default)
+      are held out for validation
     name: train_size
   - default: 'False'
     effect: whether to stop on validation ELBO instead of always running max_epochs
@@ -1550,7 +1551,7 @@ scMoMaT:
   - name: K (number of latent factors)
     source: tools_scripts/scMoMaT/main_scMoMaT.py:71
     value: '30'
-  - name: lamb (regularisation lambda)
+  - name: lamb (regularization lambda)
     source: tools_scripts/scMoMaT/main_scMoMaT.py:72
     value: '0.001'
   - name: T (training iterations)
@@ -1571,7 +1572,7 @@ scMoMaT:
   - name: n_neighbors (post-processing kNN graph size, reused as UMAP n_neighbors)
     source: tools_scripts/scMoMaT/main_scMoMaT.py:87
     value: '100'
-  - name: r (neighbourhood radius for post-graph)
+  - name: r (neighborhood radius for post-graph)
     source: tools_scripts/scMoMaT/main_scMoMaT.py:88
     value: None
   - name: njobs (parallel jobs for calc_post_graph)
@@ -1592,10 +1593,10 @@ scMoMaT:
     effect: number of latent factors / dimensionality of the cell-factor embedding
     name: K
   - default: '0.001'
-    effect: weight of the scMoMaT regularisation term in the matrix-tri-factorisation objective
+    effect: weight of the scMoMaT regularization term in the matrix-tri-factorization objective
     name: lamb
   - default: 4000 (train_func default)
-    effect: number of optimisation iterations in the first training stage
+    effect: number of optimization iterations in the first training stage
     name: T
   - default: 1e-2
     effect: Adam learning rate for factor updates
@@ -1604,14 +1605,13 @@ scMoMaT:
     effect: fraction of cells sampled per training iteration
     name: batch_size
   - default: '0'
-    effect: random seed for factor initialisation and sampling
+    effect: random seed for factor initialization and sampling
     name: seed
   - default: no default — required positional argument; README recommends 30~50
-    effect: neighbourhood size of the post-processed kNN graph that is the method's actual
-      output
+    effect: neighborhood size of the post-processed kNN graph that is the method's output
     name: n_neighbors (calc_post_graph)
   - default: None
-    effect: radius parameter (0-1) bounding neighbourhood size as an alternative to a fixed
+    effect: radius parameter (0-1) bounding neighborhood size as an alternative to a fixed
       k
     name: r (calc_post_graph)
   upstream_url: https://github.com/PeterZZQ/scMoMaT/blob/main/scmomat/model.py
@@ -1672,7 +1672,7 @@ totalVI:
   - name: protein_expression_obsm_key (setup_anndata)
     source: tools_scripts/totalVI/main_totalVI.py:73
     value: '"protein_expression"'
-  - name: batch_key (setup_anndata) — batch is synthesised as one batch per input file
+  - name: batch_key (setup_anndata) — batch is synthesized as one batch per input file
     source: tools_scripts/totalVI/main_totalVI.py:75
     value: '"batch"'
   notes: 'main_totalVI.py is the joint-embedding script; main_totalVI_imputation.py is the
