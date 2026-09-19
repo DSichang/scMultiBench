@@ -152,7 +152,7 @@ def _print_frame(df, columns=None, fmt: str = "table", file=None, *,
 
 
 def _quiet_stdout():
-    """Route a library call's stdout chatter (``[run_all] ...`` progress,
+    """Route a library call's stdout progress lines (``[run_all] ...``,
     ``[env] unpacking ...``) to stderr so stdout stays data-only for pipes."""
     return contextlib.redirect_stdout(sys.stderr)
 
@@ -592,11 +592,11 @@ def _cmd_plot(args) -> int:
 
     The frame comes from ``--input`` (a long.csv / run_all dir; repeatable)
     and/or from :func:`multibench.load_results` (``--category``,
-    ``--dataset``, ``--source``). Given both, the own rows are concatenated
-    onto the stored table - the shell equivalent of ``pd.concat`` - so a
-    method evaluated with ``multibench evaluate --method/--dataset`` is drawn
-    next to the stored table; a ``# overlay: ...`` note on stderr says how
-    many rows came from where. ``--methods`` restricts the rows in every
+    ``--dataset``, ``--source``). Given both, the ``--input`` rows are
+    concatenated onto the stored table - the shell equivalent of
+    ``pd.concat`` - so a method evaluated with ``multibench evaluate
+    --method/--dataset`` is drawn next to the stored table; a
+    ``# overlay: ...`` note on stderr says how many rows came from where. ``--methods`` restricts the rows in every
     case; ``--dataset`` selects the stored table(s) and filters the inputs.
     ``--result-path`` is ``load_results(result_path=...)``: another results
     root, named in that spelling when a stored table is missing.
@@ -1081,9 +1081,9 @@ def _cmd_env(args) -> int:
 
 # ----------------------------------------------------------------- parser
 _CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
-                  "SAME cells, e.g. CITE-seq), diagonal (modalities measured in DIFFERENT "
+                  "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
-                  "modality) or cross (several batches with ALL modalities; batch-effect "
+                  "modality) or cross (several batches with all modalities; batch-effect "
                   "removal, incl. spatial slice registration)")
 _TASK_HELP = ("task within the category: clustering (default), batch, "
               "dimension_reduction, classification, imputation, registration "

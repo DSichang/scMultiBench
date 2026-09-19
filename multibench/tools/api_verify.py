@@ -220,7 +220,7 @@ def _():
     assert list(v.index) == ["ASW", "cLISI"], list(v.index)
     return f"ASW={float(v['Value']['ASW']):.3f}"
 
-@check("evaluate(task=) - the ONE deliberate deprecated-alias check")
+@check("evaluate(task=) - the one deliberate deprecated-alias check")
 def _():
     # The 0.2 spelling must still work for one release and warn; every other
     # call in this script uses metrics=.
@@ -285,7 +285,7 @@ def _():
     return [n for n in dir(mtb.plot.style) if not n.startswith("_")][:6]
 
 # ---------------- end-to-end plot (all four scenarios) ----------------
-@check("COHERENT: 4-scenario combined figure")
+@check("end-to-end: four-scenario combined figure")
 def _():
     frames = []
     for ds in ["D11", "D28", "D45", "D52"]:
@@ -298,7 +298,7 @@ def _():
     ok = open(p, "rb").read(4) == b"\x89PNG"
     return f"{allf.shape} methods={allf['method'].nunique()} png={os.path.getsize(p)} magic={ok}"
 
-@check("COHERENT: per-scenario figures")
+@check("end-to-end: per-scenario figures")
 def _():
     made = []
     for ds, cat in [("D11","vertical"), ("D28","diagonal"), ("D45","mosaic"), ("D52","cross")]:
