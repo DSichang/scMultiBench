@@ -368,19 +368,19 @@ def inputs_for(dataset: str, category: str, method: str, *,
     do, ``mtb.AmbiguousVariantError`` lists the available modality-sets and
     the folder contents and asks for ``modalities=``.
 
-    ``check=True`` runs the content preflight: the matrix-orientation check
-    (``ValueError`` for a cells x features file), the label-length check
-    (``ValueError`` when a label CSV has a different number of rows than the
-    modality file it labels - including the numbered ``cty<i>.csv`` of a
-    cross/mosaic batch, which no method takes as an input role but every
-    evaluation reads) and, for ``data_dir`` methods, the directory-content
-    check (``FileNotFoundError`` when a spatial-registration method finds
-    fewer than two ``*.h5ad`` slices, a slice lacks ``obsm['spatial']``, or a
-    slice lacks an ``obs`` column the variant declares in ``slice_obs`` -
-    GPSA's ``Ground_Truth``; when scBridge's bare filenames are absent). This
-    is what ``mtb.scan`` reports per row as ``files_ok`` / ``files_reason``.
-    A missing ATAC-family file names the sibling that is there (a folder
-    exported with ``atac_peak.h5`` when a vertical variant reads ``atac.h5``).
+    ``check=True`` runs the content preflight that ``mtb.scan`` reports per
+    row as ``files_ok`` / ``files_reason``. Orientation: ``ValueError`` for a
+    cells x features ``matrix/data``. Label length: ``ValueError`` when a
+    label CSV has a different number of rows than the modality file it
+    labels, including the numbered ``cty<i>.csv`` of a cross/mosaic batch (no
+    method takes it as an input role, but every evaluation reads it).
+    ``data_dir`` content: ``FileNotFoundError`` when a spatial-registration
+    method finds fewer than two ``*.h5ad`` slices, a slice lacks
+    ``obsm['spatial']`` or an ``obs`` column the variant declares in
+    ``slice_obs`` (GPSA's ``Ground_Truth``), or scBridge's bare filenames are
+    absent. The error for a missing ATAC-family file names the sibling that
+    is present (a folder exported with ``atac_peak.h5`` when a vertical
+    variant reads ``atac.h5``).
 
     See Also
     --------
@@ -764,9 +764,10 @@ def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
     Without ``atac`` (wanted representation unknown) one check runs: when the
     ``atac_gas`` role fell back to ``atac.h5`` (no ``atac_gas.h5`` present) and
     >= 90% of the first 50 feature names look like peaks (``chr1:1-200`` /
-    ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`. This cannot tell a
-    method that wants peaks behind that role name (``atac: peak`` in the
-    registry), so :func:`multibench.scan` always passes ``atac=``.
+    ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`. Without the wanted
+    representation this would also flag the methods that expect peaks behind
+    the ``atac_gas`` role name (``atac: peak`` in the registry), so
+    :func:`multibench.scan` always passes ``atac=``.
 
     With ``atac=`` - the representation the method expects,
     ``method_info(m)['atac']`` (``'peak'`` / ``'gene_activity'``) - every
@@ -936,14 +937,14 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     above is used): a label file is placed where the modality it labels sits
     in the variant's inputs.
 
-    ``mtb.evaluate(labels=...)`` takes the dict as is, or
-    ``list(labels_for(ds).values())`` in the same order.
+    ``list(labels_for(ds).values())`` is the same files as a list, in the same
+    order, which ``mtb.evaluate(labels=...)`` also accepts.
 
     See Also
     --------
     mtb.inputs_for : the modality files of the same dataset.
 
-    mtb.evaluate : takes the returned dict as ``labels=``.
+    mtb.evaluate : scores an embedding against these labels.
     """
     if category is not None and (
             isinstance(category, Path)

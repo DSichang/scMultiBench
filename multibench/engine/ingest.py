@@ -411,13 +411,11 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
 
     Notes
     -----
-    Passthrough and streaming. A canonical ``.h5`` is returned as is even
-    when the runner passes ``convert=True`` and an ``out`` path. Sparse
-    matrices (CSR/CSC, in memory or inside an ``.h5ad``/``.h5mu``) are
-    converted to CSC and written ``block`` features at a time; the output is
-    gzip-compressed and chunked like the shipped benchmark files. A ``.csv``
-    / ``.tsv`` whose first column is non-numeric uses it as the cell
-    barcodes.
+    Streaming. Sparse matrices (CSR/CSC, in memory or inside an
+    ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
+    at a time; the output is gzip-compressed and chunked like the shipped
+    benchmark files. A ``.csv`` / ``.tsv`` whose first column is non-numeric
+    uses it as the cell barcodes.
 
     Size on disk. ``matrix/data`` is stored dense (features x cells x
     itemsize): gzip shrinks the file, but every reader densifies it. A
@@ -627,9 +625,9 @@ def _write_labels(labels, path: Path | str) -> Path:
     """Write cell-type labels as the single-column CSV the benchmark reads
     (header ``x``, one label per line) and return the path.
 
-    This is the shipped ``cty.csv`` format: ``workflow._read_cty`` selects
-    column ``x`` and ``eval.io.read_labels`` drops the header row and takes
-    column 0.
+    This is the shipped ``cty.csv`` format: ``eval.io.read_labels``, the
+    reader behind ``evaluate`` and ``workflow._read_cty``, returns the column
+    named ``x``.
 
     Parameters
     ----------
@@ -983,8 +981,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ATAC filenames. Without ``category``: ``atac_kind='peak'``
     (``chr:start-end`` features) is written as ``atac_peak.h5`` plus a
     hard-linked (copied when the filesystem refuses) ``atac.h5``, because
-    the plain ``atac`` role of the vertical multiome methods means peaks -
-    editing one edits both; ``'gene_activity'`` is written as
+    most vertical multiome methods that read the plain ``atac`` role want
+    peaks (Matilda wants gene activity; see ``method_info(m)['atac']``) -
+    editing a hard-linked file edits both; ``'gene_activity'`` is written as
     ``atac_gas.h5`` only, so the gene-activity role never silently falls
     back to a peak matrix. ``category='vertical'``: the ATAC matrix is
     written as plain ``atac.h5`` only, for both kinds - the one name every
