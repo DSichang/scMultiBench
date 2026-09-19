@@ -119,13 +119,13 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
 
 #: The four integration scenarios, and what each one's data looks like.
 CATEGORIES = {
-    "vertical": "Several modalities measured in the SAME cells (e.g. CITE-seq "
+    "vertical": "Several modalities measured in the same cells (e.g. CITE-seq "
                 "RNA+ADT, or 10x multiome RNA+ATAC). Cells are already matched.",
-    "diagonal": "Modalities measured in DIFFERENT cells, with no pairing "
+    "diagonal": "Modalities measured in different cells, with no pairing "
                 "(e.g. an RNA experiment and a separate ATAC experiment).",
-    "mosaic":   "Several batches where only SOME share a modality; a paired batch "
+    "mosaic":   "Several batches where only some share a modality; a paired batch "
                 "bridges the others.",
-    "cross":    "Several batches in which ALL modalities are present; the task is "
+    "cross":    "Several batches in which all modalities are present; the task is "
                 "removing batch effects. (Spatial slice registration also lives here.)",
 }
 
@@ -134,16 +134,16 @@ ROLES = {
     "rna":       "rna.h5      - gene expression",
     "adt":       "adt.h5      - surface protein (CITE-seq antibody-derived tags)",
     "atac":      "atac.h5     - chromatin accessibility",
-    "atac_gas":  "atac.h5     - ATAC as GENE-ACTIVITY scores  <-- note: plain atac.h5",
-    "atac_peak": "peak.h5     - ATAC as PEAKS                 <-- note: peak.h5, NOT atac.h5",
-    "rna1/rna2/...": "rna1.h5, rna2.h5, ... - one file per BATCH (mosaic/cross)",
-    "adt1/adt2/...": "adt1.h5, adt2.h5, ... - one file per BATCH (mosaic/cross)",
-    "cty":       "cty.csv     - cell-type labels, ONE label set (vertical)",
+    "atac_gas":  "atac.h5     - ATAC as gene-activity scores  <-- note: plain atac.h5",
+    "atac_peak": "peak.h5     - ATAC as peaks                 <-- note: peak.h5, not atac.h5",
+    "rna1/rna2/...": "rna1.h5, rna2.h5, ... - one file per batch (mosaic/cross)",
+    "adt1/adt2/...": "adt1.h5, adt2.h5, ... - one file per batch (mosaic/cross)",
+    "cty":       "cty.csv     - cell-type labels, one label set (vertical)",
     "rna_cty / atac_cty":
-                 "rna_cty.csv, atac_cty.csv - one label file PER MODALITY, used when "
+                 "rna_cty.csv, atac_cty.csv - one label file per modality, used when "
                  "RNA and ATAC come from different cells (diagonal)",
     "cty1/cty2/...":
-                 "cty1.csv, cty2.csv, ... - one label file per BATCH (mosaic/cross)",
+                 "cty1.csv, cty2.csv, ... - one label file per batch (mosaic/cross)",
 }
 
 
@@ -157,17 +157,17 @@ def list_categories() -> dict:
     dict
         ``{"vertical": ..., "diagonal": ..., "mosaic": ..., "cross": ...}``,
         one or two sentences per value saying what that scenario's data looks
-        like
+        like.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> mtb.list_categories()["vertical"]
-    'Several modalities measured in the SAME cells ...'
+    'Several modalities measured in the same cells ...'
 
     See Also
     --------
-    mtb.describe_layout : the file layout each category expects
+    mtb.describe_layout : the file layout each category expects.
     """
     return dict(CATEGORIES)
 
@@ -255,15 +255,15 @@ def describe_layout(category: str | None = None) -> str:
     gas_methods = _find_methods(atac="gene_activity")
     peak_methods = _find_methods(atac="peak")
     lines = ["Put your files in  <data_path>/<DATASET_NAME>/ , e.g. ./data/MYDATA/",
-             "  (dataset = the folder NAME; data_path = the folder that CONTAINS it)",
+             "  (dataset = the folder name; data_path = the folder that contains it)",
              ""]
     LAYOUTS = {
         "vertical": ["  rna.h5 + adt.h5 (CITE-seq)  or  rna.h5 + atac.h5 (multiome)",
-                     "  cty.csv        <- ONE label file; the cells are already matched"],
+                     "  cty.csv        <- one label file; the cells are already matched"],
         "diagonal": ["  rna.h5         <- the RNA cells",
                      "  atac.h5        <- the ATAC cells (gene activity); peak.h5 for peaks",
-                     "  rna_cty.csv AND atac_cty.csv",
-                     "                 <- ONE LABEL FILE PER MODALITY. The two cell sets are",
+                     "  rna_cty.csv and atac_cty.csv",
+                     "                 <- one label file per modality. The two cell sets are",
                      "                    disjoint, so they cannot share a single cty.csv."],
         "mosaic":   ["  rna1.h5 rna2.h5 atac2.h5 atac3.h5   <- numbered, one per batch",
                      "  cty1.csv cty2.csv cty3.csv          <- one per batch"],
@@ -277,13 +277,13 @@ def describe_layout(category: str | None = None) -> str:
         for _c, _ls in LAYOUTS.items():
             lines += [f"{_c}:"] + _ls
         lines += [""]
-    lines += ["  (numbered files live in the SAME flat dir; there is no batch column)",
+    lines += ["  (numbered files live in the same flat dir; there is no batch column)",
              "", "Modality roles and the filenames they resolve to:"]
     lines += [f"    {k:16s} {v}" for k, v in ROLES.items()]
     lines += ["",
-              "!! ATAC: the role name does NOT guarantee the representation.",
+              "!! ATAC: the role name does not guarantee the representation.",
               "   atac_gas resolves to atac_gas.h5 if present, otherwise FALLS BACK",
-              "   to atac.h5 - and a multiome atac.h5 usually holds PEAKS, not gene",
+              "   to atac.h5 - and a multiome atac.h5 usually holds peaks, not gene",
               "   activity. Check the feature names: chr1:3094772-3095489 is a peak,",
               "   a gene symbol is gene activity.",
               "   atac_peak resolves to atac_peak.h5, else peak.h5.",
@@ -307,13 +307,13 @@ def describe_layout(category: str | None = None) -> str:
               "  Both store matrix/data as float64, gzip-compressed and chunked, like",
               "  the shipped files (a 3000x2000 8%-dense matrix is ~1.5 MB on disk).",
               "",
-              "  If you do build it yourself, ALL THREE datasets are required:",
+              "  If you do build it yourself, all three datasets are required:",
               "    matrix/data      the matrix, stored FEATURES x CELLS",
               "    matrix/features  one entry per feature (row of matrix/data)",
               "    matrix/barcodes  one entry per cell    (column of matrix/data)",
               "  e.g. 2,000 genes x 5,000 cells -> matrix/data has shape (2000, 5000),",
               "  matrix/features has 2000 entries and matrix/barcodes has 5000.",
-              "  NOTE this is the TRANSPOSE of the scanpy/AnnData convention",
+              "  Note: this is the TRANSPOSE of the scanpy/AnnData convention",
               "  (AnnData.X is cells x genes). scan() rejects a transposed file, and",
               "  a file with only matrix/data fails with a KeyError about 'features'.",
               "Labels are a single-column CSV: one header line (typically 'x'),",
@@ -322,9 +322,9 @@ def describe_layout(category: str | None = None) -> str:
     if category is None or category == "cross":
         reg = sorted(_find_methods(task="registration"))
         lines += ["SPATIAL REGISTRATION (task 'registration', category 'cross'):",
-                  f"  Methods: {', '.join(reg)}. They take a DIRECTORY of slices, not",
+                  f"  Methods: {', '.join(reg)}. They take a directory of slices, not",
                   "  modality files - the role is `data_dir` and scan() shows modalities",
-                  "  as '(data_dir)'; pass NO modalities to run_all/inputs_for.",
+                  "  as '(data_dir)'; pass no modalities to run_all/inputs_for.",
                   "    <data_path>/MYVISIUM/            (or <data_path>/MYVISIUM/processed/)",
                   "        slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, >= 2",
                   "  Each .h5ad needs .X (expression, spots x genes) and",
@@ -332,22 +332,22 @@ def describe_layout(category: str | None = None) -> str:
                   "  needs obs['Ground_Truth'] (a region/layer label per spot) in",
                   "  EVERY slice - its driver reads that column at load; PASTE and",
                   "  PASTE2 read no obs column. The upstream scripts glob",
-                  "  data_dir + '*.h5ad' WITHOUT sorting (directory order, which the",
+                  "  data_dir + '*.h5ad' without sorting (directory order, which the",
                   "  filesystem decides), so run() stages the slices as zero-padded",
                   "  symlinks (00_<name>.h5ad ... in sorted order) under <out_dir>/inputs/",
                   "  and writes <out_dir>/slices_manifest.json: aligned_slice_<i>.h5ad ->",
                   "  the source file, in the order the script's glob returned - that",
                   "  manifest, not the prefix, is authoritative. Keep it - it is the",
-                  "  ONLY link back:",
+                  "  only link back:",
                   "  PASTE writes its slices WITHOUT any obs column (upstream",
                   "  main_PASTE_pairwise.py drops them all at load), PASTE2 rewrites .X",
                   "  (normalize_total + log1p + a 2,000-HVG subset) before writing, and",
-                  "  GPSA keeps obs['Ground_Truth'] only. SPIRAL also wants a UNIQUE",
+                  "  GPSA keeps obs['Ground_Truth'] only. SPIRAL also wants a unique",
                   "  leading token per filename (the part before the first '_'); the",
                   "  staged 00_/01_ prefixes satisfy that.",
                   "  Output: aligned_slice_<i>.h5ad per slice (coordinates, not an",
                   "  embedding), so run_all records RUN_OK_NO_EMBEDDING - clustering",
-                  "  metrics do not apply, and registration metrics are NOT wired into",
+                  "  metrics do not apply, and registration metrics are not wired into",
                   "  mtb.evaluate in this version.",
                   "  scan() checks the dir for >= 2 .h5ad slices with obsm['spatial'],",
                   "  and for GPSA that every slice carries obs['Ground_Truth'].",
@@ -355,8 +355,8 @@ def describe_layout(category: str | None = None) -> str:
     if category:
         lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
     lines += ["", "ENVIRONMENTS",
-              "  Every method runs in its OWN conda env (they need mutually",
-              "  incompatible framework versions). scan() checks TWO gates per row -",
+              "  Every method runs in its own conda env (they need mutually",
+              "  incompatible framework versions). scan() checks two gates per row -",
               "  files_ok (the inputs are on disk, oriented and labelled) and env_ok",
               "  (that conda env exists) - and marks a method runnable only when both",
               "  pass, so a sweep never starts one that cannot finish.",
@@ -376,8 +376,9 @@ def _data_dir_usable(variant, ds_dir) -> tuple[bool, str]:
     ``data_dir`` resolves to the dataset directory itself when there is no
     ``processed/`` subdir, so the path always exists; without a content check
     spatial-registration methods would look runnable on every dataset.
-    Delegates to :func:`multibench.engine.resolve._check_data_dir` (shared with
-    ``inputs_for(check=True)``).
+    Delegates to :func:`multibench.engine.resolve._check_data_dir`, which
+    ``inputs_for(check=True)`` - and through it ``scan`` - calls directly;
+    this wrapper is kept only as an importable alias.
     """
     return _resolve._check_data_dir(variant, ds_dir)
 
@@ -396,7 +397,7 @@ def _installed_envs() -> frozenset:
 #: the files exist and the env is installed, but the content stops the method.
 #: Surfaced by scan() so a sweep does not discover them hours in.
 _CAVEATS = {
-    ("GLUE", "D28"): ("GLUE parses coordinates out of peak NAMES and needs them "
+    ("GLUE", "D28"): ("GLUE parses coordinates out of peak names and needs them "
                       "colon-delimited (chr1:1-200); D28's are underscore-delimited "
                       "and it IndexErrors. Use D27, or rename the peaks."),
 }
@@ -511,7 +512,7 @@ def _short_reason(text: str, method: str, dataset: str, category: str | None) ->
 
     ``files_reason`` keeps the verbatim exception text (``FileNotFoundError:
     UnitedNet/D11/vertical: input files not found on disk: {'atac_gas':
-    '/home/wen/data/D11/atac_gas.h5', ...}``) because the full path is what a
+    '/path/to/data/D11/atac_gas.h5', ...}``) because the full path is what a
     user greps for. ``reason`` is what the scan frame, the CLI table
     and the "nothing is runnable" error show, so it drops what every row
     repeats: the exception class, the ``method/dataset/category:`` prefix and
@@ -656,7 +657,7 @@ def scan(dataset: str, category: str | None = None, *,
     >>> df = mtb.scan("D11", "vertical")
     >>> df[["method", "modalities", "runnable", "reason"]]
     >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]   # what blocks the rest
-    >>> mtb.scan("MYCITE", "vertical", data_path="/home/wen/data", out_dir="out/")
+    >>> mtb.scan("MYCITE", "vertical", data_path="/path/to/data", out_dir="out/")
     >>> print(df.loc[df.runnable, "command"].iloc[0])     # a paste-ready shell line
 
     Notes
@@ -708,7 +709,8 @@ def scan(dataset: str, category: str | None = None, *,
         env_ok              the env exists (and a GPU, when the script needs one)
         env_reason          verbatim env-gate text with the install command
         needs_labels        this variant demands a label file as an input
-        atac                'peak' / 'gene_activity' / None (no ATAC input)
+        atac                ATAC representation the method expects: 'peak' /
+                            'gene_activity'; None when the variant takes no ATAC
         command             the shell line the variant would run; "" if the
                             inputs do not resolve
 
@@ -771,8 +773,8 @@ def scan(dataset: str, category: str | None = None, *,
         dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
         raise FileNotFoundError(
             f"dataset folder '{ds_dir}' does not exist; folders present under {base}: "
-            f"{dirs}. dataset= is the folder NAME and data_path= the folder that "
-            f"CONTAINS it (see mtb.describe_layout())")
+            f"{dirs}. dataset= is the folder name and data_path= the folder that "
+            f"contains it (see mtb.describe_layout())")
     installed = _installed_envs()
     rows = []
     dropped_dirs: list[str] = []
@@ -1213,13 +1215,13 @@ class BatchResult:
         because the runner-up sits near chance: a difference is bounded above by
         the ARI itself, so a method scoring 0.3 could never look well-separated.
 
-        The column is ``None`` when only one ordering was possible (normal for a
-        paired/vertical dataset with a single ``cty.csv``) or when the winning
-        ordering was itself at chance (ARI < 0.05): the ratio would compare two
-        noise values, and no ordering explained the embedding. It stays numeric
-        so ``> 0.5`` and ``.isna()`` behave; the sibling column
-        ``label_order_note`` says which case applies (``"single ordering"`` /
-        ``"winner at chance"`` / ``"not scored"``).
+        The column is ``None`` in three cases, named by the sibling column
+        ``label_order_note``: ``"single ordering"`` - only one ordering was
+        possible (normal for a paired/vertical dataset with a single
+        ``cty.csv``); ``"winner at chance"`` - the winning ordering itself
+        scored ARI < 0.05, so the ratio would compare two noise values;
+        ``"not scored"`` - the row has no metrics. It stays numeric so
+        ``> 0.5`` and ``.isna()`` behave.
 
         When more than one ordering is possible the reported metrics are those
         of the ordering with the highest ARI, so they carry a small optimistic
@@ -1464,11 +1466,11 @@ class BatchResult:
 
         Notes
         -----
-        A record whose output cannot be read back (no embedding - registration
-        methods - or a deleted ``out_dir``) keeps its status and gains an
-        ``error`` note; ``RUN_OK_EVAL_FAILED`` when the new scoring fails
-        (wrong ``batch`` length, say - the error says ``batch has N entries,
-        embedding has M cells``).
+        A method that emits no embedding (registration, graph-only) is marked
+        ``RUN_OK_NO_EMBEDDING`` with a ``note``. A record whose output file is
+        gone (a deleted ``out_dir``) or whose new scoring fails (wrong ``batch``
+        length, say - ``batch has N entries, embedding has M cells``) becomes
+        ``RUN_OK_EVAL_FAILED`` with the reason in ``error``.
 
         See Also
         --------
@@ -1769,8 +1771,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         Per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``. Discover
         what a method accepts with ``mtb.params_for``. Default ``None``.
     data_path : path | None, keyword-only
-        The folder that contains ``dataset``, e.g. ``"/home/wen/data"`` (so
-        the files live in ``/home/wen/data/MYCITE/``). Default ``None``: the
+        The folder that contains ``dataset``, e.g. ``"/path/to/data"`` (so
+        the files live in ``/path/to/data/MYCITE/``). Default ``None``: the
         package's configured data root.
     evaluate : bool, keyword-only
         Score every embedding with the benchmark metrics (default True);
@@ -1832,16 +1834,16 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     Notes
     -----
-    A runnable row means the method's conda environment was found; a missing
-    env is reported by ``mtb.scan`` rather than failing hours in
-    (``multibench env doctor`` / ``env install --run``). Methods can take
-    minutes to hours.
+    Every attempted row passed both ``mtb.scan`` gates (input files and conda
+    env, plus a GPU where the script needs one), so a missing env is reported
+    there rather than failing hours in (``multibench env doctor`` /
+    ``env install --run``). Methods can take minutes to hours.
 
-    ``dry_run=True`` returns ``mtb.scan`` for the same selection - the
-    identical frame, blocked rows kept with their ``reason``, the ``command``
-    column rendered for ``out_dir`` (or the literal ``'<out_dir>'``
-    placeholder) - which is what ``multibench run-all --dry-run --format csv``
-    writes. Never empty: ``ValueError`` if nothing matches. Filter
+    ``dry_run=True`` returns the ``mtb.scan`` frame for the same selection:
+    blocked rows are kept with their ``reason`` and the ``command`` column is
+    rendered for ``out_dir`` (or the literal ``'<out_dir>'`` placeholder).
+    ``multibench run-all --dry-run --format csv`` writes the same frame.
+    Never empty: ``ValueError`` if nothing matches. Filter
     ``plan[plan.runnable]`` for what will be attempted - ``len(plan)`` is not
     the sweep size. A dry run also validates ``params``: a key no planned
     variant of that method accepts raises ``KeyError`` (naming the accepted
