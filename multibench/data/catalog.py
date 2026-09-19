@@ -14,14 +14,10 @@ __all__ = ["methods", "datasets", "metrics", "canonical_id", "canonical_metric",
 
 def __dir__() -> list[str]:
     """Tab completion (``dir(mtb.catalog)``) shows the public API and the
-    underscore names, not the imports this module merely uses.
+    underscore names, not the module-level imports (``pd``, ``Path``, ``re``,
+    ``config``, the ``annotations`` future-feature object).
 
-    ``dir()`` always sorts, so the public names cannot be listed FIRST; what
-    can be done (PEP 562) is to leave out the leak-through module-level
-    imports (``pd``, ``Path``, ``re``, ``config`` and the ``annotations``
-    future-feature object - ``mtb.catalog.annotations()`` was a puzzling
-    ``TypeError`` for one re-tester). Every attribute stays accessible;
-    only the listing changes.
+    Every attribute stays accessible; only the listing changes (PEP 562).
     """
     return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
 
@@ -62,7 +58,7 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
     """Return the canonical method id for any known spelling.
 
     Resolution order: the alias table (``"MOFA+"`` -> ``"MOFA2"``,
-    ``"Seurat(WNN)"`` -> ``"Seurat_WNN"``), then a CASE-FOLDED match against
+    ``"Seurat(WNN)"`` -> ``"Seurat_WNN"``), then a case-folded match against
     the registry ids (``"totalvi"`` -> ``"totalVI"``, ``"scmomat"`` ->
     ``"scMoMaT"``), then - for a name the registry does not know - the input
     with separators collapsed to ``_`` (a result-directory token, a user's own
@@ -318,18 +314,25 @@ def _split_multivalue(cell: object) -> list[str]:
 
 
 def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """The methods table: ``method, canonical_id, language, deep_learning, atac,
-    output, needs_labels, categories, tasks`` (``categories``/``tasks`` are
-    lists).
+    """The methods table, with the registry-backed columns overlaid.
 
-    ``deep_learning`` and ``output`` come from the shipped ``method.csv``.
-    ``needs_labels``, ``atac`` (``'peak'`` / ``'gene_activity'`` / ``None``),
-    ``categories`` and ``tasks`` are OVERLAID from the method registry
-    (``registry.get(canonical_id)``) for every row whose id is registered, so
-    the table cannot disagree with ``method_info`` / ``scan`` (the CSV's hand
-    columns had diverged on 37 of 40 rows). Rows without a registry entry keep
-    the CSV values. ``language`` is the CSV value (lower-cased), cross-checked
-    against the registry's.
+    Parameters
+    ----------
+    files_dir : path-like, optional
+        Directory holding ``method.csv`` (default: the package's ``files/``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per method with columns ``method, canonical_id, language,
+        deep_learning, atac, output, needs_labels, categories, tasks``
+        (``categories`` / ``tasks`` are lists). ``language`` (lower-cased),
+        ``deep_learning`` and ``output`` come from ``method.csv``.
+        ``needs_labels``, ``atac`` (``'peak'`` / ``'gene_activity'`` /
+        ``None``), ``categories`` and ``tasks`` are overlaid from the method
+        registry for every row whose id is registered, so the table cannot
+        disagree with ``method_info`` / ``scan``; a row without a registry
+        entry keeps the CSV values.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
@@ -374,10 +377,9 @@ def _dataset_sort_key(ds: str):
     return (m.group(1).upper(), int(m.group(2)), m.group(3))
 
 
-#: columns of dataset.csv that must be transcribed from the paper's
-#: supplementary dataset table. They are NOT derivable from anything in this
-#: repository and are shipped EMPTY (nullable) until transcribed - see
-#: files/README_PROVENANCE.txt. Nothing in the package fabricates them.
+#: columns of dataset.csv to be transcribed from the paper's supplementary
+#: dataset table. Nothing in this repository holds them, so they ship empty
+#: (nullable); see files/README_PROVENANCE.txt.
 PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 
@@ -405,8 +407,8 @@ def datasets(files_dir: Path | str | None = None, *,
           stored results (:func:`multibench.available_datasets` with
           ``source="both"``), so ``D11s``/``D28s``/``D45s``/``D52s`` (the
           re-run subsamples) and ``D24`` (published tables only) are listed
-          even though the paper table does not name them;
-          ids missing from the CSV are appended after it, in natural order;
+          even though ``dataset.csv`` does not name them; ids missing from
+          the CSV are appended after it, in natural order;
         * ``simulated`` - ``bool``, ids starting with ``SD``;
         * ``category`` - the integration category whose stored results
           (published or re-run) contain the dataset, ``";"``-joined if
@@ -426,10 +428,9 @@ def datasets(files_dir: Path | str | None = None, *,
     name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
     raw = raw.assign(**{name_col: raw[name_col].astype(str).str.strip()})
 
-    # result-tree-derived columns: filled at call time, so the table can never
-    # list fewer datasets than load_results can serve. Ids that ship results
-    # but are not in dataset.csv (the re-run subsampled D11s/D28s/D45s/D52s,
-    # D24) are APPENDED with the paper columns empty.
+    # result-tree-derived columns are filled at call time, so the table never
+    # lists fewer datasets than load_results can serve; ids with results that
+    # dataset.csv lacks are appended with the paper columns empty
     from . import results as _results
     cat_of: dict[str, list[str]] = {}
     for cat in ("cross", "diagonal", "mosaic", "vertical"):
