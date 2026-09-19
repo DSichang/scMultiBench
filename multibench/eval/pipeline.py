@@ -71,7 +71,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
         it has no ``Value`` column (the message names the expected shape and,
         for a wide one-row frame, the ``df.T.set_axis(['Value'], axis=1)``
         fix); no metric name canonicalises to anything; or two names collapse
-        onto the SAME canonical metric (``ari`` and ``ARI`` both present) - a
+        onto the same canonical metric (``ari`` and ``ARI`` both present) - a
         silent duplicate would double-count that metric in every downstream
         rank.
 
@@ -100,7 +100,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     if "metric" in cols:
         # the CSV read-back of evaluate's frame (pd.read_csv(out)): the metric
         # names are a column, not the index - reset_index below would
-        # otherwise prepend the RangeIndex as a SECOND 'metric' column
+        # otherwise prepend the RangeIndex as a second 'metric' column
         value_df = value_df.set_index("metric")
     out = value_df.rename(columns={"Value": "value"}).copy()
     out = out.reset_index()                      # the index column comes first,
@@ -129,8 +129,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
 def _metric_families() -> tuple[list, list]:
     """``(CLUSTERING_METRICS, BATCH_METRICS)`` - the two scIB families evaluate()
     can produce, in the canonical spelling ``load_results``/``to_long`` use."""
-    # the plotting layer owns the metric families; imported lazily so that the
-    # eval layer does not pull matplotlib in at import time
+    # the plotting layer owns the metric families
     from ..plot.bar import BATCH_METRICS, CLUSTERING_METRICS
     return list(CLUSTERING_METRICS), list(BATCH_METRICS)
 
@@ -182,7 +181,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
     * a ``str`` naming an obs column of ``adata`` -> that column (already in
       the output's order);
     * a ``Series``/``DataFrame`` with a non-default index, when the output
-      carries cell ids (``ids`` given) -> ALIGNED by id via
+      carries cell ids (``ids`` given) -> aligned by id via
       :func:`multibench.eval.io.align_vector` (raises on missing/extra ids);
     * a ``Series``/``DataFrame`` with a non-default index, when the output is
       a bare array -> positional, with a ``UserWarning`` saying so;
@@ -211,17 +210,14 @@ def _labels_from_dict(d: dict, label_order) -> list:
     """Turn a ``{name: path}`` label dict into the list of paths in cell order.
 
     One entry needs no order. Several entries need ``label_order`` (keys of
-    ``d``; a subset selects those files) - a dict has no cell order of its
-    own, and the order is the method's stacking order, so guessing here is
-    exactly the silent-wrong-score the user study hit.
+    ``d``; a subset selects those files) unless the dict's insertion order is
+    already the method's stacking order (what ``labels_for`` returns). Any
+    other order must be explicit: a guess would score the embedding against
+    misordered labels without any error.
     """
     if label_order is None:
         if len(d) == 1:
             return [next(iter(d.values()))]
-        # Accept the dict when its insertion order IS the benchmark's stacking
-        # order (what labels_for returns); any other order must be explicit,
-        # because guessing here is exactly the silent wrong score the user
-        # study hit.
         from ..engine.resolve import _label_sort_key
         keys = list(d)
         if keys == sorted(keys, key=_label_sort_key):
@@ -397,21 +393,7 @@ def evaluate(
 ) -> pd.DataFrame:
     """Compute scIB metrics for a run output (an embedding) against cell-type labels.
 
-    Returns a ``metric.csv``-shaped DataFrame (index = metric name in the
-    canonical spelling ``load_results`` uses - ``ARI, NMI, ASW, iASW, iF1,
-    cLISI, ASW_batch, GC, iLISI, kBET`` - one column ``Value``); reshape with
-    :func:`multibench.to_long` for plotting. The frame is never empty: a
-    request that would select no metric raises instead.
-
-    COST. ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
-    Leiden sweep (10 resolutions on a kNN graph of the embedding): tens of
-    seconds for a few thousand cells, minutes for ~10^4. Pass ``clustering=``
-    (a precomputed assignment) or ``metrics=[...]`` naming metrics that do
-    not need it (``ASW``, ``iASW``, ``cLISI``, the batch family) to skip it.
-    One line on stderr announces the sweep when it starts on more than 2,000
-    cells (``verbose``). The sweep's Leiden backend is
-    ``mtb.config.DEFAULT.leiden_flavor``: ``"igraph"`` (default; several times
-    faster) or ``"leidenalg"`` (the classic backend scib itself runs).
+    Reshape the returned frame with :func:`multibench.to_long` for plotting.
 
     Parameters
     ----------
@@ -422,31 +404,29 @@ def evaluate(
         matrix, or a path - ``.h5`` (dataset ``data``, the benchmark's
         ``embedding.h5``), ``.h5ad`` (read as an AnnData), ``.npy``,
         ``.csv``/``.tsv``. An AnnData (``obs_names``) or a DataFrame with a
-        non-default index CARRIES CELL IDS, which ``labels``/``batch``/
-        ``clustering`` given as an indexed Series are aligned against (below).
+        non-default index carries cell ids, which ``labels``/``batch``/
+        ``clustering`` given as an indexed Series are aligned against (see
+        Notes).
     labels
-        Ground-truth cell types, one per cell. Any of: a CSV path (header row;
-        column ``x`` / the only column / the last of two with a barcode index -
-        see :func:`multibench.eval.io.read_labels`), a LIST of CSV paths
-        concatenated in that order (multi-batch datasets: ``[cty1, cty2,
-        cty3]``), a dict as returned by :func:`multibench.labels_for` - it
-        goes in AS IS when its insertion order is the method's stacking order
-        (``cty1, cty2, ...`` numerically; ``rna`` before ``adt`` before
-        ``atac``), which is the order ``labels_for`` returns; a dict in ANY
-        OTHER order needs ``label_order=`` (a one-entry dict has no order to
-        get wrong) - a 1-D ``ndarray``/``Series``/``Categorical``/list, a
-        single-column DataFrame, or - when ``output`` is an AnnData - the
-        name of an ``obs`` column. A multi-column CSV/DataFrame raises: pass
-        the one column (``df["celltype"]``) itself.
+        Ground-truth cell types, one per cell. Any of:
 
-        ORDER. Arrays/lists/files are matched POSITIONALLY to the rows of
-        ``output``. A ``Series``/``DataFrame`` with a non-default index is
-        aligned BY CELL ID when ``output`` carries ids (AnnData / DataFrame
-        with a non-default index): rows are reindexed to the output's order,
-        and a missing or extra id raises ``ValueError`` naming the first ones.
-        When ``output`` is a bare array there is nothing to align against: the
-        Series is matched positionally and a ``UserWarning`` says so (pass
-        ``labels.to_numpy()`` to silence it).
+        * a CSV path (header row; column ``x`` / the only column / the last of
+          two with a barcode index - see
+          :func:`multibench.eval.io.read_labels`);
+        * a list of CSV paths, concatenated in that order (multi-batch
+          datasets: ``[cty1, cty2, cty3]``);
+        * a dict as returned by :func:`multibench.labels_for` - it goes in AS
+          IS when its insertion order is the method's stacking order (``cty1,
+          cty2, ...`` numerically; ``rna`` before ``adt`` before ``atac``),
+          which is the order ``labels_for`` returns; a dict in ANY OTHER order
+          needs ``label_order=`` (a one-entry dict has no order to get wrong);
+        * a 1-D ``ndarray``/``Series``/``Categorical``/list, or a
+          single-column DataFrame;
+        * when ``output`` is an AnnData, the name of an ``obs`` column.
+
+        A multi-column CSV/DataFrame raises: pass the one column
+        (``df["celltype"]``) itself. See Notes for how the values are matched
+        to the rows of ``output``.
     category : str, keyword-only, optional
         One of :func:`multibench.list_categories` (``vertical``, ``diagonal``,
         ``mosaic``, ``cross``). Validated when given and otherwise unused -
@@ -455,54 +435,56 @@ def evaluate(
     batch : keyword-only, optional
         Batch labels, one per cell (same forms and the same alignment rule as
         ``labels``; obs column name for AnnData). Needed for the batch family
-        (``ASW_batch, GC, iLISI, kBET``) EXCEPT when ``labels`` is a list of
-        two or more files (or a dict with ``label_order``), in which case the
-        file of origin (1, 2, ...) is used as the batch - the same rule
-        :func:`multibench.run_all` applies. Given together with a
-        ``metrics`` selection that has no batch metric it changes nothing,
-        and a ``UserWarning`` says so.
+        (``ASW_batch, GC, iLISI, kBET``) except when ``labels`` is a list (or
+        dict) of two or more files, in which case the file of origin (1, 2,
+        ...) is used as the batch - the same rule :func:`multibench.run_all`
+        applies. Given together with a ``metrics`` selection that has no
+        batch metric it changes nothing, and a ``UserWarning`` says so.
     metrics : None, str or list of str, keyword-only
-        THE metric-selection knob. ``None`` (default) computes every
-        applicable metric: the clustering family, plus the batch family when
-        a batch vector is available (``batch=`` or a list of label files);
-        kBET is never included by default - it shells out to R and takes
-        hours on large datasets. ``"clustering"`` computes ``ARI, NMI, ASW,
-        iASW, iF1, cLISI``; ``"batch"`` computes ``ASW_batch, GC, iLISI``;
-        ``"all"`` both (each needs the batch vector or raises). A LIST of
-        codes computes exactly those (case/alias tolerant, ``["ari"]``
-        works), including the Leiden sweep only when a requested metric
-        needs it (ARI, NMI, iF1 do - ``["ASW"]`` on 10^4 cells returns in
-        seconds); ``"kBET"`` in the list turns kBET on. An unknown code
-        raises ``ValueError`` listing the valid ones; a bare code string
-        (``metrics="ARI"``) raises and points at the list form. Valid codes:
+        ``None`` (default) computes every applicable metric: the clustering
+        family, plus the batch family when a batch vector is available
+        (``batch=`` or a list of label files); kBET is never included by
+        default - it shells out to R and takes hours on large datasets.
+        ``"clustering"`` computes ``ARI, NMI, ASW, iASW, iF1, cLISI``;
+        ``"batch"`` computes ``ASW_batch, GC, iLISI``; ``"all"`` both (each
+        needs the batch vector or raises). A list of codes computes exactly
+        those (case/alias tolerant, ``["ari"]`` works) and runs the Leiden
+        sweep only when one of them needs it (ARI, NMI, iF1); ``"kBET"`` in
+        the list turns kBET on. An unknown code raises ``ValueError`` listing
+        the valid ones; a bare code string (``metrics="ARI"``) raises and
+        points at the list form. Valid codes:
         ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS``.
-        (``task=``, ``family=`` and ``only=`` are the deprecated 0.2.x
-        spellings of this knob; ``slow_metrics=`` is gone.)
+        ``task=``, ``family=`` and ``only=`` are the deprecated 0.2.x
+        spellings of this argument; ``slow_metrics=`` was removed.
     clustering : keyword-only, optional
-        Optional precomputed cluster assignment (same forms and the same
-        alignment rule as ``labels``; an ``.h5`` path is read from
-        ``/obs/cluster_leiden``). When omitted the scIB optimal-resolution
-        Leiden sweep derives one from the embedding - the expensive step (10
-        resolutions; minutes for ~10^4 cells); passing one skips it for
-        ``ARI``/``NMI`` (``iF1`` still sweeps unless excluded via ``metrics``).
+        Precomputed cluster assignment (same forms and the same alignment
+        rule as ``labels``; an ``.h5`` path is read from
+        ``/obs/cluster_leiden``). When omitted, the scIB optimal-resolution
+        Leiden sweep derives one from the embedding (its cost is in Notes);
+        passing one skips the sweep for ``ARI``/``NMI`` (``iF1`` still sweeps
+        unless excluded via ``metrics``).
     obsm : str, keyword-only
         ``.obsm`` key to use when ``output`` is an AnnData / ``.h5ad``
         (default ``'X_emb'``; ``'X'`` means ``.X``).
     label_order : list of str, keyword-only
-        Only for a ``labels`` dict with several entries: the dict keys in the
-        order the method stacked the cells (the benchmark's convention is
-        numbered files ascending - ``cty1, cty2, ...`` - and ``rna`` before
-        ``atac``; :func:`multibench.labels_for` ``(ds, category, method)``
-        returns the files in that order, so ``label_order=list(d)`` trusts
-        it). A subset of the keys selects those files only. Unknown or
-        repeated keys raise; ``label_order`` with a non-dict ``labels`` raises
-        ``TypeError``.
+        Only for a ``labels`` dict with several entries: its keys in the
+        method's stacking order (see ``labels``); ``label_order=list(d)``
+        trusts the dict's own order. A subset of the keys selects those files
+        only. Unknown or repeated keys raise ``ValueError``; ``label_order``
+        with a non-dict ``labels`` raises ``TypeError``.
     verbose : bool, keyword-only
         ``True`` (default) prints one line on stderr when the Leiden
         resolution sweep starts on more than 2,000 cells - the point at
-        which it takes long enough to look like a hang (``"scIB clustering
-        metrics: Leiden resolution sweep over 11,014 cells ..."``); ``False``
-        never prints.
+        which it takes long enough to look like a hang; ``False`` never
+        prints.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``metric.csv``-shaped: index = metric name in the canonical spelling
+        ``load_results`` uses (``ARI, NMI, ASW, iASW, iF1, cLISI, ASW_batch,
+        GC, iLISI, kBET``), one column ``Value``. Never empty: a request that
+        would select no metric raises instead.
 
     Raises
     ------
@@ -520,11 +502,31 @@ def evaluate(
         unsupported input types (non-array ``labels``, ``label_order`` with
         non-dict labels, ...), and the removed 0.2.x keywords
         ``slow_metrics`` / ``column`` / ``metric_set``.
+
+    Notes
+    -----
+    Cost. ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
+    Leiden sweep (10 resolutions on a kNN graph of the embedding): tens of
+    seconds for a few thousand cells, minutes for ~10^4. To skip it, pass
+    ``metrics=[...]`` naming metrics that do not need it (``ASW``, ``iASW``,
+    ``cLISI``, the batch family) or, for ``ARI``/``NMI``, ``clustering=``.
+    The sweep's Leiden backend is ``mtb.config.DEFAULT.leiden_flavor``:
+    ``"igraph"`` (default; several times faster) or ``"leidenalg"`` (the
+    classic backend scib itself runs).
+
+    Cell order. Arrays, lists and files are matched positionally to the rows
+    of ``output``. A ``Series``/``DataFrame`` with a non-default index is
+    aligned by cell id when ``output`` carries ids (AnnData / DataFrame with
+    a non-default index): rows are reindexed to the output's order, and a
+    missing or extra id raises ``ValueError`` naming the first ones. When
+    ``output`` is a bare array there is nothing to align against: the Series
+    is matched positionally and a ``UserWarning`` says so (pass
+    ``labels.to_numpy()`` to silence it).
     """
     _validate_category(category)
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
-    # a labels_for() dict becomes the list of paths in cell order FIRST, so the
+    # a labels_for() dict becomes the list of paths in cell order first, so the
     # file-of-origin batch rule below sees it like any other list of files
     if isinstance(labels, dict):
         labels = _labels_from_dict(labels, label_order)
@@ -534,21 +536,19 @@ def evaluate(
             f"as returned by mtb.labels_for); labels is a "
             f"{type(labels).__name__} - pass the files as a list in that order "
             f"instead")
-    # `clustering` is optional: when omitted it is derived from the embedding
-    # inside scib.compute() via optimal-resolution Leiden.
     batch_from_files = batch is None and _is_label_path_list(labels) and len(labels) > 1
     group, only, slow = _plan_metrics(
         metrics, has_batch=batch is not None or batch_from_files,
         batch_given=batch is not None)
 
     if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
-        import anndata as ad      # read ONCE; keeps obs_names and obs columns
+        import anndata as ad      # read once; keeps obs_names and obs columns
         output = ad.read_h5ad(output)
     adata = output if io._is_anndata(output) else None
     ids = _cell_ids(output)
     emb = np.asarray(io.as_matrix(output, obsm=obsm))
     if _is_label_path_list(labels):
-        # several label files: concatenate IN THE GIVEN ORDER; remember the
+        # several label files: concatenate in the given order; remember the
         # sizes so the file of origin can serve as the batch below
         parts = [np.asarray(io.read_labels(p)) for p in labels]
         ct = np.concatenate(parts)
@@ -557,8 +557,8 @@ def evaluate(
         ct = _obs_or_vector(labels, adata, what="labels", ids=ids)
     # Orient to cells x dims. read_embedding() already does this for h5 inputs;
     # do the same for everything else so a caller can pass run().output (dims x
-    # cells for many methods) directly. Use the label count as the truth: only
-    # transpose when it resolves the cell-axis mismatch (never ambiguously).
+    # cells for many methods) directly. Transpose only when the label count
+    # says the cells are on the other axis.
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         warnings.warn(
             f"output was (dims x cells) {emb.shape}; transposed to (cells x dims)")
@@ -574,20 +574,19 @@ def evaluate(
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids)
     elif batch_from_files and group in {"batch", "all"}:
-        # batch = which label FILE each cell came from (1-based, as run_all)
+        # batch = which label file each cell came from (1-based, as run_all)
         ba = np.concatenate([np.full(len(v), i + 1) for i, v in enumerate(parts)])
     else:
         # clustering metrics need a batch_key but it is a no-op there, so a
         # constant vector is acceptable when no batch labels are supplied.
         ba = np.zeros(emb.shape[0], dtype=int)
 
-    from . import scib as escib  # imported lazily so non-scib paths don't require it
+    from . import scib as escib
     out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
                         verbose=None if verbose else False)
-    # The names compute() emits ARE the canonical ones, but make that a
-    # property of evaluate() rather than a coincidence: a frame that reaches
-    # to_long()/pd.concat with the published tables must never carry a second
-    # spelling of the same metric.
+    # compute() already emits canonical names; canonicalise anyway, so a frame
+    # concatenated with the published tables never carries a second spelling
+    # of a metric
     out.index = pd.Index([catalog.canonical_metric(m) for m in out.index],
                          name=out.index.name)
     if out.empty:

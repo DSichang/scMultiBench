@@ -1,6 +1,6 @@
 """Readers and coercers for evaluation inputs: embedding, labels, clustering.
 
-Two layers:
+Three groups:
 
 * ``read_*`` - file readers for the benchmark's on-disk formats (``embedding.h5``
   with dataset ``data``; ``*cty*.csv`` label files; ``/obs/cluster_leiden`` in
@@ -21,15 +21,15 @@ import h5py
 import numpy as np
 import pandas as pd
 
-#: Suffixes that mean "a CSV-like label file" when a string is handed to
-#: as_vector(); anything else that is a str/Path is treated as an h5 by
-#: read_clustering(), and a list of such strings is treated as label VALUES.
+#: Suffixes that mark a str as a CSV-like label file. evaluate() reads a
+#: clustering= str with any other suffix as an h5 (read_clustering), and
+#: as_vector() takes a list of strings without these suffixes as label values.
 _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 
 
 def _require_file(path: Path | str, what: str = "file") -> Path:
     """``Path(path)`` when it is an existing file; else ``FileNotFoundError``
-    naming the path AND the working directory (a relative path that resolves
+    naming the path and the working directory (a relative path that resolves
     from the repository but not from a notebook's cwd is the usual cause)."""
     p = Path(path)
     if p.is_dir():
@@ -55,7 +55,7 @@ def read_embedding(path: Path | str) -> np.ndarray:
     -------
     numpy.ndarray
         2-D array, cells x dims. Orientation auto-detection assumes there are
-        MORE cells than embedding dimensions; square (cells == dims) or
+        more cells than embedding dimensions; square (cells == dims) or
         tall-thin embeddings cannot be auto-disambiguated and may come back
         transposed.
 
@@ -65,7 +65,7 @@ def read_embedding(path: Path | str) -> np.ndarray:
         ``path`` does not exist (the message names it and the cwd).
     ValueError
         The file has no dataset ``data``: the message lists the keys found
-        and, when they are the canonical INPUT layout (a ``matrix`` group
+        and, when they are the canonical input layout (a ``matrix`` group
         holding ``data``/``barcodes``/``features``), says that this is an
         input matrix, not a method output.
     """
@@ -110,11 +110,11 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     1. ``column`` when given (must exist; error lists the header otherwise);
     2. the column named ``x`` when present;
     3. the only column when the file has one;
-    4. the LAST column when the file has exactly two and the first is all
+    4. the last column when the file has exactly two and the first is all
        unique (an index / barcode column);
     5. otherwise the file is ambiguous and a ``ValueError`` asks for
-       ``column=``. (Silently taking a column here is how an obs-style export
-       used to yield ARI 0.0 without a word.)
+       ``column=``: a silent pick could score the wrong column without any
+       error.
 
     Parameters
     ----------
@@ -204,15 +204,15 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
 
     * ``str`` / ``Path`` - a label file, read with :func:`read_labels`;
     * ``list``/``tuple`` of paths (every element a ``Path`` or a ``str`` ending
-      in ``.csv``/``.tsv``/``.txt``) - read each and concatenate IN THE GIVEN
-      ORDER, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
-    * ``dict`` with ONE entry (what :func:`multibench.labels_for` returns for a
-      single-label dataset) - that file. Several entries raise HERE, because
+      in ``.csv``/``.tsv``/``.txt``) - read each and concatenate in the given
+      order, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
+    * ``dict`` with one entry (what :func:`multibench.labels_for` returns for a
+      single-label dataset) - that file. Several entries raise here, because
       this coercer does not know the method's stacking order; pass the paths
-      as a list in that order. (:func:`multibench.evaluate` is more lenient:
-      it takes a multi-entry dict as is when its insertion order IS the
-      stacking order - what ``labels_for`` returns - and needs
-      ``label_order=`` only for a dict in any other order.)
+      as a list in that order. (:func:`multibench.evaluate` takes a
+      multi-entry dict as is when its insertion order is the stacking order
+      - what ``labels_for`` returns - and needs ``label_order=`` only for a
+      dict in any other order.)
     * ``numpy.ndarray`` (1-D, or ``(n, 1)``), ``pandas.Series``,
       ``pandas.Categorical``, ``pandas.Index``, or a list/tuple of scalars;
     * a single-column ``pandas.DataFrame`` (or a wider one with ``column=``).
@@ -270,13 +270,12 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
 def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
     """The error for a ``{name: path}`` dict with several entries.
 
-    A dict fixes no cell order, and the order is the method's STACKING order -
+    A dict fixes no cell order, and the order is the method's stacking order -
     the order in which the method concatenated its input cells - which is not
     alphabetical: ``cty1 < cty2 < ...`` numerically, and ``rna`` before
-    ``atac``. The old hint (``list(d.values())``) recommended the alphabetical
-    order and scored a perfect D28 embedding at ARI 0.001 - hence this message
-    names the keys, states the rule and points at the helper that returns the
-    files in that order.
+    ``atac``. A wrong order raises no error and invalidates every score, so
+    the message names the keys, states the rule and points at the helper that
+    returns the files in that order.
     """
     keys = [str(k) for k in d]
     fix = (f"pass label_order=[...] with these keys in that order (label_order="
@@ -299,10 +298,10 @@ def _first(ix, n: int = 5) -> list:
 def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> np.ndarray:
     """Align an indexed ``Series``/``DataFrame`` to the output's cell ids.
 
-    This is the pandas contract every scverse user expects: a Series indexed by
-    cell barcode is matched BY BARCODE, not by position. ``evaluate()`` calls
-    this when ``output`` carries ids (an AnnData's ``obs_names``, or a
-    DataFrame with a non-default index) and ``x`` carries a non-default index.
+    A Series indexed by cell barcode is matched by barcode, not by position
+    (the pandas convention). ``evaluate()`` calls this when ``output`` carries
+    ids (an AnnData's ``obs_names``, or a DataFrame with a non-default index)
+    and ``x`` carries a non-default index.
 
     Parameters
     ----------
@@ -413,12 +412,11 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
       leading index/barcode column is dropped). Any other suffix is tried as
       HDF5 and otherwise rejected.
 
-    Orientation is NOT decided here: :func:`read_embedding` orients files, and
-    :func:`multibench.evaluate` orients everything else against the label count.
-    A path that does not exist raises ``FileNotFoundError`` naming it and the
-    working directory; an ``.h5`` without dataset ``data`` raises
-    ``ValueError`` listing the keys found (and says so when they are the
-    canonical INPUT layout ``matrix/...``).
+    Orientation is not decided here: :func:`read_embedding` orients HDF5
+    files, and :func:`multibench.evaluate` orients everything else against the
+    label count. A path that does not exist raises ``FileNotFoundError`` naming
+    it and the working directory; an ``.h5`` without dataset ``data`` raises
+    ``ValueError`` as in :func:`read_embedding`.
 
     Parameters
     ----------
