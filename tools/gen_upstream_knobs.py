@@ -1,23 +1,21 @@
-"""Generate multibench/engine/upstream_knobs.yaml from the audited source.
+"""Generate multibench/engine/upstream_knobs.yaml from upstream_knobs_audit.json.
 
-`params_for` reports what a method's script accepts on its COMMAND LINE, and
-for most methods that is nothing: the benchmark scripts fix their
-hyperparameters in the source, and hard rule #1 forbids editing them. Reporting
-an empty `tunable` is honest but leaves the user with the wrong conclusion -
-that the method has no hyperparameters at all. This file records the other two
-halves of the truth, per method:
+`params_for` reports what a method's script accepts on its command line. For
+most methods that is nothing: the benchmark scripts fix their hyperparameters
+in the source, and this package never edits them. An empty `tunable` alone
+reads as "the method has no hyperparameters", so this file adds, per method:
 
-  fixed_in_script - the hyperparameter values the script pins, each with the
-                    file:line that pins it, so a reader can check the claim
-  upstream_knobs  - what the wrapped library documents, which is what the user
-                    was expecting to see, marked as unreachable from the CLI
+  fixed_in_script - the hyperparameter values the script fixes, each with the
+                    file:line that fixes it
+  upstream_knobs  - what the wrapped library documents but the script does not
+                    expose on the command line
 
 Regenerate with:  python tools/gen_upstream_knobs.py [path/to/scMultiBench]
 
-Every fixed_in_script entry is re-verified against the checked-out upstream
-script before it is written: an entry whose cited line no longer contains the
-cited code is DROPPED, not silently carried forward, so upstream drift shows up
-as missing facts rather than wrong ones. Each drop is named on stderr.
+Every fixed_in_script entry is checked against the upstream checkout before it
+is written. An entry whose cited line does not contain the cited code is
+dropped, so an upstream change shows up as a missing fact, not a wrong one.
+Each drop is named on stderr.
 """
 import json
 import pathlib
@@ -35,8 +33,8 @@ HEADER = """\
 #
 # Why a method reports zero tunable parameters. `params_for` lists what the
 # upstream script accepts on its command line; these are the hyperparameters it
-# FIXES in its source (with the file:line that fixes them), plus the knobs the
-# wrapped library documents but the script never exposes. Changing the latter
+# fixes in its source (with the file:line that fixes them), plus the knobs the
+# wrapped library documents but the script never exposes. Changing either
 # requires editing tools_scripts/, which this package never does.
 #
 # Every fixed_in_script entry was verified against the upstream file at
@@ -49,14 +47,13 @@ def norm(s: str) -> str:
 
 
 def is_verified(h: dict, clone: pathlib.Path) -> bool:
-    """Does the line `h["source"]` cites still hold the code `h["evidence"]` quotes?
+    """Whether the line `h["source"]` cites still holds the code `h["evidence"]` quotes.
 
-    Evidence may be the line trimmed (a trailing comment cut) or the line plus
-    its continuation, so containment is accepted either way round - but only
-    when the contained string is most of the containing one. A bare substring
-    test is vacuous at the short end: a blank line is "contained" in every
-    evidence string, and so is a lone ")", which is how a citation of the wrong
-    file at the right line number verifies.
+    Evidence may be the line with a trailing comment cut, or the line plus its
+    continuation, so containment is accepted either way round, but only when
+    the shorter string is at least half the longer one. Without that bound a
+    blank line or a lone ")" is contained in every evidence string, and a
+    citation of the wrong file at the right line number would verify.
     """
     rel, _, ln = h.get("source", "").rpartition(":")
     f = clone / rel
