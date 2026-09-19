@@ -206,8 +206,8 @@ def stage_slices(data_dir, staged_dir) -> dict:
         link = dst / f"{i:0{width}d}_{f.name}"
         os.symlink(str(f), str(link))
         source_of[link.name] = str(f)
-    # the exact call the upstream scripts make, in the directory they will
-    # make it in: os.scandir order, whatever the filesystem's is
+    # the same glob call the upstream scripts make, in the same directory: the
+    # result is in os.scandir order, which depends on the filesystem
     seen = [Path(p).name for p in glob.glob(os.path.join(str(dst), "") + "*.h5ad")]
     slices = [{"index": i, "output": f"aligned_slice_{i}.h5ad", "staged": name,
                "source": source_of[name]} for i, name in enumerate(seen)]
@@ -231,11 +231,10 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
 
     The method runs with ``cwd=out_dir`` (or the script's own directory), so a
     relative ``data/MYCITE/rna.h5`` would be looked up in the wrong place and
-    a relative ``--save_path out/x/`` would write
-    ``out/x/out/x/embedding.h5``. Many upstream scripts
-    also string-concatenate ``data_dir + "*.h5ad"``, hence the separator on
-    directory values. ``os.path.abspath`` (not ``Path.resolve``) keeps symlinked
-    data roots as the user wrote them.
+    a relative ``--save_path out/x/`` would write ``out/x/out/x/embedding.h5``.
+    Many upstream scripts also string-concatenate ``data_dir + "*.h5ad"``,
+    hence the separator on directory values. ``os.path.abspath`` (not
+    ``Path.resolve``) keeps symlinked data roots as the user wrote them.
 
     Parameters
     ----------
@@ -305,8 +304,8 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
     # entrypoint is relative to the reference repo. A variant may declare a
     # package-side `driver` that source()s/imports the unmodified upstream
-    # entrypoint and calls its function: run the driver instead and pass the upstream
-    # script's directory via --script_dir, so the script is sourced in place.
+    # entrypoint and calls its function: run the driver instead and pass the
+    # upstream script's directory via --script_dir, so it is sourced in place.
     if getattr(variant, "driver", None):
         pkg_root = Path(__file__).resolve().parents[1]      # .../multibench
         driver_abs = pkg_root / variant.driver
@@ -336,9 +335,10 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     # Opt-in pseudo-tty: some upstream scripts read the terminal size
     # (os.popen('stty size')) to draw a progress bar and crash without a tty
     # (scJoint's util/utils.py). `script` allocates a pty, forwards the child's
-    # output to captured stdout and (-e) propagates its exit code. It must be
-    # innermost - inside the conda-run wrap, hence before wrap_command - so the
-    # method's own stdin is the pty; conda run redirects stdio otherwise.
+    # output to captured stdout and (-e) propagates its exit code, so the
+    # returncode check in run() still fires. It must be innermost - inside the
+    # conda-run wrap, hence before wrap_command - so the method's own stdin is
+    # the pty; conda run redirects stdio otherwise.
     if getattr(variant, "pty", False):
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]

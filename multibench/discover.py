@@ -207,7 +207,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
         wired for that category - the same set ``scan`` / ``run_all`` /
         ``find_methods(category=)`` dispatch.
     **_removed
-        Catch-all that rejects the retired 0.2 ``task=`` / ``runnable=``
+        Catch-all that rejects the removed 0.2 ``task=`` / ``runnable=``
         filters with a ``TypeError`` naming ``find_methods``.
 
     Returns
@@ -220,7 +220,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     ValueError
         Unknown ``category``; the message lists the valid tokens.
     TypeError
-        The ``task=`` / ``runnable=`` filters of the deprecated 0.2 signature
+        The ``task=`` / ``runnable=`` filters of the removed 0.2 signature
         were passed; they are ``mtb.find_methods`` filters now
         (``find_methods(category, task=..., runnable=...)``).
 
@@ -571,11 +571,11 @@ def params_for(method: str, category: str | None = None,
     ``upstream_knobs`` - what the wrapped library documents (with its
     own defaults), unreachable without editing the script.
 
-    An **empty** ``tunable`` means the upstream script exposes no
-    hyperparameters on its command line. Because this project never
-    modifies method scripts, such a method cannot be tuned through the
-    wrapper - but it is not parameterless, which is what the last two keys
-    say (both empty for methods outside the upstream audit).
+    An empty ``tunable`` means the upstream script exposes no hyperparameters
+    on its command line; method scripts are never modified, so such a method
+    cannot be tuned through the wrapper. Its settings are reported under
+    ``fixed_in_script`` and ``upstream_knobs`` (both empty for methods outside
+    the upstream audit).
 
     See Also
     --------

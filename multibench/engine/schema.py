@@ -191,7 +191,7 @@ class ArgSpec:
 
 @dataclass
 class OutputSpec:
-    kind: str               # embedding | imputed | labels | markers | coords
+    kind: str               # embedding | graph | labels | coords (io.load_output also accepts imputed | markers)
     file: str               # filename (or glob) written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
 
@@ -269,7 +269,8 @@ class Variant:
     def takes_data_dir(self) -> bool:
         """True when this variant is fed a directory (a ``data_dir`` role) -
         the spatial-registration methods and scBridge - rather than one file
-        per modality. Such variants declare ``when.modalities: []``."""
+        per modality. Such variants declare no modalities (``when.modalities`` is
+        empty or absent)."""
         return any(a.role == "data_dir" for a in self.args)
 
     @property
@@ -327,16 +328,12 @@ class MethodSpec:
     # reference {doi, title, authors, journal, year}
     reference: dict = field(default_factory=dict)
     # GPU/CPU contract of the upstream script (per method, not per variant;
-    # see `GPU_FIELDS`). `cpu_params` are the command-line params that turn
-    # CUDA off for a script that has it on by default ({flag: value}, emitted
-    # exactly like `params`: scJoint's argparse `--use_cuda` is `type=bool`,
-    # so only the empty string is false -> {use_cuda: ""}). The runner merges
-    # them into a run's params when `envs.host_has_gpu()` is False, unless
-    # the caller passed the same key. `requires_gpu` marks a script that
-    # calls CUDA unconditionally (`.cuda()` / `torch.device('cuda')` with no
-    # switch and no `torch.cuda.is_available()` fallback); `gpu_evidence` is
+    # keys in `GPU_FIELDS`, shapes checked by validate_gpu_fields).
+    # `cpu_params`: command-line params that turn CUDA off, emitted like
+    # `params` and merged by runner.cpu_params_for on a host without a GPU.
+    # `requires_gpu`: the script calls CUDA unconditionally; `gpu_evidence` is
     # the `file:line` of that call, quoted in the refusal. A method may not
-    # carry both.
+    # carry both. Described for users in mtb.method_info (Notes).
     cpu_params: dict = field(default_factory=dict)
     requires_gpu: bool = False
     gpu_evidence: str = ""

@@ -233,7 +233,7 @@ def resolve_method_id(name: str) -> str:
     Notes
     -----
     ``check_method`` stays strict on purpose (it validates ids at the entry
-    points); use this where a spelling from a file or a table is normalised.
+    points); use this where a spelling from a file or a table is normalized.
     """
     ids = [s.id for s in load()]
     key = str(name).strip()
