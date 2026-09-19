@@ -1,7 +1,7 @@
 # method_env: method -> the conda env that runs it; each has a lockfile in
 # env_locks/. An entry here takes precedence over `groups` membership below.
 method_env:
-  Seurat_v5: scmb_seurat5          # Seurat 5 + Signac bridge stack
+  Seurat_v5: scmb_seurat5          # Seurat 5.4.0 + Signac bridge stack
   Seurat_v3: scmb_seurat4b         # Seurat 4.3.0.1 + SeuratObject 4.1.4 (5.x breaks RunCCA)
   Seurat_WNN: scmb_seurat5
   MIRA: scmb_mira
@@ -18,7 +18,7 @@ method_env:
   PASTE2: paste_envi               # paste2==1.0.1 (PASTE2/projection)
   GPSA: scmb_gpsa2                 # numpy 1.26.4 + h5py 3.10 + scikit-learn 1.4.1 (a numpy 1.21.6 pin is unsatisfiable with them) + torch 2.2.2+cu118 (the 2.6 wheel rejects numpy<2 in from_numpy) + numba 0.59.1; gpytorch, linear_operator, jaxtyping, morphops and kneed are installed in the env because PYTHONNOUSERSITE=1 hides user-site copies
   MOFA2: MOFA2_env                 # R MOFA2; mofapy2 comes from the Python named by RETICULATE_PYTHON (methods.yaml)
-  sciPENN: env_sciPENN             # torch 1.13.1+cu117, built for GPUs up to sm_86
+  sciPENN: env_sciPENN             # torch 1.13.1+cu117 (kernels up to sm_86, which sm_89 GPUs also run)
   SMILE: env_sciPENN               # anndata 0.8.0 + scanpy 1.9.3 + numpy 1.21.6 handle both np.matrix coercion and bytes var_names
   Cobolt: scmb_cobolt3             # numpy 1.21.6 (np.quantile(np.matrix) needs numpy<1.22)
   Matilda: matilda                 # torch 2.1.2; matilda-sc is installed by env_locks/matilda.post.sh
@@ -35,8 +35,9 @@ method_env:
   online_iNMF: scmb_r
   StabMap: scmb_r                  # bioconductor-stabmap
 
-# groups: recipes for shared envs, each hosting several compatible methods. A
-# method in neither method_env nor any members[] gets its own scmb_<method> env.
+# groups: env recipes keyed by env name; members[] lists the methods a recipe
+# serves. A method in neither method_env nor any members[] gets its own
+# scmb_<method> env.
 groups:
   scmb_torch:
     python_version: '3.9'
@@ -136,9 +137,8 @@ groups:
       packages (scmomat, mira-multiome, uniport, scglue, sciPENN, gpsa, paste-bio). leidenalg, igraph,
       louvain, umap-learn, seaborn and matplotlib serve the scanpy clustering paths.
 
-      Run-time constraints that do not affect the env: sciCAN and SMILE call .cuda() unconditionally;
-      scJoint loads an x86-64-only util/libutility.so (no arm64 macOS); MIRA lacks its local logger.py;
-      GLUE needs an external GTF file and an activated conda env at import time.
+      The package list also covers Cobolt, GPSA, GLUE, MIRA and Portal, which are not members: each
+      runs in its own env (method_env above; GLUE in the glue group).
   scmb_r:
     python_version: ''
     conda_channels:
@@ -193,7 +193,7 @@ groups:
     - method: Seurat_v3
       reason: Hard-pins r-base=4.2 + r-seurat=4.3 (v4-era anchor/CCA + v4 assay model via FindTransferAnchors/TransferData); incompatible with the shared Seurat>=5.0 / r-base>=4.2 env. Keeps its own per-method env.
     - method: Seurat_WNN
-      reason: Caveat explicitly requires Seurat v4 (not v5) — WNN API (FindMultiModalNeighbors, weighted.nn neighbor slot) and the v4 assay model break under Seurat v5. Conflicts with the shared Seurat>=5.0 pin; keeps its own per-method env.
+      reason: Not served by this env; method_env runs it in scmb_seurat5.
     notes: |-
       R env built around Seurat v5; the only Python is mofapy2, which MOFA2 reaches through
       reticulate because run_mofa uses use_basilisk=FALSE (point RETICULATE_PYTHON at this env's
@@ -207,8 +207,8 @@ groups:
       SingleCellExperiment, scran (StabMap); bioconductor-mofa2, r-reticulate, r-reshape2 (MOFA2);
       r-rcpp, r-rcppeigen, r-matrix, hdf5 (UINMF / online_iNMF native code); bioconductor-rhdf5 +
       hdf5array for .h5 I/O in every method. r-seuratdisk, r-hdf5r, r-biocmanager and r-devtools are
-      unpinned helpers. The only conflict among the members is the Seurat version, handled by the
-      exclusions.
+      unpinned helpers. The only conflict among the R methods is the Seurat version (Seurat_v3 needs
+      4.x), handled by its exclusion.
   scmb_py37:
     python_version: '3.7'
     conda_channels:

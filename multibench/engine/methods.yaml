@@ -93,6 +93,9 @@ methods:
       # paths. The four file roles are therefore `const` names, which inputs_for
       # skips; only `data_dir` is resolved, so the modality set is empty, as for
       # the registration methods. source = labelled RNA reference, target = ATAC query.
+      # One encoder takes both inputs (gene_num = source_data.shape[1],
+      # data_utils.py:126), so atac_gas must be gene-aligned to rna (same feature
+      # dimension), as for scJoint.
       - when: {category: diagonal, modalities: []}
         entrypoint: tools_scripts/scBridge/main_scBridge.py
         language: python
@@ -391,10 +394,6 @@ methods:
     status: verified
     setup_hint: "Runs through the package driver engine/drivers/run_matilda.py, which uses Matilda's object API (`matilda-sc`, import `matilda`; https://pyanglab.github.io/Matilda/). The upstream main_matilda_train.py only trains and writes no embedding; the driver trains once, then runs dimension reduction + classification in one pass."
     variants:
-      # The driver calls matilda.train(), then matilda.task(dim_reduce=True,
-      # classification=True) in one pass: latent space (cells x z_dim) ->
-      # embedding.h5, per-cell predictions -> predict.csv. Matilda picks the mode
-      # from the modalities passed: rna+adt = CITE-seq, rna+atac = SHARE-seq.
       # --- CITE-seq (rna + adt) ---
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/Matilda/main_matilda_train.py
@@ -524,6 +523,8 @@ methods:
     atac: gene_activity
     status: verified
     variants:
+      # main_sciCAN.py:51 concatenates the rna and atac_gas matrices row-wise, so
+      # atac_gas must be gene-aligned to rna (same feature dimension), as for scJoint.
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/sciCAN/main_sciCAN.py
         language: python
@@ -551,7 +552,10 @@ methods:
       # terminal -> pty (the runner wraps the command in `script -q -e -c`). Input
       # size and class count are set from the data at run time. The shared encoder
       # needs atac_gas gene-aligned to rna (same feature dimension): D28 is, D27 is
-      # not. embedding.h5 holds the rna cells, then the atac cells.
+      # not. embedding.h5 holds the rna cells, then the atac cells. Intermediates go
+      # to ./output/<name>_embeddings.txt in the script directory
+      # (main_scJoint.py:155), so that directory must be writable and runs must not
+      # overlap.
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/scJoint/main_scJoint.py
         language: python
@@ -623,8 +627,8 @@ methods:
       # The env's torch 1.9.1+cu102 has no sm_89 kernels -> forced to CPU with
       # CUDA_VISIBLE_DEVICES="" (the model gates on torch.cuda.is_available()).
       # The env also needs pandas<2 (pandas 2 breaks the positional indexing in
-      # torch.tensor(obs['batch'])). D1 fails in BatchNorm on a batch of one cell;
-      # D7's cell count avoids it.
+      # torch.tensor(obs['batch'])). D1 fails in BatchNorm on a training minibatch
+      # of one cell; D7's cell count avoids it.
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/scMSI/main_scMSI.py
         language: python
@@ -708,10 +712,12 @@ methods:
     language: python
     tasks: [registration]
     variants:
+      # Globs *.h5ad from --data_dir; pairwise OT alignment (paste-bio). The
+      # published script runs unmodified (no driver).
       - when: {category: cross}
         entrypoint: tools_scripts/PASTE/main_PASTE_pairwise.py
         language: python
-        cwd_at_script: true            # globs *.h5ad from --data_dir; pairwise OT alignment (paste-bio), run from the published script
+        cwd_at_script: true
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}
@@ -721,10 +727,11 @@ methods:
     language: python
     tasks: [registration]
     variants:
+      # The published script runs unmodified (no driver).
       - when: {category: cross}
         entrypoint: tools_scripts/PASTE2/main_PASTE2.py
         language: python
-        cwd_at_script: true            # run from the published script
+        cwd_at_script: true
         args:
           - {role: data_dir, flag: "--data_dir"}
           - {role: out_dir,  flag: "--save_dir"}

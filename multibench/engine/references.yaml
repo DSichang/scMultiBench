@@ -36,7 +36,7 @@ SCALEX:
 Multigrate:
   repo_url: https://multigrate.readthedocs.io/en/latest/index.html
   version: "0.0.2"
-  summary: "Product-of-experts VAE that integrates paired and unpaired multimodal batches (vertical, mosaic and cross) into one latent space; scvi-tools based."
+  summary: "Product-of-experts VAE that integrates paired and unpaired multimodal batches (vertical and mosaic) into one latent space; scvi-tools based."
   reference:
     doi: 10.1101/2022.03.16.484643
     title: Integration and querying of multimodal single-cell data with PoE-VAE (Multigrate preprint)
@@ -370,7 +370,7 @@ StabMap:
 UINMF:
   repo_url: http://htmlpreview.github.io/?https://github.com/welch-lab/liger/blob/master/vignettes/UINMF_vignette.html
   version: "2.0.1"
-  summary: "Unshared-feature integrative NMF (rliger) for mosaic / vertical / cross integration of datasets with shared and unshared features; R."
+  summary: "Unshared-feature integrative NMF (rliger) for vertical / cross integration of datasets with shared and unshared features; R."
   reference:
     doi: 10.1038/s41467-022-28431-4
     title: UINMF performs mosaic integration of single-cell multi-omic datasets using nonnegative matrix factorization
