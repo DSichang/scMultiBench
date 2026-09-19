@@ -24,10 +24,10 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     """Pick the real on-disk file for a modality role in a flat dataset dir.
 
     Tries the role token and known aliases. Label roles (anything matching
-    ``cty`` or ``label``) try ``.csv`` first since cell-type files are CSV;
-    other roles try ``.h5`` then ``.h5`` with a trailing digit (some datasets
-    store batched files). Returns the canonical ``<base>.h5`` (or ``.csv``
-    for label roles) as a fallback when nothing matches.
+    ``cty`` or ``label``) try ``.csv`` before ``.h5`` since cell-type files
+    are CSV; each extension is tried as ``<base><ext>`` then ``<base>1<ext>``
+    (some datasets number their files per batch). Returns the canonical
+    ``<base>.h5`` (``.csv`` for label roles) when nothing matches.
     """
     is_label = ("cty" in role) or ("label" in role)
     bases = _ROLE_FILE_CANDIDATES.get(role, (role,))
@@ -45,28 +45,24 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 def _resolve_data_dir(ds_dir: Path, method: str | None = None) -> str:
     """Directory of spatial slices for a registration ``data_dir`` role.
 
-    Spatial-registration methods (PASTE/PASTE2/SPIRAL/GPSA) take a DIRECTORY of
-    per-slice ``.h5ad`` files, not a per-feature file. Datasets keep those slices
-    under ``<ds_dir>/processed/`` (sometimes directly in ``<ds_dir>/``). Return the
-    first dir that actually holds ``*.h5ad`` slices, WITH a trailing separator —
+    Spatial-registration methods (PASTE/PASTE2/SPIRAL/GPSA) take a directory of
+    per-slice ``.h5ad`` files, not one file per modality. Datasets keep those
+    slices under ``<ds_dir>/processed/`` (sometimes directly in ``<ds_dir>/``).
+    Return the first dir that holds ``*.h5ad`` slices, with a trailing separator:
     the upstream scripts string-concatenate ``data_dir + "*.h5ad"``.
     """
     import os
     for cand in (ds_dir / "processed", ds_dir):
         if cand.is_dir() and any(cand.glob("*.h5ad")):
-            # SPIRAL derives each slice's cross-slice ID prefix from
-            # filename.split('_')[0]; when every slice shares that leading
-            # token (e.g. D63's `modified_*.h5ad`) the prefixed obs_names
-            # collide and `coord.loc[ann.obs_names]` explodes. Stage a
-            # sibling dir of symlinks with a UNIQUE leading token per slice.
+            # SPIRAL needs a unique leading filename token per slice
+            # (see _stage_unique_leading_token).
             if method == "SPIRAL":
                 return _stage_unique_leading_token(cand)
             return os.path.join(str(cand), "")
-    # No `.h5ad` slices anywhere: this is a NON-spatial `data_dir` role (e.g.
-    # scBridge, which takes the dataset DIRECTORY plus bare filenames). Prefer a
-    # real `processed/` if one exists (keeps the spatial error message pointing
-    # at the slice dir); otherwise fall back to the dataset dir itself, which
-    # always exists, instead of a bogus `<ds>/processed/`.
+    # No `.h5ad` slices: a non-spatial `data_dir` role (scBridge takes the
+    # dataset directory plus bare filenames). Prefer an existing `processed/`
+    # (the spatial error message then names the slice dir); otherwise the
+    # dataset dir itself, which always exists.
     proc = ds_dir / "processed"
     return os.path.join(str(proc if proc.is_dir() else ds_dir), "")
 
@@ -78,13 +74,13 @@ def _stage_unique_leading_token(slice_dir: Path) -> str:
     SPIRAL builds each slice's cross-slice cell-ID prefix from
     ``filename.split('_')[0]``. Datasets whose slice files share that token
     (D63: ``modified_E14-16h_a_S07.h5ad`` ... all split to ``modified``)
-    make SPIRAL's per-cell prefixes collide across slices, which inflates
+    make the per-cell prefixes collide across slices, which inflates
     ``coord.loc[ann.obs_names]`` into a cartesian product and crashes the
-    coordinate-assignment step. If the leading tokens are already unique we
-    return the original dir untouched; otherwise we materialize a sibling
-    ``<dir>__spiral_uniqtok/`` of SYMLINKS (no data copy, original dir is
-    never mutated) whose names start with a unique token derived from the
-    trailing token of each stem.
+    coordinate-assignment step. When the leading tokens are already unique
+    the original dir is returned; otherwise a sibling
+    ``<dir>__spiral_uniqtok/`` of symlinks is created (no data copy, the
+    original dir is never changed) whose names start with a unique token
+    taken from the end of each stem.
     """
     import os
     files = sorted(p for p in slice_dir.glob("*.h5ad") if p.is_file())
@@ -118,8 +114,8 @@ def _stage_unique_leading_token(slice_dir: Path) -> str:
 def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
     """``{role: path}`` for every input role of ``variant`` in ``ds_dir``
     (best effort: a missing file resolves to its canonical name)."""
-    # Skip args with a const (they don't need on-disk resolution) and out_dir.
-    # an arg may name ONE role (a.role) or GROUP several under one flag (a.roles)
+    # Args with a const need no on-disk resolution; out_dir is not an input.
+    # An arg names one role (a.role) or groups several under one flag (a.roles).
     roles = [r
              for a in variant.args if getattr(a, "const", None) is None
              for r in (getattr(a, "roles", None) or [a.role])
@@ -128,7 +124,7 @@ def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
              if r and not str(r).startswith("=")
              and r not in ("out_dir", "data_dir")]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
-    # A `data_dir` role points at the DIRECTORY of spatial slices (registration).
+    # A `data_dir` role resolves to a directory, not a file.
     if any(a.role == "data_dir" for a in variant.args):
         out["data_dir"] = _resolve_data_dir(ds_dir, method)
     return out
@@ -149,8 +145,9 @@ def _variant_satisfiable(variant, ds_dir: Path, method: str) -> bool:
 def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = None):
     """Pick the one variant of ``spec`` for ``category`` (+ ``modalities``).
 
-    Shared by :func:`inputs_for`, :func:`labels_for` and
-    :func:`multibench.params_for` so the three agree on what "ambiguous" means.
+    Shared by :func:`inputs_for` and :func:`labels_for` so the two agree on
+    what "ambiguous" means (``params_for`` applies the same folder rule through
+    :func:`_variant_satisfiable`).
 
     Parameters
     ----------
@@ -160,7 +157,7 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         or None. When given, ``spec.select(..., loose=True)`` is used: exact
         tokens first, then ``atac`` standing for ``atac_gas`` / ``atac_peak``.
     ds_dir : keyword-only; the dataset folder. When ``modalities`` is None and
-        several variants exist for ``category``, the ONE whose input files are
+        several variants exist for ``category``, the one whose input files are
         all present in this folder is chosen; None (or a folder that settles
         nothing) leaves the choice ambiguous.
 
@@ -204,9 +201,9 @@ def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
     """The on-disk spelling of a dataset folder name under ``base``.
 
     On a case-insensitive filesystem (macOS, Windows) ``data/d52`` opens the
-    ``D52`` folder, so a lower-case id used to pass every check and then
-    travel into frames, ``out_dir`` names and saved records as ``'d52'`` - a
-    second dataset once concatenated with rows keyed ``'D52'``, and a name
+    ``D52`` folder, so a lower-case id would pass every existence check and
+    then travel into frames, ``out_dir`` names and saved records as ``'d52'``
+    - a second dataset once concatenated with rows keyed ``'D52'``, and a name
     that fails on Linux. The folder listing is the authority: when no entry
     is spelled exactly ``dataset`` but exactly one differs only in case, that
     entry's spelling is returned (with a ``UserWarning`` saying so).
@@ -214,7 +211,7 @@ def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
     Parameters
     ----------
     base : path
-        The folder that CONTAINS the dataset folders.
+        The folder that contains the dataset folders.
     dataset : str
         The id as the caller wrote it.
     stacklevel : int, keyword-only
@@ -306,13 +303,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
         Registry id (``KeyError`` with a did-you-mean hint otherwise).
     modalities : list[str] | set[str] | None, keyword-only
         The variant's modality tokens (see ``method_info(m)['supports']``);
-        ``protein`` is accepted for ``adt``, and ``atac`` for ANY ATAC
-        representation role (``atac_gas`` / ``atac_peak`` - the file is the
-        same ``atac.h5`` on disk; the representation the method wants is
-        ``method_info(m)['atac']``). Unknown tokens raise ``ValueError``
-        naming the vocabulary. ``None`` (default): the folder decides, see Notes.
+        ``protein`` is accepted for ``adt``, and ``atac`` for any ATAC
+        representation role (``atac_gas`` / ``atac_peak``; the representation
+        the method wants is ``method_info(m)['atac']``). Unknown tokens raise
+        ``ValueError`` naming the vocabulary. ``None`` (default): the folder
+        decides, see Notes.
     data_path : Path | str | None, keyword-only
-        Root that CONTAINS the dataset folder; default
+        Root that contains the dataset folder; default
         ``config.DEFAULT.data_path``. A relative root is resolved against the
         current directory, so the returned paths are absolute.
     check : bool | None, keyword-only
@@ -357,27 +354,19 @@ def inputs_for(dataset: str, category: str, method: str, *,
     The dataset tree is flat (``<data_path>/<dataset>/<file>``). Each role is
     resolved to the actual file present in that dir (the role token, or a
     known alias such as ``atac_peak``->``peak.h5`` / ``atac_gas``->``atac.h5``),
-    falling back to ``<role>.h5`` when no candidate exists. Every returned
-    path is ABSOLUTE (``data_path='data'`` relative to the current directory
-    included): ``run`` executes the method with ``cwd=out_dir``, where a
+    falling back to ``<role>.h5`` when no candidate exists. The paths are
+    absolute because ``run`` executes the method with ``cwd=out_dir``, where a
     relative path would point at the wrong place.
 
-    The 0.2 order ``(dataset, method, category)`` is deprecated and rejected
-    with a ``TypeError`` that says so (it is never accepted silently).
-
-    Variant selection: if ``modalities`` is given, the variant matching
-    ``(category, set(modalities))`` is selected via ``spec.select`` (exact
-    tokens first; then ``atac`` standing for ``atac_gas`` / ``atac_peak`` when
-    that leaves exactly one variant). If ``modalities`` is None and exactly
-    one variant matches ``category``, that variant is used. If ``modalities``
-    is None and MORE than one variant matches ``category``, the dataset folder
-    decides: when exactly ONE of them has every input file present on disk,
-    it is used (Matilda on a ``rna.h5 + adt.h5`` folder is its rna+adt
-    variant). When none or several do, ``ValueError``
-    (``mtb.AmbiguousVariantError``) is raised listing the available
-    modality-sets and the folder contents and asking the caller to
-    disambiguate with ``modalities=``. If no variant matches ``category``, a
-    ``KeyError`` is raised.
+    Variant selection. With ``modalities``, the variant matching
+    ``(category, set(modalities))`` is selected (exact tokens first; then
+    ``atac`` standing for ``atac_gas`` / ``atac_peak`` when that leaves
+    exactly one variant). Without it, a single variant for ``category`` is
+    used; when there are several, the dataset folder decides: the one that has
+    every input file present on disk is used (Matilda on a
+    ``rna.h5 + adt.h5`` folder is its rna+adt variant). When none or several
+    do, ``mtb.AmbiguousVariantError`` lists the available modality-sets and
+    the folder contents and asks for ``modalities=``.
 
     ``check=True`` runs the content preflight: the matrix-orientation check
     (``ValueError`` for a cells x features file), the label-length check
@@ -390,7 +379,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     slice lacks an ``obs`` column the variant declares in ``slice_obs`` -
     GPSA's ``Ground_Truth``; when scBridge's bare filenames are absent). This
     is what ``mtb.scan`` reports per row as ``files_ok`` / ``files_reason``.
-    A missing ATAC-family file names the sibling that IS there (a folder
+    A missing ATAC-family file names the sibling that is there (a folder
     exported with ``atac_peak.h5`` when a vertical variant reads ``atac.h5``).
 
     See Also
@@ -440,22 +429,22 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
 
 # Every on-disk base name an ATAC-family role may be looked up under, so a
-# near miss can be named: the user exported peaks as atac_peak.h5 (what
-# describe_layout('diagonal') says) and a VERTICAL variant asks for atac.h5.
+# near miss can be named: peaks exported as atac_peak.h5 when a vertical
+# variant asks for atac.h5.
 _ATAC_FILE_BASES = ("atac", "atac_peak", "atac_gas", "peak")
 
 
 def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
-    """For each missing ATAC-family role, name the sibling file that IS there.
+    """For each missing ATAC-family role, name the sibling file that is there.
 
-    A vertical variant reads ``atac.h5``; the diagonal/mosaic roles read
-    ``atac_gas.h5`` (falling back to ``atac.h5``) / ``atac_peak.h5`` (falling
-    back to ``peak.h5``). A folder exported for the other layout therefore
-    fails with a bare "atac.h5 not found" although ``atac_peak.h5`` sits right
-    next to it. Return one hint per such role, e.g. ``"atac.h5 not found;
-    found atac_peak.h5 - vertical methods read atac.h5 (pass the representation
-    this method wants: see method_info(m)['atac'])"``; nothing for roles that
-    are not ATAC or have no sibling.
+    The ``atac`` role reads ``atac.h5``; ``atac_gas`` reads ``atac_gas.h5``
+    (falling back to ``atac.h5``) and ``atac_peak`` reads ``atac_peak.h5``
+    (falling back to ``peak.h5``). A folder exported for the other layout
+    would otherwise fail with a bare "atac.h5 not found" although
+    ``atac_peak.h5`` sits next to it. Return one hint per such role, e.g.
+    ``"atac.h5 not found; found atac_peak.h5 - vertical methods read atac.h5
+    (pass the representation this method wants: see method_info(m)['atac'])"``;
+    nothing for roles that are not ATAC or have no sibling.
     """
     hints: list[str] = []
     if not ds_dir.is_dir():
@@ -479,14 +468,14 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
 
 
 def benchmark_host_only_reason(entrypoint) -> str:
-    """Why a script whose entrypoint is an ABSOLUTE path cannot run here.
+    """Why a script whose entrypoint is an absolute path cannot run here.
 
     Such an entrypoint names one machine's filesystem - the benchmark host -
     so no download can supply it (``MethodSpec.availability ==
     'benchmark-host-only'``; SPIRAL). This is the ``files_reason`` text
-    ``scan`` should report for those rows; it starts with the machine-readable
+    ``scan`` reports for those rows; it starts with the machine-readable
     prefix :data:`BENCHMARK_HOST_ONLY`. Returns ``""`` when the path is
-    relative or actually exists (then the script IS reachable).
+    relative or exists (then the script is reachable).
     """
     ep = Path(entrypoint)
     if not ep.is_absolute() or ep.exists():
@@ -507,8 +496,8 @@ def _sniff_h5(path: str, mtime_ns: int):
     """Read (shape, n_features, n_cells) of a canonical .h5, cached by mtime.
 
     scan() runs the orientation preflight once per (method, variant) row, so
-    the same handful of files used to be opened and sniffed dozens of times
-    per call; the mtime key keeps the cache honest across rewrites.
+    the same few files would otherwise be opened many times per call; the
+    mtime key invalidates an entry when the file is rewritten.
     """
     import h5py
 
@@ -530,17 +519,15 @@ def _sniff_h5(path: str, mtime_ns: int):
 def _check_orientation(method, dataset, category, resolved):
     """Reject a transposed matrix at preflight instead of many minutes later.
 
-    Modality files store ``matrix/data`` as (features x cells). Storing it the
-    other way round is the easy mistake - cells x features is the scanpy/AnnData
-    convention, and describe_layout only says "the matrix under matrix/data"
-    without stating an orientation. The file-existence check cannot see it, so
-    the method is dispatched, pays its conda-env startup (and for a slow method
-    potentially hours of compute) and only then dies inside third-party code
-    with an error that does not mention orientation at all.
+    Modality files store ``matrix/data`` as (features x cells); cells x
+    features, the scanpy/AnnData convention, is the easy mistake. The
+    file-existence check cannot see it, so the method would start, pay its
+    conda-env startup (and possibly hours of compute) and only then fail inside
+    third-party code with an error that does not mention orientation.
 
-    ``matrix/features`` and ``matrix/barcodes`` pin the intended orientation
+    ``matrix/features`` and ``matrix/barcodes`` fix the intended orientation
     without reference to the labels, so this is checkable up front. A square
-    matrix is genuinely ambiguous and is left alone.
+    matrix is ambiguous and is left alone.
     """
     for path in resolved.values():
         p = Path(path)
@@ -620,7 +607,7 @@ def _batch_label_file(role: str, path) -> tuple[str, Path] | None:
 
     Cross and mosaic datasets label each batch in ``cty<i>.csv`` next to
     ``rna<i>.h5`` / ``adt<i>.h5`` / ``atac<i>.h5``. No cross method takes
-    that file as an INPUT role - only the evaluator reads it - so the
+    that file as an input role - only the evaluator reads it - so the
     role-driven pairing never sees it; the sibling is looked up on disk.
     """
     if is_label_role(role) or role == "data_dir":
@@ -641,14 +628,14 @@ def _check_label_lengths(method, dataset, category, resolved):
     M") and the method itself may fail or, worse, silently mis-align. The
     pairing follows the role names (see :func:`_label_partners`); a file that
     cannot be parsed or a modality file without ``matrix/barcodes`` is left
-    alone - no verdict is invented.
+    alone.
 
     Numbered batch files are checked too: ``cty<i>.csv`` (when present next
     to the modality file) against ``rna<i>.h5`` / ``adt<i>.h5`` /
     ``atac<i>.h5`` of the same batch ``i`` - the layout every cross and mosaic
-    method reads, although none of them lists ``cty<i>`` as an input role, so
-    a truncated ``cty1.csv`` used to pass :func:`multibench.scan` with
-    ``files_ok=True`` and only fail inside ``evaluate`` after the run.
+    method reads, although none of them lists ``cty<i>`` as an input role.
+    Without this a truncated ``cty1.csv`` passes :func:`multibench.scan` with
+    ``files_ok=True`` and only fails inside ``evaluate`` after the run.
     """
     for role, path in resolved.items():
         pair = _batch_label_file(role, path)
@@ -704,13 +691,13 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
     """Does a ``data_dir`` really hold what the method needs? -> (ok, why).
 
     ``data_dir`` resolves to the dataset directory itself when there is no
-    ``processed/`` subdir, so the path ALWAYS exists and existence proves
+    ``processed/`` subdir, so the path always exists and existence proves
     nothing. Spatial-registration methods (``output.kind == 'coords'``) need
     >= 2 ``*.h5ad`` slices, each carrying ``obsm['spatial']`` coordinates (the
     upstream scripts glob ``data_dir + '*.h5ad'`` and align ``.obsm['spatial']``)
     and every ``obs`` column the variant declares in ``slice_obs`` (GPSA's
     driver reads ``obs['Ground_Truth']`` from each slice at load, so a folder
-    without it used to pass scan and die after the env build); other
+    without it would otherwise pass scan and fail after the env build); other
     ``data_dir`` methods (scBridge) name their files via ``const`` args.
     """
     d = Path(data_dir)
@@ -774,16 +761,15 @@ def _peak_fraction_of(path: Path) -> float | None:
 def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
     """Non-fatal content observations about resolved inputs (never raises).
 
-    Without ``atac`` (the legacy call) one check runs: when the ``atac_gas``
-    role fell back to ``atac.h5`` (no ``atac_gas.h5`` present) and >= 90% of
-    the first 50 feature names look like peaks (``chr1:1-200`` /
-    ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`. Methods that want peaks
-    behind that role name (``atac: peak`` in the registry) are fine;
-    :func:`multibench.scan` applies the caveat only to the ones that want gene
-    activity.
+    Without ``atac`` (wanted representation unknown) one check runs: when the
+    ``atac_gas`` role fell back to ``atac.h5`` (no ``atac_gas.h5`` present) and
+    >= 90% of the first 50 feature names look like peaks (``chr1:1-200`` /
+    ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`. This cannot tell a
+    method that wants peaks behind that role name (``atac: peak`` in the
+    registry), so :func:`multibench.scan` always passes ``atac=``.
 
     With ``atac=`` - the representation the method expects,
-    ``method_info(m)['atac']`` (``'peak'`` / ``'gene_activity'``) - EVERY
+    ``method_info(m)['atac']`` (``'peak'`` / ``'gene_activity'``) - every
     ATAC-family role (``atac``, ``atac_peak``, ``atac_gas``, ``atac1``...) is
     judged against it, whatever the role name says:
 
@@ -794,8 +780,8 @@ def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
       :data:`GAS_FED_TO_PEAK_CAVEAT` (e.g. moETM/scMM/iPOLNG, whose ``atac_gas``
       role resolved to a real gene-activity ``atac_gas.h5``).
 
-    The 10-90% band (mixed names) yields no verdict. The wrong representation
-    runs to completion and returns a plausible but WRONG embedding, which is
+    The 10-90% band (mixed names) yields no caveat. The wrong representation
+    runs to completion and returns a plausible but wrong embedding, which is
     why these are surfaced at scan time.
     """
     out: list[str] = []
@@ -828,7 +814,7 @@ def _label_sort_key(stem: str):
     """Sort key giving the benchmark's cell-stacking order of label files.
 
     1. ``cty`` (one file, paired cells) first;
-    2. ``cty<N>`` numbered per batch, ascending NUMERICALLY (cty1, cty2, cty10);
+    2. ``cty<N>`` numbered per batch, ascending numerically (cty1, cty2, cty10);
     3. ``<modality>_cty`` in the canonical modality order rna, adt, atac
        (``peak_cty`` is treated as atac) - the order in which the diagonal /
        vertical methods stack their cells in the embedding (RNA cells first,
@@ -884,19 +870,19 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; validated
         whenever given (``ValueError`` listing the four on a typo). With
         ``method`` it selects the variant whose modality order ranks the
-        files; alone it changes nothing (labels are per DATASET). Default
+        files; alone it changes nothing (labels are per dataset). Default
         ``None``.
     method : str | None
         Registry id, validated whenever given (``KeyError`` with a
         did-you-mean hint on a typo). With ``category`` the files are
         ordered by that variant's modality order (the variant is chosen like
         ``inputs_for`` does - ``modalities=``, else the one the folder's
-        files satisfy); the SET of files never depends on it. Default ``None``.
+        files satisfy); the set of files never depends on it. Default ``None``.
     modalities : list[str] | set[str] | None, keyword-only
         The variant's modality tokens, used only with ``category`` +
         ``method`` to pick one of several variants. Default ``None``.
     data_path : Path | str | None, keyword-only
-        Root that CONTAINS the dataset folder; default
+        Root that contains the dataset folder; default
         ``config.DEFAULT.data_path``.
 
     Returns
@@ -934,9 +920,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     ``cty1.csv``, ...). The primary label files are returned (excluding
     tool-specific ``*_scjoint*`` reformats), keyed by filename stem.
 
-    Order of the returned dict (it is NOT alphabetical): the order in which
-    the methods stack the labelled cells in their output, so that the dict
-    can be handed to ``mtb.evaluate(labels=...)`` for a multi-file dataset -
+    The stacking order is NOT alphabetical:
 
     1. ``cty`` (one file, cells already paired) first;
     2. numbered ``cty1, cty2, ..., cty10`` ascending NUMERICALLY (batch order);
@@ -946,19 +930,14 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
        ``D28`` returns ``{'rna_cty': ..., 'atac_cty': ...}``;
     4. any other ``*cty*`` file alphabetically, last.
 
-    When ``category`` AND ``method`` are given the variant's OWN argument
+    When ``category`` and ``method`` are given the variant's own argument
     order decides instead (``modalities=`` disambiguates a method with several
     variants in that category; if it is still ambiguous the canonical order
     above is used): a label file is placed where the modality it labels sits
-    in the variant's inputs. Pass the single path - or, for a multi-file
-    dataset, ``list(labels_for(ds).values())`` in that order - to
-    ``mtb.evaluate(labels=...)``: a dict from ``labels_for`` goes in as is,
-    in its stacking order. Raises ``FileNotFoundError`` if the dataset dir is
-    absent. Paths are absolute.
+    in the variant's inputs.
 
-    The 0.2 order ``(dataset, method, category)`` - and the 0.2 positional
-    ``data_path`` in the 2nd slot - are deprecated and rejected with a
-    ``TypeError`` that says so; neither is accepted silently.
+    ``mtb.evaluate(labels=...)`` takes the dict as is, or
+    ``list(labels_for(ds).values())`` in the same order.
 
     See Also
     --------
