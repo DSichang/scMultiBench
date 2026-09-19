@@ -1,19 +1,17 @@
-"""Package-side driver for Matilda's supported object API (`matilda-sc`).
+"""multibench driver for Matilda, using its object API (`matilda-sc`).
 
-Why a driver: the upstream pair `tools_scripts/Matilda/main_matilda_{train,task}.py`
-only ran the TRAIN stage under our wiring, so Matilda never emitted an embedding
-(it was the one method listed as "train-stage only"). Matilda's documented API
-(https://pyanglab.github.io/Matilda/) is the object API — `matilda.train()` to fit
-the shared model, then one verb per task over a combinable `matilda.task()`.
+Wiring the upstream `tools_scripts/Matilda/main_matilda_train.py` alone runs only
+the train stage, which writes no embedding. Matilda's documented API
+(https://pyanglab.github.io/Matilda/) is the object API: `matilda.train()` fits
+the shared model, then `matilda.task()` runs any combination of tasks on it.
 
-This driver trains once and then runs dimension-reduction + classification in a
-SINGLE engine pass (the model loads once), writing:
+The driver trains once, then runs dimension reduction + classification in one
+pass (the model loads once), writing:
   <save_path>/embedding.h5   dataset "data"  -> the integrated latent space (cells x z_dim)
   <save_path>/predict.csv                    -> per-cell predictions (when available)
 
-Modality mode is auto-detected by Matilda from what we pass: rna+adt = CITE-seq,
-rna+atac = SHARE-seq, rna+adt+atac = TEA-seq, rna alone = rna_only. No upstream
-method script is modified.
+Matilda picks the mode from the modalities passed: rna+adt = CITE-seq,
+rna+atac = SHARE-seq, rna+adt+atac = TEA-seq, rna alone = rna_only.
 """
 from __future__ import annotations
 
@@ -35,7 +33,7 @@ def _load(path):
 
 def main() -> None:
     p = argparse.ArgumentParser("matilda-driver")
-    # injected by the runner for driver variants; unused (we use the installed package)
+    # passed by the runner to every driver; unused (the installed package is imported)
     p.add_argument("--script_dir", default=None)
     p.add_argument("--rna", required=True)
     p.add_argument("--adt", default=None)

@@ -1,4 +1,4 @@
-# AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_params.py
+# AUTO-GENERATED - do not hand-edit; regenerate with multibench/tools/gen_params.py
 #
 # Doc-only tunable hyperparameters, extracted from each upstream method
 # script's own argparse. These are never added to a command line by the

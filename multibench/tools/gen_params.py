@@ -54,7 +54,7 @@ for s in registry.load():
         if tun:
             out.setdefault(s.id, {})[vkey(v)] = tun
 
-hdr = ("# AUTO-GENERATED - do not hand-edit; regenerate with tools/gen_params.py\n"
+hdr = ("# AUTO-GENERATED - do not hand-edit; regenerate with multibench/tools/gen_params.py\n"
        "#\n"
        "# Doc-only tunable hyperparameters, extracted from each upstream method\n"
        "# script's own argparse. These are never added to a command line by the\n"

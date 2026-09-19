@@ -1,46 +1,43 @@
-# Explicit method -> real installed conda env. Verified by import-testing the
-# actual envs on the host; takes precedence over the generated `groups` below
-# (whose scmb_* names are largely fictional / never built). [v]=deps verified to
-# import; [broken]=correct target env but its import is broken (ABI/version) and
-# needs a fix; R methods now on scmb_r (rliger/StabMap built); only Conos needs r-conos.
+# method_env: method -> the conda env that runs it; each has a lockfile in
+# env_locks/. An entry here takes precedence over `groups` membership below.
 method_env:
-  Seurat_v5: scmb_seurat5          # [v] Seurat 5 + Signac bridge stack
-  Seurat_v3: scmb_seurat4b   # [v] Seurat 4.3.0.1 + SeuratObject 4.1.4 (5.x breaks RunCCA); clone of scmb_seurat4 w/ SeuratObject downgraded; RUN-VERIFIED D28
-  Seurat_WNN: scmb_seurat5         # [v]
-  MIRA: scmb_mira           # [v]
-  Portal: scmb_torch_v2     # [v]
-  totalVI: scmb_scvi        # [v] scvi-tools 1.3.3 TOTALVI
-  MultiVI: scmb_multivi      # [v] dedicated env scvi-tools 0.20.3 (older API; RUN-VERIFIED on D45)
-  scMSI: scmb_scmsi         # [v] dedicated torch 1.9.1+CPU; RUN-VERIFIED on D7 (D1 hits internal batch=1 BatchNorm; D7 cell count avoids it)
-  scBridge: scmb_torch      # [v] generic torch+scanpy, RUN-VERIFIED on D28 (rna+atac_gas, gene-aligned, +harmonypy 0.0.9, --umap_plot disables figure)
-  Concerto: scmb_concerto    # [v] uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
-  VIMCCA: scmb_vimcca       # [v] scbean==0.5.6 + TF2.4 + tfp0.12.2
-  UnitedNet: unitednet      # [v] RUN-VERIFIED on D45 (train+test+labels)
-  SPIRAL: spiral_environment # [v]
-  PASTE: paste_envi         # [v] user env: paste-bio + POT(TorchBackend) + torch CUDA; spatial registration on D63
-  PASTE2: paste_envi        # [v] paste_envi has paste2==1.0.1 (PASTE2/projection); spatial registration
-  GPSA: scmb_gpsa2          # [v] clone of GPSA_environment: numpy 1.26.4 + h5py 3.10/sklearn 1.4.1 (orig env had unsatisfiable numpy 1.21.6 pin) + torch 2.2.2+cu118 (2.6 wheel rejects numpy<2 in from_numpy) + numba 0.59.1 + gpytorch/linear_operator/jaxtyping/morphops/kneed installed into-env (orig used .local eggs, broke under PYTHONNOUSERSITE=1); RUN-VERIFIED on D63
-  MOFA2: MOFA2_env          # [v] R MOFA2 + RETICULATE_PYTHON=mofa_env_gpu/bin/python; RUN-VERIFIED on D2
-  sciPENN: env_sciPENN       # [v] user existing env: torch 1.13.1+cu117, supports up to sm_86
-  SMILE: env_sciPENN        # [v] anndata 0.8.0/scanpy 1.9.3/numpy 1.21.6 thread BOTH np.matrix-coerce + bytes-varnames needles; RUN-VERIFIED on D45 (32151x20)
-  Cobolt: scmb_cobolt3      # [v] clone of scmb_cobolt w/ numpy 1.21.6 (np.quantile(np.matrix) bug needs numpy<1.22); RUN-VERIFIED on D45
-  Matilda: matilda          # [v] user existing env: torch + matilda local imports OK
-  scMM: scmb_scmm2          # [v] old stack: torch 1.7.1 + torchnet 0.0.4 (documented)
-  scMDC: scmb_scmdc         # [v] numpy<2+torch+munkres, RUN-VERIFIED on D2 with --nbatch 1 (single-batch fix)
-  sciCAN: scmb_scican       # [v] rebuilt +tensorflow+easydl; RUN-VERIFIED on D28 (gene-aligned atac_gas)
-  Multigrate: scmb_multigrate2 # [v] fresh env: multigrate==0.0.2 + pinned torchmetrics<0.11/anndata<0.9/scanpy<1.10
-  scJoint: scmb_scjoint     # [v] numpy<1.24 (np.float restored); needs pty (script -q); RUN-VERIFIED on D28
-  VIPCCA: scmb_vipcca27     # [v] vipcca==0.2.7 (documented; tools+model import OK)
-  iPOLNG: scmb_ipolng2      # [v] rebuilt env: iPoLNG 0.0.2 + pyro 1.8.1 + torch 1.13.1+cu117 (runs on 4090/sm_89) + numpy 1.23.5 + h5py 3.8.0. Old scmb_ipolng was DOUBLY broken (h5py 3.14 vs numpy 1.21 -> can't read float64; torch 1.11+cu102 -> no sm_89 kernels) and was deleted.
-  scMVP: scmb_scmvp4        # [v] conda py3.7 + pytorch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
-  UINMF: scmb_r             # [v] fresh R env: rliger 2.2.1 (compiled from source)
-  iNMF: scmb_r              # [v] rliger 2.0.1 RUN-VERIFIED on D27 (rna+atac_gas)
-  online_iNMF: scmb_r       # [v] rliger 2.0.1 RUN-VERIFIED on D27 (rna+atac_gas)
-  StabMap: scmb_r           # [v] bioconductor-stabmap
+  Seurat_v5: scmb_seurat5          # Seurat 5.4.0 + Signac bridge stack
+  Seurat_v3: scmb_seurat4b         # Seurat 4.3.0.1 + SeuratObject 4.1.4 (5.x breaks RunCCA)
+  Seurat_WNN: scmb_seurat5
+  MIRA: scmb_mira
+  Portal: scmb_torch_v2
+  totalVI: scmb_scvi               # scvi-tools 1.3.3
+  MultiVI: scmb_multivi            # scvi-tools 0.20.3 (the script uses the older API)
+  scMSI: scmb_scmsi                # torch 1.9.1, pandas<2 (reasons in methods.yaml)
+  scBridge: scmb_torch             # generic torch + scanpy stack, plus harmonypy 0.0.9
+  Concerto: scmb_concerto          # uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
+  VIMCCA: scmb_vimcca              # scbean 0.5.6 + TensorFlow 2.4 + tensorflow-probability 0.12.2
+  UnitedNet: unitednet
+  SPIRAL: spiral_environment
+  PASTE: paste_envi                # paste-bio + POT (TorchBackend) + torch
+  PASTE2: paste_envi               # paste2==1.0.1 (PASTE2/projection)
+  GPSA: scmb_gpsa2                 # numpy 1.26.4 + h5py 3.10 + scikit-learn 1.4.1 (a numpy 1.21.6 pin is unsatisfiable with them) + torch 2.2.2+cu118 (the 2.6 wheel rejects numpy<2 in from_numpy) + numba 0.59.1; gpytorch, linear_operator, jaxtyping, morphops and kneed are installed in the env because PYTHONNOUSERSITE=1 hides user-site copies
+  MOFA2: MOFA2_env                 # R MOFA2; mofapy2 comes from the Python named by RETICULATE_PYTHON (methods.yaml)
+  sciPENN: env_sciPENN             # torch 1.13.1+cu117 (kernels up to sm_86, which sm_89 GPUs also run)
+  SMILE: env_sciPENN               # anndata 0.8.0 + scanpy 1.9.3 + numpy 1.21.6 handle both np.matrix coercion and bytes var_names
+  Cobolt: scmb_cobolt3             # numpy 1.21.6 (np.quantile(np.matrix) needs numpy<1.22)
+  Matilda: matilda                 # torch 2.1.2; matilda-sc is installed by env_locks/matilda.post.sh
+  scMM: scmb_scmm2                 # old stack: torch 1.7.1 + torchnet 0.0.4
+  scMDC: scmb_scmdc                # numpy<2 + torch + munkres
+  sciCAN: scmb_scican              # torch + tensorflow + easydl
+  Multigrate: scmb_multigrate2     # multigrate==0.0.2 with torchmetrics<0.11, anndata<0.9, scanpy<1.10
+  scJoint: scmb_scjoint            # numpy<1.24 (the scripts use np.float)
+  VIPCCA: scmb_vipcca27            # vipcca==0.2.7
+  iPOLNG: scmb_ipolng2             # iPoLNG 0.0.2 + pyro 1.8.1 + torch 1.13.1+cu117 (runs on sm_89 GPUs; 1.11+cu102 does not) + numpy 1.23.5 + h5py 3.8.0 (h5py 3.14 with numpy 1.21 cannot read float64)
+  scMVP: scmb_scmvp4               # python 3.7 + torch 1.9.1 + numpy 1.19.5 + scanpy 1.8.2
+  UINMF: scmb_r                    # rliger 2.0.1, installed by env_locks/scmb_r.post.sh
+  iNMF: scmb_r
+  online_iNMF: scmb_r
+  StabMap: scmb_r                  # bioconductor-stabmap
 
-# Shared 'group' environments: each hosts several compatible methods.
-# Generated by the env-groups workflow; see tools/gen_env_groups.py.
-# Methods not listed in any group's members[] get their own env (singleton).
+# groups: env recipes keyed by env name; members[] lists the methods a recipe
+# serves. A method in neither method_env nor any members[] gets its own
+# scmb_<method> env.
 groups:
   scmb_torch:
     python_version: '3.9'
@@ -102,7 +99,7 @@ groups:
     - PASTE2
     excluded:
     - method: scMM
-      reason: Depends on torchnet 0.0.4, whose malformed `torch (>=1.6<1.8)` metadata both trips pip>=24.1 (legacy version specifier) and hard-caps torch<1.8, which cascades pip back to an ancient pyro-ppl sdist (setup.py shells out to `git tag` and fails). scMM is the sole user of torchnet/pyro/torchvision among the group; its old-torch stack cannot coexist with the loose modern torch shared env. Keeps its own env (scmb_scmm).
+      reason: Depends on torchnet 0.0.4, whose malformed `torch (>=1.6<1.8)` metadata both trips pip>=24.1 (legacy version specifier) and hard-caps torch<1.8, which cascades pip back to an ancient pyro-ppl sdist (setup.py shells out to `git tag` and fails). scMM is the sole user of torchnet/pyro/torchvision among the group; its old-torch stack cannot coexist with the loose modern torch shared env. Keeps its own env (scmb_scmm2).
     - method: moETM
       reason: Hard exact pins numpy==1.21.4 / scipy==1.7.1 / scanpy==1.9.1 / anndata==0.8.0 / torch==1.11.0 + scib==1.0.5 and GPU-only; these old exact pins (esp. scipy<1.8 for the removed scipy.sparse.csr.spmatrix import, torch 1.11) cannot coexist with the loose shared stack. Keeps its own env.
     - method: scMSI
@@ -113,33 +110,35 @@ groups:
       reason: Exact pins numpy==1.21.0 / torch==1.11.0 (+cu113) / pyro-ppl==1.8.1 / statsmodels==0.12.2 / importlib_resources==5.8.0 and GPU-only (.type('torch.cuda.FloatTensor') hardcoded); the old exact torch/numpy/pyro combo conflicts with the shared loose stack. Keeps its own env.
     - method: UnitedNet
       reason: Requires Python 3.8 (cpython-37/38 .pyc artifacts, official spec py3.7 + torch==1.11.0); incompatible with the shared py3.9 target. Keeps its own py3.8 env.
-    notes: 'Serves 17 of 23 torch-group candidates in one py3.9 env. Base shared stack = loose torch + scanpy + numpy<2 with additive per-method packages.
+    notes: |-
+      One py3.9 env: loose torch + scanpy + numpy<2, plus each method's own packages.
 
+      Pins:
+      - numpy<2: nearly every method here uses np.mat / np.matrix / np.infty.
+      - scalex==1.0.4 + torch>=2.2.2: scalex 1.0.2 calls np.warnings (removed in numpy 1.24) and fails
+        at import; 1.0.4 fixes that but requires torch>=2.2.2 and numpy>=1.26.4, which lies inside the
+        numpy<2 ceiling. Both are pinned because pip otherwise resolves scalex 1.0.2 + torch 1.13.1.
+      - paste2==1.0.1: PASTE2 uses the PASTE2/projection submodule API.
+      - POT>=0.9.1: required by PASTE2. PASTE's requirements.txt pins POT==0.9.0; that pin is relaxed
+        here, since paste-bio only uses the stable ot.backend.TorchBackend API.
 
-      PINS (and who forces them):
+      Every excluded method hard-pins an older torch (moETM / iPOLNG / UnitedNet 1.11.0, scMSI 1.13.1,
+      SPIRAL 2.2.0, scMM <1.8 through torchnet), below the 2.2.2 floor.
 
-      - numpy<2: forced by nearly every member (np.mat/np.matrix/np.infty usage in SCALEX, Cobolt, scMM, scMDC, scMoMaT, SMILE, uniPort, GLUE, MultiMAP, sciCAN, scJoint, sciPENN, GPSA, PASTE, PASTE2). Kept as the env-wide floor.
+      R bridge: Portal imports rpy2 + anndata2ri at module load (portal/utils.py) and uses
+      sc.pp.highly_variable_genes(flavor='seurat_v3'), hence conda r-base + pip rpy2 / anndata2ri /
+      scikit-misc (GLUE uses the same HVG flavour). bioconda is listed only to supply r-base.
 
-      - scalex==1.0.4 + torch>=2.2.2: scalex 1.0.2 calls np.warnings (removed in numpy>=1.24), so it crashes on import under the numpy 1.26.4 floor; scalex 1.0.4 fixes that but requires torch>=2.2.2 and numpy>=1.26.4. numpy>=1.26.4 sits WITHIN the numpy<2 ceiling (pip picks 1.26.4), so there is no conflict. Both must be pinned explicitly: left unpinned, pip''s resolver drifts to scalex 1.0.2 + torch 1.13.1 (the np.warnings crash). torch>=2.2.2 resolves cleanly for all 17 members (verified: -> torch 2.8.0). This single scalex pin serves SCALEX (needs the classic `from scalex import SCALEX` API, present in 1.0.4).
+      pip_git: Cobolt must come from epurdom/cobolt (the PyPI 'cobolt' is an unrelated package that
+      needs py3.12); MultiMAP from Teichlab (not reliably on PyPI).
 
-      - paste2==1.0.1: pinned by PASTE2 for the PASTE2/projection submodule API.
+      Method-specific packages: munkres (scMDC), easydl (sciCAN), xgboost (Cobolt), numba + tqdm
+      (sciPENN), networkx + POT (GPSA, PASTE2), statsmodels (PASTE2), and the pip-installable method
+      packages (scmomat, mira-multiome, uniport, scglue, sciPENN, gpsa, paste-bio). leidenalg, igraph,
+      louvain, umap-learn, seaborn and matplotlib serve the scanpy clustering paths.
 
-      - POT>=0.9.1: PASTE2 requires POT>=0.9.1; PASTE''s requirements.txt pins POT==0.9.0 and GPSA leaves POT loose. POT==0.9.0 and POT>=0.9.1 directly conflict, so PASTE''s pin is RELAXED to >=0.9.1 (paste-bio uses the stable ot.backend.TorchBackend API and tolerates the 0.9.0->0.9.1 bump). Minor risk noted; if a PASTE run regresses, PASTE can fall back to its own env.
-
-
-      torch pinned to >=2.2.2 (the floor scalex 1.0.4 requires; see above). Every EXCLUDED member was instead the source of a hard LOW torch pin (moETM/iPOLNG/UnitedNet torch==1.11.0, scMSI torch==1.13.1, SPIRAL torch==2.2.0, scMM torch<1.8 via torchnet) — none compatible with the >=2.2.2 floor, confirming their exclusion. All 17 included members accept modern torch, so pip resolves a single recent CUDA torch (verified -> 2.8.0).
-
-
-      R BRIDGE for Portal: Portal imports rpy2 + anndata2ri at module load (portal/utils.py) and uses sc.pp.highly_variable_genes(flavor=''seurat_v3''), so conda r-base + pip rpy2/anndata2ri/scikit-misc are included (scikit-misc/skmisc also benefits GLUE, which uses the same seurat_v3 HVG flavor). bioconda channel added only to source r-base.
-
-
-      pip_git kept as full URLs: Cobolt MUST come from epurdom/cobolt (the PyPI ''cobolt'' is an unrelated cobalt.tools wrapper needing py3.12); MultiMAP from Teichlab (not reliably on PyPI).
-
-
-      Additive method-specific deps folded in: munkres (scMDC), easydl (sciCAN), xgboost (Cobolt), numba+tqdm (sciPENN), networkx+POT (GPSA/PASTE2), statsmodels (PASTE2), scmomat/mira-multiome/uniport/scglue/sciPENN/gpsa/paste-bio (the pip-installable method packages). leidenalg/igraph/louvain/umap-learn/seaborn/matplotlib pulled in for the scanpy clustering paths several members touch.
-
-
-      CAVEATS unchanged by merging: many members are GPU-hardcoded (.cuda() in sciCAN, SMILE; cuda in scJoint default) and scJoint additionally loads an x86-64-only compiled util/libutility.so (won''t load on arm64 macOS) — these are runtime/platform constraints, not env-resolution conflicts, so they don''t affect inclusion. MIRA is env-OK but code-blocked (missing local logger.py); GLUE needs an external GTF file and an activated conda env at import time. Env name: scmb_torch. python 3.9 within multigrate''s 3.9-3.10 band and torch/numba wheel availability.'
+      The package list also covers Cobolt, GPSA, GLUE, MIRA and Portal, which are not members: each
+      runs in its own env (method_env above; GLUE in the glue group).
   scmb_r:
     python_version: ''
     conda_channels:
@@ -194,8 +193,22 @@ groups:
     - method: Seurat_v3
       reason: Hard-pins r-base=4.2 + r-seurat=4.3 (v4-era anchor/CCA + v4 assay model via FindTransferAnchors/TransferData); incompatible with the shared Seurat>=5.0 / r-base>=4.2 env. Keeps its own per-method env.
     - method: Seurat_WNN
-      reason: Caveat explicitly requires Seurat v4 (not v5) — WNN API (FindMultiModalNeighbors, weighted.nn neighbor slot) and the v4 assay model break under Seurat v5. Conflicts with the shared Seurat>=5.0 pin; keeps its own per-method env.
-    notes: 'Pure-R shared env (no target Python env; the only Python is mofapy2 pulled in via pip for MOFA2''s reticulate bridge since run_mofa uses use_basilisk=FALSE). Built around Seurat v5 as the common base. PINS and who forces them: r-seurat>=5.0 forced by Seurat_v5 (bridge integration API); r-base>=4.2 forced by Seurat_v5 and online_iNMF; r-rliger>=2.0.1 is the tightest of the rliger requirements (UINMF needs >=2.0.1 for the modern 2.x API: createLiger/runUINMF/quantileNorm; online_iNMF needs >=2.0.0; iNMF unpinned) — all three satisfied by >=2.0.1. numpy<2 kept because MOFA2''s pip stack (mofapy2 2023-era) needs it. r-signac is shared by Seurat_v5; r-conos+r-pagoda2 by Conos; bioconductor-stabmap+SingleCellExperiment+scran by StabMap; bioconductor-mofa2+r-reticulate+r-reshape2 by MOFA2; bioconductor-rhdf5+hdf5array are common to every member for .h5 I/O. r-rcpp/r-rcppeigen/r-matrix/hdf5 from UINMF/online_iNMF native deps. r-seuratdisk/r-hdf5r/r-biocmanager/r-devtools are additive helper deps (left loose). All CRAN+Bioconductor packages here are co-installable in one conda solve; no genuine R package conflict among the 7 members beyond the Seurat-version split handled via exclusions. MOFA2 runtime requirement: reticulate must point at this env''s Python where mofapy2 is pip-installed (set RETICULATE_PYTHON or use the env python).'
+      reason: Not served by this env; method_env runs it in scmb_seurat5.
+    notes: |-
+      R env built around Seurat v5; the only Python is mofapy2, which MOFA2 reaches through
+      reticulate because run_mofa uses use_basilisk=FALSE (point RETICULATE_PYTHON at this env's
+      Python).
+
+      Pins: r-seurat>=5.0 (Seurat_v5 bridge integration API); r-base>=4.2 (Seurat_v5, online_iNMF);
+      r-rliger>=2.0.1 (UINMF needs the 2.x API: createLiger / runUINMF / quantileNorm; online_iNMF
+      needs >=2.0.0; iNMF is unpinned); numpy<2 (mofapy2).
+
+      Packages by method: r-signac (Seurat_v5); r-conos + r-pagoda2 (Conos); bioconductor-stabmap,
+      SingleCellExperiment, scran (StabMap); bioconductor-mofa2, r-reticulate, r-reshape2 (MOFA2);
+      r-rcpp, r-rcppeigen, r-matrix, hdf5 (UINMF / online_iNMF native code); bioconductor-rhdf5 +
+      hdf5array for .h5 I/O in every method. r-seuratdisk, r-hdf5r, r-biocmanager and r-devtools are
+      unpinned helpers. The only conflict among the R methods is the Seurat version (Seurat_v3 needs
+      4.x), handled by its exclusion.
   scmb_py37:
     python_version: '3.7'
     conda_channels:
@@ -226,7 +239,18 @@ groups:
     - scMVP
     - Matilda
     excluded: []
-    notes: 'No hard pin conflicts between scMVP and Matilda; both served by one py3.7 env. Pin reasons: python=3.7 (both; scMVP setup.py + Matilda official env). pytorch=1.9.1 / torchvision=0.10.1 forced by Matilda (scMVP leaves torch unpinned, so 1.9.1 satisfies both); installed via conda-forge CPU build, cudatoolkit dropped per Matilda caveat (run --device cpu / use_cuda=False). numpy==1.19.5 forced by Matilda and satisfies scMVP''s numpy<2 (required: main_scMVP.py uses np.mat, dataset.py uses np.bool, both removed in numpy 2.x). scipy==1.7.1, pandas==1.3.4, h5py==3.1.0, scanpy==1.8.2, tqdm==4.62.3, pillow==8.4.0 all forced by Matilda (scMVP unpinned on these, so no conflict). captum==0.4.1 forced by Matilda (additive; compatible with torch 1.9.1). scikit-learn==0.22.2 forced by scMVP (hard pin in its setup.py); Matilda does not constrain sklearn so the pin is safe. anndata>=0.7, numba>=0.48, loompy, matplotlib, hyperopt==0.1.2, xlrd==1.2.0 are scMVP-only additive deps. scMVP package itself is GitHub-only (bm2-lab/scMVP) — kept as pip_git; prefer `pip install -e` of the vendored local dir at scMultiBench_ref/tools_scripts/scMVP/scMVP/ as the primary install, git+URL is the fallback. Matilda is run as in-repo scripts (no pip/conda package) from scMultiBench_ref/tools_scripts/Matilda. No bioconda needed (no R/bioconductor deps).'
+    notes: |-
+      One py3.7 env for scMVP and the Matilda scripts; their pins do not conflict.
+
+      Forced by Matilda: pytorch=1.9.1 / torchvision=0.10.1 (CPU build, so run with --device cpu;
+      scMVP leaves torch unpinned), numpy==1.19.5, scipy==1.7.1, pandas==1.3.4, h5py==3.1.0,
+      scanpy==1.8.2, tqdm==4.62.3, pillow==8.4.0, captum==0.4.1. numpy 1.19.5 also meets scMVP's
+      need for numpy<2 (main_scMVP.py uses np.mat, dataset.py np.bool).
+      Forced by scMVP: scikit-learn==0.22.2 (hard pin in its setup.py); anndata>=0.7, numba>=0.48,
+      loompy, matplotlib, hyperopt==0.1.2 and xlrd==1.2.0 are scMVP-only.
+
+      The scMVP package is GitHub-only (bm2-lab/scMVP), hence pip_git; `pip install -e` of
+      tools_scripts/scMVP/scMVP/ in the scMultiBench checkout is the alternative.
   scmb_tf:
     python_version: '3.8'
     conda_channels:
@@ -255,7 +279,17 @@ groups:
     excluded:
     - method: Concerto
       reason: Hard-requires TensorFlow 2.4.1 with a rigid numpy==1.19.5 / scanpy==1.7.1 / pandas==1.1.5 / scipy==1.5.4 / h5py==2.10.0 stack that is incompatible with the shared TF 2.8.0 env (VIMCCA/VIPCCA); TF 2.4.1's numpy~=1.19.2 pin would break the others. Keeps its own per-method env.
-    notes: 'VIMCCA and VIPCCA merge cleanly: both verified-working and both empirically need the same old-TF stack (tensorflow==2.8.0 + keras==2.8.0 + protobuf<3.20 + numpy<2), so those four pins are shared by both. tensorflow-probability==0.16.0 and astunparse are forced by VIMCCA only (scbean imports TFP and TF 2.8''s import path needs astunparse); they are additive and harmless for VIPCCA. protobuf<3.20 (both): avoids the ''Descriptors cannot be created directly'' error on TF 2.8. numpy<2 (both): VIPCCA''s data_loader uses np.mat (removed in numpy 2.x) and the old TF/scanpy stack requires it. keras==2.8.0 (both): standalone keras must match the TF 2.8 minor or imports break. Additive scientific deps (scanpy/anndata/h5py/scipy/pandas/python-igraph/louvain) left unpinned since neither member requires a specific version. Python pinned to 3.8 (group target); VIMCCA listed 3.9 but TF 2.8.0 ships cp38 wheels so 3.8 satisfies both. Apple Silicon caveat: tensorflow 2.8.0 x86 wheels may be unavailable on arm64 macOS; may need tensorflow-macos==2.8.0 + tensorflow-metal or an x86 conda/Rosetta env. Method dirs: VIMCCA at tools_scripts/VIMCCA/, VIPCCA at tools_scripts/VIPCCA/main_VIPCCA.py.'
+    notes: |-
+      TensorFlow 2.8 stack for VIPCCA and VIMCCA (scbean).
+
+      Shared pins: tensorflow==2.8.0; keras==2.8.0 (standalone keras must match the TF minor);
+      protobuf<3.20 (avoids 'Descriptors cannot be created directly' on TF 2.8); numpy<2 (VIPCCA's
+      data_loader uses np.mat). tensorflow-probability==0.16.0 and astunparse are needed by VIMCCA
+      only (scbean imports TFP; TF 2.8's import path needs astunparse). Python 3.8: TF 2.8.0 ships
+      cp38 wheels.
+
+      arm64 macOS: tensorflow 2.8.0 wheels may be unavailable; tensorflow-macos==2.8.0
+      (+ tensorflow-metal) or an x86 (Rosetta) env may be needed.
   glue:
     python_version: '3.8'
     conda_channels:
@@ -268,7 +302,7 @@ groups:
     - networkx
     members:
     - GLUE
-    notes: 'GLUE needs scglue (the shared scmb_torch env lacks it) and a gencode GTF (gencode.v43.*.annotation.gtf.gz) present in the run working dir. Verified end-to-end on D27 -> (21434, 50) embedding via the existing `glue` conda env.'
+    notes: 'scglue==0.3.2 plus a gencode GTF (gencode.v43.*.annotation.gtf.gz) in the run working directory.'
   env_moETM:
     python_version: '3.9'
     conda_channels:
@@ -280,4 +314,4 @@ groups:
     - h5py
     members:
     - moETM
-    notes: 'moETM runs in the existing env_moETM conda env (torch + scanpy stack). Verified end-to-end on D1 (rna+adt) -> (26169, 100) embedding in 58s.'
+    notes: 'torch + scanpy stack for moETM.'

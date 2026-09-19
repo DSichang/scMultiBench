@@ -1,13 +1,11 @@
 #!/usr/bin/env Rscript
-# Package-side thin driver for StabMap.
+# multibench driver for StabMap.
 #
-# WHY THIS EXISTS: upstream tools_scripts/StabMap/main_StabMap.Rmd defines
-# run_StabMap()/helpers but has NO top-level call (it is meant to be `source()`d
-# from an external R driver, per the commented example in that file). The
-# package builder only does `Rscript <entrypoint> <args>`, which would just
-# define functions and exit. This driver sources the UPSTREAM .Rmd verbatim
-# (so the method script stays byte-identical to upstream) and invokes
-# run_StabMap() with file_paths assembled from CLI args.
+# Upstream tools_scripts/StabMap/main_StabMap.Rmd defines run_StabMap() and
+# helpers but has no top-level call (it is meant to be `source()`d, per the
+# commented example in that file), so `Rscript <entrypoint> <args>` would only
+# define functions and exit. This driver sources the unmodified .Rmd and calls
+# run_StabMap() with file_paths assembled from the command-line arguments.
 #
 # Args (all flagged; --rna/--adt/--atac repeatable, one file each):
 #   --script_dir <dir>     dir containing main_StabMap.Rmd + util.R (upstream)
@@ -33,9 +31,9 @@ while (i <= length(args)) {
 }
 stopifnot(!is.null(script_dir), !is.null(save_path), !is.null(reference))
 
-# absolutize file paths BEFORE setwd (they may be relative to the caller cwd)
+# Make file paths absolute before setwd (they may be relative to the caller's cwd).
 # "None" marks a batch with no file in this slot; it is a placeholder, not a
-# path, so it must survive absolutisation to keep the per-batch positions.
+# path, so it is passed through to keep the per-batch positions.
 is_gap  <- function(p) p %in% c("None", "NULL", "NA", "none")
 abspath <- function(p) if (is_gap(p)) p else normalizePath(p, mustWork = TRUE)
 if (length(rna))  rna  <- vapply(rna,  abspath, "")
@@ -48,10 +46,9 @@ setwd(script_dir)                 # so main_StabMap.Rmd`s source("util.R") resol
 source("main_StabMap.Rmd")        # defines run_StabMap + helpers (upstream, unmodified)
 
 
-# Build a per-batch list preserving GAPS: the token "None" (or "NULL"/"NA") marks
-# a batch that lacks this modality, and becomes a real NULL at that position.
-# StabMap indexes these lists by batch, so a collapsed list silently pairs a
-# modality with the wrong batch.
+# Build a per-batch list that preserves gaps: "None" (or "NULL"/"NA") becomes a
+# real NULL at that position. StabMap indexes these lists by batch, so a
+# collapsed list silently pairs a modality with the wrong batch.
 slot_list <- function(v) {
   if (length(v) == 0) return(NULL)
   out <- vector("list", length(v))
