@@ -1,8 +1,8 @@
-"""Exhaustive verification of the multibench public API.
+"""Smoke checks of the multibench public API on the benchmark host.
 
-Every genuine public entry is exercised with real inputs. Destructive operations
-run in dry-run. Stdlib re-exports (Path, annotations, dataclass, field) are
-excluded as non-API. Ends with a coherent multi-scenario plotting chain.
+Public entry points are called with real inputs (the paths below); env
+installation runs as a dry run. Ends with the four-scenario plotting chain.
+Prints a PASS/FAIL table and writes ``api_verify.json``.
 """
 import warnings, json, inspect, tempfile, os, traceback
 warnings.filterwarnings("ignore")
@@ -151,7 +151,7 @@ def _():
         g.create_dataset("features", data=np.array([b"chr1_1_200", b"chr1_300_400", b"chr2_5_9"]))
     mtb.io.normalize_peak_names(src, dst); return os.path.exists(dst)
 
-# ---------------- env (the five public names; the rest left env.__all__ in 0.3.0) ----------------
+# ---------------- env (the five public names) ----------------
 @check("env.__all__ / dir")
 def _():
     assert mtb.env.__all__ == ["status", "plan", "install", "doctor", "recipe"], mtb.env.__all__
@@ -284,7 +284,7 @@ def _():
 def _():
     return [n for n in dir(mtb.plot.style) if not n.startswith("_")][:6]
 
-# ---------------- COHERENT END-TO-END PLOT (all 4 scenarios) ----------------
+# ---------------- end-to-end plot (all four scenarios) ----------------
 @check("COHERENT: 4-scenario combined figure")
 def _():
     frames = []

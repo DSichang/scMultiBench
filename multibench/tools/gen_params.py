@@ -1,6 +1,6 @@
 """Generate engine/params.yaml: doc-only tunable hyperparams per method variant,
-extracted from each UPSTREAM script's argparse (python) / commandArgs (R).
-Never emitted on a command line - surfaced by multibench.params_for()."""
+extracted from the ``add_argument`` calls of each upstream script. The recorded
+defaults are never put on a command line; multibench.params_for() surfaces them."""
 import warnings, os, re, json; warnings.filterwarnings("ignore")
 from multibench.engine import registry
 

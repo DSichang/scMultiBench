@@ -7,7 +7,7 @@ Quickstart
     import multibench as mtb
 
     mtb.list_categories()            # the four integration scenarios
-    print(mtb.describe_layout())     # how to lay out YOUR dataset
+    print(mtb.describe_layout())     # how to lay out your dataset
 
     mtb.scan("MYDATA")               # which methods can run on it (and why not the rest)
 
@@ -65,7 +65,7 @@ def _runtime_of(method: str) -> dict:
     return method_info(method)["runtime"]
 
 
-# Deprecated 0.2 spellings, kept for ONE release: each warns (DeprecationWarning)
+# Deprecated 0.2 spellings, kept for one release: each warns (DeprecationWarning)
 # and forwards. They stay reachable as attributes but are not in __all__ and
 # do not show in dir(mtb).
 plan = _deprecated_alias("plan", "scan", scan)
