@@ -39,7 +39,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Tidy frame (``metric, value, method, dataset, category``) - the same
+        Tidy frame with columns ``method, metric, value``; ``dataset`` is
+        optional (without it the frame counts as one dataset) - the same
         frame ``mtb.load_results``, ``mtb.to_long`` and the
         ``BatchResult.long`` property produce. Concatenate several datasets'
         frames to summarise across them.
@@ -71,7 +72,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
           max-rank(mean over datasets of within-dataset max-rank))`` - the
           per-dataset ranks are averaged per metric, the mean ranks are
-          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          re-ranked across methods, averaged over metrics and min-max scaled.
           A method absent from a dataset scores rank 0 there (the paper's
           summary rule), which pulls it down.
         * ``"mean_overall"`` (bar's default): ``mean over datasets of

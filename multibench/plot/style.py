@@ -49,7 +49,7 @@ OVERALL_DOC = """\
         * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
           max-rank(mean over datasets of within-dataset max-rank))`` - the
           per-dataset ranks are averaged per metric, the mean ranks are
-          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          re-ranked across methods, averaged over metrics and min-max scaled.
           A method absent from a dataset scores rank 0 there (the paper's
           summary rule), which pulls it down.
         * ``"mean_overall"`` (bar's default): ``mean over datasets of
@@ -96,9 +96,10 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
 def mean_rank_matrix(parts: dict) -> pd.DataFrame:
     """Average the per-dataset rank matrices from :func:`per_dataset_ranks`.
 
-    Rows are the union of methods; a method absent from a dataset scores rank
-    0 there (as in the paper's summary), but only for the metrics that dataset
-    actually computed - each metric is averaged over the datasets that have it.
+    Rows are the union of methods; a method absent from a dataset, or lacking
+    a metric there, scores rank 0 (as in the paper's summary), but only for
+    the metrics that dataset computed - each metric is averaged over the
+    datasets that have it.
     """
     mats = list(parts.values())
     if not mats:

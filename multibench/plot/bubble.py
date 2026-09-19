@@ -178,9 +178,10 @@ class BubbleTable:
 
 def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
     """method x metric matrix: raw means (``"dataset"``) or the mean of the
-    within-dataset max-ranks (``"summary"``; absent method = rank 0, each
-    metric averaged over the datasets that computed it). The summary math
-    lives in :mod:`multibench.plot.style` and is shared with ``plot.bar``."""
+    within-dataset max-ranks (``"summary"``; absent method or n/a cell =
+    rank 0, each metric averaged over the datasets that computed it). The
+    summary math lives in :mod:`multibench.plot.style` and is shared with
+    ``plot.bar``."""
     if aggregate == "summary":
         return style.mean_rank_matrix(style.per_dataset_ranks(df))
     return df.pivot_table(index="method", columns="metric", values="value",
@@ -322,10 +323,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     simply absent: the family *Overall* averages the ranks of the metrics
     the method has (``mean`` skips NaN - a method scored on 3 of 4 metrics
     is compared on those 3), and a column's ranks count only the methods
-    scored in that column. Under ``aggregate="summary"`` the paper's rule
-    applies instead: an ``n/a`` cell within a dataset is rank 0 there.
-    Neither rule is visible in the numbers, so ``na`` sets how it is
-    reported; the warning text reads like ``"YukiNet: DR and clustering
+    scored in that column. Under ``aggregate="summary"`` an ``n/a`` cell
+    within a dataset is rank 0 there (the paper's rule) in the metric
+    columns and in the ``overall="rank"`` Overall; ``overall="mean_overall"``
+    skips it. Neither rule is visible in the numbers, so ``na`` sets how it
+    is reported; the warning text reads like ``"YukiNet: DR and clustering
     Overall over 3 of 4 metrics (cLISI n/a)"``.
 
     Duplicate rows for one ``(method[, dataset], metric)`` key raise rather
@@ -759,7 +761,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         b, mp = tbl.blocks[fi], mappers[fi]
         if kind == "overall":
             vals = b.overall
-            length = style.minmax(vals.to_numpy())          # ranked overall, 0..1
+            # bar length: family Overall min-max scaled across the rows
+            length = style.minmax(vals.to_numpy())
             for i, m in enumerate(methods):
                 v = vals.loc[m]
                 if pd.isna(v):
@@ -968,7 +971,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
           max-rank(mean over datasets of within-dataset max-rank))`` - the
           per-dataset ranks are averaged per metric, the mean ranks are
-          RE-RANKED across methods, averaged over metrics and min-max scaled.
+          re-ranked across methods, averaged over metrics and min-max scaled.
           A method absent from a dataset scores rank 0 there (the paper's
           summary rule), which pulls it down.
         * ``"mean_overall"`` (bar's default): ``mean over datasets of
@@ -1032,19 +1035,22 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     with ``n`` = the methods SCORED in that column, n/a cells excluded) and
     fill = the min-max scaled value along the family's colour ramp. A
     metric bar (``aggregate="summary"``) has length and fill = the min-max
-    scaled mean rank. A family *Overall* bar has length and fill = the
-    family score (see ``overall``), min-max scaled across the rows; rows
-    are ordered by the mean of the family Overall scores. The *Rank* legend
-    counts 1 = best, whereas ``BubbleTable.ranks`` / ``FamilyBlock.ranks``
-    store max-ranks (``n`` = best).
+    scaled mean rank. A family *Overall* bar has length = the family score
+    (see ``overall``) min-max scaled across the rows, and fill = the family
+    score itself (the two coincide except under ``overall="mean_overall"``);
+    rows are ordered by the mean of the family Overall scores. The *Rank*
+    legend counts 1 = best, whereas ``BubbleTable.ranks`` /
+    ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
 
     Missing cells. A cell whose metric was not computed for that method
     shows a dash (``n/a`` in the legend) instead of a marker. Under
     ``aggregate="dataset"`` the family Overall averages the metrics the
     method has and a column's ranks count only the scored methods; under
-    ``"summary"`` an ``n/a`` cell is rank 0 in that dataset (the paper's
-    rule). The ``na="warn"`` message names each method, e.g. ``"YukiNet:
-    DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
+    ``"summary"`` an ``n/a`` cell is rank 0 in that dataset for the metric
+    bar (the paper's rule); the family Overall counts it as rank 0 under
+    ``overall="rank"`` and skips it under ``"mean_overall"``. The
+    ``na="warn"`` message names each method, e.g. ``"YukiNet: DR and
+    clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
 
     Chips and badge (``show_language``). The chip reads ``Py`` / ``R`` for
     registry methods and ``?`` for methods the registry does not know (your
