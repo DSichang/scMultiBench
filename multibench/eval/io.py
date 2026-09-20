@@ -21,9 +21,10 @@ import h5py
 import numpy as np
 import pandas as pd
 
-#: Suffixes that mark a str as a CSV-like label file. evaluate() reads a
-#: clustering= str with any other suffix as an h5 (read_clustering), and
-#: as_vector() takes a list of strings without these suffixes as label values.
+#: Suffixes that mark a path as a CSV-like label file. evaluate() reads a
+#: clustering= path (str or Path) with any other suffix as an h5
+#: (read_clustering), and as_vector() takes a list of strings without these
+#: suffixes as label values.
 _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 
 
