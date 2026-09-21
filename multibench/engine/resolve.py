@@ -366,6 +366,10 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
     An unknown token raises ``ValueError`` naming the vocabulary.
 
+    **Validation.** A misspelt method id raises ``KeyError`` naming the
+    closest registry id; an unknown category raises ``ValueError`` listing
+    the four.
+
     **File resolution.** The dataset tree is flat
     (``<data_path>/<dataset>/<file>``). Each role resolves to the file present
     in the folder: the role token, or a known alias (``atac_peak`` ->
@@ -912,16 +916,18 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
                data_path: Path | str | None = None) -> dict:
     """Return a dataset's cell-type label files, in cell-stacking order.
 
-    Hand the dict to ``mtb.evaluate(labels=...)`` as is. Give ``category``
-    and ``method`` to order the files the way that method stacks its cells.
+    Hand the dict to ``mtb.evaluate(labels=...)`` as is; it matches an
+    embedding only if that embedding stacks its cells in the dict's order, so
+    give ``category`` and ``method`` for a method-specific order.
 
     Parameters
     ----------
     dataset : str
         Dataset folder name under ``data_path``, e.g. ``"D28"``.
     category : str | None
-        Integration category; with ``method``, selects the variant whose cell
-        order is used. ``None`` = the default order.
+        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``; with ``method``,
+        selects the variant whose cell order is used. ``None`` = the default
+        order.
     method : str | None
         Registry method id; with ``category``, orders the files as that
         variant stacks its cells. ``None`` = the default order.
@@ -961,7 +967,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     {'rna_cty': '/abs/data/D28/rna_cty.csv', 'atac_cty': '/abs/data/D28/atac_cty.csv'}
     >>> mtb.labels_for("D52", "cross", "StabMap")    # StabMap: its reference batch first
     {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv', 'cty2': '/abs/data/D52/cty2.csv'}
-    >>> m = mtb.evaluate(embedding, labels=mtb.labels_for("D28"))
+    >>> res = mtb.run("StabMap", "cross", inputs=mtb.inputs_for("D52", "cross", "StabMap"),
+    ...               out_dir="out/StabMap_D52")
+    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D52", "cross", "StabMap"))
 
     Notes
     -----

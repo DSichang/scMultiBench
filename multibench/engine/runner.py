@@ -436,8 +436,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         Command wrapper such as ``"conda run -n myenv {cmd}"``; ``None`` =
         enter the method's own env.
     repo_path : Path | None, keyword-only
-        Checkout holding ``tools_scripts/``; ``None`` = the configured path,
-        cloned on first use.
+        Checkout holding ``tools_scripts/``; ``None`` =
+        ``mtb.config.DEFAULT.repo_path`` if it has one, else the package root
+        if it has one, else a clone into the former.
     dry_run : bool, keyword-only
         ``True`` = return the command without running it or writing anything.
 
@@ -482,15 +483,28 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     The preview shows the inputs absolute, as the run passes them. A real run
     first copies non-canonical inputs to ``<out_dir>/inputs/<role>.h5``;
     canonical ``.h5`` files pass through unchanged, so for a laid-out dataset
-    the preview is the real command. The one exception is a variant that first
-    rewrites peak names into ``inputs/<role>_normpeaks.h5``.
+    the preview is the real command, except:
+
+    - a variant that first rewrites peak names into
+      ``inputs/<role>_normpeaks.h5``;
+    - a registration method: the real run points ``data_dir`` at the staged
+      slice links in ``<out_dir>/inputs/`` (see **What out_dir holds.**).
 
     **Variant selection.** Only ``category`` and the modality roles of
     ``inputs`` select the variant. The modality roles are every key except the
-    auxiliary roles (``data_dir``, ``source_data``, ``target_data``) and the
-    label roles (any key containing ``cty`` or ``label``). A ``data_dir``
-    variant declares no modalities, so ``category`` alone selects it: pass no
-    modality roles with it. ``method_info(m)['supports']`` lists every variant.
+    auxiliary roles (``data_dir``, ``source_data``, ``target_data``,
+    ``out_dir``) and the label roles (any key containing ``cty`` or
+    ``label``). A ``data_dir`` variant declares no modalities, so ``category``
+    alone selects it: pass no modality roles with it.
+
+    ``method_info(m)['supports']`` lists every variant. A misspelt method id
+    raises ``KeyError`` naming the closest registry id; a category and role
+    set with no variant raises ``KeyError`` listing the declared
+    ``(category, modalities)`` pairs.
+
+    Auxiliary roles (scBridge's ``data_dir`` / ``source_data`` /
+    ``target_data`` / ``source_cty`` / ``target_cty``) and label files are
+    never converted to the canonical ``.h5``.
 
     **GPU and CPU.** On a host without an NVIDIA GPU
     (``mtb.env.host_has_gpu()`` is False), the registry ``cpu_params`` - the
@@ -521,16 +535,16 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     prefix on disk raises ``OSError`` naming ``envs_dir`` and
     ``mtb.env.install``; any other value raises ``ValueError``.
 
+    The method process gets ``PYTHONNOUSERSITE=1``, so user site-packages
+    cannot shadow the env, and ``MPLBACKEND=Agg`` unless the variant sets its
+    own backend.
+
     **Env preflight.** Before any file is written, the env is looked up with
     the probe ``mtb.scan`` uses. If envs are found on this machine and the
     method's env is not among them, ``EnvironmentError`` (Python's alias of
     ``OSError``) is raised, naming the install command. If the probe finds no
     envs at all, the subprocess reports the failure. A ``cmd_template`` takes
     over env control and skips the preflight.
-
-    The method process gets ``PYTHONNOUSERSITE=1``, so user site-packages
-    cannot shadow the env, and ``MPLBACKEND=Agg`` unless the variant sets its
-    own backend.
 
     **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
     before the argv is built, and ``data_dir`` (like any existing directory)
@@ -547,10 +561,6 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
       ``slices_manifest.json`` beside it maps each ``aligned_slice_<i>.h5ad``
       back to its source slice (also in ``RunResult.extra``);
     - a ``data_dir`` method that stages nothing gets no ``inputs/`` at all.
-
-    Auxiliary roles (scBridge's ``data_dir`` / ``source_data`` /
-    ``target_data`` / ``source_cty`` / ``target_cty``) and label files are
-    passed through verbatim, never converted to the canonical ``.h5``.
 
     **Failures.** A non-zero exit raises ``RuntimeError`` with the tail of the
     method's stdout, then of its stderr (last, so a truncated message keeps

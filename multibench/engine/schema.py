@@ -23,13 +23,15 @@ class AmbiguousVariantError(ValueError, KeyError):
     Notes
     -----
     **When it fires.** ``category=`` / ``modalities=`` leave more than one
-    variant, for instance ``atac`` matching both an ``atac_gas`` and an
-    ``atac_peak`` variant:
+    variant - e.g. Matilda has an rna+adt and an rna+atac ``vertical``
+    variant, so ``params_for("Matilda")`` cannot pick:
 
-    - ``mtb.inputs_for`` and ``mtb.params_for(dataset=)`` first let the
-      dataset folder decide, and raise only when it settles nothing
+    - ``mtb.inputs_for`` (without ``modalities=``) and
+      ``mtb.params_for(dataset=)`` (without ``category=`` or ``modalities=``)
+      first let the dataset folder decide, and raise only when it settles
+      nothing;
     - ``mtb.labels_for`` never raises it; it falls back to the default label
-      order
+      order.
 
     **What to do.** Pass ``modalities=`` (and ``category=``) exactly as the
     message shows.
