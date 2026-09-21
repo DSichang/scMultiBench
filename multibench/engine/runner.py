@@ -410,130 +410,156 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         dry_run: bool = False):
     """Run one method on explicit inputs and load its output.
 
-    Method scripts are never modified. Variant selection depends only on
-    ``category`` and the supplied modality roles; the method runs in its own
-    conda env with ``cwd=out_dir``. Prefer ``mtb.run_all`` unless you need
-    this level of control.
+    Use it for full control over one run; ``mtb.run_all`` runs and scores
+    every method of a category on a dataset.
 
     Parameters
     ----------
     method : str
-        Registry id (``KeyError`` with a did-you-mean hint otherwise).
+        Registry method id, e.g. ``"Matilda"``.
     category : str
-        Integration category of the variant to run.
+        Integration category of the variant: ``vertical``, ``diagonal``,
+        ``mosaic`` or ``cross``.
     inputs : dict, keyword-only
-        ``{role: path-or-AnnData}``; the non-auxiliary, non-label roles
-        select the variant. See ``inputs_for`` / ``method_info(m)['supports']``.
-        Paths may be relative: they are made absolute (and ``data_dir`` gets a
-        trailing separator) before the argv is built, because the method
-        runs with ``cwd=out_dir``.
+        ``{role: path or AnnData}``, usually from ``mtb.inputs_for``; its
+        modality roles select the variant.
     out_dir : str, keyword-only
-        Directory the method writes into (created; made absolute the same
-        way - ``RunResult.out_dir`` is that absolute path). What ``inputs/``
-        holds is described in Notes.
+        Directory the method writes into; created if missing.
     params : dict | None, keyword-only
-        Overrides merged over the variant's default hyperparameters (default
-        ``None``). A key given here also wins over the ``cpu_params`` applied
-        on a host without an NVIDIA GPU - see Notes.
+        Hyperparameter overrides merged over the variant's defaults;
+        ``None`` = the defaults.
     task : str | None, keyword-only
-        Accepted for forward compatibility and currently ignored.
+        Accepted for forward compatibility; currently ignored.
     convert : bool, keyword-only
-        Convert modality inputs to the canonical .h5 layout (default True).
+        Convert modality inputs to the canonical ``.h5`` layout before the run.
     cmd_template : str | None, keyword-only
-        Wrapper for the argv, e.g. ``"conda run -n myenv {cmd}"``; it
-        overrides the env handling described in Notes and skips the env
-        preflight. Default ``None``: the method's env is entered
-        automatically.
+        Command wrapper such as ``"conda run -n myenv {cmd}"``; ``None`` =
+        enter the method's own env.
     repo_path : Path | None, keyword-only
-        Checkout holding ``tools_scripts/`` (default ``None``:
-        auto-provisioned; on a dry run it is located but never fetched).
+        Checkout holding ``tools_scripts/``; ``None`` = the configured path,
+        cloned on first use.
     dry_run : bool, keyword-only
-        ``True`` returns the argv list the call would execute and creates
-        nothing (default False); see Notes.
+        ``True`` = return the command without running it or writing anything.
 
     Returns
     -------
     RunResult or list[str]
-        ``RunResult`` with the primary output loaded (``output``, ``extra``,
-        ``cmd``, ``stdout``, ``stderr``, ``out_dir``); the argv list when
-        ``dry_run=True``.
+        ``RunResult`` - read ``output`` (the primary output, loaded),
+        ``out_dir`` and ``stderr``. With ``dry_run=True``, the argv list.
 
     Raises
     ------
-    OSError
-        ``method_info(m)['requires_gpu']`` is True - the upstream script
-        calls CUDA unconditionally, with no switch - and this host has no
-        NVIDIA GPU (``mtb.env.host_has_gpu()`` is False). Raised before
-        anything is written or launched, with the sentence ``scan`` reports
-        as that row's ``env_reason``; a dry run still returns the argv.
-        Also raised when ``MULTIBENCH_RUN_MODE=prefix`` is forced but no
-        prefix is on disk.
-    EnvironmentError
-        The method's conda env is not installed on this machine (found by
-        the same probe ``scan`` uses); raised before any file is written,
-        naming the install command. Skipped when ``cmd_template`` is given.
     KeyError
-        Unknown method, or no variant matches ``category`` and the modality
-        roles in ``inputs``.
+        Unknown method, or no variant fits ``category`` and the input roles.
+    OSError
+        The method needs a GPU this host lacks, or its env is not installed.
+    RuntimeError
+        The method exited with a non-zero status.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> inp = mtb.inputs_for("D11", "vertical", "Matilda")
-    >>> argv = mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11", dry_run=True)
+    >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11", dry_run=True)
     >>> res = mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
     ...               params={"epochs": 20})
-    >>> res.output.shape                     # the embedding, loaded
     >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))
 
     Notes
     -----
-    ``out_dir`` gets an ``inputs/`` sub-directory holding the canonical .h5
-    copies when ``convert=True``, or - for a registration method fed a
-    ``data_dir`` of slices - the sorted, zero-padded symlinks the script is
-    pointed at, with ``slices_manifest.json`` beside it mapping
-    ``aligned_slice_<i>.h5ad`` back to the source slice; a ``data_dir``
-    method that stages nothing gets no ``inputs/`` at all.
+    **Result.** ``RunResult`` carries ``output`` (the primary output, loaded),
+    ``extra`` (``{file: loaded object}`` for the variant's extra outputs),
+    ``cmd`` (the argv that ran), ``stdout``, ``stderr``, ``out_dir`` (an
+    absolute path) and ``method``.
 
-    GPU/CPU contract: on a host without an NVIDIA GPU
-    (``mtb.env.host_has_gpu()`` is False) the method's registry
-    ``cpu_params`` - the flags that turn CUDA off in a script that has it on
-    by default, ``method_info(m)['cpu_params']`` - are merged into ``params``
-    first, so a key given by the caller always wins; one line ``[run] no GPU
-    on this host: applying <method> cpu_params {...}`` goes to stderr when
-    that happens. A script that calls CUDA unconditionally
-    (``requires_gpu``) is refused with ``OSError`` instead.
-
-    Environment handling (``cmd_template=None``): the env
-    ``mtb.env.group_for(method)`` would provision is entered in the mode
-    picked per call - ``prefix`` whenever ``mtb.env.env_prefix(env)`` finds
-    the env on disk (a ``bash -c`` wrapper that sets ``CONDA_PREFIX`` /
-    ``CONDA_DEFAULT_ENV``, puts ``<prefix>/bin`` first on ``PATH`` and sources
-    the env's ``activate.d`` scripts; no conda binary needed), else ``conda``
-    (``conda run -n <env>``). ``MULTIBENCH_RUN_MODE=conda|prefix`` forces one
-    (``prefix`` with no prefix on disk -> ``OSError`` naming ``envs_dir`` and
-    ``mtb.env.install``). The env is also preflighted: if envs are found on
-    this machine and the method's env is not among them, ``EnvironmentError``
-    is raised (see Raises). Pass a ``cmd_template`` to take over env control
-    (no preflight).
-
-    ``dry_run=True`` returns the argv list the call would execute - built
-    from the same pieces (variant selection, ``engine.builder.build_command``,
-    the ``driver`` / ``pty`` wrapping, the real env wrap: the prefix
-    activation or ``conda run -n <env>``) - and creates nothing: no
+    **Dry run.** ``dry_run=True`` returns the argv the call would execute,
+    built from the same pieces as a real run: variant selection, the command
+    builder, the ``driver`` / ``pty`` wrapping and the real env wrap (the
+    prefix activation or ``conda run -n <env>``). It creates nothing: no
     ``out_dir``, no ``inputs/`` copies, no env preflight, no fetch of the
-    reference checkout. The inputs are shown absolutized, exactly as the run
-    passes them (a real run first copies non-canonical inputs to
-    ``<out_dir>/inputs/<role>.h5``; canonical ``.h5`` files pass through
-    unchanged, so for a laid-out dataset the preview is exact).
-    ``shlex.join`` it for a shell line. (It replaces the 0.2
-    ``command_preview``, which was removed.)
+    script checkout. ``shlex.join`` it for a shell line.
 
-    Auxiliary roles (e.g. scBridge's ``data_dir``/``source_data``/
-    ``target_data``/``source_cty``/``target_cty``) are passed through verbatim
-    and are not converted to the canonical .h5. A ``data_dir`` variant
-    declares no modalities, so it is selected by ``category`` alone: pass no
-    modality roles with it.
+    The preview shows the inputs absolute, as the run passes them. A real run
+    first copies non-canonical inputs to ``<out_dir>/inputs/<role>.h5``;
+    canonical ``.h5`` files pass through unchanged, so for a laid-out dataset
+    the preview is the real command. The one exception is a variant that first
+    rewrites peak names into ``inputs/<role>_normpeaks.h5``.
+
+    **Variant selection.** Only ``category`` and the modality roles of
+    ``inputs`` select the variant. The modality roles are every key except the
+    auxiliary roles (``data_dir``, ``source_data``, ``target_data``) and the
+    label roles (any key containing ``cty`` or ``label``). A ``data_dir``
+    variant declares no modalities, so ``category`` alone selects it: pass no
+    modality roles with it. ``method_info(m)['supports']`` lists every variant.
+
+    **GPU and CPU.** On a host without an NVIDIA GPU
+    (``mtb.env.host_has_gpu()`` is False), the registry ``cpu_params`` - the
+    flags that turn CUDA off in a script that has it on by default,
+    ``method_info(m)['cpu_params']`` - are merged into ``params`` first, so a
+    key you pass always wins.
+
+    The dry run shows these flags too; a real run prints ``[run] no GPU on
+    this host: applying <method> cpu_params {...}`` to stderr.
+
+    A script that calls CUDA unconditionally, with no switch
+    (``method_info(m)['requires_gpu']``), is refused on such a host with
+    ``OSError`` before anything is written or launched. The message is the
+    sentence ``mtb.scan`` reports as that row's ``env_reason``. A dry run
+    still returns the argv.
+
+    **Environment.** With ``cmd_template=None`` the method runs in the env
+    ``mtb.env.group_for(method)`` names, entered in one of two modes, picked
+    per call:
+
+    - ``prefix`` whenever ``mtb.env.env_prefix(env)`` finds the env on disk: a
+      ``bash -c`` wrapper sets ``CONDA_PREFIX`` / ``CONDA_DEFAULT_ENV``, puts
+      ``<prefix>/bin`` first on ``PATH`` and sources the env's ``activate.d``
+      scripts. No conda binary is needed.
+    - ``conda`` otherwise: ``conda run -n <env>``.
+
+    ``MULTIBENCH_RUN_MODE=conda|prefix`` forces one mode. ``prefix`` with no
+    prefix on disk raises ``OSError`` naming ``envs_dir`` and
+    ``mtb.env.install``; any other value raises ``ValueError``.
+
+    **Env preflight.** Before any file is written, the env is looked up with
+    the probe ``mtb.scan`` uses. If envs are found on this machine and the
+    method's env is not among them, ``EnvironmentError`` (Python's alias of
+    ``OSError``) is raised, naming the install command. If the probe finds no
+    envs at all, the subprocess reports the failure. A ``cmd_template`` takes
+    over env control and skips the preflight.
+
+    The method process gets ``PYTHONNOUSERSITE=1``, so user site-packages
+    cannot shadow the env, and ``MPLBACKEND=Agg`` unless the variant sets its
+    own backend.
+
+    **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
+    before the argv is built, and ``data_dir`` (like any existing directory)
+    gets a trailing separator, because the method runs with ``cwd=out_dir``.
+    A few variants run in their script's directory instead; the output path
+    is passed on the command line either way.
+
+    **What out_dir holds.** Besides the method's own files:
+
+    - for a method fed modality files, ``inputs/`` with their canonical
+      ``.h5`` copies (``convert=True``);
+    - for a registration method fed a ``data_dir`` of slices, ``inputs/``
+      holds the sorted, zero-padded symlinks the script reads, and
+      ``slices_manifest.json`` beside it maps each ``aligned_slice_<i>.h5ad``
+      back to its source slice (also in ``RunResult.extra``);
+    - a ``data_dir`` method that stages nothing gets no ``inputs/`` at all.
+
+    Auxiliary roles (scBridge's ``data_dir`` / ``source_data`` /
+    ``target_data`` / ``source_cty`` / ``target_cty``) and label files are
+    passed through verbatim, never converted to the canonical ``.h5``.
+
+    **Failures.** A non-zero exit raises ``RuntimeError`` with the tail of the
+    method's stdout, then of its stderr (last, so a truncated message keeps
+    it). If the call is interrupted - Ctrl-C, or a ``run_all`` timeout - the
+    method's whole process tree is killed before the exception propagates.
+
+    **Method scripts.** The upstream scripts are never modified. A variant
+    with a package-side ``driver`` runs the driver, which loads the unmodified
+    script from its own directory.
 
     See Also
     --------
