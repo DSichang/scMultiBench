@@ -146,7 +146,7 @@ def test_rescore_handles_missing_output(cite, tmp_path):
 def test_rescore_is_documented():
     import inspect
     doc = inspect.getdoc(mtb.BatchResult.rescore)
-    for w in ("batch", "labels", "only", "save", "RUN_OK_EVAL_FAILED"):
+    for w in ("batch", "labels", "metrics", "save", "RUN_OK_EVAL_FAILED"):
         assert w in doc
     doc = inspect.getdoc(mtb.BatchResult.summary.fget)
     assert "batch_source" in doc and "n_batches" in doc and "file_of_origin" in doc
