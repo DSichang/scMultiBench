@@ -344,7 +344,9 @@ def test_docs_pages_carry_the_colab_speed_round(path):
     if path.name == "installation.md":
         assert "### Google Colab" in text
         assert "INSTALL_ENVS = False" in text and "INSTALL_ENVS = True" in text
-        assert "mtb.data.fetch_outputs" in text and "packed=True, dry_run=False" in text
+        assert "stored outputs for the dataset" in text and "stored metric table" in text, \
+            "the stand-in and its offline fallback"
+        assert "`INSTALL_ENVS = True` needs Colab or a Linux host" in text
         assert "cross 3.0 GB" in text and "vertical 6.2 GB" in text, "measured archive totals per tutorial"
         assert "No conda binary is needed for the packed path" in text
         assert "MULTIBENCH_ENVS_DIR" in text and "~/.cache/multibench/envs" in text
