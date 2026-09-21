@@ -155,6 +155,18 @@ def test_list_methods_task_and_runnable_raise_naming_find_methods():
     assert mtb.find_methods("vertical", task="clustering")
 
 
+@pytest.mark.parametrize("kw", [{"available": True}, {"foo": 1},
+                                {"task": "clustering", "available": True}])
+def test_list_methods_other_keywords_raise_pythons_own_typeerror(kw):
+    # only a real find_methods filter is pointed at find_methods: available=
+    # is not one any more, and following such a pointer would fail too
+    with pytest.raises(TypeError) as e:
+        mtb.list_methods(**kw)
+    bad = next(k for k in kw if k != "task")
+    assert str(e.value) == f"list_methods() got an unexpected keyword argument {bad!r}"
+    assert "find_methods" not in str(e.value)
+
+
 def test_find_methods_filters_are_keyword_only():
     with pytest.raises(TypeError):
         mtb.find_methods("vertical", "clustering")

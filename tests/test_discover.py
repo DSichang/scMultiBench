@@ -82,6 +82,23 @@ def test_find_methods_modalities_excludes_stub():
             assert stub not in discover.find_methods(modalities=req)
 
 
+def test_method_info_declared_stub_raises_keyerror(monkeypatch):
+    # scripts_url, variants and params are read off the variants, so a
+    # declared stub (no variants) is refused by name, like params_for does
+    import dataclasses
+    from multibench.engine import registry
+    stub = dataclasses.replace(registry.get("SCALEX"), variants=[])
+    real_get = registry.get
+    monkeypatch.setattr(registry, "get",
+                        lambda m: stub if m == "SCALEX" else real_get(m))
+    with pytest.raises(KeyError, match="SCALEX: no variants \\(declared stub\\)"):
+        discover.method_info("SCALEX")
+    with pytest.raises(KeyError, match="declared stub"):
+        discover.params_for("SCALEX", "diagonal")
+    assert discover.method_info("Matilda")["scripts_url"].startswith(
+        "https://github.com/PYangLab/scMultiBench/tree/main/tools_scripts/")
+
+
 def test_find_methods_modalities_none_unchanged():
     # modalities=None must behave exactly like the call without the kwarg
     assert discover.find_methods() == discover.find_methods(modalities=None)

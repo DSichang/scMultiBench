@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import os
 from pathlib import Path
 
@@ -189,8 +190,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``; ``None`` = every method.
     **_removed
-        Catch-all that rejects any other keyword (e.g. the retired ``task=`` /
-        ``runnable=``) with a ``TypeError`` naming ``find_methods``.
+        Catch-all that rejects any other keyword with a ``TypeError``.
 
     Returns
     -------
@@ -202,8 +202,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     ValueError
         Unknown ``category``; the message lists the valid ones.
     TypeError
-        A keyword other than ``category``; use
-        ``find_methods(category, task=..., runnable=...)``.
+        A keyword other than ``category``; see **Other keywords** in Notes.
 
     Examples
     --------
@@ -217,6 +216,11 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     a variant wired for that category - the same set ``scan``, ``run_all``
     and ``find_methods(category=)`` dispatch.
 
+    **Other keywords.** A ``find_methods`` filter such as ``task=`` or
+    ``runnable=`` raises a ``TypeError`` that names the call to use
+    instead: ``find_methods(category, task=...)``. Any other keyword raises
+    Python's own ``unexpected keyword argument`` message.
+
     See Also
     --------
     mtb.find_methods : filter by task, modalities, labels, ATAC representation and more.
@@ -224,6 +228,13 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     mtb.list_categories : the four category tokens with a description of each.
     """
     if _removed:
+        # Only a real find_methods filter is pointed there; anything else
+        # gets the message Python gives for an unknown keyword.
+        filters = set(inspect.signature(find_methods).parameters) - {"category"}
+        unknown = [k for k in _removed if k not in filters]
+        if unknown:
+            raise TypeError(
+                f"list_methods() got an unexpected keyword argument {unknown[0]!r}")
         keys = ", ".join(f"{k}=..." for k in _removed)
         raise TypeError(
             f"list_methods() only takes category since 0.3.0; {keys} are find_methods "
@@ -264,7 +275,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Raises
     ------
     KeyError
-        Unknown method id; the message suggests a close match, if any.
+        Unknown method id (the message suggests a close match), or a declared stub.
 
     Examples
     --------
@@ -374,6 +385,9 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     mtb.env.recipe : the hand-written environment recipe of a method.
     """
     s = registry.get(method)
+    # scripts_url, variants and params all come from the variants
+    if not s.variants:
+        raise KeyError(f"{method}: no variants (declared stub)")
     ref = s.reference or {}
     info = {
         "id": s.id, "language": s.language, "categories": s.categories,
