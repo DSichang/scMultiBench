@@ -204,7 +204,7 @@ class ArgSpec:
 @dataclass
 class OutputSpec:
     kind: str               # embedding | graph | labels (io.load_output also accepts imputed | markers)
-    file: str               # filename (or glob) written into out_dir
+    file: str               # filename written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
     # Order of the cells in the output's rows, for a script that does not
     # stack them in argument order (see Variant.stacked_roles): a list of

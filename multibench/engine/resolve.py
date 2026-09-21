@@ -72,7 +72,7 @@ def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
              and r not in ("out_dir", "data_dir")]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
     # A `data_dir` role resolves to a directory, not a file.
-    if any(a.role == "data_dir" for a in variant.args):
+    if variant.takes_data_dir:
         out["data_dir"] = _resolve_data_dir(ds_dir)
     return out
 

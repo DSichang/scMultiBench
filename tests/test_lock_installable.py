@@ -9,9 +9,9 @@ lockfile can be complete, substantive, and still fail every single install:
   * `torch==2.6.0+cu118` - published on download.pytorch.org, never on PyPI.
     Install aborts with `No matching distribution found`.
 
-Six of the 29 committed lockfiles carried one of these and could not be built
+Several committed lockfiles carried one of these and could not be built
 from scratch. The pre-existing test only checked a lockfile was long enough,
-which is why it passed on all six. This checks the property that actually
+which is why it passed on all of them. This checks the property that actually
 matters, statically - a real build is far too slow for the suite.
 """
 

@@ -14,7 +14,6 @@ pair_path1 pair_path2 dataset_path ae_weights ae_weight_file embedding_file pred
 pre_trained rna adt atac cty file_path input output_path result_path""".split())
 
 def resolve(ep):
-    if os.path.isabs(ep) and os.path.exists(ep): return ep
     for r in ROOTS:
         c = os.path.join(r, ep)
         if os.path.exists(c): return c
