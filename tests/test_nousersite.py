@@ -5,7 +5,7 @@ installing it into the target env. The build then reports success while
 producing an env that only works if user-site leakage is allowed - and run()
 correctly sets PYTHONNOUSERSITE=1, so the method fails at dispatch.
 
-Six of the 29 envs were built short of 32 packages this way. VIPCCA died with
+Envs were built short of packages this way: VIPCCA died with
 ModuleNotFoundError on astunparse, a package its own lockfile pins.
 """
 import os

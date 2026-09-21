@@ -317,8 +317,10 @@ def test_retired_phrases_absent_from_docs_surfaces(path):
         assert phrase not in text, f"{path.name} still says {phrase!r}: {why}"
 
 
-# the spatial-registration methods were removed from the package
-REMOVED_METHODS = re.compile(r"\b(GPSA|PASTE2?|SPIRAL)\b")
+# the spatial-registration methods were removed from the package; so were
+# their env names and SPIRAL's source folder (matched in any case)
+REMOVED_METHODS = re.compile(
+    r"\b(GPSA|PASTE2?|SPIRAL)\b|(?i:spiral_environment|paste_envi|scmb_gpsa2|SPIRAL_latest)")
 
 
 @pytest.mark.parametrize(
