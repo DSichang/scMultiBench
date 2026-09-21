@@ -5,6 +5,7 @@ import functools
 import inspect
 import os
 from pathlib import Path
+from urllib.parse import quote as _quote
 
 from .engine import registry, upstream, envs
 from .engine import resolve as _resolve
@@ -305,7 +306,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``driver`` - the package-side wrapper actually executed, or ``None``
       when the upstream script runs directly.
     - ``scripts_url`` - the method's ``tools_scripts`` folder in the
-      scMultiBench repository.
+      scMultiBench repository, percent-encoded.
     - ``repo_url`` / ``version`` - the upstream repository and the version
       the benchmark ran.
     - ``reference`` - ``{doi, title, authors, journal, year}`` or ``None``;
@@ -404,9 +405,10 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         # upstream script itself is run
         "driver": next((v.driver for v in s.variants if v.driver), None),
         # folder of this method's unmodified upstream scripts in the
-        # scMultiBench repository
+        # scMultiBench repository, percent-encoded ('online iNMF' has a space)
         "scripts_url": ("https://github.com/PYangLab/scMultiBench/tree/main/"
-                        + "/".join(s.variants[0].entrypoint.split("/")[:2])),
+                        + _quote("/".join(s.variants[0].entrypoint.split("/")[:2]),
+                                 safe="/")),
         # provenance (engine/references.yaml): the upstream repository / docs, the
         # version the benchmark ran, and the paper to cite (see mtb.cite)
         "repo_url": ref.get("repo_url") or upstream.knobs_for(s.id)["upstream_url"],

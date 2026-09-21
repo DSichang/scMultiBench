@@ -64,6 +64,7 @@ The published rankings are also browsable in the
 Upgrading from 0.2.1? Some old names still work in 0.3 with a
 `DeprecationWarning`, others were removed; the old -> new table is in the
 [API reference](https://dsichang.github.io/scMultiBench/api/#deprecated-in-030).
+Upgrading from 0.3.0? See [Removed in 0.3.1](https://dsichang.github.io/scMultiBench/api/#removed-in-031).
 
 ## Citation
 

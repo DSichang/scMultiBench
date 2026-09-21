@@ -216,6 +216,30 @@ def _repo_root_no_fetch() -> Path:
     return p
 
 
+def _host_run_env(run_env: dict | None) -> dict:
+    """The variant's ``run_env`` as :func:`run` applies it on this machine.
+
+    A value made of absolute paths (``LD_PRELOAD`` may list several,
+    ``:``- or space-separated) names files on the host the registry was
+    written on: only the paths that exist here are applied, and when none
+    does the key is left unset, so the caller's own value or the tool's
+    default discovery stays in force. Where every path exists the value is
+    passed unchanged; any other value always is.
+    """
+    out = {}
+    for key, value in (run_env or {}).items():
+        value = str(value)
+        paths = value.replace(":", " ").split()
+        if paths and all(p.startswith("/") for p in paths):
+            kept = [p for p in paths if os.path.exists(p)]
+            if not kept:
+                continue
+            if len(kept) < len(paths):
+                value = (":" if ":" in value else " ").join(kept)
+        out[key] = value
+    return out
+
+
 def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
           params: dict | None, cmd_template: str | None) -> list[str]:
     """The exact argv a method run executes (shared by the run and the dry run).
@@ -465,6 +489,11 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     cannot shadow the env, and ``MPLBACKEND=Agg`` unless the variant sets its
     own backend.
 
+    A variant's own variables (its registry ``run_env``) are set over yours.
+    A value made of absolute paths, such as ``LD_PRELOAD``, is applied only
+    for the paths that exist on this machine; when none does, the variable
+    is left as you set it, or unset, so the tool's default lookup applies.
+
     **Env preflight.** Before any file is written, the env is looked up with
     the probe ``mtb.scan`` uses. If envs are found on this machine and the
     method's env is not among them, ``EnvironmentError`` (Python's alias of
@@ -586,7 +615,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # Isolate the method env from user site-packages (~/.local): a broken or
     # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch
     # egg breaking anndata imports). PYTHONNOUSERSITE=1 makes the env hermetic.
-    run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **{k: str(v) for k, v in (variant.run_env or {}).items()}}
+    run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **_host_run_env(variant.run_env)}
     # A Jupyter kernel exports MPLBACKEND=module://matplotlib_inline.backend_inline,
     # which leaks through `conda run` into the method's env, where matplotlib_inline
     # does not exist - so any method that imports matplotlib dies at import when

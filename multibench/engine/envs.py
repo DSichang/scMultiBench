@@ -627,11 +627,13 @@ def _check_methods(methods):
     Without it a typo resolves through :func:`group_for` to a made-up
     ``scmb_<typo>`` env and gets a row instead of an error. Delegates to
     :func:`registry.check_method` so the error carries the same did-you-mean
-    hint as every other entry point (``'Stabmap'`` -> ``'StabMap'``).
+    hint as every other entry point (``'Stabmap'`` -> ``'StabMap'``). A bare
+    string raises the ``TypeError`` ``mtb.scan`` / ``mtb.run_all`` raise,
+    instead of being checked character by character.
     """
+    registry.check_id_list(methods, "methods")
     if not methods:
         return
-    from . import registry
     for m in methods:
         registry.check_method(m)
 
@@ -666,6 +668,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     KeyError
         Unknown method id in ``methods``; the message suggests a close
         match, if any.
+    TypeError
+        ``methods`` given as a bare string.
 
     Examples
     --------
@@ -1394,6 +1398,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     KeyError
         Unknown method id in ``methods``; the message suggests a close
         match, if any.
+    TypeError
+        ``methods`` given as a bare string.
     RuntimeError
         ``dry_run=False`` only: a non-Linux host, no conda where needed, or a
         failed build.
@@ -1597,6 +1603,8 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     KeyError
         Unknown method id in ``methods``; the message suggests a close
         match, if any.
+    TypeError
+        ``methods`` given as a bare string.
 
     Examples
     --------

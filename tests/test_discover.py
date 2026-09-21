@@ -99,6 +99,18 @@ def test_method_info_declared_stub_raises_keyerror(monkeypatch):
         "https://github.com/PYangLab/scMultiBench/tree/main/tools_scripts/")
 
 
+def test_method_info_scripts_url_is_percent_encoded():
+    # online_iNMF's upstream folder is 'online iNMF', with a space: a raw
+    # space cuts the URL wherever it is printed or auto-linked
+    import urllib.parse
+    from multibench.engine import registry
+    url = discover.method_info("online_iNMF")["scripts_url"]
+    folder = "/".join(registry.get("online_iNMF").variants[0].entrypoint.split("/")[:2])
+    assert " " in folder and " " not in url
+    assert url.endswith("/tools_scripts/online%20iNMF")
+    assert urllib.parse.unquote(url).endswith("/" + folder)
+
+
 def test_find_methods_modalities_none_unchanged():
     # modalities=None must behave exactly like the call without the kwarg
     assert discover.find_methods() == discover.find_methods(modalities=None)

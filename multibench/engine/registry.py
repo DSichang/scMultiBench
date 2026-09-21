@@ -215,6 +215,19 @@ def check_method(method_id: str) -> str:
         + "; see mtb.list_methods()")
 
 
+def check_id_list(value, name: str):
+    """Return ``value``; raise ``TypeError`` if it is a bare string.
+
+    ``methods='StabMap'`` would be iterated character by character and fail
+    with ``KeyError: unknown method 'S'``; the ``TypeError`` says what was meant.
+    """
+    if isinstance(value, str):
+        raise TypeError(
+            f"{name} must be a list of ids, got the string {value!r} - did you "
+            f"mean {name}=[{value!r}]?")
+    return value
+
+
 def resolve_method_id(name: str) -> str:
     """Return the registry id for ``name``, accepting any letter case.
 

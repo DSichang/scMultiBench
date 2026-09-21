@@ -483,17 +483,8 @@ def _short_reason(text: str, method: str, dataset: str, category: str | None) ->
     return "; ".join(parts)
 
 
-def _list_of_ids(value, name: str):
-    """Reject a bare string where a list of ids is expected.
-
-    ``methods='StabMap'`` would be iterated character by character and fail
-    with ``KeyError: unknown method 'S'``; the ``TypeError`` says what was meant.
-    """
-    if isinstance(value, str):
-        raise TypeError(
-            f"{name} must be a list of ids, got the string {value!r} - did you "
-            f"mean {name}=[{value!r}]?")
-    return value
+# Reject a bare string where a list of ids is expected (shared with mtb.env.*).
+_list_of_ids = registry.check_id_list
 
 
 def _variant_consumes_atac(variant) -> bool:

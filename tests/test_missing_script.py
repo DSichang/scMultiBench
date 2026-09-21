@@ -3,6 +3,7 @@
 Without this check, scan() calls such a method runnable and the failure only
 arrives minutes later, from a shell, as a file-not-found.
 """
+import urllib.parse
 from types import SimpleNamespace
 
 import multibench as mtb
@@ -46,4 +47,5 @@ def test_every_entrypoint_is_a_tools_scripts_path():
         assert eps and all(e.startswith("tools_scripts/") for e in eps), (m, eps)
         folder = "/".join(eps[0].split("/")[:2])
         assert mtb.method_info(m)["scripts_url"] == (
-            "https://github.com/PYangLab/scMultiBench/tree/main/" + folder)
+            "https://github.com/PYangLab/scMultiBench/tree/main/"
+            + urllib.parse.quote(folder, safe="/"))
