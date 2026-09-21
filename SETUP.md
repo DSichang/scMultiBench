@@ -1,9 +1,8 @@
 # Setting this up on a new machine
 
-Every number here was measured by building the environments from scratch in an
-isolated clean room, then running methods in them. Nothing is estimated. The disk and
-time totals come from a 29-environment build, three more than the package needs, so
-they are upper bounds.
+Every number here was measured by building 29 environments from scratch in an
+isolated clean room, then running methods in them. Nothing is estimated. The package
+needs 26 of those 29, so the disk and time totals are upper bounds.
 
 ## What it costs
 
