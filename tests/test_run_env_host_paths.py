@@ -22,6 +22,12 @@ import pytest
 from multibench.engine import registry, runner
 
 
+def _is_paths(x) -> bool:
+    """True for a value made only of absolute paths (split on ':' or whitespace)."""
+    toks = str(x).replace(":", " ").split()
+    return bool(toks) and all(t.startswith("/") for t in toks)
+
+
 def _path_valued():
     """``(method, variant, run_env)`` for every variant whose run_env holds a
     value made of absolute paths."""
@@ -29,9 +35,7 @@ def _path_valued():
     for m in registry.list_methods():
         for v in registry.get(m).variants:
             env = v.run_env or {}
-            if any(str(x).replace(":", " ").split()
-                   and all(p.startswith("/") for p in str(x).replace(":", " ").split())
-                   for x in env.values()):
+            if any(_is_paths(x) for x in env.values()):
                 out.append((m, v, env))
     return out
 
@@ -41,9 +45,8 @@ def _rerooted(env: dict, root) -> dict:
     out = {}
     for k, x in env.items():
         x = str(x)
-        toks = x.replace(":", " ").split()
-        if toks and all(t.startswith("/") for t in toks):
-            for t in toks:
+        if _is_paths(x):
+            for t in x.replace(":", " ").split():
                 p = f"{root}{t}"
                 os.makedirs(os.path.dirname(p), exist_ok=True)
                 open(p, "w").close()
@@ -92,8 +95,10 @@ def _child_env(monkeypatch, tmp_path, method: str, run_env: dict) -> dict:
 
 def test_the_registry_path_values_pass_unchanged_where_the_paths_exist(tmp_path):
     found = _path_valued()
-    keys = {k for _, _, env in found for k in env}
-    assert {"LD_PRELOAD", "RETICULATE_PYTHON"} <= keys, keys
+    # A new path-valued run_env key is dropped wherever its path is missing
+    # (a directory the tool would create, say) - add it here only if intended.
+    path_keys = {k for _, _, env in found for k, x in env.items() if _is_paths(x)}
+    assert path_keys == {"LD_PRELOAD", "RETICULATE_PYTHON"}, path_keys
     for m, v, env in found:
         env = _rerooted(env, tmp_path)
         assert runner._host_run_env(env) == {k: str(x) for k, x in env.items()}, m
