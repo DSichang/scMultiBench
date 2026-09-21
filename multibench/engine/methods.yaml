@@ -384,6 +384,11 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
       - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
         entrypoint: tools_scripts/Concerto/main_Concerto.py
+        # The rows follow os.listdir order of the per-batch tfrecord shards, which is
+        # the filesystem's; the driver lists them in batch order, so the rows follow
+        # the argument order. Runs without it follow the host's listing: the stored
+        # D52 scores used cty3, cty1, cty2.
+        driver: engine/drivers/run_concerto.py
         language: python
         args:
           - {roles: [rna1, rna2, rna3], flag: "--path1"}
