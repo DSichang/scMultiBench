@@ -192,7 +192,6 @@ def test_env_tables_as_frame(monkeypatch):
         df = fn(**kw, as_frame=True)
         assert isinstance(df, pd.DataFrame)
         assert list(df.columns) == list(rows[0]) and len(df) == len(rows)
-    assert "availability" in envs.plan(category="cross")[0]
 
 
 def test_env_docstrings_have_parameters_and_returns():
@@ -204,4 +203,6 @@ def test_env_docstrings_have_parameters_and_returns():
         assert doc and "Returns" in doc, fn.__name__
         assert doc.splitlines()[0].strip().endswith((".", "?")), fn.__name__
     assert "multibench env install --run" in inspect.getdoc(envs.doctor)
-    assert "availability" in inspect.getdoc(envs.plan)
+    plan_doc = inspect.getdoc(envs.plan)
+    for key in envs.plan(methods=["SCALEX"])[0]:
+        assert f"``{key}``" in plan_doc, key      # Notes lists every row key

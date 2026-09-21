@@ -267,12 +267,13 @@ def test_recommend_long_df_records_source_and_family(result_dir):
     assert r2.attrs["family"] is None and r2.attrs["metrics"] == ["ARI", "NMI"]
 
 
-def test_recommend_unranked_registration_attr_is_empty(result_dir, layout_tree):
-    """The ``unranked_registration`` attr stays in every frame, always empty."""
-    r, msg = _rec("cross", result_path=layout_tree)
-    assert r.attrs["unranked_registration"] == [] and "registration" not in msg
-    r2, msg2 = _rec("vertical", result_path=result_dir)
-    assert r2.attrs["unranked_registration"] == [] and "registration" not in msg2
+def test_recommend_attrs_are_the_documented_keys(result_dir, layout_tree):
+    """``frame.attrs`` carries exactly the keys recommend's Notes list."""
+    keys = {"metrics", "family", "source", "not_scored", "missing", "dropped_methods"}
+    doc = mtb.recommend.__doc__
+    for r, _ in (_rec("cross", result_path=layout_tree), _rec("vertical", result_path=result_dir)):
+        assert set(r.attrs) == keys
+    assert all(f'``"{k}"``' in doc for k in keys)
 
 
 def test_recommend_scores_only_methods_the_registry_lists_for_the_category(result_dir, layout_tree):

@@ -648,8 +648,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     -------
     list[dict] or pandas.DataFrame
         One row per env, the env serving the most methods first. Read
-        ``env``, ``methods`` and ``availability``; all keys are listed in
-        Notes.
+        ``env`` and ``methods``; all keys are listed in Notes.
 
     Raises
     ------
@@ -662,7 +661,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.env.plan("vertical", as_frame=True)[["env", "methods", "availability"]]
+    >>> mtb.env.plan("vertical", as_frame=True)[["env", "methods"]]
     >>> mtb.env.plan(methods=["Matilda", "totalVI", "scMoMaT"])
 
     Notes
@@ -672,9 +671,6 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     - ``env`` - the conda env name, the one ``mtb.run`` activates.
     - ``shared`` - the env is a shared group of ``env_groups.yaml``.
     - ``methods`` - the selected methods this env serves, sorted.
-    - ``availability`` - ``'public'``, or ``'benchmark-host-only'`` when
-      none of those methods has a published script: the env builds, but
-      the method still cannot run off the benchmark host.
     - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the env is installed here from
       a packed archive, else ``None``.
 
@@ -699,9 +695,6 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
         buckets.setdefault(group_for(m), []).append(m)
     rows = [
         {"env": env, "shared": env in shared, "methods": sorted(ms),
-         "availability": ("benchmark-host-only"
-                          if all(registry.get(m).availability != "public" for m in ms)
-                          else "public"),
          "flavor": installed_flavor(env)}
         for env, ms in sorted(buckets.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     ]

@@ -1277,8 +1277,7 @@ def recommend(
       ``"long_df"``;
     - ``"not_scored"`` (also under ``"missing"``) - the unscored method ids;
     - ``"dropped_methods"`` - registry methods present in the table but not
-      run by this package for the category;
-    - ``"unranked_registration"`` - always an empty list.
+      run by this package for the category.
 
     **Selections.** ``metrics="batch"`` scores ASW_batch, GC, iLISI, kBET;
     ``"all"`` every metric present; a list exactly those codes (alias
@@ -1472,7 +1471,6 @@ def recommend(
     out.attrs["not_scored"] = list(missing)
     out.attrs["missing"] = list(missing)
     out.attrs["dropped_methods"] = list(foreign)
-    out.attrs["unranked_registration"] = []
 
     notes = []
     if degenerate:

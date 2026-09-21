@@ -4,9 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import PurePath
 
-#: values of ``MethodSpec.availability`` (see that property)
-AVAILABILITY = ("public", "benchmark-host-only")
-
 
 class AmbiguousVariantError(ValueError, KeyError):
     """Raised when several variants of a method fit and the call must pick one.
@@ -376,14 +373,6 @@ class Variant:
             return True
         return any(a.const and "atac" in str(a.const) for a in self.args)
 
-    @property
-    def is_public(self) -> bool:
-        """True when this variant's entrypoint is a repo-relative path (a file
-        the public scMultiBench checkout can supply). An absolute entrypoint
-        names one machine's filesystem - the benchmark host - and no download
-        can provide it; see ``MethodSpec.availability``."""
-        return not PurePath(self.entrypoint).is_absolute()
-
 
 @dataclass
 class MethodSpec:
@@ -480,25 +469,6 @@ class MethodSpec:
         ``atac_gas.h5`` as a const bare filename rather than a resolved role).
         """
         return any(v.consumes_atac for v in self.variants)
-
-    @property
-    def availability(self) -> str:
-        """Where this method can actually be run: one of :data:`AVAILABILITY`.
-
-        * ``"public"`` - every variant's entrypoint is a path inside the public
-          scMultiBench repository (``tools_scripts/...``), which ``run`` fetches
-          on first use; a public install can execute it.
-        * ``"benchmark-host-only"`` - at least one variant's entrypoint is an
-          absolute path on the machine the benchmark was produced on, so the
-          script cannot be fetched and the method cannot run from a public
-          install - whatever ``status`` says.
-
-        Derived from the entrypoints (no hand-maintained flag): the rule is
-        "any variant entrypoint is absolute". Stubs without variants are
-        ``"public"`` (nothing machine-specific is declared).
-        """
-        return ("benchmark-host-only"
-                if any(not v.is_public for v in self.variants) else "public")
 
     def select(self, category: str, modalities: set[str], *,
                loose: bool = False) -> Variant:

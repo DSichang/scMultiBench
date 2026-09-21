@@ -374,14 +374,12 @@ def _missing_script(variant, *, method: str | None = None) -> str:
 
     A method whose script is absent must not be reported runnable: the run
     would fail minutes later with a shell error instead of here, instantly.
-    Three cases are checked:
+    Two cases are checked:
 
-    * an absolute entrypoint that does not exist - it names one machine's
-      filesystem, so no download can supply it;
-    * a repo-relative entrypoint missing from a reference checkout that is
-      present. When no checkout exists at all, nothing is reported: `run` and
-      `run_all` fetch it on first use, and flagging every method as broken
-      before that first fetch would be wrong;
+    * an entrypoint missing from a reference checkout that is present. When
+      no checkout exists at all, nothing is reported: `run` and `run_all`
+      fetch it on first use, and flagging every method as broken before that
+      first fetch would be wrong;
     * a local helper module the entrypoint imports from its own directory
       (``variant.helpers``, e.g. MIRA's ``logger.py``) that the public
       repository does not ship - the script would ``ImportError`` at start.
@@ -396,13 +394,6 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     from pathlib import Path as _P
 
     ep = _P(variant.entrypoint)
-    if ep.is_absolute():
-        if ep.exists():
-            return ""
-        return _resolve.benchmark_host_only_reason(str(ep)) or (
-                f"method script not found at {ep} - this entrypoint is an "
-                f"absolute path on another machine; the script is not part of "
-                f"the public scMultiBench repository, so it cannot be fetched")
     repo = _P(config.DEFAULT.repo_path)
     for root in (repo, _P(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
@@ -465,12 +456,6 @@ def _truncate_tail(msg: str, limit: int = 500) -> str:
 
 _ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}(),:;]*")
 _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
-_HOST_ONLY_SHORT = ("benchmark-host-only: script not published "
-                    "(see method_info(m)['availability'])")
-# the full host-only text (resolve.benchmark_host_only_reason) ends with this
-# marker and contains '; ' itself, so it is collapsed before splitting on '; '
-_HOST_ONLY_RE = re.compile(r"benchmark-host-only:.*?\(method_info\(m\)\['availability'\]\)",
-                           re.S)
 
 
 def _short_reason(text: str, method: str, dataset: str, category: str | None) -> str:
@@ -482,18 +467,13 @@ def _short_reason(text: str, method: str, dataset: str, category: str | None) ->
     user greps for. ``reason`` is what the scan frame, the CLI table
     and the "nothing is runnable" error show, so it drops what every row
     repeats: the exception class, the ``method/dataset/category:`` prefix and
-    the absolute directory (each path becomes its basename). A
-    benchmark-host-only row collapses to one sentence. The env half of
+    the absolute directory (each path becomes its basename). The env half of
     ``reason`` is untouched - it carries the copy-pasteable install command.
     """
     if not text:
         return text
-    text = _HOST_ONLY_RE.sub(_HOST_ONLY_SHORT, text)
     parts = []
     for part in text.split("; "):
-        if part.startswith("benchmark-host-only:"):
-            parts.append(_HOST_ONLY_SHORT)
-            continue
         part = _EXC_PREFIX_RE.sub("", part)
         prefix = f"{method}/{dataset}/{category}: "
         if part.startswith(prefix):

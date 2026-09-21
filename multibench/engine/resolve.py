@@ -452,30 +452,6 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
     return hints
 
 
-def benchmark_host_only_reason(entrypoint) -> str:
-    """Why a script whose entrypoint is an absolute path cannot run here.
-
-    Such an entrypoint names one machine's filesystem - the benchmark host -
-    so no download can supply it (``MethodSpec.availability ==
-    'benchmark-host-only'``). This is the ``files_reason`` text
-    ``scan`` reports for those rows; it starts with the machine-readable
-    prefix :data:`BENCHMARK_HOST_ONLY`. Returns ``""`` when the path is
-    relative or exists (then the script is reachable).
-    """
-    ep = Path(entrypoint)
-    if not ep.is_absolute() or ep.exists():
-        return ""
-    return (f"{BENCHMARK_HOST_ONLY}: method script not found at {ep} - this "
-            f"entrypoint is an absolute path on the benchmark host; the script is "
-            f"not part of the public scMultiBench repository, so it cannot be "
-            f"fetched (method_info(m)['availability'])")
-
-
-#: prefix of :func:`benchmark_host_only_reason`
-BENCHMARK_HOST_ONLY = "benchmark-host-only: script not published"
-
-
-
 @functools.lru_cache(maxsize=512)
 def _sniff_h5(path: str, mtime_ns: int):
     """Read (shape, n_features, n_cells) of a canonical .h5, cached by mtime.

@@ -416,7 +416,7 @@ def test_env_tables_show_the_installed_flavour(envs_dir):
     assert list(doc[torch]) == ["env", "methods", "exists", "has_lock", "flavor"]
     pl = _by_env(envs.plan(methods=["SCALEX", "Matilda", "UINMF"]))
     assert pl[torch]["flavor"] == "cpu" and pl["matilda"]["flavor"] is None
-    assert list(pl[torch]) == ["env", "shared", "methods", "availability", "flavor"]
+    assert list(pl[torch]) == ["env", "shared", "methods", "flavor"]
     st = {r["method"]: r for r in envs.status()}
     assert st["SCALEX"]["flavor"] == "cpu" and st["Matilda"]["flavor"] is None
     assert st["UINMF"]["flavor"] is None

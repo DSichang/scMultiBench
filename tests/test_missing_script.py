@@ -1,11 +1,8 @@
 """A method whose script is unreachable must not be reported runnable.
 
-An entrypoint that is an ABSOLUTE path on the machine the benchmark was
-produced on cannot be fetched. Without this check, scan() calls such a method
-runnable everywhere and the failure only arrives minutes later, from a shell,
-as a file-not-found on a path the user has never seen.
+Without this check, scan() calls such a method runnable and the failure only
+arrives minutes later, from a shell, as a file-not-found.
 """
-from pathlib import Path
 from types import SimpleNamespace
 
 import multibench as mtb
@@ -14,18 +11,6 @@ from multibench import workflow
 
 def _variant(entrypoint):
     return SimpleNamespace(entrypoint=entrypoint)
-
-
-def test_absolute_entrypoint_that_does_not_exist_is_reported(tmp_path):
-    why = workflow._missing_script(_variant("/no/such/machine/main_X.py"))
-    assert "benchmark-host-only" in why or "absolute path on another machine" in why
-    assert "/no/such/machine/main_X.py" in why
-
-
-def test_absolute_entrypoint_that_exists_is_fine(tmp_path):
-    p = tmp_path / "main_X.py"
-    p.write_text("print(1)")
-    assert workflow._missing_script(_variant(str(p))) == ""
 
 
 def test_relative_entrypoint_missing_from_a_present_checkout(tmp_path, monkeypatch):
@@ -51,14 +36,14 @@ def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
     assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py")) == ""
 
 
-def test_no_method_needs_a_machine_specific_script():
-    """The outstanding list, so it cannot grow silently.
-
-    If this set grows, a method has become unrunnable off-host - fix that,
-    not this assertion.
-    """
+def test_every_entrypoint_is_a_tools_scripts_path():
+    """run() fetches tools_scripts/ from the scMultiBench repository and
+    method_info builds scripts_url from the first entrypoint; both rely on
+    every entrypoint being a tools_scripts/<folder>/ path."""
     from multibench.engine import registry
-    absolute = {m for m in mtb.list_methods()
-                for v in registry.get(m).variants
-                if Path(v.entrypoint).is_absolute()}
-    assert absolute == set(), absolute
+    for m in mtb.list_methods():
+        eps = [v.entrypoint for v in registry.get(m).variants]
+        assert eps and all(e.startswith("tools_scripts/") for e in eps), (m, eps)
+        folder = "/".join(eps[0].split("/")[:2])
+        assert mtb.method_info(m)["scripts_url"] == (
+            "https://github.com/PYangLab/scMultiBench/tree/main/" + folder)

@@ -42,21 +42,6 @@ def test_short_reason_strips_exception_prefix_row_prefix_and_absolute_paths():
     assert W._short_reason("", "M", "D", "c") == ""
 
 
-def test_short_reason_collapses_benchmark_host_only_to_one_sentence():
-    raw = ("benchmark-host-only: script not published: method script not found at "
-           "/benchmark/host/x/main_M.py - this entrypoint is an absolute path on "
-           "the benchmark host; the script is not part of the public scMultiBench "
-           "repository, so it cannot be fetched (method_info(m)['availability']); "
-           "FileNotFoundError: M/D11/cross: input files not found on disk: "
-           "{'rna1': '/benchmark/data/D11/rna1.h5'}. Available files in "
-           "/benchmark/data/D11: ['rna.h5']")
-    got = W._short_reason(raw, "M", "D11", "cross")
-    assert got == ("benchmark-host-only: script not published (see "
-                   "method_info(m)['availability']); input files not found on disk: "
-                   "{'rna1': 'rna1.h5'}. Available files in D11: ['rna.h5']")
-    assert "/benchmark" not in got and len(got) < len(raw) / 2
-
-
 def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     from multibench import config
     df = mtb.scan("D11", "vertical")

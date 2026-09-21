@@ -45,8 +45,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
                  atac: str | None = None,
                  modalities: list[str] | set[str] | None = None,
                  runnable: bool | None = None,
-                 tunable: bool | None = None,
-                 available: bool | None = None) -> list[str]:
+                 tunable: bool | None = None) -> list[str]:
     """Return the method ids that match every filter you pass.
 
     Filters combine with AND. A method matches when one of its variants meets
@@ -76,9 +75,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         ``True`` = methods with command-line hyperparameters that
         ``run(params=...)`` can set; ``False`` = the rest (settings fixed in
         the script); ``None`` = both.
-    available : bool | None
-        ``True`` = public methods (``availability == 'public'``); ``False`` =
-        ``benchmark-host-only`` ones; ``None`` = both.
 
     Returns
     -------
@@ -99,13 +95,13 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     >>> mtb.find_methods("vertical", modalities=["rna", "adt"])
     >>> mtb.find_methods("vertical", modalities=["rna", "adt"], needs_labels=False)
     >>> mtb.find_methods(atac="peak")                 # methods that want peak matrices
-    >>> mtb.find_methods(tunable=True, available=True)
+    >>> mtb.find_methods(tunable=True)
 
     Notes
     -----
-    **Per-variant matching.** ``task``, ``runnable``, ``tunable`` and
-    ``available`` are method-level; the other four filters hold per VARIANT,
-    as the summary says. Two consequences:
+    **Per-variant matching.** ``task``, ``runnable`` and ``tunable`` are
+    method-level; the other four filters hold per VARIANT, as the summary
+    says. Two consequences:
 
     - ``find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)``
       keeps scMoMaT: its vertical rna+adt variant takes no labels; only its
@@ -139,9 +135,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     filter that asks something of a variant: ``category``, ``modalities``,
     ``atac``, ``needs_labels=True`` or ``tunable=True``.
 
-    **Availability.** ``available`` reads ``method_info(m)['availability']``;
-    ``mtb.method_info`` explains the two values.
-
     See Also
     --------
     mtb.list_methods : the same ids filtered by ``category`` only.
@@ -173,8 +166,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
             has = any(v.tunable for v in s.variants)
             if has != tunable:
                 continue
-        if available is not None and (s.availability == "public") != available:
-            continue
         # `atac` is declared once per method but only variants that take an
         # ATAC input can honour it; fold that into the per-variant test.
         if atac and s.atac != atac:
@@ -297,14 +288,13 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``atac`` - the ATAC representation the script expects (``'peak'`` /
       ``'gene_activity'``), or ``None``.
     - ``needs_labels`` - method-level label flag; see **Labels** below.
-    - ``status`` / ``availability`` - see **Status** and **Availability**.
+    - ``status`` - see **Status**.
     - ``setup_hint`` - free-text setup advice, or ``''`` when there is none.
     - ``variants`` - the distinct upstream entrypoints, in order.
     - ``driver`` - the package-side wrapper actually executed, or ``None``
       when the upstream script runs directly.
     - ``scripts_url`` - the method's ``tools_scripts`` folder in the
-      scMultiBench repository, or ``None`` when its entrypoint is not
-      there.
+      scMultiBench repository.
     - ``repo_url`` / ``version`` - the upstream repository and the version
       the benchmark ran.
     - ``reference`` - ``{doi, title, authors, journal, year}`` or ``None``;
@@ -322,8 +312,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` - see **GPU and
       CPU**.
     - ``notes_long`` (``verbose=True`` only) - the raw upstream-knob audit
-      prose, ``None`` for methods outside the audit; a
-      ``benchmark-host-only`` method gets one sentence appended saying why.
+      prose, ``None`` for methods outside the audit.
     - Not in this dict: the paper-only catalog columns (``deep_learning``,
       ``output``); read them from ``mtb.catalog.methods()``.
 
@@ -354,16 +343,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     **Status.** ``status`` is the registry's wiring status. ``'verified'``
     means the command template was cross-checked against the upstream entrypoint
     and the method was executed end to end on a reference dataset;
-    ``'declared'`` = wired but not run. It says nothing about where the
-    script lives (see ``availability``).
-
-    **Availability.** Derived from the entrypoints, not a hand-set flag:
-
-    - ``'public'`` - every entrypoint lives in the public scMultiBench
-      repository; a public install can run it.
-    - ``'benchmark-host-only'`` - an entrypoint is an absolute path on the
-      benchmark host and is not published; ``scan`` reports it not
-      runnable and ``find_methods(available=True)`` drops it.
+    ``'declared'`` = wired but not run.
 
     **GPU and CPU.** ``cpu_params``, ``requires_gpu`` and ``gpu_evidence``
     are the GPU/CPU contract of the upstream script, read from its source:
@@ -401,8 +381,6 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         # env, or the method's own scmb_<method> env (see engine.envs.group_for).
         "tasks": s.tasks, "env": envs.group_for(s.id), "atac": s.atac,
         "needs_labels": s.needs_labels, "status": s.status,
-        # public | benchmark-host-only, derived from the entrypoints (schema)
-        "availability": s.availability,
         "setup_hint": s.setup_hint,
         # distinct entrypoints, in declaration order (several variants may share
         # one script)
@@ -413,11 +391,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
         "driver": next((v.driver for v in s.variants if v.driver), None),
         # folder of this method's unmodified upstream scripts in the
         # scMultiBench repository
-        "scripts_url": (
-            "https://github.com/PYangLab/scMultiBench/tree/main/"
-            + "/".join(s.variants[0].entrypoint.split("/")[:2])
-            if s.variants and s.variants[0].entrypoint.startswith("tools_scripts/")
-            else None),
+        "scripts_url": ("https://github.com/PYangLab/scMultiBench/tree/main/"
+                        + "/".join(s.variants[0].entrypoint.split("/")[:2])),
         # provenance (engine/references.yaml): the upstream repository / docs, the
         # version the benchmark ran, and the paper to cite (see mtb.cite)
         "repo_url": ref.get("repo_url") or upstream.knobs_for(s.id)["upstream_url"],
@@ -457,11 +432,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     info["requires_gpu"] = bool(s.requires_gpu)
     info["gpu_evidence"] = s.gpu_evidence or None
     if verbose:
-        notes_long = up["notes"]
-        if s.availability != "public":
-            why = _availability_sentence(s)
-            notes_long = f"{notes_long.rstrip()} {why}" if notes_long else why
-        info["notes_long"] = notes_long
+        info["notes_long"] = up["notes"]
     return info
 
 
@@ -495,16 +466,6 @@ def _runtime_hint(method: str) -> dict:
     rt["note"] = ("times observed on the benchmark host (NVIDIA RTX 4090); on a "
                   "CPU-only host expect training methods to take many times longer")
     return rt
-
-
-def _availability_sentence(spec) -> str:
-    """One sentence saying why a method is ``benchmark-host-only``."""
-    eps = sorted({v.entrypoint for v in spec.variants if not v.is_public})
-    return (f"Availability: benchmark-host-only - the entrypoint "
-            f"{', '.join(eps)} is an absolute path on the machine the benchmark "
-            f"was produced on and is not published in the scMultiBench repository, "
-            f"so a public install cannot fetch or run it (scan reports it not "
-            f"runnable; find_methods(available=True) omits it).")
 
 
 def _variant_key(v) -> str:
