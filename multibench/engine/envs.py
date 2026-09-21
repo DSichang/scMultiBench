@@ -359,26 +359,25 @@ _LOCKS_DIR = Path(__file__).resolve().parent / "env_locks"
 def recipe(method: str) -> dict:
     """Return the hand-written environment recipe of a method.
 
-    Read from ``engine/env_specs.yaml``; ``multibench env recipe METHOD``
-    renders it as commands.
+    The readable alternative to the lockfile: which Python, conda and pip
+    packages the method's env needs, with caveats.
 
     Parameters
     ----------
     method : str
-        Registry id (``KeyError`` with a did-you-mean hint on a typo).
+        Registry method id, e.g. ``'Matilda'``.
 
     Returns
     -------
     dict
-        The declared ``env_spec`` (``python_version``, ``conda_channels``,
-        ``conda_packages``, ``pip_packages``, ``difficulty``,
-        ``verified_working``, ``caveats`` ...); ``{}`` when the method has no
-        recipe.
+        The recipe as a dict; ``{}`` when the method declares none. Read
+        ``conda_packages``, ``pip_packages`` and ``caveats``; all keys are
+        listed in Notes.
 
     Raises
     ------
     KeyError
-        Unknown method id.
+        Unknown method id; the message suggests a close match, if any.
 
     Examples
     --------
@@ -386,11 +385,35 @@ def recipe(method: str) -> dict:
     >>> mtb.env.recipe("Matilda")["conda_packages"]
     >>> mtb.env.recipe("Matilda").get("caveats")
 
+    Notes
+    -----
+    **Keys.**
+
+    - ``python_version`` - the Python pin of the create line.
+    - ``conda_channels`` / ``conda_packages`` - the conda create line.
+    - ``pip_packages`` / ``pip_git`` - installed with pip afterwards
+      (``pip_git`` from git URLs).
+    - ``package_source`` - where the method's own code comes from (PyPI,
+      CRAN, vendored in ``tools_scripts/`` ...).
+    - ``difficulty`` / ``verified_working`` - the same values as in
+      ``mtb.env.status``.
+    - ``caveats`` - free-text notes on the recipe.
+
+    **Source.** The recipes live in ``engine/env_specs.yaml``, one entry per
+    method id (the method's ``env_spec``).
+
+    **Command line.** ``multibench env recipe METHOD`` prints the recipe as
+    conda/pip commands and ``multibench env yml METHOD`` as an
+    ``environment.yml``; by default both name the env the way ``mtb.scan``
+    and ``mtb.run`` expect it. The env ``mtb.run`` relies on is the lockfile
+    or packed-archive build (``mtb.env.install``); a recipe build can miss
+    what ``mtb.run`` needs (see ``caveats``).
+
     See Also
     --------
-    mtb.env.install : the lockfile / packed-archive path, which is what ``run`` relies on.
+    mtb.env.install : installs the env ``mtb.run`` relies on (packed archive or lockfile).
 
-    mtb.env.status : ``has_recipe`` / ``difficulty`` per method.
+    mtb.env.status : ``has_recipe`` and ``difficulty`` per method.
     """
     return registry.get(method).env_spec or {}
 
@@ -606,37 +629,35 @@ def _check_methods(methods):
 
 def plan(category: str | None = None, methods: list[str] | None = None, *,
          as_frame: bool = False):
-    """Which envs to build to cover a set of methods (e.g. all for a category).
+    """List the conda envs a set of methods needs, one row per env.
 
-    One entry per distinct conda env, listing the methods it serves - build
-    these (few) envs instead of one per method. ``multibench env plan`` prints
-    it with the archive / on-disk sizes from ``packed_sizes``.
+    Methods that share an env collapse into one row, so a whole category
+    needs only a few envs.
 
     Parameters
     ----------
     category : str | None
-        Restrict to the methods wired for this integration category
-        (``ValueError`` listing the four on a typo); default ``None``: every
-        method.
+        Integration category (``'vertical'``, ``'diagonal'``, ``'mosaic'`` or
+        ``'cross'``) whose methods to cover; ``None`` = every method.
     methods : list[str] | None
-        Explicit method ids instead of ``category`` (``KeyError`` with a
-        did-you-mean hint on a typo); default ``None``.
+        Method ids to cover instead of ``category``.
     as_frame : bool, keyword-only
-        ``True`` returns a ``pandas.DataFrame`` with the same columns
-        instead of the list of dicts (default False).
+        ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
     -------
     list[dict] or pandas.DataFrame
-        ``[{env, shared, methods, availability, flavor}]``, largest env
-        first; the keys are described in Notes.
+        One row per env, the env serving the most methods first. Read
+        ``env``, ``methods`` and ``availability``; all keys are listed in
+        Notes.
 
     Raises
     ------
     ValueError
-        Unknown ``category``.
+        Unknown ``category``; the message lists the valid ones.
     KeyError
-        Unknown method id in ``methods``.
+        Unknown method id in ``methods``; the message suggests a close
+        match, if any.
 
     Examples
     --------
@@ -646,18 +667,28 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
 
     Notes
     -----
-    ``shared`` - the env serves several methods (an ``env_groups.yaml``
-    group); ``availability`` - ``'public'``, or ``'benchmark-host-only'``
-    when every method the env serves needs a script that is not published
-    (SPIRAL): the env builds, the method still cannot run off the benchmark
-    host; ``flavor`` - ``'cpu'`` / ``'gpu'`` when the env is installed here
-    from a packed archive (``installed_flavor``), else ``None``.
+    **Keys.**
+
+    - ``env`` - the conda env name, the one ``mtb.run`` activates.
+    - ``shared`` - the env is a shared group of ``env_groups.yaml``.
+    - ``methods`` - the selected methods this env serves, sorted.
+    - ``availability`` - ``'public'``, or ``'benchmark-host-only'`` when
+      none of those methods has a published script (SPIRAL): the env
+      builds, but the method still cannot run off the benchmark host.
+    - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the env is installed here from
+      a packed archive, else ``None``.
+
+    **Selection.** ``methods`` takes precedence over ``category``.
+
+    **Command line.** ``multibench env plan`` prints the same rows with each
+    archive's download size and unpacked size on disk (from the shipped
+    ``packed_sizes.json``; ``?`` = not measured) and a total line.
 
     See Also
     --------
     mtb.env.install : builds or unpacks exactly these envs.
 
-    mtb.env.doctor : whether each of them exists here.
+    mtb.env.doctor : whether each of these envs exists here.
     """
     _check_methods(methods)
     if methods is None:
@@ -950,24 +981,21 @@ def installed_envs(conda: str | None = None) -> list[str]:
 
 
 def status(conda: str | None = None, *, as_frame: bool = False):
-    """Per-method install status: is the method's env on this machine?
+    """Report, per method, whether its conda env is installed on this machine.
 
     Parameters
     ----------
     conda : str | None
-        conda executable used to list the installed envs; default ``None``:
-        conda if found, else mamba (prefixes under ``envs_dir`` are probed
-        either way).
+        conda/mamba executable that lists the installed envs; ``None`` =
+        conda if found, else mamba.
     as_frame : bool, keyword-only
-        ``True`` returns a ``pandas.DataFrame`` instead of the list of dicts
-        (default False).
+        ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
     -------
     list[dict] or pandas.DataFrame
-        One entry per registry method: ``{method, env, group, own_env,
-        exists, has_lock, difficulty, verified_working, has_recipe,
-        flavor}``; each key is described in Notes.
+        One row per registry method. Read ``method``, ``env``, ``exists``
+        and ``has_lock``; all keys are listed in Notes.
 
     Examples
     --------
@@ -978,16 +1006,45 @@ def status(conda: str | None = None, *, as_frame: bool = False):
 
     Notes
     -----
-    ``env`` and ``group`` are both the env the package uses for the method
-    (``default_env_name`` == ``group_for``); ``own_env`` is the singleton
-    ``scmb_<method>`` name, reported installed too when present; ``has_lock``
-    says a shipped lockfile can build ``env`` (the ``[L]`` of
-    ``MARK_LEGEND``, shared with ``doctor``). ``difficulty`` is one of the
-    ``DIFFICULTY`` tags (``easy`` / ``old-scvi`` / ``old-tensorflow`` / ``R``
-    / ``verified`` / ``blocked-script``; ``unknown`` without a recipe) and
-    ``verified_working`` is the ``*`` of ``env status`` (``VERIFIED_STAR``).
-    ``flavor`` is ``'cpu'`` / ``'gpu'`` when the installed env came from a
-    packed archive (``installed_flavor``), else ``None``.
+    **Keys.**
+
+    - ``method`` - the registry id.
+    - ``env`` - the env the package uses for the method, the name
+      ``mtb.scan`` and ``mtb.run`` use (``mtb.env.default_env_name``).
+    - ``group`` - the same name as ``env``.
+    - ``own_env`` - the singleton name ``scmb_<method>`` (lower-case); the
+      method also counts as installed when this env exists.
+    - ``exists`` - ``env`` or ``own_env`` is installed here.
+    - ``has_lock`` - a shipped lockfile can build ``env`` (``[L]`` in
+      ``multibench env status`` while the env is missing, as in
+      ``multibench env doctor``).
+    - ``difficulty`` - a tag for how hard the env is to build (below).
+    - ``verified_working`` - the env ran the method end-to-end on its
+      reference dataset (the ``*`` after the tag in ``multibench env status``).
+    - ``has_recipe`` - the method declares a recipe (``mtb.env.recipe``).
+    - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the installed env came from a
+      packed archive, else ``None``.
+
+    **Difficulty tags.** They describe how hard the env is to build from its
+    recipe, not how well the method works (full text in
+    ``mtb.env.DIFFICULTY``):
+
+    - ``easy`` - modern Python/torch stack; builds from the lockfile.
+    - ``old-scvi`` / ``old-tensorflow`` - old scvi-tools or TensorFlow pins
+      that need their own env.
+    - ``R`` - an R env; the post-install script restores packages
+      installed with ``install.packages()``.
+    - ``verified`` - built from the lockfile on a fresh machine, and the
+      method ran end-to-end on its reference dataset.
+    - ``blocked-script`` - the env builds, but the upstream script cannot
+      run unmodified from the public checkout.
+    - ``unknown`` - no recipe declared.
+
+    **What counts as installed.** A prefix ``<envs_dir>/<env>`` with a
+    ``bin/`` directory (``envs_dir`` = ``mtb.config.Config.envs_dir``; no
+    conda needed), or an env listed by ``conda env list`` of the ``conda``
+    given, else of the conda/mamba on PATH. The prefix probe runs whether or
+    not ``conda`` is given.
 
     See Also
     --------
@@ -1231,67 +1288,61 @@ def packed_manifest() -> dict:
 def install(methods: list[str] | None = None, *, category: str | None = None,
             packed: bool = True, dry_run: bool = True, conda: str | None = None,
             force: bool = False, flavor: str = "auto") -> list[dict]:
-    """Install the conda envs a selection of methods needs.
+    """Install the conda envs a set of methods needs (a dry run by default).
 
-    The Python equivalent of ``multibench env install`` (the CLI calls this
-    function). The default is a dry run that returns the plan; pass
-    ``dry_run=False`` to download packed archives or build from lockfiles.
+    The Python form of ``multibench env install``. The default returns the
+    plan; ``dry_run=False`` unpacks packed archives or builds from lockfiles,
+    on Linux.
 
     Parameters
     ----------
     methods : list[str] | None
-        Registry ids (``KeyError`` with a did-you-mean hint on a typo);
-        default ``None``: every method of ``category``, or every method.
+        Method ids to cover; ``None`` = every method of ``category``, or every
+        method.
     category : str | None, keyword-only
-        Restrict to the methods wired for this integration category; default
-        ``None``.
+        Integration category (``'vertical'``, ``'diagonal'``, ``'mosaic'`` or
+        ``'cross'``) whose methods to cover when ``methods`` is ``None``.
     packed : bool, keyword-only
-        Use the prebuilt conda-pack archives where one is published
-        (``packed_manifest``), falling back to the lockfile build (default
-        True); ``False`` builds every missing env from its lockfile.
+        Use a prebuilt conda-pack archive where one is published, else the
+        lockfile; ``False`` = lockfile builds only.
     dry_run : bool, keyword-only
-        ``True`` (default) installs nothing and returns the plan; ``False``
-        installs the missing envs - packed archives first when ``packed``,
-        lockfile builds otherwise - and returns the per-env outcome. The
-        ``state`` values are listed in Notes.
+        ``True`` returns the plan and installs nothing; ``False`` installs the
+        missing envs.
     conda : str | None, keyword-only
-        conda/mamba executable; default ``None``: conda if found, else mamba.
-        Not needed for the packed path: archives unpack into
-        ``mtb.config.Config.envs_dir`` and the runner activates the prefix
-        directly (Colab, laptops without conda).
+        conda/mamba executable; ``None`` = conda if found, else mamba. The
+        packed path needs none.
     force : bool, keyword-only
-        The archives and lockfiles are linux-64; ``dry_run=False`` on
-        macOS/Windows raises ``RuntimeError`` before any download unless
-        ``force=True`` (default False).
+        ``True`` = attempt a real install on a non-Linux host, which is
+        refused otherwise.
     flavor : str, keyword-only
-        Which packed archive per env - ``'gpu'`` (the CUDA build), ``'cpu'``
-        (the ``'<env>-cpu'`` archive, 3-4x smaller, where published; the
-        GPU build with a ``UserWarning`` otherwise) or ``'auto'`` (default:
-        ``'cpu'`` when ``host_has_gpu`` is ``False``, else ``'gpu'``). The
-        dry-run plan sizes and URL follow the flavour, so a CPU host sees the
-        CPU archives' download total. Anything else: ``ValueError`` listing
-        the three.
+        Packed-archive build per env: ``'cpu'``, ``'gpu'`` (the CUDA build)
+        or ``'auto'`` (``'cpu'`` unless an NVIDIA GPU is visible); unused
+        when ``packed=False``.
 
     Returns
     -------
     list[dict]
-        One entry per distinct env, largest first: ``{env, methods, exists,
-        has_lock, cmds, state, packed_url, archive_bytes, unpacked_bytes,
-        flavor}``; the keys are described in Notes.
+        One row per env, the env serving the most methods first. Read
+        ``env``, ``state`` and ``archive_bytes``; all keys and ``state``
+        values are listed in Notes.
 
     Raises
     ------
     ValueError
-        ``flavor`` not in ``FLAVORS`` - before anything else is checked.
-    RuntimeError
-        ``dry_run=False`` only: a non-Linux host without ``force``; a failed
-        build; or no conda/mamba on the host while a missing env needs a
-        lockfile build - ``"no conda/mamba on this host; <env> has a packed
-        archive - pass packed=True"`` when ``packed=False`` would have
-        skipped a published archive, ``"... has no packed archive - install
-        conda first"`` when none exists. Both are raised before any download.
+        ``flavor`` is not ``'auto'``, ``'cpu'`` or ``'gpu'``; or unknown
+        ``category``.
     KeyError
-        Unknown method id in ``methods``.
+        Unknown method id in ``methods``; the message suggests a close
+        match, if any.
+    RuntimeError
+        ``dry_run=False`` only: a non-Linux host, no conda where needed, or a
+        failed build.
+
+    Warns
+    -----
+    UserWarning
+        A CPU install finds no CPU archive for an env; the GPU build is
+        installed.
 
     Examples
     --------
@@ -1303,32 +1354,92 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
 
     Notes
     -----
-    ``state`` on a dry run is one of ``'have'``, ``'packed archive
-    published'`` (plus its sizes/URL), ``'no archive - lockfile build'``,
-    ``'no archive - NO-LOCK'``, ``'build(dry-run)'`` or ``'NO-LOCK'``; after
-    a real install it is ``'PACKED'`` / ``'BUILD'`` / ``'have'`` /
-    ``'NO-LOCK'``.
+    **Keys.**
 
-    ``cmds`` = the lockfile commands run, or that would run; ``packed_url``
-    / ``archive_bytes`` / ``unpacked_bytes`` are ``None`` unless ``packed``
-    and known - a ``null`` in ``packed_sizes.json`` is unknown, same as a
-    missing entry. ``flavor``: for an installed env the archive it came from
-    (``installed_flavor``; ``None`` when unrecorded), for a missing env the
-    flavour the packed path would install (``'cpu'`` / ``'gpu'`` after the
-    per-env fallback), ``None`` when ``packed=False`` (a lockfile build has
-    no flavour).
+    - ``env`` / ``methods`` - the env and the selected methods it serves.
+    - ``exists`` - the env is installed when the lockfile step runs:
+      ``True`` for an env already there or just unpacked (``'PACKED'``),
+      ``False`` for one this call builds or cannot build.
+    - ``has_lock`` - a shipped lockfile can build the env.
+    - ``state`` - what happened, or would happen (values below).
+    - ``cmds`` - the lockfile commands run, or that would run.
+    - ``packed_url`` / ``archive_bytes`` / ``unpacked_bytes`` - the archive
+      the flavour selects and its sizes; ``None`` unless ``packed`` and
+      known (a ``null`` in ``packed_sizes.json`` counts as unknown).
+    - ``flavor`` - for an installed env, the archive it came from (``None``
+      when unrecorded); for a missing env, the flavour the packed path would
+      install, or ``None`` when ``packed=False``.
 
-    The per-env unpacking is ``install_packed``; the lockfile path is
-    ``create_all``. The CLI equivalents are ``multibench env install
-    --methods X --packed --run`` and ``multibench env install --run``.
+    **State values on a dry run.**
+
+    - ``'have'`` - already installed.
+    - ``'packed archive published'`` - an archive would be downloaded; the
+      sizes and URL are filled in.
+    - ``'no archive - lockfile build'`` / ``'no archive - NO-LOCK'`` -
+      ``packed=True`` but no archive is published; the lockfile builds the
+      env, or there is no lockfile either.
+    - ``'build(dry-run)'`` / ``'NO-LOCK'`` - ``packed=False``; the lockfile
+      builds the env, or there is none.
+
+    **State values after a real install** (``dry_run=False``).
+
+    - ``'PACKED'`` - unpacked from an archive.
+    - ``'BUILD'`` - built from the lockfile.
+    - ``'have'`` - already installed.
+    - ``'NO-LOCK'`` - no lockfile and no archive unpacked; reported, not
+      built.
+
+    **Flavours.** The env name and prefix are the same whatever the flavour.
+
+    - ``'gpu'`` - the ``'<env>'`` archive, the CUDA build every env has.
+    - ``'cpu'`` - the ``'<env>-cpu'`` archive (the same env without the CUDA
+      libraries, several times smaller) where published; otherwise the GPU
+      build and one ``UserWarning``.
+    - ``'auto'`` - ``'cpu'`` when ``mtb.env.host_has_gpu()`` is ``False``
+      (no ``nvidia-smi -L`` output and no ``/proc/driver/nvidia/version``),
+      else ``'gpu'``.
+
+    The dry-run sizes and URL follow the flavour, so a CPU host sees the CPU
+    archives' download total. The flavour installed is recorded in
+    ``<prefix>/.multibench_flavor`` and shown by ``mtb.env.status``,
+    ``mtb.env.doctor`` and ``mtb.env.plan``.
+
+    **Order of work** (``dry_run=False``). With ``packed``, each missing env
+    is first tried as an archive (its URL in ``packed_urls.json``, else the
+    release-asset default under ``mtb.env.PACKED_URL``). An HTTP error on
+    the download or a failed unpack falls back to the lockfile build; envs
+    with no lockfile are reported ``'NO-LOCK'``, not built.
+
+    **Where envs go.** Archives unpack into ``mtb.config.Config.envs_dir``
+    (or, when ``conda`` is given, that tool's envs dir). The runner activates
+    the prefix directly, so the packed path works without conda (Colab,
+    laptops without conda).
+
+    **Errors.** ``flavor`` is checked before anything else. With
+    ``dry_run=False``:
+
+    - Archives and lockfiles are linux-64, so a non-Linux host raises
+      ``RuntimeError`` before any download unless ``force=True``.
+    - Without conda/mamba, a missing env that needs a lockfile build raises
+      ``RuntimeError`` before any download: ``"no conda/mamba on this host;
+      <env> has a packed archive - pass packed=True"`` when ``packed=False``
+      skipped a published archive, ``"... has no packed archive - install
+      conda first"`` otherwise.
+    - A failed build command raises ``RuntimeError`` with its stderr tail.
+
+    **Command line.** ``multibench env install --methods X --packed --run``
+    takes the packed path; ``multibench env install --run`` builds from
+    lockfiles (the CLI's ``--packed`` is off by default). The per-env steps
+    are ``mtb.env.install_packed`` (one archive) and ``mtb.env.create_all``
+    (lockfile builds).
 
     See Also
     --------
-    mtb.env.plan : the envs a selection of methods needs, before installing.
+    mtb.env.plan : the envs a set of methods needs, before installing.
 
-    mtb.env.doctor : which of them exist here.
+    mtb.env.doctor : which of those envs exist here.
 
-    mtb.env.status : the same per method.
+    mtb.env.status : install status per method.
     """
     check_flavor(flavor)
     _check_methods(methods)
@@ -1395,38 +1506,37 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
 
 def doctor(category: str | None = None, methods: list[str] | None = None,
            conda: str | None = None, *, as_frame: bool = False):
-    """Report, per env the selected methods need, whether it exists and has a lockfile.
+    """Report, per needed env, whether it is installed and has a lockfile.
 
-    This is the preflight behind ``multibench env doctor`` and the ``env_ok``
-    gate of ``mtb.scan``. A fresh machine sees ``exists=False`` everywhere;
-    ``multibench env install --run`` (Python: ``mtb.env.install`` with
-    ``dry_run=False``) builds the missing ones - on Linux only, see
-    ``host_platform_problem``.
+    Run it before ``mtb.run`` on a new machine; ``mtb.env.install`` installs
+    the envs it reports missing.
 
     Parameters
     ----------
     category : str | None
-        Restrict to the methods wired for this category; default ``None``: all.
+        Integration category (``'vertical'``, ``'diagonal'``, ``'mosaic'`` or
+        ``'cross'``) whose methods to check; ``None`` = every method.
     methods : list[str] | None
-        Explicit method ids (``KeyError`` with a did-you-mean hint on a
-        typo); default ``None``.
+        Method ids to check instead of ``category``.
     conda : str | None
-        conda executable used to list the installed envs; default ``None``:
+        conda/mamba executable that lists the installed envs; ``None`` =
         conda if found, else mamba.
     as_frame : bool, keyword-only
-        ``True`` returns a ``pandas.DataFrame`` instead of the list of dicts
-        (default False).
+        ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
     -------
     list[dict] or pandas.DataFrame
-        ``[{env, methods, exists, has_lock, flavor}]``, largest env first;
-        the keys are described in Notes.
+        One row per env, the env serving the most methods first. Read
+        ``env``, ``exists`` and ``has_lock``; all keys are listed in Notes.
 
     Raises
     ------
+    ValueError
+        Unknown ``category``; the message lists the valid ones.
     KeyError
-        Unknown method id in ``methods``.
+        Unknown method id in ``methods``; the message suggests a close
+        match, if any.
 
     Examples
     --------
@@ -1436,20 +1546,33 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
 
     Notes
     -----
-    ``exists`` - the env is installed (the ``[x]`` of ``MARK_LEGEND``);
-    ``has_lock`` - ``env_locks/<env>.yml`` is shipped, so ``env install
-    --run`` can build it (``[L]``); neither (``[!]``) means the recipe path
-    only. The same marks ``env status`` prints per method. ``flavor`` -
-    ``'cpu'`` / ``'gpu'`` when the installed env came from a packed archive
-    (``installed_flavor``), else ``None``.
+    **Keys.** The marks in brackets are the ones ``multibench env doctor``
+    prints per env and ``multibench env status`` prints per method.
+
+    - ``env`` / ``methods`` - the env and the selected methods it serves.
+    - ``exists`` - the env is installed here (``[x]``).
+    - ``has_lock`` - ``env_locks/<env>.yml`` is shipped, so
+      ``multibench env install --run`` can build it (``[L]`` while missing).
+      A missing env without one (``[!]``) needs a packed archive or the
+      recipe (``mtb.env.recipe``).
+    - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the installed env came from a
+      packed archive, else ``None``.
+
+    **Next step.** A fresh machine reports ``exists=False`` everywhere.
+    ``mtb.env.install(methods, dry_run=False)`` installs the missing envs,
+    packed archives first; on the command line that is
+    ``multibench env install --methods ... --packed --run`` (the ``# next``
+    line ``multibench env doctor`` prints), while plain
+    ``multibench env install --run`` builds from lockfiles only. Linux only;
+    ``mtb.env.host_platform_problem()`` says why another host refuses.
 
     See Also
     --------
     mtb.env.install : builds or unpacks the envs reported missing.
 
-    mtb.env.status : the same per method.
+    mtb.env.status : the same information per method.
 
-    mtb.scan : uses this as its ``env_ok`` gate.
+    mtb.scan : its ``env_ok`` column uses the same installed-env check.
     """
     _check_methods(methods)
     have = set(installed_envs(conda))
