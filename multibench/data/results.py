@@ -68,10 +68,25 @@ _DEGENERATE_PUBLISHED_ARI = 0.2
 class DegenerateRerunWarning(UserWarning):
     """A re-run row scored ARI ~0 where the published table scored well.
 
-    Emitted by :func:`load_results` (``source="rerun"`` / ``"both"``) so a
-    silently failed re-run can never enter a ranking unnoticed. Filter with
-    ``warnings.simplefilter("ignore", mtb.data.results.DegenerateRerunWarning)``
-    once you have decided how to treat those rows.
+    Emitted by ``mtb.load_results`` with ``source="rerun"`` or ``"both"``,
+    so a silently failed re-run never enters a ranking unnoticed.
+
+    Notes
+    -----
+    **When it fires:**
+
+    - a re-run row scored ARI below 0.01 where the published table scored
+      the same category, dataset and method above 0.2: the re-run almost
+      certainly failed silently (a collapsed embedding, a wrong label
+      order), so the row says nothing about the method;
+    - also emitted by ``mtb.recommend`` on those sources; a ``result_path``
+      file is not checked;
+    - in the shipped sweeps: Conos on D28.
+
+    **What to do:** drop the row before ranking (the message suggests
+    ``df[df.method != 'Conos']``); once you have decided how to treat those
+    rows, silence it with
+    ``warnings.simplefilter("ignore", mtb.DegenerateRerunWarning)``.
     """
 
 # a result directory like ``Concerto_louvain`` is the method's louvain variant:
@@ -548,127 +563,164 @@ def load_results(
     source: str = "published",
     result_path: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Benchmark metric tables as a tidy long frame.
+    """Load the stored benchmark metric tables as one tidy long frame.
+
+    Reads the published scIB tables, the package's re-run sweeps, or a long
+    CSV of your own. Frames from any source concatenate and go straight to
+    ``mtb.plot.bubble`` or ``mtb.recommend``.
 
     Parameters
     ----------
-    category : {"vertical", "diagonal", "mosaic", "cross"}, optional
-        Integration category. ``None`` (default) loads every category that
-        has tables for the requested ``source``; an unknown token raises
-        ``ValueError`` listing the valid ones.
+    category : str, optional
+        Integration category (``vertical``, ``diagonal``, ``mosaic``,
+        ``cross``); ``None`` = every category with tables for ``source``.
     dataset : str or list of str, keyword-only
-        Dataset id(s), e.g. ``"D11"`` or ``["D11", "D11s"]``. Default: all
-        datasets of the category. Every requested id must have a table:
-        ``["D11", "D99"]`` raises ``FileNotFoundError`` naming ``D99`` and the
-        datasets that are available.
+        Dataset id(s), e.g. ``"D11"`` or ``["D11", "D11s"]``; ``None`` = every
+        dataset of the category.
     methods : str or list of str, keyword-only
-        Keep only these method(s); alias tolerant and case-insensitive
-        (``"mofa+"`` -> MOFA2, ``"totalvi"`` -> totalVI). A name that is
-        neither a registry id nor a method in the loaded frame raises
-        ``KeyError`` with a did-you-mean hint (``"unknown method 'Matlida';
-        did you mean 'Matilda'?"``). A known method with no rows gives an
-        empty frame and a ``UserWarning`` (see Notes). ``method=`` is the
-        deprecated 0.2.x spelling.
+        Method(s) to keep, alias tolerant and case-insensitive (``"mofa+"``
+        -> ``MOFA2``, ``"totalvi"`` -> ``totalVI``); ``None`` = every method.
     metrics : None, str or list of str, keyword-only
-        Which metrics to keep, in the vocabulary of
-        :func:`multibench.evaluate`: ``None`` / ``"all"`` (default) keeps
-        every metric; ``"clustering"`` keeps ``mtb.plot.CLUSTERING_METRICS``
-        (ARI, NMI, ASW, iASW, iF1, cLISI); ``"batch"`` keeps
-        ``mtb.plot.BATCH_METRICS`` (ASW_batch, GC, iLISI, kBET); a list of
-        codes keeps exactly those (alias tolerant, ``["ari"]`` -> ARI). Every
-        code must be one of :func:`multibench.catalog.known_metrics` or
-        present in the frame: ``["ZZZ"]`` raises ``ValueError`` listing both.
-        A known code the tables lack gives an empty frame and a
-        ``UserWarning``; an unknown token (``"dimension_reduction"`` is a
-        ``list_tasks`` token, not a family) raises ``ValueError``.
-        ``metric=``, ``task=`` and ``family=`` are the deprecated 0.2.x
-        spellings.
+        ``None`` / ``"all"`` = every metric; or ``"clustering"``,
+        ``"batch"``, or a list of codes such as ``["ARI", "NMI"]``.
     clustering : {"default", "louvain", "kmeans"}, keyword-only
-        Which clustering variant of the published tables to read
-        (``metric.csv`` / ``metric_louvain.csv`` / ``metric_kmeans.csv``). A
-        result directory named ``<method>_louvain`` / ``<method>_kmeans`` is
-        that variant: it is reported under the method's canonical id with
-        ``clustering`` set to the suffix, and only when that variant is
-        requested. The re-run sweeps are ``"default"`` only.
+        Clustering variant of the published tables: ``metric.csv``,
+        ``metric_louvain.csv`` or ``metric_kmeans.csv``.
     source : str, keyword-only
-        For a results root: ``"published"`` (default; the scIB tables under
-        ``result_path/scib_metric``, none for mosaic), ``"rerun"`` (the
-        package's re-run sweeps ``result_path/rerun/long_all_<dataset>.csv``:
-        vertical D11/D11s, diagonal D28/D28s, mosaic D45/D45s, cross
-        D52/D52s) or ``"both"`` (the concatenation; the ``source`` column
-        tells the rows apart). Anything else raises ``ValueError``. For a
-        file, ``"published"`` and ``"both"`` keep every row, while any other
-        value filters on the file's own ``source`` column: ``"user"`` keeps
-        the rows :func:`multibench.to_long` wrote, ``"rerun"`` matches
-        ``rerun`` and a ``rerun-<version>`` stamp by prefix, and a value the
-        file does not contain raises ``ValueError`` listing the ones present.
-        Notes describes the warnings tied to ``source``.
+        ``"published"`` (scIB tables), ``"rerun"`` (package sweeps) or
+        ``"both"``; for a ``result_path`` file, a value of its ``source``
+        column.
     result_path : path-like, keyword-only
-        A results root (holding ``scib_metric/`` and/or ``rerun/``; default
-        ``mtb.config.DEFAULT.result_path``, the tables shipped in the
-        package) or a single long CSV file (columns ``metric, value, method``
-        at least, e.g. written by ``to_long(...).to_csv`` or
-        ``BatchResult.save()``). A file keeps whatever ``source`` /
-        ``clustering`` values it carries; a missing column or a blank cell is
-        filled with ``"user"`` / ``"default"`` per row.
+        A results root holding ``scib_metric/`` and/or ``rerun/``, or one
+        long CSV file; ``None`` = the tables shipped in the package.
 
     Returns
     -------
     pandas.DataFrame
-        Columns, in this order: ``metric, value, method, dataset, category,
-        clustering, source``. Method ids are canonical registry tokens
-        (``MOFA+`` -> ``MOFA2``, ``Seurat(WNN)`` -> ``Seurat_WNN``); metric
-        codes are canonical (``iFI`` -> ``iF1``). ``source`` is
-        ``"published"``, ``"rerun"`` or ``"user"`` (a file keeps its own
-        values); ``frame.attrs["rerun_version"]`` holds the package version
-        stamped on the re-run rows (``"0.2.1"``; a sorted tuple when files
-        from several versions were loaded; ``None`` when no stamped row is
-        present). ``attrs`` do not survive ``pd.concat`` - read it before
-        concatenating.
+        One row per score, columns ``metric, value, method, dataset,
+        category, clustering, source``. ``attrs["rerun_version"]`` holds the
+        re-run stamp (Notes).
 
     Raises
     ------
     FileNotFoundError
-        No table for the requested category/dataset/source (any element of a
-        ``dataset`` list), with the path looked at, the datasets that have
-        tables and the ``result_path=`` hint.
+        No table for a requested category, dataset or source.
     KeyError
-        An unknown method name in ``methods`` (did-you-mean hint).
+        An unknown name in ``methods`` (with a did-you-mean hint).
     ValueError
-        Unknown ``category`` / ``metrics`` token or code / ``clustering`` /
-        ``source``, or a ``result_path`` file without the long-format
-        columns.
+        An unknown ``category``, ``metrics``, ``clustering`` or ``source``,
+        or a malformed ``result_path`` file.
     TypeError
-        The removed 0.2.x keyword ``metric_set``, or a positional argument
-        after ``category`` (everything else is keyword-only).
+        A positional argument after ``category``, or a retired keyword
+        (Notes).
 
     Examples
     --------
-    >>> pub = mtb.load_results("diagonal", dataset="D28")            # published
-    >>> rr = mtb.load_results("diagonal", dataset="D28", source="rerun")
-    >>> both = mtb.load_results("cross", dataset="D52", source="both")
-    >>> mtb.plot.bubble(both[both.source != "published"])
-    >>> mtb.load_results("diagonal", dataset="D28", metrics="batch")   # one family
-    >>> mine = mtb.load_results(result_path="mine.csv", source="user")  # your rows only
+    >>> import multibench as mtb
+    >>> pub = mtb.load_results("diagonal", dataset="D28")                 # published tables
+    >>> rr = mtb.load_results("diagonal", dataset="D28", source="rerun")  # package re-runs
+    >>> both = mtb.load_results("cross", dataset="D52", source="both", metrics="batch")
+    >>> mine = mtb.load_results(result_path="mine.csv", source="user")    # your own rows
 
     Notes
     -----
-    A known method with no rows in the loaded tables gives an empty frame and
-    a ``UserWarning`` rather than an error, so that several calls can be
-    concatenated. Under ``source="published"`` the warning also says whether
-    the re-run sweeps hold that method (``"rerun has 1 dataset(s) ... pass
-    source='rerun'"``): a published table need not score every method wired
-    for its category.
+    **Sources.** ``source`` picks the tables under a results root
+    (default ``mtb.config.DEFAULT.result_path``, shipped in the package):
 
-    With ``"rerun"`` / ``"both"``, a re-run row whose ARI is ~0 while the
-    published table scored the same method and dataset well is reported by a
-    :class:`DegenerateRerunWarning` (in the shipped sweeps: Conos on D28).
+    - ``"published"`` - the scIB tables under ``result_path/scib_metric``
+      (shipped: vertical D11, diagonal D24/D25/D28, cross D52; none for
+      mosaic);
+    - ``"rerun"`` - the package's re-run sweeps
+      ``result_path/rerun/long_all_<dataset>.csv`` (shipped: vertical
+      D11/D11s, diagonal D28/D28s, mosaic D45/D45s, cross D52/D52s);
+    - ``"both"`` - the concatenation; the ``source`` column tells the rows
+      apart.
 
-    When the selection holds one method in the chosen source while the other
-    source holds more, a ``UserWarning`` says so (``"only one method
+    **Your own file.** ``result_path`` may be one long CSV with at least the
+    columns ``metric, value, method``, e.g. written by ``to_long(...).to_csv``
+    or ``BatchResult.save()``. A file keeps whatever ``source`` /
+    ``clustering`` values it carries; a missing column or a blank cell is
+    filled with ``"user"`` / ``"default"`` per row. ``source=`` then filters
+    on the file's own ``source`` column:
+
+    - ``"published"`` / ``"both"`` - keep every row;
+    - ``"user"`` - the rows ``mtb.to_long`` wrote;
+    - ``"rerun"`` - ``rerun`` and ``rerun-<version>`` rows (prefix match);
+    - any value the file does not contain raises ``ValueError`` listing the
+      ones present.
+
+    **Method and metric names.** A ``methods`` entry that is neither a
+    registry id nor a method in the loaded frame raises ``KeyError`` with a
+    did-you-mean hint (``"unknown method 'Matlida'; did you mean
+    'Matilda'?"``). Method folders of the published tables are reported by
+    registry id (``MOFA+`` -> ``MOFA2``, ``Seurat(WNN)`` -> ``Seurat_WNN``);
+    metric names read from the published tables or a file are canonical
+    (``iFI`` -> ``iF1``).
+
+    **Dataset ids.** Every requested id must have a table: ``["D11",
+    "D99"]`` raises ``FileNotFoundError`` naming ``D99``, the datasets that
+    have tables and the ``result_path=`` hint. Ids are case-sensitive; with
+    a ``category``, an id that differs from a stored one only in case
+    (``"d52"``) is replaced by the stored spelling, with a ``UserWarning``.
+
+    **Metric selection.** Uses the vocabulary of ``mtb.evaluate``:
+
+    - ``"clustering"`` - ``mtb.plot.CLUSTERING_METRICS`` (ARI, NMI, ASW,
+      iASW, iF1, cLISI);
+    - ``"batch"`` - ``mtb.plot.BATCH_METRICS`` (ASW_batch, GC, iLISI, kBET);
+    - a list - exactly those codes (alias tolerant, ``["ari"]`` -> ARI).
+
+    Every code must be one of ``mtb.catalog.known_metrics()`` or present in
+    the frame: ``["ZZZ"]`` raises ``ValueError`` listing both. An unknown
+    token raises too (``"dimension_reduction"`` is a ``list_tasks`` token,
+    not a family).
+
+    **Empty results.** A known method or metric with no rows gives an empty
+    frame and a ``UserWarning`` rather than an error, so that several calls
+    can be concatenated. Under ``source="published"`` the warning also says
+    whether the re-run sweeps hold that method (``"rerun has 1 dataset(s)
+    ... pass source='rerun'"``): a published table need not score every
+    method wired for its category.
+
+    **Clustering variants.** A result directory named ``<method>_louvain`` /
+    ``<method>_kmeans`` is that variant: it is reported under the method's
+    canonical id with ``clustering`` set to the suffix, and only when that
+    variant is requested. ``clustering=`` reads the published tables only;
+    re-run rows are ``"default"``.
+
+    **Warnings about the tables.** With ``"rerun"`` / ``"both"``, a re-run
+    row whose ARI is ~0 while the published table scored the same method
+    and dataset well emits a ``mtb.DegenerateRerunWarning`` (in the shipped
+    sweeps: Conos on D28).
+
+    When the selection holds one method in the chosen source while the
+    other source holds more, a ``UserWarning`` says so (``"only one method
     (scMoMaT) in the published table for cross/D52 ... pass source='rerun'
     (or 'both')"``): a one-method table yields meaningless ranks. No warning
     when the other source has nothing more.
+
+    **Re-run version.** The sweep files stamp their rows
+    ``rerun-<version>``; the ``source`` column reads plain ``"rerun"`` and
+    ``attrs["rerun_version"]`` keeps the version (``"0.2.1"``; a sorted
+    tuple when files from several versions were loaded; ``None`` when no
+    stamped row is present). ``pd.concat`` keeps ``attrs`` only when every
+    input carries the same ones - read it before concatenating.
+
+    **Retired keywords.** ``method=``, ``metric=``, ``task=`` and
+    ``family=`` still work, with a ``DeprecationWarning``; ``metric_set=``
+    raises ``TypeError``. The API overview lists the replacements.
+
+    See Also
+    --------
+    mtb.available_datasets : the dataset ids that have stored tables.
+
+    mtb.results_coverage : which methods each source covers, per dataset.
+
+    mtb.to_long : turns ``mtb.evaluate`` scores into this shape.
+
+    mtb.recommend : ranks methods from these tables.
+
+    mtb.plot.bubble : plots the frame.
     """
     if clustering not in _CLUSTERING_FILES:
         raise ValueError(
@@ -884,27 +936,17 @@ def available_datasets(
 ) -> list[str]:
     """Dataset ids that ship stored results, not the datasets that can be downloaded.
 
-    Stored results are the metric tables :func:`load_results` reads. Only a
-    few of the benchmark's datasets are downloadable: the release assets of
-    :func:`multibench.data.fetch`, listed by ``mtb.data.fetchable()``. An id
-    returned here but not there has metric tables to plot and rank against,
-    and no data file this package can obtain.
+    Stored results are the metric tables ``mtb.load_results`` reads;
+    ``mtb.data.fetchable`` lists the ids that can be downloaded.
 
     Parameters
     ----------
     category : str, optional
-        One of the four integration categories; ``None`` (default) gives
-        the union across all of them. A category folder that does not exist
-        (``mosaic`` has no published tables) contributes nothing, without an
-        error.
+        Integration category; ``None`` = the union over all four.
     source : {"published", "rerun", "both"}, keyword-only
-        Which tables to look at (see :func:`load_results`). Published ids
-        are those holding at least one method's default-clustering table
-        (``metric.csv``) - what ``load_results(category, dataset=...)``
-        loads.
+        Which stored tables to look at (see ``mtb.load_results``).
     result_path : path-like, keyword-only
-        Results root (see :func:`load_results`). A root that does not exist
-        gives a ``UserWarning`` and ``[]``.
+        Results root; ``None`` = the tables shipped in the package.
 
     Returns
     -------
@@ -915,12 +957,39 @@ def available_datasets(
     ------
     ValueError
         An unknown ``category`` or ``source``.
-    TypeError
-        The removed 0.2.x keywords ``metric_set`` / ``clustering``.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.available_datasets()                     # ['D11', 'D24', 'D25', 'D28', 'D52']
+    >>> mtb.available_datasets("diagonal")           # ['D24', 'D25', 'D28']
+    >>> mtb.available_datasets(source="rerun")       # ['D11', 'D11s', 'D28', ...]
+
+    Notes
+    -----
+    **Stored is not downloadable.** Only a few of the benchmark's datasets
+    are downloadable: the release assets of ``mtb.data.fetch``, listed by
+    ``mtb.data.fetchable()``. An id returned here but not there has metric
+    tables to plot and rank against, and no data file this package can
+    obtain.
+
+    **What counts.** Published ids are those holding at least one method's
+    default-clustering table (``metric.csv``) - what
+    ``load_results(category, dataset=...)`` loads. A category folder that
+    does not exist (``mosaic`` has no published tables) contributes
+    nothing, without an error. A ``result_path`` that does not exist gives
+    a ``UserWarning`` and ``[]``.
+
+    **Retired keywords.** ``metric_set=`` and ``clustering=`` are not
+    parameters; passing either raises ``TypeError``.
 
     See Also
     --------
-    fetchable : the ids :func:`multibench.data.fetch` can download.
+    mtb.data.fetchable : the ids ``mtb.data.fetch`` can download.
+
+    mtb.results_coverage : which methods have results for each dataset.
+
+    mtb.load_results : loads the tables behind these ids.
     """
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
@@ -937,26 +1006,28 @@ def available_datasets(
 
 
 def fetchable() -> list[str]:
-    """Dataset ids :func:`multibench.data.fetch` can download.
+    """Dataset ids ``mtb.data.fetch`` can download.
 
-    The companion of :func:`available_datasets`, which lists the ids that
-    ship stored results; the two sets overlap but are not the same.
+    The companion of ``mtb.available_datasets``, which lists the ids with
+    stored results; the two sets overlap but are not the same.
 
     Returns
     -------
     list of str
-        Dataset ids in natural order (``D11 < D28 < ...``).
+        Dataset ids in natural order (``D11``, ``D28``, ``D45``, ...)
 
     Examples
     --------
+    >>> import multibench as mtb
     >>> mtb.data.fetchable()
     ['D11', 'D28', 'D45', 'D46', 'D52']
 
     Notes
     -----
-    ``D24`` has published metric tables and no downloadable file, ``D46``
-    downloads and has no stored table; the list is read from the fetcher's
-    own asset table, so it always agrees with what ``fetch()`` accepts.
+    **Overlap with stored results:** ``D24`` has published metric tables and
+    no downloadable file, ``D46`` downloads and has no stored table; the
+    list is read from the fetcher's own asset table, so it always agrees
+    with what ``fetch()`` accepts.
     """
     from .fetch import AVAILABLE
     return sorted(AVAILABLE, key=catalog._dataset_sort_key)
@@ -970,35 +1041,59 @@ def results_coverage(
 ) -> pd.DataFrame:
     """Which (category, dataset, method) combinations have results, and where from.
 
-    One row per distinct ``category, dataset, method, clustering, source``;
-    the published tree is scanned for every clustering variant (default,
-    louvain, kmeans), so a method that only exists as e.g. a ``_louvain``
-    directory shows up under ``clustering="louvain"``. A category that has no
-    tables raises nothing; it has no rows.
+    Use it to choose the ``source`` to pass to ``mtb.load_results`` or
+    ``mtb.recommend``.
 
     Parameters
     ----------
     category : str, optional
-        Restrict to one integration category (default: all four).
-    source : {"published", "rerun", "both"}, keyword-only
-        Which tables to scan (default ``"both"``).
+        Integration category; ``None`` = all four.
+    source : {"both", "published", "rerun"}, keyword-only
+        Which stored tables to scan; ``"both"`` = published and re-run.
     result_path : path-like, keyword-only
-        Results root (see :func:`load_results`).
+        Results root; ``None`` = the tables shipped in the package.
 
     Returns
     -------
     pandas.DataFrame
-        Columns ``category, dataset, method, clustering, source``, sorted;
-        ``source`` is ``"published"`` or ``"rerun"``, and
-        ``frame.attrs["rerun_version"]`` holds the package version stamped
-        on the re-run sweeps (as in :func:`load_results`).
+        One sorted row per distinct ``category, dataset, method, clustering,
+        source``; ``source`` is ``"published"`` or ``"rerun"``.
+
+    Raises
+    ------
+    ValueError
+        An unknown ``category`` or ``source``.
 
     Examples
     --------
+    >>> import multibench as mtb
     >>> cov = mtb.results_coverage("cross")
     >>> cov[cov.dataset == "D52"]           # scMoMaT (published) + 8 methods (rerun)
     >>> cov.attrs["rerun_version"]          # '0.2.1'
     >>> cov.groupby(["category", "source"]).method.nunique()
+
+    Notes
+    -----
+    **Clustering variants.** The published tree is scanned for every
+    clustering variant (default, louvain, kmeans), so a method that only
+    exists as e.g. a ``_louvain`` directory shows up under
+    ``clustering="louvain"``.
+
+    **Empty categories.** A category that has no tables raises nothing; it
+    has no rows.
+
+    **Warnings.** The degenerate-row and one-method warnings of
+    ``mtb.load_results`` are silenced here: coverage says where rows are,
+    not whether they are sound or rankable.
+
+    **Re-run version.** ``attrs["rerun_version"]`` holds the package version
+    stamped on the re-run sweeps, as in ``mtb.load_results``.
+
+    See Also
+    --------
+    mtb.available_datasets : just the dataset ids.
+
+    mtb.load_results : the scores behind each row.
     """
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
@@ -1076,122 +1171,151 @@ def recommend(
 ) -> pd.DataFrame:
     """Rank methods for a category from stored results, with coverage made explicit.
 
-    Scoring and coverage rules: see Notes.
+    Scores each method on the stored metric tables (or ``long_df``) and also
+    lists every wired method it could not score; the rules are in Notes.
 
     Parameters
     ----------
-    category : {"vertical", "diagonal", "mosaic", "cross"}
-        Integration category to rank.
+    category : str
+        Integration category to rank: ``vertical``, ``diagonal``, ``mosaic``
+        or ``cross``.
     modalities : list of str, keyword-only
-        Keep only methods that consume all of these base modalities
-        (``["rna", "adt"]``), via :func:`multibench.find_methods`.
+        Keep only methods that consume all of these base modalities, e.g.
+        ``["rna", "adt"]``; ``None`` = no filter.
     methods : list of str, keyword-only
-        Rank only these methods (alias tolerant and case-insensitive, as in
-        :func:`load_results` - ``"mofa+"`` -> MOFA2, ``"totalvi"`` ->
-        totalVI); a name that is neither a registry id nor in the frame
-        raises ``KeyError`` with a did-you-mean hint. The unscored and
-        registration lines of the warning are restricted to the same set,
-        so a requested method without rows is still reported as such.
-        Default: every method. The within-dataset ranks are computed among
-        the requested methods only.
+        Rank only these methods (alias tolerant, case-insensitive), among
+        themselves; ``None`` = every method.
     metrics : None, str or list of str, keyword-only
-        What to score on, in the vocabulary of :func:`multibench.evaluate` /
-        :func:`load_results`. ``None`` (default) scores the ``"clustering"``
-        family (ARI, NMI, ASW, iASW, iF1, cLISI - the benchmark's headline
-        ranking); ``"batch"`` scores ASW_batch, GC, iLISI, kBET; ``"all"``
-        every metric present; a list of codes exactly those (alias
-        tolerant). A family / list none of whose metrics is in the frame
-        raises ``ValueError`` naming the metrics that are there; an unknown
-        token or code raises too. ``task=`` / ``family=`` are the deprecated
-        0.2.x spellings.
+        ``None`` = the ``"clustering"`` family (the benchmark's headline
+        ranking); or ``"batch"``, ``"all"``, or a list of codes.
     long_df : pandas.DataFrame, keyword-only
-        Score this frame (``metric, value, method, dataset``) instead of
-        loading stored results - e.g. ``pd.concat([published, mine])`` to
-        place your own method.
+        Frame to score (``metric, value, method, dataset``) instead of the
+        stored tables, e.g. ``pd.concat([published, mine])``.
     min_methods : int, keyword-only
-        Datasets with fewer methods than this are dropped (default 2).
+        Datasets with fewer methods than this are dropped.
     source : {"published", "rerun", "both"}, keyword-only
-        Which stored tables to load when ``long_df`` is not given (default
-        ``"published"``; ``"both"`` averages the method/dataset/metric
-        triples present in both sources).
+        Stored tables to load when ``long_df`` is not given; ``"both"``
+        averages the scores present in both.
     result_path : path-like, keyword-only
-        Results root (see :func:`load_results`).
+        Results root; ``None`` = the tables shipped in the package.
 
     Returns
     -------
     pandas.DataFrame
-        Sorted best-first, unscored methods last; columns ``method,
-        grand_score, n_datasets, n_datasets_total, coverage, needs_labels,
-        runtime_tier, worst_sec, env, output_kind``. The metadata columns are
-        ``None`` for ids that are not registry methods (your own method, a
-        result-dir token). ``frame.attrs`` records the choices the ranking
-        was made under: ``"metrics"`` (the family token, or the list of
-        codes), ``"family"`` (the token; ``None`` when a list was given),
-        ``"source"`` (``"published"`` / ``"rerun"`` / ``"both"``, or
-        ``"long_df"``), ``"not_scored"`` (the unscored method ids, also under
-        ``"missing"``), ``"dropped_methods"`` (registry methods present in
-        the table but not run by this package for the category) and
-        ``"unranked_registration"`` (the coords-output methods of the
-        category, never scored).
+        One row per method, best first, unscored methods last. Read
+        ``method``, ``grand_score`` and ``coverage``; all columns and
+        ``attrs`` are in Notes.
 
     Raises
     ------
     ValueError
-        No dataset has ``min_methods`` methods (nothing can be ranked; when
-        the other stored source holds more methods for the category the
-        message says so - cross/D52: ``pass source='rerun'``), the
-        frame has none of the requested metrics (the message lists the
-        metrics it does have), every row belongs to a method the package
-        does not run for the category, ``methods=`` leaves no rows, or an
-        unknown ``metrics`` token / code.
+        Nothing left to rank (Notes lists the cases), or an unknown
+        ``metrics`` value.
     KeyError
-        An unknown name in ``methods``.
+        An unknown name in ``methods`` (with a did-you-mean hint).
     FileNotFoundError
-        No stored results for the category/source.
+        No stored results for the category and source.
 
     Examples
     --------
+    >>> import multibench as mtb
     >>> r = mtb.recommend("vertical", modalities=["rna", "adt"])
-    >>> r[r.grand_score.notna()]                    # the scored rows
-    >>> r.attrs["not_scored"]                       # wired but no published rows
-    >>> mtb.recommend("diagonal", metrics="batch", source="rerun")[["method", "grand_score", "coverage"]]
+    >>> r[["method", "grand_score", "coverage"]]
+    >>> r.attrs["not_scored"]                        # wired, but no published rows
+    >>> mtb.recommend("cross", source="rerun")       # cross has one published method
+    >>> mtb.recommend("diagonal", metrics="batch", source="rerun")
 
     Notes
     -----
-    The score is ``overall="mean_overall"`` of :mod:`multibench.plot.style`:
-    the min-max scaled mean of per-metric max-ranks within each dataset,
-    then averaged over the datasets the method was run on. The five rules:
+    **Score.** ``grand_score`` is the ``overall="mean_overall"`` score of
+    ``mtb.plot.bar``: within each dataset, the min-max scaled mean of the
+    per-metric max-ranks, then averaged over the datasets the method was run
+    on.
 
-    * only methods this package runs for the category are ranked - the set
-      ``mtb.list_methods(category=...)`` lists. A cross table may also
-      score MOFA2 and Multigrate, which the package wires for other
-      categories only; such rows are dropped before ranking (they would
-      otherwise shape every other method's within-dataset rank) and named
-      in the warning (``"also scored in the published table but not run by
-      this package for cross: MOFA2, Multigrate"``) and in
-      ``frame.attrs["dropped_methods"]``. A name the registry does not know
-      at all (your own method in ``long_df``) is kept;
-    * a dataset holding fewer than ``min_methods`` methods is dropped: the
+    **Ranking rules.**
+
+    - Only methods this package runs for the category are ranked - the set
+      ``mtb.list_methods(category=...)`` lists. Other registry methods in
+      the table (MOFA2 or Multigrate in a cross table) are dropped before
+      ranking, since they would shape every other method's within-dataset
+      rank, and named in the warning and in ``attrs["dropped_methods"]``. A
+      name the registry does not know (your own method in ``long_df``) is
+      kept.
+    - A dataset holding fewer than ``min_methods`` methods is dropped: the
       min-max of a single method is 1.0 by construction, so a lone method
-      would win such a dataset by default;
-    * the returned ``n_datasets`` / ``n_datasets_total`` / ``coverage``
-      columns say how much of the matrix each score rests on;
-    * every method wired for the category (and ``modalities``) that has no
-      rows in the chosen source is still listed - appended after the scored
-      rows with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0 -
-      so "not ranked" is never mistaken for "ranked last" (a published table
+      would win such a dataset by default.
+    - ``n_datasets`` / ``n_datasets_total`` / ``coverage`` say how much of
+      the method x dataset matrix each score rests on.
+    - Every method wired for the category (and ``modalities``) that has no
+      rows in the chosen source is still listed, after the scored rows,
+      with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0, so
+      "not ranked" is never mistaken for "ranked last". A published table
       need not score every method wired for its category; the re-run sweeps
-      may cover more - ``source="rerun"``). Their ids are also in
-      ``frame.attrs["not_scored"]``;
-    * registration methods (``output_kind == "coords"``: GPSA, PASTE,
+      may cover more (``source="rerun"``).
+    - Registration methods (``output_kind == "coords"``: GPSA, PASTE,
       PASTE2, SPIRAL in cross) produce aligned coordinates, not an
       embedding, so no scIB metric applies and they are not rows of the
-      table; the warning names them with that reason and
-      ``frame.attrs["unranked_registration"]`` lists them.
+      table.
 
-    One ``UserWarning`` with one line per finding summarises dropped
-    methods and datasets, partial coverage, the unscored methods and the
-    unranked registration methods.
+    **Columns.**
+
+    - ``method`` - the method id;
+    - ``grand_score`` - the score above; NaN when unscored;
+    - ``n_datasets`` / ``n_datasets_total`` - datasets the method was scored
+      on / datasets kept for the ranking;
+    - ``coverage`` - ``n_datasets / n_datasets_total``;
+    - ``needs_labels``, ``runtime_tier``, ``worst_sec``, ``env``,
+      ``output_kind`` - registry metadata for the category; ``None`` for
+      ids that are not registry methods (your own method, a result-dir
+      token).
+
+    **Frame attrs.** ``frame.attrs`` records the choices the ranking was
+    made under:
+
+    - ``"metrics"`` - the family token, or the list of codes;
+    - ``"family"`` - the token; ``None`` when a list was given;
+    - ``"source"`` - ``"published"`` / ``"rerun"`` / ``"both"``, or
+      ``"long_df"``;
+    - ``"not_scored"`` (also under ``"missing"``) - the unscored method ids;
+    - ``"dropped_methods"`` - registry methods present in the table but not
+      run by this package for the category;
+    - ``"unranked_registration"`` - the coords-output methods of the
+      category, never scored.
+
+    **Selections.** ``metrics="batch"`` scores ASW_batch, GC, iLISI, kBET;
+    ``"all"`` every metric present; a list exactly those codes (alias
+    tolerant). ``methods`` is resolved as in ``mtb.load_results``
+    (``"mofa+"`` -> MOFA2, ``"totalvi"`` -> totalVI), and the unscored and
+    registration lines of the warning are restricted to the same set, so a
+    requested method without rows is still reported as such. ``modalities``
+    uses ``mtb.find_methods``.
+
+    **Warning.** One ``UserWarning`` with one line per finding summarises
+    dropped methods and datasets, partial coverage, the unscored methods
+    and the unranked registration methods.
+
+    **Errors.** ``ValueError`` is raised when:
+
+    - no dataset holds ``min_methods`` methods (when the other stored source
+      holds more methods for the category the message says so - cross/D52:
+      ``pass source='rerun'``);
+    - the frame has none of the requested metrics (the message lists the
+      metrics it does have);
+    - every row belongs to a method the package does not run for the
+      category;
+    - ``methods=`` or ``modalities=`` leaves no scored method;
+    - a ``metrics`` token or code is unknown.
+
+    **Retired keywords.** ``task=`` / ``family=`` still work as
+    ``metrics=<token>``, with a ``DeprecationWarning``.
+
+    See Also
+    --------
+    mtb.load_results : the stored tables it ranks.
+
+    mtb.results_coverage : which methods each source covers.
+
+    mtb.plot.bar : plots the same overall score per method.
     """
     from ..plot import style
 
