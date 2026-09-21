@@ -9,29 +9,37 @@ AVAILABILITY = ("public", "benchmark-host-only")
 
 
 class AmbiguousVariantError(ValueError, KeyError):
-    """Several variants of a method fit the selection; say which one.
+    """Raised when several variants of a method fit and the call must pick one.
 
-    Raised by ``mtb.params_for``, ``mtb.inputs_for`` and ``mtb.labels_for``
-    when ``category=`` / ``modalities=`` (or the dataset folder) leave more
-    than one variant; the message spells out the call that selects one.
+    Raised by ``mtb.params_for`` and ``mtb.inputs_for``; the message spells
+    out the call that selects one variant.
 
     Examples
     --------
     >>> from multibench import params_for, AmbiguousVariantError
-    >>> params_for("Matilda")                              # raises: rna+adt or rna+atac?
+    >>> params_for("Matilda")                              # raises: rna+adt or rna+atac
     >>> params_for("Matilda", "vertical", ["rna", "adt"])  # selects one
 
     Notes
     -----
-    ``inputs_for`` and ``params_for(dataset=)`` first let the dataset folder
-    decide and raise only when the folder settles nothing; the fix is to pass
-    ``modalities=`` (and ``category=``) exactly as the message shows.
+    **When it fires.** ``category=`` / ``modalities=`` leave more than one
+    variant - e.g. Matilda has an rna+adt and an rna+atac ``vertical``
+    variant, so ``params_for("Matilda")`` cannot pick:
 
-    It is a ``ValueError`` - the package reserves ``KeyError`` for unknown
-    ids (a typo in a method name) - but it still derives from ``KeyError``
-    so code written against the earlier ``params_for`` / ``inputs_for``
-    contract keeps catching it, and ``str(exc)`` is the plain message (no
-    ``KeyError`` quoting).
+    - ``mtb.inputs_for`` (without ``modalities=``) and
+      ``mtb.params_for(dataset=)`` (without ``category=`` or ``modalities=``)
+      first let the dataset folder decide, and raise only when it settles
+      nothing;
+    - ``mtb.labels_for`` never raises it; it falls back to the default label
+      order.
+
+    **What to do.** Pass ``modalities=`` (and ``category=``) exactly as the
+    message shows.
+
+    **Catching it.** It is a ``ValueError`` - the package reserves
+    ``KeyError`` for unknown ids, such as a typo in a method name - that also
+    derives from ``KeyError``, so ``except KeyError`` handlers catch it too;
+    ``str(exc)`` is the plain message, without ``KeyError`` quoting.
 
     See Also
     --------

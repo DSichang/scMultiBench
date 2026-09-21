@@ -282,63 +282,55 @@ def inputs_for(dataset: str, category: str, method: str, *,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
                check: bool | None = False) -> dict:
-    """Return ``{modality_role: path}`` for a method's variant on a dataset.
+    """Return the input files a method reads from a dataset folder, by role.
 
-    Every returned path is ABSOLUTE, and a ``data_dir`` value ends with the
-    path separator. The positional order is ``(dataset, category, method)`` -
-    the same order ``scan`` / ``run_all`` / ``labels_for`` use. Use
-    ``labels_for`` to get the matching cell-type label CSVs.
+    Paths are ABSOLUTE, ready for ``mtb.run(inputs=...)``. Pass
+    ``check=True`` to verify the files before a long run.
 
     Parameters
     ----------
     dataset : str
-        Dataset folder name under ``data_path``. A spelling that differs
-        from the folder only in case (``'d52'`` for ``D52`` on a
-        case-insensitive filesystem) is replaced by the on-disk spelling
-        with a ``UserWarning``.
+        Dataset folder name under ``data_path``, e.g. ``"D11"``.
     category : str
-        ``vertical``/``diagonal``/``mosaic``/``cross`` (validated:
-        ``ValueError`` listing the valid tokens on a typo).
+        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``.
     method : str
-        Registry id (``KeyError`` with a did-you-mean hint otherwise).
+        Registry method id, e.g. ``"Matilda"``.
     modalities : list[str] | set[str] | None, keyword-only
-        The variant's modality tokens (see ``method_info(m)['supports']``);
-        ``protein`` is accepted for ``adt``, and ``atac`` for any ATAC
-        representation role (``atac_gas`` / ``atac_peak``; the representation
-        the method wants is ``method_info(m)['atac']``). Unknown tokens raise
-        ``ValueError`` naming the vocabulary. ``None`` (default): the folder
-        decides, see Notes.
+        Modality tokens that pick the variant, e.g. ``["rna", "adt"]``;
+        ``None`` = the files in the dataset folder decide.
     data_path : Path | str | None, keyword-only
-        Root that contains the dataset folder; default
-        ``config.DEFAULT.data_path``. A relative root is resolved against the
-        current directory, so the returned paths are absolute.
+        Folder that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
     check : bool | None, keyword-only
-        What to do when a resolved path does not exist on disk. ``False``
-        (default) - return the best-effort paths silently; ``True`` - raise
-        ``FileNotFoundError`` and also run the content preflight (see Notes);
-        ``None`` - return the paths but emit a ``UserWarning`` listing the
-        missing ones.
+        ``False`` = no checks; ``True`` = raise on a missing or malformed
+        input; ``None`` = warn about missing files.
 
     Returns
     -------
     dict
-        ``{role: absolute path}`` - one entry per input role of the selected
+        ``{role: absolute path}``, one entry per input role of the selected
         variant (``data_dir`` for the directory-fed methods).
 
     Raises
     ------
     TypeError
-        The deprecated 0.2 ``(dataset, method, category)`` order was used.
+        ``category`` and ``method`` were passed in swapped order.
     KeyError
-        Unknown method, or no variant of it matches ``category``.
+        Unknown method, or no variant matches ``category`` and ``modalities``.
     ValueError
-        Unknown ``category`` or modality token; several variants fit and the
-        folder does not settle it (``mtb.AmbiguousVariantError``); with
-        ``check=True``, a transposed matrix or a label CSV whose row count
-        differs from the modality file it labels.
+        Unknown category or modality token, or several variants fit
+        (``mtb.AmbiguousVariantError``).
+    ValueError
+        ``check=True``: a transposed matrix, or label rows differ from the cell count.
     FileNotFoundError
-        ``check=True`` only: a resolved input is missing, or a ``data_dir``
-        method finds fewer than two slices / a slice lacks what it needs.
+        ``check=True``: an input file is missing, or the slice folder is unusable.
+
+    Warns
+    -----
+    UserWarning
+        ``dataset`` matches a folder only up to letter case.
+    UserWarning
+        ``check=None`` and some resolved files do not exist.
 
     Examples
     --------
@@ -351,36 +343,84 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
     Notes
     -----
-    The dataset tree is flat (``<data_path>/<dataset>/<file>``). Each role is
-    resolved to the actual file present in that dir (the role token, or a
-    known alias such as ``atac_peak``->``peak.h5`` / ``atac_gas``->``atac.h5``),
-    falling back to ``<role>.h5`` when no candidate exists. The paths are
-    absolute because ``run`` executes the method with ``cwd=out_dir``, where a
-    relative path would point at the wrong place.
+    **Variant selection.** With ``modalities``, the variant matching
+    ``(category, modalities)`` is used: exact tokens first, then ``atac``
+    standing for ``atac_gas`` / ``atac_peak`` when that leaves exactly one
+    variant.
 
-    Variant selection. With ``modalities``, the variant matching
-    ``(category, set(modalities))`` is selected (exact tokens first; then
-    ``atac`` standing for ``atac_gas`` / ``atac_peak`` when that leaves
-    exactly one variant). Without it, a single variant for ``category`` is
-    used; when there are several, the dataset folder decides: the one that has
-    every input file present on disk is used (Matilda on a
-    ``rna.h5 + adt.h5`` folder is its rna+adt variant). When none or several
-    do, ``mtb.AmbiguousVariantError`` lists the available modality-sets and
-    the folder contents and asks for ``modalities=``.
+    Without ``modalities``, a category with one variant uses it. With several,
+    the dataset folder decides: the variant whose input files are all present
+    is used (Matilda on a ``rna.h5 + adt.h5`` folder is its rna+adt variant).
+    When none or several qualify, ``mtb.AmbiguousVariantError`` (a
+    ``ValueError``) lists the modality sets and the folder contents and asks
+    for ``modalities=``.
 
-    ``check=True`` runs the content preflight that ``mtb.scan`` reports per
-    row as ``files_ok`` / ``files_reason``. Orientation: ``ValueError`` for a
-    cells x features ``matrix/data``. Label length: ``ValueError`` when a
-    label CSV has a different number of rows than the modality file it
-    labels, including the numbered ``cty<i>.csv`` of a cross/mosaic batch (no
-    method takes it as an input role, but every evaluation reads it).
-    ``data_dir`` content: ``FileNotFoundError`` when a spatial-registration
-    method finds fewer than two ``*.h5ad`` slices, a slice lacks
-    ``obsm['spatial']`` or an ``obs`` column the variant declares in
-    ``slice_obs`` (GPSA's ``Ground_Truth``), or scBridge's bare filenames are
-    absent. The error for a missing ATAC-family file names the sibling that
-    is present (a folder exported with ``atac_peak.h5`` when a vertical
-    variant reads ``atac.h5``).
+    **Modality tokens.** ``method_info(m)['supports']`` lists each variant's
+    tokens. Accepted aliases:
+
+    - ``protein`` for ``adt``;
+    - ``peak`` / ``peaks`` for ``atac_peak``, ``gas`` / ``gene_activity`` for
+      ``atac_gas``;
+    - ``atac`` for either ATAC representation role; the one the method wants
+      is ``method_info(m)['atac']``.
+
+    An unknown token raises ``ValueError`` naming the vocabulary.
+
+    **Validation.** A misspelt method id raises ``KeyError`` naming the
+    closest registry id; an unknown category raises ``ValueError`` listing
+    the four.
+
+    **File resolution.** The dataset tree is flat
+    (``<data_path>/<dataset>/<file>``). Each role resolves to the file present
+    in the folder: the role token, or a known alias (``atac_peak`` ->
+    ``peak.h5``, ``atac_gas`` -> ``atac.h5``), also numbered (``<name>1.h5``).
+    Label roles look for ``.csv`` first. When nothing matches, the role falls
+    back to ``<role>.h5`` (``<role>.csv`` for a label role), a path that does
+    not exist (see ``check``).
+
+    A ``data_dir`` role resolves to the folder holding the ``*.h5ad`` slices:
+    ``<dataset>/processed/`` or the dataset folder itself. For SPIRAL, when
+    the slice files share their leading filename token, it points at a
+    sibling ``<folder>__spiral_uniqtok/`` of symlinks with unique names; the
+    original folder is untouched.
+
+    **Absolute paths.** Every returned path is ABSOLUTE (a relative
+    ``data_path`` is resolved against the current directory), and a
+    ``data_dir`` value ends with the path separator. ``mtb.run`` executes the
+    method with ``cwd=out_dir``, where a relative path would point at the
+    wrong place.
+
+    **The check argument.**
+
+    - ``False`` (default): the best-effort paths, returned silently.
+    - ``None``: the same paths, plus a ``UserWarning`` listing the missing ones.
+    - ``True``: ``FileNotFoundError`` for a missing input, plus the content
+      preflight below.
+
+    The missing-file error or warning names an ATAC-family sibling that is
+    present, e.g. ``atac_peak.h5`` when a vertical variant reads ``atac.h5``.
+
+    **Content preflight** (``check=True``). The same checks ``mtb.scan``
+    reports per row as ``files_ok`` / ``files_reason``:
+
+    - orientation: ``ValueError`` when ``matrix/data`` is stored cells x
+      features;
+    - label length: ``ValueError`` when a label CSV has a different number of
+      rows than the modality file it labels, including the numbered
+      ``cty<i>.csv`` of a cross/mosaic batch (no method takes it as an input
+      role, but every evaluation reads it);
+    - ``data_dir`` content: ``FileNotFoundError`` when a spatial-registration
+      method finds fewer than two ``*.h5ad`` slices, a slice lacks
+      ``obsm['spatial']`` or an ``obs`` column the variant declares in
+      ``slice_obs`` (GPSA's ``Ground_Truth``), or scBridge's named files are
+      absent.
+
+    **Dataset name case.** A spelling that differs from the folder only in
+    case (``'d52'`` for ``D52`` on a case-insensitive filesystem) is replaced
+    by the on-disk spelling, with a ``UserWarning``.
+
+    **Argument order.** ``(dataset, category, method)``, the same order
+    ``mtb.scan``, ``mtb.run_all`` and ``mtb.labels_for`` use.
 
     See Also
     --------
@@ -874,100 +914,111 @@ class LabelFiles(dict):
 def labels_for(dataset: str, category: str | None = None, method: str | None = None,
                *, modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None) -> dict:
-    """Return ``{name: path}`` of a dataset's cell-type label CSVs, in stacking order.
+    """Return a dataset's cell-type label files, in cell-stacking order.
 
-    With ``category`` and ``method`` the files come in the order that method
-    variant stacks the labelled cells in its output; without them, in the
-    default order most methods use (Notes). Either way the dict can be
-    handed to ``mtb.evaluate(labels=...)`` as is, and it matches an
-    embedding only if that embedding stacks its cells in the dict's order.
-    Paths are absolute. The positional order is ``(dataset, category,
-    method)``, like ``inputs_for`` / ``scan`` / ``run_all``.
+    Hand the dict to ``mtb.evaluate(labels=...)`` as is; it matches an
+    embedding only if that embedding stacks its cells in the dict's order, so
+    give ``category`` and ``method`` for a method-specific order.
 
     Parameters
     ----------
     dataset : str
-        Dataset folder name under ``data_path``.
+        Dataset folder name under ``data_path``, e.g. ``"D28"``.
     category : str | None
-        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``; validated
-        whenever given (``ValueError`` listing the four on a typo). With
-        ``method`` it selects the variant whose modality order ranks the
-        files; alone it changes nothing (labels are per dataset). Default
-        ``None``.
+        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``; with ``method``,
+        selects the variant whose cell order is used. ``None`` = the default
+        order.
     method : str | None
-        Registry id, validated whenever given (``KeyError`` with a
-        did-you-mean hint on a typo). With ``category`` the files are
-        ordered as that variant's output stacks the cells (the variant is
-        chosen like ``inputs_for`` does - ``modalities=``, else the one the
-        folder's files satisfy); the set of files never depends on it.
-        Default ``None``.
+        Registry method id; with ``category``, orders the files as that
+        variant stacks its cells. ``None`` = the default order.
     modalities : list[str] | set[str] | None, keyword-only
-        The variant's modality tokens, used only with ``category`` +
-        ``method`` to pick one of several variants. Default ``None``.
+        Modality tokens that pick one of several variants; used only with
+        ``category`` and ``method``.
     data_path : Path | str | None, keyword-only
-        Root that contains the dataset folder; default
-        ``config.DEFAULT.data_path``.
+        Folder that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
 
     Returns
     -------
     dict
         ``{stem: absolute path}`` in cell-stacking order, keyed by filename
-        stem (``cty``, ``rna_cty``, ``cty1`` ...). A ``dict`` subclass that
-        remembers this order, so ``evaluate`` takes it as is; a copy
-        (``dict(d)``) or a dict whose keys were reordered goes in as is only
-        in the default order.
+        stem (``cty``, ``rna_cty``, ``cty1`` ...).
 
     Raises
     ------
     TypeError
-        The deprecated ``(dataset, method, category)`` order, or a path in
-        the ``category`` slot (the deprecated positional ``data_path``).
+        ``category`` and ``method`` swapped, or a path passed positionally as ``category``.
     FileNotFoundError
         No dataset folder at ``<data_path>/<dataset>``.
     ValueError
         Unknown ``category``.
     KeyError
-        Unknown ``method``.
+        Unknown ``method``, or it has no variant for ``category``.
+
+    Warns
+    -----
+    UserWarning
+        ``dataset`` matches a folder only up to letter case.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.labels_for("D11")
-    {'cty': '/abs/data/D11/cty.csv'}
     >>> mtb.labels_for("D28")                       # diagonal: RNA cells first, then ATAC
     {'rna_cty': '/abs/data/D28/rna_cty.csv', 'atac_cty': '/abs/data/D28/atac_cty.csv'}
-    >>> m = mtb.evaluate(embedding, labels=mtb.labels_for("D28"))
     >>> mtb.labels_for("D52", "cross", "StabMap")    # StabMap: its reference batch first
     {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv', 'cty2': '/abs/data/D52/cty2.csv'}
+    >>> res = mtb.run("StabMap", "cross", inputs=mtb.inputs_for("D52", "cross", "StabMap"),
+    ...               out_dir="out/StabMap_D52")
+    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D52", "cross", "StabMap"))
 
     Notes
     -----
-    The benchmark stores cell-type labels as ``*cty*.csv`` in the (flat)
-    dataset dir, under dataset-specific names (``cty.csv``, ``rna_cty.csv``,
-    ``cty1.csv``, ...). The primary label files are returned (excluding
-    tool-specific ``*_scjoint*`` reformats), keyed by filename stem.
+    **Which files.** The benchmark stores cell-type labels as ``*cty*.csv`` in
+    the flat dataset folder, under dataset-specific names (``cty.csv``,
+    ``rna_cty.csv``, ``cty1.csv`` ...). All of them are returned except the
+    tool-specific ``*_scjoint*`` reformats. The set of files depends on the
+    dataset only, never on ``category`` or ``method``.
 
-    The default order is NOT alphabetical:
+    **Default order.** Without ``category`` and ``method``, the order is
+    NOT alphabetical:
 
     1. ``cty`` (one file, cells already paired) first;
-    2. numbered ``cty1, cty2, ..., cty10`` ascending NUMERICALLY (batch order);
+    2. numbered ``cty1, cty2, ..., cty10``, ascending NUMERICALLY (batch
+       order);
     3. modality-named files in the canonical modality order **rna, adt, atac**
-       (``rna_cty`` before ``atac_cty``; ``peak_cty`` counts as atac) - the
-       diagonal methods other than uniPort emit the RNA cells first, then
-       the ATAC cells, so ``D28`` returns ``{'rna_cty': ..., 'atac_cty': ...}``;
-    4. any other ``*cty*`` file alphabetically, last.
+       (``peak_cty`` counts as atac) - the diagonal methods other than uniPort
+       emit the RNA cells first, then the ATAC cells;
+    4. any other ``*cty*`` file, alphabetically, last.
 
-    When ``category`` and ``method`` are given the variant decides instead
-    (``modalities=`` disambiguates a method with several variants in that
-    category; if it is still ambiguous the default order above is used): a
-    label file is placed where the cells it labels sit in the variant's
-    output. That is the variant's argument order unless the registry
-    declares another (``output.cell_order`` in ``methods.yaml``): StabMap
-    stacks its reference batch first (``cty3, cty1, cty2`` on ``D52``),
-    uniPort its ATAC cells before its RNA cells.
+    **Per-method order.** With ``category`` and ``method``, each file goes
+    where the cells it labels sit in that variant's output. That is the
+    variant's argument order unless the registry declares another
+    (``output.cell_order`` in ``methods.yaml``): StabMap stacks its reference
+    batch first (``cty3, cty1, cty2`` on ``D52``), uniPort its ATAC cells
+    before its RNA cells.
 
-    ``list(labels_for(ds).values())`` is the same files as a list, in the same
-    order, which ``mtb.evaluate(labels=...)`` also accepts.
+    The variant is chosen as ``mtb.inputs_for`` does: by ``modalities=``, else
+    the category's only variant or the one whose files the folder holds. If
+    the choice stays ambiguous, or no label file pairs with the variant's
+    roles, the default order is used; ``labels_for`` does not raise
+    ``mtb.AmbiguousVariantError``.
+
+    **Passing it to evaluate.** The dict is a ``dict`` subclass that remembers
+    its order, so ``mtb.evaluate(labels=...)`` takes it as is. A copy
+    (``dict(d)``) or a dict whose keys were reordered goes in as is only in
+    the default order; otherwise name the order with ``evaluate``'s
+    ``label_order=``. ``list(labels_for(ds).values())`` is the same files as a
+    list, in the same order, which ``evaluate`` also accepts.
+
+    **Validation.** ``category`` and ``method`` are validated whenever given:
+    ``ValueError`` listing the four categories on a typo, ``KeyError`` with a
+    did-you-mean hint for a method. Either one alone changes nothing.
+
+    **Paths and names.** Paths are absolute. A dataset spelling that differs
+    from the folder only in case (``'d52'`` for ``D52``) is replaced by the
+    on-disk spelling, with a ``UserWarning``. The positional order is
+    ``(dataset, category, method)``, like ``mtb.inputs_for``, ``mtb.scan`` and
+    ``mtb.run_all``.
 
     See Also
     --------
