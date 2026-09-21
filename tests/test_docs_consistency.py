@@ -209,12 +209,12 @@ def _methods_per_dataset(df):
 
 
 def test_clustering_variants_ship_per_category_as_documented(tmp_path):
-    """plot.md's "Which variants ship, per category" note follows the shipped
-    tree: the variant files are exactly ``SHIPPED_VARIANTS``, each louvain /
-    kmeans variant loads for exactly those datasets (with, per dataset, the
-    same methods as the default table), a category without the file raises
-    ``FileNotFoundError`` naming it, and the note says the same per category
-    and variant. The nested run-configuration layout
+    """The sentence in plot.md's "Clustering variants" section that says which
+    variants ship follows the shipped tree: the variant files are exactly
+    ``SHIPPED_VARIANTS``, each louvain / kmeans variant loads for exactly those
+    datasets (with, per dataset, the same methods as the default table), a
+    category without the file raises ``FileNotFoundError`` naming it, and the
+    sentence says the same per category and variant. The nested run-configuration layout
     (``<method>/<config>/metric_louvain.csv``,
     ``<method>/kmeans/metric_kmeans.csv``) is exercised on a synthetic tree."""
     import multibench as mtb
@@ -253,9 +253,11 @@ def test_clustering_variants_ship_per_category_as_documented(tmp_path):
     # `default` only has no variant file; every category is named once
     for path in _docs_md_files():
         if path.name == "plot.md" and path.parent.name == "tutorials":
-            marker = '!!! note "Which variants ship, per category"'
-            note = path.read_text().split(marker, 1)[1].split("\n\n", 1)[0]
-            sentence = " ".join(note.split()).split(". ", 1)[0]
+            marker = "### Clustering variants"
+            section = re.split(r"\n#{2,3} ", path.read_text().split(marker, 1)[1], maxsplit=1)[0]
+            sentence = next((s for s in " ".join(section.split()).split(". ")
+                             if "all three variants" in s), None)
+            assert sentence, f"plot.md {marker!r}: no sentence says which variants ship"
             named = []
             for clause in sentence.split(";"):
                 cats = re.findall(r"\*\*(\w+)\*\*", clause)
