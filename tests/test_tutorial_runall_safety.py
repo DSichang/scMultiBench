@@ -404,10 +404,21 @@ def test_batch_metrics_prose_names_the_metrics_knob(cat):
     """The one selector is metrics= (0.3.0): the prose shows the family form
     and says what the default None computes; the 0.2 task= never returns."""
     md = _markdown(f"tutorial_{cat}")
-    assert 'labels=mtb.labels_for(DATASET), metrics="all")' in md
-    assert "`None` (the default) computes every\napplicable metric" in md \
-        or "`None` (the default) computes every applicable metric" in md
+    assert '`"clustering"`, `"batch"` or `"all"`: a family' in md
+    assert "- `None` (the default): every applicable metric" in md
     assert 'task="all"' not in md and 'task="clustering"' not in md
+
+
+@pytest.mark.parametrize("cat", [c for c in CATS if c != "vertical"])
+def test_labels_for_prose_warns_that_a_wrong_order_scores_silently(cat):
+    """labels_for's order is not every method's stacking order (StabMap on
+    D52 stacks cty3, cty1, cty2): a multi-file tutorial must not say the dict
+    scores a dataset as is, and must name label_order= as the remedy."""
+    md = " ".join(_markdown(f"tutorial_{cat}").split())
+    assert "pass that order as `label_order=`" in md
+    assert "a wrong order gives wrong scores without an error" in md
+    assert "scores a multi-file dataset directly" not in md
+    assert "in the order `evaluate` expects" not in md
 
 
 @pytest.mark.parametrize("cat", CATS)
