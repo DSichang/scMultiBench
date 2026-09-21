@@ -5,9 +5,9 @@
 [![PyPI](https://img.shields.io/pypi/v/multibench-sc)](https://pypi.org/project/multibench-sc/)
 
 Multitask benchmarking of single-cell multimodal omics integration methods,
-with `multibench`: a Python API that runs the benchmark's 40 integration
-methods across four categories (vertical, diagonal, mosaic, cross), scores
-them with scIB metrics, and draws scIB-style bubble tables.
+with `multibench`: a Python API that runs 36 integration methods across
+four categories (vertical, diagonal, mosaic, cross), scores them with scIB
+metrics, and draws scIB-style bubble tables.
 
 **Documentation and tutorials:** <https://dsichang.github.io/scMultiBench/>
 
