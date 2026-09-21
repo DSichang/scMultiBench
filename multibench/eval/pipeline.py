@@ -29,8 +29,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     ----------
     value_df : pandas.DataFrame or pandas.Series
         What ``mtb.evaluate`` returns (metrics as the index, one column
-        ``Value``), a Series indexed by metric, or that frame read back with
-        ``pd.read_csv``.
+        ``Value``), a Series indexed by metric, or its CSV read back with a
+        ``metric`` column.
     method : str, keyword-only
         Method id written into every row; your own name is fine.
     dataset : str, keyword-only, optional
@@ -70,6 +70,12 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     **Metric names.** Names are canonicalised (``ari`` -> ``ARI``, ``kbet``
     -> ``kBET``); rows whose name is blank are dropped, and a name the
     package does not know is kept as written.
+
+    **CSV read-back.** Save the frame with
+    ``wide.to_csv(path, index_label="metric")``, or read it back with
+    ``pd.read_csv(path, index_col=0)``. A plain ``pd.read_csv`` of
+    ``wide.to_csv(path)`` names the metric column ``Unnamed: 0``, and the
+    metric names come out as ``0, 1, ...`` without an error.
 
     **Column values.** ``dataset=None`` writes ``"all"``, the placeholder the
     plotting layer uses for a frame without datasets, so the column is never
@@ -426,8 +432,9 @@ def evaluate(
         The embedding, cells x dims: an array, DataFrame, sparse matrix,
         AnnData (``.obsm[obsm]``) or a file path (formats in Notes).
     labels
-        Cell types, one per cell: CSV path(s), a ``mtb.labels_for`` dict, a
-        1-D array-like, or an ``obs`` column name (forms in Notes).
+        Cell types, one per cell (required): CSV path(s), a
+        ``mtb.labels_for`` dict, a 1-D array-like, or an ``obs`` column name
+        (forms in Notes).
     category : str, keyword-only, optional
         One of ``mtb.list_categories()``; validated, otherwise unused (the
         metrics do not depend on it). Lets a call mirror ``mtb.run``.
@@ -444,9 +451,9 @@ def evaluate(
         ``.obsm`` key used when ``output`` is an AnnData or ``.h5ad``;
         ``'X'`` means ``.X``.
     label_order : list of str, keyword-only
-        Keys of a multi-entry ``labels`` dict in the method's stacking order
-        (a subset selects those files); ``None`` = the dict's order where
-        safe (Notes).
+        Keys of a multi-entry ``labels`` dict, in the method's stacking
+        order; a subset selects those files. ``None`` works for an unchanged
+        ``mtb.labels_for`` dict (Notes).
     verbose : bool, keyword-only
         ``True`` prints one stderr line when the Leiden sweep starts on more
         than 2,000 cells; ``False`` never prints.
@@ -484,13 +491,8 @@ def evaluate(
       two when the first is a barcode index);
     - a list of CSV paths, concatenated in that order (multi-batch datasets:
       ``[cty1, cty2, cty3]``);
-    - a dict from ``mtb.labels_for``, unchanged - it goes in AS IS, in the
-      order ``labels_for`` gave it (with ``category`` and ``method``, that
-      method's stacking order); any other dict goes in as is only in the
-      default order (``cty1, cty2, ...`` numerically; ``rna`` before ``adt``
-      before ``atac``) and otherwise needs ``label_order=`` naming its keys;
-      ``label_order=list(d)`` trusts the dict's own order, and a one-entry
-      dict has no order to get wrong;
+    - a ``{name: path}`` dict, such as ``mtb.labels_for`` returns (order
+      rules under **Label dicts.**);
     - a 1-D ``ndarray`` / ``Series`` / ``Categorical`` / list, or a
       single-column DataFrame;
     - when ``output`` is an AnnData, the name of an ``obs`` column.
@@ -498,7 +500,19 @@ def evaluate(
     A multi-column CSV / DataFrame raises: pass the one column
     (``df["celltype"]``) itself. ``batch`` and ``clustering`` take the same
     forms except a multi-entry dict; for ``clustering``, a path that is not
-    a CSV is read as an h5 from ``/obs/cluster_leiden``.
+    ``.csv`` / ``.tsv`` / ``.txt`` is read as an h5 from
+    ``/obs/cluster_leiden``.
+
+    **Label dicts.** A dict with several entries needs a known order:
+
+    - a dict from ``mtb.labels_for``, unchanged, goes in AS IS, in the
+      order ``labels_for`` gave it (with ``category`` and ``method``, that
+      method's stacking order);
+    - any other dict goes in as is only in the default order
+      (``cty1, cty2, ...`` numerically; ``rna`` before ``adt`` before
+      ``atac``) and otherwise needs ``label_order=`` naming its keys;
+    - ``label_order=list(d)`` trusts the dict's own order; a one-entry dict
+      has no order to get wrong.
 
     **Metric selection.** ``None`` computes the clustering family (``ARI,
     NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, GC, iLISI`` when a batch
@@ -517,15 +531,16 @@ def evaluate(
     code string (``metrics="ARI"``) raises and points at the list form.
 
     **Cost.** ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
-    Leiden sweep (10 resolutions on a kNN graph of the embedding): tens of
-    seconds for a few thousand cells, minutes for ~10^4. To skip it, name
-    only metrics that do not need it in ``metrics=[...]`` (``ASW``,
-    ``iASW``, ``cLISI``, the batch family). ``clustering=`` removes the need
-    for ``ARI`` / ``NMI`` only; ``iF1`` always sweeps.
+    Leiden sweep (10 resolutions on a kNN graph of the embedding). With
+    ``leidenalg`` it takes tens of seconds for a few thousand cells, minutes
+    for ~10^4; the default ``igraph`` backend is several times faster.
+
+    To skip it, name only metrics that do not need it in ``metrics=[...]``
+    (``ASW``, ``iASW``, ``cLISI``, the batch family). ``clustering=``
+    removes the need for ``ARI`` / ``NMI`` only; ``iF1`` always sweeps.
 
     **Leiden backend.** ``mtb.config.DEFAULT.leiden_flavor``: ``"igraph"``
-    (default; several times faster) or ``"leidenalg"`` (the classic backend
-    scib itself runs).
+    (default) or ``"leidenalg"`` (the classic backend scib itself runs).
 
     **Batch.** The batch family (``ASW_batch, GC, iLISI, kBET``) needs batch
     labels. When ``labels`` is a list (or dict) of two or more files and

@@ -68,8 +68,9 @@ _DEGENERATE_PUBLISHED_ARI = 0.2
 class DegenerateRerunWarning(UserWarning):
     """A re-run row scored ARI ~0 where the published table scored well.
 
-    Emitted by ``mtb.load_results`` with ``source="rerun"`` or ``"both"``,
-    so a silently failed re-run never enters a ranking unnoticed.
+    Emitted by ``mtb.load_results`` and ``mtb.recommend`` with
+    ``source="rerun"`` or ``"both"``, so a silently failed re-run never
+    enters a ranking unnoticed.
 
     Notes
     -----
@@ -79,13 +80,13 @@ class DegenerateRerunWarning(UserWarning):
       the same category, dataset and method above 0.2: the re-run almost
       certainly failed silently (a collapsed embedding, a wrong label
       order), so the row says nothing about the method;
-    - also emitted by ``mtb.recommend`` on those sources; a ``result_path``
-      file is not checked;
+    - never for a ``result_path`` file or a ``long_df`` frame passed to
+      ``mtb.recommend``;
     - in the shipped sweeps: Conos on D28.
 
-    **What to do:** drop the row before ranking (the message suggests
-    ``df[df.method != 'Conos']``); once you have decided how to treat those
-    rows, silence it with
+    **What to do:** drop the row before ranking (the message names the
+    filter, here ``df[df.method != 'Conos']``); once you have decided how to
+    treat those rows, silence it with
     ``warnings.simplefilter("ignore", mtb.DegenerateRerunWarning)``.
     """
 
@@ -588,8 +589,8 @@ def load_results(
         ``metric_louvain.csv`` or ``metric_kmeans.csv``.
     source : str, keyword-only
         ``"published"`` (scIB tables), ``"rerun"`` (package sweeps) or
-        ``"both"``; for a ``result_path`` file, a value of its ``source``
-        column.
+        ``"both"``. For a ``result_path`` file: a value of its ``source``
+        column; ``"published"`` / ``"both"`` keep every row.
     result_path : path-like, keyword-only
         A results root holding ``scib_metric/`` and/or ``rerun/``, or one
         long CSV file; ``None`` = the tables shipped in the package.
@@ -1014,7 +1015,7 @@ def fetchable() -> list[str]:
     Returns
     -------
     list of str
-        Dataset ids in natural order (``D11``, ``D28``, ``D45``, ...)
+        Dataset ids in natural order (``D11``, ``D28``, ``D45``, ...).
 
     Examples
     --------
