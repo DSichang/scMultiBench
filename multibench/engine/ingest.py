@@ -182,8 +182,8 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None)
     """Return ``(X, feature_names)`` for the requested slot of ``adata``.
 
     ``obsm`` matrices carry no var axis in AnnData, so feature names come from
-    ``feature_names`` when given, else ``adata.uns[f"{obsm}_names"]`` (when its
-    length matches), else the columns of a DataFrame-valued obsm, else
+    ``feature_names`` when given, else the columns of a DataFrame-valued obsm,
+    else ``adata.uns[f"{obsm}_names"]`` (when its length matches), else
     ``feature_0..`` - with a ``UserWarning`` naming the fallback, because a
     protein panel written as ``feature_0..feature_29`` loses its marker names
     in every downstream readout. ``what`` labels the warning (``'adt'``).
@@ -323,13 +323,16 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     ----------
     src : AnnData, MuData, Path or str
         Matrix to convert: an AnnData, a MuData (with ``mod``), or a path to
-        ``.h5ad`` / ``.h5mu`` / ``.csv`` / ``.tsv`` / ``.loom`` / canonical ``.h5``.
+        ``.h5ad`` / ``.h5mu`` / ``.csv`` / ``.tsv`` (cells x features) /
+        ``.loom`` / canonical ``.h5``.
     out : Path | str | None
         Output file, or a directory (existing or ending in ``/``) that gets
-        the ``modality`` filename; ``None`` = current directory.
+        the ``modality`` filename; ``None`` = that filename in the current
+        directory (needs ``modality``).
     modality : str | None
-        ``'rna'``, ``'adt'``, ``'atac'``, ``'atac_peak'`` or ``'atac_gas'``
-        (aliases in Notes); picks the filename and enables the role checks.
+        ``'rna'``, ``'adt'``, ``'atac'``, ``'atac_peak'`` or ``'atac_gas'``;
+        names the file when ``out`` is a directory or ``None``, and enables
+        the ADT / ATAC checks (Notes).
     convert : bool
         ``False`` = never write: pass a canonical ``.h5`` through, raise for
         anything else.
@@ -391,8 +394,13 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     - ``out=None`` and ``modality`` given: that filename in the current
       directory; ``out=None`` without ``modality`` raises ``ValueError``.
 
-    **Modality aliases.** ``'protein'`` -> ``'adt'``, ``'peak'`` ->
-    ``'atac_peak'``, ``'gas'`` / ``'gene_activity'`` -> ``'atac_gas'``.
+    **Modality aliases and checks.** ``'protein'`` -> ``'adt'``,
+    ``'peak'`` -> ``'atac_peak'``, ``'gas'`` / ``'gene_activity'`` ->
+    ``'atac_gas'``. The ADT check is the ``obsm=`` rule under *ADT
+    matrices*. ``'atac_peak'`` warns when fewer than half of the feature
+    names look like peaks (``chr1:100-200``, ``chr1_100_200``,
+    ``chr1-100-200``), ``'atac_gas'`` when more than half do; plain
+    ``'atac'`` is not checked.
 
     **ADT matrices.** With ``modality='adt'`` on an AnnData that has
     ``obsm`` keys, ``obsm=`` or ``layer=`` must say where the protein matrix
@@ -413,10 +421,11 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     representation, because that is the one name every vertical (paired
     multiome) variant resolves and none reads ``atac_peak.h5``.
 
-    Without it, ``to_canonical(atac, d, modality='peak')`` writes
-    ``atac_peak.h5`` and ``mtb.scan(d, 'vertical')`` finds no ATAC method
-    runnable. The representation is recorded NOWHERE on disk: whether a
-    vertical method expects peaks or gene activity in ``atac.h5`` is
+    **Check the ATAC kind.** Without ``category='vertical'``,
+    ``to_canonical(atac, d, modality='peak')`` writes ``atac_peak.h5`` and
+    ``mtb.scan(d, 'vertical')`` finds no ATAC method runnable. The
+    representation is recorded NOWHERE on disk: whether a vertical method
+    expects peaks or gene activity in ``atac.h5`` is
     ``method_info(m)['atac']``.
 
     **Streaming.** Sparse matrices (CSR/CSC, in memory or inside an
@@ -886,10 +895,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ----------
     data : AnnData, MuData or None
         Object the selector strings refer to; ``None`` when every modality is
-        passed as an object.
+        passed as an object. With a MuData, name each modality (``rna='rna'``).
     dataset_dir : Path | str
         Folder to create; its name is the dataset id for ``mtb.scan`` /
-        ``mtb.run_all``.
+        ``mtb.run_all``, and its parent their ``data_path``.
     rna : str, AnnData, DataFrame, array or None, keyword-only
         RNA matrix: a selector against ``data`` (``'X'``, ``'layer:counts'``)
         or an object (forms in Notes); ``None`` = no RNA.
@@ -953,6 +962,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     - an AnnData (its ``.X`` is written);
     - a DataFrame (index = cell barcodes, columns = features);
     - a 2-D array or sparse matrix already in the master cell order.
+
+    An ``obsm`` selector takes its feature names from ``adt_names`` (ADT
+    only), else the columns of a DataFrame-valued entry, else
+    ``adata.uns['<key>_names']`` (order in ``mtb.io.to_canonical``).
 
     All matrices are cells x features and are written transposed. With
     ``data=None`` the default ``rna='X'`` means "no RNA": pass
@@ -1030,8 +1043,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     **Warnings.** ``UserWarning`` is emitted for feature names that
     contradict ``atac_kind``; a bare array or ``obsm`` matrix without
-    feature names (``feature_0..`` written - pass ``adt_names``); non-unique
-    barcodes (paired positionally); a dense ``matrix/data`` over 1 GB.
+    feature names (``feature_0..`` written; for ADT pass ``adt_names``,
+    otherwise a DataFrame or AnnData); non-unique barcodes (paired
+    positionally); a dense ``matrix/data`` over 1 GB.
 
     See Also
     --------

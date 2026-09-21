@@ -189,7 +189,7 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     KeyError
         A name in ``methods`` is not in the tree (the message lists its methods).
     RuntimeError
-        The archive lacks ``batch_result.json``, or a foreign folder blocks the target.
+        The archive lacks ``batch_result.json``, or a non-empty ``outputs/<dataset>/`` lacks one.
 
     Examples
     --------

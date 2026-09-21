@@ -60,21 +60,21 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
     Parameters
     ----------
     name : str
-        Any spelling of a method name (``"MOFA+"``, ``"totalvi"``, ``"Seurat v4"``).
+        Any spelling of a method name (``"MOFA+"``, ``"totalvi"``, ``"Seurat(WNN)"``).
     strict : bool, keyword-only
-        ``True`` = raise for a name that is not a registry id; ``False`` =
-        return the folded name.
+        ``True`` = raise for a name that is neither an alias nor a registry id;
+        ``False`` = return the folded name.
 
     Returns
     -------
     str
-        The registry id; for an unknown name, the input with spaces and dots
-        collapsed to ``_``.
+        The canonical id (an alias target or a registry id); for an unknown
+        name, the input with spaces and dots collapsed to ``_``.
 
     Raises
     ------
     KeyError
-        ``strict=True`` and the name is not a registry id (with a did-you-mean hint).
+        ``strict=True`` and the name is neither an alias nor a registry id.
 
     Examples
     --------
@@ -98,10 +98,12 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
        ``_``, unchanged in case.
 
     **Strict mode.** The error is the message ``mtb.method_info`` and
-    ``mtb.scan`` give, e.g. ``"unknown method 'Matlida'; did you mean
-    'Matilda'?; see mtb.list_methods()"``. The default is lenient because
-    result directories and user frames legitimately carry names the
-    registry does not know.
+    ``mtb.scan`` give, with a did-you-mean hint, e.g. ``"unknown method
+    'Matlida'; did you mean 'Matilda'?; see mtb.list_methods()"``. An
+    alias-table hit is returned without the registry check, even with
+    ``strict=True``: ``"Seurat v4"`` -> ``"Seurat_v4"``, which is not a
+    registry id. The default is lenient because result directories and user
+    frames legitimately carry names the registry does not know.
 
     See Also
     --------
