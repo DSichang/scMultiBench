@@ -169,32 +169,23 @@ class Config:
     Attributes
     ----------
     result_path : pathlib.Path
-        The result tables shipped with the package, which
-        ``mtb.load_results`` reads. Default ``<package root>/multibench/result``.
+        Result tables shipped with the package, read by ``mtb.load_results``.
+        Default ``<package root>/multibench/result``.
     files_path : pathlib.Path
-        The shipped per-dataset files (label CSVs and similar). Default
-        ``<package root>/multibench/files``.
+        Catalog CSVs read by ``mtb.catalog`` (``method.csv``, ``dataset.csv``,
+        ``metric_full.csv``). Default ``<package root>/multibench/files``.
     repo_path : pathlib.Path
-        Checkout holding the upstream ``tools_scripts/`` (the method
-        scripts); cloned on first use when absent. Default
-        ``<base>/scMultiBench_ref`` (see Notes for ``<base>``).
+        Checkout holding the upstream ``tools_scripts/`` (the method scripts),
+        cloned on first use when absent. Default ``<base>/scMultiBench_ref``.
     data_path : pathlib.Path
-        Where ``mtb.data.fetch`` lays out datasets and where ``mtb.scan`` /
-        ``mtb.run_all`` look for ``<data_path>/<dataset>/``. Default
-        ``<base>/data``.
+        Where ``mtb.data.fetch`` puts datasets and ``mtb.scan`` /
+        ``mtb.run_all`` look for ``<data_path>/<dataset>/``. Default ``<base>/data``.
     leiden_flavor : str
-        Leiden backend for the scIB resolution sweep in ``mtb.evaluate``:
-        ``"igraph"`` (default; scanpy's igraph implementation, several times
-        faster) or ``"leidenalg"`` (the backend the published tables were
-        computed with).
+        Leiden backend of the scIB clustering sweep in ``mtb.evaluate``:
+        ``"igraph"`` (default) or ``"leidenalg"``.
     envs_dir : pathlib.Path
-        Where the method environment prefixes live (``<envs_dir>/<env>``):
-        what ``mtb.env.install`` unpacks packed archives into and what the
-        runner's prefix mode activates. Resolved lazily on first read, in
-        this order: the ``MULTIBENCH_ENVS_DIR`` environment variable; else
-        the first writable envs directory of the conda/mamba found on PATH;
-        else ``~/.cache/multibench/envs`` (``$XDG_CACHE_HOME`` honoured).
-        Settable like every other field.
+        Where the method environment prefixes live (``<envs_dir>/<env>``);
+        resolved on first read (order in Notes).
 
     Examples
     --------
@@ -207,14 +198,31 @@ class Config:
 
     Notes
     -----
-    ``<base>`` is the repository root in a checkout or editable install
-    (``pyproject.toml`` next to the package) and the per-user cache
+    **Where ``<base>`` is.** The repository root in a checkout or editable
+    install (``pyproject.toml`` next to the package), and the per-user cache
     ``~/.cache/multibench`` (``$XDG_CACHE_HOME`` honoured) for a wheel
     install, so ``site-packages`` never accumulates datasets or clones.
 
-    The first read of ``envs_dir`` may run ``conda info --json`` (once per
-    process, never at import); assigning a value converts it to ``Path`` and
-    skips the probe.
+    **Assigning paths.** Assign ``pathlib.Path`` objects. Only ``envs_dir``
+    converts a string on assignment; ``mtb.data.fetch``, ``mtb.scan`` and
+    ``mtb.load_results`` use ``data_path`` / ``result_path`` as they are and
+    fail on a plain string.
+
+    **How ``envs_dir`` is resolved.** Lazily, on first read, from the first
+    of:
+
+    1. the ``MULTIBENCH_ENVS_DIR`` environment variable;
+    2. the first writable envs directory of the conda/mamba found on PATH;
+    3. ``~/.cache/multibench/envs`` (``$XDG_CACHE_HOME`` honoured).
+
+    It is what ``mtb.env.install`` unpacks packed archives into and what the
+    runner's prefix mode activates. The first read may run ``conda info
+    --json`` (once per process, never at import); assigning a value skips
+    the probe. It is settable like every other field.
+
+    **Leiden backends.** ``"igraph"`` is scanpy's igraph implementation,
+    several times faster; ``"leidenalg"`` is the backend the published
+    tables were computed with.
 
     See Also
     --------

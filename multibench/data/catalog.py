@@ -57,35 +57,56 @@ def _registry_ids() -> list[str]:
 def canonical_id(name: str, *, strict: bool = False) -> str:
     """Return the canonical method id for any known spelling.
 
-    Resolution order: the alias table (``"MOFA+"`` -> ``"MOFA2"``,
-    ``"Seurat(WNN)"`` -> ``"Seurat_WNN"``), then a case-folded match against
-    the registry ids (``"totalvi"`` -> ``"totalVI"``, ``"scmomat"`` ->
-    ``"scMoMaT"``), then - for a name the registry does not know - the input
-    with separators collapsed to ``_`` (a result-directory token, a user's own
-    method name), unchanged in case.
-
     Parameters
     ----------
     name : str
-        Any spelling of a method id.
+        Any spelling of a method name (``"MOFA+"``, ``"totalvi"``, ``"Seurat v4"``).
     strict : bool, keyword-only
-        ``True`` raises ``KeyError`` for a name that is not a registry id
-        after aliasing and case-folding, with a did-you-mean hint (the same
-        message :func:`multibench.method_info` / ``scan`` give). Default
-        ``False`` returns the folded token, because result directories and
-        user frames legitimately carry names the registry does not know.
+        ``True`` = raise for a name that is not a registry id; ``False`` =
+        return the folded name.
 
     Returns
     -------
     str
-        The canonical id.
+        The registry id; for an unknown name, the input with spaces and dots
+        collapsed to ``_``.
 
     Raises
     ------
     KeyError
-        ``strict=True`` and the name is unknown, e.g.
-        ``"unknown method 'Matlida'; did you mean 'Matilda'?; see
-        mtb.list_methods()"``.
+        ``strict=True`` and the name is not a registry id (with a did-you-mean hint).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.catalog.canonical_id("MOFA+"), mtb.catalog.canonical_id("totalvi")
+    ('MOFA2', 'totalVI')
+    >>> mtb.catalog.canonical_id("my method")          # unknown: separators folded
+    'my_method'
+
+    Notes
+    -----
+    **Resolution order.** The first rule that matches wins:
+
+    1. the alias table, case-insensitive (``"MOFA+"`` -> ``"MOFA2"``,
+       ``"Seurat(WNN)"`` -> ``"Seurat_WNN"``);
+    2. a case-folded match against the registry ids, after collapsing spaces
+       and dots to ``_`` (``"totalvi"`` -> ``"totalVI"``, ``"scmomat"`` ->
+       ``"scMoMaT"``);
+    3. for a name the registry does not know (a result-directory token, a
+       user's own method name): the input with separators collapsed to
+       ``_``, unchanged in case.
+
+    **Strict mode.** The error is the message ``mtb.method_info`` and
+    ``mtb.scan`` give, e.g. ``"unknown method 'Matlida'; did you mean
+    'Matilda'?; see mtb.list_methods()"``. The default is lenient because
+    result directories and user frames legitimately carry names the
+    registry does not know.
+
+    See Also
+    --------
+    mtb.list_methods : the registry ids.
+    mtb.catalog.canonical_metric : the same normalisation for metric codes.
     """
     key = str(name).strip().lower()
     if key in _ALIASES:
@@ -137,12 +158,20 @@ def known_metrics() -> list[str]:
     Returns
     -------
     list of str
-        ``ARI, NMI, ASW, iASW, iF1, cLISI`` (clustering / bio conservation),
-        ``ASW_batch, GC, iLISI, kBET`` (batch correction) and ``PCR``
-        (principal-component regression, present in some published tables).
-        This is the vocabulary ``canonical_metric(strict=True)`` validates
-        against; the two scIB families are ``mtb.plot.CLUSTERING_METRICS`` /
-        ``mtb.plot.BATCH_METRICS``.
+        The clustering / bio-conservation codes (``mtb.plot.CLUSTERING_METRICS``),
+        the batch-correction codes (``mtb.plot.BATCH_METRICS``), then ``PCR``
+        (principal-component regression, in some published tables).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.catalog.known_metrics()
+    ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI', 'kBET', 'PCR']
+
+    See Also
+    --------
+    mtb.catalog.canonical_metric : maps any spelling to these codes; ``strict=True`` accepts only them.
+    mtb.catalog.metrics : the description of each scIB metric.
     """
     seen: list[str] = []
     for v in _METRIC_CANON.values():
@@ -154,30 +183,53 @@ def known_metrics() -> list[str]:
 
 
 def canonical_metric(code: str, *, strict: bool = False) -> str | None:
-    """Canonicalize a metric short-code (``"ari"`` -> ``"ARI"``, ``"kbet"`` -> ``"kBET"``).
+    """Return the canonical code for a metric name (``"ari"`` -> ``"ARI"``).
 
     Parameters
     ----------
     code : str
         A metric name in any spelling the package or scIB uses
-        (``"iFI"``, ``"isolated_label_f1"`` and ``"if1"`` all -> ``"iF1"``).
+        (``"kbet"``, ``"isolated_label_f1"``).
     strict : bool, keyword-only
-        ``True`` raises ``ValueError`` for a code that is not in
-        :func:`known_metrics` after canonicalisation. Default ``False``
-        returns an unknown code stripped but otherwise unchanged, so a user
-        frame can carry a metric the package does not know.
+        ``True`` = raise for a code not in ``known_metrics()``; ``False`` =
+        return an unknown code unchanged (stripped).
 
     Returns
     -------
     str or None
         The canonical code; ``None`` for ``None``, an empty string or the
-        string ``"nan"`` (a blank cell), which callers drop.
+        string ``"nan"`` (a blank cell, which callers drop).
 
     Raises
     ------
     ValueError
-        ``strict=True`` and the code is unknown:
-        ``"unknown metric 'nope'; valid: ['ARI', 'NMI', ...]"``.
+        ``strict=True`` and the code is not a known metric (the message lists them).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.catalog.canonical_metric("kbet"), mtb.catalog.canonical_metric("isolated_label_f1")
+    ('kBET', 'iF1')
+    >>> mtb.catalog.canonical_metric("my_score")        # unknown: kept as given
+    'my_score'
+
+    Notes
+    -----
+    **Spellings.** Matching ignores case and surrounding whitespace:
+    ``"iFI"``, ``"if1"`` and ``"isolated_label_f1"`` all give ``"iF1"``. The
+    raw scIB long names ``"ARI_cluster/label"``, ``"NMI_cluster/label"``,
+    ``"ASW_label"`` and ``"isolated_label_silhouette"`` map to ``ARI``,
+    ``NMI``, ``ASW`` and ``iASW``.
+
+    **Unknown codes.** The default returns an unknown code stripped but
+    otherwise unchanged, so a user frame can carry a metric the package
+    does not know. With ``strict=True`` the error reads ``"unknown metric
+    'nope'; valid: ['ARI', 'NMI', ...]"``.
+
+    See Also
+    --------
+    mtb.catalog.known_metrics : the codes ``strict=True`` accepts.
+    mtb.catalog.canonical_id : the same normalisation for method names.
     """
     if code is None:
         return None
@@ -314,25 +366,50 @@ def _split_multivalue(cell: object) -> list[str]:
 
 
 def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """The methods table, with the registry-backed columns overlaid.
+    """Table of the benchmark's methods, one row per method.
 
     Parameters
     ----------
-    files_dir : path-like, optional
-        Directory holding ``method.csv`` (default: the package's ``files/``).
+    files_dir : Path | str | None
+        Folder holding ``method.csv``; ``None`` = the package's shipped ``files/``.
 
     Returns
     -------
     pandas.DataFrame
-        One row per method with columns ``method, canonical_id, language,
-        deep_learning, atac, output, needs_labels, categories, tasks``
-        (``categories`` / ``tasks`` are lists). ``language`` (lower-cased),
-        ``deep_learning`` and ``output`` come from ``method.csv``.
-        ``needs_labels``, ``atac`` (``'peak'`` / ``'gene_activity'`` /
-        ``None``), ``categories`` and ``tasks`` are overlaid from the method
-        registry for every row whose id is registered, so the table cannot
-        disagree with ``method_info`` / ``scan``; a row without a registry
-        entry keeps the CSV values.
+        One row per method. Read ``method``, ``needs_labels``, ``atac`` and
+        ``categories``; all columns are listed in Notes.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> m = mtb.catalog.methods()
+    >>> m[m.needs_labels][["method", "categories"]]
+    >>> m[m.categories.map(lambda c: "vertical" in c)].method.tolist()
+
+    Notes
+    -----
+    **Column reference.**
+
+    - ``method`` - the name as spelled in ``method.csv``;
+    - ``canonical_id`` - the registry id (``mtb.catalog.canonical_id``);
+    - ``language`` - ``'python'`` or ``'r'`` (lower-cased);
+    - ``deep_learning`` - ``'Yes'`` / ``'No'``, as in the CSV;
+    - ``atac`` - ``'peak'``, ``'gene_activity'`` or ``None``;
+    - ``output`` - ``'embedding'``, ``'graph'`` or ``'coords'``;
+    - ``needs_labels`` - bool, the method needs cell-type labels;
+    - ``categories`` / ``tasks`` - lists of integration categories and tasks.
+
+    **Registry overlay.** ``needs_labels``, ``atac``, ``categories`` and
+    ``tasks`` come from the method registry for every row whose id is
+    registered, so the table cannot disagree with ``mtb.method_info`` /
+    ``mtb.scan``; a row without a registry entry keeps the CSV values.
+    ``language``, ``deep_learning`` and ``output`` come from ``method.csv``.
+
+    See Also
+    --------
+    mtb.list_methods : the registry method ids, optionally per category.
+    mtb.method_info : everything the registry knows about one method.
+    mtb.catalog.canonical_id : the normalisation behind the ``canonical_id`` column.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
@@ -385,40 +462,67 @@ PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 def datasets(files_dir: Path | str | None = None, *,
              category: str | None = None) -> pd.DataFrame:
-    """The benchmark's dataset table, joined with what the result tree knows.
+    """Table of the benchmark's datasets, joined with the stored results.
 
     Parameters
     ----------
-    files_dir : path-like, optional
-        Directory holding ``dataset.csv`` (default: the package's
-        ``files/``).
-    category : str, keyword-only, optional
-        Keep only datasets whose result tree places them in this integration
-        category (``"vertical"``, ``"diagonal"``, ``"mosaic"``, ``"cross"``).
+    files_dir : Path | str | None
+        Folder holding ``dataset.csv``; ``None`` = the package's shipped ``files/``.
+    category : str | None, keyword-only
+        Keep only datasets with stored results in this integration category
+        (``'vertical'``, ``'diagonal'``, ``'mosaic'``, ``'cross'``); ``None`` = all.
 
     Returns
     -------
     pandas.DataFrame
-        One row per dataset id with columns
+        One row per dataset id. Read ``dataset``, ``category`` and
+        ``has_results``; all columns are listed in Notes.
 
-        * ``dataset`` - the id (``D11``, ``SD15``, ...); ``dataset name`` is
-          kept as a duplicate column for one release (old callers read it).
-          The rows are the union of ``dataset.csv`` and every id that has
-          stored results (:func:`multibench.available_datasets` with
-          ``source="both"``), so ``D11s``/``D28s``/``D45s``/``D52s`` (the
-          re-run subsamples) and ``D24`` (published tables only) are listed
-          even though ``dataset.csv`` does not name them; ids missing from
-          the CSV are appended after it, in natural order;
-        * ``simulated`` - ``bool``, ids starting with ``SD``;
-        * ``category`` - the integration category whose stored results
-          (published or re-run) contain the dataset, ``";"``-joined if
-          several, NaN when no stored results exist; derived at call time
-          from :func:`multibench.available_datasets` so it never goes stale;
-        * ``has_results`` - ``bool``, whether any stored metric table
-          (``load_results``) covers it;
-        * ``assay, tissue, n_cells, n_batches, source`` - the paper's
-          descriptive columns, nullable; empty until transcribed from the
-          supplementary table (see ``files/README_PROVENANCE.txt``).
+    Raises
+    ------
+    ValueError
+        ``category`` is not an integration category (the message lists them).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> ds = mtb.catalog.datasets()
+    >>> ds[ds.has_results][["dataset", "category"]]
+    >>> mtb.catalog.datasets(category="vertical").dataset.tolist()
+
+    Notes
+    -----
+    **Column reference.**
+
+    - ``dataset`` - the id (``D11``, ``SD15``, ...);
+    - ``dataset name`` - a duplicate of ``dataset``, kept for one release
+      for older callers;
+    - ``simulated`` - bool, ids starting with ``SD``;
+    - ``category`` - the integration categories whose stored results
+      (published or re-run) contain the dataset, ``";"``-joined; ``None``
+      when no stored results exist;
+    - ``has_results`` - bool, a stored metric table (``mtb.load_results``)
+      covers it;
+    - ``assay``, ``tissue``, ``n_cells``, ``n_batches``, ``source`` - the
+      paper's descriptive columns, nullable; empty until transcribed from
+      the supplementary table (see ``files/README_PROVENANCE.txt``).
+
+    **Row set.** The rows are the union of ``dataset.csv`` and every id with
+    stored results (``mtb.available_datasets(source="both")``), so
+    ``D11s``/``D28s``/``D45s``/``D52s`` (the re-run subsamples) and ``D24``
+    (published tables only) are listed although ``dataset.csv`` does not
+    name them. Ids missing from the CSV are appended after it, in natural
+    order.
+
+    **Freshness.** ``category`` and ``has_results`` are derived at call time
+    from ``mtb.available_datasets``, so they never go stale; a missing or
+    unreadable result tree leaves them empty instead of raising.
+
+    See Also
+    --------
+    mtb.available_datasets : dataset ids with stored results, per category.
+    mtb.data.fetchable : dataset ids that can be downloaded.
+    mtb.load_results : the stored metric tables themselves.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
@@ -460,22 +564,36 @@ def datasets(files_dir: Path | str | None = None, *,
 
 
 def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """The metric details table shipped in ``files/metric_full.csv``.
+    """Table describing the scIB metrics, from ``files/metric_full.csv``.
 
     Parameters
     ----------
-    files_dir : path-like, optional
-        Directory holding ``metric_full.csv`` (default: the package's
-        ``files/``).
+    files_dir : Path | str | None
+        Folder holding ``metric_full.csv``; ``None`` = the package's shipped ``files/``.
 
     Returns
     -------
     pandas.DataFrame
-        One row per scIB metric (``ARI, NMI, ASW, iASW, iF1, cLISI,
-        ASW_batch, GC, iLISI, kBET``) with the CSV's descriptive columns
-        (whitespace-stripped headers). The canonical code vocabulary,
-        including ``PCR`` from the published tables, is
-        :func:`known_metrics`.
+        One row per scIB metric, with the CSV's columns (``metric`` and
+        ``description`` in the shipped file).
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> tab = mtb.catalog.metrics()
+    >>> tab.set_index("metric").loc["kBET", "description"]
+
+    Notes
+    -----
+    **Rows.** The ten scIB metrics ``ARI, NMI, ASW, iASW, iF1, cLISI,
+    ASW_batch, GC, iLISI, kBET``; header whitespace is stripped. The
+    canonical code vocabulary, including ``PCR`` from the published tables,
+    is ``mtb.catalog.known_metrics``.
+
+    See Also
+    --------
+    mtb.catalog.known_metrics : the canonical metric codes.
+    mtb.evaluate : computes these metrics for an embedding.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
