@@ -48,35 +48,31 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
 
 
 def load_batch(out_dir, *, methods=None) -> "BatchResult":
-    """Reload a ``BatchResult`` that ``BatchResult.save`` wrote.
+    """Reload a ``BatchResult`` from the folder ``BatchResult.save`` wrote.
 
-    ``run_all`` saves automatically, so after an overnight sweep you can come
-    back and re-plot, re-score or re-inspect without re-running anything.
+    ``run_all`` saves every sweep, so a finished one can be re-plotted,
+    re-scored or inspected later without re-running any method.
 
     Parameters
     ----------
     out_dir : path-like
-        The folder holding ``batch_result.json`` (plus ``long.csv`` when the
-        run produced metrics) - ``run_all(out_dir=...)``, or the tree
-        ``mtb.data.fetch_outputs`` downloads.
+        Folder holding ``batch_result.json``: a ``run_all`` ``out_dir`` or a
+        ``mtb.data.fetch_outputs`` tree.
     methods : list[str] | None, keyword-only
-        Keep only these methods' records, in the order the tree ran them
-        (``mtb.load_batch(mtb.data.fetch_outputs("D11"), methods=trio)``).
-        ``None`` (default) keeps every record.
+        Methods whose records to keep; ``None`` = every record.
 
     Returns
     -------
     BatchResult
-        The reloaded sweep; ``out_dir`` is remembered so ``save()`` with no
+        The reloaded sweep. It remembers ``out_dir``, so ``save()`` with no
         argument writes back to the same folder.
 
     Raises
     ------
-    KeyError
-        A name in ``methods`` is not in the tree; the message lists the
-        methods that are.
     FileNotFoundError
-        No ``batch_result.json`` under ``out_dir``.
+        ``out_dir`` holds no ``batch_result.json``.
+    KeyError
+        A name in ``methods`` has no record; the message lists the methods that do.
 
     Examples
     --------
@@ -84,16 +80,25 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     >>> res = mtb.load_batch("out/")
     >>> res.summary
     >>> res.plot().savefig("compare.png")
-    >>> res.rescore(metrics=["ARI", "NMI"]).summary
-    >>> mtb.load_batch(mtb.data.fetch_outputs("D11"), methods=["Matilda", "totalVI"])
+    >>> mtb.load_batch(mtb.data.fetch_outputs("D11"), methods=["Matilda", "scMM"])
+
+    Notes
+    -----
+    **Files read.** ``batch_result.json`` holds the per-method records.
+    ``long.csv``, written when the run produced metrics, restores each
+    method's unrounded tidy frame; without it ``BatchResult.long`` is rebuilt
+    from the records' rounded ``metrics``.
+
+    **Record order.** ``methods=`` only filters: the kept records stay in the
+    order the tree ran them, not the order of ``methods``.
 
     See Also
     --------
     mtb.BatchResult : the object returned.
 
-    mtb.run_all : produces the folder this function reads.
+    mtb.run_all : writes the folder this function reads.
 
-    mtb.data.fetch_outputs : downloads recorded run outputs in that layout.
+    mtb.data.fetch_outputs : downloads recorded run outputs in the same layout.
     """
     d = Path(out_dir)
     with open(d / "batch_result.json") as fh:
@@ -150,14 +155,11 @@ ROLES = {
 def list_categories() -> dict:
     """Return the valid ``category`` values with a plain-language description of each.
 
-    ``category`` is a required argument of ``mtb.run_all``; this is the list.
-
     Returns
     -------
     dict
-        ``{"vertical": ..., "diagonal": ..., "mosaic": ..., "cross": ...}``,
-        one or two sentences per value saying what that scenario's data looks
-        like.
+        ``{category: description}`` for ``vertical``, ``diagonal``, ``mosaic``
+        and ``cross``: the values ``mtb.run_all`` requires as ``category``.
 
     Examples
     --------
@@ -175,16 +177,13 @@ def list_categories() -> dict:
 def describe_layout(category: str | None = None) -> str:
     """Return the directory layout the package expects for your own dataset.
 
-    The text covers the role -> filename mapping, the numbered per-batch files,
-    the ATAC representation trap, the ``.h5`` file format and the spatial
-    registration layout. Start here when bringing your own data, then confirm
-    with ``mtb.scan``.
+    Start here when bringing your own data, then confirm the folder with
+    ``mtb.scan``.
 
     Parameters
     ----------
     category : str | None
-        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross`` to print the
-        layout of one category; ``None`` (default) prints all four.
+        Category whose layout block to include; ``None`` = all four.
 
     Returns
     -------
@@ -194,9 +193,7 @@ def describe_layout(category: str | None = None) -> str:
     Raises
     ------
     ValueError
-        Unknown ``category`` (the message lists the four); ``'spatial'``
-        raises with a pointer to ``describe_layout('cross')`` (it is a task,
-        not a category).
+        Unknown ``category``, including ``'spatial'`` (a task, not a category).
 
     Examples
     --------
@@ -207,35 +204,46 @@ def describe_layout(category: str | None = None) -> str:
 
     Notes
     -----
-    A "role" is the name of one input a method takes. For CITE-seq the
-    roles are ``rna`` (``rna.h5``) and ``adt`` (``adt.h5``, surface protein /
-    antibody-derived tags), plus ``cty.csv`` for cell-type labels::
+    **What the text covers.** The role -> filename mapping, the numbered
+    per-batch files, the ATAC representation trap, the ``.h5`` file format,
+    the label CSV, the conda envs and, for ``None`` or ``cross``, the
+    spatial-registration layout.
 
-        <data_path>/MYCITE/
-            rna.h5
-            adt.h5
-            cty.csv
+    **Roles.** A "role" is the name of one input a method takes. For
+    CITE-seq the roles are ``rna`` (``rna.h5``) and ``adt`` (``adt.h5``,
+    surface protein / antibody-derived tags), plus ``cty.csv`` for cell-type
+    labels:
 
-    Several batches (mosaic / cross integration) use one numbered file per
-    batch, in the same flat directory - not sub-folders, and not one
-    pre-concatenated matrix. Three batches of CITE-seq::
+    ```text
+    <data_path>/MYCITE/
+        rna.h5
+        adt.h5
+        cty.csv
+    ```
 
-        <data_path>/COREBATCH/
-            rna1.h5   adt1.h5   cty1.csv     # batch 1
-            rna2.h5   adt2.h5   cty2.csv     # batch 2
-            rna3.h5   adt3.h5   cty3.csv     # batch 3
+    **Several batches.** Mosaic and cross integration use one numbered file
+    per batch, in the same flat directory - not sub-folders, and not one
+    pre-concatenated matrix. Batch membership is carried by the file
+    numbering; there is no batch column. Three batches of CITE-seq:
 
-    Batch membership is carried by the file numbering; there is no batch
-    column.
+    ```text
+    <data_path>/COREBATCH/
+        rna1.h5   adt1.h5   cty1.csv     # batch 1
+        rna2.h5   adt2.h5   cty2.csv     # batch 2
+        rna3.h5   adt3.h5   cty3.csv     # batch 3
+    ```
 
-    Spatial registration (PASTE/PASTE2/SPIRAL/GPSA, category ``cross``) takes
-    a directory of per-slice ``.h5ad`` files instead - see the SPATIAL
-    REGISTRATION block of the output.
+    **Spatial registration.** PASTE, PASTE2, SPIRAL and GPSA (category
+    ``cross``) take a directory of per-slice ``.h5ad`` files instead; see the
+    SPATIAL REGISTRATION block of the output.
 
-    The lists of methods that need gene-activity vs peak ATAC matrices are
-    built from the method registry at call time (``find_methods(atac=...)``),
-    so they always agree with what ``method_info`` / ``scan``'s ``atac``
-    column say.
+    **ATAC method lists.** The methods that need gene-activity vs peak ATAC
+    matrices are listed from the method registry at call time
+    (``find_methods(atac=...)``), so they always agree with ``method_info``
+    and the ``atac`` column of ``mtb.scan``.
+
+    **Errors.** An unknown ``category`` raises a ``ValueError`` that lists the
+    four; ``'spatial'`` raises with a pointer to ``describe_layout('cross')``.
 
     See Also
     --------
@@ -585,71 +593,56 @@ def scan(dataset: str, category: str | None = None, *,
          verbose: bool = True) -> pd.DataFrame:
     """Report what can run on a dataset, why the rest cannot, and each command.
 
-    Nothing is executed. This is the first call to make when pointing the
-    benchmark at a new dataset, and the frame ``run_all(dry_run=True)``
-    returns. Every row carries two independent gates - ``files_ok`` (the
-    inputs resolve on disk) and ``env_ok`` (the conda env exists here) - and
-    ``runnable`` is their conjunction.
+    Nothing is executed. Call it first on a new dataset;
+    ``run_all(dry_run=True)`` returns the same frame.
 
     Parameters
     ----------
     dataset : str
-        Folder name under ``data_path`` (not a path). If the folder does
-        not exist, ``FileNotFoundError`` lists the folders that do. A spelling
-        that differs from the folder only in case (``'d52'`` on macOS) is
-        replaced by the on-disk spelling with a ``UserWarning``.
+        Dataset folder name under ``data_path`` (not a path).
     category : str | None
-        Restrict to one integration category (``ValueError`` listing the
-        valid ones on a typo); default ``None``: all four.
+        Integration category to scan; ``None`` = all four.
     methods : list[str] | None, keyword-only
-        Restrict to these registry ids, as a list (``KeyError`` with a
-        did-you-mean hint on a typo; a bare string such as
-        ``methods="StabMap"`` raises ``TypeError`` saying to pass a list).
-        Blocked rows are kept with their reason. Default ``None``: every method.
+        Registry ids to include, as a list; ``None`` = every method.
     modalities : list[str] | None, keyword-only
-        Restrict to one modality combination, given as a list of role names
-        (``["rna", "adt"]``; ``protein`` is accepted for ``adt``; a bare
-        string raises ``TypeError``). ``modalities=[]`` selects the
-        directory-input variants. Default ``None``: every combination.
+        Role names of one modality combination, e.g. ``["rna", "adt"]``;
+        ``None`` = every combination.
     data_path : Path | str | None, keyword-only
-        The folder that contains ``dataset``; default the configured data
-        root (``config.DEFAULT.data_path``).
+        Folder that contains ``dataset``; ``None`` = the configured data root
+        (``config.DEFAULT.data_path``).
     out_dir : path | str, keyword-only
-        Root the ``command`` lines write under
-        (``<out_dir>/<method>_<dataset>/``, exactly like ``run_all``).
-        Default: the literal placeholder ``'<out_dir>'``; pass the real one
-        for paste-ready lines.
+        Root the ``command`` lines write under; default the literal
+        placeholder ``'<out_dir>'``. Pass the real one for paste-ready lines.
     params : dict | None, keyword-only
-        ``{method: {key: value}}`` hyperparameter overrides merged into each
-        command the way ``run_all(params=)`` merges them; a key no variant of
-        that method accepts raises ``KeyError`` naming the accepted keys, so
-        a typo is caught here rather than hours into a sweep.
+        ``{method: {key: value}}`` hyperparameter overrides, rendered into
+        ``command`` and checked against the keys each method accepts.
     verbose : bool, keyword-only
         Print one line ``[scan] files OK for k/n method rows; e/n envs
-        installed`` (default True; ``run_all`` passes its own ``verbose``).
+        installed``.
 
     Returns
     -------
     pandas.DataFrame
         One row per (method, category, modalities) variant, runnable rows
-        first, 18 columns (``SCAN_COLUMNS``); each column is described in
-        Notes. The four to read at the REPL are
-        ``df[["method", "modalities", "runnable", "reason"]]``; go to
-        ``files_reason`` / ``env_reason`` only for a row you are debugging.
+        first. Read ``df[["method", "modalities", "runnable", "reason"]]``;
+        all 18 columns are listed in Notes.
 
     Raises
     ------
     FileNotFoundError
-        No folder ``<data_path>/<dataset>``; the message lists the folders present.
+        ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
     ValueError
-        Unknown ``category``, or no variant of the requested ``methods``
-        exists under ``category`` (a known id with no diagonal variant, say)
-        - never a silently empty frame.
+        Unknown ``category``, or no variant of ``methods`` exists under ``category``.
     KeyError
-        Unknown method id in ``methods`` or ``params``, or a ``params`` key
-        no variant of that method accepts.
+        Unknown id in ``methods`` or ``params``, or a ``params`` key no variant accepts.
     TypeError
         ``methods`` or ``modalities`` given as a bare string.
+
+    Warns
+    -----
+    UserWarning
+        ``dataset`` matches a folder only up to case, or ``modalities`` drops
+        directory-input methods.
 
     Examples
     --------
@@ -657,93 +650,119 @@ def scan(dataset: str, category: str | None = None, *,
     >>> df = mtb.scan("D11", "vertical")
     >>> df[["method", "modalities", "runnable", "reason"]]
     >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]   # what blocks the rest
+    >>> print(df.loc[df.files_ok, "command"].iloc[0])                  # a paste-ready shell line
     >>> mtb.scan("MYCITE", "vertical", data_path="/path/to/data", out_dir="out/")
-    >>> print(df.loc[df.runnable, "command"].iloc[0])     # a paste-ready shell line
 
     Notes
     -----
-    Each gate is reported per row as a flag and a reason:
+    **Column reference.** The full frame is 18 columns wide
+    (``SCAN_COLUMNS``):
 
-    ``files_ok`` / ``files_reason`` - the input files resolve on disk, are
-    oriented features x cells, every label CSV has one row per cell of the
-    modality it labels, and a ``data_dir`` method finds what it needs (>= 2
-    ``.h5ad`` slices with ``obsm['spatial']`` for registration; scBridge's
-    bare filenames). This gate always runs, whether or not any conda env is
-    installed, so a laptop without envs still tells you whether your layout
-    is right.
+    ```text
+    method              registry id
+    category            integration category of the variant
+    modalities          '+'-joined string ("rna+adt"); "(data_dir)" for a
+                        directory-fed variant
+    env                 the conda env the method runs in
+    output_kind         embedding / graph / coords
+    n_tunable           number of command-line hyperparameters
+    runtime_tier        fast / medium / slow / very_slow / unknown
+    observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
+    caveat              known content trap for this method x dataset, or ""
+    runnable            files_ok & env_ok
+    reason              short form of the non-empty reasons, "; "-joined
+    files_ok            the inputs resolve, are oriented and labelled
+    files_reason        verbatim file-gate text, full paths
+    env_ok              the env exists (and a GPU, when the script needs one)
+    env_reason          verbatim env-gate text with the install command
+    needs_labels        this variant demands a label file as an input
+    atac                ATAC representation the method expects: 'peak' /
+                        'gene_activity'; None when the variant takes no ATAC
+    command             the shell line the variant would run; "" if the
+                        inputs do not resolve
+    ```
 
-    ``env_ok`` / ``env_reason`` - the method's conda env exists on this
-    machine; the reason names the env and the one-method install command
-    (``multibench env install --methods X --packed --run``). For a method
-    whose upstream script calls CUDA unconditionally
-    (``method_info(m)['requires_gpu']``) the gate also needs an NVIDIA GPU
-    (``mtb.env.host_has_gpu()``); without one ``env_reason`` carries the
-    sentence ``run`` would raise (``"<method> needs an NVIDIA GPU: the
-    upstream script calls CUDA unconditionally (<file>:<line>) ..."``). On a
-    GPU-less host the ``command`` column already carries each method's
-    ``cpu_params`` (the flags that turn CUDA off where a switch exists).
+    **Two gates.** Every row carries two independent gates, each a flag plus
+    a reason, and ``runnable = files_ok & env_ok``:
 
-    ``runnable = files_ok & env_ok`` and ``reason`` joins the non-empty reasons
-    with ``"; "`` (empty iff runnable). ``reason`` is the short form: the file
-    half drops the exception class, the ``method/dataset/category:`` prefix
-    and the absolute directory (``input files not found on disk: {'atac':
-    'atac.h5'}. Available files in D11: [...]``), while ``files_reason`` /
-    ``env_reason`` keep the verbatim text with full paths.
+    - ``files_ok`` / ``files_reason`` - the method's script is present, the
+      input files resolve on disk and are oriented features x cells, every
+      label CSV has one row per cell of the modality it labels, and a
+      ``data_dir`` method finds what it needs (>= 2 ``.h5ad`` slices with
+      ``obsm['spatial']`` for registration; scBridge's bare filenames).
+    - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
+      machine; the reason names the env and the one-method install command
+      (``multibench env install --methods X --packed --run``).
+    - GPU - for a method whose upstream script calls CUDA unconditionally
+      (``method_info(m)['requires_gpu']``), ``env_ok`` also needs an NVIDIA
+      GPU (``mtb.env.host_has_gpu()``). Without one, ``env_reason`` carries
+      the sentence ``run`` would raise (``"<method> needs an NVIDIA GPU: the
+      upstream script calls CUDA unconditionally (<file>:<line>) ..."``).
 
-    The full frame is 18 columns wide (``SCAN_COLUMNS``)::
+    The file gate always runs, whether or not any conda env is installed, so
+    a laptop without envs still tells you whether your layout is right.
 
-        method              registry id
-        category            integration category of the variant
-        modalities          '+'-joined string ("rna+adt"); "(data_dir)" for a
-                            directory-fed variant
-        env                 the conda env the method runs in
-        output_kind         embedding / graph / coords
-        n_tunable           number of command-line hyperparameters
-        runtime_tier        fast / medium / slow / very_slow / unknown
-        observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
-        caveat              known content trap for this method x dataset, or ""
-        runnable            files_ok & env_ok
-        reason              short form of the non-empty reasons, "; "-joined
-        files_ok            the inputs resolve, are oriented and labelled
-        files_reason        verbatim file-gate text, full paths
-        env_ok              the env exists (and a GPU, when the script needs one)
-        env_reason          verbatim env-gate text with the install command
-        needs_labels        this variant demands a label file as an input
-        atac                ATAC representation the method expects: 'peak' /
-                            'gene_activity'; None when the variant takes no ATAC
-        command             the shell line the variant would run; "" if the
-                            inputs do not resolve
+    **Reason columns.** ``reason`` joins the non-empty reasons with ``"; "``
+    and is empty iff the row is runnable. It is the short form: the file half
+    drops the exception class, the ``method/dataset/category:`` prefix and
+    the absolute directory (``input files not found on disk: {'atac':
+    'atac.h5'}. Available files in D11: [...]``). ``files_reason`` /
+    ``env_reason`` keep the verbatim text with full paths; read them for a
+    row you are debugging.
 
-    ``modalities`` is a ``+``-joined string here (e.g. ``"rna+adt"``);
-    ``run_all``/``inputs_for`` take it as a list (``["rna", "adt"]``), so
-    split on ``"+"``. The sentinel ``"(data_dir)"`` marks a method that
-    consumes a whole directory rather than named modality files (the
-    spatial-registration methods, and scBridge) - for those, pass no
-    ``modalities`` at all (``modalities=[]`` selects exactly them). Because
-    ``modalities=`` is an exact selector, any non-empty list excludes the
-    directory-input variants; when that happens a ``UserWarning`` names them
-    and says ``modalities=[]`` selects them.
+    **The command column.**
 
-    ``runtime_tier`` / ``observed_worst_sec`` (see
+    - ``command`` is ``run(..., dry_run=True)``, ``shlex``-joined, writing
+      under ``<out_dir>/<method>_<dataset>/`` exactly like ``run_all`` - the
+      literal ``'<out_dir>'`` placeholder unless ``out_dir`` is given.
+    - Paths are absolute: a relative ``out_dir``, the placeholder included,
+      is resolved against the working directory.
+    - ``params`` are merged in the way ``run_all(params=)`` merges them.
+    - On a GPU-less host it already carries each method's ``cpu_params``
+      (the flags that turn CUDA off where a switch exists).
+    - A row blocked only by ``env_ok`` still shows its command - the line to
+      paste into a job script once the env is built.
+
+    **The modalities column.** ``modalities`` is a ``+``-joined string here
+    (``"rna+adt"``); ``run_all`` / ``inputs_for`` take a list
+    (``["rna", "adt"]``), so split on ``"+"``. The sentinel ``"(data_dir)"``
+    marks a method that consumes a whole directory rather than named modality
+    files (the spatial-registration methods, and scBridge); for those, pass
+    no ``modalities`` at all.
+
+    **Sizing a sweep.** ``runtime_tier`` / ``observed_worst_sec`` (see
     ``method_info(m)['runtime']``) let you size a sweep before launching it;
     ``caveat`` carries known content traps (e.g. an ``atac_gas`` role that
     fell back to a peak matrix).
 
-    ``command`` is ``run(..., dry_run=True)``, ``shlex``-joined, writing under
-    ``<out_dir>/<method>_<dataset>/`` - the literal ``'<out_dir>'``
-    placeholder unless ``out_dir`` is given. A row blocked only by ``env_ok``
-    still shows its command - the line to paste into a job script once the
-    env is built. ``multibench scan`` prints a compact view by default;
-    ``--columns all`` adds the rest, including ``command``. The 0.2 ``plan`` /
-    ``plan_commands`` are deprecated aliases of this function.
+    **Selection and input checks.**
 
-    A CITE-seq folder (``rna.h5`` + ``adt.h5`` + ``cty.csv``) is ``vertical`` with
-    modalities ``["rna", "adt"]``; RNA and ATAC from different cells is
-    ``diagonal``. See ``mtb.list_categories`` and ``mtb.describe_layout``.
+    - ``methods`` - an unknown id raises ``KeyError`` with a did-you-mean
+      hint; blocked rows of the selected methods are kept, with their reason.
+      A selection with no variant under ``category`` (a known id with no
+      diagonal variant, say) raises ``ValueError`` - never a silently empty
+      frame.
+    - ``modalities`` - an exact selector: ``protein`` is accepted for
+      ``adt``, ``modalities=[]`` selects exactly the directory-input
+      variants, and any non-empty list excludes them (a ``UserWarning`` names
+      them and says ``modalities=[]`` selects them).
+    - ``params`` - a key no variant of that method accepts raises
+      ``KeyError`` naming the accepted keys, so a typo is caught here rather
+      than hours into a sweep.
+    - ``dataset`` - a spelling that differs from the folder only in case
+      (``'d52'`` on macOS) is replaced by the on-disk spelling, with a
+      ``UserWarning``.
 
-    Each method runs in its own conda environment (they need mutually
-    incompatible framework versions). List them with ``multibench env
-    doctor``; build them with ``multibench env install --run``.
+    **Choosing a category.** A CITE-seq folder (``rna.h5`` + ``adt.h5`` +
+    ``cty.csv``) is ``vertical`` with modalities ``["rna", "adt"]``; RNA and
+    ATAC from different cells is ``diagonal``. See ``mtb.list_categories``
+    and ``mtb.describe_layout``.
+
+    **Environments and CLI.** Each method runs in its own conda environment
+    (they need mutually incompatible framework versions). List them with
+    ``multibench env doctor``; build them with
+    ``multibench env install --run``. ``multibench scan`` prints a compact
+    view by default; ``--columns all`` adds the rest, including ``command``.
 
     See Also
     --------
@@ -1089,26 +1108,25 @@ def _with_label_order_note(sm: "pd.DataFrame") -> "pd.DataFrame":
 class BatchResult:
     """Outcome of ``mtb.run_all`` - a summary table, a tidy frame and a figure.
 
-    Built by ``mtb.run_all`` and ``mtb.load_batch``; not normally constructed
-    by hand. The per-method records are kept, so a finished sweep can be
-    re-scored (``rescore``) or re-plotted (``plot``) without re-running any
-    method.
+    Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. The
+    per-method records are kept, so a finished sweep can be re-scored or
+    re-plotted without re-running any method.
 
     Parameters
     ----------
     records : list[dict]
-        One record per method run (see ``results``).
+        One record per method run, as ``run_all`` builds them.
     dataset : str
-        The dataset folder name the sweep ran on.
+        Dataset folder name the sweep ran on.
     category : str
-        The integration category the sweep ran under.
+        Integration category the sweep ran under.
     out_dir : path | None
         Where the sweep wrote its outputs; ``save()`` defaults to it.
 
     Attributes
     ----------
     records : list[dict]
-        The raw per-method records (same object as ``results``).
+        The raw per-method records (the same list ``results`` returns).
     dataset : str
         Dataset folder name.
     category : str
@@ -1123,7 +1141,7 @@ class BatchResult:
     results : list[dict]
         The raw records, including every label ordering tried (property).
     failures : pandas.DataFrame
-        The methods that failed, timed out or could not be scored:
+        Methods that failed, timed out or could not be scored:
         ``method, status, error`` (property).
 
     Examples
@@ -1133,9 +1151,13 @@ class BatchResult:
     >>> res.summary[["method", "status", "ARI", "NMI"]]
     >>> res.failures                              # empty frame when all went well
     >>> fig = res.plot(metrics=["ARI", "NMI", "ASW"])
-    >>> res2 = res.rescore(metrics="clustering")  # re-score stored outputs, nothing re-run
-    >>> res2.save("out/rescored")
-    >>> len(res)                                  # number of method records
+    >>> res.rescore(metrics="clustering").save("out/rescored")   # nothing re-run
+
+    Notes
+    -----
+    **Size and repr.** ``len(res)`` is the number of method records. The
+    repr counts the methods with metrics, those that ran but could not be
+    scored, and the failures.
 
     See Also
     --------
@@ -1156,15 +1178,12 @@ class BatchResult:
     def summary(self) -> pd.DataFrame:
         """One row per method: status, timing, shape, label matching and every metric.
 
-        Columns: ``method, status, run_sec, output_kind, emb_shape, n_tunable,
-        label_order, label_order_confidence, batch_source, n_batches`` plus one
-        column per metric (``ARI``, ``NMI``, ``ASW``, ...) and, when needed,
-        ``label_order_note``.
-
         Returns
         -------
         pandas.DataFrame
-            Sorted by ``method``; empty (with the fixed columns) when nothing ran.
+            One row per method, sorted by ``method``. Read ``method``,
+            ``status`` and the metric columns (``ARI``, ``NMI`` ...); all
+            columns are listed in Notes.
 
         Examples
         --------
@@ -1174,58 +1193,93 @@ class BatchResult:
 
         Notes
         -----
-        ``status`` is ``CHAIN_OK`` (ran and scored), ``CHAIN_OK_GRAPH_METHOD``
-        (scored via a secondary embedding), ``RUN_OK_NO_EMBEDDING`` (ran, but the
-        method emits a graph/coordinates so clustering metrics do not apply),
-        ``RUN_OK_EVAL_FAILED`` (the method ran and produced an embedding, but
-        scoring it failed; see ``error``), ``RUN_OK_NO_LABEL_MATCH`` (ran, but no
-        label file matches the embedding's cell count), ``RUN_OK`` (ran with
-        ``evaluate=False``), ``TIMEOUT`` (exceeded ``run_all(timeout=...)``) or
-        ``FAIL`` (the method itself errored; see ``error``).
-        ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and ``RUN_OK_NO_LABEL_MATCH``
-        appear in ``failures``.
+        **Column reference.** When nothing ran the frame is empty, with the
+        first ten columns below:
 
-        Two methods can both be ``output_kind=graph`` and still end differently:
-        scMoMaT also writes a UMAP embedding among its ``extra_outputs``, so it is
-        scored through that (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a
-        neighbour graph, so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and
-        its ``emb_shape`` is ``None`` - there is no embedding to describe.
+        ```text
+        method                  registry id
+        status                  outcome; see "Status values"
+        run_sec                 wall-clock seconds of the method run
+        output_kind             embedding / graph / coords
+        emb_shape               [cells, dims] of the embedding; None without one
+        n_tunable               number of command-line hyperparameters
+        label_order             label file(s) the metrics used, in order
+        label_order_confidence  how clearly that ordering won, 0-1
+        batch_source            'file_of_origin' / 'user' / None
+        n_batches               distinct batch values used (1 = none)
+        ARI, NMI, ASW, ...      one column per metric
+        label_order_note        why label_order_confidence is blank
+        ```
 
-        ``batch_source`` / ``n_batches`` say which batch vector the batch metrics
-        (ASW_batch, GC, iLISI ...) were computed against: ``'file_of_origin'``
-        - each cell's label file (``cty1.csv`` -> 1, ``cty2.csv`` -> 2 ...), the
-        rule for multi-batch datasets; ``'user'`` - the vector passed as
-        ``run_all(batch=)`` / ``rescore(batch=)``; ``None`` - a single
-        label file, so no batch structure and clustering metrics only.
-        ``n_batches`` is the number of distinct batch values used (1 = none).
+        **Status values.**
 
-        Two columns describe how the cells were matched to labels.
-        ``label_order`` is which label file(s), in which order, the metrics were
-        computed against (e.g. ``rna_cty.csv+atac_cty.csv``). For
-        unpaired/diagonal data the embedding holds two disjoint cell sets stacked
-        in a method-specific order, so this is the difference between a
-        meaningful ARI and a meaningless one.
+        - ``CHAIN_OK`` - ran and scored.
+        - ``CHAIN_OK_GRAPH_METHOD`` - a graph method, scored via a secondary
+          embedding.
+        - ``RUN_OK_NO_EMBEDDING`` - ran, but the method emits a
+          graph/coordinates, so clustering metrics do not apply.
+        - ``RUN_OK_EVAL_FAILED`` - the method ran and produced an embedding,
+          but scoring it failed; see ``error`` in ``failures``.
+        - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file matches the
+          embedding's cell count.
+        - ``RUN_OK`` - ran with ``evaluate=False``.
+        - ``TIMEOUT`` - exceeded ``run_all(timeout=...)``.
+        - ``FAIL`` - the method itself errored; see ``error`` in ``failures``.
 
-        ``label_order_confidence`` is ``(best - runner_up) / best`` over the
-        candidate orderings' ARI, on a 0-1 scale. Near 1.0 - every alternative
-        ordering scored near chance, so the correspondence is unambiguous and
-        the metrics can be read normally. Below ~0.5 - two orderings explained
-        the embedding comparably well, which should not happen for a correct
-        one; treat that row with suspicion. It is a ratio, not a difference,
-        because the runner-up sits near chance: a difference is bounded above by
-        the ARI itself, so a method scoring 0.3 could never look well-separated.
+        ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and
+        ``RUN_OK_NO_LABEL_MATCH`` also appear in ``failures``.
 
-        The column is ``None`` in three cases, named by the sibling column
-        ``label_order_note``: ``"single ordering"`` - only one ordering was
-        possible (normal for a paired/vertical dataset with a single
-        ``cty.csv``); ``"winner at chance"`` - the winning ordering itself
-        scored ARI < 0.05, so the ratio would compare two noise values;
-        ``"not scored"`` - the row has no metrics. It stays numeric so
-        ``> 0.5`` and ``.isna()`` behave.
+        **Graph methods.** Two methods can both be ``output_kind=graph`` and
+        still end differently: scMoMaT also writes a UMAP embedding among its
+        ``extra_outputs``, so it is scored through that
+        (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a neighbour graph,
+        so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and its
+        ``emb_shape`` is ``None``.
 
-        When more than one ordering is possible the reported metrics are those
-        of the ordering with the highest ARI, so they carry a small optimistic
-        bias; this column shows whether the choice was clear-cut.
+        **Batch columns.** ``batch_source`` / ``n_batches`` say which batch
+        vector the batch metrics (ASW_batch, GC, iLISI ...) were computed
+        against, and how many distinct values it has (1 = none):
+
+        - ``'file_of_origin'`` - each cell's label file (``cty1.csv`` -> 1,
+          ``cty2.csv`` -> 2 ...), the rule for multi-batch datasets.
+        - ``'user'`` - the vector passed as ``run_all(batch=)`` /
+          ``rescore(batch=)``.
+        - ``None`` - a single label file, so no batch structure and
+          clustering metrics only.
+
+        **Label order.** ``label_order`` is which label file(s), in which
+        order, the metrics were computed against (e.g.
+        ``rna_cty.csv+atac_cty.csv``). For unpaired/diagonal data the
+        embedding holds two disjoint cell sets stacked in a method-specific
+        order, so this is the difference between a meaningful ARI and a
+        meaningless one.
+
+        **Label-order confidence.** ``label_order_confidence`` is
+        ``(best - runner_up) / best`` over the candidate orderings' ARI, on a
+        0-1 scale. Near 1.0 - every alternative ordering scored near chance,
+        so the correspondence is unambiguous and the metrics can be read
+        normally. Below ~0.5 - two orderings explained the embedding
+        comparably well, which should not happen for a correct one; treat
+        that row with suspicion.
+
+        **Why a ratio.** The runner-up sits near chance, so a difference is
+        bounded above by the ARI itself and a method scoring 0.3 could never
+        look well-separated.
+
+        **Optimistic bias.** When more than one ordering is possible the
+        reported metrics are those of the ordering with the highest ARI, so
+        they carry a small optimistic bias; ``label_order_confidence`` shows
+        whether the choice was clear-cut.
+
+        **Blank confidence.** The column stays numeric, so ``> 0.5`` and
+        ``.isna()`` behave. It is ``None`` in three cases, named by
+        ``label_order_note``:
+
+        - ``"single ordering"`` - only one ordering was possible (normal for a
+          paired/vertical dataset with a single ``cty.csv``).
+        - ``"winner at chance"`` - the winning ordering itself scored
+          ARI < 0.05, so the ratio would compare two noise values.
+        - ``"not scored"`` - the row has no metrics.
 
         See Also
         --------
@@ -1261,7 +1315,7 @@ class BatchResult:
         -------
         pandas.DataFrame
             Columns ``metric, value, method, dataset, category, clustering,
-            source``; empty (with those seven columns) if no method produced
+            source``; empty, with those columns, when no method produced
             metrics.
 
         Examples
@@ -1272,10 +1326,10 @@ class BatchResult:
 
         Notes
         -----
-        Derived from each record: the unrounded frame ``run_all`` attached (or
-        ``long.csv`` via ``mtb.load_batch``) when present, otherwise the record's
-        ``metrics`` dict - so a result built or reloaded without ``long.csv``
-        still plots.
+        **Source of the rows.** Each record contributes the unrounded frame
+        ``run_all`` attached (or ``long.csv`` via ``mtb.load_batch``) when
+        present, otherwise its ``metrics`` dict - so a result built or
+        reloaded without ``long.csv`` still plots.
 
         See Also
         --------
@@ -1304,23 +1358,46 @@ class BatchResult:
     def results(self) -> list:
         """The raw per-method records: status, out_dir, metrics and the orderings tried.
 
-        Keeps a long sweep's outputs addressable so you can re-score or re-plot
-        without re-running the methods.
+        Keeps a long sweep's outputs addressable, so you can re-score or
+        re-plot without re-running the methods.
 
         Returns
         -------
         list[dict]
-            One dict per method with ``method, status, out_dir, metrics,
-            params_used, run_sec, emb_shape, ...`` and
-            ``label_order_candidates`` - every label ordering that was tried, with
-            the ARI each achieved (the evidence behind ``summary``'s
-            ``label_order_confidence``).
+            One dict per method. Read ``method``, ``status``, ``out_dir`` and
+            ``metrics`` first; the other keys are listed in Notes.
 
         Examples
         --------
         >>> res = mtb.load_batch("out/")
         >>> [r["out_dir"] for r in res.results]
-        >>> res.results[0]["label_order_candidates"]
+        >>> res.results[0].get("label_order_candidates")    # None with a single ordering
+
+        Notes
+        -----
+        **Record keys.** A key is present only when it applies:
+
+        ```text
+        method, category, dataset   what ran, and on what
+        modalities                  the variant's modality roles
+        status                      outcome (see BatchResult.summary)
+        out_dir                     the method's output folder
+        metrics                     {metric: value}, rounded to 4 places
+        params_used                 the hyperparameter overrides passed
+        run_sec, emb_shape          timing and embedding shape
+        labels_used                 the label file(s) behind the metrics
+        label_order_candidates      every label ordering tried, with its ARI
+        batch_source, n_batches     the batch vector the batch metrics used
+        error, traceback, note      why a method failed or was not scored
+        reused                      the output came from skip_existing
+        env, output_kind, n_tunable the scan row the method ran from
+        data_path, multibench_version, started_at   provenance of the run
+        ```
+
+        **Label-order evidence.** ``label_order_candidates`` holds every
+        ordering tried and the ARI each achieved - the evidence behind
+        ``summary``'s ``label_order_confidence``. It is present only when more
+        than one ordering was possible.
 
         See Also
         --------
@@ -1332,8 +1409,8 @@ class BatchResult:
     def failures(self) -> pd.DataFrame:
         """Methods that failed, timed out or could not be scored.
 
-        ``run_all`` records failures instead of raising, so always check this - a
-        sweep can finish with several methods having failed.
+        ``run_all`` records failures instead of raising, so always check this -
+        a sweep can finish with several methods having failed.
 
         Returns
         -------
@@ -1348,13 +1425,17 @@ class BatchResult:
 
         Notes
         -----
-        ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and
-        ``RUN_OK_NO_LABEL_MATCH`` (ran, but no label file matched the output's
-        cell count, so nothing could be scored - usually a data-layout problem
-        worth fixing) appear here.
-        ``RUN_OK_NO_EMBEDDING`` does not: those methods ran correctly and emit
-        a graph or spatial coordinates instead of an embedding, so there is
-        nothing for clustering metrics to score. See ``summary`` for them.
+        **Statuses listed.**
+
+        - ``FAIL`` and ``TIMEOUT``.
+        - ``RUN_OK_EVAL_FAILED`` - the embedding exists, scoring it failed.
+        - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file matched the
+          output's cell count, so nothing could be scored; usually a
+          data-layout problem worth fixing.
+
+        **Not listed.** ``RUN_OK_NO_EMBEDDING``: those methods ran correctly and
+        emit a graph or spatial coordinates instead of an embedding, so there
+        is nothing for clustering metrics to score. See ``summary`` for them.
 
         See Also
         --------
@@ -1373,17 +1454,15 @@ class BatchResult:
     def plot(self, **kw):
         """Bubble figure of every method that produced metrics.
 
-        Methods are rows (best first), metrics are columns; bubble size encodes the
-        method's rank - rank 1 is the largest bubble - and bubble colour the
-        value, darker being higher.
+        Rows are methods (best first) and columns metrics; bubble size encodes
+        the method's rank (rank 1 is the largest), colour the value (darker is
+        higher).
 
         Parameters
         ----------
         **kw
-            Passed to ``mtb.plot.bubble``: ``metrics=`` (column order),
-            ``methods=`` (subset), ``order=`` (row order; unlisted methods follow
-            best-first; unknown names raise ``ValueError``), ``title=``,
-            ``cmap=``, ``save=``.
+            Keyword arguments of ``mtb.plot.bubble``: ``metrics=``,
+            ``methods=``, ``order=``, ``title=``, ``cmap=``, ``save=`` ...
 
         Returns
         -------
@@ -1393,8 +1472,7 @@ class BatchResult:
         Raises
         ------
         ValueError
-            Nothing scored - check ``failures`` then; or an unknown name in
-            ``order=`` / ``methods=``.
+            Nothing was scored (see ``failures``), or an unknown name in ``order=`` / ``methods=``.
 
         Examples
         --------
@@ -1405,10 +1483,14 @@ class BatchResult:
 
         Notes
         -----
-        Size and colour are both relative to the methods in this figure. Read it
-        next to ``summary`` - with few methods a small absolute gap still spans
-        the whole colour scale. There is no default title: pass ``title=`` when
-        one is wanted.
+        **Keywords.** ``metrics=`` sets the column order, ``methods=`` a
+        subset, ``order=`` the row order (unlisted methods follow best-first;
+        unknown names raise ``ValueError``). There is no default title: pass
+        ``title=`` when one is wanted.
+
+        **Reading the figure.** Size and colour are both relative to the
+        methods in this figure. Read it next to ``summary`` - with few methods
+        a small absolute gap still spans the whole colour scale.
 
         See Also
         --------
@@ -1429,33 +1511,28 @@ class BatchResult:
         """Re-evaluate the stored outputs with different labels / batch / metrics.
 
         Nothing is re-run: each record's embedding is read back from its
-        ``out_dir`` and scored again, so an overnight sweep can be re-scored in
-        minutes - e.g. with the batch vector the dataset really has instead of
-        the file-of-origin rule, or with your own labels.
+        ``out_dir`` and scored again, so an overnight sweep can be re-scored
+        in minutes.
 
         Parameters
         ----------
         batch : array-like | Series | path | None, keyword-only
-            One batch id per cell in the embedding's row order (array-like,
-            Series, or a CSV path read like a label file); ``None`` (default)
-            keeps the file-of-origin rule. Recorded as ``batch_source='user'``.
+            One batch id per cell, in embedding row order (array, Series or
+            CSV path); ``None`` = each cell's label file.
         labels : array-like | Series | path | None, keyword-only
-            One cell-type label per cell in embedding order (same forms);
-            ``None`` (default) re-runs the label-order search over the dataset's
-            label files (``label_order`` / ``label_order_confidence`` are refilled).
+            One cell-type label per cell, in embedding order (same forms);
+            ``None`` = search the dataset's label files again.
         metrics : str | list[str] | None, keyword-only
-            The metric selection handed to ``evaluate(metrics=)``: a family token
-            (``"clustering"`` / ``"batch"`` / ``"all"``) or a list of metric codes
-            (``["ARI", "NMI"]``); ``None`` (default) = every metric the batch
-            structure allows. Replaces the 0.2 ``only=``.
+            Metric family (``"clustering"``, ``"batch"``, ``"all"``) or metric
+            codes; ``None`` = every metric the batch structure allows.
         verbose : bool, keyword-only
-            Print one line per method (default False).
+            Print one line per method.
 
         Returns
         -------
         BatchResult
-            A new result; this one is untouched. Call ``.save(out_dir)`` on it to
-            persist - ``mtb.load_batch`` keeps returning the original until you do.
+            A new result; this one is untouched. Call ``.save(out_dir)`` on it
+            to persist it.
 
         Examples
         --------
@@ -1466,11 +1543,30 @@ class BatchResult:
 
         Notes
         -----
-        A method that emits no embedding (registration, graph-only) is marked
-        ``RUN_OK_NO_EMBEDDING`` with a ``note``. A record whose output file is
-        gone (a deleted ``out_dir``) or whose new scoring fails (wrong ``batch``
-        length, say - ``batch has N entries, embedding has M cells``) becomes
-        ``RUN_OK_EVAL_FAILED`` with the reason in ``error``.
+        **Typical uses.** Re-score with the batch vector the dataset really
+        has instead of the file-of-origin rule, with your own labels, or with
+        a different metric selection.
+
+        **Arguments.** A ``batch`` CSV path is read like a label file, and the
+        vector is recorded as ``batch_source='user'``. With ``labels=None``
+        the label-order search runs again (``label_order`` /
+        ``label_order_confidence`` are refilled); given labels read
+        ``(user labels)`` in ``label_order``. ``metrics`` is handed to
+        ``evaluate(metrics=)``.
+
+        **Record status.** A method that emits no embedding (registration,
+        graph-only) is marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. A record
+        whose output file is gone (a deleted ``out_dir``) or whose new scoring
+        fails (wrong ``batch`` length, say - ``batch has N entries, embedding
+        has M cells``) becomes ``RUN_OK_EVAL_FAILED`` with the reason in
+        ``error``.
+
+        **Other hosts.** Records keep the absolute ``out_dir`` of the run, so
+        a tree fetched or copied from another host re-scores only where those
+        folders exist.
+
+        **Persisting.** ``mtb.load_batch`` keeps returning the original result
+        until the new one is saved.
 
         See Also
         --------
@@ -1514,7 +1610,7 @@ class BatchResult:
         Parameters
         ----------
         out_dir : path | None
-            Target folder (created); default ``None``: the result's own
+            Target folder, created if missing; ``None`` = the result's own
             ``out_dir``, else the current directory.
 
         Returns
@@ -1530,12 +1626,21 @@ class BatchResult:
 
         Notes
         -----
-        Produces ``summary.csv``, ``long.csv`` (only when some method produced
-        metrics), ``failures.csv`` and ``batch_result.json``. Reload with
-        ``mtb.load_batch`` to re-score or re-plot later without re-running any
-        method. In ``summary.csv`` the ``label_order_note`` column
-        says why ``label_order_confidence`` is empty on a row, so that a "single
-        ordering" result is not confused with a run that never scored.
+        **Files written.**
+
+        - ``summary.csv`` - the ``summary`` frame.
+        - ``long.csv`` - the ``long`` frame, only when some method produced
+          metrics.
+        - ``failures.csv`` - the ``failures`` frame.
+        - ``batch_result.json`` - dataset, category and the per-method records.
+
+        Reload with ``mtb.load_batch`` to re-score or re-plot later without
+        re-running any method.
+
+        **Blank confidence on disk.** In ``summary.csv`` the
+        ``label_order_note`` column says why ``label_order_confidence`` is
+        empty on a row, so that a "single ordering" result is not confused
+        with a run that never scored.
 
         See Also
         --------
@@ -1735,90 +1840,60 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             batch=None) -> "BatchResult | pd.DataFrame":
     """Run every runnable method on a dataset under one category and score it.
 
-    Only the rows ``mtb.scan`` marks runnable are attempted; each method's
-    output is scored with the benchmark metrics and the whole sweep comes back
-    as a ``BatchResult`` that is also saved under ``out_dir``. A failure is
-    recorded, never raised, so one bad method cannot abort the sweep.
+    Only rows ``mtb.scan`` marks runnable are attempted. A method's failure is
+    recorded, never raised, and the sweep is saved under ``out_dir``.
 
     Parameters
     ----------
     dataset : str
-        The directory name of your data, e.g. ``"MYCITE"`` - not a full path.
-        A folder that does not exist raises ``FileNotFoundError`` (listing the
-        folders that do) before anything else happens. A spelling that differs
-        from the folder only in case (``'d52'``) is replaced by the on-disk
-        spelling, with a ``UserWarning``, before anything is named after it.
+        Dataset folder name under ``data_path``, e.g. ``"MYCITE"`` (not a path).
     category : str
-        Integration category (``ValueError`` listing the four on a typo).
+        Integration category: ``vertical``, ``diagonal``, ``mosaic`` or ``cross``.
     out_dir : path | None
-        Where each method's output goes (one sub-directory
-        ``<out_dir>/<method>_<dataset>/`` per method). Required for a real run
-        (``TypeError`` otherwise); with ``dry_run=True`` it only names the
-        directory the ``command`` column is rendered for (default: the
-        literal ``'<out_dir>'`` placeholder).
+        Output root, one ``<out_dir>/<method>_<dataset>/`` per method; required
+        unless ``dry_run=True``.
     methods : list[str] | None, keyword-only
-        Restrict to these method ids, as a list, e.g. ``["Matilda",
-        "totalVI"]`` (default ``None``: everything runnable). An unknown id
-        raises ``KeyError`` with a did-you-mean hint; a bare string
-        (``methods="StabMap"``) raises ``TypeError`` saying to pass a list.
+        Method ids to include, as a list; ``None`` = every runnable method.
     modalities : list[str] | None, keyword-only
-        Restrict to one modality combination, given as a list of role names,
-        e.g. ``["rna", "adt"]`` for CITE-seq, ``["rna", "atac_gas"]`` for RNA +
-        ATAC gene-activity, or ``["rna", "atac_peak"]`` for RNA + ATAC peaks
-        (see ``mtb.describe_layout`` for every role name). Default ``None``:
-        all combinations. See the ATAC warning in Notes.
+        Role names of one modality combination, e.g. ``["rna", "adt"]``;
+        ``None`` = every combination.
     params : dict | None, keyword-only
-        Per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``. Discover
-        what a method accepts with ``mtb.params_for``. Default ``None``.
+        Per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``; see
+        ``mtb.params_for`` for the accepted keys.
     data_path : path | None, keyword-only
-        The folder that contains ``dataset``, e.g. ``"/path/to/data"`` (so
-        the files live in ``/path/to/data/MYCITE/``). Default ``None``: the
-        package's configured data root.
+        Folder that contains ``dataset``; ``None`` = the configured data root.
     evaluate : bool, keyword-only
-        Score every embedding with the benchmark metrics (default True);
-        ``False`` runs only (status ``RUN_OK``).
+        Score each embedding; ``False`` only runs (status ``RUN_OK``).
     dry_run : bool, keyword-only
-        ``True`` returns the ``mtb.scan`` frame for the same selection and
-        runs nothing (default False). Free; do it first. Details in Notes.
+        Return the ``mtb.scan`` frame for this selection and run nothing.
     verbose : bool, keyword-only
-        Print progress (``[run_all] ...`` lines; the dry-run summary). Default True.
+        Print ``[run_all] ...`` progress lines.
     timeout : float | None, keyword-only
-        Per-method wall-clock cap in seconds (default ``None``: no cap). A
-        method exceeding it is recorded as ``TIMEOUT`` and the sweep moves on.
-        Strongly recommended for unattended runs; see Notes for sizing it.
+        Per-method wall-clock cap in seconds; ``None`` = no cap.
     skip_existing : bool, keyword-only
-        If a method's output file is already present in ``out_dir``, reuse it
-        instead of recomputing (default False), so an interrupted overnight
-        sweep resumes without repeating the hours already done. Refused
-        together with ``params`` - see Notes.
+        Reuse an output file already in ``out_dir`` instead of re-running the
+        method, to resume an interrupted sweep.
     batch : array-like | None, keyword-only
-        One batch id per cell, in the embedding's row order (array-like /
-        Series / a CSV path), used for the batch-correction metrics instead
-        of the default rule (batch = the label file each cell came from,
-        ``cty1.csv`` -> 1 ...). Recorded as ``batch_source='user'``. Default
-        ``None``: the file-of-origin rule.
+        One batch id per cell, in embedding row order (array, Series or CSV
+        path); ``None`` = each cell's label file.
 
     Returns
     -------
     BatchResult or pandas.DataFrame
-        The sweep's ``BatchResult`` (saved under ``out_dir``); the
-        ``mtb.scan`` frame when ``dry_run=True``.
+        The sweep's ``BatchResult``; read ``summary`` and ``failures`` first.
+        With ``dry_run=True``, the ``mtb.scan`` frame.
 
     Raises
     ------
-    KeyError
-        An unknown id in ``methods`` or ``params`` (did-you-mean hint), raised
-        before any file or env is looked at; a ``params`` key no variant of
-        that method accepts (on a dry run; a real run records it as ``FAIL``).
-    ValueError
-        Unknown ``category``; no variant of the requested methods exists under
-        ``category`` ("no 'cross' variant matches ..."); nothing is runnable
-        (see Notes); ``skip_existing=True`` together with ``params``.
-    TypeError
-        A real run without ``out_dir``; ``methods`` / ``modalities`` given as
-        a bare string.
     FileNotFoundError
-        No folder ``<data_path>/<dataset>``; the message lists the folders present.
+        ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
+    ValueError
+        Unknown ``category``, no matching variant, nothing runnable, or
+        ``skip_existing`` with ``params``.
+    KeyError
+        Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
+    TypeError
+        A real run without ``out_dir``; ``methods`` or ``modalities`` given as a string.
 
     Examples
     --------
@@ -1828,59 +1903,89 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     >>> res = mtb.run_all("D11", "vertical", out_dir="out/", timeout=3600)
     >>> res.summary                                # one row per method, metrics as columns
     >>> res.failures                               # always check: failures are recorded, not raised
-    >>> res.plot().savefig("D11_vertical.png")
-    >>> mtb.run_all("D11", "vertical", out_dir="out/lr", methods=["Multigrate"],
-    ...             params={"Multigrate": {"lr": 1e-3}})
 
     Notes
     -----
-    Every attempted row passed both ``mtb.scan`` gates (input files and conda
-    env, plus a GPU where the script needs one), so a missing env is reported
-    there rather than failing hours in (``multibench env doctor`` /
-    ``env install --run``). Methods can take minutes to hours.
-
-    ``dry_run=True`` returns the ``mtb.scan`` frame for the same selection:
-    blocked rows are kept with their ``reason`` and the ``command`` column is
-    rendered for ``out_dir`` (or the literal ``'<out_dir>'`` placeholder).
+    **Dry run.** ``dry_run=True`` is free; do it first. It returns the
+    ``mtb.scan`` frame for the same selection: blocked rows are kept with
+    their ``reason``, and ``command`` is rendered for ``out_dir`` (or the
+    literal ``'<out_dir>'`` placeholder). Filter ``plan[plan.runnable]`` for
+    what will be attempted - ``len(plan)`` is not the sweep size.
     ``multibench run-all --dry-run --format csv`` writes the same frame.
-    Never empty: ``ValueError`` if nothing matches. Filter
-    ``plan[plan.runnable]`` for what will be attempted - ``len(plan)`` is not
-    the sweep size. A dry run also validates ``params``: a key no planned
-    variant of that method accepts raises ``KeyError`` (naming the accepted
-    keys) instead of being discovered hours in.
 
-    The "nothing is runnable ..." ``ValueError`` fires when variants exist but
-    not one passes both gates. Its message lists the reason of every requested
-    variant (or the first 3 of N when ``methods`` was not given), never the
-    reasons of methods you did not ask for.
+    **Before the sweep.** Every attempted row passed both ``mtb.scan`` gates
+    (input files and conda env, plus a GPU where the script needs one), so a
+    missing env is reported up front rather than hours in
+    (``multibench env doctor`` / ``env install --run``). Methods take minutes
+    to hours each.
 
-    ATAC representation warning: the two ATAC representations do not map to
-    the obvious filenames - gene-activity is ``atac.h5`` but peaks are
-    ``peak.h5``. Putting a peak matrix in ``atac.h5`` runs every method on the
-    wrong representation and raises no error; the numbers are plausible and
-    wrong.
+    **Failures are recorded.** In a real run a method that raises is
+    recorded as ``FAIL`` (with its ``error``), one that exceeds ``timeout``
+    as ``TIMEOUT``, and the sweep moves on; a ``params`` key the variant does
+    not accept is a ``FAIL`` too. Check ``res.failures``.
 
-    ``timeout``: size it from the ``runtime_tier`` / ``observed_worst_sec``
-    columns of ``mtb.scan`` (or ``method_info(m)['runtime']``); the slowest
-    methods take more than 4 h. Without a cap a single hanging method blocks
-    everything.
+    **Timeout.** Strongly recommended for unattended runs: without a cap a
+    single hanging method blocks everything. Size it from the
+    ``runtime_tier`` / ``observed_worst_sec`` columns of ``mtb.scan`` (or
+    ``method_info(m)['runtime']``); the slowest methods take more than 4 h.
+    The cap covers the run and its scoring; off the main thread it is
+    unavailable, with a warning.
 
-    ``skip_existing=True`` together with ``params=...`` raises ``ValueError``:
-    reuse is keyed on the output file, not on ``params``, so it would return
-    results computed with the old parameters. When tuning, give each setting a
-    fresh ``out_dir`` (or leave ``skip_existing`` False). Reuse also only
-    checks that the output file exists, not that it is complete: a method
-    killed mid-write leaves a truncated file that would be reused as if it had
-    succeeded. After a hard kill, delete that method's sub-directory before
-    resuming.
+    **Saved files.** The result is saved automatically under ``out_dir``
+    (``summary.csv``, ``failures.csv``, ``batch_result.json``, and
+    ``long.csv`` when some method produced metrics); reload it with
+    ``mtb.load_batch``.
 
-    ``batch``: a vector of the wrong length marks that method
-    ``RUN_OK_EVAL_FAILED`` (``batch has N entries, embedding has M cells``).
-    You can also re-score a finished sweep with ``BatchResult.rescore``.
+    **Resuming.** ``skip_existing=True`` skips the hours an interrupted
+    sweep already did. Reuse only checks that the output file exists, not
+    that it is complete: a method killed mid-write leaves a truncated file
+    that would be reused as if it had succeeded. After a hard kill, delete
+    that method's sub-directory before resuming.
 
-    The result is saved automatically (``summary.csv``, ``long.csv``,
-    ``failures.csv``, ``batch_result.json`` under ``out_dir``); reload it
-    with ``mtb.load_batch``.
+    **Tuning.** ``skip_existing=True`` together with ``params=...`` raises
+    ``ValueError`` on a real run: reuse is keyed on the output file, not on
+    ``params``, so it would return results computed with the old parameters.
+    Give each setting a fresh ``out_dir`` (or leave ``skip_existing`` False),
+    as ``mtb.sweep`` does:
+
+    ```python
+    mtb.run_all("D11", "vertical", out_dir="out/lr", methods=["Multigrate"],
+                params={"Multigrate": {"lr": 1e-3}})
+    ```
+
+    **Batch vector.** By default the batch metrics use the label file each
+    cell came from (``cty1.csv`` -> 1 ...); ``batch=`` replaces that rule and
+    is recorded as ``batch_source='user'``. A vector of the wrong length marks
+    that method ``RUN_OK_EVAL_FAILED`` (``batch has N entries, embedding has M
+    cells``). Re-score a finished sweep with ``BatchResult.rescore``.
+
+    **ATAC representation.** Other combinations are ``["rna", "atac_gas"]``
+    (RNA + ATAC gene activity) and ``["rna", "atac_peak"]`` (RNA + ATAC
+    peaks); ``mtb.describe_layout`` lists every role name. The two ATAC
+    representations do not map to the obvious filenames: gene activity is
+    ``atac.h5`` but peaks are ``peak.h5``. A peak matrix in ``atac.h5`` runs
+    every method on the wrong representation without an error; the numbers
+    are plausible and wrong.
+
+    **Errors raised.**
+
+    - An unknown id in ``methods`` or ``params`` - ``KeyError`` with a
+      did-you-mean hint, before anything runs.
+    - A selection that matches no variant - ``ValueError`` ("no 'cross'
+      variant matches ..."); a dry run is never empty.
+    - A dry run with a ``params`` key no planned variant of that method
+      accepts - ``KeyError`` naming the accepted keys, instead of the typo
+      being discovered hours in.
+    - Variants exist but not one passes both gates - the "nothing is
+      runnable ..." ``ValueError``. Its message lists the reason of every
+      requested variant (or the first 3 of N when ``methods`` was not
+      given), never the reasons of methods you did not ask for. On a
+      non-Linux host with env-blocked rows it adds that the install commands
+      refuse there.
+
+    **Dataset spelling.** A ``dataset`` that differs from the folder only in
+    case (``'d52'``) is replaced by the on-disk spelling, with a
+    ``UserWarning``, before anything is named after it.
 
     See Also
     --------
@@ -2057,52 +2162,47 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
           verbose: bool = True) -> pd.DataFrame:
     """Run one method repeatedly over a range of one hyperparameter.
 
-    Replaces a hand-written loop and the two mistakes it invites: sharing one
-    ``out_dir`` between settings, so their outputs collide, and losing track
-    of which row came from which value.
+    Replaces a hand-written loop and its two usual mistakes: settings that
+    share one ``out_dir`` and overwrite each other, and rows that lose track
+    of their value.
 
     Parameters
     ----------
     dataset : str
-        Dataset folder name under ``data_path`` (as for ``mtb.run_all``).
+        Dataset folder name under ``data_path``, as for ``mtb.run_all``.
     category : str
         Integration category of the variant to run.
     method : str
-        Registry id (``KeyError`` with a did-you-mean hint on a typo).
+        Registry id of the method.
     param : str
-        Name of the hyperparameter to sweep; must be in the variant's
-        ``tunable`` set (``mtb.params_for``), else ``KeyError`` naming the
-        accepted keys.
+        Hyperparameter to sweep; one of the variant's ``tunable`` keys
+        (``mtb.params_for``).
     values : iterable
-        The settings to try, one ``run_all`` per value.
+        Settings to try; each one is a separate ``mtb.run_all``.
     out_dir : path, keyword-only
-        Root directory; each setting runs under ``<out_dir>/<param>_<value>/``
-        (``.`` -> ``p``, ``-`` -> ``m`` in the folder name).
+        Root folder; each setting runs under ``<out_dir>/<param>_<value>/``.
     modalities : list[str] | None, keyword-only
-        The variant's modality tokens when the method has several variants in
-        ``category``; default ``None``.
+        Modality roles of the variant, when the method has several in
+        ``category``; ``None`` = every variant.
     data_path : path | None, keyword-only
-        The folder that contains ``dataset``; default the configured data root.
+        Folder that contains ``dataset``; ``None`` = the configured data root.
     timeout : float | None, keyword-only
-        Per-setting wall-clock cap in seconds, passed to ``run_all``; default
-        ``None``.
+        Per-setting wall-clock cap in seconds, passed to ``run_all``;
+        ``None`` = no cap.
     verbose : bool, keyword-only
-        Print ``run_all``'s progress lines (default True).
+        Print ``run_all``'s progress lines.
 
     Returns
     -------
     pandas.DataFrame
-        The per-setting ``BatchResult.summary`` rows stacked, with the swept
-        value as the first column (named ``param``). A tidy frame is attached
-        as ``df.attrs["long"]`` and written to ``<out_dir>/sweep_long.csv``
-        (``df.attrs["long_path"]``).
+        The settings' ``BatchResult.summary`` rows stacked, the swept value
+        first (column named ``param``). A tidy frame for plotting is in
+        ``df.attrs["long"]``.
 
     Raises
     ------
     KeyError
-        Unknown ``method``, or ``param`` not among the variant's tunable
-        hyperparameters (the message lists them; an empty set means the
-        script hardcodes them upstream).
+        Unknown ``method``, or ``param`` not among the variant's tunable keys.
 
     Examples
     --------
@@ -2115,20 +2215,32 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
     Notes
     -----
-    The tidy frame written to ``<out_dir>/sweep_long.csv`` (and attached as
-    ``df.attrs["long"]``, which does not survive ``to_csv``) makes each
-    setting a separate series (``"Multigrate (lr=0.001)"``), so it can go
-    straight into ``mtb.plot.bubble`` - ``.long`` keys rows by method, so
-    without this every setting would collapse onto one row.
+    **Folder names.** Each setting's folder is ``<param>_<value>`` with
+    ``.`` -> ``p`` and ``-`` -> ``m`` (``lr=0.001`` runs under
+    ``<out_dir>/lr_0p001/``).
 
-    A setting that fails is not fatal: ``run_all`` records it, so that
-    value's row appears with ``status`` ``FAIL`` (or ``TIMEOUT``) and empty
-    metrics rather than aborting the sweep. Check the ``status`` column before
-    reading the curve - a failed setting and a poor one must not be
-    confused.
+    **The tidy frame.** ``df.attrs["long"]`` makes each setting a separate
+    series (``"Multigrate (lr=0.001)"``), so it can go straight into
+    ``mtb.plot.bubble``; ``.long`` keys rows by method, so without it every
+    setting would collapse onto one row. ``DataFrame.attrs`` does not
+    survive ``to_csv``, so the frame is also written to
+    ``<out_dir>/sweep_long.csv`` (path in ``df.attrs["long_path"]``) when any
+    setting produced metrics.
 
-    Check ``mtb.params_for`` first - a method whose ``tunable`` is empty
-    hardcodes its hyperparameters and cannot be swept at all.
+    **Failed settings.** A setting that fails is not fatal: ``run_all``
+    records it, so that value's row appears with ``status`` ``FAIL`` (or
+    ``TIMEOUT``) and empty metrics rather than aborting the sweep. Check the
+    ``status`` column before reading the curve - a failed setting and a poor
+    one must not be confused.
+
+    **Untunable methods.** Check ``mtb.params_for`` first: a method whose
+    ``tunable`` is empty hardcodes its hyperparameters upstream and cannot be
+    swept. ``sweep`` does not reject it up front; every setting is recorded
+    as ``FAIL``.
+
+    **Errors.** The ``KeyError`` for an unknown ``param`` lists the keys the
+    variant accepts. Errors of ``mtb.run_all`` (e.g. nothing is runnable)
+    propagate.
 
     See Also
     --------
