@@ -980,14 +980,48 @@ def installed_envs(conda: str | None = None) -> list[str]:
     return names
 
 
+def _check_conda(conda) -> None:
+    """Raise unless ``conda`` is ``None`` or names an executable.
+
+    ``status`` takes the executable as its only positional argument, so the
+    natural ``status("Matilda")`` would be read as a binary that is not there
+    (every row back, no error) and a list would fail in the ``lru_cache`` of
+    :func:`_conda_prefixes` with ``unhashable type``. Both name the call that
+    takes methods.
+    """
+    if conda is None:
+        return
+    if isinstance(conda, (list, tuple, set, frozenset)):
+        raise TypeError(
+            f"conda is the conda/mamba executable, not a list of methods "
+            f"(got {list(conda)!r}); for their envs call "
+            f"mtb.env.doctor(methods={list(conda)!r})")
+    if not isinstance(conda, (str, os.PathLike)):
+        raise TypeError(
+            f"conda must be the conda/mamba executable (a path or a name on "
+            f"PATH), got {type(conda).__name__} {conda!r}")
+    name = os.fspath(conda)
+    ids = {s.id.lower(): s.id for s in registry.load()}
+    if str(name).lower() in ids:
+        m = ids[str(name).lower()]
+        raise ValueError(
+            f"{name!r} is a method id, but status() takes no methods: its "
+            f"only positional argument is conda, the conda/mamba executable. "
+            f"For this method call mtb.env.doctor(methods=[{m!r}]), or keep "
+            f"the status() row whose method is {m!r}")
+    if shutil.which(name) is None:
+        raise ValueError(
+            f"conda={name!r} is not an executable path or a name on PATH")
+
+
 def status(conda: str | None = None, *, as_frame: bool = False):
     """Report, per method, whether its conda env is installed on this machine.
 
     Parameters
     ----------
     conda : str | None
-        conda/mamba executable that lists the installed envs; ``None`` =
-        conda if found, else mamba.
+        conda/mamba executable, a path or a name on PATH, that lists the
+        installed envs; ``None`` = conda if found, else mamba.
     as_frame : bool
         ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
@@ -996,6 +1030,13 @@ def status(conda: str | None = None, *, as_frame: bool = False):
     list[dict] or pandas.DataFrame
         One row per registry method. Read ``method``, ``env``, ``exists``
         and ``has_lock``; all keys are listed in Notes.
+
+    Raises
+    ------
+    TypeError
+        ``conda`` is not a path or a name, e.g. a list of method ids.
+    ValueError
+        ``conda`` is a method id, or no executable has that path or name.
 
     Examples
     --------
@@ -1006,6 +1047,12 @@ def status(conda: str | None = None, *, as_frame: bool = False):
 
     Notes
     -----
+    **Selecting methods.** ``status`` always reports every method and takes
+    no method ids: ``status("Matilda")`` raises and names
+    ``mtb.env.doctor(methods=["Matilda"])``, which reports the envs of a
+    selection. On the command line, ``multibench env status --methods ...``
+    prints only those methods.
+
     **Keys.**
 
     - ``method`` - the registry id.
@@ -1052,6 +1099,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
 
     mtb.env.install : builds or unpacks the missing envs.
     """
+    _check_conda(conda)
     have = set(installed_envs(conda))
     out = []
     for s in registry.load():
