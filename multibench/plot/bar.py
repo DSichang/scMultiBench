@@ -32,27 +32,27 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         Tidy frame with ``method``, ``metric``, ``value`` columns and an
         optional ``dataset`` (absent = one dataset), e.g. from
         ``mtb.load_results``.
-    metrics : list of str | None, keyword-only
+    metrics : list of str | None
         Metric codes to score; ``None`` = every metric. Ignored when
         ``group`` is given.
-    group : {"clustering", "batch"} | None, keyword-only
+    group : {"clustering", "batch"} | None
         Score one metric family only (the benchmark's two summary panels);
         ``None`` = the ``metrics`` selection.
-    top : int | None, keyword-only
+    top : int | None
         Keep the ``top`` best methods, scored against all of them; ``None``
         = every method.
-    title : str | None, keyword-only
+    title : str | None
         Figure title; ``None`` = the number of datasets. With ``group``,
         ``(<group> metrics)`` is appended.
-    cmap : str, keyword-only
+    cmap : str
         Matplotlib colormap for the bars; ``group="batch"`` always uses
         ``"Greens"`` (the paper's family colour).
-    show_datasets : bool, keyword-only
+    show_datasets : bool
         Overlay one dot per dataset's score on each bar; drawn only under
         ``overall="mean_overall"`` with several datasets.
-    save : str | None, keyword-only
+    save : str | None
         File to write the figure to (140 dpi, tight bounding box).
-    overall : {"rank", "mean_overall"}, keyword-only
+    overall : {"rank", "mean_overall"}
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
         dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
         (missing dataset skipped).

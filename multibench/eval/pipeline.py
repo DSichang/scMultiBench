@@ -31,16 +31,16 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
         What ``mtb.evaluate`` returns (metrics as the index, one column
         ``Value``), a Series indexed by metric, or its CSV read back with a
         ``metric`` column.
-    method : str, keyword-only
+    method : str
         Method id written into every row; your own name is fine.
-    dataset : str, keyword-only, optional
+    dataset : str, optional
         Dataset id written into every row; ``None`` writes ``"all"``.
-    category : str, keyword-only, optional
+    category : str, optional
         Integration category written into every row; ``None`` writes
         ``"user"``.
-    clustering : str, keyword-only
+    clustering : str
         Value of the ``clustering`` column.
-    source : str, keyword-only
+    source : str
         Value of the ``source`` column; ``source="user"`` in
         ``mtb.load_results`` selects these rows again.
 
@@ -435,27 +435,27 @@ def evaluate(
         Cell types, one per cell (required): CSV path(s), a
         ``mtb.labels_for`` dict, a 1-D array-like, or an ``obs`` column name
         (forms in Notes).
-    category : str, keyword-only, optional
+    category : str, optional
         Integration category, one of ``mtb.list_categories()``; validated,
         otherwise unused (the metrics do not depend on it). Lets a call mirror
         ``mtb.run``.
-    batch : keyword-only, optional
+    batch : optional
         Batch labels, one per cell, in the forms ``labels`` accepts; needed
         for the batch metrics unless ``labels`` lists two or more files.
-    metrics : None, str or list of str, keyword-only
+    metrics : None, str or list of str
         ``None`` = every applicable metric except kBET; or ``"clustering"``,
         ``"batch"``, ``"all"``, or a list of codes such as ``["ARI", "NMI"]``.
-    clustering : keyword-only, optional
+    clustering : optional
         Precomputed cluster assignment, in the forms ``labels`` accepts or an
         ``.h5`` path; ``None`` = derive one with the Leiden sweep.
-    obsm : str, keyword-only
+    obsm : str
         ``.obsm`` key used when ``output`` is an AnnData or ``.h5ad``;
         ``'X'`` means ``.X``.
-    label_order : list of str, keyword-only
+    label_order : list of str
         Keys of a multi-entry ``labels`` dict, in the method's stacking
         order; a subset selects those files. ``None`` works for an unchanged
         ``mtb.labels_for`` dict (Notes).
-    verbose : bool, keyword-only
+    verbose : bool
         ``True`` prints one stderr line when the Leiden sweep starts on more
         than 2,000 cells; ``False`` never prints.
 

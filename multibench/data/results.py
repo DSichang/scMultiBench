@@ -575,23 +575,23 @@ def load_results(
     category : str, optional
         Integration category (``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``); ``None`` = every category with tables for ``source``.
-    dataset : str or list of str, keyword-only
+    dataset : str or list of str
         Dataset id(s), e.g. ``"D11"`` or ``["D11", "D11s"]``; ``None`` = every
         dataset of the category.
-    methods : str or list of str, keyword-only
+    methods : str or list of str
         Method(s) to keep, alias tolerant and case-insensitive (``"mofa+"``
         -> ``MOFA2``, ``"totalvi"`` -> ``totalVI``); ``None`` = every method.
-    metrics : None, str or list of str, keyword-only
+    metrics : None, str or list of str
         ``None`` / ``"all"`` = every metric; or ``"clustering"``,
         ``"batch"``, or a list of codes such as ``["ARI", "NMI"]``.
-    clustering : {"default", "louvain", "kmeans"}, keyword-only
+    clustering : {"default", "louvain", "kmeans"}
         Clustering variant of the published tables: ``metric.csv``,
         ``metric_louvain.csv`` or ``metric_kmeans.csv``.
-    source : str, keyword-only
+    source : str
         ``"published"`` (scIB tables), ``"rerun"`` (package sweeps) or
         ``"both"``. For a ``result_path`` file: a value of its ``source``
         column; ``"published"`` / ``"both"`` keep every row.
-    result_path : path-like, keyword-only
+    result_path : path-like
         A results root holding ``scib_metric/`` and/or ``rerun/``, or one
         long CSV file; ``None`` = the tables shipped in the package.
 
@@ -945,9 +945,9 @@ def available_datasets(
     ----------
     category : str, optional
         Integration category; ``None`` = the union over all four.
-    source : {"published", "rerun", "both"}, keyword-only
+    source : {"published", "rerun", "both"}
         Which stored tables to look at (see ``mtb.load_results``).
-    result_path : path-like, keyword-only
+    result_path : path-like
         Results root; ``None`` = the tables shipped in the package.
 
     Returns
@@ -1050,9 +1050,9 @@ def results_coverage(
     ----------
     category : str, optional
         Integration category; ``None`` = all four.
-    source : {"both", "published", "rerun"}, keyword-only
+    source : {"both", "published", "rerun"}
         Which stored tables to scan; ``"both"`` = published and re-run.
-    result_path : path-like, keyword-only
+    result_path : path-like
         Results root; ``None`` = the tables shipped in the package.
 
     Returns
@@ -1181,24 +1181,24 @@ def recommend(
     category : str
         Integration category to rank: ``vertical``, ``diagonal``, ``mosaic``
         or ``cross``.
-    modalities : list of str, keyword-only
+    modalities : list of str
         Keep only methods that consume all of these base modalities, e.g.
         ``["rna", "adt"]``; ``None`` = no filter.
-    methods : list of str, keyword-only
+    methods : list of str
         Rank only these methods (alias tolerant, case-insensitive), among
         themselves; ``None`` = every method.
-    metrics : None, str or list of str, keyword-only
+    metrics : None, str or list of str
         ``None`` = the ``"clustering"`` family (the benchmark's headline
         ranking); or ``"batch"``, ``"all"``, or a list of codes.
-    long_df : pandas.DataFrame, keyword-only
+    long_df : pandas.DataFrame
         Frame to score (``metric, value, method, dataset``) instead of the
         stored tables, e.g. ``pd.concat([published, mine])``.
-    min_methods : int, keyword-only
+    min_methods : int
         Datasets with fewer methods than this are dropped.
-    source : {"published", "rerun", "both"}, keyword-only
+    source : {"published", "rerun", "both"}
         Stored tables to load when ``long_df`` is not given; ``"both"``
         averages the scores present in both.
-    result_path : path-like, keyword-only
+    result_path : path-like
         Results root; ``None`` = the tables shipped in the package.
 
     Returns

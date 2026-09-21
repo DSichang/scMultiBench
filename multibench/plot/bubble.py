@@ -248,26 +248,26 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     long_df : pandas.DataFrame
         Tidy frame with ``method``, ``metric``, ``value`` columns; optional
         ``dataset``, ``category`` and ``needs_labels`` columns (Notes).
-    metrics : list of str | None, keyword-only
+    metrics : list of str | None
         Metric codes to keep, in this order within each family; ``None`` =
         every metric in the frame.
-    methods : list of str | None, keyword-only
+    methods : list of str | None
         Methods (rows) to keep; ``None`` = every method in the frame.
-    order : list of str | None, keyword-only
+    order : list of str | None
         Methods to put first, in this order; the rest follow best first.
         Reorders only - filter with ``methods``.
-    aggregate : {"dataset", "summary"}, keyword-only
+    aggregate : {"dataset", "summary"}
         ``"dataset"``: raw metric values of one dataset (several are averaged
         per method). ``"summary"``: within-dataset max-ranks averaged across
         datasets (the paper's panel c).
-    require_complete : bool, keyword-only
+    require_complete : bool
         With ``aggregate="summary"``: keep only the methods present in every
         dataset.
-    overall : {"rank", "mean_overall"}, keyword-only
+    overall : {"rank", "mean_overall"}
         Formula for each family's Overall under ``aggregate="summary"``:
         ``"rank"`` (the paper's panel rule) or ``"mean_overall"`` (bar's
         default); see ``mtb.plot.bubble``.
-    na : {"warn", "skip", "raise"}, keyword-only
+    na : {"warn", "skip", "raise"}
         How to report ``n/a`` cells (a method lacking a metric): ``"warn"``,
         ``"skip"`` (silent, nothing is dropped) or ``"raise"``; also stored
         as ``na_cells``.
@@ -940,37 +940,37 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         Tidy frame with ``method``, ``metric``, ``value`` and optional
         ``dataset`` columns, as from ``mtb.load_results``, ``mtb.to_long`` or
         the ``BatchResult.long`` property (more in Notes).
-    metrics : list of str | None, keyword-only
+    metrics : list of str | None
         Metric codes to show, in this order within each family; ``None`` =
         every metric in the frame.
-    methods : list of str | None, keyword-only
+    methods : list of str | None
         Methods (rows) to show; ``None`` = every method in the frame.
-    order : list of str | None, keyword-only
+    order : list of str | None
         Methods to put first, in this order; the rest follow best first.
         Reorders only - filter with ``methods``.
-    aggregate : {"dataset", "summary"}, keyword-only
+    aggregate : {"dataset", "summary"}
         ``"dataset"``: one dataset's values, drawn as circles. ``"summary"``:
         within-dataset ranks averaged across datasets, drawn as bars (the
         paper's panel c).
-    cmap : str | None, keyword-only
+    cmap : str | None
         Matplotlib colormap for the first family; ``None`` = blues, greens
         and purples per family.
-    title : str | None, keyword-only
+    title : str | None
         Figure title; ``None`` = no title.
-    save : str or path-like | None, keyword-only
+    save : str or path-like | None
         File to write the figure to (tight bounding box); the suffix picks
         the format, e.g. ``.pdf``, ``.png``, ``.svg``.
-    show_language : bool, keyword-only
+    show_language : bool
         Draw the ``Py`` / ``R`` chip and the ``L`` (supervised) badge left of
         each row, plus a key line (Notes).
-    require_complete : bool, keyword-only
+    require_complete : bool
         With ``aggregate="summary"``: keep only the methods present in every
         dataset.
-    overall : {"rank", "mean_overall"}, keyword-only
+    overall : {"rank", "mean_overall"}
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
         dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
         (missing dataset skipped). Applies under ``aggregate="summary"``.
-    na : {"warn", "skip", "raise"}, keyword-only
+    na : {"warn", "skip", "raise"}
         How to report ``n/a`` cells (a method lacking a metric): warn once,
         stay silent, or raise.
 

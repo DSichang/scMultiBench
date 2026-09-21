@@ -61,7 +61,7 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
     ----------
     name : str
         Any spelling of a method name (``"MOFA+"``, ``"totalvi"``, ``"Seurat(WNN)"``).
-    strict : bool, keyword-only
+    strict : bool
         ``True`` = raise for a name that is neither an alias nor a registry id;
         ``False`` = return the folded name.
 
@@ -192,7 +192,7 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
     code : str
         A metric name in any spelling the package or scIB uses
         (``"kbet"``, ``"isolated_label_f1"``).
-    strict : bool, keyword-only
+    strict : bool
         ``True`` = raise for a code not in ``known_metrics()``; ``False`` =
         return an unknown code unchanged (stripped).
 
@@ -276,11 +276,11 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         ``None`` (no restriction), a family token (``"clustering"``,
         ``"batch"``, ``"all"``) or a list of metric codes (case/alias
         tolerant: ``["ari", "kbet"]`` -> ``ARI, kBET``).
-    extra : collection of str, keyword-only
+    extra : collection of str
         Codes accepted on top of :func:`known_metrics` - the metrics present
         in a frame, so a user's own metric name in a long file can still be
         selected; they are listed in the error too.
-    kw : str, keyword-only
+    kw : str
         The keyword the value arrived through, named in the errors.
 
     Returns
@@ -470,7 +470,7 @@ def datasets(files_dir: Path | str | None = None, *,
     ----------
     files_dir : Path | str | None
         Folder holding ``dataset.csv``; ``None`` = the package's shipped ``files/``.
-    category : str | None, keyword-only
+    category : str | None
         Keep only datasets with stored results in this integration category
         (``vertical``, ``diagonal``, ``mosaic`` or ``cross``); ``None`` = all.
 

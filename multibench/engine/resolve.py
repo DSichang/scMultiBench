@@ -214,7 +214,7 @@ def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
         The folder that contains the dataset folders.
     dataset : str
         The id as the caller wrote it.
-    stacklevel : int, keyword-only
+    stacklevel : int
         ``warnings.warn`` stacklevel, so the warning points at the caller's
         caller (the public entry point) by default.
 
@@ -296,13 +296,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
         ``cross``.
     method : str
         Registry method id, e.g. ``"Matilda"``.
-    modalities : list[str] | set[str] | None, keyword-only
+    modalities : list[str] | set[str] | None
         Modality tokens that pick the variant, e.g. ``["rna", "adt"]``;
         ``None`` = the files in the dataset folder decide.
-    data_path : Path | str | None, keyword-only
+    data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
-    check : bool | None, keyword-only
+    check : bool | None
         ``False`` = no checks; ``True`` = raise on a missing or malformed
         input; ``None`` = warn about missing files.
 
@@ -932,10 +932,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     method : str | None
         Registry method id; with ``category``, orders the files as that
         variant stacks its cells. ``None`` = the default order.
-    modalities : list[str] | set[str] | None, keyword-only
+    modalities : list[str] | set[str] | None
         Modality tokens that pick one of several variants; used only with
         ``category`` and ``method``.
-    data_path : Path | str | None, keyword-only
+    data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
 

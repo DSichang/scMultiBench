@@ -58,7 +58,7 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     out_dir : path-like
         Folder holding ``batch_result.json``: a ``run_all`` ``out_dir`` or a
         ``mtb.data.fetch_outputs`` tree.
-    methods : list[str] | None, keyword-only
+    methods : list[str] | None
         Methods whose records to keep; ``None`` = every record.
 
     Returns
@@ -603,21 +603,21 @@ def scan(dataset: str, category: str | None = None, *,
         Dataset folder name under ``data_path`` (not a path).
     category : str | None
         Integration category to scan; ``None`` = all four.
-    methods : list[str] | None, keyword-only
+    methods : list[str] | None
         Method ids to include, as a list; ``None`` = every method.
-    modalities : list[str] | None, keyword-only
+    modalities : list[str] | None
         Modality tokens of one combination, e.g. ``["rna", "adt"]``; ``None`` =
         every combination.
-    data_path : Path | str | None, keyword-only
+    data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
-    out_dir : path | str, keyword-only
+    out_dir : path | str
         Root the ``command`` lines write under; default the literal
         placeholder ``'<out_dir>'``. Pass the real one for paste-ready lines.
-    params : dict | None, keyword-only
+    params : dict | None
         ``{method: {key: value}}`` hyperparameter overrides, rendered into
         ``command`` and checked against the keys each method accepts.
-    verbose : bool, keyword-only
+    verbose : bool
         Print one line ``[scan] files OK for k/n method rows; e/n envs
         installed``.
 
@@ -1521,17 +1521,17 @@ class BatchResult:
 
         Parameters
         ----------
-        batch : array-like | Series | path | None, keyword-only
+        batch : array-like | Series | path | None
             One batch id per cell, in embedding row order (array, Series or CSV
             path); ``None`` = each cell's source label file, or none with
             ``labels=``.
-        labels : array-like | Series | path | None, keyword-only
+        labels : array-like | Series | path | None
             One cell-type label per cell, in embedding row order (same forms);
             ``None`` = search the dataset's label files again.
-        metrics : str | list[str] | None, keyword-only
+        metrics : str | list[str] | None
             Metric family (``"clustering"``, ``"batch"``, ``"all"``) or metric
             codes; ``None`` = every metric the batch structure allows.
-        verbose : bool, keyword-only
+        verbose : bool
             Print one line per method.
 
         Returns
@@ -1866,30 +1866,30 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     out_dir : path | None
         Output root, one ``<out_dir>/<method>_<dataset>/`` per method; required
         unless ``dry_run=True``.
-    methods : list[str] | None, keyword-only
+    methods : list[str] | None
         Method ids to include, as a list; ``None`` = every runnable method.
-    modalities : list[str] | None, keyword-only
+    modalities : list[str] | None
         Modality tokens of one combination, e.g. ``["rna", "adt"]``; ``None`` =
         every combination.
-    params : dict | None, keyword-only
+    params : dict | None
         Per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``; see
         ``mtb.params_for`` for the accepted keys.
-    data_path : path | None, keyword-only
+    data_path : path | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
-    evaluate : bool, keyword-only
+    evaluate : bool
         Score each embedding; ``False`` only runs (status ``RUN_OK``).
-    dry_run : bool, keyword-only
+    dry_run : bool
         ``True`` = return the ``mtb.scan`` frame for this selection and run
         nothing.
-    verbose : bool, keyword-only
+    verbose : bool
         Print ``[run_all] ...`` progress lines.
-    timeout : float | None, keyword-only
+    timeout : float | None
         Per-method wall-clock cap in seconds; ``None`` = no cap.
-    skip_existing : bool, keyword-only
+    skip_existing : bool
         Reuse an output file already in ``out_dir`` instead of re-running the
         method, to resume an interrupted sweep.
-    batch : array-like | None, keyword-only
+    batch : array-like | None
         One batch id per cell, in embedding row order (array, Series or CSV
         path); ``None`` = batch by the label file each cell came from.
 
@@ -2204,18 +2204,18 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         (``mtb.params_for``).
     values : iterable
         Settings to try; each one is a separate ``mtb.run_all``.
-    out_dir : path, keyword-only
+    out_dir : path
         Root folder; each setting runs under ``<out_dir>/<param>_<value>/``.
-    modalities : list[str] | None, keyword-only
+    modalities : list[str] | None
         Modality tokens of the variant, when the method has several in
         ``category``; ``None`` = every variant.
-    data_path : path | None, keyword-only
+    data_path : path | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
-    timeout : float | None, keyword-only
+    timeout : float | None
         Per-setting wall-clock cap in seconds, passed to ``run_all``;
         ``None`` = no cap.
-    verbose : bool, keyword-only
+    verbose : bool
         Print ``run_all``'s progress lines.
 
     Returns

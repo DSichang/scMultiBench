@@ -420,26 +420,26 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     category : str
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``.
-    inputs : dict, keyword-only
+    inputs : dict
         ``{role: path or AnnData}``, usually from ``mtb.inputs_for``; its
         modality roles select the variant.
-    out_dir : str, keyword-only
+    out_dir : str
         Folder the method writes into; created if missing.
-    params : dict | None, keyword-only
+    params : dict | None
         Hyperparameter overrides merged over the variant's defaults;
         ``None`` = the defaults.
-    task : str | None, keyword-only
+    task : str | None
         Accepted for forward compatibility; currently ignored.
-    convert : bool, keyword-only
+    convert : bool
         Convert modality inputs to the canonical ``.h5`` layout before the run.
-    cmd_template : str | None, keyword-only
+    cmd_template : str | None
         Command wrapper such as ``"conda run -n myenv {cmd}"``; ``None`` =
         enter the method's own env.
-    repo_path : Path | None, keyword-only
+    repo_path : Path | None
         Checkout holding ``tools_scripts/``; ``None`` =
         ``mtb.config.DEFAULT.repo_path`` if it has one, else the package root
         if it has one, else a clone into the former.
-    dry_run : bool, keyword-only
+    dry_run : bool
         ``True`` = return the command without running it or writing anything.
 
     Returns

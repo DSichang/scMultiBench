@@ -336,22 +336,22 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     convert : bool
         ``False`` = never write: pass a canonical ``.h5`` through, raise for
         anything else.
-    layer : str | None, keyword-only
+    layer : str | None
         Take the matrix from ``adata.layers[layer]`` instead of ``adata.X``.
-    obsm : str | None, keyword-only
+    obsm : str | None
         Take the matrix from ``adata.obsm[obsm]`` (e.g. ``'protein'`` for CITE-seq).
-    mod : str | None, keyword-only
+    mod : str | None
         MuData modality to convert (``mdata.mod[mod]``); required for a MuData.
-    dtype : str, keyword-only
+    dtype : str
         Stored dtype of ``matrix/data``; ``'float32'`` halves the file (see Notes).
-    compression : str | None, keyword-only
+    compression : str | None
         h5py compression filter; ``None`` = uncompressed.
-    block : int, keyword-only
+    block : int
         Number of features written per streaming step.
-    category : str | None, keyword-only
+    category : str | None
         Integration category the file is for (``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``); only changes ATAC filenames (Notes).
-    feature_names : list | None, keyword-only
+    feature_names : list | None
         Feature names that override ``var_names`` / ``uns`` / DataFrame
         columns; the way to name a bare ``obsm`` array.
 
@@ -899,31 +899,31 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     dataset_dir : Path | str
         Folder to create; its name is the dataset id for ``mtb.scan`` /
         ``mtb.run_all``, and its parent their ``data_path``.
-    rna : str, AnnData, DataFrame, array or None, keyword-only
+    rna : str, AnnData, DataFrame, array or None
         RNA matrix: a selector against ``data`` (``'X'``, ``'layer:counts'``)
         or an object (forms in Notes); ``None`` = no RNA.
-    adt : str, AnnData, DataFrame, array or None, keyword-only
+    adt : str, AnnData, DataFrame, array or None
         Protein (ADT) matrix, same forms as ``rna`` (e.g. ``'obsm:protein'``);
         ``None`` = no ADT.
-    atac : str, AnnData, DataFrame, array or None, keyword-only
+    atac : str, AnnData, DataFrame, array or None
         ATAC matrix, same forms as ``rna``; needs ``atac_kind``. ``None`` = no ATAC.
-    atac_kind : str or None, keyword-only
+    atac_kind : str or None
         What ``atac`` holds: ``'peak'`` or ``'gene_activity'``; decides the
         ATAC filename.
-    labels : str, Series, sequence or None, keyword-only
+    labels : str, Series, sequence or None
         Cell-type labels for ``cty.csv``: ``'obs:<col>'``, a Series indexed by
         barcode, or a sequence in cell order.
-    batch : str, Series, sequence or None, keyword-only
+    batch : str, Series, sequence or None
         Batch per cell, same forms as ``labels``; splits every file per batch
         (``rna1.h5``, ``rna2.h5``, ...).
-    dtype : str, keyword-only
+    dtype : str
         Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
-    compression : str or None, keyword-only
+    compression : str or None
         h5py compression filter, forwarded to ``mtb.io.to_canonical``.
-    category : str or None, keyword-only
+    category : str or None
         Integration category the folder is for (``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``); changes the ATAC filenames (Notes).
-    adt_names : list or None, keyword-only
+    adt_names : list or None
         Protein names for the ADT matrix; they override any it carries and
         are needed when it has none.
 

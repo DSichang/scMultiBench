@@ -60,26 +60,26 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     category : str | None
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``; ``None`` = any.
-    task : str | None, keyword-only
+    task : str | None
         A task from ``mtb.list_tasks()``, e.g. ``"clustering"``; ``None`` = any.
-    needs_labels : bool | None, keyword-only
+    needs_labels : bool | None
         ``True`` = a matching variant needs cell-type labels; ``False`` = one
         runs without them; ``None`` = no filter.
-    atac : str | None, keyword-only
+    atac : str | None
         ATAC representation the script expects: ``"peak"`` or
         ``"gene_activity"``; ``None`` = no filter.
-    modalities : list[str] | set[str] | None, keyword-only
+    modalities : list[str] | set[str] | None
         Modalities a variant must consume, all of them, e.g. ``["rna", "adt"]``;
         ``None`` = no filter.
-    runnable : bool | None, keyword-only
+    runnable : bool | None
         ``True`` = methods wired with at least one variant (not a check of
         your host: see ``mtb.scan``); ``False`` = declared stubs; ``None`` =
         both.
-    tunable : bool | None, keyword-only
+    tunable : bool | None
         ``True`` = methods with command-line hyperparameters that
         ``run(params=...)`` can set; ``False`` = the rest (settings fixed in
         the script); ``None`` = both.
-    available : bool | None, keyword-only
+    available : bool | None
         ``True`` = public methods (``availability == 'public'``); ``False`` =
         ``benchmark-host-only`` ones; ``None`` = both.
 
@@ -283,7 +283,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ----------
     method : str
         Registry method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
-    verbose : bool, keyword-only
+    verbose : bool
         ``True`` adds ``notes_long``, the long upstream-audit notes.
 
     Returns
@@ -555,10 +555,10 @@ def params_for(method: str, category: str | None = None,
     modalities : list[str] | set[str] | None
         Modality tokens of the variant, e.g. ``["rna", "adt"]``; ``None`` =
         infer it from the other arguments.
-    dataset : str | None, keyword-only
+    dataset : str | None
         Dataset folder that settles an ambiguous selection: the one variant
         whose input files it holds.
-    data_path : Path | str | None, keyword-only
+    data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
 
@@ -763,7 +763,7 @@ def cite(*methods, fmt: str = "text") -> str:
     *methods : str | list[str]
         Method ids, one per argument or as one list; ``"all"`` = every
         registry method; none = the benchmark only.
-    fmt : str, keyword-only
+    fmt : str
         ``"text"`` (one line per entry) or ``"bibtex"`` (one ``@article`` per
         entry).
 

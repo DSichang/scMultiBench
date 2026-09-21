@@ -641,7 +641,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
         ``cross``) whose methods to cover; ``None`` = every method.
     methods : list[str] | None
         Method ids to cover instead of ``category``.
-    as_frame : bool, keyword-only
+    as_frame : bool
         ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
@@ -851,10 +851,10 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     conda : str, keyword-only, optional
         conda/mamba executable whose envs dir to unpack into when
         ``envs_dir`` is not given. Not required.
-    force : bool, keyword-only
+    force : bool
         The archives are linux-64; on any other host ``RuntimeError`` is
         raised before the download unless ``force=True``.
-    flavor : str, keyword-only
+    flavor : str
         Which archive: ``'gpu'`` - the ``'<env>'`` archive (the CUDA build
         every env has); ``'cpu'`` - the ``'<env>-cpu'`` archive (the same
         env without the CUDA libraries, 3-4x smaller) when it is published
@@ -988,7 +988,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
     conda : str | None
         conda/mamba executable that lists the installed envs; ``None`` =
         conda if found, else mamba.
-    as_frame : bool, keyword-only
+    as_frame : bool
         ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
@@ -1178,7 +1178,7 @@ def create_env(env_name: str, conda: str | None = None,
         conda executable; default ``conda``.
     dry_run : bool
         ``True`` (default) only returns the commands; ``False`` runs them.
-    force : bool, keyword-only
+    force : bool
         Lockfiles are linux-64; with ``dry_run=False`` on another host
         ``RuntimeError`` is raised before anything runs unless ``force``.
 
@@ -1232,7 +1232,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
         conda executable; default ``conda``.
     dry_run : bool
         ``True`` (default) plans only - works on every host.
-    force : bool, keyword-only
+    force : bool
         Lockfiles are linux-64; ``dry_run=False`` on macOS/Windows raises
         ``RuntimeError`` before any build unless ``force=True``.
 
@@ -1299,22 +1299,22 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     methods : list[str] | None
         Method ids to cover; ``None`` = every method of ``category``, or every
         method.
-    category : str | None, keyword-only
+    category : str | None
         Integration category (``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``) whose methods to cover when ``methods`` is ``None``.
-    packed : bool, keyword-only
+    packed : bool
         Use a prebuilt conda-pack archive where one is published, else the
         lockfile; ``False`` = lockfile builds only.
-    dry_run : bool, keyword-only
+    dry_run : bool
         ``True`` = return the plan and install nothing; ``False`` = install the
         missing envs.
-    conda : str | None, keyword-only
+    conda : str | None
         conda/mamba executable; ``None`` = conda if found, else mamba. The
         packed path needs none.
-    force : bool, keyword-only
+    force : bool
         ``True`` = attempt a real install on a non-Linux host, which is
         refused otherwise.
-    flavor : str, keyword-only
+    flavor : str
         Packed-archive build per env: ``'cpu'``, ``'gpu'`` (the CUDA build)
         or ``'auto'`` (``'cpu'`` unless an NVIDIA GPU is visible); unused
         when ``packed=False``.
@@ -1521,7 +1521,7 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     conda : str | None
         conda/mamba executable that lists the installed envs; ``None`` =
         conda if found, else mamba.
-    as_frame : bool, keyword-only
+    as_frame : bool
         ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
@@ -1789,7 +1789,7 @@ def create(method: str, env_name: str | None = None, conda: str | None = None,
         conda executable.
     dry_run : bool
         ``True`` (default) returns the commands without running them.
-    force : bool, keyword-only
+    force : bool
         Build even though this host is not linux-64 (``dry_run=False`` on
         macOS/Windows otherwise raises ``RuntimeError`` first).
 
@@ -1824,7 +1824,7 @@ def create_group(group: str, env_name: str | None = None, conda: str | None = No
         conda executable.
     dry_run : bool
         ``True`` (default) returns the commands without running them.
-    force : bool, keyword-only
+    force : bool
         Build even though this host is not linux-64.
 
     Returns

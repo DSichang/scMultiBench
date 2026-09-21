@@ -47,7 +47,7 @@ OVERALL_BASES = ("rank", "mean_overall")
 #: the ``overall`` parameter entry written out verbatim in the docstrings of
 #: plot.bubble and plot.bar (tests/test_bubble.py and tests/test_bar.py pin it)
 OVERALL_DOC = """\
-    overall : {"rank", "mean_overall"}, keyword-only
+    overall : {"rank", "mean_overall"}
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
         dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
         (missing dataset skipped)."""
