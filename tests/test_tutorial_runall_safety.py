@@ -411,14 +411,24 @@ def test_batch_metrics_prose_names_the_metrics_knob(cat):
 
 @pytest.mark.parametrize("cat", [c for c in CATS if c != "vertical"])
 def test_labels_for_prose_warns_that_a_wrong_order_scores_silently(cat):
-    """labels_for's order is not every method's stacking order (StabMap on
-    D52 stacks cty3, cty1, cty2): a multi-file tutorial must not say the dict
-    scores a dataset as is, and must name label_order= as the remedy."""
+    """labels_for(dataset) returns the default order, which is not every
+    method's stacking order (StabMap on D52 stacks cty3, cty1, cty2): a
+    multi-file tutorial must say a wrong order scores silently, name
+    labels_for(DATASET, CATEGORY, method) as the remedy, list the methods whose
+    order the live package gives differently, and show one of them in code."""
     md = " ".join(_markdown(f"tutorial_{cat}").split())
-    assert "pass that order as `label_order=`" in md
-    assert "a wrong order gives wrong scores without an error" in md
+    assert "`labels_for(DATASET, CATEGORY, method)` returns the files in that method's order" in md
+    assert "A wrong order gives wrong scores without an error" in md
     assert "scores a multi-file dataset directly" not in md
     assert "in the order `evaluate` expects" not in md
+    ds = GEN.SCEN[cat]["ds"]
+    others = GEN.reordering_methods(cat, ds)
+    assert others, f"{cat}: no method with another order on {ds}"
+    for m, order in others.items():
+        assert f"{m} (`{', '.join(order)}`)" in md
+    m0 = next(iter(others))
+    assert any(f'mtb.labels_for(DATASET, CATEGORY, "{m0}")' in src
+               for src in _code(f"tutorial_{cat}"))
 
 
 @pytest.mark.parametrize("cat", CATS)
@@ -640,3 +650,31 @@ def test_end_to_end_scenario_counts_only_methods_with_a_variant_for_the_dataset(
     exec(src, ns)
     out = capsys.readouterr().out
     assert out.count("not on disk") == len(ns["SCENARIOS"]) and "methods" not in out.replace("its methods", "")
+
+
+def test_end_to_end_label_order_claims_match_labels_for_and_the_stored_summaries():
+    """Section 8's Label order cell says what labels_for(ds, category, method)
+    returns and what the stored summaries recorded. Each claim is checked
+    against both, so the Concerto caveat fails here - and gets reworded - as
+    soon as labels_for returns Concerto's recorded order."""
+    import pandas as pd
+    import multibench as mtb
+    md = " ".join(next(src for kind, src in _cells(E2E)
+                       if kind == "markdown" and src.startswith("### Label order")).split())
+    assert "`labels_for(dataset, category, method)` returns the label files in that order" in md
+    assert 'mtb.labels_for("D52", "cross", "StabMap")) # cty3, cty1, cty2' in md
+
+    def stored(ds, method):
+        df = pd.read_csv(ROOT / "notebooks" / "results" / f"summary_{ds}.csv")
+        return [Path(f).stem for f in df.set_index("method").at[method, "label_order"].split("+")]
+
+    assert list(mtb.labels_for("D52", "cross", "StabMap")) == stored("D52", "StabMap") == ["cty3", "cty1", "cty2"]
+    assert list(mtb.labels_for("D28", "diagonal", "uniPort")) == stored("D28", "uniPort") == ["atac_cty", "rna_cty"]
+    assert "StabMap on D52 puts batch 3 first (`cty3+cty1+cty2`)" in md
+    assert "uniPort on D28 puts ATAC before RNA" in md
+    # the caveat: Concerto's recorded order is not what labels_for returns
+    assert '`labels_for("D52", "cross", "Concerto")` returns `cty1, cty2, cty3`' in md
+    assert list(mtb.labels_for("D52", "cross", "Concerto")) == ["cty1", "cty2", "cty3"]
+    assert stored("D52", "Concerto") == ["cty3", "cty1", "cty2"]
+    assert 'UINMF on D52 uses `label_order=["cty1", "cty2"]`' in md
+    assert stored("D52", "UINMF") == ["cty1", "cty2"]

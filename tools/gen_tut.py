@@ -127,6 +127,18 @@ def and_list(items):
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
+def reordering_methods(cat, dataset):
+    """``{method: [stem, ...]}`` for the methods whose
+    ``labels_for(dataset, cat, method)`` differs from the default
+    ``labels_for(dataset)``, read from the live package at generation time.
+    Needs the dataset on disk (``config.DEFAULT.data_path``); a missing one
+    raises instead of dropping the list from the tutorial."""
+    import multibench as mtb
+    default = list(mtb.labels_for(dataset))
+    orders = {m: list(mtb.labels_for(dataset, cat, m)) for m in sorted(mtb.list_methods(cat))}
+    return {m: o for m, o in orders.items() if o != default}
+
+
 CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
             "mosaic": ["D45", "D46"], "cross": ["D52"]}
 
@@ -551,18 +563,30 @@ res.summary''')
 
 The same calls on a dataset folder the package has not seen. `describe_layout` prints the files a {cat} dataset needs and their format:""")
     code("""print(mtb.describe_layout(CATEGORY))""")
+    labels_code = """labels = mtb.labels_for(DATASET)            # {file stem: path}
+print({k: Path(v).name for k, v in labels.items()})
+print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")"""
     if cat == "vertical":
         md("`labels_for` returns a dataset's label files; a vertical dataset has one, `cty`:")
     else:
         files = "`rna_cty` then `atac_cty`" if cat == "diagonal" else "`cty1`, `cty2`, ... in that order"
-        md(f"""`labels_for` returns a dataset's label files: {files}. If a method stacked its cells in another order, pass that order as `label_order=`; a wrong order gives wrong scores without an error.
+        others = reordering_methods(cat, ds)
+        if not others:
+            raise SystemExit(f"no {cat} method stacks {ds}'s cells in another order: reword section 3")
+        md(f"""`labels_for` returns a dataset's label files: {files}. Some methods stack their cells in another order; `labels_for(DATASET, CATEGORY, method)` returns the files in that method's order. A wrong order gives wrong scores without an error.
 
 """ + details(
-            "**Order.** The `label_order` column of `res.summary` shows the order "
-            "`run_all` recorded for each method.", label="Details: label order"))
-    code("""labels = mtb.labels_for(DATASET)            # {file stem: path}
-print({k: Path(v).name for k, v in labels.items()})
-print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")""")
+            f"**On `{ds}`**, `labels_for` returns another order for "
+            + and_list(f"{m} (`{', '.join(o)}`)" for m, o in others.items()) + ".",
+            "**With `evaluate`.** Pass the dict `labels_for` returns as is. A dict you "
+            "build or reorder yourself goes in as is only in the default order; name "
+            "any other order with `label_order=`.",
+            "**Check.** `run_all` scores every order that fits the cell count and keeps "
+            "the one with the highest ARI; the `label_order` column of `res.summary` "
+            "shows it.", label="Details: label order"))
+        m0 = next(iter(others))
+        labels_code += f'\nprint("{m0}:", list(mtb.labels_for(DATASET, CATEGORY, "{m0}")))'
+    code(labels_code)
     md(EXPORT_INTRO[cat] + ("\n\n" + details(EXPORT_DETAIL[cat], label="Details: MuData")
                             if EXPORT_DETAIL[cat] else ""))
     code(EXPORT_DEMO[cat])
