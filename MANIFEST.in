@@ -1,0 +1,3 @@
+# The test suite needs the repository checkout (data/, the upstream scripts,
+# conftest fixtures); it is not shipped in the source distribution.
+prune tests
