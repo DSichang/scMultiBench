@@ -1084,9 +1084,9 @@ _CATEGORY_HELP = ("integration category: vertical (several modalities measured i
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
                   "modality) or cross (several batches with all modalities; batch-effect "
-                  "removal, incl. spatial slice registration)")
+                  "removal)")
 _TASK_HELP = ("task within the category: clustering (default), batch, "
-              "dimension_reduction, classification, imputation, registration "
+              "dimension_reduction, classification, imputation "
               "(mtb.list_tasks())")
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
 _FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)

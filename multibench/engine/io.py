@@ -15,6 +15,4 @@ def load_output(out_dir: Path | str, spec):
             return np.asarray(f[spec.dataset or "data"])
     if spec.kind == "labels":
         return [ln for ln in path.read_text().splitlines() if ln != ""]
-    if spec.kind == "coords":
-        return path  # caller handles multi-file / glob
     raise ValueError(f"unknown output kind {spec.kind!r}")

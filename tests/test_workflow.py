@@ -38,25 +38,9 @@ def test_scan_filters_by_category():
     assert set(df["category"]) == {"vertical"}
 
 
-def test_scan_rejects_spatial_methods_on_non_spatial_data():
-    """A data_dir path always exists, so existence alone must not imply runnable."""
-    df = mtb.scan("D11", category="cross")
-    spatial = df[df["method"].isin(["PASTE", "PASTE2", "SPIRAL", "GPSA"])]
-    assert len(spatial) == 4
-    assert not spatial["runnable"].any()
-    assert spatial["reason"].str.contains("h5ad").all()
-
-
 def _has_dataset(name):
     from multibench import config
     return (config.DEFAULT.data_path / name).is_dir()
-
-
-@pytest.mark.skipif(not _has_dataset("D63"), reason="D63 slices not on this host")
-def test_scan_accepts_spatial_methods_on_spatial_data():
-    df = mtb.scan("D63", category="cross")
-    spatial = df[df["method"].isin(["PASTE", "PASTE2", "SPIRAL", "GPSA"])]
-    assert spatial["runnable"].all()
 
 
 @pytest.mark.skipif(not _envs_installed("vertical"), reason=_NO_ENVS)
@@ -79,8 +63,7 @@ def test_run_all_dry_run_respects_method_filter():
 
 def test_run_all_dry_run_is_the_scan_frame():
     """Holds on every host: dry_run == scan(dataset, category), row for row."""
-    for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D63", "cross"),
-                    ("D45", "mosaic")]:
+    for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D45", "mosaic")]:
         if not _has_dataset(ds):
             continue
         plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
@@ -94,7 +77,7 @@ def test_run_all_dry_run_is_the_scan_frame():
 def test_run_all_plans_match_scan():
     """Runnable counts on the reference host (needs the method envs)."""
     for ds, cat, n in [("D11", "vertical", 14), ("D52", "cross", 8),
-                       ("D63", "cross", 4), ("D45", "mosaic", 4)]:
+                       ("D45", "mosaic", 4)]:
         if not _has_dataset(ds):
             continue
         plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)

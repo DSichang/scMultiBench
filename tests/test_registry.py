@@ -3,7 +3,7 @@ from multibench.engine import registry
 
 def test_all_methods_declared():
     specs = registry.load()
-    assert len(specs) >= 40
+    assert len(specs) >= 36
 
 
 def test_verified_methods_present():

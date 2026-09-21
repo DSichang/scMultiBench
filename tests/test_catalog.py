@@ -140,15 +140,13 @@ def test_datasets_lists_every_id_with_results(files_dir):
 # --- re-test round 3: output column agrees with the registry, dir() hygiene ---
 
 def test_methods_output_agrees_with_method_info_output_kind(files_dir):
-    """method.csv said output='embedding' for PASTE/PASTE2/GPSA/SPIRAL while
-    method_info(...)['supports'][*]['output_kind'] says 'coords' (aligned
-    coordinates). The CSV must agree with the registry for EVERY method."""
+    """method.csv once disagreed with method_info(...)['supports'][*]['output_kind'].
+    The CSV must agree with the registry for EVERY method."""
     import multibench as mtb
     df = catalog.methods(files_dir).set_index("canonical_id")
     for cid in df.index:
         kinds = {s["output_kind"] for s in mtb.method_info(cid)["supports"]}
         assert kinds == {df.loc[cid, "output"]}, (cid, kinds, df.loc[cid, "output"])
-    assert df.loc[["PASTE", "PASTE2", "GPSA", "SPIRAL"], "output"].tolist() == ["coords"] * 4
     assert df.loc["scMoMaT", "output"] == "graph"
 
 

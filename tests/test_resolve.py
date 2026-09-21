@@ -180,30 +180,36 @@ def test_atac_gas_peak_caveat(tmp_path):
                                                          data_path=tmp_path)) == []
 
 
-def test_inputs_for_check_true_rejects_data_dir_without_slices(tmp_path):
-    (tmp_path / "D11").mkdir()
-    with pytest.raises(FileNotFoundError, match=">=2 .h5ad"):
-        resolve.inputs_for("D11", "cross", "PASTE", data_path=tmp_path, check=True)
+def test_inputs_for_check_true_rejects_data_dir_without_the_named_files(tmp_path):
+    (tmp_path / "D27").mkdir()
+    with pytest.raises(FileNotFoundError, match="missing files in"):
+        resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path, check=True)
     # default (warn-only) still hands back the directory
-    got = resolve.inputs_for("D11", "cross", "PASTE", data_path=tmp_path)
-    assert got["data_dir"].rstrip("/").endswith("D11")
+    got = resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path)
+    assert got["data_dir"].rstrip("/").endswith("D27")
 
 
-def test_check_data_dir_wants_obsm_spatial(tmp_path):
-    import anndata as ad
-    import numpy as np
+def test_data_dir_is_processed_when_present_else_the_dataset_folder(tmp_path):
+    import os
+    d = tmp_path / "D27"; d.mkdir()
+    assert resolve._resolve_data_dir(d) == os.path.join(str(d), "")
+    (d / "processed").mkdir()
+    assert resolve._resolve_data_dir(d) == os.path.join(str(d / "processed"), "")
+
+
+def test_check_data_dir_names_the_missing_files(tmp_path):
     from multibench.engine import registry
-    v = registry.get("PASTE").select("cross", set())
+    v = registry.get("scBridge").select("diagonal", set())
     d = tmp_path / "S"; d.mkdir()
-    assert resolve._check_data_dir(v, d) == (False, f"spatial registration needs >=2 .h5ad slice files; found 0 in {d}")
-    for i in range(2):
-        ad.AnnData(np.ones((5, 3))).write_h5ad(d / f"s{i}.h5ad")
-    ok, why = resolve._check_data_dir(v, d)
-    assert not ok and "obsm['spatial']" in why
-    for i in range(2):
-        a = ad.AnnData(np.ones((5, 3))); a.obsm["spatial"] = np.zeros((5, 2))
-        a.write_h5ad(d / f"s{i}.h5ad")
+    assert resolve._check_data_dir(v, d) == (
+        False, f"missing files in {d}: ['rna.h5', 'atac_gas.h5', 'rna_cty.csv', 'atac_cty.csv']")
+    for name in ("rna.h5", "atac_gas.h5", "rna_cty.csv"):
+        (d / name).write_text("")
+    assert resolve._check_data_dir(v, d) == (False, f"missing files in {d}: ['atac_cty.csv']")
+    (d / "atac_cty.csv").write_text("")
     assert resolve._check_data_dir(v, d) == (True, "")
+    gone = tmp_path / "nope"
+    assert resolve._check_data_dir(v, gone) == (False, f"no such directory: {gone}")
     # the workflow alias delegates here
     from multibench import workflow as W
     assert W._data_dir_usable(v, d) == (True, "")

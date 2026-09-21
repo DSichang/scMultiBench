@@ -78,12 +78,11 @@ def test_params_for_category_only_reaches_data_dir_variants():
     """A data_dir variant has NO modalities, so category alone must be enough.
 
     Regression: params_for used to demand BOTH category and modalities, which made
-    scBridge and the spatial methods unreachable through this API.
+    scBridge unreachable through this API.
     """
     r = mtb.params_for("scBridge", "diagonal")
     assert r["variant"].startswith("diagonal")
     assert r["tunable"]
-    assert mtb.params_for("PASTE", "cross")["variant"].startswith("cross")
 
 
 def test_params_for_modalities_only():

@@ -19,20 +19,15 @@ def test_find_methods_modalities_keeps_scbridge_without_warning():
             len(mtb.list_methods(category="diagonal"))
 
 
-def test_find_methods_modalities_keeps_data_dir_methods_with_warning():
-    with pytest.warns(UserWarning, match="data_dir") as rec:
-        ids = discover.find_methods(category="cross", modalities=["rna"])
-    assert {"SPIRAL", "GPSA", "PASTE", "PASTE2"} <= set(ids)
-    msg = str(rec[0].message)
-    for m in ("SPIRAL", "GPSA", "PASTE", "PASTE2"):
-        assert m in msg
-    assert "could not be filtered by modalities" in msg and "task='registration'" in msg
+def test_find_methods_modalities_never_warns():
+    """The one directory-fed method (scBridge) names its matrices, so
+    ``modalities=`` filters every variant and nothing is kept unfiltered."""
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        discover.find_methods(category="cross")
-        discover.find_methods(task="registration")
+        for cat in (None, "vertical", "diagonal", "mosaic", "cross"):
+            discover.find_methods(category=cat, modalities=["rna"])
     doc = discover.find_methods.__doc__
-    assert "KEPT" in doc and "scBridge" in doc
+    assert "Directory-fed methods" in doc and "scBridge" in doc
 
 
 def test_recommend_modalities_keeps_scbridge(result_dir):

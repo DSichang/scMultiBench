@@ -288,7 +288,6 @@ BANNED_PHRASES = {
     # retest after polish round 2: stale printed examples the fresh installer found
     "raises `EnvironmentError`": "the env preflight raises OSError (EnvironmentError is only its alias): say OSError",
     "prints the path": "labels_for returns a dict of paths and prints nothing",
-    "# ['PASTE', 'PASTE2']": "find_methods(task='registration', available=True) is ['GPSA', 'PASTE', 'PASTE2']",
     "rerun-0.2.1": "the source column says 'rerun'; the sweep version is not part of the value",
     "IMPUTATION_ONLY": "coverage derives from method_info(m)['categories'] / ['tasks'], not a hand-written list",
     'warnings.filterwarnings("ignore")': "library-specific filters only; multibench's own UserWarnings must stay visible",
@@ -316,19 +315,28 @@ def test_retired_phrases_absent_from_docs_surfaces(path):
         text = "\n".join("".join(c["source"]) for c in json.loads(text)["cells"])
     for phrase, why in BANNED_PHRASES.items():
         assert phrase not in text, f"{path.name} still says {phrase!r}: {why}"
-    # GPSA is public (it runs through the package driver); only SPIRAL is
-    # benchmark-host-only. No sentence may pair GPSA with that token.
-    for sentence in re.split(r"[.;]\s|\n\n", text):
-        if "benchmark-host-only" in sentence:
-            assert "GPSA" not in sentence, \
-                f"{path.name} pairs GPSA with benchmark-host-only: {sentence.strip()[:160]!r}"
+
+
+# the spatial-registration methods were removed from the package
+REMOVED_METHODS = re.compile(r"\b(GPSA|PASTE2?|SPIRAL)\b")
+
+
+@pytest.mark.parametrize(
+    "path",
+    NOTEBOOKS + [ROOT / "README.md", ROOT / "SETUP.md"] + _docs_md_files(),
+    ids=lambda p: p.name)
+def test_removed_methods_absent_from_docs_surfaces(path):
+    text = path.read_text()
+    if path.suffix == ".ipynb":
+        text = "\n".join("".join(c["source"]) for c in json.loads(text)["cells"])
+    hits = sorted({m.group(0) for m in REMOVED_METHODS.finditer(text)})
+    assert not hits, f"{path.name} still names removed method(s) {hits}"
 
 
 def test_printed_examples_match_the_live_package():
     """The README / quickstart examples the fresh installer re-ran: labels_for
     returns a dict, method_info(m)['runtime'] carries 'source' inside
-    'observed', the diagonal rna+atac list includes scBridge, registration is
-    three methods."""
+    'observed', the diagonal rna+atac list includes scBridge."""
     import multibench as mtb
     assert set(mtb.labels_for("D11")) == {"cty"}
     hint = mtb.method_info("SCALEX")["runtime"]
@@ -336,7 +344,6 @@ def test_printed_examples_match_the_live_package():
     assert hint["observed"][0]["source"] == "manual"
     found = mtb.find_methods(category="diagonal", modalities=["rna", "atac"])
     assert "scBridge" in found and len(found) == 14
-    assert mtb.find_methods(task="registration", available=True) == ["GPSA", "PASTE", "PASTE2"]
     readme = (ROOT / "README.md").read_text()
     assert "mtb.describe_layout(" in readme
     assert "multibench run --method Matilda --category vertical --input rna=" in readme \
@@ -402,15 +409,6 @@ def test_docs_pages_carry_the_colab_speed_round(path):
         assert "the default `conda run" not in text, "conda run is the fallback, not the default"
     if path.name == "quickstart.md":
         assert 'default\n    `cmd_template="conda run' not in text
-
-
-def test_host_only_method_set_behind_the_docs_rule():
-    """The GPSA/SPIRAL sentence rule above encodes the live registry; if the
-    availability table changes, this test says the docs rule must move too."""
-    import multibench as mtb
-    assert mtb.find_methods(available=False) == ["SPIRAL"]
-    assert mtb.method_info("GPSA")["availability"] == "public"
-    assert mtb.method_info("GPSA")["driver"]
 
 
 # ---- the generated API reference (docs/reference/*.md, mkdocstrings) ---------

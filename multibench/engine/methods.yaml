@@ -91,8 +91,8 @@ methods:
       # scBridge takes the dataset directory plus bare file names relative to it
       # (upstream: --data_path="../D27/" --source_data="rna.h5" ...), not absolute
       # paths. The four file roles are therefore `const` names, which inputs_for
-      # skips; only `data_dir` is resolved, so the modality set is empty, as for
-      # the registration methods. source = labelled RNA reference, target = ATAC query.
+      # skips; only `data_dir` is resolved, so the modality set is empty.
+      # source = labelled RNA reference, target = ATAC query.
       # One encoder takes both inputs (gene_num = source_data.shape[1],
       # data_utils.py:126), so atac_gas must be gene-aligned to rna (same feature
       # dimension), as for scJoint.
@@ -676,73 +676,6 @@ methods:
         output: {kind: embedding, file: embedding1.h5, dataset: data}
         extra_outputs:
           - {kind: labels, file: predict1.csv}
-  - id: SPIRAL
-    # GPU: the published main_SPIRAL.py:211 does `torch.Tensor(...).float().cuda()`
-    # unconditionally and the spiral package it drives builds its model with
-    # `.cuda()` (spiral/main.py:57, :71-72; spiral/utils.py:365). The wired
-    # entrypoint is the benchmark host's copy of the same code (see below).
-    requires_gpu: true
-    gpu_evidence: tools_scripts/SPIRAL/main_SPIRAL.py:211
-    status: verified
-    language: python
-    tasks: [registration]
-    variants:
-      - when: {category: cross}
-        entrypoint: /media/disk2/Sichang/scmbench_pkg/multibench_codes/SPIRAL_latest/main_SPIRAL_ori.py
-        language: python
-        cwd_at_script: true            # local Process/spiral imports and ./txt_file/ intermediates resolve from the script directory.
-                                       # Benchmark-host-only: the published main_SPIRAL.py is broken, and a package-driver port trains fully
-                                       # but fails after mclust on an empty txt_file/ ("<slice-prefixed barcodes> not in index"), so the
-                                       # working run depends on intermediates cached in the host's txt_file/.
-        args:
-          - {role: data_dir, flag: "--data_dir"}
-          - {role: out_dir,  flag: "--save_dir"}
-        output: {kind: coords, file: ""}
-        run_env: {R_PROFILE_USER: /media/disk2/Sichang/scmbench_pkg/spiral_mclust_shim.Rprofile, OMP_NUM_THREADS: 8, OPENBLAS_NUM_THREADS: 8, MKL_NUM_THREADS: 8}  # mclust dimnames fix: the shim binds the data to an R symbol before Mclust (rpy2's closure call breaks mclust 6.x `dimnames<-`); thread caps for a shared host
-  - id: GPSA
-    status: verified
-    language: python
-    tasks: [registration]
-    variants:
-      - when: {category: cross}                  # single registration variant; data_dir is an aux role (no modality-based selection)
-        entrypoint: tools_scripts/GPSA/main_GPSA.py      # upstream file writes only an elapsed time; the package driver below writes the aligned slices
-        driver: engine/drivers/run_gpsa.py                # the benchmark's working GPSA script, shipped with the package
-        language: python
-        cwd_at_script: true            # globs *.h5ad from --data_dir; variational-GP spatial alignment (gpsa + gpytorch), 3000 HVGs
-        slice_obs: [Ground_Truth]      # the driver reads obs['Ground_Truth'] from every slice at load; scan's file gate checks it
-        args:
-          - {role: data_dir, flag: "--data_dir"}   # directory of spatial slice .h5ad files (obs[Ground_Truth] + obsm[spatial])
-          - {role: out_dir,  flag: "--save_dir"}    # writes aligned_slice_*.h5ad into save_dir
-        output: {kind: coords, file: ""}            # registration output = the save_dir (aligned slices)
-  - id: PASTE
-    status: verified
-    language: python
-    tasks: [registration]
-    variants:
-      # Globs *.h5ad from --data_dir; pairwise OT alignment (paste-bio). The
-      # published script runs unmodified (no driver).
-      - when: {category: cross}
-        entrypoint: tools_scripts/PASTE/main_PASTE_pairwise.py
-        language: python
-        cwd_at_script: true
-        args:
-          - {role: data_dir, flag: "--data_dir"}
-          - {role: out_dir,  flag: "--save_dir"}
-        output: {kind: coords, file: ""}
-  - id: PASTE2
-    status: verified
-    language: python
-    tasks: [registration]
-    variants:
-      # The published script runs unmodified (no driver).
-      - when: {category: cross}
-        entrypoint: tools_scripts/PASTE2/main_PASTE2.py
-        language: python
-        cwd_at_script: true
-        args:
-          - {role: data_dir, flag: "--data_dir"}
-          - {role: out_dir,  flag: "--save_dir"}
-        output: {kind: coords, file: ""}
   - id: iPOLNG
     # GPU: main_iPOLNG.py:12 picks the default tensor type with an
     # is_available() fallback, but :41 then casts both inputs with

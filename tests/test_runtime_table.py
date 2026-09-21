@@ -1,7 +1,7 @@
 """engine/runtimes.yaml must never understate a run the package itself recorded.
 
-Five 1-second placeholders (scBridge and the four registration methods) once
-reported tier 'fast' while 170-3729 s had been recorded for the same runs;
+One-second placeholders (scBridge among them) once reported tier 'fast' while
+far longer runs had been recorded for the same methods;
 scan/recommend/run_all(timeout=) all surfaced them. The table is now the max
 over its three sources and these invariants pin it.
 """
@@ -79,9 +79,8 @@ def test_summary_csv_run_sec_is_not_understated():
 def test_expected_tier_moves_after_regeneration():
     def hint(m):
         return mtb.method_info(m)["runtime"]
-    for m in ("scBridge", "PASTE"):
-        assert hint(m)["tier"] == "medium", m
-    for m in ("PASTE2", "GPSA", "SPIRAL", "iPOLNG", "scMVP"):
+    assert hint("scBridge")["tier"] == "medium"
+    for m in ("iPOLNG", "scMVP"):
         assert hint(m)["tier"] == "slow", m
     assert hint("scBridge")["worst_sec"] == 964     # summary_D28.csv, not the 170 s recorded run
     # keys of the public answer are unchanged; unmeasured methods stay 'unknown'

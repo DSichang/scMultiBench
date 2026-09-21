@@ -25,16 +25,11 @@ def test_inputs_for_returns_absolute_paths_for_relative_data_path(tmp_path, monk
     assert all(os.path.isabs(p) for p in got.values()), got
     assert got["rna"] == str(tmp_path / "data" / "MYCITE" / "rna.h5")
     # a data_dir method: absolute AND trailing separator
-    import anndata as ad
-    import numpy as np
-    sl = tmp_path / "data" / "MYVISIUM"
-    sl.mkdir()
-    for i in range(2):
-        a = ad.AnnData(np.ones((4, 3))); a.obsm["spatial"] = np.zeros((4, 2))
-        a.write_h5ad(sl / f"s{i}.h5ad")
-    got = mtb.inputs_for("MYVISIUM", "cross", "PASTE", data_path="data", check=False)
+    dd = tmp_path / "data" / "MYDIAG"
+    _touch(dd, ["rna.h5", "atac_gas.h5", "rna_cty.csv", "atac_cty.csv"])
+    got = mtb.inputs_for("MYDIAG", "diagonal", "scBridge", data_path="data", check=False)
     assert os.path.isabs(got["data_dir"]) and got["data_dir"].endswith(os.sep)
-    assert got["data_dir"] == os.path.join(str(sl), "")
+    assert got["data_dir"] == os.path.join(str(dd), "")
 
 
 def test_inputs_for_docstring_promises_absolute_paths():

@@ -81,20 +81,22 @@ def test_scan_missing_dataset_folder_raises(tmp_path):
     assert "HERE" in msg, "must list the folders that DO exist"
 
 
-def test_scan_empty_folder_flags_data_dir_methods(tmp_path, all_envs):
+def test_scan_empty_folder_flags_data_dir_methods(tmp_path, all_envs, monkeypatch):
+    # scBridge calls CUDA unconditionally; a mocked GPU keeps the env gate open
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     (tmp_path / "EMPTY").mkdir()
-    df = mtb.scan("EMPTY", "cross", data_path=tmp_path)
-    paste = df[df["method"].isin(["PASTE", "PASTE2"])]
-    assert len(paste) == 2
-    assert not paste["files_ok"].any()
-    assert paste["files_reason"].str.contains(".h5ad").all()
-    assert not paste["runnable"].any()
+    df = mtb.scan("EMPTY", "diagonal", data_path=tmp_path)
+    rows = df[df["method"] == "scBridge"]
+    assert len(rows) == 1
+    r = rows.iloc[0]
+    assert not r["files_ok"] and not r["runnable"]
+    assert "'rna.h5'" in r["files_reason"] and "'atac_cty.csv'" in r["files_reason"]
     # env gate passed (mocked), so the ONLY reason is the file problem - in
     # its short form: the exception class and the absolute dir are gone
-    assert paste["env_ok"].all()
-    assert paste["reason"].str.contains(r"needs >=2 \.h5ad slice files; found 0 in EMPTY$").all()
-    assert paste["files_reason"].str.startswith("FileNotFoundError: ").all()
-    assert not paste["reason"].str.contains("FileNotFoundError").any()
+    assert r["env_ok"]
+    assert r["reason"].startswith("missing files in EMPTY: ")
+    assert r["files_reason"].startswith("FileNotFoundError: ")
+    assert "FileNotFoundError" not in r["reason"]
 
 
 def test_scan_runnable_equals_files_ok_and_env_ok(all_envs):
@@ -196,25 +198,6 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
     peak_wanters = df[(df["atac"] == "peak") & df["modalities"].str.contains("atac_gas")]
     assert len(peak_wanters) > 0
     assert not peak_wanters["caveat"].str.contains("PEAK matrix").any()
-
-
-def test_scan_registration_needs_obsm_spatial(tmp_path, all_envs):
-    import anndata as ad
-    d = tmp_path / "SLICES"
-    d.mkdir()
-    for i in range(2):
-        a = ad.AnnData(np.ones((10, 4), dtype=float))
-        a.write_h5ad(d / f"slice_{i}.h5ad")              # no obsm['spatial']
-    df = mtb.scan("SLICES", "cross", data_path=tmp_path)
-    paste = df[df["method"] == "PASTE"].iloc[0]
-    assert not paste["files_ok"] and "obsm['spatial']" in paste["files_reason"]
-    for i in range(2):
-        a = ad.AnnData(np.ones((10, 4), dtype=float))
-        a.obsm["spatial"] = np.zeros((10, 2))
-        a.write_h5ad(d / f"slice_{i}.h5ad")
-    df = mtb.scan("SLICES", "cross", data_path=tmp_path)
-    paste = df[df["method"] == "PASTE"].iloc[0]
-    assert paste["files_ok"], paste["files_reason"]
 
 
 # --- run_all(dry_run=True) is the scan frame, never silently empty ------------

@@ -11,8 +11,8 @@ This module works from the dataset instead:
 It also handles two traps that otherwise yield wrong numbers without an error:
 
 * **output kind** - not every method returns an embedding. Methods emitting a
-  graph or spatial coordinates are recorded as such instead of being scored with
-  embedding metrics (scoring a KNN index matrix gives ARI ~ 0).
+  graph are recorded as such instead of being scored with embedding metrics
+  (scoring a KNN index matrix gives ARI ~ 0).
 * **label order** - ``evaluate`` needs labels in the embedding's cell order, and
   matching by length cannot distinguish orders because every permutation has the
   same length. Candidate orders are scored and the best kept, with the full
@@ -131,7 +131,7 @@ CATEGORIES = {
     "mosaic":   "Several batches where only some share a modality; a paired batch "
                 "bridges the others.",
     "cross":    "Several batches in which all modalities are present; the task is "
-                "removing batch effects. (Spatial slice registration also lives here.)",
+                "removing batch effects.",
 }
 
 #: Modality role -> the file the loader looks for in <data_path>/<dataset>/.
@@ -194,21 +194,20 @@ def describe_layout(category: str | None = None) -> str:
     Raises
     ------
     ValueError
-        Unknown ``category``, including ``'spatial'`` (a task, not a category).
+        Unknown ``category``.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> print(mtb.describe_layout("vertical"))    # CITE-seq / multiome, cells already matched
-    >>> print(mtb.describe_layout("cross"))       # numbered batches; spatial registration
+    >>> print(mtb.describe_layout("cross"))       # numbered batches
     >>> print(mtb.describe_layout())              # everything
 
     Notes
     -----
     **What the text covers.** The role -> filename mapping, the numbered
     per-batch files, the ATAC representation trap, the ``.h5`` file format,
-    the label CSV, the conda envs and, for ``None`` or ``cross``, the
-    spatial-registration layout.
+    the label CSV and the conda envs.
 
     **Roles.** A "role" is the name of one input a method takes. For
     CITE-seq the roles are ``rna`` (``rna.h5``) and ``adt`` (``adt.h5``,
@@ -234,17 +233,13 @@ def describe_layout(category: str | None = None) -> str:
         rna3.h5   adt3.h5   cty3.csv     # batch 3
     ```
 
-    **Spatial registration.** PASTE, PASTE2, SPIRAL and GPSA (category
-    ``cross``) take a directory of per-slice ``.h5ad`` files instead; see the
-    SPATIAL REGISTRATION block of the output.
-
     **ATAC method lists.** The methods that need gene-activity vs peak ATAC
     matrices are listed from the method registry at call time
     (``find_methods(atac=...)``), so they always agree with ``method_info``
     and the ``atac`` column of ``mtb.scan``.
 
     **Errors.** An unknown ``category`` raises a ``ValueError`` that lists the
-    four; ``'spatial'`` raises with a pointer to ``describe_layout('cross')``.
+    four.
 
     See Also
     --------
@@ -254,10 +249,6 @@ def describe_layout(category: str | None = None) -> str:
 
     mtb.io.export_dataset : writes a whole dataset in this layout from an AnnData.
     """
-    if category == "spatial":
-        raise ValueError(
-            "'spatial' is not a category; registration methods live under "
-            "category 'cross' - see describe_layout('cross')")
     registry.check_category(category)       # None passes; typo -> ValueError
     # ATAC representation lists come from the registry, so they cannot go stale.
     from .discover import find_methods as _find_methods
@@ -277,8 +268,7 @@ def describe_layout(category: str | None = None) -> str:
         "mosaic":   ["  rna1.h5 rna2.h5 atac2.h5 atac3.h5   <- numbered, one per batch",
                      "  cty1.csv cty2.csv cty3.csv          <- one per batch"],
         "cross":    ["  rna1.h5 rna2.h5 rna3.h5 + adt1.h5 adt2.h5 adt3.h5",
-                     "  cty1.csv cty2.csv cty3.csv          <- one per batch",
-                     "  (spatial registration instead takes a directory of .h5ad slices)"],
+                     "  cty1.csv cty2.csv cty3.csv          <- one per batch"],
     }
     if category in LAYOUTS:
         lines += [f"LAYOUT FOR {category.upper()}:"] + LAYOUTS[category] + [""]
@@ -328,39 +318,6 @@ def describe_layout(category: str | None = None) -> str:
               "Labels are a single-column CSV: one header line (typically 'x'),",
               "then one cell-type label per cell; the evaluator reads the first",
               "column and skips the header.", ""]
-    if category is None or category == "cross":
-        reg = sorted(_find_methods(task="registration"))
-        lines += ["SPATIAL REGISTRATION (task 'registration', category 'cross'):",
-                  f"  Methods: {', '.join(reg)}. They take a directory of slices, not",
-                  "  modality files - the role is `data_dir` and scan() shows modalities",
-                  "  as '(data_dir)'; pass no modalities to run_all/inputs_for.",
-                  "    <data_path>/MYVISIUM/            (or <data_path>/MYVISIUM/processed/)",
-                  "        slice_0.h5ad  slice_1.h5ad  ...   one AnnData per slice, >= 2",
-                  "  Each .h5ad needs .X (expression, spots x genes) and",
-                  "  .obsm['spatial'] (spot coordinates, spots x 2). GPSA additionally",
-                  "  needs obs['Ground_Truth'] (a region/layer label per spot) in",
-                  "  EVERY slice - its driver reads that column at load; PASTE and",
-                  "  PASTE2 read no obs column. The upstream scripts glob",
-                  "  data_dir + '*.h5ad' without sorting (directory order, which the",
-                  "  filesystem decides), so run() stages the slices as zero-padded",
-                  "  symlinks (00_<name>.h5ad ... in sorted order) under <out_dir>/inputs/",
-                  "  and writes <out_dir>/slices_manifest.json: aligned_slice_<i>.h5ad ->",
-                  "  the source file, in the order the script's glob returned - that",
-                  "  manifest, not the prefix, is authoritative. Keep it - it is the",
-                  "  only link back:",
-                  "  PASTE writes its slices WITHOUT any obs column (upstream",
-                  "  main_PASTE_pairwise.py drops them all at load), PASTE2 rewrites .X",
-                  "  (normalize_total + log1p + a 2,000-HVG subset) before writing, and",
-                  "  GPSA keeps obs['Ground_Truth'] only. SPIRAL also wants a unique",
-                  "  leading token per filename (the part before the first '_'); the",
-                  "  staged 00_/01_ prefixes satisfy that.",
-                  "  Output: aligned_slice_<i>.h5ad per slice (coordinates, not an",
-                  "  embedding), so run_all records RUN_OK_NO_EMBEDDING - clustering",
-                  "  metrics do not apply, and registration metrics are not wired into",
-                  "  mtb.evaluate in this version.",
-                  "  scan() checks the dir for >= 2 .h5ad slices with obsm['spatial'],",
-                  "  and for GPSA that every slice carries obs['Ground_Truth'].",
-                  ""]
     if category:
         lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
     lines += ["", "ENVIRONMENTS",
@@ -384,7 +341,7 @@ def _data_dir_usable(variant, ds_dir) -> tuple[bool, str]:
 
     ``data_dir`` resolves to the dataset directory itself when there is no
     ``processed/`` subdir, so the path always exists; without a content check
-    spatial-registration methods would look runnable on every dataset.
+    a ``data_dir`` method (scBridge) would look runnable on every dataset.
     Delegates to :func:`multibench.engine.resolve._check_data_dir`, which
     ``inputs_for(check=True)`` - and through it ``scan`` - calls directly;
     this wrapper is kept only as an importable alias.
@@ -665,7 +622,7 @@ def scan(dataset: str, category: str | None = None, *,
     modalities          '+'-joined string ("rna+adt"); "(data_dir)" for a
                         directory-fed variant
     env                 the conda env the method runs in
-    output_kind         embedding / graph / coords
+    output_kind         embedding / graph
     n_tunable           number of command-line hyperparameters
     runtime_tier        fast / medium / slow / very_slow / unknown
     observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
@@ -689,8 +646,7 @@ def scan(dataset: str, category: str | None = None, *,
     - ``files_ok`` / ``files_reason`` - the method's script is present, the
       input files resolve on disk and are oriented features x cells, every
       label CSV has one row per cell of the modality it labels, and a
-      ``data_dir`` method finds what it needs (>= 2 ``.h5ad`` slices with
-      ``obsm['spatial']`` for registration; scBridge's bare filenames).
+      ``data_dir`` method (scBridge) finds the files it names.
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command
       (``multibench env install --methods X --packed --run``).
@@ -729,8 +685,7 @@ def scan(dataset: str, category: str | None = None, *,
     (``"rna+adt"``); ``run_all`` / ``inputs_for`` take a list
     (``["rna", "adt"]``), so split on ``"+"``. The sentinel ``"(data_dir)"``
     marks a method that consumes a whole directory rather than named modality
-    files (the spatial-registration methods, and scBridge); for those, pass
-    no ``modalities`` at all.
+    files (scBridge); for it, pass no ``modalities`` at all.
 
     **Sizing a sweep.** ``runtime_tier`` / ``observed_worst_sec`` (see
     ``method_info(m)['runtime']``) let you size a sweep before launching it;
@@ -1204,7 +1159,7 @@ class BatchResult:
         method                  registry id
         status                  outcome; see "Status values"
         run_sec                 wall-clock seconds of the method run
-        output_kind             embedding / graph / coords
+        output_kind             embedding / graph
         emb_shape               [cells, dims] of the embedding; None without one
         n_tunable               number of command-line hyperparameters
         label_order             label file(s) the metrics used, in order
@@ -1220,8 +1175,8 @@ class BatchResult:
         - ``CHAIN_OK`` - ran and scored.
         - ``CHAIN_OK_GRAPH_METHOD`` - a graph method, scored via a secondary
           embedding.
-        - ``RUN_OK_NO_EMBEDDING`` - ran, but the method emits a
-          graph/coordinates, so clustering metrics do not apply.
+        - ``RUN_OK_NO_EMBEDDING`` - ran, but the method emits only a graph,
+          so clustering metrics do not apply.
         - ``RUN_OK_EVAL_FAILED`` - the method ran and produced an embedding,
           but scoring it failed; see ``error`` in ``failures``.
         - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file matches the
@@ -1439,8 +1394,8 @@ class BatchResult:
           data-layout problem worth fixing.
 
         **Not listed.** ``RUN_OK_NO_EMBEDDING``: those methods ran correctly and
-        emit a graph or spatial coordinates instead of an embedding, so there
-        is nothing for clustering metrics to score. See ``summary`` for them.
+        emit a graph instead of an embedding, so there is nothing for
+        clustering metrics to score. See ``summary`` for them.
 
         See Also
         --------
@@ -1565,8 +1520,8 @@ class BatchResult:
         only clustering metrics are computed; pass ``batch`` as well to get
         the batch metrics.
 
-        **Record status.** A method that emits no embedding (registration,
-        graph-only) is marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. A record
+        **Record status.** A method that emits no embedding (graph-only) is
+        marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. A record
         whose output file is gone (a deleted ``out_dir``) or whose new scoring
         fails (wrong ``batch`` length, say - ``batch has N entries, embedding
         has M cells``) becomes ``RUN_OK_EVAL_FAILED`` with the reason in

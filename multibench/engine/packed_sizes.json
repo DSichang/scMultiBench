@@ -32,20 +32,12 @@
     "archive_bytes": 584704264,
     "unpacked_bytes": 1880385956
   },
-  "paste_envi": {
-    "archive_bytes": 3292561028,
-    "unpacked_bytes": null
-  },
   "scmb_cobolt3": {
     "archive_bytes": 4466945677,
     "unpacked_bytes": null
   },
   "scmb_concerto": {
     "archive_bytes": 887587172,
-    "unpacked_bytes": null
-  },
-  "scmb_gpsa2": {
-    "archive_bytes": 5208247272,
     "unpacked_bytes": null
   },
   "scmb_ipolng2": {
@@ -130,10 +122,6 @@
   },
   "scmb_vipcca27": {
     "archive_bytes": 718808190,
-    "unpacked_bytes": null
-  },
-  "spiral_environment": {
-    "archive_bytes": 5162235528,
     "unpacked_bytes": null
   },
   "unitednet": {

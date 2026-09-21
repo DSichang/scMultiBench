@@ -28,7 +28,7 @@ def test_seurat_positional_R_command():
 def test_scbridge_eq_and_labels():
     # scBridge takes the dataset DIRECTORY plus BARE FILENAMES relative to it, so the
     # four file roles are `const` and only data_dir is resolved -> the variant declares
-    # no modalities (same shape as the spatial data_dir methods).
+    # no modalities.
     v = registry.get("scBridge").select("diagonal", set())
     cmd = builder.build_command(v, values={"data_dir": "D27/"}, out_dir="out/")
     assert "--data_path=D27/" in cmd

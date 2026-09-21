@@ -6,10 +6,8 @@
   "glue": "https://zenodo.org/records/21928889/files/glue.tar.gz?download=1",
   "matilda": "https://zenodo.org/records/21928889/files/matilda.tar.gz?download=1",
   "matilda-cpu": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/matilda-cpu.tar.gz",
-  "paste_envi": "https://zenodo.org/records/21928889/files/paste_envi.tar.gz?download=1",
   "scmb_cobolt3": "https://zenodo.org/records/21928885/files/scmb_cobolt3.tar.gz?download=1",
   "scmb_concerto": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_concerto.tar.gz",
-  "scmb_gpsa2": "https://zenodo.org/records/21928889/files/scmb_gpsa2.tar.gz?download=1",
   "scmb_ipolng2": "https://zenodo.org/records/21928889/files/scmb_ipolng2.tar.gz?download=1",
   "scmb_mira": "https://zenodo.org/records/21928889/files/scmb_mira.tar.gz?download=1",
   "scmb_multigrate2": "https://zenodo.org/records/21928885/files/scmb_multigrate2.tar.gz?download=1",
@@ -31,6 +29,5 @@
   "scmb_torch_v2": "https://zenodo.org/records/21928885/files/scmb_torch_v2.tar.gz?download=1",
   "scmb_vimcca": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_vimcca.tar.gz",
   "scmb_vipcca27": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_vipcca27.tar.gz",
-  "spiral_environment": "https://zenodo.org/records/21928889/files/spiral_environment.tar.gz?download=1",
   "unitednet": "https://zenodo.org/records/21928885/files/unitednet.tar.gz?download=1"
 }

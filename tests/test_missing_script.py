@@ -1,10 +1,9 @@
 """A method whose script is unreachable must not be reported runnable.
 
-Four spatial variants (SPIRAL, GPSA, PASTE, PASTE2) carry entrypoints that are
-ABSOLUTE paths on the machine the benchmark was produced on. Without this
-check, scan() calls them runnable everywhere and the failure only arrives
-minutes later, from a shell, as a file-not-found on a path the user has never
-seen.
+An entrypoint that is an ABSOLUTE path on the machine the benchmark was
+produced on cannot be fetched. Without this check, scan() calls such a method
+runnable everywhere and the failure only arrives minutes later, from a shell,
+as a file-not-found on a path the user has never seen.
 """
 from pathlib import Path
 from types import SimpleNamespace
@@ -52,21 +51,14 @@ def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
     assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py")) == ""
 
 
-def test_only_the_known_two_still_need_a_machine_specific_script():
-    """The outstanding list, so it cannot grow silently - or shrink unnoticed.
+def test_no_method_needs_a_machine_specific_script():
+    """The outstanding list, so it cannot grow silently.
 
-    PASTE and PASTE2 were repointed at the published scripts once those were
-    shown to produce the same output. SPIRAL and GPSA cannot be: upstream
-    main_SPIRAL.py is the broken variant, and upstream main_GPSA.py writes an
-    elapsed time instead of the aligned slices. When their working scripts are
-    published, this set empties and the assertion below is what tells you.
+    If this set grows, a method has become unrunnable off-host - fix that,
+    not this assertion.
     """
     from multibench.engine import registry
     absolute = {m for m in mtb.list_methods()
                 for v in registry.get(m).variants
                 if Path(v.entrypoint).is_absolute()}
-    # 0.3.0: GPSA runs through a package driver (engine/drivers/run_gpsa.py).
-    # SPIRAL is the one method still tied to the benchmark host: its clean-run
-    # port failed after mclust (see methods.yaml). If this set grows, a method
-    # has become unrunnable off-host - fix that, not this assertion.
-    assert absolute == {"SPIRAL"}, absolute
+    assert absolute == set(), absolute

@@ -75,7 +75,7 @@ def test_find_methods_modalities_rna_ubiquitous():
 def test_find_methods_modalities_excludes_stub():
     # A declared stub (no variants) has an empty modality set, so it must never
     # appear in a modalities= filter. Checked dynamically over any remaining
-    # stubs: all 40 methods are currently wired (zero stubs), so this may be
+    # stubs: every method is currently wired (zero stubs), so this may be
     # vacuous now, but it stays correct if an unwired stub is ever re-added.
     for stub in discover.find_methods(runnable=False):
         for req in (["rna"], ["rna", "atac"], ["adt"]):
@@ -96,7 +96,7 @@ def test_find_methods_runnable_filter():
     assert set(runnable) & set(stubs) == set()               # disjoint
     assert "SCALEX" in runnable                              # has a variant
     assert set(stubs) == set(all_ids) - set(runnable)        # stubs == the non-runnable
-    # Milestone: all 40 methods are now wired -> zero stubs, every id dispatchable.
+    # Milestone: every method is now wired -> zero stubs, every id dispatchable.
     # (Guard: adding a new declared-but-unwired method should wire it or update this.)
     assert stubs == []
     assert set(runnable) == set(all_ids)
@@ -141,8 +141,8 @@ def test_find_methods_atac_vertical_nonempty():
 
 def test_find_methods_rejects_bad_tokens():
     import pytest
-    with pytest.raises(ValueError, match="unknown category 'spatial'"):
-        discover.find_methods(category="spatial")
+    with pytest.raises(ValueError, match="unknown category 'horizontal'"):
+        discover.find_methods(category="horizontal")
     with pytest.raises(ValueError, match="unknown category 'crosss'"):
         discover.find_methods(category="crosss")
     with pytest.raises(ValueError, match="unknown task 'xx'"):

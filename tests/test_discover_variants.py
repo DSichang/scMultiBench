@@ -4,9 +4,9 @@ Workshop findings (Priya, Tomás, Aisha, Chen, Elena): needs_labels was the
 method-level OR over all variants so scMoMaT vanished from
 find_methods(vertical, rna+adt, needs_labels=False); category/modalities were
 not required to hold on the same variant so Multigrate showed up for vertical
-rna+atac; SPIRAL/GPSA were 'verified' with nothing saying their scripts are
-not public.
+rna+atac; nothing marked a 'verified' method whose script is not public.
 """
+import copy
 from pathlib import Path
 
 import multibench as mtb
@@ -90,49 +90,67 @@ def test_find_methods_docstring_states_per_variant_rule():
 
 
 # ----------------------------------------------------------------- H6 availability
-def test_availability_is_derived_from_absolute_entrypoints():
+def _with_host_only(monkeypatch, method="SCALEX"):
+    """The live registry with ``method``'s entrypoints made absolute."""
+    specs = [copy.deepcopy(s) for s in registry.load()]
+    spec = next(s for s in specs if s.id == method)
+    for v in spec.variants:
+        v.entrypoint = "/benchmark/host/" + v.entrypoint
+    monkeypatch.setattr(registry, "load", lambda: specs)
+    return spec
+
+
+def test_availability_is_derived_from_absolute_entrypoints(monkeypatch):
     assert AVAILABILITY == ("public", "benchmark-host-only")
     host_only = {m for m in mtb.list_methods()
                  if registry.get(m).availability == "benchmark-host-only"}
     absolute = {m for m in mtb.list_methods()
                 for v in registry.get(m).variants if Path(v.entrypoint).is_absolute()}
-    # GPSA ships a package driver; SPIRAL is still benchmark-host-only
-    assert host_only == absolute == {"SPIRAL"}
+    # every registered entrypoint is repo-relative
+    assert host_only == absolute == set()
     for m in mtb.list_methods():
         assert discover.method_info(m)["availability"] == registry.get(m).availability
-    assert discover.method_info("PASTE")["availability"] == "public"
+    # the rule, on a synthetic spec: an absolute entrypoint makes it host-only
+    spec = _with_host_only(monkeypatch)
+    assert spec.availability == "benchmark-host-only"
+    assert not any(v.is_public for v in spec.variants)
+    assert discover.method_info("SCALEX")["availability"] == "benchmark-host-only"
     # status is unchanged (availability is a separate axis)
-    assert discover.method_info("SPIRAL")["status"] == "verified"
+    assert discover.method_info("SCALEX")["status"] == "verified"
 
 
-def test_find_methods_available_keyword():
-    assert set(discover.find_methods(available=False)) == {"SPIRAL"}
-    assert "GPSA" in discover.find_methods(available=True)
-    assert set(discover.find_methods(task="registration", available=True)) == {"PASTE", "PASTE2", "GPSA"}
-    assert set(discover.find_methods(available=True)) | {"SPIRAL", "GPSA"} == set(mtb.list_methods())
+def test_find_methods_available_keyword(monkeypatch):
+    assert discover.find_methods(available=False) == []
+    assert discover.find_methods(available=True) == discover.find_methods()
     assert discover.find_methods(available=None) == discover.find_methods()
     # top-level alias takes the keyword too
     assert mtb.find_methods(available=False) == discover.find_methods(available=False)
+    _with_host_only(monkeypatch)
+    assert discover.find_methods(available=False) == ["SCALEX"]
+    assert "SCALEX" not in discover.find_methods(available=True)
+    assert set(discover.find_methods(available=True)) | {"SCALEX"} == set(mtb.list_methods())
 
 
-def test_host_only_sentence_only_for_spiral():
-    info = discover.method_info("SPIRAL", verbose=True)
-    assert info["availability"] == "benchmark-host-only"
-    assert "benchmark-host-only" in info["notes_long"]
-    for m in ("GPSA", "PASTE"):
+def test_host_only_sentence_only_for_host_only_methods(monkeypatch):
+    for m in ("SCALEX", "Matilda"):
         pub = discover.method_info(m, verbose=True)
         assert pub["availability"] == "public"
         assert not pub["notes_long"] or "benchmark-host-only" not in pub["notes_long"]
+    _with_host_only(monkeypatch)
+    info = discover.method_info("SCALEX", verbose=True)
+    assert info["availability"] == "benchmark-host-only"
+    assert "benchmark-host-only" in info["notes_long"]
+    assert "/benchmark/host/tools_scripts/SCALEX/" in info["notes_long"]
 
 
 def test_benchmark_host_only_reason_text(tmp_path):
-    why = resolve.benchmark_host_only_reason("/media/disk2/no/such/main_SPIRAL_ori.py")
+    why = resolve.benchmark_host_only_reason("/benchmark/host/no/such/main_M.py")
     assert why.startswith("benchmark-host-only: script not published")
     assert "absolute path on the benchmark host" in why
-    assert "/media/disk2/no/such/main_SPIRAL_ori.py" in why
+    assert "/benchmark/host/no/such/main_M.py" in why
     assert resolve.BENCHMARK_HOST_ONLY in why
     # relative entrypoints and existing absolute paths are not flagged
-    assert resolve.benchmark_host_only_reason("tools_scripts/PASTE/main.py") == ""
+    assert resolve.benchmark_host_only_reason("tools_scripts/SCALEX/main.py") == ""
     p = tmp_path / "main.py"; p.write_text("print(1)")
     assert resolve.benchmark_host_only_reason(str(p)) == ""
 

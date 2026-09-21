@@ -71,7 +71,6 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         driver=d.get("driver"),
         normalize_peaks=d.get("normalize_peaks", []),
         extra_outputs=[OutputSpec(**o) for o in d.get("extra_outputs", [])],
-        slice_obs=list(d.get("slice_obs", []) or []),
         helpers=list(d.get("helpers", []) or []),
     )
     # labels_for orders label files by this; a declaration the variant cannot
@@ -353,7 +352,7 @@ def list_tasks() -> list[str]:
     --------
     >>> import multibench as mtb
     >>> mtb.list_tasks()                        # ['batch', 'classification', 'clustering', ...]
-    >>> mtb.find_methods(task="registration")
+    >>> mtb.find_methods(task="imputation")
 
     See Also
     --------
