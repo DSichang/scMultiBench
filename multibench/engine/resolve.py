@@ -43,13 +43,17 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 
 def _resolve_data_dir(ds_dir: Path) -> str:
-    """Directory for a ``data_dir`` role: ``<ds_dir>/processed/`` when it
-    exists, else ``<ds_dir>`` itself (which always exists).
+    """Directory for a ``data_dir`` role, ending with a path separator.
 
-    scBridge takes the dataset directory plus bare filenames relative to it
-    (``const`` args). The path ends with a separator: the upstream script
+    The first of ``<ds_dir>/processed/`` and ``<ds_dir>`` that holds a
+    ``*.h5ad`` file; when neither does, ``processed/`` if it exists, else
+    ``<ds_dir>`` itself (which always exists). scBridge takes this directory
+    plus bare filenames relative to it (``const`` args); the upstream script
     string-concatenates ``data_path + filename``.
     """
+    for cand in (ds_dir / "processed", ds_dir):
+        if cand.is_dir() and any(cand.glob("*.h5ad")):
+            return os.path.join(str(cand), "")
     proc = ds_dir / "processed"
     return os.path.join(str(proc if proc.is_dir() else ds_dir), "")
 
@@ -322,8 +326,10 @@ def inputs_for(dataset: str, category: str, method: str, *,
     back to ``<role>.h5`` (``<role>.csv`` for a label role), a path that does
     not exist (see ``check``).
 
-    A ``data_dir`` role (scBridge) resolves to ``<dataset>/processed/`` when
-    that folder exists, else to the dataset folder itself.
+    A ``data_dir`` role (scBridge) resolves to the first of
+    ``<dataset>/processed/`` and the dataset folder that holds a ``.h5ad``
+    file; when neither does, to ``processed/`` if that folder exists, else to
+    the dataset folder itself.
 
     **Absolute paths.** Every returned path is ABSOLUTE (a relative
     ``data_path`` is resolved against the current directory), and a

@@ -189,11 +189,17 @@ def test_inputs_for_check_true_rejects_data_dir_without_the_named_files(tmp_path
     assert got["data_dir"].rstrip("/").endswith("D27")
 
 
-def test_data_dir_is_processed_when_present_else_the_dataset_folder(tmp_path):
+def test_data_dir_prefers_a_folder_with_h5ad_then_processed(tmp_path):
     import os
     d = tmp_path / "D27"; d.mkdir()
     assert resolve._resolve_data_dir(d) == os.path.join(str(d), "")
     (d / "processed").mkdir()
+    assert resolve._resolve_data_dir(d) == os.path.join(str(d / "processed"), "")
+    # a .h5ad file directly in the dataset folder wins over an h5ad-less processed/
+    (d / "x.h5ad").write_text("")
+    assert resolve._resolve_data_dir(d) == os.path.join(str(d), "")
+    # processed/ is checked first
+    (d / "processed" / "y.h5ad").write_text("")
     assert resolve._resolve_data_dir(d) == os.path.join(str(d / "processed"), "")
 
 
