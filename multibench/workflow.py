@@ -693,11 +693,12 @@ def scan(dataset: str, category: str | None = None, *,
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command
       (``multibench env install --methods X --packed --run``).
-    - GPU - for a method whose upstream script calls CUDA unconditionally
-      (``method_info(m)['requires_gpu']``), ``env_ok`` also needs an NVIDIA
-      GPU (``mtb.env.host_has_gpu()``). Without one, ``env_reason`` carries
-      the sentence ``run`` would raise (``"<method> needs an NVIDIA GPU: the
-      upstream script calls CUDA unconditionally (<file>:<line>) ..."``).
+    - ``env_ok`` on a GPU-only method - when the upstream script calls CUDA
+      unconditionally (``method_info(m)['requires_gpu']``), ``env_ok`` also
+      needs an NVIDIA GPU (``mtb.env.host_has_gpu()``); without one,
+      ``env_reason`` carries the sentence ``run`` would raise (``"<method>
+      needs an NVIDIA GPU: the upstream script calls CUDA unconditionally
+      (<file>:<line>) ..."``).
 
     The file gate always runs, whether or not any conda env is installed, so
     a laptop without envs still tells you whether your layout is right.
@@ -737,6 +738,8 @@ def scan(dataset: str, category: str | None = None, *,
 
     **Selection and input checks.**
 
+    - ``category`` - a typo raises ``ValueError`` listing the four valid
+      values.
     - ``methods`` - an unknown id raises ``KeyError`` with a did-you-mean
       hint; blocked rows of the selected methods are kept, with their reason.
       A selection with no variant under ``category`` (a known id with no
@@ -1389,9 +1392,10 @@ class BatchResult:
         label_order_candidates      every label ordering tried, with its ARI
         batch_source, n_batches     the batch vector the batch metrics used
         error, traceback, note      why a method failed or was not scored
-        reused                      the output came from skip_existing
+        reused                      True when skip_existing reused the output
         env, output_kind, n_tunable the scan row the method ran from
         data_path, multibench_version, started_at   provenance of the run
+        _long                       internal tidy frame; read BatchResult.long instead
         ```
 
         **Label-order evidence.** ``label_order_candidates`` holds every
@@ -1517,8 +1521,9 @@ class BatchResult:
         Parameters
         ----------
         batch : array-like | Series | path | None, keyword-only
-            One batch id per cell, in embedding row order (array, Series or
-            CSV path); ``None`` = each cell's label file.
+            One batch id per cell, in embedding order (array, Series or CSV
+            path); ``None`` = each cell's label file of origin, or none with
+            ``labels=``.
         labels : array-like | Series | path | None, keyword-only
             One cell-type label per cell, in embedding order (same forms);
             ``None`` = search the dataset's label files again.
@@ -1554,6 +1559,11 @@ class BatchResult:
         ``(user labels)`` in ``label_order``. ``metrics`` is handed to
         ``evaluate(metrics=)``.
 
+        **Labels without batch.** Given ``labels`` and no ``batch``, every
+        cell is in one batch (``batch_source`` ``None``, ``n_batches`` 1), so
+        only clustering metrics are computed; pass ``batch`` as well to get
+        the batch metrics.
+
         **Record status.** A method that emits no embedding (registration,
         graph-only) is marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. A record
         whose output file is gone (a deleted ``out_dir``) or whose new scoring
@@ -1561,9 +1571,12 @@ class BatchResult:
         has M cells``) becomes ``RUN_OK_EVAL_FAILED`` with the reason in
         ``error``.
 
-        **Other hosts.** Records keep the absolute ``out_dir`` of the run, so
-        a tree fetched or copied from another host re-scores only where those
-        folders exist.
+        **Other hosts.** Records keep ``out_dir`` and ``data_path`` as
+        ``run_all`` received them - relative if you passed a relative path.
+        A tree fetched or copied from another host, or re-scored from another
+        working directory, re-scores only where those folders exist: a
+        missing output folder gives ``RUN_OK_EVAL_FAILED``, a missing
+        ``data_path`` (without ``labels=``) ``RUN_OK_NO_LABEL_MATCH``.
 
         **Persisting.** ``mtb.load_batch`` keeps returning the original result
         until the new one is saved.
@@ -1875,7 +1888,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         method, to resume an interrupted sweep.
     batch : array-like | None, keyword-only
         One batch id per cell, in embedding row order (array, Series or CSV
-        path); ``None`` = each cell's label file.
+        path); ``None`` = batch by the label file each cell came from.
 
     Returns
     -------
@@ -1894,6 +1907,12 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
         A real run without ``out_dir``; ``methods`` or ``modalities`` given as a string.
+
+    Warns
+    -----
+    UserWarning
+        ``dataset`` matched a folder only up to case, or ``modalities`` dropped
+        directory-input methods.
 
     Examples
     --------
@@ -1959,16 +1978,18 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     that method ``RUN_OK_EVAL_FAILED`` (``batch has N entries, embedding has M
     cells``). Re-score a finished sweep with ``BatchResult.rescore``.
 
-    **ATAC representation.** Other combinations are ``["rna", "atac_gas"]``
-    (RNA + ATAC gene activity) and ``["rna", "atac_peak"]`` (RNA + ATAC
-    peaks); ``mtb.describe_layout`` lists every role name. The two ATAC
-    representations do not map to the obvious filenames: gene activity is
-    ``atac.h5`` but peaks are ``peak.h5``. A peak matrix in ``atac.h5`` runs
-    every method on the wrong representation without an error; the numbers
-    are plausible and wrong.
+    **ATAC representation.** Besides ``["rna", "adt"]``, ``modalities``
+    takes ``["rna", "atac_gas"]`` (RNA + ATAC gene activity) and
+    ``["rna", "atac_peak"]`` (RNA + ATAC peaks); ``mtb.describe_layout``
+    lists every role name. The two ATAC representations do not map to the
+    obvious filenames: gene activity is ``atac.h5`` but peaks are
+    ``peak.h5``. A peak matrix in ``atac.h5`` runs every method on the
+    wrong representation without an error; the numbers are plausible and
+    wrong.
 
     **Errors raised.**
 
+    - An unknown ``category`` - ``ValueError`` listing the four.
     - An unknown id in ``methods`` or ``params`` - ``KeyError`` with a
       did-you-mean hint, before anything runs.
     - A selection that matches no variant - ``ValueError`` ("no 'cross'
@@ -2163,8 +2184,8 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     """Run one method repeatedly over a range of one hyperparameter.
 
     Replaces a hand-written loop and its two usual mistakes: settings that
-    share one ``out_dir`` and overwrite each other, and rows that lose track
-    of their value.
+    share one ``out_dir`` and overwrite each other, and results that no
+    longer say which value produced them.
 
     Parameters
     ----------
@@ -2202,7 +2223,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     Raises
     ------
     KeyError
-        Unknown ``method``, or ``param`` not among the variant's tunable keys.
+        Unknown ``method``, or ``param`` not among the tunable keys of a single variant.
 
     Examples
     --------
@@ -2238,9 +2259,13 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     swept. ``sweep`` does not reject it up front; every setting is recorded
     as ``FAIL``.
 
-    **Errors.** The ``KeyError`` for an unknown ``param`` lists the keys the
-    variant accepts. Errors of ``mtb.run_all`` (e.g. nothing is runnable)
-    propagate.
+    **Errors.** An unknown ``method`` raises ``KeyError`` with a did-you-mean
+    hint; the ``KeyError`` for an unknown ``param`` lists the keys the
+    variant accepts. The ``param`` check needs one variant: with
+    ``modalities=None`` and several variants in ``category`` (Matilda under
+    ``vertical``), an unknown ``param`` is recorded as ``FAIL`` for every
+    setting instead - pass ``modalities`` to get the ``KeyError``. Errors of
+    ``mtb.run_all`` (e.g. nothing is runnable) propagate.
 
     See Also
     --------
