@@ -182,8 +182,8 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None)
     """Return ``(X, feature_names)`` for the requested slot of ``adata``.
 
     ``obsm`` matrices carry no var axis in AnnData, so feature names come from
-    ``feature_names`` when given, else ``adata.uns[f"{obsm}_names"]`` (when its
-    length matches), else the columns of a DataFrame-valued obsm, else
+    ``feature_names`` when given, else the columns of a DataFrame-valued obsm,
+    else ``adata.uns[f"{obsm}_names"]`` (when its length matches), else
     ``feature_0..`` - with a ``UserWarning`` naming the fallback, because a
     protein panel written as ``feature_0..feature_29`` loses its marker names
     in every downstream readout. ``what`` labels the warning (``'adt'``).
@@ -318,88 +318,63 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     The canonical layout is ``matrix/data`` (features x cells),
     ``matrix/features`` and ``matrix/barcodes``. A path that is already a
     canonical ``.h5`` is returned untouched, whatever the other arguments.
-    Sparse matrices are streamed without densifying the whole matrix.
 
     Parameters
     ----------
-    src : AnnData, MuData or path-like
-        AnnData, MuData (then ``mod=`` is required), or a path to ``.h5ad``
-        / ``.h5mu`` / ``.csv`` / ``.tsv`` (cells x features) / ``.loom`` / a
-        canonical ``.h5``.
-    out : path-like | None
-        Output file path, or a directory (existing, or spelled with a
-        trailing slash) when ``modality`` is given - the canonical filename
-        for that modality is appended. Default ``None``: with ``modality``
-        the file goes into the current directory, without it ``ValueError``.
+    src : AnnData, MuData, Path or str
+        Matrix to convert: an AnnData, a MuData (with ``mod``), or a path to
+        ``.h5ad`` / ``.h5mu`` / ``.csv`` / ``.tsv`` (cells x features) /
+        ``.loom`` / canonical ``.h5``.
+    out : Path | str | None
+        Output file, or a directory (existing or ending in ``/``) that gets
+        the ``modality`` filename; ``None`` = that filename in the current
+        directory (needs ``modality``).
     modality : str | None
-        ``'rna'`` | ``'adt'`` | ``'atac'`` | ``'atac_peak'`` | ``'atac_gas'``
-        (aliases ``'protein'`` -> adt, ``'peak'`` -> atac_peak, ``'gas'`` /
-        ``'gene_activity'`` -> atac_gas). Picks the filename when ``out`` is
-        a directory and switches on the role checks in Notes. Default
-        ``None``.
+        ``'rna'``, ``'adt'``, ``'atac'``, ``'atac_peak'`` or ``'atac_gas'``;
+        names the file when ``out`` is a directory or ``None``, and enables
+        the ADT / ATAC checks (Notes).
     convert : bool
-        ``False`` means "never write": a canonical path is passed through,
-        any other input raises ``ValueError``. Default ``True``.
+        ``False`` = never write: pass a canonical ``.h5`` through, raise for
+        anything else.
     layer : str | None, keyword-only
         Take the matrix from ``adata.layers[layer]`` instead of ``adata.X``.
-        Mutually exclusive with ``obsm``. Default ``None``.
     obsm : str | None, keyword-only
-        Take the matrix from ``adata.obsm[obsm]`` (e.g. ``'protein'`` for
-        CITE-seq); where its feature names come from is in Notes. Default
-        ``None``.
+        Take the matrix from ``adata.obsm[obsm]`` (e.g. ``'protein'`` for CITE-seq).
     mod : str | None, keyword-only
-        For MuData input, the modality to export (``mdata.mod[mod]``).
-        Default ``None``; required for a MuData, an error otherwise.
+        MuData modality to convert (``mdata.mod[mod]``); required for a MuData.
     dtype : str, keyword-only
-        Stored dtype of ``matrix/data``. Default ``'float64'`` matches the
-        shipped benchmark files; ``'float32'`` halves the size on disk (see
-        Notes).
+        Stored dtype of ``matrix/data``; ``'float32'`` halves the file (see Notes).
     compression : str | None, keyword-only
-        h5py compression filter; default ``'gzip'``, ``None`` for none. Any
-        compression enables chunking.
+        h5py compression filter; ``None`` = uncompressed.
     block : int, keyword-only
-        Number of features written per streaming step. Default ``1024``.
-    category : {"vertical", "diagonal", "mosaic", "cross"} | None, keyword-only
-        Which integration layout the file is for. It only changes the
-        filename picked for an ATAC modality when ``out`` is a directory (or
-        ``None``); see Notes. Default ``None``.
+        Number of features written per streaming step.
+    category : str | None, keyword-only
+        Integration category the file is for (``'vertical'``, ``'diagonal'``,
+        ``'mosaic'``, ``'cross'``); only changes ATAC filenames (Notes).
     feature_names : list | None, keyword-only
-        Explicit feature names for the matrix (length must match its feature
-        count). Overrides ``var_names`` / ``uns`` / DataFrame columns; the
-        way to name a bare ``obsm`` protein array. Default ``None``.
+        Feature names that override ``var_names`` / ``uns`` / DataFrame
+        columns; the way to name a bare ``obsm`` array.
 
     Returns
     -------
     pathlib.Path
-        The canonical ``.h5`` written (or ``src`` itself on passthrough).
+        The canonical ``.h5`` written, or ``src`` itself on passthrough.
 
     Raises
     ------
     FileNotFoundError
-        ``src`` is a path that does not exist (the message names it and the
-        current directory).
+        ``src`` is a path that does not exist.
     ValueError
-        ``out`` is ``None`` without ``modality``; an unknown ``modality`` /
-        ``category``; ``convert=False`` on a non-canonical input; an ``.h5``
-        without ``matrix/data`` (the message lists the keys it does hold - a
-        top-level ``data`` dataset is a method output, not an input); an
-        unsupported suffix; ``mod`` missing for a MuData or given for
-        anything else; ``layer`` and ``obsm`` together; ``modality='adt'``
-        on an AnnData with ``obsm`` keys but no ``obsm=`` / ``layer=``; a
-        feature-name or barcode count that does not match the matrix.
+        Invalid or conflicting arguments, or a non-canonical ``.h5`` (full list in Notes).
     KeyError
-        A ``layer`` / ``obsm`` / ``mod`` name the object does not have (the
-        message lists the ones it has).
+        ``layer``, ``obsm`` or ``mod`` names an entry the object does not have.
     ImportError
-        ``.h5mu`` without the optional ``mudata`` package, ``.loom`` without
-        ``loompy``.
+        ``.h5mu`` without ``mudata``, or ``.loom`` without ``loompy``.
 
     Warns
     -----
     UserWarning
-        Feature names that contradict an ATAC ``modality`` (peaks declared
-        as gene activity or vice versa); an ``obsm`` matrix without feature
-        names (``feature_0..`` written); a dense ``matrix/data`` over 1 GB.
+        Feature names contradict an ATAC ``modality`` or are missing; a dense matrix over 1 GB.
 
     Examples
     --------
@@ -411,38 +386,77 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
 
     Notes
     -----
-    Streaming. Sparse matrices (CSR/CSC, in memory or inside an
-    ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
-    at a time; the output is gzip-compressed and chunked like the shipped
-    benchmark files. A ``.csv`` / ``.tsv`` whose first column is non-numeric
-    uses it as the cell barcodes.
+    **Output location.**
 
-    Size on disk. ``matrix/data`` is stored dense (features x cells x
-    itemsize): gzip shrinks the file, but every reader densifies it. A
-    ``UserWarning`` states the size when it exceeds ``DENSE_WARN_BYTES``
-    (1 GB) and suggests filtering features or ``dtype='float32'``, which
-    h5py / rhdf5 / hdf5r read (as double in R).
+    - ``out`` a file path: written there; ``category`` does not rename it;
+    - ``out`` a directory and ``modality`` given: the modality's canonical
+      filename is appended (``rna.h5``, ``adt.h5``, ...);
+    - ``out=None`` and ``modality`` given: that filename in the current
+      directory; ``out=None`` without ``modality`` raises ``ValueError``.
 
-    ADT matrices. With ``modality='adt'`` on an AnnData that has ``obsm``
-    keys, ``obsm=`` or ``layer=`` must say where the protein matrix is;
-    otherwise ``adata.X`` (usually the RNA) would be written as ``adt.h5``,
-    so it raises. For an ``obsm`` matrix the feature names come from
-    ``feature_names`` when given, else ``adata.uns[f'{obsm}_names']`` when
-    present with the right length, else the columns if the obsm entry is a
-    DataFrame, else ``feature_0..`` with a ``UserWarning`` (the protein
-    names would be lost in every downstream readout).
+    **Modality aliases and checks.** ``'protein'`` -> ``'adt'``,
+    ``'peak'`` -> ``'atac_peak'``, ``'gas'`` / ``'gene_activity'`` ->
+    ``'atac_gas'``. The ADT check is the ``obsm=`` rule under *ADT
+    matrices*. ``'atac_peak'`` warns when fewer than half of the feature
+    names look like peaks (``chr1:100-200``, ``chr1_100_200``,
+    ``chr1-100-200``), ``'atac_gas'`` when more than half do; plain
+    ``'atac'`` is not checked.
 
-    ATAC filenames. Without ``category`` the file is named after the
-    representation: ``atac_peak.h5``, ``atac_gas.h5`` or ``atac.h5`` for the
-    plain ``'atac'`` role; the diagonal, mosaic and cross categories keep
-    those names too. ``category='vertical'`` writes ``atac.h5`` whatever the
+    **ADT matrices.** With ``modality='adt'`` on an AnnData that has
+    ``obsm`` keys, ``obsm=`` or ``layer=`` must say where the protein matrix
+    is; otherwise ``adata.X`` (usually the RNA) would be written as
+    ``adt.h5``, so it raises. ``layer`` and ``obsm`` are mutually exclusive.
+    The feature names of an ``obsm`` matrix come from the first of:
+
+    1. ``feature_names``;
+    2. the columns, when the ``obsm`` entry is a DataFrame;
+    3. ``adata.uns[f'{obsm}_names']``, when its length matches;
+    4. ``feature_0..``, with a ``UserWarning`` (the protein names would be
+       lost in every downstream readout).
+
+    **ATAC filenames.** Without ``category``, and for ``'diagonal'`` /
+    ``'mosaic'`` / ``'cross'``, the file is named after the representation:
+    ``atac_peak.h5``, ``atac_gas.h5``, or ``atac.h5`` for the plain
+    ``'atac'`` role. ``category='vertical'`` writes ``atac.h5`` whatever the
     representation, because that is the one name every vertical (paired
-    multiome) variant resolves and none reads ``atac_peak.h5`` - without it
+    multiome) variant resolves and none reads ``atac_peak.h5``.
+
+    **Check the ATAC kind.** Without ``category='vertical'``,
     ``to_canonical(atac, d, modality='peak')`` writes ``atac_peak.h5`` and
     ``mtb.scan(d, 'vertical')`` finds no ATAC method runnable. The
     representation is recorded NOWHERE on disk: whether a vertical method
     expects peaks or gene activity in ``atac.h5`` is
     ``method_info(m)['atac']``.
+
+    **Streaming.** Sparse matrices (CSR/CSC, in memory or inside an
+    ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
+    at a time, without densifying the whole matrix. The defaults (gzip,
+    ``'float64'``) match the shipped benchmark files; any compression
+    enables chunking. A ``.csv`` / ``.tsv`` is read as cells x features, and
+    a non-numeric first column is used as the cell barcodes.
+
+    **Size on disk.** ``matrix/data`` is stored dense (features x cells x
+    itemsize): gzip shrinks the file, but every reader densifies it. A
+    ``UserWarning`` states the size when it exceeds ``DENSE_WARN_BYTES``
+    (1 GB) and suggests filtering features or ``dtype='float32'``, which
+    h5py / rhdf5 / hdf5r read (as double in R).
+
+    **Errors.** ``ValueError`` is raised for:
+
+    - ``out=None`` without ``modality``;
+    - an unknown ``modality`` or ``category``;
+    - ``convert=False`` on a non-canonical input;
+    - an ``.h5`` without ``matrix/data`` (the message lists the keys it does
+      hold - a top-level ``data`` dataset is a method output, not an input);
+    - an unsupported suffix;
+    - ``mod`` missing for a MuData, or given for anything else;
+    - ``layer`` and ``obsm`` together;
+    - ``modality='adt'`` on an AnnData with ``obsm`` keys but no ``obsm=`` /
+      ``layer=``;
+    - a feature-name or barcode count that does not match the matrix.
+
+    The ``FileNotFoundError`` message names the path and the current
+    directory; the ``KeyError`` message lists the entries the object has.
 
     See Also
     --------
@@ -506,19 +520,17 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
 
     Parameters
     ----------
-    path : path-like
-        Canonical ``.h5`` (``matrix/data`` features x cells, plus the
-        optional ``matrix/features`` / ``matrix/barcodes``).
+    path : Path | str
+        Canonical ``.h5`` file.
     sparse : bool | None
-        ``True``: ``.X`` is a CSR matrix; ``False``: a dense ndarray;
-        ``None`` (default): CSR when fewer than half of the entries are
-        non-zero, dense otherwise.
+        ``True`` = CSR ``.X``; ``False`` = dense ndarray; ``None`` = CSR when
+        fewer than half of the entries are non-zero.
 
     Returns
     -------
     anndata.AnnData
-        ``.X`` cells x features as float; ``var_names`` / ``obs_names``
-        taken from the file when it has them.
+        ``.X`` as float, cells x features; names taken from the file when it
+        has them.
 
     Examples
     --------
@@ -529,12 +541,15 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
 
     Notes
     -----
-    The whole matrix is read densely and transposed before the sparsity
-    decision, so memory peaks at the dense size (features x cells x 8
-    bytes) even when the result is CSR; it is meant for the shipped
+    **Memory.** The whole matrix is read densely and transposed before the
+    sparsity decision, so memory peaks at the dense size (features x cells
+    x 8 bytes) even when the result is CSR. It is meant for the shipped
     benchmark inputs and for what ``to_canonical`` writes, not for a
-    100k-cell peak matrix. It does not validate: a file without
-    ``matrix/data`` raises h5py's ``KeyError``.
+    100k-cell peak matrix.
+
+    **No validation.** A file without ``matrix/data`` raises h5py's
+    ``KeyError``. ``matrix/features`` and ``matrix/barcodes`` are optional;
+    without them AnnData's default names (``'0'``, ``'1'``, ...) are kept.
 
     See Also
     --------
@@ -561,17 +576,15 @@ def normalize_peak_names(src, dst):
     """Copy a canonical ``.h5``, rewriting ATAC peak names to ``chr:start-end``.
 
     Signac's ``CreateChromatinAssay(sep=c(":","-"))`` (Seurat v3 and the
-    other Signac-based methods) expects that spelling, while peak ids also
-    come as ``chr_start_end`` or ``chr-start-end``. The source file is never
-    modified.
+    other Signac-based methods) expects that spelling. The source file is
+    never modified.
 
     Parameters
     ----------
-    src : path-like
+    src : Path | str
         Canonical ``.h5`` whose ``matrix/features`` holds the peak ids.
-    dst : path-like
-        Path of the copy to write; parent directories are created and an
-        existing file is overwritten.
+    dst : Path | str
+        Path of the copy; parent folders are created, an existing file is overwritten.
 
     Returns
     -------
@@ -585,18 +598,22 @@ def normalize_peak_names(src, dst):
 
     Notes
     -----
-    A feature counts as a peak when it reads ``<chr><sep><start><sep><end>``
-    with two integers, the first separator one of ``_``, ``-``, ``:`` and
-    the second ``_`` or ``-``; it is rewritten as ``<chr>:<start>-<end>``.
-    Anything else (gene symbols, ids without two numbers) is passed through
-    unchanged, so the file stays usable whatever the matrix holds.
-    ``matrix/data`` and ``matrix/barcodes`` are copied as they are; only
-    ``matrix/features`` is replaced.
+    **Recognised peaks.** Peak ids come as ``chr_start_end``,
+    ``chr-start-end`` or ``chr:start-end``. A feature counts as a peak when
+    it reads ``<chr><sep><start><sep><end>`` with two integers, the first
+    separator one of ``_``, ``-``, ``:`` and the second ``_`` or ``-``; it
+    is rewritten as ``<chr>:<start>-<end>``.
 
-    ``mtb.run`` applies this itself for the variants whose registry entry
-    declares ``normalize_peaks`` roles, writing a per-run
-    ``<role>_normpeaks.h5`` copy next to the converted inputs - call it by
-    hand only to prepare a file for a script you run outside the wrapper.
+    **Everything else is kept.** Other features (gene symbols, ids without
+    two numbers) pass through unchanged, so the file stays usable whatever
+    the matrix holds. ``matrix/data`` and ``matrix/barcodes`` are copied as
+    they are; only ``matrix/features`` is replaced.
+
+    **Inside ``mtb.run``.** ``mtb.run`` applies this itself for the variants
+    whose registry entry declares ``normalize_peaks`` roles, writing a
+    per-run ``<role>_normpeaks.h5`` copy next to the converted inputs. Call
+    it by hand only to prepare a file for a script you run outside the
+    wrapper.
 
     See Also
     --------
@@ -870,61 +887,45 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt_names: list | None = None) -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
-    One call produces the flat layout ``mtb.describe_layout`` documents -
-    ``rna.h5``, ``adt.h5``, ``atac_peak.h5`` (+ ``atac.h5``) or
-    ``atac_gas.h5``, and ``cty.csv`` - so that ``mtb.scan`` and
-    ``mtb.run_all`` work on your own data. Every modality is written in one
-    master cell order, paired by barcode (see Notes). Everything after
-    ``dataset_dir`` is keyword-only.
+    Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
+    ``adt.h5``, ATAC files, ``cty.csv``), so ``mtb.scan`` and
+    ``mtb.run_all`` work on your own data.
 
     Parameters
     ----------
     data : AnnData, MuData or None
-        The object the selectors below refer to. With a MuData a modality
-        may be given as the bare modality name (``rna='rna'`` =
-        ``mdata.mod['rna'].X``) or as a ``'mod:<name>'`` selector. ``None``
-        when every modality is passed as an object (then the default
-        ``rna='X'`` means "no RNA": pass ``rna=<AnnData>``).
-    dataset_dir : path-like
-        Folder to create, e.g. ``<data_path>/MYDATA``. Its *name* is the
-        dataset id you pass to ``mtb.scan`` / ``mtb.run_all`` with
-        ``data_path=<parent>``.
-    rna, adt, atac : str, AnnData, DataFrame, array or None, keyword-only
-        Where each modality matrix lives: a selector against ``data``
-        (``'X'``, ``'obsm:<key>'``, ``'layer:<key>'``, ``'mod:<name>'``,
-        ``'mod:<name>.obsm:<key>'``), or an object - an AnnData (``.X``), a
-        DataFrame (index = barcodes, columns = features) or a 2-D array /
-        sparse matrix already in the master order. ``None`` skips the
-        modality; defaults ``rna='X'``, ``adt=None``, ``atac=None``. All
-        matrices are cells x features and are written transposed.
-    atac_kind : {"peak", "gene_activity"} or None, keyword-only
-        Required with ``atac``: what the ATAC matrix holds, which decides
-        its filename (see Notes). Default ``None``.
+        Object the selector strings refer to; ``None`` when every modality is
+        passed as an object. With a MuData, name each modality (``rna='rna'``).
+    dataset_dir : Path | str
+        Folder to create; its name is the dataset id for ``mtb.scan`` /
+        ``mtb.run_all``, and its parent their ``data_path``.
+    rna : str, AnnData, DataFrame, array or None, keyword-only
+        RNA matrix: a selector against ``data`` (``'X'``, ``'layer:counts'``)
+        or an object (forms in Notes); ``None`` = no RNA.
+    adt : str, AnnData, DataFrame, array or None, keyword-only
+        Protein (ADT) matrix, same forms as ``rna`` (e.g. ``'obsm:protein'``);
+        ``None`` = no ADT.
+    atac : str, AnnData, DataFrame, array or None, keyword-only
+        ATAC matrix, same forms as ``rna``; needs ``atac_kind``. ``None`` = no ATAC.
+    atac_kind : str or None, keyword-only
+        What ``atac`` holds: ``'peak'`` or ``'gene_activity'``; decides the
+        ATAC filename.
     labels : str, Series, sequence or None, keyword-only
-        Cell-type labels -> ``cty.csv``: an ``'obs:<col>'`` /
-        ``'mod:<name>.obs:<col>'`` selector (a MuData also accepts
-        ``'<mod>:<col>'``), a pandas Series aligned by index to the master
-        barcodes, or a 1-D sequence in master order. Default ``None``: no
-        label file.
+        Cell-type labels for ``cty.csv``: ``'obs:<col>'``, a Series indexed by
+        barcode, or a sequence in cell order.
     batch : str, Series, sequence or None, keyword-only
-        Batch per cell, same forms as ``labels``. When given, cells are
-        split per batch value (sorted) and numbered files are written
-        instead: ``rna1.h5``, ``rna2.h5`` ..., ``adt1.h5`` ..., ``cty1.csv``
-        ... (the layout of the shipped D52). Default ``None``: one file per
-        modality.
+        Batch per cell, same forms as ``labels``; splits every file per batch
+        (``rna1.h5``, ``rna2.h5``, ...).
     dtype : str, keyword-only
-        Forwarded to ``mtb.io.to_canonical``. Default ``'float64'``.
+        Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
     compression : str or None, keyword-only
-        Forwarded to ``mtb.io.to_canonical``. Default ``'gzip'``.
-    category : {"vertical", "diagonal", "mosaic", "cross"} or None, keyword-only
-        The integration layout the folder is for; it changes the ATAC
-        filenames (see Notes). Default ``None``: representation-named files
-        plus the ``atac.h5`` link for peaks.
+        h5py compression filter, forwarded to ``mtb.io.to_canonical``.
+    category : str or None, keyword-only
+        Integration category the folder is for (``'vertical'``, ``'diagonal'``,
+        ``'mosaic'``, ``'cross'``); changes the ATAC filenames (Notes).
     adt_names : list or None, keyword-only
-        Protein names for the ADT matrix, needed when it is a bare ``obsm``
-        array (or a bare array) without ``uns['<key>_names']``; otherwise
-        ``feature_0..`` is written and a ``UserWarning`` says so. Default
-        ``None``.
+        Protein names for the ADT matrix; they override any it carries and
+        are needed when it has none.
 
     Returns
     -------
@@ -934,74 +935,117 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     Raises
     ------
     ValueError
-        Nothing to export (all of ``rna`` / ``adt`` / ``atac`` / ``labels``
-        ``None``); ``atac`` without a valid ``atac_kind`` or ``atac_kind``
-        without ``atac``; an unknown ``category``; a selector string with
-        ``data=None`` or a malformed selector; a bare array whose cell
-        order cannot be checked (no barcodes anywhere) or with the wrong
-        row count; a modality whose barcodes differ from the master order
-        (the message names the strays); a ``labels`` / ``batch`` Series
-        missing cells, or a sequence of the wrong length.
+        Missing or conflicting arguments, or cells that do not pair across modalities (Notes).
     KeyError
-        A selector naming a ``mod`` / ``obsm`` / ``layer`` / ``obs`` column
-        the object does not have (the message lists the ones it has).
+        A selector names a ``mod``, ``obsm``, ``layer`` or ``obs`` column that is absent.
 
     Warns
     -----
     UserWarning
-        Feature names that contradict ``atac_kind``; a bare array / ``obsm``
-        matrix without feature names (``feature_0..`` written); non-unique
-        barcodes, which are paired positionally; a dense matrix over 1 GB.
+        Feature names missing or contradicting ``atac_kind``; non-unique barcodes; a dense matrix over 1 GB.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.io.export_dataset(a, "data/MYCITE", rna="X", adt="obsm:protein",
-    ...                       labels="obs:celltype")
-    >>> mtb.io.export_dataset(rna_adata, "data/MYMULTI", atac=atac_adata,      # separate objects,
-    ...                       atac_kind="peak", labels=rna_adata.obs["celltype"])  # paired by barcode
+    >>> mtb.io.export_dataset(adata, "data/MYCITE", adt="obsm:protein", labels="obs:celltype")
     >>> mtb.io.export_dataset(mdata, "data/MYMU", rna="rna", atac="atac", atac_kind="peak",
-    ...                       labels="rna:celltype", batch="rna:sample")        # MuData, per batch
+    ...                       labels="rna:celltype", batch="rna:sample")    # MuData, per batch
     >>> mtb.scan("MYCITE", "vertical", data_path="data")
 
     Notes
     -----
-    Master cell order. Every modality is written in one order -
+    **Modality arguments.** ``rna``, ``adt`` and ``atac`` each accept:
+
+    - a selector string against ``data``: ``'X'``, ``'obsm:<key>'``,
+      ``'layer:<key>'``, ``'mod:<name>'``, ``'mod:<name>.obsm:<key>'`` or
+      ``'mod:<name>.layer:<key>'``;
+    - an AnnData (its ``.X`` is written);
+    - a DataFrame (index = cell barcodes, columns = features);
+    - a 2-D array or sparse matrix already in the master cell order.
+
+    An ``obsm`` selector takes its feature names from ``adt_names`` (ADT
+    only), else the columns of a DataFrame-valued entry, else
+    ``adata.uns['<key>_names']`` (order in ``mtb.io.to_canonical``).
+
+    All matrices are cells x features and are written transposed. With
+    ``data=None`` the default ``rna='X'`` means "no RNA": pass
+    ``rna=<AnnData>``. Separate objects are paired by barcode:
+
+    ```python
+    mtb.io.export_dataset(rna_adata, "data/MYMULTI", atac=atac_adata,
+                          atac_kind="peak", labels=rna_adata.obs["celltype"])
+    ```
+
+    **MuData.** A bare modality name selects ``mdata.mod[name].X``
+    (``rna='rna'``); a full ``'mod:<name>'`` selector works too. Every
+    modality of a MuData needs one of these, so the default ``rna='X'``
+    raises: pass ``rna=<mod name>`` or ``rna=None``. ``labels`` / ``batch``
+    accept ``'<mod>:<obs column>'`` (``'rna:celltype'``) or
+    ``'mod:<mod>.obs:<col>'``.
+
+    **Master cell order.** Every modality is written in one order -
     ``data.obs_names`` when ``data`` is given, else the first modality
-    object's - and re-indexed to it by barcode: the same barcodes in
-    another order are reordered, a barcode set that differs raises
-    ``ValueError`` naming the strays, and non-unique barcodes cannot be
-    matched by name, so the cells are paired positionally with a
-    ``UserWarning`` (a different cell count still raises). A bare array
-    carries no barcodes, so nothing can be checked - pass a DataFrame or
-    AnnData when the order is not known to be right. A ``labels`` /
-    ``batch`` Series is aligned by index to the master barcodes; a plain
-    ``RangeIndex`` of the right length is taken positionally.
+    object's - and re-indexed to it by barcode:
 
-    ATAC filenames. Without ``category``: ``atac_kind='peak'``
-    (``chr:start-end`` features) is written as ``atac_peak.h5`` plus a
-    hard-linked (copied when the filesystem refuses) ``atac.h5``, because
-    most vertical multiome methods that read the plain ``atac`` role want
-    peaks (Matilda wants gene activity; see ``method_info(m)['atac']``) -
-    editing a hard-linked file edits both; ``'gene_activity'`` is written as
-    ``atac_gas.h5`` only, so the gene-activity role never silently falls
-    back to a peak matrix. ``category='vertical'``: the ATAC matrix is
-    written as plain ``atac.h5`` only, for both kinds - the one name every
-    vertical (paired multiome) variant resolves. The representation is
-    recorded nowhere on disk, so check that ``method_info(m)['atac']`` is
-    the kind exported: a gene-activity ``atac.h5`` fed to a peak method runs
-    and returns a wrong embedding (``mtb.scan`` flags the mismatch as a
-    caveat). ``'diagonal'`` / ``'mosaic'`` / ``'cross'``: ``atac_peak.h5``
-    or ``atac_gas.h5`` exactly as named, and no ``atac.h5`` link.
+    - the same barcodes in another order are reordered;
+    - a barcode set that differs raises ``ValueError`` naming the strays;
+    - non-unique barcodes cannot be matched by name, so the cells are paired
+      positionally with a ``UserWarning`` (a different cell count still
+      raises).
 
-    Labels. ``cty.csv`` is the single-column CSV the benchmark reads
-    (header ``x``, one label per line, written per batch as ``cty1.csv``
-    ...); ``mtb.labels_for`` finds these files again.
+    A bare array carries no barcodes, so nothing can be checked - pass a
+    DataFrame or AnnData when the order is not known to be right.
 
-    MuData. A bare modality name selects ``mdata.mod[name].X``; ``labels``
-    / ``batch`` accept ``'<mod>:<obs column>'`` (``'rna:celltype'``) or
-    ``'mod:<mod>.obs:<col>'``. This replaces the 0.2 ``from_mudata``
-    helper.
+    **Labels.** ``cty.csv`` is the single-column CSV the benchmark reads
+    (header ``x``, one label per line); ``mtb.labels_for`` finds these files
+    again. A ``labels`` / ``batch`` Series is aligned by index to the master
+    barcodes; a plain ``RangeIndex`` of the right length is taken
+    positionally.
+
+    **Batches.** With ``batch``, cells are split per batch value (sorted)
+    and numbered files are written instead: ``rna1.h5``, ``rna2.h5`` ...,
+    ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52).
+
+    **ATAC filenames.**
+
+    - no ``category``: ``atac_kind='peak'`` (``chr:start-end`` features) is
+      written as ``atac_peak.h5`` plus a hard-linked ``atac.h5`` (copied when
+      the filesystem refuses); ``'gene_activity'`` as ``atac_gas.h5`` only,
+      so the gene-activity role never silently falls back to a peak matrix;
+    - ``category='vertical'``: plain ``atac.h5`` only, for both kinds - the
+      one name every vertical (paired multiome) variant resolves;
+    - ``'diagonal'`` / ``'mosaic'`` / ``'cross'``: ``atac_peak.h5`` or
+      ``atac_gas.h5`` exactly as named, and no ``atac.h5`` link.
+
+    The ``atac.h5`` link exists because most vertical multiome methods that
+    read the plain ``atac`` role want peaks (Matilda wants gene activity;
+    see ``method_info(m)['atac']``). Editing a hard-linked file edits both.
+
+    **Check the ATAC kind.** The representation is recorded nowhere on
+    disk, so check that ``method_info(m)['atac']`` is the kind exported: a
+    gene-activity ``atac.h5`` fed to a peak method runs and returns a wrong
+    embedding (``mtb.scan`` flags the mismatch as a caveat).
+
+    **Errors.** ``ValueError`` is raised for:
+
+    - nothing to export (``rna``, ``adt``, ``atac`` and ``labels`` all ``None``);
+    - ``atac`` without a valid ``atac_kind``, or ``atac_kind`` without ``atac``;
+    - an unknown ``category``;
+    - a selector string with ``data=None``, or a malformed selector;
+    - a bare array whose cell order cannot be checked (no barcodes anywhere)
+      or with the wrong row count;
+    - a modality whose barcodes differ from the master order (the message
+      names the strays);
+    - a ``labels`` / ``batch`` Series missing cells, or a sequence of the
+      wrong length.
+
+    The ``KeyError`` message lists the names the object does have.
+
+    **Warnings.** ``UserWarning`` is emitted for feature names that
+    contradict ``atac_kind``; a bare array or ``obsm`` matrix without
+    feature names (``feature_0..`` written; for ADT pass ``adt_names``,
+    otherwise a DataFrame or AnnData); non-unique barcodes (paired
+    positionally); a dense ``matrix/data`` over 1 GB.
 
     See Also
     --------
