@@ -461,7 +461,7 @@ def evaluate(
         spellings of this argument; ``slow_metrics=`` was removed.
     clustering : keyword-only, optional
         Precomputed cluster assignment (same forms and the same alignment
-        rule as ``labels``; an ``.h5`` path given as a ``str`` is read from
+        rule as ``labels``; an ``.h5`` path is read from
         ``/obs/cluster_leiden``). When omitted, the scIB optimal-resolution
         Leiden sweep derives one from the embedding (its cost is in Notes);
         passing one skips the sweep for ``ARI``/``NMI`` (``iF1`` still sweeps
@@ -569,7 +569,8 @@ def evaluate(
         emb = emb.T
     if clustering is None:
         cl = None
-    elif isinstance(clustering, (str, Path)) and not io._is_label_file(clustering) \
+    elif isinstance(clustering, (str, Path)) \
+            and Path(clustering).suffix.lower() not in io._LABEL_FILE_SUFFIXES \
             and not (adata is not None and isinstance(clustering, str)
                      and clustering in adata.obs.columns):
         cl = io.read_clustering(clustering)        # the benchmark's h5 layout

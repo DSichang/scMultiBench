@@ -486,12 +486,18 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         flavor = _resolve_flavor(flavor)
         if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
             import sys
-            needs = [m for m in ("ARI", "NMI", "iF1") if only is None or m in only]
+            # a clustering that was passed in already serves ARI/NMI; the
+            # sweep then runs for iF1 alone
+            needs = [m for m in ("ARI", "NMI")
+                     if cluster is None and (only is None or m in only)] \
+                + (["iF1"] if _needs_isof1 else [])
+            skip = ("clustering= or metrics=[...] without ARI/NMI/iF1"
+                    if cluster is None else "metrics=[...] without iF1")
             print(f"scIB clustering metrics: Leiden resolution sweep (10 "
                   f"resolutions, flavor={flavor}) over {n:,} cells for "
                   f"{', '.join(needs)} - typically 30-60 s per 3,000 cells with "
                   f"leidenalg, several times faster with igraph; pass "
-                  f"clustering= or metrics=[...] without ARI/NMI/iF1 to skip it",
+                  f"{skip} to skip it",
                   file=sys.stderr, flush=True)
         with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
             warnings.simplefilter("ignore")

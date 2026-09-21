@@ -382,6 +382,22 @@ def test_evaluate_clustering_accepts_csv_and_arraylike(tmp_path):
         assert float(got.loc["ARI", "Value"]) == float(ref.loc["ARI", "Value"])
 
 
+def test_evaluate_clustering_h5_path_reads_like_the_str(tmp_path):
+    # the suffix decides how a clustering= path is read, not its type: a
+    # pathlib.Path to an .h5 goes to read_clustering, exactly as the str does
+    pytest.importorskip("scib")
+    from multibench.eval.pipeline import evaluate
+    emb, ct, _ = _toy()
+    p = tmp_path / "x.h5"
+    with h5py.File(p, "w") as f:
+        f.create_group("obs").create_dataset(
+            "cluster_leiden", data=np.repeat([0, 1], len(ct) // 2))
+    as_str = evaluate(emb, labels=ct, clustering=str(p), metrics=["ARI"])
+    as_path = evaluate(emb, labels=ct, clustering=p, metrics=["ARI"])
+    assert float(as_str.loc["ARI", "Value"]) == pytest.approx(1.0)
+    assert float(as_path.loc["ARI", "Value"]) == float(as_str.loc["ARI", "Value"])
+
+
 def test_read_cty_and_io_read_labels_agree_on_benchmark_style_files(tmp_path):
     """workflow._read_cty and eval.io.read_labels are the package's two label
     readers; they must return the same thing on the benchmark's cty layout
