@@ -559,18 +559,19 @@ The same calls on a dataset folder the package has not seen. `describe_layout` p
 
 """ + details(
             "**Order.** The `label_order` column of `res.summary` shows the order "
-            "`run_all` recorded for each method."))
+            "`run_all` recorded for each method.", label="Details: label order"))
     code("""labels = mtb.labels_for(DATASET)            # {file stem: path}
 print({k: Path(v).name for k, v in labels.items()})
 print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")""")
-    md(EXPORT_INTRO[cat] + ("\n\n" + details(EXPORT_DETAIL[cat]) if EXPORT_DETAIL[cat] else ""))
+    md(EXPORT_INTRO[cat] + ("\n\n" + details(EXPORT_DETAIL[cat], label="Details: MuData")
+                            if EXPORT_DETAIL[cat] else ""))
     code(EXPORT_DEMO[cat])
     md(f"""A real dataset under a new name: a random 60% of `{s['own_src']}`'s cells, capped at 2,000 cells and 5,000 features per file.
 
 """ + details(
         "**Alignment.** Files with the same number of cells keep the same cells in the "
         "same order, so each modality file stays aligned with its label file. An export "
-        "of your own data must keep this alignment."))
+        "of your own data must keep this alignment.", label="Details: cell alignment"))
     code(SUBSAMPLE_FN)
     md("""`scan` checks each method against the folder (`files_ok`) and against this machine's environments (`env_ok`); `runnable` needs both, and `reason` says what failed. The folder check works on any machine.""")
     code(f'''DATA_ROOT = "/tmp/mydata"
@@ -609,7 +610,7 @@ mine.summary''')
 
 The package ships stored results for {n_rerun} methods on `{ds}` (`source="rerun"`). `load_results` reads them as a long table and `mtb.plot.bubble` draws it; nothing is run.
 
-""" + details(*stored_notes))
+""" + details(*stored_notes, label="Details: sources"))
     code('''long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")
 print(long.method.nunique(), "methods,", long.source.unique())
 fig = mtb.plot.bubble(long)
@@ -624,7 +625,7 @@ fig''')
     ]
     md(f"""**Across datasets.** `aggregate="summary"` ranks the methods over `{ds}` and `{ds2}`, a 60% cell subsample of `{ds}`; `require_complete=True` keeps only the methods with results on both.
 
-""" + details(*pair_notes))
+""" + details(*pair_notes, label="Details: summary bars"))
     code(f'''pair = mtb.load_results(CATEGORY, dataset=[DATASET, DATASET + "s"], source="rerun")
 print(pair.groupby("dataset").method.nunique().to_dict())
 mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
