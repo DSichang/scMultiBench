@@ -729,13 +729,13 @@ Two families; higher is better for every metric.
             "fits no mosaic dataset here.")
     md(f"""### Methods from the benchmark study
 
-The cell compares the methods the scMultiBench study benchmarked for {cat} integration, on the tasks this package covers, with the methods this package has a {cat} variant for, and prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
-    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} in the study
+The cell compares the methods the scMultiBench study benchmarked for {cat} integration with the methods this package has a {cat} variant for, and prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
+    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} on the tasks this package covers
 registry = set(mtb.list_methods())
 wired = sorted(m for m in registry
                if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
 missing = [m for m in paper if m not in wired]
-print(f"the study benchmarks {{len(paper)}} methods for {{CATEGORY}}; this package has a variant for {{len(wired)}}")
+print(f"the study benchmarks {{len(paper)}} methods for {{CATEGORY}} on the tasks this package covers; this package has a variant for {{len(wired)}}")
 for m in missing:
     if m in registry:
         info = mtb.method_info(m)
