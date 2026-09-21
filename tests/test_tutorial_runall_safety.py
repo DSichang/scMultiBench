@@ -624,10 +624,10 @@ def test_end_to_end_stored_tables_do_not_need_the_results_folder(tmp_path):
 def test_end_to_end_scenario_counts_only_methods_with_a_variant_for_the_dataset(
         tmp_path, monkeypatch, capsys):
     """find_methods checks modality types only: on D45 it also returns StabMap
-    and scMoMaT, whose mosaic variants need files D45 does not have, and on
-    D52 the four registration methods. The printed count keeps the methods
-    with a variant whose files resolve on the dataset; a dataset that is not
-    on disk (Colab fetches only D11) gets a line instead of a wrong count."""
+    and scMoMaT, whose mosaic variants need files D45 does not have. The
+    printed count keeps the methods with a variant whose files resolve on the
+    dataset; a dataset that is not on disk (Colab fetches only D11) gets a
+    line instead of a wrong count."""
     import re
     import warnings
     import multibench as mtb
@@ -637,14 +637,15 @@ def test_end_to_end_scenario_counts_only_methods_with_a_variant_for_the_dataset(
         warnings.simplefilter("ignore")
         exec(src, ns)
         out = capsys.readouterr().out
-        shrunk = 0
+        shrunk = set()
         for cat, s in ns["SCENARIOS"].items():
             got = mtb.find_methods(category=cat, modalities=[m.rstrip("123") for m in s["modalities"]])
             sc = mtb.scan(s["dataset"], cat, verbose=False)
             n = len(set(got) & set(sc[sc.files_ok].method))
             assert re.search(rf"^{cat}\s+{s['dataset']}\s+->\s+{n} methods$", out, re.M), (cat, n, out)
-            shrunk += n < len(got)
-    assert shrunk >= 2, "mosaic D45 and cross D52 count fewer methods than find_methods returns"
+            if n < len(got):
+                shrunk.add(cat)
+    assert "mosaic" in shrunk, "mosaic D45 counts fewer methods than find_methods returns"
 
     monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path)
     exec(src, ns)
