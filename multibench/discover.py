@@ -232,7 +232,7 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     Raises
     ------
     ValueError
-        Unknown ``category``; the message lists the valid tokens.
+        Unknown ``category``; the message lists the valid ones.
     TypeError
         A keyword other than ``category``; use
         ``find_methods(category, task=..., runnable=...)``.
@@ -282,7 +282,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Parameters
     ----------
     method : str
-        Registry id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Registry method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
     verbose : bool, keyword-only
         ``True`` adds ``notes_long``, the long upstream-audit notes.
 
@@ -296,7 +296,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Raises
     ------
     KeyError
-        Unknown method id; the message suggests a close match when there is one.
+        Unknown method id; the message suggests a close match, if any.
 
     Examples
     --------
@@ -548,10 +548,10 @@ def params_for(method: str, category: str | None = None,
     Parameters
     ----------
     method : str
-        Registry id, e.g. ``"Matilda"``.
+        Registry method id, e.g. ``"Matilda"``.
     category : str | None
-        Category of the variant: ``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``; ``None`` = infer it from the other arguments.
+        Integration category of the variant: ``vertical``, ``diagonal``,
+        ``mosaic`` or ``cross``; ``None`` = infer it from the other arguments.
     modalities : list[str] | set[str] | None
         Modality tokens of the variant, e.g. ``["rna", "adt"]``; ``None`` =
         infer it from the other arguments.
@@ -559,7 +559,8 @@ def params_for(method: str, category: str | None = None,
         Dataset folder that settles an ambiguous selection: the one variant
         whose input files it holds.
     data_path : Path | str | None, keyword-only
-        Root holding ``dataset``; ``None`` = ``config.DEFAULT.data_path``.
+        Data root that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
 
     Returns
     -------
@@ -777,7 +778,7 @@ def cite(*methods, fmt: str = "text") -> str:
     ValueError
         ``fmt`` is neither ``"text"`` nor ``"bibtex"``; the message lists both.
     KeyError
-        Unknown method id; the message suggests a close match when there is one.
+        Unknown method id; the message suggests a close match, if any.
     TypeError
         Several ids are given and one is not a string.
 

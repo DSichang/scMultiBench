@@ -365,7 +365,7 @@ def recipe(method: str) -> dict:
     Parameters
     ----------
     method : str
-        Registry method id, e.g. ``'Matilda'``.
+        Registry method id, e.g. ``"Matilda"``.
 
     Returns
     -------
@@ -637,8 +637,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     Parameters
     ----------
     category : str | None
-        Integration category (``'vertical'``, ``'diagonal'``, ``'mosaic'`` or
-        ``'cross'``) whose methods to cover; ``None`` = every method.
+        Integration category (``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``) whose methods to cover; ``None`` = every method.
     methods : list[str] | None
         Method ids to cover instead of ``category``.
     as_frame : bool, keyword-only
@@ -1300,13 +1300,13 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         Method ids to cover; ``None`` = every method of ``category``, or every
         method.
     category : str | None, keyword-only
-        Integration category (``'vertical'``, ``'diagonal'``, ``'mosaic'`` or
-        ``'cross'``) whose methods to cover when ``methods`` is ``None``.
+        Integration category (``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``) whose methods to cover when ``methods`` is ``None``.
     packed : bool, keyword-only
         Use a prebuilt conda-pack archive where one is published, else the
         lockfile; ``False`` = lockfile builds only.
     dry_run : bool, keyword-only
-        ``True`` returns the plan and installs nothing; ``False`` installs the
+        ``True`` = return the plan and install nothing; ``False`` = install the
         missing envs.
     conda : str | None, keyword-only
         conda/mamba executable; ``None`` = conda if found, else mamba. The
@@ -1514,8 +1514,8 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     Parameters
     ----------
     category : str | None
-        Integration category (``'vertical'``, ``'diagonal'``, ``'mosaic'`` or
-        ``'cross'``) whose methods to check; ``None`` = every method.
+        Integration category (``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``) whose methods to check; ``None`` = every method.
     methods : list[str] | None
         Method ids to check instead of ``category``.
     conda : str | None

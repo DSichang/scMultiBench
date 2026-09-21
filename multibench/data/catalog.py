@@ -472,7 +472,7 @@ def datasets(files_dir: Path | str | None = None, *,
         Folder holding ``dataset.csv``; ``None`` = the package's shipped ``files/``.
     category : str | None, keyword-only
         Keep only datasets with stored results in this integration category
-        (``'vertical'``, ``'diagonal'``, ``'mosaic'``, ``'cross'``); ``None`` = all.
+        (``vertical``, ``diagonal``, ``mosaic`` or ``cross``); ``None`` = all.
 
     Returns
     -------
@@ -483,7 +483,7 @@ def datasets(files_dir: Path | str | None = None, *,
     Raises
     ------
     ValueError
-        ``category`` is not an integration category (the message lists them).
+        Unknown ``category``; the message lists the valid ones.
 
     Examples
     --------

@@ -67,7 +67,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     ValueError
         ``long_df`` is empty or lacks ``method`` / ``metric`` / ``value``.
     ValueError
-        An unknown ``metrics`` code, or an invalid ``group`` / ``overall``.
+        Unknown ``metrics`` code, or an invalid ``group`` / ``overall``.
     ValueError
         ``group`` names a family with no metric in the frame.
 

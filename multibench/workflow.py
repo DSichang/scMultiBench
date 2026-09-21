@@ -183,7 +183,8 @@ def describe_layout(category: str | None = None) -> str:
     Parameters
     ----------
     category : str | None
-        Category whose layout block to include; ``None`` = all four.
+        Integration category whose layout block to include; ``None`` = all
+        four.
 
     Returns
     -------
@@ -603,13 +604,13 @@ def scan(dataset: str, category: str | None = None, *,
     category : str | None
         Integration category to scan; ``None`` = all four.
     methods : list[str] | None, keyword-only
-        Registry ids to include, as a list; ``None`` = every method.
+        Method ids to include, as a list; ``None`` = every method.
     modalities : list[str] | None, keyword-only
-        Role names of one modality combination, e.g. ``["rna", "adt"]``;
-        ``None`` = every combination.
+        Modality tokens of one combination, e.g. ``["rna", "adt"]``; ``None`` =
+        every combination.
     data_path : Path | str | None, keyword-only
-        Folder that contains ``dataset``; ``None`` = the configured data root
-        (``config.DEFAULT.data_path``).
+        Data root that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
     out_dir : path | str, keyword-only
         Root the ``command`` lines write under; default the literal
         placeholder ``'<out_dir>'``. Pass the real one for paste-ready lines.
@@ -641,8 +642,8 @@ def scan(dataset: str, category: str | None = None, *,
     Warns
     -----
     UserWarning
-        ``dataset`` matches a folder only up to case, or ``modalities`` drops
-        directory-input methods.
+        ``dataset`` matches a folder only up to letter case, or ``modalities``
+        drops directory-input methods.
 
     Examples
     --------
@@ -1521,11 +1522,11 @@ class BatchResult:
         Parameters
         ----------
         batch : array-like | Series | path | None, keyword-only
-            One batch id per cell, in embedding order (array, Series or CSV
-            path); ``None`` = each cell's label file of origin, or none with
+            One batch id per cell, in embedding row order (array, Series or CSV
+            path); ``None`` = each cell's source label file, or none with
             ``labels=``.
         labels : array-like | Series | path | None, keyword-only
-            One cell-type label per cell, in embedding order (same forms);
+            One cell-type label per cell, in embedding row order (same forms);
             ``None`` = search the dataset's label files again.
         metrics : str | list[str] | None, keyword-only
             Metric family (``"clustering"``, ``"batch"``, ``"all"``) or metric
@@ -1868,17 +1869,19 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     methods : list[str] | None, keyword-only
         Method ids to include, as a list; ``None`` = every runnable method.
     modalities : list[str] | None, keyword-only
-        Role names of one modality combination, e.g. ``["rna", "adt"]``;
-        ``None`` = every combination.
+        Modality tokens of one combination, e.g. ``["rna", "adt"]``; ``None`` =
+        every combination.
     params : dict | None, keyword-only
         Per-method hyperparameters, ``{"Cobolt": {"lr": 1e-3}}``; see
         ``mtb.params_for`` for the accepted keys.
     data_path : path | None, keyword-only
-        Folder that contains ``dataset``; ``None`` = the configured data root.
+        Data root that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
     evaluate : bool, keyword-only
         Score each embedding; ``False`` only runs (status ``RUN_OK``).
     dry_run : bool, keyword-only
-        Return the ``mtb.scan`` frame for this selection and run nothing.
+        ``True`` = return the ``mtb.scan`` frame for this selection and run
+        nothing.
     verbose : bool, keyword-only
         Print ``[run_all] ...`` progress lines.
     timeout : float | None, keyword-only
@@ -1906,13 +1909,14 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     KeyError
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
-        A real run without ``out_dir``; ``methods`` or ``modalities`` given as a string.
+        A real run without ``out_dir``; ``methods`` or ``modalities`` given as
+        a bare string.
 
     Warns
     -----
     UserWarning
-        ``dataset`` matched a folder only up to case, or ``modalities`` dropped
-        directory-input methods.
+        ``dataset`` matches a folder only up to letter case, or ``modalities``
+        drops directory-input methods.
 
     Examples
     --------
@@ -2194,7 +2198,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     category : str
         Integration category of the variant to run.
     method : str
-        Registry id of the method.
+        Registry method id, e.g. ``"Matilda"``.
     param : str
         Hyperparameter to sweep; one of the variant's ``tunable`` keys
         (``mtb.params_for``).
@@ -2203,10 +2207,11 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     out_dir : path, keyword-only
         Root folder; each setting runs under ``<out_dir>/<param>_<value>/``.
     modalities : list[str] | None, keyword-only
-        Modality roles of the variant, when the method has several in
+        Modality tokens of the variant, when the method has several in
         ``category``; ``None`` = every variant.
     data_path : path | None, keyword-only
-        Folder that contains ``dataset``; ``None`` = the configured data root.
+        Data root that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
     timeout : float | None, keyword-only
         Per-setting wall-clock cap in seconds, passed to ``run_all``;
         ``None`` = no cap.

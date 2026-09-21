@@ -436,8 +436,9 @@ def evaluate(
         ``mtb.labels_for`` dict, a 1-D array-like, or an ``obs`` column name
         (forms in Notes).
     category : str, keyword-only, optional
-        One of ``mtb.list_categories()``; validated, otherwise unused (the
-        metrics do not depend on it). Lets a call mirror ``mtb.run``.
+        Integration category, one of ``mtb.list_categories()``; validated,
+        otherwise unused (the metrics do not depend on it). Lets a call mirror
+        ``mtb.run``.
     batch : keyword-only, optional
         Batch labels, one per cell, in the forms ``labels`` accepts; needed
         for the batch metrics unless ``labels`` lists two or more files.

@@ -178,8 +178,9 @@ class Config:
         Checkout holding the upstream ``tools_scripts/`` (the method scripts),
         cloned on first use when absent. Default ``<base>/scMultiBench_ref``.
     data_path : pathlib.Path
-        Where ``mtb.data.fetch`` puts datasets and ``mtb.scan`` /
-        ``mtb.run_all`` look for ``<data_path>/<dataset>/``. Default ``<base>/data``.
+        Data root that holds the dataset folders: ``mtb.data.fetch`` puts
+        datasets there, ``mtb.scan`` / ``mtb.run_all`` look for
+        ``<data_path>/<dataset>/``. Default ``<base>/data``.
     leiden_flavor : str
         Leiden backend of the scIB clustering sweep in ``mtb.evaluate``:
         ``"igraph"`` (default) or ``"leidenalg"``.

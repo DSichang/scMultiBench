@@ -349,8 +349,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     block : int, keyword-only
         Number of features written per streaming step.
     category : str | None, keyword-only
-        Integration category the file is for (``'vertical'``, ``'diagonal'``,
-        ``'mosaic'``, ``'cross'``); only changes ATAC filenames (Notes).
+        Integration category the file is for (``vertical``, ``diagonal``,
+        ``mosaic`` or ``cross``); only changes ATAC filenames (Notes).
     feature_names : list | None, keyword-only
         Feature names that override ``var_names`` / ``uns`` / DataFrame
         columns; the way to name a bare ``obsm`` array.
@@ -921,8 +921,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     compression : str or None, keyword-only
         h5py compression filter, forwarded to ``mtb.io.to_canonical``.
     category : str or None, keyword-only
-        Integration category the folder is for (``'vertical'``, ``'diagonal'``,
-        ``'mosaic'``, ``'cross'``); changes the ATAC filenames (Notes).
+        Integration category the folder is for (``vertical``, ``diagonal``,
+        ``mosaic`` or ``cross``); changes the ATAC filenames (Notes).
     adt_names : list or None, keyword-only
         Protein names for the ADT matrix; they override any it carries and
         are needed when it has none.

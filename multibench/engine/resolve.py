@@ -292,14 +292,15 @@ def inputs_for(dataset: str, category: str, method: str, *,
     dataset : str
         Dataset folder name under ``data_path``, e.g. ``"D11"``.
     category : str
-        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``.
+        Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``.
     method : str
         Registry method id, e.g. ``"Matilda"``.
     modalities : list[str] | set[str] | None, keyword-only
         Modality tokens that pick the variant, e.g. ``["rna", "adt"]``;
         ``None`` = the files in the dataset folder decide.
     data_path : Path | str | None, keyword-only
-        Folder that holds the dataset folders; ``None`` =
+        Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
     check : bool | None, keyword-only
         ``False`` = no checks; ``True`` = raise on a missing or malformed
@@ -309,7 +310,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     -------
     dict
         ``{role: absolute path}``, one entry per input role of the selected
-        variant (``data_dir`` for the directory-fed methods).
+        variant (``data_dir`` for the directory-input methods).
 
     Raises
     ------
@@ -925,9 +926,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     dataset : str
         Dataset folder name under ``data_path``, e.g. ``"D28"``.
     category : str | None
-        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``; with ``method``,
-        selects the variant whose cell order is used. ``None`` = the default
-        order.
+        Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``; with ``method``, selects the variant whose cell order is
+        used. ``None`` = the default order.
     method : str | None
         Registry method id; with ``category``, orders the files as that
         variant stacks its cells. ``None`` = the default order.
@@ -935,7 +936,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         Modality tokens that pick one of several variants; used only with
         ``category`` and ``method``.
     data_path : Path | str | None, keyword-only
-        Folder that holds the dataset folders; ``None`` =
+        Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
 
     Returns
@@ -949,9 +950,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     TypeError
         ``category`` and ``method`` swapped, or a path passed positionally as ``category``.
     FileNotFoundError
-        No dataset folder at ``<data_path>/<dataset>``.
+        ``<data_path>/<dataset>`` does not exist.
     ValueError
-        Unknown ``category``.
+        Unknown ``category``; the message lists the valid ones.
     KeyError
         Unknown ``method``, or it has no variant for ``category``.
 

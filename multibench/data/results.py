@@ -573,7 +573,7 @@ def load_results(
     Parameters
     ----------
     category : str, optional
-        Integration category (``vertical``, ``diagonal``, ``mosaic``,
+        Integration category (``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``); ``None`` = every category with tables for ``source``.
     dataset : str or list of str, keyword-only
         Dataset id(s), e.g. ``"D11"`` or ``["D11", "D11s"]``; ``None`` = every
@@ -607,10 +607,11 @@ def load_results(
     FileNotFoundError
         No table for a requested category, dataset or source.
     KeyError
-        An unknown name in ``methods`` (with a did-you-mean hint).
+        Unknown method name in ``methods``; the message suggests a close match,
+        if any.
     ValueError
-        An unknown ``category``, ``metrics``, ``clustering`` or ``source``,
-        or a malformed ``result_path`` file.
+        Unknown ``category``, ``metrics``, ``clustering`` or ``source``, or a
+        malformed ``result_path`` file.
     TypeError
         A positional argument after ``category``, or a retired keyword
         (Notes).
@@ -957,7 +958,7 @@ def available_datasets(
     Raises
     ------
     ValueError
-        An unknown ``category`` or ``source``.
+        Unknown ``category`` or ``source``.
 
     Examples
     --------
@@ -1063,7 +1064,7 @@ def results_coverage(
     Raises
     ------
     ValueError
-        An unknown ``category`` or ``source``.
+        Unknown ``category`` or ``source``.
 
     Examples
     --------
@@ -1213,7 +1214,8 @@ def recommend(
         Nothing left to rank (Notes lists the cases), or an unknown
         ``metrics`` value.
     KeyError
-        An unknown name in ``methods`` (with a did-you-mean hint).
+        Unknown method name in ``methods``; the message suggests a close match,
+        if any.
     FileNotFoundError
         No stored results for the category and source.
 

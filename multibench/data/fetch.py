@@ -70,8 +70,9 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
     *datasets : str
         Dataset ids to fetch; ``mtb.data.fetchable()`` lists them.
     data_path : Path | str | None, keyword-only
-        Data root; ``None`` = ``mtb.config.DEFAULT.data_path``. Each dataset
-        lands in ``<data_path>/<dataset>/``.
+        Data root that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``. Each dataset lands in
+        ``<data_path>/<dataset>/``.
     quiet : bool, keyword-only
         Suppress the one "downloading ..." line per dataset.
 
@@ -170,10 +171,11 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     dataset : str
         Dataset id with shipped outputs: ``D11``, ``D28``, ``D46`` or ``D52``.
     methods : list of str, optional
-        Method names that must be in the tree; checked only, the whole tree
+        Method ids that must be in the tree; checked only, the whole tree
         is downloaded either way.
     data_path : Path | str | None, keyword-only
-        Data root; ``None`` = ``mtb.config.DEFAULT.data_path``.
+        Data root that holds the dataset folders; ``None`` =
+        ``mtb.config.DEFAULT.data_path``.
     quiet : bool, keyword-only
         Suppress the one "downloading ..." line.
 

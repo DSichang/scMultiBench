@@ -424,7 +424,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         ``{role: path or AnnData}``, usually from ``mtb.inputs_for``; its
         modality roles select the variant.
     out_dir : str, keyword-only
-        Directory the method writes into; created if missing.
+        Folder the method writes into; created if missing.
     params : dict | None, keyword-only
         Hyperparameter overrides merged over the variant's defaults;
         ``None`` = the defaults.
