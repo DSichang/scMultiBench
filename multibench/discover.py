@@ -72,11 +72,13 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         Modalities a variant must consume, all of them, e.g. ``["rna", "adt"]``;
         ``None`` = no filter.
     runnable : bool | None, keyword-only
-        ``True`` = methods with at least one variant; ``False`` = declared
-        stubs; ``None`` = both.
+        ``True`` = methods wired with at least one variant (not a check of
+        your host: see ``mtb.scan``); ``False`` = declared stubs; ``None`` =
+        both.
     tunable : bool | None, keyword-only
         ``True`` = methods with command-line hyperparameters that
-        ``run(params=...)`` can set; ``False`` = the rest; ``None`` = both.
+        ``run(params=...)`` can set; ``False`` = the rest (settings fixed in
+        the script); ``None`` = both.
     available : bool | None, keyword-only
         ``True`` = public methods (``availability == 'public'``); ``False`` =
         ``benchmark-host-only`` ones; ``None`` = both.
@@ -97,8 +99,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     Warns
     -----
     UserWarning
-        A kept method takes a directory that ``modalities`` cannot check (the
-        spatial registration methods).
+        ``modalities`` is given and a returned method's input directory cannot
+        be checked (spatial registration).
 
     Examples
     --------
@@ -111,10 +113,9 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
     Notes
     -----
-    **Per-variant matching.** ``category``, ``modalities``, ``needs_labels``
-    and ``atac`` are evaluated per VARIANT: a method matches when at least one
-    of its variants satisfies all of them together. ``task``, ``runnable``,
-    ``tunable`` and ``available`` are method-level. Two consequences:
+    **Per-variant matching.** ``task``, ``runnable``, ``tunable`` and
+    ``available`` are method-level; the other four filters hold per VARIANT,
+    as the summary says. Two consequences:
 
     - ``find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)``
       keeps scMoMaT: its vertical rna+adt variant takes no labels; only its
@@ -233,7 +234,8 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     ValueError
         Unknown ``category``; the message lists the valid tokens.
     TypeError
-        A keyword other than ``category``; filter with ``mtb.find_methods``.
+        A keyword other than ``category``; use
+        ``find_methods(category, task=..., runnable=...)``.
 
     Examples
     --------
@@ -246,9 +248,6 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     **Category membership.** A method is listed under a category when it has
     a variant wired for that category - the same set ``scan``, ``run_all``
     and ``find_methods(category=)`` dispatch.
-
-    **Other filters.** ``task``, ``runnable`` and the other filters live in
-    ``mtb.find_methods``: ``find_methods(category, task=..., runnable=...)``.
 
     See Also
     --------
@@ -280,10 +279,6 @@ def _effective(v) -> dict:
 def method_info(method: str, *, verbose: bool = False) -> dict:
     """Return everything known about one method as a flat dict.
 
-    Read ``supports`` for the category and modality combinations it runs,
-    ``params`` for what ``run(params=...)`` can change and ``runtime`` to size
-    a sweep.
-
     Parameters
     ----------
     method : str
@@ -294,13 +289,14 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Returns
     -------
     dict
-        One flat record. Read ``supports``, ``params``, ``runtime`` and
-        ``needs_labels`` first; every key is listed in Notes.
+        One flat record. Read ``supports`` (category/modality combinations it
+        runs), ``params`` (what ``run(params=...)`` can change), ``runtime``
+        (to size a sweep) and ``needs_labels``; all keys are in Notes.
 
     Raises
     ------
     KeyError
-        Unknown method id; the message suggests the closest one.
+        Unknown method id; the message suggests a close match when there is one.
 
     Examples
     --------
@@ -325,12 +321,13 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       ``'gene_activity'``), or ``None``.
     - ``needs_labels`` - method-level label flag; see **Labels** below.
     - ``status`` / ``availability`` - see **Status** and **Availability**.
-    - ``setup_hint`` - free-text setup advice, or ``None``.
+    - ``setup_hint`` - free-text setup advice, or ``''`` when there is none.
     - ``variants`` - the distinct upstream entrypoints, in order.
     - ``driver`` - the package-side wrapper actually executed, or ``None``
       when the upstream script runs directly.
     - ``scripts_url`` - the method's ``tools_scripts`` folder in the
-      scMultiBench repository.
+      scMultiBench repository, or ``None`` when its entrypoint is not
+      there (SPIRAL).
     - ``repo_url`` / ``version`` - the upstream repository and the version
       the benchmark ran.
     - ``reference`` - ``{doi, title, authors, journal, year}`` or ``None``;
@@ -350,9 +347,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``notes_long`` (``verbose=True`` only) - the raw upstream-knob audit
       prose, ``None`` for methods outside the audit; a
       ``benchmark-host-only`` method gets one sentence appended saying why.
-
-    The paper-only catalog columns (``deep_learning``, ``output``) are in
-    ``mtb.catalog.methods()``.
+    - Not in this dict: the paper-only catalog columns (``deep_learning``,
+      ``output``); read them from ``mtb.catalog.methods()``.
 
     **Runtime.** ``runtime`` is ``{"tier", "worst_sec", "observed", "host",
     "note"}``, what this method has been observed to cost:
@@ -554,11 +550,11 @@ def params_for(method: str, category: str | None = None,
     method : str
         Registry id, e.g. ``"Matilda"``.
     category : str | None
-        Category of the variant (``vertical``, ``diagonal``, ``mosaic``,
-        ``cross``); ``None`` when the method or ``modalities`` settles it.
+        Category of the variant: ``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``; ``None`` = infer it from the other arguments.
     modalities : list[str] | set[str] | None
-        Modality tokens of the variant, e.g. ``["rna", "adt"]``; ``None`` when
-        ``category`` alone selects one variant.
+        Modality tokens of the variant, e.g. ``["rna", "adt"]``; ``None`` =
+        infer it from the other arguments.
     dataset : str | None, keyword-only
         Dataset folder that settles an ambiguous selection: the one variant
         whose input files it holds.
@@ -620,8 +616,9 @@ def params_for(method: str, category: str | None = None,
 
     **Variant selection.** ``category`` and ``modalities`` select the variant
     exactly like ``run``. Either may be omitted when the rest leaves one
-    variant; ``category`` alone is the only way to reach a ``data_dir``
-    variant such as scBridge's or PASTE's.
+    variant. A ``data_dir`` variant (scBridge's, PASTE's) has no modality
+    tokens: leave ``modalities`` out and select it by ``category``, or by
+    nothing when it is the method's only variant.
 
     **Dataset tie-break.** When the selection is still ambiguous, ``dataset``
     picks the one variant whose input files are all present in
@@ -780,7 +777,7 @@ def cite(*methods, fmt: str = "text") -> str:
     ValueError
         ``fmt`` is neither ``"text"`` nor ``"bibtex"``; the message lists both.
     KeyError
-        Unknown method id; the message suggests the closest one.
+        Unknown method id; the message suggests a close match when there is one.
     TypeError
         Several ids are given and one is not a string.
 
@@ -795,8 +792,8 @@ def cite(*methods, fmt: str = "text") -> str:
 
     Notes
     -----
-    **Two spellings.** These return the same text; ``cite(None)`` is
-    ``cite()``.
+    **Two spellings.** Both forms return the same text, and ``cite(None)`` is
+    ``cite()``:
 
     - ``cite('Matilda', 'MOFA2')`` - one id per argument, like the CLI
       ``multibench cite Matilda MOFA2``.
