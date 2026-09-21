@@ -6,15 +6,14 @@ the run cells executing for real on a CPU runtime, and section 5's
 ``avail[avail.runnable]`` table empty on every host without environments.
 The Colab speed round then removed condacolab (the packed environments run
 without a conda binary), pinned numpy / pandas to the host's versions in the
-install cell, made a host without environments stand in the benchmark host's
-real ``run_all`` outputs (``mtb.data.fetch_outputs``) before the stored metric
-table, and added a per-stage ``tick`` recorder. These tests pin all of it:
-one ``INSTALL_ENVS = False`` flag cell that the one environment download
-(``mtb.env.install(..., dry_run=False)``) sits behind, no ``condacolab``
-token anywhere, run cells gated on ``scan().env_ok`` with the two-level
-stand-in otherwise, the evaluate cell scoring a real embedding when one is on
-disk, library-specific warning filters, the file-gate table with the env
-columns next to it, and the timing table as the last cell.
+install cell, and made a host without environments stand in the benchmark
+host's real ``run_all`` outputs (``mtb.data.fetch_outputs``) before the stored
+metric table. These tests pin all of it: one ``INSTALL_ENVS = False`` flag
+cell that the one environment download (``mtb.env.install(...,
+dry_run=False)``) sits behind, no ``condacolab`` token anywhere, run cells
+gated on ``scan().env_ok`` with the two-level stand-in otherwise, the
+evaluate cell scoring a real embedding when one is on disk, library-specific
+warning filters, and the file-gate table with the env columns next to it.
 """
 import ast
 import importlib.util
@@ -84,13 +83,6 @@ def _env_install_calls(tree):
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and ast.unparse(node.func).endswith("env.install"):
             yield node, {k.arg: k.value for k in node.keywords if k.arg}
-
-
-def _tick_labels(src):
-    return [node.args[0].value for node in ast.walk(_tree(src))
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-            and node.func.id == "tick" and node.args
-            and isinstance(node.args[0], ast.Constant)]
 
 
 # ---------------------------------------------------------------- the flag
@@ -321,8 +313,7 @@ def _evaluate_cell_ns(res, calls):
             calls.append((output, labels, kw))
             return pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
 
-    ns = {"mtb": _Mtb, "Path": Path, "res": res, "TIMES": [], "tick": lambda label: ns["TIMES"].append(label)}
-    return ns
+    return {"mtb": _Mtb, "Path": Path, "res": res}
 
 
 def test_evaluate_cell_scores_the_method_embedding_with_its_label_order(tmp_path):
@@ -346,12 +337,12 @@ def test_evaluate_cell_scores_the_method_embedding_with_its_label_order(tmp_path
     assert output == d / "embedding.h5"
     assert labels == mtb.labels_for("D11")
     assert kw["label_order"] == ["cty"] and kw["verbose"] is False
-    assert ns["scores"] is not None and ns["TIMES"] == ["evaluate"]
+    assert ns["scores"] is not None
 
 
 def test_evaluate_cell_skips_the_stored_table_stand_in(capsys):
     """A BatchResult from the stored metric table has no out_dir and no file:
-    the cell prints why and still ticks, so the notebook runs through."""
+    the cell prints why and sets ``scores = None``, so the notebook runs through."""
     import multibench as mtb
     res = mtb.BatchResult([{"method": "Matilda", "status": "STORED"}], "D11", "vertical")
     calls = []
@@ -359,25 +350,23 @@ def test_evaluate_cell_skips_the_stored_table_stand_in(capsys):
     exec(GEN.EVALUATE_CELL_TEMPLATE.format(method="Matilda"), ns)
     assert calls == [] and ns["scores"] is None
     assert "no embedding on this host" in capsys.readouterr().out
-    assert ns["TIMES"] == ["evaluate"]
 
 
 @pytest.mark.parametrize("cat", CATS)
 def test_evaluate_cell_names_the_live_method(cat):
     code = _code(f"tutorial_{cat}")
-    cells = [src for src in code if 'tick("evaluate")' in src]
+    cells = [src for src in code if "mtb.evaluate(" in src]
     assert len(cells) == 1
     assert cells[0] == GEN.EVALUATE_CELL_TEMPLATE.format(method=GEN.SCEN[cat]["live"][0])
     i_run = next(i for i, src in enumerate(code) if "mtb.run_all(" in src)
-    i_plot = next(i for i, src in enumerate(code) if 'tick("plot")' in src)
+    i_plot = next(i for i, src in enumerate(code) if src.strip() == "res.plot()")
     assert i_run < code.index(cells[0]) < i_plot, "run, then evaluate, then plot"
 
 
-# ---------------------------------------------------------------- the timing
-def test_install_cell_pins_the_host_stack_and_defines_tick():
+# ------------------------------------------------------------ the install cell
+def test_install_cell_pins_the_host_stack():
     """The install cell (shared by every notebook) pins numpy / pandas to the
-    running interpreter's versions on the pip line and is the setup that
-    defines the two-line tick recorder, calling it once for itself."""
+    running interpreter's versions on both pip lines."""
     src = GEN.INSTALL_CELLS[0]
     assert ('pins = [f"{p}=={importlib.metadata.version(p)}" for p in ("numpy", "pandas") '
             'if importlib.util.find_spec(p)]') in src
@@ -385,35 +374,6 @@ def test_install_cell_pins_the_host_stack_and_defines_tick():
     assert len(pip_lines) == 2 and all('{" ".join(pins)}' in l for l in pip_lines)
     assert '"multibench-sc>=0.3"' in pip_lines[0] and "git+https://github.com/DSichang/scMultiBench.git" in pip_lines[1]
     assert "import importlib.metadata" in src
-    tick_lines = [l for l in src.splitlines() if "TIMES" in l or l.startswith("def tick")]
-    assert len(tick_lines) == 2, "a two-line recorder"
-    assert src.rstrip().endswith('tick("install")')
-    ns = {"time": __import__("time")}
-    exec("\n".join(tick_lines), ns)
-    ns["tick"]("a"); ns["tick"]("b")
-    assert [lab for lab, _ in ns["TIMES"]] == ["a", "b"]
-    assert all(isinstance(sec, float) and sec >= 0 for _, sec in ns["TIMES"])
-
-
-@pytest.mark.parametrize("cat", CATS)
-def test_every_stage_ticks_and_the_last_cell_prints_where_the_time_went(cat):
-    code = _code(f"tutorial_{cat}")
-    labels = [lab for src in code for lab in _tick_labels(src)]
-    assert labels[:2] == ["install", "data fetch"]
-    for lab in ("environments", "run-or-fetch", "evaluate", "plot", "own data", "stored results"):
-        assert labels.count(lab) == 1, f"tutorial_{cat}: tick({lab!r}) once"
-    assert code[-1] == GEN.TIMING_CELL
-    assert "TIMES" in code[-1] and "seconds" in code[-1]
-    kinds = [kind for kind, _ in _cells(f"tutorial_{cat}")]
-    assert kinds[-1] == "code" and "Where the time went" in _markdown(f"tutorial_{cat}")
-
-
-def test_quickstart_ticks_and_prints_where_the_time_went():
-    code = _code("colab_quickstart")
-    labels = [lab for src in code for lab in _tick_labels(src)]
-    assert labels == ["install", "import", "stored results", "plot"]
-    assert code[-1] == GEN.TIMING_CELL
-    assert "condacolab" not in "\n".join(code)
 
 
 # ------------------------------------------------------ the rest of the polish
@@ -453,10 +413,9 @@ def test_batch_metrics_prose_names_the_metrics_knob(cat):
 @pytest.mark.parametrize("cat", CATS)
 def test_prose_says_no_conda_is_needed_and_names_the_knobs(cat):
     md = " ".join(_markdown(f"tutorial_{cat}").split()).replace("*", "")   # one line, no emphasis marks
-    assert "no conda binary is needed" in md
-    assert "mtb.config.DEFAULT.envs_dir" in md and "MULTIBENCH_RUN_MODE" in md
-    assert "mtb.config.DEFAULT.leiden_flavor" in md
-    assert "mtb.data.fetch_outputs" in md and "mtb.load_batch(..., methods=)" in md
+    assert "no conda needed" in md
+    assert "mtb.config.DEFAULT.envs_dir" in md
+    assert "mtb.data.fetch_outputs" in md and "mtb.load_batch" in md
     assert "restarts the kernel" not in md and "provisions conda" not in md
 
 

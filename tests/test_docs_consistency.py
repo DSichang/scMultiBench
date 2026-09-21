@@ -137,6 +137,29 @@ def test_gen_tut_output_matches_committed_notebooks(tmp_path, monkeypatch):
     assert cells == _code_cells(ROOT / "notebooks" / "colab_quickstart.ipynb")
 
 
+def test_collapsed_blocks_render_as_markdown():
+    """Every ``<details>`` block in the generated notebooks has a one-line
+    ``<summary>``, a blank line after it and a blank line before
+    ``</details>``: without them Jupyter, Colab and mkdocs-jupyter show the
+    inner markdown as literal text (``**Label.**``, ``- item``)."""
+    gen = _load_gen_tut()
+    n = 0
+    for name in [f"tutorial_{cat}" for cat in gen.SCEN] + ["colab_quickstart"]:
+        nb = json.loads((ROOT / "notebooks" / f"{name}.ipynb").read_text())
+        for c in nb["cells"]:
+            src = "".join(c["source"])
+            if c["cell_type"] != "markdown" or "<details>" not in src:
+                continue
+            assert src.count("<details>") == src.count("</details>"), name
+            for block in re.findall(r"<details>(.*?)</details>", src, re.S):
+                n += 1
+                assert re.match(r"\n<summary>[^<\n]+</summary>\n\n\S", block), \
+                    f"{name}: <summary> must be followed by a blank line: {block[:80]!r}"
+                assert block.endswith("\n\n") and not block.endswith("\n\n\n"), \
+                    f"{name}: one blank line before </details>: {block[-80:]!r}"
+    assert n >= 20, f"only {n} collapsed blocks across the generated notebooks"
+
+
 def test_tutorials_use_the_public_api_not_raw_csv_reads():
     gen = _load_gen_tut()
     for cat, s in gen.SCEN.items():
