@@ -465,3 +465,178 @@ def test_stand_in_keeps_methods_only_when_the_sweep_has_them():
     assert GEN.stand_in("cross", "D52", ["UINMF", "sciPENN", "StabMap"]) == \
         ("D52", ["UINMF", "sciPENN", "StabMap"])
     assert GEN.stand_in("mosaic", "D45", ["StabMap", "scMoMaT"]) == ("D45", None)
+
+
+# ------------------------------------- the end-to-end tutorial (hand-maintained)
+# tutorial_end_to_end.ipynb has no generator, so its Run-all safety is pinned
+# here directly: the category tutorials' install cell, flag cell and skip line,
+# the one environment download behind INSTALL_ENVS and the linux check, the
+# mtb.run cell gated on scan().env_ok with a stand-in (fetch_outputs +
+# load_batch, else the stored scores), stored tables that work without the
+# repository's results/ folder (Colab opens the notebook alone), and section
+# 8's counts restricted to methods with a variant for each dataset's files.
+E2E = "tutorial_end_to_end"
+
+
+def _e2e_function(name):
+    """Source of the one ``def name`` in the end-to-end notebook, to exec."""
+    found = [ast.unparse(node) for src in _code(E2E) for node in ast.walk(_tree(src))
+             if isinstance(node, ast.FunctionDef) and node.name == name]
+    assert len(found) == 1, f"{E2E}: exactly one def {name}"
+    return found[0]
+
+
+def test_end_to_end_installs_the_package_and_sets_the_flag_before_any_download():
+    code = _code(E2E)
+    assert code[0] == GEN.INSTALL_CELLS[0], "the shared install cell comes first"
+    size = GEN.env_size_text(methods=["Matilda"])
+    assert code[1] == GEN.FLAG_CELL_TEMPLATE.format(size=size[0].upper() + size[1:]), \
+        "the category tutorials' flag cell, stating Matilda's measured download size"
+    flags = [i for i, src in enumerate(code) for node in ast.walk(_tree(src))
+             if isinstance(node, ast.Assign)
+             and any(isinstance(t, ast.Name) and t.id == "INSTALL_ENVS" for t in node.targets)]
+    assert flags == [1], f"{E2E}: exactly one INSTALL_ENVS assignment, the flag cell"
+    assert min(i for i, src in enumerate(code) if "import multibench as mtb" in src) > 1
+
+
+def test_end_to_end_environment_download_sits_behind_the_flag_and_the_platform_check():
+    downloads = []
+    for i, src in enumerate(_code(E2E)):
+        tree = _tree(src)
+        for node, cmd in _shell_calls(tree):
+            assert "env install" not in cmd, f"{E2E}: environments install through mtb.env.install: {cmd!r}"
+        for node, kw in _env_install_calls(tree):
+            dry = kw.get("dry_run")
+            if isinstance(dry, ast.Constant) and dry.value is False:
+                downloads.append(i)
+                assert _guarded_by(node, "INSTALL_ENVS") and _guarded_by(node, "sys.platform")
+                assert isinstance(kw.get("packed"), ast.Constant) and kw["packed"].value is True
+                assert ast.literal_eval(node.args[0]) == ["Matilda"] and "category" in kw
+                assert src.index("archive_bytes") < src.index("dry_run=False"), "size first, download second"
+    assert len(downloads) == 1 and downloads[0] > 1, f"{E2E}: one download, after the flag cell"
+
+
+def test_end_to_end_run_cell_is_gated_on_env_ok_and_stands_in_otherwise():
+    runs = [(src, node) for src in _code(E2E) for node in ast.walk(_tree(src))
+            if isinstance(node, ast.Call) and ast.unparse(node.func) in ("mtb.run", "mtb.run_all")]
+    assert len(runs) == 1, f"{E2E}: section 4 runs Matilda once"
+    src, call = runs[0]
+    assert _guarded_by(call, "env_ok"), f"{E2E}: mtb.run not gated on scan().env_ok"
+    assert "mtb.scan(" in src and GEN.SKIP_LINE in src
+    gate = next(n for n in ast.walk(_tree(src)) if isinstance(n, ast.If) and "env_ok" in ast.unparse(n.test))
+    assert "stand_in(DATASET" in ast.unparse(ast.Module(body=gate.orelse, type_ignores=[])), \
+        "a skipped run stands in the benchmark host's output"
+    helper = ast.parse(_e2e_function("stand_in"))
+    names = {ast.unparse(n.func) for n in ast.walk(helper) if isinstance(n, ast.Call)}
+    assert {"mtb.data.fetch_outputs", "mtb.load_batch"} <= names
+    assert any(isinstance(n, ast.Try) for n in ast.walk(helper)), "a failed download is caught"
+
+
+def test_end_to_end_stand_in_reads_the_host_embedding_or_returns_none(tmp_path, capsys):
+    import h5py
+    import numpy as np
+    root = tmp_path / "outputs" / "D11"
+    (root / "Matilda_D11").mkdir(parents=True)
+    with h5py.File(root / "Matilda_D11" / "embedding.h5", "w") as f:
+        f["data"] = np.arange(6.0).reshape(3, 2)
+
+    class _Batch:
+        out_dir = root
+
+    mtb = _StubMtb(_StubData(root), loaded=_Batch())
+    ns = {"mtb": mtb, "Path": Path, "h5py": h5py}
+    exec(_e2e_function("stand_in"), ns)
+    assert ns["stand_in"]("D11", "Matilda").shape == (3, 2)
+    assert mtb.load_batch_calls == [(root, ["Matilda"])]
+    assert "stand-in: Matilda's embedding from the benchmark host's run_all outputs for D11" \
+        in capsys.readouterr().out
+
+    ns = {"mtb": _StubMtb(_StubData(OSError("offline"))), "Path": Path, "h5py": h5py}
+    exec(_e2e_function("stand_in"), ns)
+    assert ns["stand_in"]("D11", "Matilda") is None
+    assert "(OSError from fetch_outputs: offline)" in capsys.readouterr().out
+
+
+def test_end_to_end_evaluate_cell_without_an_embedding_shows_the_stored_scores(capsys):
+    """The offline stand-in leaves ``emb = None``: section 5 then shows
+    Matilda's stored scores in evaluate's shape, so section 6 still plots."""
+    import warnings
+    import multibench as mtb
+    import pandas as pd
+
+    class _Mtb:
+        def __getattr__(self, name):
+            return getattr(mtb, name)
+
+        @staticmethod
+        def evaluate(*a, **kw):
+            raise AssertionError("nothing to evaluate without an embedding")
+
+    src = next(s for s in _code(E2E) if "mtb.evaluate(" in s)
+    ns = {"mtb": _Mtb(), "pd": pd, "emb": None, "DATASET": "D11", "CATEGORY": "vertical"}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        exec(src, ns)
+        stored = mtb.load_results("vertical", dataset="D11", source="rerun", methods=["Matilda"])
+    assert ns["scores"]["Value"].to_dict() == stored.set_index("metric")["value"].to_dict()
+    long = mtb.to_long(ns["scores"], method="Matilda", dataset="D11", category="vertical")
+    assert sorted(long.metric) == sorted(stored.metric)
+    assert "no embedding on this host for Matilda" in capsys.readouterr().out
+
+
+def test_end_to_end_stored_tables_do_not_need_the_results_folder(tmp_path):
+    """Sections 7 and 8 read results/ next to the notebook; without it (Colab)
+    the package's stored rerun tables give the same metric values."""
+    import warnings
+    import numpy as np
+    import multibench as mtb
+    import pandas as pd
+    for src in _code(E2E):
+        if "RESULTS /" in src:
+            assert "def stored_table(" in src, f"{E2E}: every results/ read goes through stored_table"
+    ns = {"mtb": mtb, "pd": pd}
+    exec(_e2e_function("stored_table"), ns)
+    for ds in ("D11", "D28", "D45", "D52"):
+        ns["RESULTS"] = ROOT / "notebooks" / "results"
+        long_here, summary_here = ns["stored_table"]("long_all", ds), ns["stored_table"]("summary", ds)
+        ns["RESULTS"] = tmp_path / "results"                 # absent, as on Colab
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            long_pkg, summary_pkg = ns["stored_table"]("long_all", ds), ns["stored_table"]("summary", ds)
+        both = long_here.merge(long_pkg, on=["method", "metric"], how="outer", indicator=True)
+        assert (both._merge == "both").all() and np.allclose(both.value_x, both.value_y), ds
+        both = summary_here.merge(summary_pkg, on="method", how="outer", indicator=True)
+        assert (both._merge == "both").all(), ds
+        for m in ("ARI", "NMI", "ASW"):
+            assert np.allclose(both[f"{m}_x"], both[f"{m}_y"], atol=1e-4), (ds, m)
+
+
+def test_end_to_end_scenario_counts_only_methods_with_a_variant_for_the_dataset(
+        tmp_path, monkeypatch, capsys):
+    """find_methods checks modality types only: on D45 it also returns StabMap
+    and scMoMaT, whose mosaic variants need files D45 does not have, and on
+    D52 the four registration methods. The printed count keeps the methods
+    with a variant whose files resolve on the dataset; a dataset that is not
+    on disk (Colab fetches only D11) gets a line instead of a wrong count."""
+    import re
+    import warnings
+    import multibench as mtb
+    src = next(s for s in _code(E2E) if "SCENARIOS = {" in s)
+    ns = {"mtb": mtb}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        exec(src, ns)
+        out = capsys.readouterr().out
+        shrunk = 0
+        for cat, s in ns["SCENARIOS"].items():
+            got = mtb.find_methods(category=cat, modalities=[m.rstrip("123") for m in s["modalities"]])
+            sc = mtb.scan(s["dataset"], cat, verbose=False)
+            n = len(set(got) & set(sc[sc.files_ok].method))
+            assert re.search(rf"^{cat}\s+{s['dataset']}\s+->\s+{n} methods$", out, re.M), (cat, n, out)
+            shrunk += n < len(got)
+    assert shrunk >= 2, "mosaic D45 and cross D52 count fewer methods than find_methods returns"
+
+    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path)
+    exec(src, ns)
+    out = capsys.readouterr().out
+    assert out.count("not on disk") == len(ns["SCENARIOS"]) and "methods" not in out.replace("its methods", "")
