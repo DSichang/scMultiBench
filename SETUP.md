@@ -1,13 +1,14 @@
 # Setting this up on a new machine
 
-Every number here was measured by building all 29 environments from scratch in an
-isolated clean room, then running methods in them. Nothing is estimated.
+Every number here was measured by building 29 environments from scratch in an
+isolated clean room, then running methods in them. Nothing is estimated. The package
+needs 26 of those 29, so the disk and time totals are upper bounds.
 
 ## What it costs
 
 | | measured |
 |---|---|
-| environments | **29** (40 methods share them; `scmb_r` alone serves 5) |
+| environments | **26** (36 methods share them; `scmb_r` alone serves 5) |
 | disk, environments | **175 GB** |
 | disk, conda package cache | **52 GB** (safe to delete afterwards: `conda clean -a`) |
 | build wall-clock | **~50 min** total with a warm package cache; the first few envs dominate |
@@ -71,11 +72,6 @@ broken method rather than a provisioning gap.
   two installs are not byte-identical.
 - `scMVP` — installed from public upstream `bm2-lab/scMVP` at a pinned commit; the
   working copy lives outside this repository.
-
-**One environment cannot be fully rebuilt from a fresh clone.** `spiral_environment`
-installs from `multibench_codes/SPIRAL_latest`, which git does not track. Its
-post-install fails with an explicit message naming the upstream repo rather than
-producing a quietly broken environment.
 
 ## Verifying your install
 
