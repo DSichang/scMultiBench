@@ -672,9 +672,14 @@ def test_end_to_end_label_order_claims_match_labels_for_and_the_stored_summaries
     assert list(mtb.labels_for("D28", "diagonal", "uniPort")) == stored("D28", "uniPort") == ["atac_cty", "rna_cty"]
     assert "StabMap on D52 puts batch 3 first (`cty3+cty1+cty2`)" in md
     assert "uniPort on D28 puts ATAC before RNA" in md
-    # the caveat: Concerto's recorded order is not what labels_for returns
+    # the caveat: Concerto's stored run is not in the order labels_for returns,
+    # which is the order of a run through mtb.run (its driver lists the shards)
     assert '`labels_for("D52", "cross", "Concerto")` returns `cty1, cty2, cty3`' in md
     assert list(mtb.labels_for("D52", "cross", "Concerto")) == ["cty1", "cty2", "cty3"]
     assert stored("D52", "Concerto") == ["cty3", "cty1", "cty2"]
+    assert "`mtb.run` has them listed in batch order" in md
+    from multibench.engine import registry
+    assert all(v.driver == "engine/drivers/run_concerto.py"
+               for v in registry.get("Concerto").variants if v.when["category"] == "cross")
     assert 'UINMF on D52 uses `label_order=["cty1", "cty2"]`' in md
     assert stored("D52", "UINMF") == ["cty1", "cty2"]
