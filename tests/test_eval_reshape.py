@@ -117,7 +117,7 @@ def test_to_long_rejects_wide_one_row_frame_with_hint():
 def test_to_long_accepts_csv_readback_and_series(tmp_path):
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=pd.Index(["ARI", "NMI"], name="metric"))
     f = tmp_path / "wide.csv"
-    w.to_csv(f)                                    # what `multibench evaluate --out` writes
+    w.to_csv(f)                                    # header 'metric,Value' (a named index)
     back = pd.read_csv(f)                          # columns ['metric', 'Value'], RangeIndex
     out = to_long(back, method="M", dataset="D", category="vertical")
     assert out.columns.tolist().count("metric") == 1
@@ -130,3 +130,92 @@ def test_to_long_all_blank_names_raises():
     w = pd.DataFrame({"Value": [0.5, 0.1]}, index=["", ""])
     with pytest.raises(ValueError, match="no metric name in the index canonicalises"):
         to_long(w, method="M", dataset="D", category="vertical")
+
+
+# --- CSV read-back: metric names are strings or to_long raises -------------
+def _evaluate_frame():
+    """A real ``mtb.evaluate`` frame (its index is unnamed)."""
+    import numpy as np
+    lab = np.repeat(["a", "b"], 20)
+    emb = np.random.default_rng(0).normal(size=(40, 3)) + (lab == "b")[:, None] * 5.0
+    return mtb.evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])
+
+
+def test_to_long_accepts_plain_read_csv_of_evaluate_frame(tmp_path):
+    wide = _evaluate_frame()
+    f = tmp_path / "m.csv"
+    wide.to_csv(f)                                 # header ',Value': the index is unnamed
+    back = pd.read_csv(f)
+    assert back.columns.tolist() == ["Unnamed: 0", "Value"]
+    out = to_long(back, method="M", dataset="D", category="vertical")
+    assert out.metric.tolist() == ["ARI", "NMI"]
+    assert out.value.tolist() == wide["Value"].tolist()
+    assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
+                                    "clustering", "source"]
+    # the documented read-back gives the same rows
+    same = to_long(pd.read_csv(f, index_col=0), method="M", dataset="D", category="vertical")
+    pd.testing.assert_frame_equal(out, same)
+
+
+def test_to_long_accepts_cli_evaluate_out_read_back_plainly(tmp_path):
+    from multibench import cli
+    import numpy as np
+    lab = np.repeat(["a", "b"], 20)
+    emb = tmp_path / "e.npy"
+    np.save(emb, np.random.default_rng(0).normal(size=(40, 3)) + (lab == "b")[:, None] * 5.0)
+    labels = tmp_path / "cty.csv"
+    pd.DataFrame({"x": lab}).to_csv(labels, index=False)
+    f = tmp_path / "wide.csv"
+    assert cli.main(["evaluate", "--output", str(emb), "--labels", str(labels),
+                     "--clustering", str(labels), "--metrics", "ARI,NMI", "--out", str(f)]) == 0
+    out = to_long(pd.read_csv(f), method="M", dataset="D", category="vertical")
+    assert out.metric.tolist() == ["ARI", "NMI"]
+
+
+FIX = "pd.read_csv(path, index_col=0)"
+
+
+@pytest.mark.parametrize("frame", [
+    # saved twice with the index: the row numbers come first, the names second
+    pd.DataFrame({"Unnamed: 0": [0, 1], "Unnamed: 0.1": ["ARI", "NMI"], "Value": [0.5, 0.6]}),
+    # an unnamed column that holds no names
+    pd.DataFrame({"Unnamed: 0": [0, 1], "Value": [0.5, 0.6]}),
+    # the read-back shape plus a column evaluate never writes
+    pd.DataFrame({"Unnamed: 0": ["ARI", "NMI"], "Value": [0.5, 0.6], "note": ["x", "y"]}),
+    # wide.to_csv(path, index_label="Metric") read back plainly
+    pd.DataFrame({"Metric": ["ARI", "NMI"], "Value": [0.5, 0.6]}),
+    # no names anywhere
+    pd.DataFrame({"Value": [0.5, 0.6]}),
+    pd.Series([0.5, 0.6]),
+    # rows filtered after a plain read-back of the named-column form
+    pd.DataFrame({"Metric": ["ARI", "NMI", "ASW"], "Value": [0.5, 0.6, 0.7]}).iloc[[0, 2]],
+], ids=["saved-twice", "unnamed-ints", "extra-column", "other-label", "range-index",
+        "range-series", "filtered-rows"])
+def test_to_long_raises_instead_of_numbering_metrics(frame):
+    with pytest.raises(ValueError, match="metric names") as e:
+        to_long(frame, method="M", dataset="D", category="vertical")
+    assert FIX in str(e.value)
+
+
+def test_to_long_unnamed_column_is_used_only_when_the_index_holds_no_names():
+    frame = pd.DataFrame({"Unnamed: 0": ["x", "y"], "Value": [0.5, 0.6]}, index=["ARI", "NMI"])
+    assert to_long(frame, method="M", dataset="D", category="vertical").metric.tolist() == ["ARI", "NMI"]
+
+
+def test_to_long_unnamed_read_back_drops_a_blank_name(tmp_path):
+    f = tmp_path / "m.csv"
+    pd.DataFrame({"Value": [0.5, 0.1]}, index=["ARI", ""]).to_csv(f)
+    back = pd.read_csv(f)                          # the blank name reads back as NaN
+    assert back.columns.tolist() == ["Unnamed: 0", "Value"]
+    assert to_long(back, method="M", dataset="D", category="vertical").metric.tolist() == ["ARI"]
+
+
+def test_to_long_named_fix_recovers_a_file_saved_twice(tmp_path):
+    once, twice = tmp_path / "once.csv", tmp_path / "twice.csv"
+    pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]).to_csv(once)
+    pd.read_csv(once).to_csv(twice)                # ',Unnamed: 0,Value' then '0,ARI,0.5'
+    with pytest.raises(ValueError, match="metric names"):
+        to_long(pd.read_csv(twice), method="M", dataset="D", category="vertical")
+    back = pd.read_csv(twice, index_col=0)         # the fix the message names
+    out = to_long(back, method="M", dataset="D", category="vertical")
+    assert out.metric.tolist() == ["ARI", "NMI"] and out.value.tolist() == [0.5, 0.6]
