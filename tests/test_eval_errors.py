@@ -107,8 +107,9 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
 
 def test_docstrings_match_the_code():
     doc = " ".join(evaluate.__doc__.split())
-    assert "goes in AS IS when its insertion order is the method's stacking order" in doc
-    assert "a dict in ANY OTHER order needs ``label_order=``" in doc
+    assert "goes in AS IS, in the order ``labels_for`` gave it" in doc
+    assert "any other dict goes in as is only in the default order" in doc
+    assert "otherwise needs ``label_order=``" in doc
     assert "Leiden sweep" in doc and "minutes for ~10^4" in doc
     assert "v1" not in doc
     assert "verbose" in doc and "2,000 cells" in doc

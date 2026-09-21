@@ -817,9 +817,10 @@ def _label_sort_key(stem: str):
     1. ``cty`` (one file, paired cells) first;
     2. ``cty<N>`` numbered per batch, ascending numerically (cty1, cty2, cty10);
     3. ``<modality>_cty`` in the canonical modality order rna, adt, atac
-       (``peak_cty`` is treated as atac) - the order in which the diagonal /
+       (``peak_cty`` is treated as atac) - the order in which most diagonal /
        vertical methods stack their cells in the embedding (RNA cells first,
-       then ATAC cells);
+       then ATAC cells; uniPort declares the reverse, see
+       ``Variant.stacked_roles``);
     4. anything else (``source_cty`` ...) alphabetically, last.
     """
     if stem == "cty":
@@ -834,11 +835,10 @@ def _label_sort_key(stem: str):
 
 
 def _variant_label_rank(stems: list[str], variant) -> dict[str, tuple] | None:
-    """Rank label stems by the position of the modality they label in
-    ``variant``'s argument order (the order the runner passes the files and
-    the method stacks the cells). ``None`` when no stem pairs with a role."""
-    roles = variant.roles()
-    mods = [r for r in roles if not is_label_role(r) and r != "data_dir"]
+    """Rank label stems by where the cells they label sit in ``variant``'s
+    output (``Variant.stacked_roles``: the argument order unless the registry
+    declares ``output.cell_order``). ``None`` when no stem pairs with a role."""
+    mods = variant.stacked_roles()
     rank: dict[str, tuple] = {}
     for stem in stems:
         partners = _label_partners(stem, mods)
@@ -852,16 +852,37 @@ def _variant_label_rank(stems: list[str], variant) -> dict[str, tuple] | None:
     return rank
 
 
+class LabelFiles(dict):
+    """The ``{stem: path}`` dict :func:`labels_for` returns.
+
+    A plain ``dict`` except that it remembers the key order ``labels_for``
+    gave it (``stacking_order``), so ``evaluate`` takes it as is even when
+    that is not the default order (StabMap's reference batch first). Once
+    the keys are in another order it is held to the default order like any
+    dict; a ``dict(...)`` copy is a plain dict.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stacking_order = tuple(self)
+
+    def in_stacking_order(self) -> bool:
+        """True while the keys are exactly the ones ``labels_for`` returned, in its order."""
+        return tuple(self) == self.stacking_order
+
+
 def labels_for(dataset: str, category: str | None = None, method: str | None = None,
                *, modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None) -> dict:
     """Return ``{name: path}`` of a dataset's cell-type label CSVs, in stacking order.
 
-    The order of the returned dict is the order in which the methods stack
-    the labelled cells in their output, so the dict can be handed to
-    ``mtb.evaluate(labels=...)`` as is. Paths are absolute. The positional
-    order is ``(dataset, category, method)``, like ``inputs_for`` / ``scan``
-    / ``run_all``.
+    With ``category`` and ``method`` the files come in the order that method
+    variant stacks the labelled cells in its output; without them, in the
+    default order most methods use (Notes). Either way the dict can be
+    handed to ``mtb.evaluate(labels=...)`` as is, and it matches an
+    embedding only if that embedding stacks its cells in the dict's order.
+    Paths are absolute. The positional order is ``(dataset, category,
+    method)``, like ``inputs_for`` / ``scan`` / ``run_all``.
 
     Parameters
     ----------
@@ -876,9 +897,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     method : str | None
         Registry id, validated whenever given (``KeyError`` with a
         did-you-mean hint on a typo). With ``category`` the files are
-        ordered by that variant's modality order (the variant is chosen like
-        ``inputs_for`` does - ``modalities=``, else the one the folder's
-        files satisfy); the set of files never depends on it. Default ``None``.
+        ordered as that variant's output stacks the cells (the variant is
+        chosen like ``inputs_for`` does - ``modalities=``, else the one the
+        folder's files satisfy); the set of files never depends on it.
+        Default ``None``.
     modalities : list[str] | set[str] | None, keyword-only
         The variant's modality tokens, used only with ``category`` +
         ``method`` to pick one of several variants. Default ``None``.
@@ -890,7 +912,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     -------
     dict
         ``{stem: absolute path}`` in cell-stacking order, keyed by filename
-        stem (``cty``, ``rna_cty``, ``cty1`` ...).
+        stem (``cty``, ``rna_cty``, ``cty1`` ...). A ``dict`` subclass that
+        remembers this order, so ``evaluate`` takes it as is; a copy
+        (``dict(d)``) or a dict whose keys were reordered goes in as is only
+        in the default order.
 
     Raises
     ------
@@ -912,7 +937,8 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     >>> mtb.labels_for("D28")                       # diagonal: RNA cells first, then ATAC
     {'rna_cty': '/abs/data/D28/rna_cty.csv', 'atac_cty': '/abs/data/D28/atac_cty.csv'}
     >>> m = mtb.evaluate(embedding, labels=mtb.labels_for("D28"))
-    >>> mtb.labels_for("D28", "diagonal", "scJoint")  # the variant's own argument order
+    >>> mtb.labels_for("D52", "cross", "StabMap")    # StabMap: its reference batch first
+    {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv', 'cty2': '/abs/data/D52/cty2.csv'}
 
     Notes
     -----
@@ -921,21 +947,24 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     ``cty1.csv``, ...). The primary label files are returned (excluding
     tool-specific ``*_scjoint*`` reformats), keyed by filename stem.
 
-    The stacking order is NOT alphabetical:
+    The default order is NOT alphabetical:
 
     1. ``cty`` (one file, cells already paired) first;
     2. numbered ``cty1, cty2, ..., cty10`` ascending NUMERICALLY (batch order);
     3. modality-named files in the canonical modality order **rna, adt, atac**
        (``rna_cty`` before ``atac_cty``; ``peak_cty`` counts as atac) - the
-       diagonal methods emit the RNA cells first, then the ATAC cells, so
-       ``D28`` returns ``{'rna_cty': ..., 'atac_cty': ...}``;
+       diagonal methods other than uniPort emit the RNA cells first, then
+       the ATAC cells, so ``D28`` returns ``{'rna_cty': ..., 'atac_cty': ...}``;
     4. any other ``*cty*`` file alphabetically, last.
 
-    When ``category`` and ``method`` are given the variant's own argument
-    order decides instead (``modalities=`` disambiguates a method with several
-    variants in that category; if it is still ambiguous the canonical order
-    above is used): a label file is placed where the modality it labels sits
-    in the variant's inputs.
+    When ``category`` and ``method`` are given the variant decides instead
+    (``modalities=`` disambiguates a method with several variants in that
+    category; if it is still ambiguous the default order above is used): a
+    label file is placed where the cells it labels sit in the variant's
+    output. That is the variant's argument order unless the registry
+    declares another (``output.cell_order`` in ``methods.yaml``): StabMap
+    stacks its reference batch first (``cty3, cty1, cty2`` on ``D52``),
+    uniPort its ATAC cells before its RNA cells.
 
     ``list(labels_for(ds).values())`` is the same files as a list, in the same
     order, which ``mtb.evaluate(labels=...)`` also accepts.
@@ -977,4 +1006,4 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
             rank = _variant_label_rank(stems, cand)
             if rank is not None:
                 stems = sorted(stems, key=lambda st: rank[st])
-    return {st: files[st] for st in stems}
+    return LabelFiles((st, files[st]) for st in stems)

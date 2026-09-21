@@ -59,6 +59,13 @@ def is_label_role(role: str) -> bool:
     return ("cty" in role) or ("label" in role)
 
 
+def _batch_of(role: str) -> int | None:
+    """Batch number of a numbered role (``rna3`` -> 3); ``None`` for an
+    unnumbered one (``rna``, ``reference``)."""
+    stem = role.rstrip("0123456789")
+    return int(role[len(stem):]) if stem and stem != role else None
+
+
 def base_modality(role: str) -> str:
     """Map an arg role to its base modality type (``rna``/``adt``/``atac``/...).
 
@@ -194,6 +201,12 @@ class OutputSpec:
     kind: str               # embedding | graph | labels | coords (io.load_output also accepts imputed | markers)
     file: str               # filename (or glob) written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
+    # Order of the cells in the output's rows, for a script that does not
+    # stack them in argument order (see Variant.stacked_roles): a list of
+    # input roles, first block first (roles left out follow in argument
+    # order), or "reference_first" - the batch the `reference` const names
+    # (data<N>) first, the others in argument order. None = argument order.
+    cell_order: list | str | None = None
 
 
 @dataclass
@@ -235,6 +248,80 @@ class Variant:
                     continue
                 out.append(r)
         return out
+
+    def stacked_roles(self) -> list[str]:
+        """The input roles in the order the output stacks their cells.
+
+        Argument order (label roles and ``data_dir`` left out) unless
+        ``output.cell_order`` declares another:
+
+        * a list of roles - those first, in that order, then the rest in
+          argument order (uniPort: ``[atac_gas, rna]``, its script
+          concatenates the ATAC cells first);
+        * ``"reference_first"`` - the roles of the batch the ``reference``
+          const names as ``data<N>`` first, then the rest in argument order
+          (StabMap: ``stabMap()`` stacks the reference dataset's cells before
+          the others, and its util.R names the batches ``data1..dataN`` by
+          slot, so slot ``k`` of each repeated flag must hold batch ``k``).
+
+        Raises
+        ------
+        ValueError
+            A ``cell_order`` this variant cannot honour; the registry loader
+            calls this, so a bad declaration fails when methods.yaml loads.
+        """
+        mods = [r for r in self.roles() if not is_label_role(r) and r != "data_dir"]
+        order = self.output.cell_order
+        if order is None:
+            return mods
+        if order == "reference_first":
+            batch = self._reference_batch(mods)
+            return ([r for r in mods if _batch_of(r) == batch]
+                    + [r for r in mods if _batch_of(r) != batch])
+        if isinstance(order, str) or not isinstance(order, list):
+            raise ValueError(
+                f"output.cell_order must be a list of input roles or "
+                f"'reference_first'; got {order!r}")
+        unknown = [r for r in order if r not in mods]
+        if unknown:
+            raise ValueError(f"output.cell_order names {unknown}, which are not "
+                             f"input roles of this variant ({mods})")
+        if len(set(order)) != len(order):
+            raise ValueError(f"output.cell_order names a role twice: {order}")
+        return list(order) + [r for r in mods if r not in order]
+
+    def _reference_batch(self, mods: list[str]) -> int:
+        """Batch number ``N`` of the ``reference`` const ``data<N>``, checked
+        against the slots StabMap's util.R numbers (see :meth:`stacked_roles`)."""
+        refs = [a for a in self.args if a.role == "reference" and a.const]
+        if len(refs) != 1:
+            raise ValueError(
+                f"output.cell_order 'reference_first' needs one `reference` arg "
+                f"with a const; found {len(refs)}"
+                + (" (no `reference` arg)" if not refs else ""))
+        const = str(refs[0].const)
+        if not (const.startswith("data") and const[4:].isdigit()):
+            raise ValueError(f"the `reference` const must be data<N> (the N-th batch) "
+                             f"for 'reference_first'; got {const!r}")
+        batch = int(const[4:])
+        if not any(_batch_of(r) == batch for r in mods):
+            raise ValueError(f"the `reference` const {const!r} names batch {batch}, "
+                             f"but no input role belongs to batch {batch} ({mods})")
+        slots: dict[str, int] = {}
+        for a in self.args:
+            entries = a.roles or [a.role]
+            if a.flag is None or not any(
+                    str(e).startswith("=") or _batch_of(str(e)) is not None
+                    for e in entries):
+                continue
+            slots[a.flag] = slots.get(a.flag, 0) + 1
+            for e in map(str, entries):
+                if not e.startswith("=") and _batch_of(e) != slots[a.flag]:
+                    raise ValueError(
+                        f"slot {slots[a.flag]} of {a.flag} holds {e!r}; with "
+                        f"'reference_first' slot k of a repeated flag must be "
+                        f"batch k (or an '=None' gap), because data<N> counts slots")
+        return batch
 
     @property
     def needs_labels(self) -> bool:

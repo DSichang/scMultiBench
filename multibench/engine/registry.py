@@ -55,7 +55,7 @@ def _variant_key(when: dict) -> str:
 
 
 def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
-    return Variant(
+    v = Variant(
         when=d["when"],
         entrypoint=d["entrypoint"],
         language=d.get("language", "python"),
@@ -74,6 +74,13 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         slice_obs=list(d.get("slice_obs", []) or []),
         helpers=list(d.get("helpers", []) or []),
     )
+    # labels_for orders label files by this; a declaration the variant cannot
+    # honour must fail here, not hand evaluate() a wrong order later
+    try:
+        v.stacked_roles()
+    except ValueError as e:
+        raise ValueError(f"methods.yaml: {method_id!r} {_variant_key(v.when)}: {e}") from None
+    return v
 
 
 def _parse_method(d: dict) -> MethodSpec:
