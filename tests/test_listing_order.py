@@ -186,8 +186,6 @@ _LISTING = re.compile(r"os\.listdir|os\.scandir|glob\.glob|\bglob\(|\.iterdir\(|
 #: driver, that lists a directory - and why the listing order cannot reach
 #: the output rows unnoticed:
 #: driver    - Concerto; engine/drivers/run_concerto.py lists the shards in batch order
-#: staged    - reads a data_dir; run() stages it and records the order the
-#:             script's glob returns there (runner.stage_slices)
 #: by_name   - lists one folder and picks each file by its name
 #: not_data  - lists code, not data
 #: not_run   - a script in the folder that no variant runs
@@ -195,11 +193,6 @@ _ACCOUNTED = {
     "tools_scripts/Concerto/main_Concerto.py": "driver",
     "tools_scripts/Concerto/concerto_function5_3.py": "driver",
     "engine/drivers/run_concerto.py": "driver",
-    "tools_scripts/GPSA/main_GPSA.py": "staged",
-    "engine/drivers/run_gpsa.py": "staged",
-    "tools_scripts/PASTE/main_PASTE_pairwise.py": "staged",
-    "tools_scripts/PASTE/main_PASTE_center.py": "not_run",
-    "tools_scripts/PASTE2/main_PASTE2.py": "staged",
     "tools_scripts/scMM/datasets.py": "by_name",
     "tools_scripts/UnitedNet/src/configs/__init__.py": "not_data",
     "tools_scripts/totalVI/main_totalVI_imputation.py": "not_run",
@@ -240,7 +233,5 @@ def test_each_disposition_holds():
                 batches = {schema._batch_of(r) for r in v.stacked_roles()} - {None}
                 if len(batches) > 1:
                     assert v.driver == DRIVER, (s.id, v.when)
-            elif why == "staged":
-                assert v.roles() == ["data_dir"] and v.output.kind == "coords", (s.id, v.when)
     concerto = [v for v in registry.get("Concerto").variants if v.when["category"] == "cross"]
     assert concerto and all(v.driver == DRIVER for v in concerto)
