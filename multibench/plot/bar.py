@@ -37,7 +37,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         ``group`` is given.
     group : {"clustering", "batch"} | None, keyword-only
         Score one metric family only (the benchmark's two summary panels);
-        ``None`` = every metric in the frame.
+        ``None`` = the ``metrics`` selection.
     top : int | None, keyword-only
         Keep the ``top`` best methods, scored against all of them; ``None``
         = every method.
@@ -53,8 +53,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     save : str | None, keyword-only
         File to write the figure to (140 dpi, tight bounding box).
     overall : {"rank", "mean_overall"}, keyword-only
-        Across-dataset *Overall* formula: ``"rank"`` gives a method rank 0 on
-        a dataset it lacks, ``"mean_overall"`` skips that dataset (Notes).
+        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
+        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
+        (missing dataset skipped).
 
     Returns
     -------

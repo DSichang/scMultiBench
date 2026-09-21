@@ -3,8 +3,9 @@
 This module is also the single source of truth for the cross-dataset summary
 math shared by :func:`multibench.plot.bubble` and :func:`multibench.plot.bar`:
 :func:`per_dataset_ranks`, :func:`mean_rank_matrix` and
-:func:`overall_by_basis`. Both figures call these, so passing the same
-``overall=`` to both yields the same method ordering.
+:func:`overall_by_basis`. Both figures call these, so with the same
+``overall=`` and the metrics of one family they order methods identically
+(see the Notes of ``plot.bubble``).
 """
 from __future__ import annotations
 
@@ -46,9 +47,10 @@ OVERALL_BASES = ("rank", "mean_overall")
 #: the ``overall`` parameter entry written out verbatim in the docstrings of
 #: plot.bubble and plot.bar (tests/test_bubble.py and tests/test_bar.py pin it)
 OVERALL_DOC = """\
-    overall : {"rank", "mean_overall"}
-        Across-dataset *Overall* formula: ``"rank"`` gives a method rank 0 on
-        a dataset it lacks, ``"mean_overall"`` skips that dataset (Notes)."""
+    overall : {"rank", "mean_overall"}, keyword-only
+        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
+        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
+        (missing dataset skipped)."""
 
 
 def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:

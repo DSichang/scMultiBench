@@ -54,14 +54,14 @@ class FamilyBlock:
 class BubbleTable:
     """The numbers behind a bubble figure, as ``mtb.plot.build_table`` returns.
 
-    Rows are ``methods``, best first; the per-family matrices live in
-    ``blocks``. Pass the table to ``mtb.plot.render`` to draw it.
+    Rows are ``methods``; the per-family matrices live in ``blocks``. Pass
+    the table to ``mtb.plot.render`` to draw it.
 
     Attributes
     ----------
     methods : list of str
-        Row order, best first; a method's position in the figure (1 = best)
-        is ``methods.index(name) + 1``.
+        Row order: best first, or the ``order`` methods first;
+        ``methods.index(name) + 1`` is the row's position (1 = top).
     blocks : list of FamilyBlock
         One block per metric family present, in paper order, each with its
         own ``raw``, ``norm``, ``ranks`` and ``overall``.
@@ -73,7 +73,7 @@ class BubbleTable:
         mean within-dataset max-ranks under ``"summary"``.
     overall : pandas.Series
         Combined Overall per method (mean of the family Overalls); it sets
-        the row order.
+        the row order unless ``order`` is given.
     aggregate : str
         ``"dataset"`` (metric markers are circles) or ``"summary"`` (bars,
         the paper's panel c).
@@ -131,7 +131,7 @@ class BubbleTable:
     mtb.plot.render : draws a table as the paper-style figure.
     mtb.plot.bubble : build and render in one call.
     """
-    methods: list             # row order, best first
+    methods: list             # row order: order= methods first, then best first
     blocks: list              # list[FamilyBlock], in FAMILIES order
     # kept for backward compatibility with callers that inspect the table
     matrix: pd.DataFrame      # all families' min-max scaled columns
@@ -257,8 +257,9 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         Methods to put first, in this order; the rest follow best first.
         Reorders only - filter with ``methods``.
     aggregate : {"dataset", "summary"}, keyword-only
-        ``"dataset"``: raw metric values. ``"summary"``: within-dataset
-        max-ranks averaged across datasets (the paper's panel c).
+        ``"dataset"``: raw metric values of one dataset (several are averaged
+        per method). ``"summary"``: within-dataset max-ranks averaged across
+        datasets (the paper's panel c).
     require_complete : bool, keyword-only
         With ``aggregate="summary"``: keep only the methods present in every
         dataset.
@@ -267,21 +268,22 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         ``"rank"`` (the paper's panel rule) or ``"mean_overall"`` (bar's
         default); see ``mtb.plot.bubble``.
     na : {"warn", "skip", "raise"}, keyword-only
-        How to report ``n/a`` cells (a method lacking a metric); the report
-        is also stored as ``na_cells``.
+        How to report ``n/a`` cells (a method lacking a metric): ``"warn"``,
+        ``"skip"`` (silent, nothing is dropped) or ``"raise"``; also stored
+        as ``na_cells``.
 
     Returns
     -------
     BubbleTable
-        Read ``methods`` (row order, best first), ``ranks`` (max-ranks,
-        ``n`` = best) and ``overall``; every field is listed under
-        ``mtb.plot.BubbleTable``.
+        Read ``methods`` (row order: best first unless ``order`` is given),
+        ``ranks`` (max-ranks, ``n`` = best) and ``overall``; all fields are
+        under ``mtb.plot.BubbleTable``.
 
     Raises
     ------
     ValueError
-        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or a selector
-        names a value not in it.
+        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or ``metrics`` /
+        ``methods`` / ``order`` names an absent value.
     ValueError
         Duplicate ``(method[, dataset], metric)`` rows, or an invalid
         ``aggregate`` / ``overall`` / ``na``.
@@ -312,8 +314,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     Notes
     -----
     **Missing-metric rule.** A method may lack a value for some metric (an
-    ``n/a`` cell, drawn as a dash). Neither rule is visible in the numbers,
-    so ``na`` sets how it is reported.
+    ``n/a`` cell, drawn as a dash):
 
     - ``aggregate="dataset"``: the cell is simply absent. The family
       *Overall* averages the ranks of the metrics the method has (a method
@@ -323,15 +324,14 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
       paper's rule), in the metric columns and in the ``overall="rank"``
       Overall; ``overall="mean_overall"`` skips it.
 
-    The warning reads like ``"YukiNet: DR and clustering Overall over 3 of 4
-    metrics (cLISI n/a)"``.
+    Neither rule is visible in the numbers, so ``na`` sets how it is
+    reported; the warning reads like ``"YukiNet: DR and clustering Overall
+    over 3 of 4 metrics (cLISI n/a)"``.
 
     **Row order.** The combined Overall is the mean of the family Overalls,
     sorted best first with a stable sort, so tied methods keep alphabetical
     order - the tie-break ``mtb.plot.bar`` uses. Ranks and scores always
-    come from the whole filtered frame; ``order`` only moves rows. Metrics
-    outside the two paper families are still shown, in a neutral purple
-    "Other" block.
+    come from the whole filtered frame; ``order`` only moves rows.
 
     **require_complete.** It never drops silently: one ``UserWarning`` names
     each dropped method and the datasets it lacks (``"require_complete=True
@@ -348,7 +348,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     **Name matching.** ``metrics``, ``methods`` and ``order`` match the
     frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
     case-insensitively; the frame's own spelling is kept. The family blocks
-    always stay in paper order.
+    always stay in paper order; metrics outside the two paper families form
+    a neutral purple "Other" block.
 
     **Errors.** A frame that looks like ``mtb.evaluate``'s wide output gets a
     hint to convert it with ``mtb.to_long`` first; an unknown name gets a
@@ -513,7 +514,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     combined = pd.concat([b.overall for b in blocks], axis=1).mean(axis=1)
     # stable sort: tied methods keep index (alphabetical) order, the same
-    # tie-break plot.bar uses, so the two figures agree under the same overall=
+    # tie-break plot.bar uses
     ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
     if order is not None:
         order = _resolve(order, raw_all.index.tolist(), "method", catalog.canonical_id)
@@ -930,14 +931,15 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     """Draw the paper-style bubble table: methods as rows, metrics as columns.
 
     Metrics are grouped into task families, each led by an *Overall* bar;
-    rows run best first. ``mtb.plot.build_table`` returns the same numbers
-    without drawing.
+    rows run best first unless ``order`` is given. ``mtb.plot.build_table``
+    returns the same numbers without drawing.
 
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Tidy frame with ``method``, ``metric``, ``value`` columns, as from
-        ``mtb.load_results``, ``mtb.to_long`` or the ``BatchResult.long`` property.
+        Tidy frame with ``method``, ``metric``, ``value`` and optional
+        ``dataset`` columns, as from ``mtb.load_results``, ``mtb.to_long`` or
+        the ``BatchResult.long`` property (more in Notes).
     metrics : list of str | None, keyword-only
         Metric codes to show, in this order within each family; ``None`` =
         every metric in the frame.
@@ -965,9 +967,9 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         With ``aggregate="summary"``: keep only the methods present in every
         dataset.
     overall : {"rank", "mean_overall"}, keyword-only
-        Across-dataset *Overall* formula: ``"rank"`` gives a method rank 0 on
-        a dataset it lacks, ``"mean_overall"`` skips that dataset (Notes).
-        Applies under ``aggregate="summary"``.
+        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
+        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
+        (missing dataset skipped). Applies under ``aggregate="summary"``.
     na : {"warn", "skip", "raise"}, keyword-only
         How to report ``n/a`` cells (a method lacking a metric): warn once,
         stay silent, or raise.
@@ -980,8 +982,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     Raises
     ------
     ValueError
-        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or a selector
-        names a value not in it.
+        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or ``metrics`` /
+        ``methods`` / ``order`` names an absent value.
     ValueError
         Duplicate ``(method[, dataset], metric)`` rows, or an invalid
         ``aggregate`` / ``overall`` / ``na``.
@@ -1107,6 +1109,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     See Also
     --------
     mtb.plot.build_table : the numbers behind the figure, to audit first.
+    mtb.plot.render : draw a ``BubbleTable``; ``bubble`` is ``build_table`` then ``render``.
     mtb.plot.bar : one bar per method across datasets; same ``overall=`` formulas.
     mtb.to_long : reshape ``mtb.evaluate``'s wide frame into the long frame.
     mtb.load_results : stored metric tables as a long frame.
