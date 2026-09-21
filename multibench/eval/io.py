@@ -211,9 +211,8 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
       single-label dataset) - that file. Several entries raise here, because
       this coercer does not know the method's stacking order; pass the paths
       as a list in that order. (:func:`multibench.evaluate` takes a
-      multi-entry dict as is when its insertion order is the stacking order
-      - what ``labels_for`` returns - and needs ``label_order=`` only for a
-      dict in any other order.)
+      multi-entry dict as is when it is an unchanged ``labels_for`` dict or
+      in the default order, and needs ``label_order=`` otherwise.)
     * ``numpy.ndarray`` (1-D, or ``(n, 1)``), ``pandas.Series``,
       ``pandas.Categorical``, ``pandas.Index``, or a list/tuple of scalars;
     * a single-column ``pandas.DataFrame`` (or a wider one with ``column=``).
@@ -273,10 +272,10 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
 
     A dict fixes no cell order, and the order is the method's stacking order -
     the order in which the method concatenated its input cells - which is not
-    alphabetical: ``cty1 < cty2 < ...`` numerically, and ``rna`` before
-    ``atac``. A wrong order raises no error and invalidates every score, so
-    the message names the keys, states the rule and points at the helper that
-    returns the files in that order.
+    alphabetical: for most methods ``cty1 < cty2 < ...`` numerically, and
+    ``rna`` before ``atac``. A wrong order raises no error and invalidates
+    every score, so the message names the keys, states the rule and points
+    at the helper that returns the files in that order.
     """
     keys = [str(k) for k in d]
     fix = (f"pass label_order=[...] with these keys in that order (label_order="
@@ -285,8 +284,9 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
     return (
         f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
         f"fix the cell order, and the order must be the method's stacking order "
-        f"(the order the method concatenated its input cells: numbered files "
-        f"ascending, cty1, cty2, ...; rna before atac) - NOT alphabetical. "
+        f"(the order the method concatenated its input cells - NOT "
+        f"alphabetical; for most methods numbered files ascending, cty1, cty2, "
+        f"..., and rna before atac). "
         f"{fix}, or a list of paths in cell order. "
         f"mtb.labels_for(dataset, method=<method>, category=<category>) returns "
         f"the files in that order.")

@@ -149,6 +149,9 @@ methods:
           - {role: rna2, flag: "--pair_path1"}   # paired (multiome) RNA
           - {role: atac2, flag: "--pair_path2"}  # paired (multiome) ATAC
           - {role: out_dir, flag: "--save_path"}
+        # cells in argument order (rna1, atac3, paired) only when the ATAC-only
+        # and paired batches have the same size, as in D45: scvi stacks paired,
+        # RNA, ATAC and main_MultiVI.py re-slices that by the ATAC-only count
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Cobolt
     language: python
@@ -482,6 +485,8 @@ methods:
           - {role: rna1, flag: "--query_path1"}   # query = RNA-only
           - {role: atac3, flag: "--query_path2"}  # query = ATAC-only
           - {role: out_dir, flag: "--save_path"}
+        # cells in argument order: main_SMILE.py stacks the paired reference
+        # ((z_a+z_b)/2), then query RNA, then query ATAC
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Portal
     language: python
@@ -511,7 +516,9 @@ methods:
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         params: {seed: 1}
-        output: {kind: embedding, file: embedding.h5, dataset: data}
+        # ATAC cells first: main_uniPort.py:48 concatenates adata_atac before
+        # adata_rna (D28: ARI .599 atac-first vs .001 rna-first)
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: [atac_gas, rna]}
   - id: sciCAN
     # GPU: main_sciCAN.py:46 calls Cycle_train_wolabel, which puts every network
     # and minibatch on CUDA unconditionally (training.py:162-166, :193-198); the
@@ -781,7 +788,11 @@ methods:
           - {role: adt3, flag: "--adt"}
           - {role: out_dir, flag: "--save_path"}
           - {role: reference, flag: "--reference", const: data3}
-        output: {kind: embedding, file: embedding.h5, dataset: data}
+        # stabMap() rbinds the reference dataset's embedding before the others
+        # (StabMap R/stabMap.R, embedding_list filled from all_shortest_paths
+        # from the reference); util.R:184 names the batches data1..dataN. D52:
+        # ARI .688 for cty3, cty1, cty2 vs .0006 for cty1, cty2, cty3.
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
       # Mosaic integration. Same driver as cross; run_stabmap.R accepts
       # repeatable --rna/--adt/--atac, and util.R names datasets data1..dataN one
       # per batch. D46 is rna1+adt1 | rna2+atac2 | rna3, so data1 is a bridge
@@ -806,7 +817,8 @@ methods:
           - {roles: ["=None"], flag: "--atac"}
           - {role: out_dir, flag: "--save_path"}
           - {role: reference, flag: "--reference", const: data1}
-        output: {kind: embedding, file: embedding.h5, dataset: data}
+        # reference batch first, as in the cross variant (D46: cty1, cty2, cty3)
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
   - id: UINMF
     language: R
     tasks: [batch, clustering]

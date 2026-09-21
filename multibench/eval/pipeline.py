@@ -213,25 +213,30 @@ def _labels_from_dict(d: dict, label_order) -> list:
     """Turn a ``{name: path}`` label dict into the list of paths in cell order.
 
     One entry needs no order. Several entries need ``label_order`` (keys of
-    ``d``; a subset selects those files) unless the dict's insertion order is
-    already the method's stacking order (what ``labels_for`` returns). Any
-    other order must be explicit: a guess would score the embedding against
-    misordered labels without any error.
+    ``d``; a subset selects those files) unless ``d`` is what ``labels_for``
+    returned, in the order it returned it (a method variant's stacking
+    order, recorded on the dict), or any dict in the default order
+    (``_label_sort_key``). Any other order must be explicit: a guess would
+    score the embedding against misordered labels without any error.
     """
     if label_order is None:
         if len(d) == 1:
             return [next(iter(d.values()))]
-        from ..engine.resolve import _label_sort_key
+        from ..engine.resolve import LabelFiles, _label_sort_key
         keys = list(d)
+        if isinstance(d, LabelFiles) and d.in_stacking_order():
+            return [d[k] for k in keys]
         if keys == sorted(keys, key=_label_sort_key):
             return [d[k] for k in keys]
         raise ValueError(
-            f"labels: got a dict with {len(d)} label files {keys} whose order is "
-            f"not the method's stacking order (cty1, cty2, ... numerically; rna "
-            f"before adt before atac - NOT alphabetical); pass a list of paths "
-            f"in cell order, or label_order=[...] naming the keys in that order, "
-            f"or mtb.labels_for(dataset, method=<method>, category=<category>) "
-            f"which returns them already in stacking order")
+            f"labels: got a dict with {len(d)} label files {keys} that is not "
+            f"an unchanged mtb.labels_for dict and is not in the default "
+            f"stacking order (cty1, cty2, ... numerically; rna before adt before "
+            f"atac - NOT alphabetical); pass the dict "
+            f"mtb.labels_for(dataset, method=<method>, category=<category>) "
+            f"returns, unchanged (it is in that method's stacking order), a list "
+            f"of paths in cell order, or label_order=[...] naming the keys in "
+            f"that order")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
         raise TypeError(
             f"label_order= must be a list of keys of the labels dict, e.g. "
@@ -419,10 +424,11 @@ def evaluate(
         * a list of CSV paths, concatenated in that order (multi-batch
           datasets: ``[cty1, cty2, cty3]``);
         * a dict as returned by :func:`multibench.labels_for` - it goes in AS
-          IS when its insertion order is the method's stacking order (``cty1,
-          cty2, ...`` numerically; ``rna`` before ``adt`` before ``atac``),
-          which is the order ``labels_for`` returns; a dict in ANY OTHER order
-          needs ``label_order=`` (a one-entry dict has no order to get wrong);
+          IS, in the order ``labels_for`` gave it (with ``category`` and
+          ``method``, that method's stacking order); any other dict goes in
+          as is only in the default order (``cty1, cty2, ...`` numerically;
+          ``rna`` before ``adt`` before ``atac``) and otherwise needs
+          ``label_order=`` (a one-entry dict has no order to get wrong);
         * a 1-D ``ndarray``/``Series``/``Categorical``/list, or a
           single-column DataFrame;
         * when ``output`` is an AnnData, the name of an ``obs`` column.
@@ -496,8 +502,9 @@ def evaluate(
         labels, unknown category, ``metrics`` token or code, length
         mismatches (``'input length mismatch: emb has N cells, celltype has
         M'``), cell-id mismatches when aligning, ambiguous label files, a
-        multi-entry labels dict in a non-stacking order without
-        ``label_order``, an ``.h5`` output without dataset ``data``.
+        multi-entry labels dict (other than an unchanged ``labels_for`` one)
+        out of the default order without ``label_order``, an ``.h5`` output
+        without dataset ``data``.
     FileNotFoundError
         an ``output`` / label path that does not exist (the message names
         the path and the working directory).
