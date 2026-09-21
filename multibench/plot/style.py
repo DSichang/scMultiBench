@@ -3,8 +3,9 @@
 This module is also the single source of truth for the cross-dataset summary
 math shared by :func:`multibench.plot.bubble` and :func:`multibench.plot.bar`:
 :func:`per_dataset_ranks`, :func:`mean_rank_matrix` and
-:func:`overall_by_basis`. Both figures call these, so passing the same
-``overall=`` to both yields the same method ordering.
+:func:`overall_by_basis`. Both figures call these, so with the same
+``overall=`` and the metrics of one family they order methods identically
+(see the Notes of ``plot.bubble``).
 """
 from __future__ import annotations
 
@@ -39,28 +40,17 @@ def compute_overall(mat: pd.DataFrame) -> pd.Series:
 # cross-dataset summary math (shared by bubble and bar)
 # --------------------------------------------------------------------------
 
-#: the two ways an across-dataset "Overall" can be formed; see OVERALL_DOC
+#: the two ways an across-dataset "Overall" can be formed; the formulas are
+#: in overall_by_basis
 OVERALL_BASES = ("rank", "mean_overall")
 
+#: the ``overall`` parameter entry written out verbatim in the docstrings of
+#: plot.bubble and plot.bar (tests/test_bubble.py and tests/test_bar.py pin it)
 OVERALL_DOC = """\
-    overall : {"rank", "mean_overall"}
-        How the across-dataset *Overall* score is formed.
-
-        * ``"rank"`` (bubble's default): ``minmax(mean over metrics of
-          max-rank(mean over datasets of within-dataset max-rank))`` - the
-          per-dataset ranks are averaged per metric, the mean ranks are
-          re-ranked across methods, averaged over metrics and min-max scaled.
-          A method absent from a dataset scores rank 0 there (the paper's
-          summary rule), which pulls it down.
-        * ``"mean_overall"`` (bar's default): ``mean over datasets of
-          minmax(mean over metrics of within-dataset max-rank)`` - each
-          dataset gets its own min-max-scaled overall and those are averaged
-          over the datasets the method was actually run on (absence is
-          skipped, not penalised).
-
-        The two formulas can order methods differently on the same frame;
-        pass the same ``overall=`` to ``plot.bubble`` and ``plot.bar`` to get
-        the same ordering. The formula in use is printed on the figure."""
+    overall : {"rank", "mean_overall"}, keyword-only
+        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
+        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
+        (missing dataset skipped)."""
 
 
 def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
@@ -124,9 +114,16 @@ def coverage(parts: dict) -> pd.Series:
 def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
     """Across-dataset Overall per method under the given ``basis``.
 
-    ``parts`` is the dict from :func:`per_dataset_ranks`. See
-    :data:`OVERALL_DOC` for the two formulas. Raises ``ValueError`` for an
-    unknown ``basis``.
+    ``parts`` is the dict from :func:`per_dataset_ranks`. The two formulas
+    (spelled out again in the Notes of ``plot.bubble`` and ``plot.bar``):
+
+    - ``"rank"``: ``minmax(mean over metrics of max-rank(mean over datasets
+      of within-dataset max-rank))``; a method absent from a dataset scores
+      rank 0 there (the paper's summary rule).
+    - ``"mean_overall"``: ``mean over datasets of minmax(mean over metrics of
+      within-dataset max-rank)``; a dataset the method lacks is skipped.
+
+    Raises ``ValueError`` for an unknown ``basis``.
     """
     if basis not in OVERALL_BASES:
         raise ValueError(
