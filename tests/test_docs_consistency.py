@@ -676,6 +676,84 @@ def test_api_overview_links_every_entry_point_to_its_reference_anchor():
     assert "```python\nmtb." not in text, "api.md carries a hand-written signature block; the reference pages own them"
 
 
+# ---- the summary table atop each reference page ------------------------------
+# tools/gen_reference_tables.py writes it from the docstrings between these
+# markers: one row per ``:::`` entry, the public name linked to its anchor and
+# the docstring's summary line. Checked here without the generator, so a
+# generator bug cannot hide a stale table.
+SUMMARY_BLOCK = re.compile(r"<!-- api-summary:[^\n]*-->\n(.*?)<!-- /api-summary -->", re.S)
+SUMMARY_ROW = re.compile(r"^\| \[`([^`]+)`\]\(#([^)\s]+)\) \| (.*) \|$")
+REGENERATE = "regenerate: python tools/gen_reference_tables.py $SCMULTIBENCH_DOCS"
+
+
+def _load_tool(name):
+    spec = importlib.util.spec_from_file_location(name, ROOT / "tools" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)          # __main__ guard: nothing is written
+    return mod
+
+
+def _summary_rows(text):
+    """``[(name, anchor, summary)]`` of a page's summary table, None without one."""
+    m = SUMMARY_BLOCK.search(text)
+    if m is None:
+        return None
+    return [(r.group(1), r.group(2), r.group(3).replace(r"\|", "|"))
+            for r in map(SUMMARY_ROW.match, m.group(1).splitlines()) if r]
+
+
+@needs_docs
+def test_reference_pages_open_with_a_summary_table_matching_the_docstrings():
+    """Every reference page opens with its title, one intro paragraph and the
+    summary table; the table lists exactly the page's ``:::`` entries, in page
+    order, each linked to its anchor, and each summary cell is the first line
+    of ``inspect.getdoc`` of the imported object - which must be the whole
+    summary (numpydoc: one line)."""
+    docs = _docs_root()
+    problems = []
+    for page in sorted((docs / "reference").glob("*.md")):
+        text = page.read_text()
+        entries = [(heading, path) for path, heading in _directives(text).items()]
+        rows = _summary_rows(text)
+        if rows is None:
+            problems.append(f"{page.name}: no summary table")
+            continue
+        head = text[:SUMMARY_BLOCK.search(text).start()]
+        if not re.fullmatch(r"# [^\n]+\n\n(?:[^\n]+\n)+\n", head):
+            problems.append(f"{page.name}: the table must follow the title and ONE intro paragraph")
+        if [(name, anchor) for name, anchor, _ in rows] != entries:
+            problems.append(f"{page.name}: table rows {[r[0] for r in rows]} != entries {[e[0] for e in entries]}")
+        for name, anchor, cell in rows:
+            doc = inspect.getdoc(_resolve(anchor)) or ""
+            summary = doc.split("\n\n", 1)[0].splitlines()
+            first = summary[0].strip() if summary else ""
+            if len(summary) > 1:
+                problems.append(f"{name}: the docstring summary wraps onto {len(summary)} lines; "
+                                "numpydoc keeps it to one")
+            if cell != first:
+                problems.append(f"{page.name}: {name}: table says {cell!r}, docstring says {first!r}")
+    assert not problems, "\n".join(problems + [REGENERATE])
+
+
+@needs_docs
+def test_reference_table_generator_repairs_a_drifted_table(tmp_path, capsys):
+    """The generator the integrator reruns after a docstring change: on a
+    copy of run.md with a row dropped and a cell gone stale, ``--check``
+    reports the page and a rewrite restores the committed table."""
+    gen = _load_tool("gen_reference_tables")
+    text = (_docs_root() / "reference" / "run.md").read_text()
+    rows = [line for line in text.splitlines() if SUMMARY_ROW.match(line)]
+    assert len(rows) >= 2
+    stale = rows[1].rsplit(" | ", 1)[0] + " | a summary nobody wrote |"
+    (tmp_path / "reference").mkdir()
+    page = tmp_path / "reference" / "run.md"
+    page.write_text(text.replace(rows[0] + "\n", "").replace(rows[1], stale))
+    assert gen.main([str(tmp_path), "--check"]) == 1
+    assert "run.md" in capsys.readouterr().out
+    assert gen.main([str(tmp_path)]) == 0
+    assert page.read_text() == text
+
+
 # ---- the executed tutorial copies on the site (docs/tutorials/*.ipynb) ------
 def _write_nb(path, cells, executed=True):
     """A minimal notebook file: ``cells`` is ``[(cell_type, source), ...]``."""
