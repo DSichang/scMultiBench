@@ -218,19 +218,28 @@ def check_flavor(flavor) -> str:
 def host_has_gpu() -> bool:
     """Is an NVIDIA GPU visible on this host?
 
-    ``True`` when ``nvidia-smi`` is on ``PATH`` and ``nvidia-smi -L`` exits
-    0 printing at least one line, or when ``/proc/driver/nvidia/version``
-    exists (the driver is loaded but the tool is not on ``PATH``). Nothing
-    else counts: a torch install, ``CUDA_VISIBLE_DEVICES`` or a CUDA
-    library on disk say nothing about the machine. Cached per process
-    (``host_has_gpu.cache_clear()`` re-probes); module-level so tests
-    monkeypatch it either way.
-
     Returns
     -------
     bool
-        ``True`` when a GPU is visible; ``False`` on a CPU-only host - the
-        ``flavor='auto'`` decision of :func:`install_packed`.
+        ``True`` when a GPU is visible; ``False`` on a CPU-only host.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.env.host_has_gpu()
+
+    Notes
+    -----
+    **Detection.** ``True`` when ``nvidia-smi -L`` runs and lists at least one
+    device, or when ``/proc/driver/nvidia/version`` exists (driver loaded, tool
+    not on ``PATH``). A torch install, ``CUDA_VISIBLE_DEVICES`` or a CUDA
+    library on disk do not count.
+
+    **Where it is used.** ``mtb.env.install(flavor="auto")`` picks the GPU or
+    CPU archives from it.
+
+    **Caching.** The result is cached per process;
+    ``mtb.env.host_has_gpu.cache_clear()`` probes again.
     """
     smi = shutil.which("nvidia-smi")
     if smi:
@@ -791,21 +800,31 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
     Parameters
     ----------
     env : str
-        The env name (:func:`group_for`), e.g. ``'matilda'``.
+        Environment name, e.g. ``"matilda"`` (``mtb.method_info(m)["env"]``).
     conda : str, optional
-        conda/mamba executable to ask when the prefix is not under
-        ``envs_dir``; default: the one on PATH, if any.
+        conda/mamba executable to ask when the env is not under ``envs_dir``;
+        ``None`` = the one on ``PATH``, if any.
 
     Returns
     -------
     Path or None
-        ``<config.DEFAULT.envs_dir>/<env>`` when that directory contains
-        ``bin/`` (a conda-pack archive unpacked there, or a conda-built env
-        in the same directory) - no conda needed; else, when a conda/mamba
-        binary is found, the prefix ``conda env list`` reports for that name;
-        else ``None``. This is what "installed" means everywhere
-        (:func:`installed_envs`, :func:`doctor`, ``scan()['env_ok']``) and
-        what the runner's prefix mode activates.
+        The environment's prefix; ``None`` when it is not installed.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.env.env_prefix("matilda")       # None until the env is installed
+
+    Notes
+    -----
+    **Lookup order.** ``<mtb.config.DEFAULT.envs_dir>/<env>`` when that folder
+    contains ``bin/`` (an unpacked archive or a conda-built env there; no conda
+    needed); otherwise, when a conda/mamba binary is found, the prefix
+    ``conda env list`` reports for that name; otherwise ``None``.
+
+    **Where it is used.** This is what "installed" means everywhere
+    (``mtb.env.doctor``, ``env_ok`` in ``mtb.scan``) and the prefix the runner
+    activates.
     """
     cand = Path(config.DEFAULT.envs_dir) / env
     if (cand / "bin").is_dir():
