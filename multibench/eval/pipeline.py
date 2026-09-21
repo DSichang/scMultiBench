@@ -29,8 +29,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     ----------
     value_df : pandas.DataFrame or pandas.Series
         What ``mtb.evaluate`` returns (metrics as the index, one column
-        ``Value``), a Series indexed by metric, or its CSV read back with a
-        ``metric`` column.
+        ``Value``), a Series indexed by metric, or that frame's CSV read back
+        (forms in Notes).
     method : str
         Method id written into every row; your own name is fine.
     dataset : str, optional
@@ -53,8 +53,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     Raises
     ------
     ValueError
-        ``value_df`` is already long, has no ``Value`` column, no metric
-        names, or duplicate ones.
+        ``value_df`` is already long, lacks ``Value`` or string metric names,
+        or repeats a name.
 
     Examples
     --------
@@ -71,11 +71,13 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     -> ``kBET``); rows whose name is blank are dropped, and a name the
     package does not know is kept as written.
 
-    **CSV read-back.** Save the frame with
-    ``wide.to_csv(path, index_label="metric")``, or read it back with
-    ``pd.read_csv(path, index_col=0)``. A plain ``pd.read_csv`` of
-    ``wide.to_csv(path)`` names the metric column ``Unnamed: 0``, and the
-    metric names come out as ``0, 1, ...`` without an error.
+    **CSV read-back.** ``pd.read_csv(path, index_col=0)`` reads
+    ``wide.to_csv(path)`` back. A plain ``pd.read_csv(path)`` works too: its
+    metric column ``Unnamed: 0`` is taken as the names only when the columns
+    are exactly ``Unnamed: 0, Value``, it holds strings and the index none.
+    So does a ``metric`` column (``wide.to_csv(path, index_label="metric")``).
+    Metric names that are not strings, like row numbers ``0, 1, ...``, raise
+    instead of being scored.
 
     **Column values.** ``dataset=None`` writes ``"all"``, the placeholder the
     plotting layer uses for a frame without datasets, so the column is never
@@ -93,6 +95,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
       the plot / ``load_results`` consumers directly;
     - no ``Value`` column - the message names the expected shape and, for a
       wide one-row frame, the ``df.T.set_axis(['Value'], axis=1)`` fix;
+    - a metric name that is not a string (row numbers from a plain
+      ``pd.read_csv`` of another shape) - the message names
+      ``pd.read_csv(path, index_col=0)``;
     - every metric name blank;
     - two names that collapse onto one canonical metric (``ari`` and
       ``ARI``): a silent duplicate would double-count that metric in every
@@ -122,13 +127,29 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
             f"'Value'; got columns {cols} (index {idx}) - for a wide one-row "
             f"frame use df.T.set_axis(['Value'], axis=1)")
     if "metric" in cols:
-        # the CSV read-back of evaluate's frame (pd.read_csv(out)): the metric
-        # names are a column, not the index - reset_index below would
+        # pd.read_csv of evaluate's frame saved with index_label="metric": the
+        # metric names are a column, not the index - reset_index below would
         # otherwise prepend the RangeIndex as a second 'metric' column
         value_df = value_df.set_index("metric")
+    elif (cols == ["Unnamed: 0", "Value"]
+          and all(map(_name_or_blank, value_df["Unnamed: 0"]))
+          and any(isinstance(n, str) for n in value_df["Unnamed: 0"])
+          and not any(isinstance(n, str) for n in value_df.index)):
+        # pd.read_csv(path) of evaluate's frame saved with .to_csv(path): the
+        # index is unnamed, so pandas names its blank header cell 'Unnamed: 0'
+        # and numbers the rows - the names are that column, not the index
+        value_df = value_df.set_index("Unnamed: 0")
     out = value_df.rename(columns={"Value": "value"}).copy()
     out = out.reset_index()                      # the index column comes first,
     out = out.rename(columns={out.columns[0]: "metric"})   # whatever it was named
+    if not all(map(_name_or_blank, out["metric"])):
+        # row numbers (a plain read_csv of any other saved shape) would pass
+        # canonical_metric unchanged and score metrics '0', '1', ...
+        raise ValueError(
+            f"to_long needs the metric names as strings (evaluate()'s index or a "
+            f"'metric' column); got {out['metric'].head(5).tolist()} with columns {cols} "
+            f"- read a CSV saved with wide.to_csv(path) back with "
+            f"pd.read_csv(path, index_col=0)")
     out["metric"] = out["metric"].map(catalog.canonical_metric)
     out = out.dropna(subset=["metric"])
     if out.empty and len(value_df):
@@ -148,6 +169,11 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     out["clustering"] = clustering
     out["source"] = source
     return out[list(LONG_COLUMNS)].reset_index(drop=True)
+
+
+def _name_or_blank(v) -> bool:
+    """A metric name (``str``) or a blank cell (``None``/NaN, which to_long drops)."""
+    return isinstance(v, str) or (pd.api.types.is_scalar(v) and pd.isna(v))
 
 
 def _metric_families() -> tuple[list, list]:
