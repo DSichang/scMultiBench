@@ -439,13 +439,13 @@ def evaluate(
         Integration category, one of ``mtb.list_categories()``; validated,
         otherwise unused (the metrics do not depend on it). Lets a call mirror
         ``mtb.run``.
-    batch : optional
+    batch
         Batch labels, one per cell, in the forms ``labels`` accepts; needed
         for the batch metrics unless ``labels`` lists two or more files.
     metrics : None, str or list of str
         ``None`` = every applicable metric except kBET; or ``"clustering"``,
         ``"batch"``, ``"all"``, or a list of codes such as ``["ARI", "NMI"]``.
-    clustering : optional
+    clustering
         Precomputed cluster assignment, in the forms ``labels`` accepts or an
         ``.h5`` path; ``None`` = derive one with the Leiden sweep.
     obsm : str
