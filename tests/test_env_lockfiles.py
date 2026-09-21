@@ -4,8 +4,8 @@
 a new machine. An env with no lockfile is silently unbuildable there: env doctor
 shows it as "[!] missing, no lockfile" and the reviewer has no route forward.
 
-scmb_gpsa2 (GPSA) was in exactly that state - 28 of 29 covered - and nothing in
-the suite would have caught it.
+One env was in exactly that state - 28 of 29 covered - and nothing in the
+suite would have caught it.
 """
 
 from multibench.engine import envs

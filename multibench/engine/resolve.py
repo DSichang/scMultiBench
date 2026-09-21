@@ -42,73 +42,16 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     return ds_dir / f"{bases[0]}{fallback_ext}"
 
 
-def _resolve_data_dir(ds_dir: Path, method: str | None = None) -> str:
-    """Directory of spatial slices for a registration ``data_dir`` role.
+def _resolve_data_dir(ds_dir: Path) -> str:
+    """Directory for a ``data_dir`` role: ``<ds_dir>/processed/`` when it
+    exists, else ``<ds_dir>`` itself (which always exists).
 
-    Spatial-registration methods (PASTE/PASTE2/SPIRAL/GPSA) take a directory of
-    per-slice ``.h5ad`` files, not one file per modality. Datasets keep those
-    slices under ``<ds_dir>/processed/`` (sometimes directly in ``<ds_dir>/``).
-    Return the first dir that holds ``*.h5ad`` slices, with a trailing separator:
-    the upstream scripts string-concatenate ``data_dir + "*.h5ad"``.
+    scBridge takes the dataset directory plus bare filenames relative to it
+    (``const`` args). The path ends with a separator: the upstream script
+    string-concatenates ``data_path + filename``.
     """
-    import os
-    for cand in (ds_dir / "processed", ds_dir):
-        if cand.is_dir() and any(cand.glob("*.h5ad")):
-            # SPIRAL needs a unique leading filename token per slice
-            # (see _stage_unique_leading_token).
-            if method == "SPIRAL":
-                return _stage_unique_leading_token(cand)
-            return os.path.join(str(cand), "")
-    # No `.h5ad` slices: a non-spatial `data_dir` role (scBridge takes the
-    # dataset directory plus bare filenames). Prefer an existing `processed/`
-    # (the spatial error message then names the slice dir); otherwise the
-    # dataset dir itself, which always exists.
     proc = ds_dir / "processed"
     return os.path.join(str(proc if proc.is_dir() else ds_dir), "")
-
-
-def _stage_unique_leading_token(slice_dir: Path) -> str:
-    """Return a dir of the same `.h5ad` slices but with a unique leading
-    filename token (the part before the first '_').
-
-    SPIRAL builds each slice's cross-slice cell-ID prefix from
-    ``filename.split('_')[0]``. Datasets whose slice files share that token
-    (D63: ``modified_E14-16h_a_S07.h5ad`` ... all split to ``modified``)
-    make the per-cell prefixes collide across slices, which inflates
-    ``coord.loc[ann.obs_names]`` into a cartesian product and crashes the
-    coordinate-assignment step. When the leading tokens are already unique
-    the original dir is returned; otherwise a sibling
-    ``<dir>__spiral_uniqtok/`` of symlinks is created (no data copy, the
-    original dir is never changed) whose names start with a unique token
-    taken from the end of each stem.
-    """
-    import os
-    files = sorted(p for p in slice_dir.glob("*.h5ad") if p.is_file())
-    if not files:
-        return os.path.join(str(slice_dir), "")
-    lead = [f.name.split("_")[0] for f in files]
-    if len(set(lead)) == len(lead):
-        return os.path.join(str(slice_dir), "")  # already unique
-    staged = slice_dir.parent / (slice_dir.name + "__spiral_uniqtok")
-    staged.mkdir(parents=True, exist_ok=True)
-    used = set()
-    for f in files:
-        stem = f.stem
-        tok = stem.split("_")[-1] or stem  # trailing token, e.g. S07
-        base = tok
-        i = 1
-        while tok in used:
-            i += 1
-            tok = f"{base}{i}"
-        used.add(tok)
-        link = staged / f"{tok}_{f.name}"
-        if link.is_symlink() or link.exists():
-            try:
-                link.unlink()
-            except OSError:
-                pass
-        os.symlink(os.path.realpath(str(f)), str(link))
-    return os.path.join(str(staged), "")
 
 
 def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
@@ -126,7 +69,7 @@ def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
     # A `data_dir` role resolves to a directory, not a file.
     if any(a.role == "data_dir" for a in variant.args):
-        out["data_dir"] = _resolve_data_dir(ds_dir, method)
+        out["data_dir"] = _resolve_data_dir(ds_dir)
     return out
 
 
@@ -324,7 +267,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     ValueError
         ``check=True``: a transposed matrix, or label rows differ from the cell count.
     FileNotFoundError
-        ``check=True``: an input file is missing, or the slice folder is unusable.
+        ``check=True``: an input file is missing, or ``data_dir`` lacks a file the method names.
 
     Warns
     -----
@@ -340,7 +283,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     {'rna': '/abs/data/D11/rna.h5', 'adt': '/abs/data/D11/adt.h5', 'cty': '/abs/data/D11/cty.csv'}
     >>> inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"], check=True)
     >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11")
-    >>> mtb.inputs_for("MYVISIUM", "cross", "PASTE", data_path="data")   # {'data_dir': '/abs/data/MYVISIUM/'}
+    >>> mtb.inputs_for("D28", "diagonal", "scBridge")   # {'data_dir': '/abs/data/D28/'}
 
     Notes
     -----
@@ -379,11 +322,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
     back to ``<role>.h5`` (``<role>.csv`` for a label role), a path that does
     not exist (see ``check``).
 
-    A ``data_dir`` role resolves to the folder holding the ``*.h5ad`` slices:
-    ``<dataset>/processed/`` or the dataset folder itself. For SPIRAL, when
-    the slice files share their leading filename token, it points at a
-    sibling ``<folder>__spiral_uniqtok/`` of symlinks with unique names; the
-    original folder is untouched.
+    A ``data_dir`` role (scBridge) resolves to ``<dataset>/processed/`` when
+    that folder exists, else to the dataset folder itself.
 
     **Absolute paths.** Every returned path is ABSOLUTE (a relative
     ``data_path`` is resolved against the current directory), and a
@@ -410,10 +350,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
       rows than the modality file it labels, including the numbered
       ``cty<i>.csv`` of a cross/mosaic batch (no method takes it as an input
       role, but every evaluation reads it);
-    - ``data_dir`` content: ``FileNotFoundError`` when a spatial-registration
-      method finds fewer than two ``*.h5ad`` slices, a slice lacks
-      ``obsm['spatial']`` or an ``obs`` column the variant declares in
-      ``slice_obs`` (GPSA's ``Ground_Truth``), or scBridge's named files are
+    - ``data_dir`` content: ``FileNotFoundError`` when a file scBridge names
+      inside ``data_dir`` (``rna.h5``, ``atac_gas.h5``, the two label CSVs) is
       absent.
 
     **Dataset name case.** A spelling that differs from the folder only in
@@ -513,7 +451,7 @@ def benchmark_host_only_reason(entrypoint) -> str:
 
     Such an entrypoint names one machine's filesystem - the benchmark host -
     so no download can supply it (``MethodSpec.availability ==
-    'benchmark-host-only'``; SPIRAL). This is the ``files_reason`` text
+    'benchmark-host-only'``). This is the ``files_reason`` text
     ``scan`` reports for those rows; it starts with the machine-readable
     prefix :data:`BENCHMARK_HOST_ONLY`. Returns ``""`` when the path is
     relative or exists (then the script is reachable).
@@ -733,41 +671,12 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
 
     ``data_dir`` resolves to the dataset directory itself when there is no
     ``processed/`` subdir, so the path always exists and existence proves
-    nothing. Spatial-registration methods (``output.kind == 'coords'``) need
-    >= 2 ``*.h5ad`` slices, each carrying ``obsm['spatial']`` coordinates (the
-    upstream scripts glob ``data_dir + '*.h5ad'`` and align ``.obsm['spatial']``)
-    and every ``obs`` column the variant declares in ``slice_obs`` (GPSA's
-    driver reads ``obs['Ground_Truth']`` from each slice at load, so a folder
-    without it would otherwise pass scan and fail after the env build); other
-    ``data_dir`` methods (scBridge) name their files via ``const`` args.
+    nothing. A ``data_dir`` method (scBridge) names its files via ``const``
+    args; every named ``.h5`` / ``.csv`` file must be present.
     """
     d = Path(data_dir)
     if not d.is_dir():
         return False, f"no such directory: {d}"
-    if variant.output.kind == "coords":
-        slices = sorted(d.glob("*.h5ad"))
-        if len(slices) < 2:
-            return False, ("spatial registration needs >=2 .h5ad slice files; "
-                           f"found {len(slices)} in {d}")
-        import h5py
-        for sl in slices:
-            try:
-                with h5py.File(sl, "r") as f:
-                    has = "obsm" in f and "spatial" in f["obsm"]
-                    obs_cols = set(f["obs"].keys()) if "obs" in f else set()
-            except OSError:
-                return False, f"{sl.name} is not a readable .h5ad file"
-            if not has:
-                return False, (f"{sl.name} has no obsm['spatial'] coordinates; "
-                               f"registration needs .X plus obsm['spatial'] per slice")
-            for col in (getattr(variant, "slice_obs", None) or []):
-                if col not in obs_cols:
-                    return False, (f"{sl.name} has no obs[{col!r}] column; this method "
-                                   f"reads obs[{col!r}] (a region/layer label per spot) "
-                                   f"from EVERY slice - add the column to each .h5ad "
-                                   f"(see mtb.describe_layout('cross'))")
-        return True, ""
-    # non-spatial data_dir methods (e.g. scBridge) name their files via `const`
     needed = [a.const for a in variant.args if a.const and str(a.const).endswith((".h5", ".csv"))]
     missing = [f for f in needed if not (d / f).exists()]
     if missing:

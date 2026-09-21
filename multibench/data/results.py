@@ -1255,10 +1255,6 @@ def recommend(
       "not ranked" is never mistaken for "ranked last". A published table
       need not score every method wired for its category; the re-run sweeps
       may cover more (``source="rerun"``).
-    - Registration methods (``output_kind == "coords"``: GPSA, PASTE,
-      PASTE2, SPIRAL in cross) produce aligned coordinates, not an
-      embedding, so no scIB metric applies and they are not rows of the
-      table.
 
     **Columns.**
 
@@ -1282,20 +1278,19 @@ def recommend(
     - ``"not_scored"`` (also under ``"missing"``) - the unscored method ids;
     - ``"dropped_methods"`` - registry methods present in the table but not
       run by this package for the category;
-    - ``"unranked_registration"`` - the coords-output methods of the
-      category, never scored.
+    - ``"unranked_registration"`` - always an empty list.
 
     **Selections.** ``metrics="batch"`` scores ASW_batch, GC, iLISI, kBET;
     ``"all"`` every metric present; a list exactly those codes (alias
     tolerant). ``methods`` is resolved as in ``mtb.load_results``
-    (``"mofa+"`` -> MOFA2, ``"totalvi"`` -> totalVI), and the unscored and
-    registration lines of the warning are restricted to the same set, so a
-    requested method without rows is still reported as such. ``modalities``
+    (``"mofa+"`` -> MOFA2, ``"totalvi"`` -> totalVI), and the unscored line
+    of the warning is restricted to the same set, so a requested method
+    without rows is still reported as such. ``modalities``
     uses ``mtb.find_methods``.
 
     **Warning.** One ``UserWarning`` with one line per finding summarises
-    dropped methods and datasets, partial coverage, the unscored methods
-    and the unranked registration methods.
+    dropped methods and datasets, partial coverage and the unscored
+    methods.
 
     **Errors.** ``ValueError`` is raised when:
 
@@ -1419,9 +1414,9 @@ def recommend(
                 f"methods matching the modalities: {sorted(allowed)}")
 
     # Methods wired for the category but absent from the source. The registry
-    # 'clustering' tag covers every embedding method of a category and
-    # excludes the registration-only cross methods; the 'batch' tag is
-    # incomplete (vertical), so the requested family never gates this list.
+    # 'clustering' tag covers every embedding method of a category; the
+    # 'batch' tag is incomplete (vertical), so the requested family never
+    # gates this list.
     wired = find_methods(category=category, task="clustering", modalities=modalities,
                          runnable=True)
     if want_ids is not None:
@@ -1436,18 +1431,6 @@ def recommend(
 
     from ..engine import registry, envs
     from ..discover import method_info
-
-    # registration methods: every variant of the category outputs coords
-    registration = []
-    for m in list_methods(category=category, runnable=True):
-        vs = [v for v in registry.get(m).variants if v.when.get("category") == category]
-        if vs and all(v.output.kind == "coords" for v in vs):
-            registration.append(m)
-    if modalities is not None:
-        registration = [m for m in registration if m in allowed]
-    if want_ids is not None:
-        registration = [m for m in registration if m in want_ids]
-    registration = sorted(registration, key=str.lower)
 
     rows = []
     for m in keep_methods + missing:
@@ -1489,7 +1472,7 @@ def recommend(
     out.attrs["not_scored"] = list(missing)
     out.attrs["missing"] = list(missing)
     out.attrs["dropped_methods"] = list(foreign)
-    out.attrs["unranked_registration"] = list(registration)
+    out.attrs["unranked_registration"] = []
 
     notes = []
     if degenerate:
@@ -1520,11 +1503,6 @@ def recommend(
             f"grand_score NaN / coverage 0.0"
             + (' (try source="rerun")' if source == "published" and long_df_was_none
                else ""))
-    if registration:
-        notes.append(
-            f"registration methods (coords output: {', '.join(registration)}) "
-            f"produce aligned coordinates, not an embedding - no scIB metric "
-            f"applies, so they have no rows and are not ranked")
     if notes:
         warnings.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
                       UserWarning, stacklevel=3)

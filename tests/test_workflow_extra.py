@@ -59,19 +59,19 @@ def test_batch_result_attributes_are_documented():
 
 
 def test_failures_excludes_successful_but_unscorable_runs():
-    """A method that ran fine but emits coords/graph is NOT a failure.
+    """A method that ran fine but emits only a graph is NOT a failure.
 
-    The four spatial-registration methods produce aligned coordinates, so there is
-    no embedding to score - listing them under .failures sends users hunting for a
+    Seurat_WNN and MIRA write a neighbour graph and no embedding, so there is
+    nothing to score - listing them under .failures sends users hunting for a
     bug that does not exist.
     """
     from multibench.workflow import BatchResult
-    recs = [{"method": "PASTE", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
-            {"method": "SPIRAL", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
+    recs = [{"method": "Seurat_WNN", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
+            {"method": "MIRA", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
             {"method": "Broken", "status": "FAIL", "error": "boom", "_long": None},
             {"method": "Slow", "status": "TIMEOUT", "error": "too long", "_long": None},
             {"method": "Good", "status": "CHAIN_OK", "_long": None}]
-    r = BatchResult(recs, "D63", "cross")
+    r = BatchResult(recs, "D11", "vertical")
     assert set(r.failures["method"]) == {"Broken", "Slow"}
     assert "ran but not scorable" in repr(r)
 import multibench as mtb
@@ -186,25 +186,17 @@ def test_describe_layout_atac_lists_come_from_registry():
     assert "WRONG" in txt
 
 
-def test_describe_layout_rejects_typo_and_redirects_spatial():
+def test_describe_layout_rejects_typo():
     with pytest.raises(ValueError, match="unknown category 'crosss'"):
         mtb.describe_layout("crosss")
-    with pytest.raises(ValueError) as e:
-        mtb.describe_layout("spatial")
-    assert "cross" in str(e.value) and "describe_layout('cross')" in str(e.value)
     assert mtb.describe_layout(None)            # None still prints everything
 
 
-def test_describe_layout_spatial_block_and_export_route():
+def test_describe_layout_export_route():
     txt = mtb.describe_layout("cross")
-    assert "SPATIAL REGISTRATION" in txt
-    for m in ("PASTE", "PASTE2", "SPIRAL", "GPSA"):
-        assert m in txt
-    assert ".h5ad" in txt and "obsm['spatial']" in txt and "data_dir" in txt
     assert "export_dataset" in txt and "float64" in txt and "gzip" in txt
-    # the vertical text has no spatial block, but keeps every praised sentence
+    # the vertical text keeps every praised sentence
     vert = mtb.describe_layout("vertical")
-    assert "SPATIAL REGISTRATION" not in vert
     for s_ in ("FEATURES x CELLS", "TRANSPOSE", "single-column CSV", "FALLS BACK",
                "to_canonical"):
         assert s_ in vert

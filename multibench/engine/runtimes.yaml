@@ -47,14 +47,6 @@ GLUE:
     source: manual
   tier: very_slow
   worst_sec: 9031
-GPSA:
-  observed:
-  - cells: 1272
-    dataset: D63
-    sec: 3729
-    source: recorded
-  tier: slow
-  worst_sec: 3729
 MIRA:
   observed:
   - cells: null
@@ -111,22 +103,6 @@ Multigrate:
     source: manual
   tier: very_slow
   worst_sec: 10369
-PASTE:
-  observed:
-  - cells: 1272
-    dataset: D63
-    sec: 569
-    source: recorded
-  tier: medium
-  worst_sec: 569
-PASTE2:
-  observed:
-  - cells: 1272
-    dataset: D63
-    sec: 2735
-    source: recorded
-  tier: slow
-  worst_sec: 2735
 Portal:
   observed:
   - cells: 11014
@@ -151,14 +127,6 @@ SMILE:
     source: manual
   tier: slow
   worst_sec: 1916
-SPIRAL:
-  observed:
-  - cells: 1272
-    dataset: D63
-    sec: 3093
-    source: recorded
-  tier: slow
-  worst_sec: 3093
 Seurat_WNN:
   observed:
   - cells: 2864

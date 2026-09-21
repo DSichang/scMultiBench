@@ -1,6 +1,6 @@
 """Method environments: packed archives, lockfiles, recipes and shared envs.
 
-scMultiBench wraps ~40 separately developed tools whose pinned dependencies
+scMultiBench wraps ~36 separately developed tools whose pinned dependencies
 conflict (TF 2.4 vs 2.8, scvi <0.20 vs latest, py3.7 vs 3.10, R vs Python), so
 no single conda env can host them all. Compatible methods share an env:
 ``env_groups.yaml`` maps each method to the env that serves it, and ``plan()``
@@ -673,8 +673,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     - ``shared`` - the env is a shared group of ``env_groups.yaml``.
     - ``methods`` - the selected methods this env serves, sorted.
     - ``availability`` - ``'public'``, or ``'benchmark-host-only'`` when
-      none of those methods has a published script (SPIRAL): the env
-      builds, but the method still cannot run off the benchmark host.
+      none of those methods has a published script: the env builds, but
+      the method still cannot run off the benchmark host.
     - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the env is installed here from
       a packed archive, else ``None``.
 
@@ -1598,7 +1598,7 @@ _CONDA_TO_PYPI = {
 # env and recorded by `pip freeze` as a bare `name==version` no index can
 # satisfy. Stripped from the pip section and restored by <env>.post.sh, which
 # names the source (a git URL + commit, or a path inside this repo).
-_NOT_ON_PYPI = frozenset({"cobolt", "spiral", "multimap"})
+_NOT_ON_PYPI = frozenset({"cobolt", "multimap"})
 # conda's own installer machinery: importable in a conda env, so `pip freeze`
 # lists it, but distributed only through conda channels, so the pip install
 # aborts with "No matching distribution found". Narrow on purpose: packages

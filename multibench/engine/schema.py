@@ -206,7 +206,7 @@ class ArgSpec:
 
 @dataclass
 class OutputSpec:
-    kind: str               # embedding | graph | labels | coords (io.load_output also accepts imputed | markers)
+    kind: str               # embedding | graph | labels (io.load_output also accepts imputed | markers)
     file: str               # filename (or glob) written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
     # Order of the cells in the output's rows, for a script that does not
@@ -233,7 +233,6 @@ class Variant:
     driver: str | None = None          # package-relative R/py wrapper that source()s the (unmodified) upstream entrypoint then calls its function; see engine/drivers/
     normalize_peaks: list = field(default_factory=list)  # roles whose .h5 ATAC peak names get normalized to chr:start-end before the run
     extra_outputs: list[OutputSpec] = field(default_factory=list)
-    slice_obs: list = field(default_factory=list)   # obs columns every slice of a data_dir must carry (GPSA reads obs['Ground_Truth']); checked by scan's file gate
     helpers: list = field(default_factory=list)     # local modules the entrypoint imports from its own dir that upstream does not ship (MIRA's logger.py); scan reports the script blocked when one is absent
 
     def matches(self, category: str, modalities: set[str]) -> bool:
@@ -363,19 +362,9 @@ class Variant:
     @property
     def takes_data_dir(self) -> bool:
         """True when this variant is fed a directory (a ``data_dir`` role) -
-        the spatial-registration methods and scBridge - rather than one file
-        per modality. Such variants declare no modalities (``when.modalities`` is
-        empty or absent)."""
+        scBridge - rather than one file per modality. Such variants declare no
+        modalities (``when.modalities`` is empty or absent)."""
         return any(a.role == "data_dir" for a in self.args)
-
-    @property
-    def modalities_unknown(self) -> bool:
-        """True when nothing in the declaration says which modalities this
-        variant consumes: it takes a directory and no bare filename names a
-        matrix (SPIRAL/GPSA/PASTE/PASTE2, whose slices are ``.h5ad`` files).
-        ``find_methods(modalities=...)`` keeps such variants and warns rather
-        than silently dropping them."""
-        return self.takes_data_dir and not self.modality_types
 
     @property
     def consumes_atac(self) -> bool:
@@ -500,10 +489,9 @@ class MethodSpec:
           scMultiBench repository (``tools_scripts/...``), which ``run`` fetches
           on first use; a public install can execute it.
         * ``"benchmark-host-only"`` - at least one variant's entrypoint is an
-          absolute path on the machine the benchmark was produced on (SPIRAL's
-          working script is not published), so the script cannot be fetched
-          and the method cannot run from a public install - whatever
-          ``status`` says.
+          absolute path on the machine the benchmark was produced on, so the
+          script cannot be fetched and the method cannot run from a public
+          install - whatever ``status`` says.
 
         Derived from the entrypoints (no hand-maintained flag): the rule is
         "any variant entrypoint is absolute". Stubs without variants are

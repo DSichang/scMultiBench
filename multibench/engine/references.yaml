@@ -301,50 +301,6 @@ UnitedNet:
     journal: Nature Communications
     year: 2023
 
-SPIRAL:
-  repo_url: https://github.com/guott15/SPIRAL/tree/main
-  version: "1.0"
-  summary: "Graph-neural-network integration and alignment of spatially resolved transcriptomics slices across experiments and technologies; registration task."
-  reference:
-    doi: 10.1186/s13059-023-03078-6
-    title: "SPIRAL: integrating and aligning spatially resolved transcriptomics data across different experiments, conditions, and technologies"
-    authors: Guo T, Yuan Z, Pan Y, Wang J, Chen F, Zhang MQ, Li X
-    journal: Genome Biology
-    year: 2023
-
-GPSA:
-  repo_url: https://github.com/andrewcharlesjones/spatial-alignment
-  version: "0.8"
-  summary: "Gaussian-process spatial alignment: deep GP warps of spatial genomics slices into a common coordinate system; registration task."
-  reference:
-    doi: 10.1038/s41592-023-01972-2
-    title: Alignment of spatial genomics data using deep Gaussian processes
-    authors: Jones A, Townes FW, Li D, Engelhardt BE
-    journal: Nature Methods
-    year: 2023
-
-PASTE:
-  repo_url: https://github.com/raphael-group/paste
-  version: "1.4.0"
-  summary: "Probabilistic alignment of spatial transcriptomics slices with fused Gromov-Wasserstein optimal transport; pairwise and centre alignment."
-  reference:
-    doi: 10.1038/s41592-022-01459-6
-    title: Alignment and integration of spatial transcriptomics data
-    authors: Zeira R, Land M, Strzalkowski A, Raphael BJ
-    journal: Nature Methods
-    year: 2022
-
-PASTE2:
-  repo_url: https://github.com/raphael-group/paste2
-  version: "b71ec88"
-  summary: "Partial alignment of multislice spatial transcriptomics data: extends PASTE to partially overlapping slices via partial optimal transport."
-  reference:
-    doi: 10.1101/gr.277670.123
-    title: Partial alignment of multislice spatially resolved transcriptomics data
-    authors: Liu X, Zeira R, Raphael BJ
-    journal: Genome Research
-    year: 2023
-
 iPOLNG:
   repo_url: https://github.com/cuhklinlab/iPoLNG
   version: "0.0.2"

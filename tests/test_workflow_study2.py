@@ -44,16 +44,17 @@ def test_short_reason_strips_exception_prefix_row_prefix_and_absolute_paths():
 
 def test_short_reason_collapses_benchmark_host_only_to_one_sentence():
     raw = ("benchmark-host-only: script not published: method script not found at "
-           "/media/disk2/x/main_SPIRAL_ori.py - this entrypoint is an absolute path on "
+           "/benchmark/host/x/main_M.py - this entrypoint is an absolute path on "
            "the benchmark host; the script is not part of the public scMultiBench "
            "repository, so it cannot be fetched (method_info(m)['availability']); "
-           "FileNotFoundError: SPIRAL/D11/cross: spatial registration needs >=2 .h5ad "
-           "slice files; found 0 in /media/disk2/data/D11")
-    got = W._short_reason(raw, "SPIRAL", "D11", "cross")
+           "FileNotFoundError: M/D11/cross: input files not found on disk: "
+           "{'rna1': '/benchmark/data/D11/rna1.h5'}. Available files in "
+           "/benchmark/data/D11: ['rna.h5']")
+    got = W._short_reason(raw, "M", "D11", "cross")
     assert got == ("benchmark-host-only: script not published (see "
-                   "method_info(m)['availability']); spatial registration needs >=2 "
-                   ".h5ad slice files; found 0 in D11")
-    assert "/media" not in got and len(got) < len(raw) / 2
+                   "method_info(m)['availability']); input files not found on disk: "
+                   "{'rna1': 'rna1.h5'}. Available files in D11: ['rna.h5']")
+    assert "/benchmark" not in got and len(got) < len(raw) / 2
 
 
 def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
@@ -73,18 +74,6 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert "--packed --run" in r["reason"]                    # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
     assert "{'atac_gas': 'atac_gas.h5', 'rna_cty': 'rna_cty.csv'}" in row["reason"]
-    # the nothing-runnable error (built from `reason`) is shorter too
-    with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "cross", methods=["SPIRAL"], out_dir="/tmp/unused", verbose=False)
-    # On the benchmark host SPIRAL's absolute script EXISTS, so the block is
-    # about the dataset, not the script, and naming the path is right there;
-    # everywhere else the collapsed host-only reason must replace the path.
-    from pathlib import Path as _P
-    from multibench.engine import registry as _reg
-    _script = _P(_reg.get("SPIRAL").variants[0].entrypoint)
-    if not _script.exists():
-        assert "/media/disk2" not in str(e.value) and "benchmark-host-only" in str(e.value)
-    assert "SPIRAL" in str(e.value)
 
 
 def test_scan_docs_name_the_four_columns():
@@ -132,19 +121,18 @@ def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypa
 # ----------------------------------------------------------------- P03: data_dir note
 def test_scan_modalities_warns_about_excluded_data_dir_methods(all_envs):
     with pytest.warns(UserWarning) as rec:
-        df = mtb.scan("D11", "cross", modalities=["rna", "adt"])
+        df = mtb.scan("D28", "diagonal", modalities=["rna", "atac_gas"])
     msgs = [str(w.message) for w in rec if "directory-input" in str(w.message)]
     assert len(msgs) == 1, msgs
-    for m in ("PASTE", "PASTE2", "GPSA", "SPIRAL"):
-        assert m in msgs[0]
+    assert "scBridge" in msgs[0]
     assert "modalities=[]" in msgs[0]
     assert "(data_dir)" not in set(df["modalities"])      # rows unchanged: exact selector
-    # modalities=[] selects exactly them, and no note is emitted
+    # modalities=[] selects exactly it, and no note is emitted
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        d2 = mtb.scan("D11", "cross", modalities=[])
+        d2 = mtb.scan("D28", "diagonal", modalities=[])
         assert set(d2["modalities"]) == {"(data_dir)"}
-        assert {"PASTE", "PASTE2", "GPSA", "SPIRAL"} <= set(d2["method"])
+        assert set(d2["method"]) == {"scBridge"}
         # a category without directory variants stays silent
         mtb.scan("D11", "vertical", modalities=["rna", "adt"])
 

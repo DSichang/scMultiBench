@@ -27,7 +27,7 @@ from multibench.engine import envs, registry, runner, schema
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 #: the classification snapshot - a registry change must change this test
-GPU_ONLY = {"scBridge", "moETM", "SMILE", "sciCAN", "UnitedNet", "SPIRAL", "iPOLNG"}
+GPU_ONLY = {"scBridge", "moETM", "SMILE", "sciCAN", "UnitedNet", "iPOLNG"}
 CPU_SWITCH = {"scJoint": {"use_cuda": ""}, "scMDC": {"device": "cpu"}}
 
 

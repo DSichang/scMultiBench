@@ -16,7 +16,6 @@ RUNTIME_READ = [
     "engine/params.yaml",
     "engine/upstream_knobs.yaml",
     "engine/references.yaml",
-    "engine/drivers/run_gpsa.py",
     "result/rerun/long_all_D11.csv",
     "result/scib_metric/vertical integration/D11/scMoMaT/metric.csv",
     "engine/runtimes.yaml",
@@ -50,7 +49,7 @@ def test_every_runtime_read_file_is_packaged():
 def test_lockfiles_are_packaged():
     globs = _package_data_globs()
     locks = list((ROOT / "multibench/engine/env_locks").glob("*.yml"))
-    assert len(locks) >= 29
+    assert len(locks) >= 26
     for p in locks:
         rel = f"engine/env_locks/{p.name}"
         assert any(fnmatch.fnmatch(rel, g) for g in globs), rel

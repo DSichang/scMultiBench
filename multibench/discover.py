@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import functools
 import os
-import warnings
 from pathlib import Path
 
 from .engine import registry, upstream, envs
@@ -34,9 +33,7 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
         return want is None and atac is None and not needs_labels
     if category and v.when.get("category") != category:
         return False
-    # A directory-fed variant that names no matrix (the spatial registration
-    # methods) cannot be judged by modality: keep it, find_methods warns.
-    if want is not None and not v.modalities_unknown and not want <= v.modality_types:
+    if want is not None and not want <= v.modality_types:
         return False
     if needs_labels is not None and v.needs_labels != needs_labels:
         return False
@@ -96,19 +93,12 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     TypeError
         ``modalities`` is a bare string, not a list.
 
-    Warns
-    -----
-    UserWarning
-        ``modalities`` is given and a returned method's input directory cannot
-        be checked (spatial registration).
-
     Examples
     --------
     >>> import multibench as mtb
     >>> mtb.find_methods("vertical", modalities=["rna", "adt"])
     >>> mtb.find_methods("vertical", modalities=["rna", "adt"], needs_labels=False)
     >>> mtb.find_methods(atac="peak")                 # methods that want peak matrices
-    >>> mtb.find_methods(task="registration")         # the spatial slice-alignment methods
     >>> mtb.find_methods(tunable=True, available=True)
 
     Notes
@@ -128,12 +118,9 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     tokens such as ``atac_gas`` or ``rna1`` reduce to their base type
     (``rna``, ``adt``, ``atac``).
 
-    **Directory-fed methods.** A method fed a directory is judged by the bare
-    filenames its variant names: scBridge's ``rna.h5`` / ``atac_gas.h5`` make
-    it an rna+atac method. The spatial-registration variants name nothing
-    (their ``data_dir`` holds ``.h5ad`` slices), so ``modalities`` cannot
-    filter them: they are KEPT and a ``UserWarning`` names them. Use
-    ``task='registration'`` or ``category`` to select or exclude them.
+    **Directory-fed methods.** scBridge is fed a directory and is judged by
+    the bare filenames its variant names: ``rna.h5`` / ``atac_gas.h5`` make it
+    an rna+atac method.
 
     **ATAC representation.** ``atac`` is what the upstream script consumes,
     which is not always what its role name suggests: moETM, scMM and iPOLNG
@@ -175,7 +162,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     want = (set(registry.normalize_modalities(modalities, base=True))
             if modalities is not None else None)
     out = []
-    unfiltered: list[str] = []
     for s in registry.load():
         if category and category not in s.categories:
             continue
@@ -200,15 +186,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         if not hits:
             continue
         out.append(s.id)
-        if want is not None and all(v is not None and v.modalities_unknown for v in hits):
-            unfiltered.append(s.id)
-    if unfiltered:
-        warnings.warn(
-            f"find_methods: {len(unfiltered)} method(s) take a directory (data_dir role) "
-            f"and could not be filtered by modalities={sorted(want)}; kept: "
-            f"{', '.join(unfiltered)} - see method_info(m)['supports'] "
-            f"(task='registration' selects the spatial ones)",
-            UserWarning, stacklevel=2)
     return out
 
 
@@ -327,7 +304,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       when the upstream script runs directly.
     - ``scripts_url`` - the method's ``tools_scripts`` folder in the
       scMultiBench repository, or ``None`` when its entrypoint is not
-      there (SPIRAL).
+      there.
     - ``repo_url`` / ``version`` - the upstream repository and the version
       the benchmark ran.
     - ``reference`` - ``{doi, title, authors, journal, year}`` or ``None``;
@@ -385,7 +362,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``'public'`` - every entrypoint lives in the public scMultiBench
       repository; a public install can run it.
     - ``'benchmark-host-only'`` - an entrypoint is an absolute path on the
-      benchmark host and is not published (SPIRAL); ``scan`` reports it not
+      benchmark host and is not published; ``scan`` reports it not
       runnable and ``find_methods(available=True)`` drops it.
 
     **GPU and CPU.** ``cpu_params``, ``requires_gpu`` and ``gpu_evidence``
@@ -585,7 +562,7 @@ def params_for(method: str, category: str | None = None,
     >>> p = mtb.params_for("Matilda", "vertical", ["rna", "adt"])
     >>> p["tunable"]["device"]["default"], p["effective"]["device"]   # upstream default vs what a run uses
     >>> mtb.params_for("Matilda", dataset="D11")      # the folder picks the variant
-    >>> mtb.params_for("PASTE", "cross")              # a data_dir variant: no modalities
+    >>> mtb.params_for("scBridge", "diagonal")        # a data_dir variant: no modalities
 
     Notes
     -----
@@ -593,7 +570,7 @@ def params_for(method: str, category: str | None = None,
 
     - ``method`` / ``variant`` - the registry id and the selected variant as
       ``'category:mods'`` (``mods`` is ``-`` for a ``data_dir`` variant,
-      e.g. ``'cross:-'``).
+      e.g. ``'diagonal:-'``).
     - ``defaults`` - parameters the package emits on every run. Override them
       with ``run(..., params={...})``; the override is merged over these.
     - ``tunable`` - the parameters the upstream script accepts on its command
@@ -617,7 +594,7 @@ def params_for(method: str, category: str | None = None,
 
     **Variant selection.** ``category`` and ``modalities`` select the variant
     exactly like ``run``. Either may be omitted when the rest leaves one
-    variant. A ``data_dir`` variant (scBridge's, PASTE's) has no modality
+    variant. A ``data_dir`` variant (scBridge's) has no modality
     tokens: leave ``modalities`` out and select it by ``category``, or by
     nothing when it is the method's only variant.
 
@@ -677,7 +654,7 @@ def params_for(method: str, category: str | None = None,
             v = s.variants[0]
     elif modalities is None:
         # category alone is enough whenever it selects exactly one variant. This is
-        # the only way to reach a data_dir variant (scBridge, the spatial methods),
+        # the only way to reach a data_dir variant (scBridge),
         # which has no modalities to pass.
         cands = [x for x in s.variants if x.when.get("category") == category]
         if not cands:

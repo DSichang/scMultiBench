@@ -397,7 +397,7 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     - ``language`` - ``'python'`` or ``'r'`` (lower-cased);
     - ``deep_learning`` - ``'Yes'`` / ``'No'``, as in the CSV;
     - ``atac`` - ``'peak'``, ``'gene_activity'`` or ``None``;
-    - ``output`` - ``'embedding'``, ``'graph'`` or ``'coords'``;
+    - ``output`` - ``'embedding'`` or ``'graph'``;
     - ``needs_labels`` - bool, the method needs cell-type labels;
     - ``categories`` / ``tasks`` - lists of integration categories and tasks.
 

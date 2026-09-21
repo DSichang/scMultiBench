@@ -13,7 +13,7 @@ method.csv - one row per method of the registry (multibench/engine/methods.yaml)
   atac. language, deep_learning and output are read from the CSV and not
   overlaid; the registry has no deep-learning field.
 
-dataset.csv - the dataset ids of the benchmark's dataset tree (SD* = simulated).
+dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
   dataset      The id. catalog.datasets() also reads the older header
                'dataset name' and exposes a duplicate column of that name for
                one release.

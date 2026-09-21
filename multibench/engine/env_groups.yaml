@@ -13,10 +13,6 @@ method_env:
   Concerto: scmb_concerto          # uniout shim + openTSNE/faiss/sentencepiece (BERT stack)
   VIMCCA: scmb_vimcca              # scbean 0.5.6 + TensorFlow 2.4 + tensorflow-probability 0.12.2
   UnitedNet: unitednet
-  SPIRAL: spiral_environment
-  PASTE: paste_envi                # paste-bio + POT (TorchBackend) + torch
-  PASTE2: paste_envi               # paste2==1.0.1 (PASTE2/projection)
-  GPSA: scmb_gpsa2                 # numpy 1.26.4 + h5py 3.10 + scikit-learn 1.4.1 (a numpy 1.21.6 pin is unsatisfiable with them) + torch 2.2.2+cu118 (the 2.6 wheel rejects numpy<2 in from_numpy) + numba 0.59.1; gpytorch, linear_operator, jaxtyping, morphops and kneed are installed in the env because PYTHONNOUSERSITE=1 hides user-site copies
   MOFA2: MOFA2_env                 # R MOFA2; mofapy2 comes from the Python named by RETICULATE_PYTHON (methods.yaml)
   sciPENN: env_sciPENN             # torch 1.13.1+cu117 (kernels up to sm_86, which sm_89 GPUs also run)
   SMILE: env_sciPENN               # anndata 0.8.0 + scanpy 1.9.3 + numpy 1.21.6 handle both np.matrix coercion and bytes var_names
@@ -77,11 +73,6 @@ groups:
     - uniport
     - scglue
     - sciPENN
-    - gpsa
-    - paste-bio
-    - paste2==1.0.1
-    - POT>=0.9.1
-    - statsmodels
     - rich
     pip_git:
     - git+https://github.com/epurdom/cobolt.git#egg=cobolt
@@ -95,8 +86,6 @@ groups:
     - scJoint
     - MultiMAP
     - sciPENN
-    - PASTE
-    - PASTE2
     excluded:
     - method: scMM
       reason: Depends on torchnet 0.0.4, whose malformed `torch (>=1.6<1.8)` metadata both trips pip>=24.1 (legacy version specifier) and hard-caps torch<1.8, which cascades pip back to an ancient pyro-ppl sdist (setup.py shells out to `git tag` and fails). scMM is the sole user of torchnet/pyro/torchvision among the group; its old-torch stack cannot coexist with the loose modern torch shared env. Keeps its own env (scmb_scmm2).
@@ -104,8 +93,6 @@ groups:
       reason: Hard exact pins numpy==1.21.4 / scipy==1.7.1 / scanpy==1.9.1 / anndata==0.8.0 / torch==1.11.0 + scib==1.0.5 and GPU-only; these old exact pins (esp. scipy<1.8 for the removed scipy.sparse.csr.spmatrix import, torch 1.11) cannot coexist with the loose shared stack. Keeps its own env.
     - method: scMSI
       reason: Hard pin torch==1.13.1 plus anndata<0.10 (depends on the private anndata._core.sparse_dataset.SparseDataset removed in 0.10), forcing scanpy<1.10 / pandas<2; the exact-torch + capped-anndata stack would constrain/break the loose shared env. Keeps its own env.
-    - method: SPIRAL
-      reason: Heavy exact pins (torch==2.2.0, POT==0.8.0 with internal ot.gromov APIs, scanpy==1.9.8, anndata==0.10.5.post1, numpy==1.26.4, rpy2==3.5.15) plus extra R deps (r-mclust, r-vegan) and a hardcoded R binary path; the exact torch/POT/scanpy/anndata combo is mutually incompatible with the loose shared env. Keeps its own env.
     - method: iPOLNG
       reason: Exact pins numpy==1.21.0 / torch==1.11.0 (+cu113) / pyro-ppl==1.8.1 / statsmodels==0.12.2 / importlib_resources==5.8.0 and GPU-only (.type('torch.cuda.FloatTensor') hardcoded); the old exact torch/numpy/pyro combo conflicts with the shared loose stack. Keeps its own env.
     - method: UnitedNet
@@ -118,12 +105,9 @@ groups:
       - scalex==1.0.4 + torch>=2.2.2: scalex 1.0.2 calls np.warnings (removed in numpy 1.24) and fails
         at import; 1.0.4 fixes that but requires torch>=2.2.2 and numpy>=1.26.4, which lies inside the
         numpy<2 ceiling. Both are pinned because pip otherwise resolves scalex 1.0.2 + torch 1.13.1.
-      - paste2==1.0.1: PASTE2 uses the PASTE2/projection submodule API.
-      - POT>=0.9.1: required by PASTE2. PASTE's requirements.txt pins POT==0.9.0; that pin is relaxed
-        here, since paste-bio only uses the stable ot.backend.TorchBackend API.
 
       Every excluded method hard-pins an older torch (moETM / iPOLNG / UnitedNet 1.11.0, scMSI 1.13.1,
-      SPIRAL 2.2.0, scMM <1.8 through torchnet), below the 2.2.2 floor.
+      scMM <1.8 through torchnet), below the 2.2.2 floor.
 
       R bridge: Portal imports rpy2 + anndata2ri at module load (portal/utils.py) and uses
       sc.pp.highly_variable_genes(flavor='seurat_v3'), hence conda r-base + pip rpy2 / anndata2ri /
@@ -133,11 +117,11 @@ groups:
       needs py3.12); MultiMAP from Teichlab (not reliably on PyPI).
 
       Method-specific packages: munkres (scMDC), easydl (sciCAN), xgboost (Cobolt), numba + tqdm
-      (sciPENN), networkx + POT (GPSA, PASTE2), statsmodels (PASTE2), and the pip-installable method
-      packages (scmomat, mira-multiome, uniport, scglue, sciPENN, gpsa, paste-bio). leidenalg, igraph,
-      louvain, umap-learn, seaborn and matplotlib serve the scanpy clustering paths.
+      (sciPENN), networkx (GLUE), and the pip-installable method packages (scmomat, mira-multiome,
+      uniport, scglue, sciPENN). leidenalg, igraph, louvain, umap-learn, seaborn and matplotlib serve
+      the scanpy clustering paths.
 
-      The package list also covers Cobolt, GPSA, GLUE, MIRA and Portal, which are not members: each
+      The package list also covers Cobolt, GLUE, MIRA and Portal, which are not members: each
       runs in its own env (method_env above; GLUE in the glue group).
   scmb_r:
     python_version: ''

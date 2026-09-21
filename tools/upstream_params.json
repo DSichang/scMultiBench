@@ -24,22 +24,6 @@
   "train_size / test_size (MultiTrainer)",
   "atac_threshold / cell_threshold (LoadData)"
  ],
- "GPSA": [
-  "m_X_per_view",
-  "m_G",
-  "fixed_view_idx",
-  "n_epochs (training loop)",
-  "learning_rate (Adam)",
-  "kernel_func_warp",
-  "kernel_func_data",
-  "mean_function",
-  "n_spatial_dims",
-  "n_latent_gps",
-  "data_init / minmax_init / grid_init",
-  "n_noise_variance_params",
-  "mean_penalty_param",
-  "fixed_warp_kernel_variances / fixed_warp_kernel_lengthscales / fixed_data_kernel_lengthscales"
- ],
  "Cobolt": [
   "n_latent",
   "lr",
@@ -55,21 +39,6 @@
   "filter_features(min_count, min_cell, upper_quantile, lower_quantile)",
   "clustering(k, algo, resolution, seed)",
   "run_UMAP(n_components, n_neighbors, min_dist, metric)"
- ],
- "PASTE": [
-  "alpha",
-  "dissimilarity",
-  "use_rep",
-  "norm",
-  "numItermax",
-  "a_distribution / b_distribution",
-  "G_init",
-  "backend / use_gpu",
-  "n_components",
-  "lmbda",
-  "threshold",
-  "max_iter",
-  "random_seed"
  ],
  "Seurat_WNN": [
   "reduction.list",
@@ -300,37 +269,6 @@
   "optimizer / learning rate",
   "feature head width (SMILE / Paired_SMILE)",
   "random seed"
- ],
- "PASTE2": [
-  "s",
-  "alpha",
-  "dissimilarity",
-  "use_rep",
-  "norm",
-  "armijo",
-  "G_init",
-  "a_distribution / b_distribution",
-  "numItermax",
-  "latent_dim (glmpca)",
-  "filter / top genes (glmpca)",
-  "overlap grid (select_overlap_fraction)",
-  "degree (model selection graph)"
- ],
- "SPIRAL": [
-  "epochs",
-  "lr / weight_decay",
-  "batch_size",
-  "zdim",
-  "znoise_dim",
-  "AEdims / AEdimsR",
-  "GSdims",
-  "CLdims / DIdims",
-  "alpha1",
-  "alpha2 / alpha3 / alpha4",
-  "lamda",
-  "Q",
-  "knn / num_samples / N_WALKS / N_WALK_LEN / NUM_NEG",
-  "CoordAlignment alpha / types / numItermax"
  ],
  "GLUE": [
   "prob_model (configure_dataset)",

@@ -22,7 +22,7 @@ def test_categories_derived_from_variants():
     assert "Multigrate" not in mtb.list_methods(category="cross")
     for m in ("totalVI", "sciPENN"):
         assert m not in mtb.list_methods(category="mosaic")
-    assert len(mtb.list_methods(category="cross")) == 12
+    assert len(mtb.list_methods(category="cross")) == 8
     assert mtb.method_info("Multigrate")["categories"] == ["mosaic", "vertical"]
 
 
@@ -45,10 +45,8 @@ def test_explicit_categories_still_accepted_by_the_dataclass():
 def test_scbridge_modality_types_from_const_filenames():
     v = registry.get("scBridge").variants[0]
     assert v.modality_types == {"rna", "atac"} and v.takes_data_dir
-    assert not v.modalities_unknown
-    for m in ("SPIRAL", "GPSA", "PASTE", "PASTE2"):
-        w = registry.get(m).variants[0]
-        assert w.modality_types == set() and w.takes_data_dir and w.modalities_unknown, m
+    # scBridge is the only directory-fed variant (the docstrings say so)
+    assert [s.id for s in registry.load() for w in s.variants if w.takes_data_dir] == ["scBridge"]
     # role-derived answers unchanged
     assert registry.get("SCALEX").variants[0].modality_types == {"rna", "atac"}
     assert registry.get("UINMF").select("vertical", {"rna", "adt"}).modality_types == {"rna", "adt"}

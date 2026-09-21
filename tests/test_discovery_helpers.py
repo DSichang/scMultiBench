@@ -267,19 +267,12 @@ def test_recommend_long_df_records_source_and_family(result_dir):
     assert r2.attrs["family"] is None and r2.attrs["metrics"] == ["ARI", "NMI"]
 
 
-def test_recommend_cross_skips_registration_methods(result_dir, layout_tree):
-    """The registration (coords-output) methods are never rows of the table,
-    but they are no longer silently absent: the warning names them with the
-    reason and attrs lists them (re-test round 3, spatial user)."""
+def test_recommend_unranked_registration_attr_is_empty(result_dir, layout_tree):
+    """The ``unranked_registration`` attr stays in every frame, always empty."""
     r, msg = _rec("cross", result_path=layout_tree)
-    assert not ({"PASTE", "PASTE2", "SPIRAL", "GPSA"} & set(r.method))
-    assert r.attrs["unranked_registration"] == ["GPSA", "PASTE", "PASTE2", "SPIRAL"]
-    assert ("registration methods (coords output: GPSA, PASTE, PASTE2, SPIRAL) produce "
-            "aligned coordinates, not an embedding - no scIB metric applies") in msg
-    assert "are not ranked" in msg
-    # a category without registration methods has neither the line nor the ids
+    assert r.attrs["unranked_registration"] == [] and "registration" not in msg
     r2, msg2 = _rec("vertical", result_path=result_dir)
-    assert r2.attrs["unranked_registration"] == [] and "registration methods" not in msg2
+    assert r2.attrs["unranked_registration"] == [] and "registration" not in msg2
 
 
 def test_recommend_scores_only_methods_the_registry_lists_for_the_category(result_dir, layout_tree):
@@ -318,11 +311,9 @@ def test_recommend_methods_keyword(layout_tree):
     reached for it and got a TypeError)."""
     from multibench.data.results import recommend
     result_dir = layout_tree        # cross: D53 holds several methods, D52 one
-    r, msg = _rec("cross", methods=["scmdc", "sciPENN", "scMoMaT", "paste"], result_path=result_dir)
+    r, msg = _rec("cross", methods=["scmdc", "sciPENN", "scMoMaT"], result_path=result_dir)
     assert r.method.tolist() == ["sciPENN", "scMDC", "scMoMaT"]        # alias/case tolerant
     assert r.attrs["not_scored"] == ["scMoMaT"]                        # restricted to the request
-    assert r.attrs["unranked_registration"] == ["PASTE"]
-    assert "registration methods (coords output: PASTE)" in msg
     assert "StabMap" not in msg and "totalVI" not in msg
     # a requested method without rows is still listed as unscored
     r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], result_path=result_dir)
