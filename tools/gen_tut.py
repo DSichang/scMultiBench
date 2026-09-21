@@ -29,8 +29,9 @@ OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
 
 # Method sets benchmarked per category in the paper (Nature Methods 22:2449-2460
-# and the PYangLab/scMultiBench README), so each tutorial states its own
-# coverage instead of letting the reader assume parity.
+# and the PYangLab/scMultiBench README), for the tasks this package covers, so
+# each tutorial states its own coverage instead of letting the reader assume
+# parity.
 PAPER_METHODS = {
  "vertical": ["totalVI","sciPENN","Concerto","scMSI","Matilda","MOFA2","Multigrate",
               "UINMF","scMoMaT","Seurat_WNN","scMM","scMDC","moETM","VIMCCA",
@@ -40,7 +41,7 @@ PAPER_METHODS = {
  "mosaic":   ["MultiVI","scMoMaT","StabMap","Cobolt","UINMF","Multigrate","SMILE",
               "scMM","moETM","UnitedNet","totalVI","sciPENN"],
  "cross":    ["totalVI","scMoMaT","UnitedNet","sciPENN","Concerto","scMDC","StabMap",
-              "UINMF","scMM","MOFA2","Multigrate","PASTE","PASTE2","SPIRAL","GPSA"],
+              "UINMF","scMM","MOFA2","Multigrate"],
 }
 
 
@@ -359,7 +360,7 @@ folder = mtb.io.export_dataset(demo, os.path.join(tempfile.mkdtemp(), "MYCROSS")
                                batch="obs:batch")
 print(sorted(os.listdir(folder)))
 sc = mtb.scan("MYCROSS", CATEGORY, data_path=folder.parent)
-print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file check (the rest are spatial-registration methods)")""",
+print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file check")""",
 }
 
 SUBSAMPLE_FN = '''import os
@@ -699,13 +700,11 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
 `method_info` returns what the registry holds about a method, including its reference and repository; `mtb.cite` returns the citations for the benchmark and the methods you ran.
 
 """ + details(
-        "**availability** is `'public'`, or `'benchmark-host-only'` for SPIRAL, whose "
-        "script is not published.",
         "**needs_labels** is True when any variant needs cell-type labels; each entry of "
         "`supports` gives it per variant.",
         "**verbose=True** adds the long notes."))
     code(f'''info = mtb.method_info("{fastm}", verbose=True)
-{{k: info[k] for k in ("id", "env", "availability", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
+{{k: info[k] for k in ("id", "env", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
     code(f'''print(mtb.cite({trio!r}))   # fmt="bibtex" for BibTeX entries''')
     md("""### The metrics
 
@@ -731,12 +730,12 @@ Two families; higher is better for every metric.
     md(f"""### Methods from the benchmark study
 
 The cell compares the methods the scMultiBench study benchmarked for {cat} integration with the methods this package has a {cat} variant for, and prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
-    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} in the study
+    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} on the tasks this package covers
 registry = set(mtb.list_methods())
 wired = sorted(m for m in registry
                if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
 missing = [m for m in paper if m not in wired]
-print(f"the study benchmarks {{len(paper)}} methods for {{CATEGORY}}; this package has a variant for {{len(wired)}}")
+print(f"the study benchmarks {{len(paper)}} methods for {{CATEGORY}} on the tasks this package covers; this package has a variant for {{len(wired)}}")
 for m in missing:
     if m in registry:
         info = mtb.method_info(m)
@@ -745,24 +744,6 @@ for m in missing:
         print(f"  {{m}}: not in the registry")
 if not missing:
     print("every benchmarked method has a variant for this category")""")
-
-    if cat == "cross":
-        md("""### Spatial registration
-
-`PASTE`, `PASTE2`, `SPIRAL` and `GPSA` align spatial slices. Their output is aligned coordinates, not an embedding: the status is `RUN_OK_NO_EMBEDDING` and no scIB metrics apply.
-
-""" + details(
-            "**Input.** A directory of per-slice `.h5ad` files (`.X` plus "
-            "`obsm['spatial']`), as the SPATIAL REGISTRATION block of "
-            "`describe_layout(\"cross\")` describes; `scan` checks it.",
-            "**Availability.** `PASTE`, `PASTE2` and `GPSA` are public. `SPIRAL`'s "
-            "script is not published, so `scan` reports it as `benchmark-host-only` and "
-            "`mtb.find_methods(task=\"registration\", available=True)` leaves it out.",
-            "**GPSA labels.** GPSA also reads `obs['Ground_Truth']` (a region label per "
-            "spot) from every slice and writes its own PAA, LTARI and SCS scores to "
-            "`<out_dir>/GPSA_aligned_slices/<data_dir_name>_metrics.csv`.",
-            "**Slice order.** `mtb.run` writes `<out_dir>/slices_manifest.json`, which "
-            "maps each `aligned_slice_<i>` output to its input file."))
 
     # -------------------------------------------------------- troubleshooting
     siblings = ", ".join(f"**{c}**" for c in SCEN if c != cat)
@@ -816,7 +797,7 @@ mtb.list_methods(category="vertical")""")
         "**Filters.** A method matches when one of its variants meets every filter "
         "(category, modalities, `needs_labels`, `atac`)."))
     code("""info = mtb.method_info("Matilda")
-{k: info[k] for k in ("id", "language", "env", "availability", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
+{k: info[k] for k in ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
     code("""print(mtb.cite(["Matilda"]))   # fmt="bibtex" for BibTeX entries""")
     md("""## Draw the stored results
