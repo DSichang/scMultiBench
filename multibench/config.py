@@ -193,10 +193,13 @@ class Config:
     --------
     >>> from pathlib import Path
     >>> import multibench as mtb
-    >>> mtb.config.DEFAULT.data_path = Path("/scratch/data")    # a Path; a str fails in fetch / scan
-    >>> mtb.config.DEFAULT.envs_dir = Path("/scratch/envs")     # before mtb.env.install(...)
-    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"          # the leidenalg backend, not igraph
-    >>> cfg = mtb.config.Config(data_path=Path("/data/mine"))   # a separate instance
+    >>> # a Path; a str fails in fetch / scan
+    >>> mtb.config.DEFAULT.data_path = Path("/scratch/data")
+    >>> # before mtb.env.install(...)
+    >>> mtb.config.DEFAULT.envs_dir = Path("/scratch/envs")
+    >>> # the leidenalg backend, not igraph
+    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"
+    >>> cfg = mtb.config.Config(data_path=Path("/data/mine"))  # a separate instance
 
     Notes
     -----

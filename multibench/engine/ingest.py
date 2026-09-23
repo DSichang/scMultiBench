@@ -450,10 +450,12 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="rna")     # data/MYCITE/rna.h5
+    >>> # writes data/MYCITE/rna.h5
+    >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="rna")
     >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="adt", obsm="protein")
-    >>> mtb.io.to_canonical("counts.csv", "rna.h5")                     # explicit file name
-    >>> mtb.io.to_canonical(atac, "data/MYMULTI/", modality="peak", category="vertical")
+    >>> mtb.io.to_canonical("counts.csv", "rna.h5")  # explicit file name
+    >>> mtb.io.to_canonical(atac, "data/MYMULTI/", modality="peak",
+    ...                     category="vertical")
 
     Notes
     -----
@@ -1084,10 +1086,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.io.export_dataset(adata, "data/MYCITE", rna="layer:counts", adt="obsm:protein",
-    ...                       labels="obs:celltype")
+    >>> mtb.io.export_dataset(adata, "data/MYCITE", rna="layer:counts",
+    ...                       adt="obsm:protein", labels="obs:celltype")
     >>> mtb.io.export_dataset(mdata, "data/MYMULTIOME", rna="rna", atac="atac",
-    ...                       atac_kind="peak", labels="obs:celltype", category="vertical")
+    ...                       atac_kind="peak", labels="obs:celltype",
+    ...                       category="vertical")
     >>> mtb.io.export_dataset(rna, "data/LUNG", atac=atac, atac_kind="peak",
     ...                       labels="obs:cell_type", category="diagonal")
     >>> mtb.scan("MYCITE", "vertical", data_path="data")

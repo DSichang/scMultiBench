@@ -337,7 +337,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     --------
     >>> import multibench as mtb
     >>> info = mtb.method_info("Matilda")
-    >>> info["supports"]                    # one entry per variant: category, modalities, labels ...
+    >>> # one entry per variant: category, modalities, labels ...
+    >>> info["supports"]
     >>> info["runtime"]["tier"], info["runtime"]["worst_sec"]
     >>> info["params"]["vertical:rna+adt"]["tunable"]
 
@@ -594,9 +595,10 @@ def params_for(method: str, category: str | None = None,
     --------
     >>> import multibench as mtb
     >>> p = mtb.params_for("Matilda", "vertical", ["rna", "adt"])
-    >>> p["tunable"]["device"]["default"], p["effective"]["device"]   # upstream default vs what a run uses
-    >>> mtb.params_for("Matilda", dataset="D11")      # the folder picks the variant
-    >>> mtb.params_for("scBridge", "diagonal")        # a data_dir variant: no modalities
+    >>> # upstream default vs what a run uses
+    >>> p["tunable"]["device"]["default"], p["effective"]["device"]
+    >>> mtb.params_for("Matilda", dataset="D11")  # the folder picks the variant
+    >>> mtb.params_for("scBridge", "diagonal")  # a data_dir variant: no modalities
 
     Notes
     -----

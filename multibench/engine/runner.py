@@ -659,7 +659,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     --------
     >>> import multibench as mtb
     >>> inp = mtb.inputs_for("D11", "vertical", "Matilda")
-    >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11", dry_run=True)
+    >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
+    ...         dry_run=True)
     >>> res = mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
     ...               params={"epochs": 20})
     >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))

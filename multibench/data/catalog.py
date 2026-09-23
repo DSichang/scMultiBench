@@ -168,7 +168,8 @@ def known_metrics() -> list[str]:
     --------
     >>> import multibench as mtb
     >>> mtb.catalog.known_metrics()
-    ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI', 'kBET', 'PCR']
+    ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI',
+     'kBET', 'PCR']
 
     See Also
     --------
@@ -210,8 +211,10 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.catalog.canonical_metric("kbet"), mtb.catalog.canonical_metric("isolated_label_f1")
-    ('kBET', 'iF1')
+    >>> mtb.catalog.canonical_metric("kbet")
+    'kBET'
+    >>> mtb.catalog.canonical_metric("isolated_label_f1")
+    'iF1'
     >>> mtb.catalog.canonical_metric("my_score")        # unknown: kept as given
     'my_score'
 

@@ -202,9 +202,9 @@ def describe_layout(category: str | None = None) -> str:
     Examples
     --------
     >>> import multibench as mtb
-    >>> print(mtb.describe_layout("vertical"))    # CITE-seq or multiome
-    >>> print(mtb.describe_layout("mosaic"))      # the batch patterns methods accept
-    >>> print(mtb.describe_layout())              # every category
+    >>> print(mtb.describe_layout("vertical"))  # CITE-seq or multiome
+    >>> print(mtb.describe_layout("mosaic"))    # batch patterns methods accept
+    >>> print(mtb.describe_layout())            # every category
 
     Notes
     -----
@@ -802,9 +802,11 @@ def scan(dataset: str, category: str | None = None, *,
     >>> import multibench as mtb
     >>> df = mtb.scan("D11", "vertical")
     >>> df[["method", "modalities", "runnable", "reason"]]
-    >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]   # what blocks the rest
-    >>> print(df.loc[df.files_ok, "command"].iloc[0])                  # a ready-to-run shell line
-    >>> mtb.scan("MYCITE", "vertical", modalities=["rna", "adt"], data_path="/path/to/data")
+    >>> # what blocks the rest
+    >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]
+    >>> print(df.loc[df.files_ok, "command"].iloc[0])  # a ready-to-run shell line
+    >>> mtb.scan("MYCITE", "vertical", modalities=["rna", "adt"],
+    ...          data_path="/path/to/data")
 
     Notes
     -----
@@ -1275,6 +1277,10 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
         # hand the winning clustering to the full evaluation so it does not
         # repeat the sweep
         val = _full(lab, bat, clustering=clus)
+        if clus is not None and val.attrs.get("clustering") == "user":
+            # the clusters came from the screening sweep, not from the user
+            val.attrs.update(clustering="sweep",
+                             leiden_flavor=sweep_adata.uns.get("leiden_flavor"))
     except Exception as e:
         raise RuntimeError(
             f"evaluation failed for the winning label order {names}: "
@@ -1403,7 +1409,8 @@ class BatchResult:
         --------
         >>> res = mtb.load_batch("out/")
         >>> res.summary[["method", "status", "ARI", "label_order_confidence"]]
-        >>> res.summary.query("status == 'CHAIN_OK'").sort_values("ARI", ascending=False)
+        >>> ok = res.summary.query("status == 'CHAIN_OK'")
+        >>> ok.sort_values("ARI", ascending=False)
 
         Notes
         -----
@@ -1585,7 +1592,7 @@ class BatchResult:
         --------
         >>> res = mtb.load_batch("out/")
         >>> [r["out_dir"] for r in res.results]
-        >>> res.results[0].get("label_order_candidates")    # None with a single ordering
+        >>> res.results[0].get("label_order_candidates")  # None with a single ordering
 
         Notes
         -----
@@ -1754,7 +1761,8 @@ class BatchResult:
         --------
         >>> res = mtb.load_batch("out/")
         >>> res.rescore(metrics=["ARI", "NMI"]).summary
-        >>> res.rescore(batch="data/D11/donor.csv").summary[["method", "batch_source", "iLISI"]]
+        >>> new = res.rescore(batch="data/D11/donor.csv")
+        >>> new.summary[["method", "batch_source", "iLISI"]]
         >>> res.rescore(labels=my_labels).save("out/rescored")
 
         Notes
@@ -2163,11 +2171,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     Examples
     --------
     >>> import multibench as mtb
-    >>> plan = mtb.run_all("D11", "vertical", dry_run=True)       # free: what would run?
+    >>> plan = mtb.run_all("D11", "vertical", dry_run=True)  # free: what would run?
     >>> plan[["method", "modalities", "runnable", "reason"]]
     >>> res = mtb.run_all("D11", "vertical", out_dir="out/", timeout=3600)
-    >>> res.summary                                # one row per method, metrics as columns
-    >>> res.failures                               # always check: failures are recorded, not raised
+    >>> res.summary        # one row per method, metrics as columns
+    >>> res.failures       # always check: failures are recorded, not raised
 
     Notes
     -----
@@ -2484,7 +2492,8 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.params_for("Multigrate", "vertical", ["rna", "adt"])["tunable"]   # what can be swept
+    >>> # what can be swept
+    >>> mtb.params_for("Multigrate", "vertical", ["rna", "adt"])["tunable"]
     >>> df = mtb.sweep("MYDATA", "vertical", "Multigrate", "lr",
     ...                [1e-4, 1e-3, 1e-2], out_dir="out/lr")
     >>> df[["lr", "status", "ARI", "NMI"]]
