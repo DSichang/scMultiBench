@@ -183,7 +183,8 @@ class Config:
         ``<data_path>/<dataset>/``. Default ``<base>/data``.
     leiden_flavor : str
         Leiden backend of the scIB clustering sweep in ``mtb.evaluate``:
-        ``"igraph"`` (default) or ``"leidenalg"``.
+        ``"igraph"`` (default, faster) or ``"leidenalg"`` (the backend of both
+        stored sources).
     envs_dir : pathlib.Path
         Where the method environment prefixes live (``<envs_dir>/<env>``);
         resolved on first read (order in Notes).
@@ -222,8 +223,8 @@ class Config:
     the probe. It is settable like every other field.
 
     **Leiden backends.** ``"igraph"`` is scanpy's igraph implementation,
-    several times faster; ``"leidenalg"`` is the backend the published
-    tables were computed with.
+    several times faster; ``"leidenalg"`` is the backend both stored
+    sources (published and re-run) were computed with.
 
     See Also
     --------

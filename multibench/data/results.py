@@ -1,4 +1,4 @@
-"""Load benchmark metric tables into a tidy long DataFrame.
+"""Load benchmark metric tables into one long table (a DataFrame).
 
 Two sources ship with the package (``multibench/result/``):
 
@@ -69,8 +69,7 @@ class DegenerateRerunWarning(UserWarning):
     """A re-run row scored ARI ~0 where the published table scored well.
 
     Emitted by ``mtb.load_results`` and ``mtb.recommend`` with
-    ``source="rerun"`` or ``"both"``, so a silently failed re-run never
-    enters a ranking unnoticed.
+    ``source="rerun"`` or ``"both"``.
 
     Notes
     -----
@@ -564,7 +563,7 @@ def load_results(
     source: str = "published",
     result_path: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Load the stored benchmark metric tables as one tidy long frame.
+    """Load the stored benchmark metric tables as one long table.
 
     Reads the published scIB tables, the package's re-run sweeps, or a long
     CSV of your own. Frames from any source concatenate and go straight to
@@ -638,6 +637,11 @@ def load_results(
     - ``"both"`` - the concatenation; the ``source`` column tells the rows
       apart.
 
+    Re-run rows were scored by multibench 0.2.1's ``evaluate`` with the
+    leidenalg backend and every cell type counted as isolated. Set
+    ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` to score comparable
+    rows.
+
     **Your own file.** ``result_path`` may be one long CSV with at least the
     columns ``metric, value, method``, e.g. written by ``to_long(...).to_csv``
     or ``BatchResult.save()``. A file keeps whatever ``source`` /
@@ -678,11 +682,10 @@ def load_results(
     not a family).
 
     **Empty results.** A known method or metric with no rows gives an empty
-    frame and a ``UserWarning`` rather than an error, so that several calls
-    can be concatenated. Under ``source="published"`` the warning also says
-    whether the re-run sweeps hold that method (``"rerun has 1 dataset(s)
-    ... pass source='rerun'"``): a published table need not score every
-    method wired for its category.
+    frame and a ``UserWarning``, not an error. Under ``source="published"``
+    the warning also says whether the re-run sweeps hold that method
+    (``"rerun has 1 dataset(s) ... pass source='rerun'"``): a published
+    table need not score every method wired for its category.
 
     **Clustering variants.** A result directory named ``<method>_louvain`` /
     ``<method>_kmeans`` is that variant: it is reported under the method's
@@ -1027,9 +1030,8 @@ def fetchable() -> list[str]:
     Notes
     -----
     **Overlap with stored results:** ``D24`` has published metric tables and
-    no downloadable file, ``D46`` downloads and has no stored table; the
-    list is read from the fetcher's own asset table, so it always agrees
-    with what ``fetch()`` accepts.
+    no downloadable file, ``D46`` downloads and has no stored table. The
+    list is exactly the set of ids ``fetch()`` accepts.
     """
     from .fetch import AVAILABLE
     return sorted(AVAILABLE, key=catalog._dataset_sort_key)
@@ -1136,6 +1138,39 @@ def results_coverage(
     return out
 
 
+#: the modalities each shipped stored dataset measured: metadata about the
+#: shipped tables, so ``recommend`` can say which data a ranking describes
+_STORED_DATASET_MODALITIES = {
+    "D11": ("rna", "adt"), "D11s": ("rna", "adt"),
+    "D24": ("rna", "atac"), "D25": ("rna", "atac"),
+    "D28": ("rna", "atac"), "D28s": ("rna", "atac"),
+    "D45": ("rna", "atac"), "D45s": ("rna", "atac"),
+    "D52": ("rna", "adt"), "D52s": ("rna", "adt"),
+}
+_MODALITY_ORDER = ("rna", "adt", "atac")
+
+
+def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) -> str:
+    """The recommend() warning line when a requested modality was measured by
+    none of the ranked datasets; ``""`` when every one was, or when a dataset
+    is not a shipped one (its modalities are unknown)."""
+    datasets = [str(d) for d in datasets]
+    if not datasets or any(d not in _STORED_DATASET_MODALITIES for d in datasets):
+        return ""
+    measured = set().union(*(_STORED_DATASET_MODALITIES[d] for d in datasets))
+    missing = [m for m in _MODALITY_ORDER if m in wanted and m not in measured]
+    if not missing:
+        return ""
+    groups: dict[tuple, list[str]] = {}
+    for d in sorted(datasets, key=catalog._dataset_sort_key):
+        groups.setdefault(_STORED_DATASET_MODALITIES[d], []).append(d)
+    where = "; ".join(f"{', '.join(ds)} ({'+'.join(mods)})" for mods, ds in groups.items())
+    data = "+".join(m.upper() for m in _MODALITY_ORDER if m in wanted)
+    head = f"stored {category} scores" if stored else f"{category} scores in long_df"
+    return (f"{head} come from {where}; none measured {' or '.join(missing)}, "
+            f"so this ranking does not describe {data} data")
+
+
 def _runtime(method_id: str, method_info) -> dict:
     """``method_info(m)["runtime"]`` (``{"tier", "worst_sec", "observed"}``)."""
     return dict(method_info(method_id)["runtime"])
@@ -1164,6 +1199,7 @@ def recommend(
     category: str,
     *,
     modalities: list[str] | None = None,
+    atac: str | None = None,
     methods: list[str] | None = None,
     metrics=None,
     long_df: pd.DataFrame | None = None,
@@ -1182,8 +1218,12 @@ def recommend(
         Integration category to rank: ``vertical``, ``diagonal``, ``mosaic``
         or ``cross``.
     modalities : list of str
-        Keep only methods that consume all of these base modalities, e.g.
-        ``["rna", "adt"]``; ``None`` = no filter.
+        Keep only methods that consume all of these modalities, e.g.
+        ``["rna", "adt"]``; tokens as in ``mtb.find_methods``. ``None`` = no
+        filter.
+    atac : str
+        Keep only methods that read this ATAC representation: ``"peak"`` or
+        ``"gene_activity"``; ``None`` = no filter.
     methods : list of str
         Rank only these methods (alias tolerant, case-insensitive), among
         themselves; ``None`` = every method.
@@ -1205,8 +1245,8 @@ def recommend(
     -------
     pandas.DataFrame
         One row per method, best first, unscored methods last. Read
-        ``method``, ``grand_score`` and ``coverage``; all columns and
-        ``attrs`` are in Notes.
+        ``method``, ``grand_score``, ``coverage`` and ``datasets``; all
+        columns and ``attrs`` are in Notes.
 
     Raises
     ------
@@ -1223,10 +1263,10 @@ def recommend(
     --------
     >>> import multibench as mtb
     >>> r = mtb.recommend("vertical", modalities=["rna", "adt"])
-    >>> r[["method", "grand_score", "coverage"]]
+    >>> r[["method", "grand_score", "coverage", "datasets"]]
     >>> r.attrs["not_scored"]                        # wired, but no published rows
+    >>> mtb.recommend("diagonal", atac="peak")       # methods that read peaks
     >>> mtb.recommend("cross", source="rerun")       # cross has one published method
-    >>> mtb.recommend("diagonal", metrics="batch", source="rerun")
 
     Notes
     -----
@@ -1240,10 +1280,9 @@ def recommend(
     - Only methods this package runs for the category are ranked - the set
       ``mtb.list_methods(category=...)`` lists. Other registry methods in
       the table (MOFA2 or Multigrate in a cross table) are dropped before
-      ranking, since they would shape every other method's within-dataset
-      rank, and named in the warning and in ``attrs["dropped_methods"]``. A
-      name the registry does not know (your own method in ``long_df``) is
-      kept.
+      the within-dataset ranks are taken, and named in the warning and in
+      ``attrs["dropped_methods"]``. A name the registry does not know (your
+      own method in ``long_df``) is kept.
     - A dataset holding fewer than ``min_methods`` methods is dropped: the
       min-max of a single method is 1.0 by construction, so a lone method
       would win such a dataset by default.
@@ -1251,10 +1290,9 @@ def recommend(
       the method x dataset matrix each score rests on.
     - Every method wired for the category (and ``modalities``) that has no
       rows in the chosen source is still listed, after the scored rows,
-      with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0, so
-      "not ranked" is never mistaken for "ranked last". A published table
-      need not score every method wired for its category; the re-run sweeps
-      may cover more (``source="rerun"``).
+      with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0. A
+      published table need not score every method wired for its category;
+      the re-run sweeps may cover more (``source="rerun"``).
 
     **Columns.**
 
@@ -1266,7 +1304,16 @@ def recommend(
     - ``needs_labels``, ``runtime_tier``, ``worst_sec``, ``env``,
       ``output_kind`` - registry metadata for the category; ``None`` for
       ids that are not registry methods (your own method, a result-dir
-      token).
+      token);
+    - ``datasets`` - the dataset ids the score comes from, comma-joined;
+      ``""`` when unscored.
+
+    **Which data the ranking describes.** ``modalities`` and ``atac`` select
+    methods; they do not change the datasets the scores come from. The
+    shipped tables measured rna+adt (D11, D11s, D52, D52s) or rna+atac (D24,
+    D25, D28, D28s, D45, D45s). When ``modalities`` or ``atac`` names a
+    modality that none of the ranked datasets measured, a ``UserWarning``
+    says so.
 
     **Frame attrs.** ``frame.attrs`` records the choices the ranking was
     made under:
@@ -1284,12 +1331,12 @@ def recommend(
     tolerant). ``methods`` is resolved as in ``mtb.load_results``
     (``"mofa+"`` -> MOFA2, ``"totalvi"`` -> totalVI), and the unscored line
     of the warning is restricted to the same set, so a requested method
-    without rows is still reported as such. ``modalities``
-    uses ``mtb.find_methods``.
+    without rows is still reported as such. ``modalities`` and ``atac``
+    select methods with ``mtb.find_methods``, under the same token rule.
 
     **Warning.** One ``UserWarning`` with one line per finding summarises
-    dropped methods and datasets, partial coverage and the unscored
-    methods.
+    a requested modality the datasets did not measure, dropped methods and
+    datasets, partial coverage and the unscored methods.
 
     **Errors.** ``ValueError`` is raised when:
 
@@ -1300,7 +1347,9 @@ def recommend(
       metrics it does have);
     - every row belongs to a method the package does not run for the
       category;
-    - ``methods=`` or ``modalities=`` leaves no scored method;
+    - ``methods=``, ``modalities=`` or ``atac=`` leaves no scored method;
+    - an unknown modality token or ``atac`` value, or two ATAC
+      representations (the rule of ``mtb.find_methods``);
     - a ``metrics`` token or code is unknown.
 
     **Retired keywords.** ``task=`` / ``family=`` still work as
@@ -1317,6 +1366,13 @@ def recommend(
     from ..plot import style
 
     config.category_folder(category)
+    from ..discover import _modality_filter, find_methods
+
+    # the modality selection is validated before any table is read
+    want_mods, atac = _modality_filter(modalities, atac)
+    filtered = want_mods is not None or atac is not None
+    if want_mods is None and atac is not None:
+        want_mods = {"atac"}
     if metrics is None:
         metrics = "clustering"           # the benchmark's headline ranking
     sel = catalog.metric_selection(metrics)   # a token is validated before any load
@@ -1400,24 +1456,25 @@ def recommend(
     n_ds = per_ds.notna().sum(axis=1)
     n_total = per_ds.shape[1]
 
-    from ..discover import find_methods
-
     keep_methods = list(grand.index)
-    if modalities is not None:
-        allowed = set(find_methods(category=category, modalities=modalities))
+    if filtered:
+        allowed = set(find_methods(category=category, modalities=modalities, atac=atac))
         keep_methods = [m for m in keep_methods if catalog.canonical_id(m) in allowed]
         if not keep_methods:
+            asked = " and ".join(
+                ([f"consumes modalities {list(modalities)}"] if modalities is not None
+                 else []) + ([f"reads atac={atac!r}"] if atac is not None else []))
             raise ValueError(
-                f"no scored method in {category} consumes modalities "
-                f"{list(modalities)}; methods with results: {sorted(grand.index)}; "
-                f"methods matching the modalities: {sorted(allowed)}")
+                f"no scored method in {category} {asked}; methods with results: "
+                f"{sorted(grand.index)}; methods matching the selection: "
+                f"{sorted(allowed)}")
 
     # Methods wired for the category but absent from the source. The registry
     # 'clustering' tag covers every embedding method of a category; the
     # 'batch' tag is incomplete (vertical), so the requested family never
     # gates this list.
     wired = find_methods(category=category, task="clustering", modalities=modalities,
-                         runnable=True)
+                         atac=atac, runnable=True)
     if want_ids is not None:
         wired = [m for m in wired if m in want_ids]
     scored_ids = {catalog.canonical_id(m) for m in keep_methods}
@@ -1461,6 +1518,9 @@ def recommend(
             "worst_sec": rt.get("worst_sec") if spec is not None else None,
             "env": env,
             "output_kind": okind,
+            "datasets": ", ".join(sorted((str(d) for d in per_ds.columns
+                                          if pd.notna(per_ds.loc[m, d])),
+                                         key=catalog._dataset_sort_key)) if scored else "",
         })
     out = pd.DataFrame(rows)
     out = out.sort_values("grand_score", ascending=False, kind="mergesort",
@@ -1473,6 +1533,11 @@ def recommend(
     out.attrs["dropped_methods"] = list(foreign)
 
     notes = []
+    if filtered:
+        unmeasured = _unmeasured_note(category, list(per_ds.columns), want_mods,
+                                      long_df_was_none)
+        if unmeasured:
+            notes.append(unmeasured)
     if degenerate:
         notes.append(
             f"dropped {len(degenerate)} dataset(s) with fewer than {min_methods} "

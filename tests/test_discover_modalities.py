@@ -94,7 +94,7 @@ def test_cite_is_variadic_and_keeps_the_list_form():
         mtb.cite("Matilda", fmt="nope")
     with pytest.raises(KeyError, match="did you mean 'Matilda'"):
         mtb.cite("Matlida")
-    with pytest.raises(TypeError, match="pass ONE list"):
+    with pytest.raises(TypeError, match="pass one list"):
         mtb.cite(["Matilda"], ["MOFA2"])
     # the 0.2 methods= keyword and the positional fmt are gone: loud
     with pytest.raises(TypeError, match="methods"):
