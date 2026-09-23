@@ -125,8 +125,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
       ``pd.read_csv(path, index_col=0)``;
     - every metric name blank;
     - two names that collapse onto one canonical metric (``ari`` and
-      ``ARI``): a silent duplicate would double-count that metric in every
-      downstream rank.
+      ``ARI``).
 
     See Also
     --------
@@ -603,17 +602,17 @@ def evaluate(
     An unknown code raises ``ValueError`` listing the valid ones; a bare
     code string (``metrics="ARI"``) raises and points at the list form.
 
-    **Cost.** ``ARI``, ``NMI`` and ``iF1`` need the scIB optimal-resolution
-    Leiden sweep (10 resolutions on a kNN graph of the embedding). With
-    ``leidenalg`` it takes tens of seconds for a few thousand cells, minutes
-    for ~10^4; the default ``igraph`` backend is several times faster.
+    **Cost and Leiden backend.** ``ARI``, ``NMI`` and ``iF1`` need the scIB
+    optimal-resolution Leiden sweep (10 resolutions on a kNN graph of the
+    embedding). ``mtb.config.DEFAULT.leiden_flavor`` sets its backend:
+    ``"igraph"`` (default) or ``"leidenalg"``, the classic backend scib
+    itself runs. With ``leidenalg`` the sweep takes tens of seconds for a
+    few thousand cells and minutes for ~10^4; ``igraph`` is several times
+    faster.
 
     To skip it, name only metrics that do not need it in ``metrics=[...]``
     (``ASW``, ``iASW``, ``cLISI``, the batch family). ``clustering=``
     removes the need for ``ARI`` / ``NMI`` only; ``iF1`` always sweeps.
-
-    **Leiden backend.** ``mtb.config.DEFAULT.leiden_flavor``: ``"igraph"``
-    (default) or ``"leidenalg"`` (the classic backend scib itself runs).
 
     **Metric definitions.** Every value lies in 0-1 and higher is better.
     ARI can fall below 0; about 0 means a random clustering. Each metric is

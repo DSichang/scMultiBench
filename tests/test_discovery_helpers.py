@@ -156,7 +156,7 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     msg = str(rec[0].message)
     # D56's only published table is MOFA2's (dropped): it has no rankable rows
     # at all, so it is neither ranked nor listed as a singleton
-    assert "D52" in msg and "D57" in msg and "D56" not in msg and "1.0 by construction" in msg
+    assert "D52" in msg and "D57" in msg and "D56" not in msg and "is always 1.0" in msg
     # ONE warning, one line per finding, the dropped-datasets line first
     assert len([w for w in rec if issubclass(w.category, UserWarning)
                 and "recommend(" in str(w.message)]) == 1

@@ -1217,7 +1217,7 @@ def recommend(
     source: str = "published",
     result_path: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Rank methods for a category from stored results, with coverage made explicit.
+    """Rank methods from stored results, with the share of datasets each was scored on.
 
     Scores each method on the stored metric tables (or ``long_df``) and also
     lists every wired method it could not score; the rules are in Notes.
@@ -1293,9 +1293,9 @@ def recommend(
       the within-dataset ranks are taken, and named in the warning and in
       ``attrs["dropped_methods"]``. A name the registry does not know (your
       own method in ``long_df``) is kept.
-    - A dataset holding fewer than ``min_methods`` methods is dropped: the
-      min-max of a single method is 1.0 by construction, so a lone method
-      would win such a dataset by default.
+    - A dataset holding fewer than ``min_methods`` methods is dropped. The
+      min-max of a single method is always 1.0, so a lone method would win
+      that dataset.
     - ``n_datasets`` / ``n_datasets_total`` / ``coverage`` say how much of
       the method x dataset matrix each score rests on.
     - Every method wired for the category (and ``modalities``) that has no
@@ -1552,7 +1552,7 @@ def recommend(
         notes.append(
             f"dropped {len(degenerate)} dataset(s) with fewer than {min_methods} "
             f"methods ({', '.join(map(str, degenerate))}) - a min-max score over "
-            f"one method is 1.0 by construction")
+            f"one method is always 1.0")
     if foreign:
         notes.append(
             f"also scored in the {table_noun} but not run by this package for "

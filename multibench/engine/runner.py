@@ -556,7 +556,8 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     return wrap_command(cmd, outer) if outer is not None else cmd
 
 
-def cpu_params_for(spec, params: dict | None) -> tuple[dict | None, dict]:
+def cpu_params_for(spec, params: dict | None, *,
+                   gpu: bool | None = None) -> tuple[dict | None, dict]:
     """The params a run on this host should emit, after the CPU switch.
 
     On a host without an NVIDIA GPU (:func:`multibench.engine.envs.host_has_gpu`
@@ -573,6 +574,8 @@ def cpu_params_for(spec, params: dict | None) -> tuple[dict | None, dict]:
         The method (``spec.cpu_params`` is the registry declaration).
     params : dict or None
         The caller's overrides.
+    gpu : bool or None
+        Whether the run has a GPU; ``None`` = probe this host.
 
     Returns
     -------
@@ -583,7 +586,7 @@ def cpu_params_for(spec, params: dict | None) -> tuple[dict | None, dict]:
         (empty on a GPU host, for a method without ``cpu_params``, or when
         the caller set every key).
     """
-    if not spec.cpu_params or envs.host_has_gpu():
+    if not spec.cpu_params or (envs.host_has_gpu() if gpu is None else gpu):
         return params, {}
     given = dict(params or {})
     applied = {k: v for k, v in spec.cpu_params.items() if k not in given}
@@ -970,12 +973,13 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
             convert: bool = True, cmd_template: str | None = None,
-            repo_path=None) -> tuple[list[str], list[str]]:
+            repo_path=None, gpu: bool | None = None) -> tuple[list[str], list[str]]:
     """The argv a run would execute, plus the setup notes to show with it.
 
     What ``run(..., dry_run=True)`` computes before it prints the notes to
     stderr; ``mtb.scan`` calls it for the ``command`` column and puts the
-    notes in ``caveat``. Nothing is written, fetched or launched.
+    notes in ``caveat``. Nothing is written, fetched or launched. ``gpu``
+    is passed to :func:`cpu_params_for` (``True`` previews a GPU node's line).
 
     Returns
     -------
@@ -984,7 +988,7 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     """
     spec = registry.get(method)
     variant = spec.select(category, _modality_roles(inputs))
-    params, _ = cpu_params_for(spec, params)
+    params, _ = cpu_params_for(spec, params, gpu=gpu)
     # absolute paths as the run passes them, the input plan the run follows,
     # the checkout located but never fetched
     values, out_str = normalize_paths(inputs, out_dir)

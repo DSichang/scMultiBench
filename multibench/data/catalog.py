@@ -107,8 +107,8 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
     'Matlida'; did you mean 'Matilda'?; see mtb.list_methods()"``. An
     alias-table hit is returned without the registry check, even with
     ``strict=True``: ``"Seurat v4"`` -> ``"Seurat_v4"``, which is not a
-    registry id. The default is lenient because result directories and user
-    frames legitimately carry names the registry does not know.
+    registry id. The default is lenient: result directories and user
+    frames can hold names the registry does not know.
 
     See Also
     --------

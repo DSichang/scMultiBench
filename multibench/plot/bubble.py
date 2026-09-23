@@ -18,6 +18,7 @@ import pandas as pd
 from . import style
 from .bar import BATCH_METRICS, CLUSTERING_METRICS
 from .. import _compat
+from .. import config as _config
 
 # column order within each family, as in the paper's panels
 FAMILIES = [
@@ -453,20 +454,26 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                 lacks = {m: [ds for ds, mat in parts.items() if m not in mat.index]
                          for m in dropped.index}
                 warnings.warn(
-                    f"require_complete=True dropped {len(dropped)} method(s) "
+                    _config.hint("require_complete=True", "--require-complete")
+                    + f" dropped {len(dropped)} method(s) "
                     f"not present on all {n} datasets ({', '.join(map(str, parts))}): "
                     + ", ".join(f"{m} (missing {', '.join(map(str, lacks[m]))})"
                                 for m in dropped.index)
-                    + "; pass require_complete=False to keep them (a missing "
-                    "dataset then scores rank 0 under overall='rank').",
+                    + "; " + _config.hint("pass require_complete=False",
+                                          "leave out --require-complete")
+                    + " to keep them (a missing dataset then scores rank 0 under "
+                    + _config.hint("overall='rank'", "--overall rank") + ").",
                     UserWarning, stacklevel=2)
                 df = df[df["method"].isin(keep)]
                 parts = style.per_dataset_ranks(df)
                 cov = style.coverage(parts)
         for msg in style.coverage_warnings(
                 parts, basis=overall,
-                incomplete_fix="Pass require_complete=True to restrict to the "
-                               "complete intersection."):
+                incomplete_fix=_config.hint(
+                    "Pass require_complete=True to restrict to the complete "
+                    "intersection.",
+                    "Pass --require-complete to keep only the methods scored on "
+                    "every dataset.")):
             warnings.warn(msg, UserWarning, stacklevel=2)
         raw_all = style.mean_rank_matrix(parts)
     else:
@@ -1065,8 +1072,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
       down.
     - ``"mean_overall"`` (bar's default): ``mean over datasets of
       minmax(mean over metrics of within-dataset max-rank)`` - each dataset
-      gets its own min-max-scaled overall, averaged over the datasets the
-      method was run on (absence is skipped, not penalised).
+      gets its own min-max-scaled overall, and these are averaged; a dataset
+      the method lacks is skipped.
 
     **Bubble and bar.** ``mtb.plot.bar`` uses the same formulas and the same
     tie-break (alphabetical within a tie). With ``aggregate="summary"``, the
