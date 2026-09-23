@@ -49,3 +49,44 @@ def test_no_module_level_name_is_used_before_a_local_reimport():
                                  f"{fn.name} uses {node.id} above its local import "
                                  f"(line {first[node.id]})")
     assert not found, "\n".join(found)
+
+
+def _h5(path, n_feat, n_cell, feats=None):
+    import h5py
+    import numpy as np
+    with h5py.File(path, "w") as f:
+        f.create_dataset("matrix/data", data=np.zeros((n_feat, n_cell)))
+        f.create_dataset("matrix/features",
+                         data=np.array(feats or [f"g{i}" for i in range(n_feat)], dtype="S"))
+        f.create_dataset("matrix/barcodes",
+                         data=np.array([f"c{i}" for i in range(n_cell)], dtype="S"))
+
+
+PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
+
+
+def test_near_miss_hint_names_the_rename_when_the_kind_matches(tmp_path, monkeypatch):
+    """M23 (files_reason part): a peak method on a vertical folder whose peaks
+    sit in atac_peak.h5 gets the same fix as scan's short reason."""
+    import pytest
+    from multibench import config
+    from multibench.engine import resolve
+    d = tmp_path / "MU"
+    d.mkdir()
+    _h5(d / "rna.h5", 30, 50)
+    _h5(d / "atac_peak.h5", 40, 50, feats=PEAKS)
+    with pytest.raises(FileNotFoundError) as ei:
+        resolve.inputs_for("MU", "vertical", "scMVP", data_path=tmp_path, check=True)
+    msg = str(ei.value)
+    assert ("atac.h5 not found; found atac_peak.h5 - vertical reads atac.h5: rename "
+            "atac_peak.h5 to atac.h5, or write it with category=\"vertical\"") in msg
+    assert "pass the representation" not in msg
+    # the CLI spelling of the same fix
+    monkeypatch.setattr(config, "_CLI", True)
+    hints = resolve._near_miss_hints(d, {"atac": str(d / "atac.h5")}, "vertical",
+                                     atac="peak")
+    assert hints and hints[0].endswith("--category vertical"), hints
+    # a method that reads gene activity keeps the representation pointer
+    hints = resolve._near_miss_hints(d, {"atac": str(d / "atac.h5")}, "vertical",
+                                     atac="gene_activity")
+    assert "pass the representation this method wants" in hints[0]

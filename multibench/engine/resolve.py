@@ -515,7 +515,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     variant = select_variant(spec, category, modalities, ds_dir=ds_dir)
     out = _resolve_variant_inputs(variant, ds_dir, method)
     missing = {r: p for r, p in out.items() if not Path(p).exists()}
-    near = _near_miss_hints(ds_dir, missing, category)
+    near = _near_miss_hints(ds_dir, missing, category, atac=spec.atac)
     batch_hint = _per_batch_hint(
         ds_dir, category, {st for r in missing for st in _role_stems(r)[0]})
     if batch_hint:
@@ -555,9 +555,12 @@ def inputs_for(dataset: str, category: str, method: str, *,
 # near miss can be named: peaks exported as atac_peak.h5 when a vertical
 # variant asks for atac.h5.
 _ATAC_FILE_BASES = ("atac", "atac_peak", "atac_gas", "peak")
+#: the representation a sibling file holds, by its name (``spec.atac`` values)
+_KIND_BY_BASE = {"atac_peak": "peak", "peak": "peak", "atac_gas": "gene_activity"}
 
 
-def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
+def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
+                     atac: str | None = None) -> list[str]:
     """For each missing ATAC-family role, name the sibling file that is there.
 
     The ``atac`` role reads ``atac.h5``; ``atac_gas`` reads ``atac_gas.h5``
@@ -567,7 +570,10 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
     e.g. ``"atac.h5 not found; found atac_peak.h5 - vertical methods read
     atac.h5 (pass the representation this method wants: see
     method_info(m)['atac'])"``; nothing for roles that are not ATAC or have
-    no sibling.
+    no sibling. ``atac`` is the method's representation (``spec.atac``):
+    when a vertical sibling holds it (by name: ``atac_peak`` / ``peak`` are
+    peaks, ``atac_gas`` gene activity), the hint names the rename instead,
+    as scan's short reason does.
     """
     hints: list[str] = []
     if not ds_dir.is_dir():
@@ -583,6 +589,14 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
                        if f"{b}{digits}.h5" not in accepted
                        and (ds_dir / f"{b}{digits}.h5").is_file())
         if not found:
+            continue
+        same = [f for f in found if category == "vertical" and not m and atac
+                and _KIND_BY_BASE.get(f[:-len(".h5")]) == atac]
+        if same:
+            hints.append(
+                f"{accepted[0]} not found; found {', '.join(found)} - vertical reads "
+                f"{accepted[0]}: rename {same[0]} to {accepted[0]}, or write it with "
+                + config.hint('category="vertical"', "--category vertical"))
             continue
         why = ("every mosaic method reads peaks" if m else
                "pass the representation this method wants: see method_info(m)['atac']")
