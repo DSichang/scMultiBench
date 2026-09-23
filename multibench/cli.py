@@ -179,7 +179,10 @@ def _print_frame(df, columns=None, fmt: str = "table", file=None, *,
     elif fmt == "tsv":
         print(df.to_csv(index=False, sep="\t"), end="", file=file)
     elif fmt == "json":
-        print(df.to_json(orient="records", indent=1, default_handler=str), file=file)
+        # to_json converts the values (NaN -> null, numpy scalars); json.dumps
+        # writes them without escaping '/' as '\/'
+        rows = json.loads(df.to_json(orient="records", default_handler=str))
+        print(json.dumps(rows, indent=1), file=file)
     else:
         if truncate is None:
             truncate = not columns
@@ -341,7 +344,8 @@ def _cmd_scan(args) -> int:
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
     df = multibench.scan(args.dataset, args.category, data_path=args.data_path,
-                         modalities=_csv_list(args.modalities), verbose=False)
+                         modalities=_csv_list(args.modalities), verbose=False,
+                         assume_gpu=getattr(args, "assume_gpu", False))
     if methods:
         unknown = sorted(set(methods) - set(df["method"]))
         if unknown:
@@ -368,6 +372,8 @@ def _strict_problem(df, methods) -> str | None:
     It fails when no row is runnable, or when a method named in
     ``--methods`` has no runnable row. The text counts the rows each check
     blocks and, for named methods, gives the reason of each one's first row.
+    A GPU-only method on a host without a GPU is counted apart from a
+    missing env, with a pointer to ``--assume-gpu``.
     """
     ok = df["runnable"].astype(bool)
     runnable = df[ok]
@@ -382,19 +388,48 @@ def _strict_problem(df, methods) -> str | None:
     counts = []
     if "files_ok" in rest and (~rest["files_ok"].astype(bool)).any():
         counts.append(f"input files missing in {int((~rest['files_ok'].astype(bool)).sum())}")
-    if "env_ok" in rest and (~rest["env_ok"].astype(bool)).any():
-        counts.append(f"env not ready in {int((~rest['env_ok'].astype(bool)).sum())}")
+    n_env, n_gpu, gpu_only = _env_and_gpu_counts(rest)
+    if n_env:
+        counts.append(f"env not ready in {n_env}")
+    if n_gpu:
+        counts.append(f"needs a GPU on this host in {n_gpu}")
+    gpu_note = ("\nFor a job that runs on a GPU node, add --assume-gpu."
+                if gpu_only else "")
     if counts:
         head += f" ({'; '.join(counts)})"
     if not methods:
-        return head + "; the reason column says why"
+        return head + "; the reason column says why" + gpu_note
     lines = []
     for m in blocked:
         rows = df[df["method"] == m]
         reason = rows["reason"].iloc[0] if len(rows) else ""
         lines.append(f"  {m}: {'no row' if _blank(reason) else _truncate(reason, 120)}")
     return (head + f"; no runnable row for {', '.join(blocked)}:\n"
-            + "\n".join(lines))
+            + "\n".join(lines) + gpu_note)
+
+
+def _env_and_gpu_counts(rest) -> tuple[int, int, int]:
+    """Count the rows of ``rest`` blocked by a missing env and by this host's GPU test.
+
+    ``env_reason`` joins the env sentence and the GPU sentence
+    (``spec.requires_gpu_reason``) with ``"; "``; a row counts under each
+    part it carries. The third count is the rows the GPU test alone blocks
+    (files and env ready): the ones ``--assume-gpu`` makes runnable.
+    """
+    from .engine import registry
+    if "env_ok" not in rest:
+        return 0, 0, 0
+    n_env = n_gpu = gpu_only = 0
+    for _, r in rest[~rest["env_ok"].astype(bool)].iterrows():
+        text = "" if _blank(r.get("env_reason")) else str(r["env_reason"])
+        spec = registry.get(r["method"])
+        gpu = spec.requires_gpu_reason if spec.requires_gpu else ""
+        blocked_by_gpu = bool(gpu) and gpu in text
+        env_missing = bool(text.replace(gpu, "").strip("; ") if gpu else text.strip("; "))
+        n_gpu += blocked_by_gpu
+        n_env += env_missing
+        gpu_only += blocked_by_gpu and not env_missing and bool(r.get("files_ok", True))
+    return n_env, n_gpu, gpu_only
 
 
 def _cmd_layout(args) -> int:
@@ -419,7 +454,7 @@ RNA and ATAC from different cells (diagonal):
 
 One file per batch (mosaic or cross): write each file as its batch number.
   multibench convert A.h5ad data/LAB --rna X --adt obsm:protein --labels obs:cell_type --category mosaic --batch-index 1
-  multibench convert B.h5mu data/LAB --rna mod:rna --atac mod:atac --atac-kind peak --labels mod:rna.obs:cell_type --category mosaic --batch-index 2
+  multibench convert B.h5mu data/LAB --rna mod:rna --atac mod:atac --atac-kind peak --labels rna:cell_type --category mosaic --batch-index 2
   multibench convert C.h5ad data/LAB --rna X --labels obs:cell_type --category mosaic --batch-index 3
   multibench scan LAB --category mosaic --data-path data
 """
@@ -1045,13 +1080,17 @@ def _cmd_run_all(args) -> int:
     import multibench
     params = _parse_params(args.param, args) or None
     columns = _csv_list(args.columns)
+    if getattr(args, "assume_gpu", False) and not args.dry_run:
+        _usage_error(args, "--assume-gpu applies to --dry-run only; a real run checks "
+                           "this host's GPU")
     if args.dry_run:
         with _quiet_stdout():
             df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
                                     methods=_csv_list(args.methods),
                                     modalities=_csv_list(args.modalities),
                                     data_path=args.data_path, params=params,
-                                    dry_run=True, verbose=False)
+                                    dry_run=True, verbose=False,
+                                    assume_gpu=getattr(args, "assume_gpu", False))
         k, n = int(df["runnable"].sum()), len(df)
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
               f"{args.dataset} ({args.category}); commands below are what run() "
@@ -1658,6 +1697,9 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--strict", action="store_true",
                     help="exit 1 when nothing requested is runnable (for scripts: "
                          "multibench scan DS --category C --strict && sbatch ...)")
+    ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
+                    help="skip this host's GPU test: check on a GPU-less login node a "
+                         "job that runs on a GPU node (mtb.scan(assume_gpu=True))")
     ps.set_defaults(func=_cmd_scan, _parser=ps)
 
     # ---- layout
@@ -1690,12 +1732,10 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("out", help="output .h5 file (mode 1; or an existing directory - or a "
                                "path ending in / - with --modality) or the dataset "
                                "folder to create (mode 2)")
-    pc.add_argument("--category", help=_CATEGORY_HELP + ". Sets the ATAC "
-                    "filename: vertical writes atac.h5 whatever --atac-kind/--modality "
-                    "say; diagonal (and cross, or no --category) writes atac_peak.h5 / "
-                    "atac_gas.h5; mosaic writes atac<i>.h5. Diagonal pairs no barcodes "
-                    "and writes the labels as rna_cty.csv / atac_cty.csv "
-                    "(mtb.io.to_canonical / export_dataset category=)")
+    pc.add_argument("--category", help=_CATEGORY_HELP + ". Sets the file names. "
+                    "vertical writes atac.h5. diagonal writes atac_peak.h5 or "
+                    "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "
+                    "mosaic writes atac<i>.h5.")
     pc.add_argument("--modality", help="mode 1: rna | adt | atac | atac_peak | atac_gas "
                                        "(aliases protein, peak, gas/gene_activity); "
                                        "validated, picks the filename when OUT is a "
@@ -1878,6 +1918,9 @@ def build_parser() -> argparse.ArgumentParser:
                           "variant whose inputs resolve, the exact command line run() "
                           "would execute (the 'command' column in csv/tsv/json); "
                           "execute and create nothing")
+    pra.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
+                     help="with --dry-run: skip this host's GPU test, as scan "
+                          "--assume-gpu does")
     pra.add_argument("--param", "-p", action="append", metavar="METHOD:KEY=VALUE",
                      help="one hyperparameter override, repeatable: --param "
                           "Matilda:epochs=5 --param Matilda:lr=0.001 -> params="

@@ -836,7 +836,18 @@ def _select_obs(data, spec, *, what):
         return _obs_column(data.mod[name].obs, rest[4:], what=what, spec=spec,
                            where=f"mdata[{name!r}].obs")
     if spec.startswith("obs:"):
-        return _obs_column(data.obs, spec[4:], what=what, spec=spec,
+        col = spec[4:]
+        if mu and col not in data.obs.columns:
+            # muon keeps a modality's labels in mdata[mod].obs: name that spelling
+            has = [n for n in data.mod if col in data.mod[n].obs.columns]
+            if has:
+                from .. import config
+                raise KeyError(
+                    f"{what}={spec!r}: column {col!r} not in obs: searched mdata.obs; "
+                    f"available: {list(data.obs.columns)}. mdata[{has[0]!r}].obs has "
+                    f"{col!r}: use " + config.hint(f"{what}='{has[0]}:{col}'",
+                                                   f"--{what} {has[0]}:{col}"))
+        return _obs_column(data.obs, col, what=what, spec=spec,
                            where="mdata.obs" if mu else "data.obs")
     if mu:
         name, _, col = spec.partition(":")
@@ -850,7 +861,9 @@ def _select_obs(data, spec, *, what):
                    f"mdata[{name!r}].obs and mdata.obs[{name + ':' + col!r}]; "
                    f"mdata[{name!r}].obs has {list(obs.columns)}")
             if col in data.obs.columns:
-                msg += f". The global mdata.obs has {col!r}: pass {what}='obs:{col}'"
+                from .. import config
+                msg += (f". The global mdata.obs has {col!r}: pass "
+                        + config.hint(f"{what}='obs:{col}'", f"--{what} obs:{col}"))
             raise KeyError(msg)
     raise ValueError(f"{what}={spec!r}: use 'obs:<col>' (or 'mod:<name>.obs:<col>')")
 
@@ -1393,9 +1406,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask]))
     existing = [pth.name for pth, _, _ in plan if pth.exists() or pth.is_symlink()]
     if existing and not overwrite:
+        from .. import config
         raise FileExistsError(
             f"{out} already holds {existing}, which this call would write; "
-            f"pass overwrite=True (--overwrite) to replace them")
+            f"pass {config.hint('overwrite=True', '--overwrite')} to replace them")
     for pth, kind, payload in plan:
         if kind == "matrix":
             sub, feats, sub_bars = payload

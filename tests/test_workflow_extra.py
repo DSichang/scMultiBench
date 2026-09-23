@@ -181,10 +181,15 @@ def test_describe_layout_atac_lists_come_from_registry():
         txt = mtb.describe_layout(cat)
         gas_line = next(l for l in txt.splitlines() if "need gene activity:" in l)
         peak_line = next(l for l in txt.splitlines() if "need peaks:" in l)
-        assert set(mtb.find_methods(cat, atac="gene_activity")) == \
+        # diagonal: a method that needs both files is listed on that line only
+        both_line = next((l for l in txt.splitlines() if "need both files:" in l), "")
+        both = set(both_line.split(":", 1)[1].strip().split(", ")) if both_line else set()
+        assert set(mtb.find_methods(cat, atac="gene_activity")) - both == \
             set(gas_line.split(":", 1)[1].strip().split(", "))
-        assert set(mtb.find_methods(cat, atac="peak")) == \
+        assert set(mtb.find_methods(cat, atac="peak")) - both == \
             set(peak_line.split(":", 1)[1].strip().split(", "))
+        assert both <= set(mtb.find_methods(cat, atac="peak")) | set(
+            mtb.find_methods(cat, atac="gene_activity"))
         # the wrong representation is named plainly, without capitals (L61)
         assert "wrong embedding" in txt and "WRONG" not in txt and "!!" not in txt
         if cat == "vertical":

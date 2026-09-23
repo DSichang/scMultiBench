@@ -145,10 +145,12 @@ def test_cli_scan_without_category_scans_every_category(capsys):
     assert len(df) == len(multibench.scan("D28"))
 
 
-def test_cli_layout(capsys):
+def test_cli_layout(capsys, monkeypatch):
     rc = cli.main(["layout", "vertical"])
     out = capsys.readouterr().out
     assert rc == 0
+    # the same text, with the command-line spelling of each next step
+    monkeypatch.setattr(multibench.config, "_CLI", True)
     assert out.strip() == multibench.describe_layout("vertical").strip()
     rc = cli.main(["layout"])
     assert rc == 0

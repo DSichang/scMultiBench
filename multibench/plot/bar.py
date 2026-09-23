@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from . import style
+from .. import config as _config
 from .style import compute_overall, minmax, rank_max
 
 # scIB metric families, so a summary can be split the way the benchmark reports
@@ -193,8 +194,11 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     # always ranks within each dataset first
     for msg in style.coverage_warnings(
             parts, basis=overall,
-            incomplete_fix="Filter long_df to the methods scored on every "
-                           "dataset to compare like with like."):
+            incomplete_fix=_config.hint(
+                "Filter long_df to the methods scored on every dataset to compare "
+                "like with like.",
+                "Pass --methods with the methods scored on every dataset to compare "
+                "like with like.")):
         warnings.warn(msg, UserWarning, stacklevel=2)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed

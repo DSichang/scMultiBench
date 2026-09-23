@@ -194,7 +194,7 @@ def test_existing_files_raise_unless_overwrite(tmp_path):
     a = _cite()
     ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
     before = {p.name: p.stat().st_mtime_ns for p in (tmp_path / "D").iterdir()}
-    with pytest.raises(FileExistsError, match=r"pass overwrite=True \(--overwrite\) to "
+    with pytest.raises(FileExistsError, match=r"pass overwrite=True to "
                                               r"replace them") as ei:
         ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
     assert "rna.h5" in str(ei.value) and "cty.csv" in str(ei.value)

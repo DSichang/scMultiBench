@@ -212,7 +212,8 @@ def describe_layout(category: str | None = None) -> str:
     one name per file, as ``mtb.io.export_dataset`` writes them. It also
     gives the ATAC representation each method needs, the ``.h5`` and label
     formats, and the install command. For mosaic and cross it lists each
-    batch pattern the methods accept.
+    batch pattern the methods accept. ``multibench layout`` prints the same
+    text, with ``multibench`` commands in place of the Python calls.
 
     **One rule for ATAC files.** Vertical reads ``atac.h5``;
     ``method_info(m)["atac"]`` says whether it must hold peaks or gene
@@ -253,22 +254,32 @@ def describe_layout(category: str | None = None) -> str:
         lines += _layout_block(cat, full=category is not None) + [""]
     if category is None:
         lines += ["Every file name the loader reads:"]
-        lines += [f"  {k:20s} {v}" for k, v in ROLES.items()]
+        lines += [f"  {k:20s} {v.replace(_METHOD_INFO_ATAC, _check_atac_call())}"
+                  for k, v in ROLES.items()]
         lines += [f"  {OLDER_NAMES}", ""]
+    cat = category or "<category>"
     lines += ["Each .h5 file holds matrix/data (features x cells, the transpose of "
-              "AnnData.X),",
-              "matrix/features and matrix/barcodes. mtb.io.export_dataset writes the "
-              "whole folder",
-              "from an AnnData or MuData; mtb.io.to_canonical writes one file.",
+              "AnnData.X),"]
+    lines += [config.hint("matrix/features and matrix/barcodes. mtb.io.export_dataset "
+                          "writes the whole folder",
+                          "matrix/features and matrix/barcodes. multibench convert "
+                          "writes the whole folder"),
+              config.hint("from an AnnData or MuData; mtb.io.to_canonical writes one "
+                          "file.",
+                          "from an .h5ad or .h5mu file, or one file; multibench convert "
+                          "--help has examples."),
               "A label file is a single-column CSV: one header line, then one label "
               "per cell.",
               "",
               "Each method runs in its own environment, on Linux. Install one with:",
               "  multibench env install --methods X --packed --run",
-              "mtb.scan checks the files and the environment for each method "
-              "(columns files_ok, env_ok).",
-              f"Next: mtb.scan('MYDATA', '{category or '<category>'}'), then "
-              f"mtb.run_all('MYDATA', '{category or '<category>'}', out_dir='out/')"]
+              config.hint("mtb.scan", "multibench scan") + " checks the files and the "
+              "environment for each method (columns files_ok, env_ok).",
+              config.hint(
+                  f"Next: mtb.scan('MYDATA', '{cat}'), then, on Linux, "
+                  f"mtb.run_all('MYDATA', '{cat}', out_dir='out/')",
+                  f"Next: multibench scan MYDATA --category {cat}; on Linux, "
+                  f"multibench run-all MYDATA --category {cat} --out-dir out/")]
     return "\n".join(lines)
 
 
@@ -329,11 +340,16 @@ def _atac_lines(category: str) -> list[str]:
     if category == "vertical":
         out.append("atac.h5 holds peaks or gene activity; each method needs one of them:")
     elif category == "diagonal":
-        out.append("Give atac_peak.h5, atac_gas.h5 or both; each method needs one of them:")
-        both = [s.id for s, v, _c, mods in _variant_rows("diagonal")
-                if {"atac_peak", "atac_gas"} <= set(mods)]
+        out.append("Give atac_peak.h5, atac_gas.h5 or both. Each method needs one of "
+                   "them, or both:")
+        both = list(dict.fromkeys(s.id for s, v, _c, mods in _variant_rows("diagonal")
+                                  if {"atac_peak", "atac_gas"} <= set(mods)))
         if both:
-            out.append(f"  need both files:       {', '.join(dict.fromkeys(both))}")
+            out.append(f"  need both files:       {', '.join(both)}")
+        # each method on one line: the ones that need both files are not
+        # listed again under the representation they also read
+        peak = [m for m in peak if m not in both]
+        gas = [m for m in gas if m not in both]
     elif gas:
         out.append("atac<i>.h5 holds peaks or gene activity; each method needs one of them:")
     else:
@@ -345,18 +361,30 @@ def _atac_lines(category: str) -> list[str]:
         if gas:
             out.append(f"  need gene activity:    {', '.join(gas)}")
     out.append("A method given the other ATAC representation still runs but gives a "
-               "wrong embedding; check method_info(m)['atac'].")
+               f"wrong embedding; check {_check_atac_call()}.")
     if category == "diagonal":
         out.append(OLDER_NAMES)
     return out
 
 
+#: The call that says which ATAC representation a method reads, as the
+#: layout text names it; the command line shows ``multibench info``.
+_METHOD_INFO_ATAC = "method_info(m)['atac']"
+
+
+def _check_atac_call() -> str:
+    return config.hint(_METHOD_INFO_ATAC, "multibench info METHOD")
+
+
 #: How ``describe_layout`` shows a batch's modalities as ``convert`` flags.
+#: A ``.h5mu`` batch keeps its labels in the RNA modality's obs (muon's
+#: usual layout), read with the documented ``<mod>:<col>`` selector.
 _CONVERT_FLAGS = {
     ("rna",): ("h5ad", "--rna X"),
     ("adt", "rna"): ("h5ad", "--rna X --adt obsm:protein"),
     ("atac", "rna"): ("h5mu", "--rna mod:rna --atac mod:atac --atac-kind peak"),
 }
+_CONVERT_LABELS = {"h5ad": "obs:cell_type", "h5mu": "rna:cell_type"}
 
 
 def _batch_recipe(category: str, patterns) -> list[str]:
@@ -380,7 +408,8 @@ def _batch_recipe(category: str, patterns) -> list[str]:
     for b, ms in batches.items():
         ext, flags = _CONVERT_FLAGS[ms]
         lines.append(f"  multibench convert batch{b}.{ext} data/MYDATA {flags} "
-                     f"--labels obs:cell_type --category {category} --batch-index {b}")
+                     f"--labels {_CONVERT_LABELS[ext]} --category {category} "
+                     f"--batch-index {b}")
         if same:
             rest = [str(k) for k in batches if k != b]
             if rest:
@@ -388,10 +417,14 @@ def _batch_recipe(category: str, patterns) -> list[str]:
                              f"{' and '.join(rest)}, with --batch-index "
                              f"{' and '.join(rest)})")
             break
-    first = next(iter(batches.values()))
-    kw = "rna='X', adt='obsm:protein'" if "adt" in first else "rna='X'"
-    lines.append(f"  in Python: mtb.io.export_dataset(adata, 'data/MYDATA', {kw}, "
-                 f"labels='obs:cell_type', category='{category}', batch_index=1)")
+    if any(_CONVERT_FLAGS[ms][0] == "h5mu" for ms in batches.values()):
+        lines.append("  In a .h5mu file, rna:cell_type reads the RNA modality's obs; "
+                     "obs:<col> reads the global obs.")
+    if not config._CLI:
+        first = next(iter(batches.values()))
+        kw = "rna='X', adt='obsm:protein'" if "adt" in first else "rna='X'"
+        lines.append(f"  in Python: mtb.io.export_dataset(adata, 'data/MYDATA', {kw}, "
+                     f"labels='obs:cell_type', category='{category}', batch_index=1)")
     return lines
 
 
@@ -562,6 +595,9 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
             f"see {config.hint('mtb.env.doctor()', '`multibench env doctor`')}")
 
 
+#: The caveat of a GPU-only row that ``scan(assume_gpu=True)`` keeps runnable.
+GPU_NODE_CAVEAT = "assumes the job runs on a GPU node"
+
 #: What the scan summary line adds off Linux, after the counts.
 LINUX_ONLY_SUMMARY = ("Method environments are Linux-only: here you can check files, "
                       "score embeddings and plot. The commands use this computer's "
@@ -627,7 +663,16 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
         need = f"needs {want + ' ' if want else ''}ATAC ({want_file})"
         found = [p.parent / f"{b}{digits}.h5" for b in ("atac", "atac_peak", "atac_gas", "peak")]
         found = [f for f in found if f.is_file() and f.name != want_file]
-        if found:
+        # the right representation under a diagonal name: only the name is wrong
+        same = [f for f in found if category == "vertical" and want
+                and _atac_kind_of(f) == {"peak": "peaks",
+                                         "gene-activity": "gene activity"}[want]]
+        if same:
+            atac_parts.append(
+                f"vertical reads {want_file}: rename {same[0].name} to {want_file}, or "
+                "write it with " + config.hint('category="vertical"',
+                                               "--category vertical"))
+        elif found:
             has = ", ".join(f"{_atac_kind_of(f)} ({f.name})" for f in found)
             atac_parts.append(f"{need}; folder has {has}")
         else:
@@ -738,7 +783,7 @@ def _modality_matcher(modalities):
 
 
 def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset: str,
-                  params: dict | None) -> tuple[str, list[str]]:
+                  params: dict | None, gpu: bool | None = None) -> tuple[str, list[str]]:
     """The shell line ``run`` would execute for one scan row (``shlex``-joined),
     and the note when that line reads files ``run`` writes first.
 
@@ -752,7 +797,7 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
         # Its setup notes are not used here; scan builds its own caveat.
         argv, notes = _runner.preview(method, category, inputs=inputs,
                                       out_dir=Path(out_dir) / f"{method}_{dataset}",
-                                      params=params)
+                                      params=params, gpu=gpu)
         prepared = [n for n in notes if n.startswith(_runner._PREPARED_PREFIX)]
         return shlex.join(argv), prepared
     except Exception as e:  # noqa: BLE001 - a preview must never abort the scan
@@ -765,7 +810,8 @@ def scan(dataset: str, category: str | None = None, *,
          data_path: Path | str | None = None,
          out_dir="<out_dir>",
          params: dict | None = None,
-         verbose: bool = True) -> pd.DataFrame:
+         verbose: bool = True,
+         assume_gpu: bool = False) -> pd.DataFrame:
     """Report what can run on a dataset, why the rest cannot, and each command.
 
     Nothing is executed. Call it first on a new dataset;
@@ -794,6 +840,9 @@ def scan(dataset: str, category: str | None = None, *,
     verbose : bool
         Print one line ``[scan] files OK for k/n method rows; e/n envs
         installed``.
+    assume_gpu : bool
+        ``True`` = skip this host's GPU test, to check on a GPU-less login node
+        a job that runs on a GPU node.
 
     Returns
     -------
@@ -876,6 +925,10 @@ def scan(dataset: str, category: str | None = None, *,
       ``env_reason`` carries the sentence ``run`` would raise (``"<method>
       needs an NVIDIA GPU: the upstream script calls CUDA unconditionally
       (<file>:<line>) ..."``).
+    - ``assume_gpu=True`` (``multibench scan --assume-gpu``) skips that GPU
+      test, for a check on a login node before a GPU-node job. The row's
+      ``caveat`` then says ``assumes the job runs on a GPU node``, and
+      ``command`` leaves out the CPU flags.
 
     The file check runs whether or not any conda env is installed.
 
@@ -1068,10 +1121,14 @@ def scan(dataset: str, category: str | None = None, *,
         # ... and the host: a script that calls CUDA unconditionally cannot
         # finish without an NVIDIA GPU, however complete the env - the same
         # sentence run() raises as OSError, so the sweep never starts it.
+        # assume_gpu checks a job for a GPU node from a host without one.
         if spec.requires_gpu and not envs.host_has_gpu():
-            rec["env_ok"] = False
-            rec["env_reason"] = "; ".join(
-                r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
+            if assume_gpu:
+                rec["caveat"] = "; ".join(x for x in [rec["caveat"], GPU_NODE_CAVEAT] if x)
+            else:
+                rec["env_ok"] = False
+                rec["env_reason"] = "; ".join(
+                    r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"])
         rec["reason"] = "; ".join(r for r in (*short_problems, rec["env_reason"]) if r)
         # --- the command line: only when the files resolved (something to
@@ -1081,7 +1138,8 @@ def scan(dataset: str, category: str | None = None, *,
         if rec["files_ok"] and got is not None:
             rec["command"], prepared = _command_line(spec.id, cat, got, out_dir=out_dir,
                                                      dataset=dataset,
-                                                     params=params.get(spec.id))
+                                                     params=params.get(spec.id),
+                                                     gpu=True if assume_gpu else None)
             # the setup note in its first sentence: the full hint is one
             # method_info(m)['setup_hint'] away
             notes = [f"setup: {_first_sentence(n[len('setup: '):])}"
@@ -2153,7 +2211,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             dry_run: bool = False, verbose: bool = True,
             timeout: float | None = None,
             skip_existing: bool = False,
-            batch=None) -> "BatchResult | pd.DataFrame":
+            batch=None,
+            assume_gpu: bool = False) -> "BatchResult | pd.DataFrame":
     """Run every runnable method on a dataset under one category and score it.
 
     Only rows ``mtb.scan`` marks runnable are attempted. A method's failure is
@@ -2194,6 +2253,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     batch : array-like | None
         One batch id per cell, in embedding row order (array, Series or CSV
         path); ``None`` = batch by the label file each cell came from.
+    assume_gpu : bool
+        Dry run only: skip this host's GPU test, as ``mtb.scan(assume_gpu=True)``
+        does.
 
     Returns
     -------
@@ -2207,7 +2269,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
     ValueError
         Unknown ``category``, no matching variant, nothing runnable, a
-        mismatched ``out_dir``, or ``skip_existing`` with ``params``.
+        mismatched ``out_dir``, or conflicting arguments (Notes).
     KeyError
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
@@ -2321,6 +2383,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
       methods run only on Linux.
     - An ``out_dir`` holding a saved result of another dataset or category
       - ``ValueError``, before any method runs.
+    - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
+      real run - ``ValueError``; a real run checks this host's GPU.
 
     **Dataset spelling.** A ``dataset`` that differs from the folder only in
     case (``'d52'``) is replaced by the on-disk spelling, with a
@@ -2347,6 +2411,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     params = params or {}
     for _m in params:                      # KeyError (did-you-mean) before any I/O
         registry.check_method(_m)
+    if assume_gpu and not dry_run:
+        raise ValueError(
+            "assume_gpu=True applies to a dry run only; a real run checks this "
+            "host's GPU. Pass dry_run=True, or run the sweep on the GPU node "
+            "without assume_gpu.")
     if not dry_run and skip_existing and params:
         raise ValueError(
             "skip_existing=True with params=... would return results computed with the "
@@ -2364,7 +2433,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     # methods exists under this category and KeyError on a params key no
     # variant accepts all come from scan(); blocked rows are kept.
     plan_df = scan(dataset, category, data_path=data_path, methods=methods,
-                   modalities=modalities, verbose=False,
+                   modalities=modalities, verbose=False, assume_gpu=assume_gpu,
                    # the dry run renders (and validates) params in the frame; a real
                    # run validates per method and records a bad override as FAIL
                    params=params if dry_run else None,
@@ -2384,8 +2453,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             msg = (f"[run_all] dry run: {k} of {n} requested variant(s) runnable on "
                    f"{dataset} ({category})")
             if n > k:
+                doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
                 msg += (f"; {n - k} blocked - see the reason column "
-                        f"(files_ok / env_ok say which check; mtb.env.doctor() for envs)")
+                        f"(files_ok / env_ok say which check; {doctor} for envs)")
             print(msg, flush=True)
         return plan_df                     # = scan(): runnable rows first, blocked rows keep `reason`
     blocked = plan_df[~plan_df["runnable"]]
