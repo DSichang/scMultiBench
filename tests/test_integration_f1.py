@@ -4,7 +4,8 @@ Each work package fixed its own half; these pin the joins:
 
 - scan's ``reason`` column (built from resolved paths, L31) carries the
   per-batch hint that ``inputs_for`` gives (L03);
-- scan and find_methods refuse two ATAC representations alike (L13);
+- scan and find_methods read two ATAC representations alike: the
+  variants that read both files (L13);
 - a constant placeholder argument (Seurat_WNN passes ``NULL`` for its unused
   modality) is not a modality the variant reads, in find_methods as in scan
   (L13, L32);
@@ -55,16 +56,17 @@ def test_scan_reason_has_no_batch_hint_on_a_plain_folder(root):
     assert not sc["reason"].str.contains("per-batch").any()
 
 
-def test_scan_refuses_two_atac_representations_like_find_methods(root):
+def test_scan_and_find_methods_read_two_representations_alike(root):
+    # both representation tokens: the variants that read both files
     mods = ["rna", "atac_peak", "atac_gas"]
-    with pytest.raises(ValueError, match="names two ATAC representations"):
-        mtb.find_methods("diagonal", modalities=mods)
-    with pytest.raises(ValueError, match="names two ATAC representations"):
-        mtb.scan("D28", "diagonal", modalities=mods, data_path=root / "data",
-                 verbose=False)
-    with pytest.raises(ValueError, match="names two ATAC representations"):
-        mtb.run_all("D28", "diagonal", modalities=mods, data_path=root / "data",
-                    dry_run=True)
+    want = {"MultiMAP", "Seurat_v3"}
+    assert set(mtb.find_methods("diagonal", modalities=mods)) == want
+    sc = mtb.scan("D28", "diagonal", modalities=mods, data_path=root / "data",
+                  verbose=False)
+    assert set(sc["method"]) == want
+    plan = mtb.run_all("D28", "diagonal", modalities=mods, data_path=root / "data",
+                       dry_run=True)
+    assert set(plan["method"]) == want
 
 
 def test_scan_and_find_methods_agree_per_representation(root):

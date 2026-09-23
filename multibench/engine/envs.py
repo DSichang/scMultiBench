@@ -1,15 +1,16 @@
-"""Method environments: packed archives, lockfiles, recipes and shared envs.
+"""Method environments: check, plan and install the conda envs the methods run in.
 
-scMultiBench wraps ~36 separately developed tools whose pinned dependencies
-conflict (TF 2.4 vs 2.8, scvi <0.20 vs latest, py3.7 vs 3.10, R vs Python), so
-no single conda env can host them all. Compatible methods share an env:
-``env_groups.yaml`` maps each method to the env that serves it, and ``plan()``
-lists the few envs a selection of methods needs.
+Methods whose dependencies conflict run in separate envs; methods that fit
+together share one. ``mtb.method_info(m)['env']`` names a method's env.
 
-An env is unpacked from a prebuilt conda-pack archive (``install_packed``) or
-rebuilt from its committed lockfile (``create_env``); the hand-written
-``env_spec`` recipe (``create_commands`` / ``environment_yml``) is the fallback
-for an env without a lockfile.
+- ``mtb.env.plan(methods=[...])`` lists the envs a selection of methods
+  needs.
+- ``mtb.env.install([...], dry_run=False)`` installs them: a prebuilt
+  archive when one exists, else a build from the pinned package list.
+- ``mtb.env.status`` and ``mtb.env.doctor`` check the installed envs.
+- ``mtb.env.recipe(method)`` returns the hand-written recipe of one env.
+
+The envs are Linux-only.
 """
 from __future__ import annotations
 
@@ -1090,7 +1091,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
 
     - ``method`` - the registry id.
     - ``env`` - the env the package uses for the method, the name
-      ``mtb.scan`` and ``mtb.run`` use (``mtb.env.default_env_name``).
+      ``mtb.scan`` and ``mtb.run`` use (``mtb.method_info(m)['env']``).
     - ``group`` - the same name as ``env``.
     - ``own_env`` - the singleton name ``scmb_<method>`` (lower-case); the
       method also counts as installed when this env exists.
@@ -1661,8 +1662,8 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     packed archives first; on the command line that is
     ``multibench env install --methods ... --packed --run`` (the ``# next``
     line ``multibench env doctor`` prints), while plain
-    ``multibench env install --run`` builds from lockfiles only. Linux only;
-    ``mtb.env.host_platform_problem()`` says why another host refuses.
+    ``multibench env install --run`` builds from lockfiles only. Linux only:
+    on macOS and Windows the install is refused unless ``force=True``.
 
     See Also
     --------

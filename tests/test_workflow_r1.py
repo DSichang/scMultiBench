@@ -442,7 +442,7 @@ _ALLOWED_CAPS = {"RNA", "ADT", "ATAC", "CSV", "TSV", "JSON", "GPU", "CPU", "CUDA
                  "GENCODE", "HDF5", "CITE", "API", "CLI", "OS", "NB", "MB", "GB",
                  "ID", "UMI", "PCA", "SVD", "HVG", "FDR", "MPLBACKEND", "CONDA_PREFIX",
                  "CONDA_DEFAULT_ENV", "PYTHONNOUSERSITE", "LD_PRELOAD", "MULTIBENCH_RUN_MODE",
-                 "MULTIBENCH_ENVS_DIR", "TIMEOUT", "FAIL", "WNN", "MOFA", "NULL"}
+                 "MULTIBENCH_ENVS_DIR", "TIMEOUT", "FAIL", "WNN", "MOFA", "NULL", "README"}
 
 
 def _caps(text):
@@ -455,7 +455,8 @@ def _caps(text):
 
 @pytest.mark.parametrize("obj", [mtb.scan, mtb.run_all, mtb.run, mtb.sweep, mtb.load_batch,
                                  mtb.describe_layout, mtb.BatchResult, runner.RunResult,
-                                 mtb.BatchResult.save])
+                                 mtb.BatchResult.save, mtb.data.fetch,
+                                 mtb.data.fetch_outputs])
 def test_docstrings_use_plain_wording(obj):
     doc = inspect.getdoc(obj)
     assert _caps(doc) == [], _caps(doc)

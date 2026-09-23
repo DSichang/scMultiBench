@@ -130,4 +130,4 @@ def test_docstrings_match_the_code():
     assert "v1" not in results.__doc__ and "v1" not in results.load_results.__doc__
     assert "Parameters" in pipeline.to_long.__doc__
     assert pipeline.to_long.__doc__.strip().splitlines()[0] == \
-        "Reshape ``mtb.evaluate``'s wide frame into the tidy long results frame."
+        "Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``."

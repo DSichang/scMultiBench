@@ -76,9 +76,9 @@ class DegenerateRerunWarning(UserWarning):
     **When it fires:**
 
     - a re-run row scored ARI below 0.01 where the published table scored
-      the same category, dataset and method above 0.2: the re-run almost
-      certainly failed silently (a collapsed embedding, a wrong label
-      order), so the row says nothing about the method;
+      the same category, dataset and method above 0.2. Such a row usually
+      comes from a failed re-run (a collapsed embedding, a wrong label
+      order), not from the method;
     - never for a ``result_path`` file or a ``long_df`` frame passed to
       ``mtb.recommend``;
     - in the shipped sweeps: Conos on D28.
@@ -356,6 +356,11 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
 # --------------------------------------------------------------------------
 # a user's own long CSV
 # --------------------------------------------------------------------------
+#: optional columns of a long CSV that ``load_results(result_path=<file>)``
+#: keeps: ``scored_with`` is the provenance ``mtb.to_long`` writes
+_KEPT_FILE_COLUMNS = ("scored_with",)
+
+
 def _load_long_csv(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     need = ["metric", "value", "method"]
@@ -382,7 +387,7 @@ def _load_long_csv(path: Path) -> pd.DataFrame:
             df[col] = default
         else:
             df[col] = df[col].fillna(default)
-    return df[COLUMNS]
+    return df[COLUMNS + [c for c in _KEPT_FILE_COLUMNS if c in df.columns]]
 
 
 # --------------------------------------------------------------------------
@@ -496,10 +501,10 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
                       for r in bad.itertuples())
     warnings.warn(
         f"degenerate re-run row(s) - ARI < {_DEGENERATE_RERUN_ARI} where the "
-        f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. The "
-        f"re-run most likely failed silently (a collapsed embedding or a wrong "
-        f"label order), so the row says nothing about the method; drop it "
-        f"before ranking (df[df.method != {bad.method.iloc[0]!r}]).",
+        f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. Such a "
+        f"row usually comes from a failed re-run (a collapsed embedding or a "
+        f"wrong label order), not from the method; drop it before ranking "
+        f"(df[df.method != {bad.method.iloc[0]!r}]).",
         DegenerateRerunWarning, stacklevel=stacklevel)
 
 
@@ -649,8 +654,9 @@ def load_results(
     columns ``metric, value, method``, e.g. written by ``to_long(...).to_csv``
     or ``BatchResult.save()``. A file keeps whatever ``source`` /
     ``clustering`` values it carries; a missing column or a blank cell is
-    filled with ``"user"`` / ``"default"`` per row. ``source=`` then filters
-    on the file's own ``source`` column:
+    filled with ``"user"`` / ``"default"`` per row. A ``scored_with`` column
+    is kept, with NaN for the stored rows. ``source=`` then filters on the
+    file's own ``source`` column:
 
     - ``"published"`` / ``"both"`` - keep every row;
     - ``"user"`` - the rows ``mtb.to_long`` wrote;
@@ -843,7 +849,8 @@ def load_results(
             warnings.warn(
                 f"metric(s) {sel.codes} not present in {where} (source={source!r}; "
                 f"available: {have_metrics})", UserWarning, stacklevel=3)
-    out = out[COLUMNS].reset_index(drop=True)
+    out = out[COLUMNS + [c for c in _KEPT_FILE_COLUMNS if c in out.columns]]
+    out = out.reset_index(drop=True)
     out.attrs["rerun_version"] = _version_attr(rerun_versions)
     if source in ("rerun", "both") and not base.is_file():
         _warn_degenerate(out, base, rerun_version=out.attrs["rerun_version"])
@@ -1351,8 +1358,8 @@ def recommend(
     - every row belongs to a method the package does not run for the
       category;
     - ``methods=``, ``modalities=`` or ``atac=`` leaves no scored method;
-    - an unknown modality token or ``atac`` value, or two ATAC
-      representations (the rule of ``mtb.find_methods``);
+    - an unknown modality token or ``atac`` value, or a representation
+      token that contradicts ``atac`` (the rule of ``mtb.find_methods``);
     - a ``metrics`` token or code is unknown.
 
     **Retired keywords.** ``task=`` / ``family=`` still work as

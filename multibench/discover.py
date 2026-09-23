@@ -28,6 +28,17 @@ def _modality_types(spec) -> set[str]:
 _REPRESENTATION_TOKENS = {"atac_peak": "peak", "atac_gas": "gene_activity"}
 
 
+def _representations(toks) -> set[str]:
+    """The ATAC representations (``peak``, ``gene_activity``) that normalised
+    modality tokens name."""
+    return {_REPRESENTATION_TOKENS[t] for t in toks if t in _REPRESENTATION_TOKENS}
+
+
+#: the two ATAC representation roles; naming both selects the variants that
+#: read both files (MultiMAP and Seurat_v3 read atac_peak.h5 and atac_gas.h5)
+_BOTH_FILES = frozenset(_REPRESENTATION_TOKENS)
+
+
 def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
     """The one modality rule of ``find_methods`` and ``recommend``.
 
@@ -38,11 +49,13 @@ def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
     means base ``atac`` plus the representation the method reads
     (``method_info(m)['atac']``), the same as ``atac='peak'`` /
     ``atac='gene_activity'``: the role name alone does not say what the script
-    reads (moETM takes ``atac_gas`` and reads peaks).
+    reads (moETM takes ``atac_gas`` and reads peaks). Both representation
+    tokens together select the variants that read both files
+    (:func:`_reads_both_files`); ``atac`` is then left as given.
 
     Raises ``TypeError`` for a bare string, ``ValueError`` for an unknown
-    token or ``atac`` value, for two representations, or for a
-    representation that contradicts ``atac=``.
+    token or ``atac`` value, or for a representation that contradicts
+    ``atac=``.
     """
     if isinstance(modalities, str):
         raise TypeError(
@@ -52,19 +65,23 @@ def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
     if modalities is None:
         return None, atac
     toks = registry.normalize_modalities(modalities)
-    reps = sorted({_REPRESENTATION_TOKENS[t] for t in toks if t in _REPRESENTATION_TOKENS})
-    if len(reps) > 1:
-        raise ValueError(
-            f"modalities={list(modalities)} names two ATAC representations (peak and "
-            f"gene activity); name one of atac_peak / atac_gas to select methods by "
-            f"what they read, or 'atac' for every ATAC method")
-    if reps:
+    reps = sorted(_representations(toks))
+    if len(reps) == 1:
         if atac is not None and atac != reps[0]:
             raise ValueError(
                 f"modalities={list(modalities)} selects methods that read "
                 f"{reps[0].replace('_', ' ')} but atac={atac!r}; pass one of the two")
         atac = reps[0]
     return {_base_modality(t) for t in toks}, atac
+
+
+def _reads_both_files(modalities) -> bool:
+    """Whether ``modalities`` names both ATAC representations (``atac_peak``
+    and ``atac_gas``, in any spelling): then only a variant with both roles
+    matches."""
+    if modalities is None or isinstance(modalities, str):
+        return False
+    return _BOTH_FILES <= set(registry.normalize_modalities(modalities))
 
 
 def _variant_matches(v, category, want, needs_labels, atac) -> bool:
@@ -130,8 +147,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     Raises
     ------
     ValueError
-        Unknown ``category``, ``task``, ``atac`` or modality token, or two ATAC
-        representations.
+        Unknown ``category``, ``task``, ``atac`` or modality token, or a
+        token that contradicts ``atac``.
     TypeError
         ``modalities`` is a bare string, not a list.
 
@@ -156,15 +173,20 @@ def find_methods(category: str | None = None, *, task: str | None = None,
       Multigrate: rna+atac exists only as a mosaic variant, so
       ``inputs_for(..., 'vertical', modalities=['rna', 'atac'])`` would raise.
 
-    **Modality tokens.** A base token matches every role of its type:
-    ``atac`` matches the ``atac``, ``atac_gas`` and ``atac_peak`` roles,
-    ``rna`` matches ``rna1``, and ``protein`` is ``adt``.
+    **Modality tokens.** A method matches when one variant reads at least
+    the named modalities. ``mtb.scan`` and ``mtb.run_all`` use a stricter
+    rule: a row's modalities must be exactly the named combination.
+
+    A base token matches every role of its type: ``atac`` matches the
+    ``atac``, ``atac_gas`` and ``atac_peak`` roles, ``rna`` matches ``rna1``,
+    and ``protein`` is ``adt``.
 
     A representation token selects by what the method reads. ``atac_peak``
     (also ``peak``) is ``atac`` plus ``atac='peak'``; ``atac_gas`` (also
     ``gas``, ``gene_activity``) is ``atac`` plus ``atac='gene_activity'``.
-    Two representations, or one that contradicts ``atac=``, raise
-    ``ValueError``.
+    Both tokens together select the variants that read both files
+    (MultiMAP, Seurat_v3). A representation that contradicts ``atac=``
+    raises ``ValueError``.
 
     **Directory-fed methods.** scBridge is fed a directory and is judged by
     the bare filenames its variant names: ``rna.h5`` / ``atac_gas.h5`` make it
@@ -203,6 +225,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     registry.check_category(category)
     registry.check_task(task)
     want, atac = _modality_filter(modalities, atac)
+    both = _reads_both_files(modalities)
     out = []
     for s in registry.load():
         if category and category not in s.categories:
@@ -222,14 +245,38 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         cands = s.variants or [None]
         hits = [v for v in cands
                 if _variant_matches(v, category, want, needs_labels, atac)
-                and (not atac or v is None or v.consumes_atac)]
+                and (not atac or v is None or v.consumes_atac)
+                and (not both or v is not None and _BOTH_FILES <= {
+                    r.rstrip("0123456789") for r in v.when.get("modalities") or []})]
         if not hits:
             continue
         out.append(s.id)
     return out
 
 
-def list_methods(category: str | None = None, **_removed) -> list[str]:
+def _find_methods_filters_raise(fn):
+    """Keyword guard of ``list_methods``: a ``find_methods`` filter passed to
+    it raises a ``TypeError`` that names ``find_methods``; any other unknown
+    keyword gets Python's own message. The signature stays ``(category)``."""
+    @functools.wraps(fn)
+    def guard(*args, **kwargs):
+        extra = [k for k in kwargs if k != "category"]
+        if extra:
+            filters = set(inspect.signature(find_methods).parameters) - {"category"}
+            unknown = [k for k in extra if k not in filters]
+            if unknown:
+                raise TypeError(
+                    f"list_methods() got an unexpected keyword argument {unknown[0]!r}")
+            keys = ", ".join(f"{k}=..." for k in extra)
+            raise TypeError(
+                f"list_methods() only takes category since 0.3.0; {keys} are find_methods "
+                f"filters - use find_methods(category, {keys})")
+        return fn(*args, **kwargs)
+    return guard
+
+
+@_find_methods_filters_raise
+def list_methods(category: str | None = None) -> list[str]:
     """Return the registry method ids, optionally restricted to one category.
 
     Parameters
@@ -237,8 +284,6 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
     category : str | None
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``; ``None`` = every method.
-    **_removed
-        Catch-all that rejects any other keyword with a ``TypeError``.
 
     Returns
     -------
@@ -275,18 +320,6 @@ def list_methods(category: str | None = None, **_removed) -> list[str]:
 
     mtb.list_categories : the four category tokens with a description of each.
     """
-    if _removed:
-        # Only a real find_methods filter is pointed there; anything else
-        # gets the message Python gives for an unknown keyword.
-        filters = set(inspect.signature(find_methods).parameters) - {"category"}
-        unknown = [k for k in _removed if k not in filters]
-        if unknown:
-            raise TypeError(
-                f"list_methods() got an unexpected keyword argument {unknown[0]!r}")
-        keys = ", ".join(f"{k}=..." for k in _removed)
-        raise TypeError(
-            f"list_methods() only takes category since 0.3.0; {keys} are find_methods "
-            f"filters - use find_methods(category, {keys})")
     return registry.list_methods(category)
 
 

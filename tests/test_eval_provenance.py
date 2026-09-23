@@ -108,6 +108,15 @@ def test_scored_with_column_passes_through_the_consumers(tmp_path):
     both.to_csv(path, index=False)
     back = mtb.load_results(result_path=path, source="user")
     assert set(back["method"]) == {"Mine"} and len(back) == len(mine)
+    # the provenance survives the documented CSV round trip
+    assert back.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
+    assert back["scored_with"].tolist() == mine["scored_with"].tolist()
+    every = mtb.load_results(result_path=path, source="both")
+    assert every["scored_with"].isna().sum() == len(stored)
+    # a file without the column still loads with the seven columns
+    stored.to_csv(tmp_path / "stored.csv", index=False)
+    assert mtb.load_results(result_path=tmp_path / "stored.csv").columns.tolist() == \
+        pipeline.LONG_COLUMNS
 
 
 def test_run_all_scoring_labels_its_internal_sweep_as_sweep():

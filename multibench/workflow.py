@@ -130,8 +130,9 @@ CATEGORIES = {
                 "(e.g. an RNA experiment and a separate ATAC experiment).",
     "mosaic":   "Several batches where only some share a modality; a paired batch "
                 "bridges the others.",
-    "cross":    "Several batches in which all modalities are present; the task is "
-                "removing batch effects.",
+    "cross":    "Several batches, each measured with RNA and ADT, for example one "
+                "CITE-seq assay from several donors; the task is removing batch "
+                "effects.",
 }
 
 #: Modality role -> the file the loader looks for in <data_path>/<dataset>/.
@@ -693,23 +694,26 @@ def _variant_consumes_atac(variant) -> bool:
 def _modality_matcher(modalities):
     """A test ``(spec, variant_modalities) -> bool`` for ``scan(modalities=)``.
 
-    One rule, shared with ``find_methods``: a base token (``rna``, ``adt`` /
-    ``protein``, ``atac``) matches every role of that base (``atac`` matches
-    ``atac``, ``atac_gas``, ``atac_peak`` and the numbered ``atac2``); a
-    representation token (``atac_peak`` / ``peak``, ``atac_gas`` /
-    ``gene_activity``) matches the ATAC roles of a method whose
-    ``method_info(m)['atac']`` is that representation; a numbered token
-    (``rna1``) matches that role. A variant matches when every token matches
-    one of its roles and every role is matched: the tokens name one
-    combination, in any order. ``[]`` matches only the variants fed a folder.
-    Unknown tokens, and two ATAC representations, raise ``ValueError`` as in
+    A list that names a variant's roles exactly (a scan row's ``modalities``
+    split on ``+``) keeps that variant. Otherwise the tokens name one
+    combination: a base token (``rna``, ``adt`` / ``protein``, ``atac``)
+    matches every role of that base (``atac`` matches ``atac``, ``atac_gas``,
+    ``atac_peak`` and the numbered ``atac2``); a representation token
+    (``atac_peak`` / ``peak``, ``atac_gas`` / ``gene_activity``) matches the
+    ATAC roles of a method whose ``method_info(m)['atac']`` is that
+    representation; a numbered token (``rna1``) matches that role. A variant
+    matches when every token matches one of its roles and every role is
+    matched. Both representation tokens together therefore keep only the
+    variants with both roles (MultiMAP, Seurat_v3). ``[]`` matches only the
+    variants fed a folder. Unknown tokens raise ``ValueError`` as in
     ``find_methods``.
     """
     from .discover import _modality_filter
     from .engine.schema import modality_family
-    # find_methods' checks: ValueError on an unknown token or on two ATAC
-    # representations, TypeError on a bare string
+    # find_methods' checks: ValueError on an unknown token, TypeError on a
+    # bare string
     _modality_filter(modalities, None)
+    exact = set(registry.normalize_modalities(modalities))
     toks = []
     for tok in modalities:
         t = registry.MODALITY_ALIASES.get(str(tok).lower(), str(tok))
@@ -725,6 +729,8 @@ def _modality_matcher(modalities):
     def match(spec, mods) -> bool:
         if not mods or not toks:
             return not mods and not toks
+        if exact == set(mods):
+            return True
         if any(rep and spec.atac != rep for _f, rep, _b in toks):
             return False
         return (all(any(covers(t, r) for r in mods) for t in toks)
@@ -733,8 +739,9 @@ def _modality_matcher(modalities):
 
 
 def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset: str,
-                  params: dict | None) -> str:
-    """The shell line ``run`` would execute for one scan row (``shlex``-joined).
+                  params: dict | None) -> tuple[str, list[str]]:
+    """The shell line ``run`` would execute for one scan row (``shlex``-joined),
+    and the note when that line reads files ``run`` writes first.
 
     ``(no preview: ...)`` when building it failed - a preview must never
     abort the scan.
@@ -743,20 +750,21 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
     try:
         # the runner's preview, not the module-level ``_run`` hook the
         # dispatch tests replace: a preview must never count as a dispatch.
-        # Its notes are not printed here; scan puts them in ``caveat``.
-        argv, _notes = _runner.preview(method, category, inputs=inputs,
-                                       out_dir=Path(out_dir) / f"{method}_{dataset}",
-                                       params=params)
-        return shlex.join(argv)
+        # Its setup notes are not used here; scan builds its own caveat.
+        argv, notes = _runner.preview(method, category, inputs=inputs,
+                                      out_dir=Path(out_dir) / f"{method}_{dataset}",
+                                      params=params)
+        prepared = [n for n in notes if n.startswith(_runner._PREPARED_PREFIX)]
+        return shlex.join(argv), prepared
     except Exception as e:  # noqa: BLE001 - a preview must never abort the scan
-        return f"(no preview: {type(e).__name__}: {e})"
+        return f"(no preview: {type(e).__name__}: {e})", []
 
 
 def scan(dataset: str, category: str | None = None, *,
          methods: list[str] | None = None,
          modalities: list[str] | None = None,
          data_path: Path | str | None = None,
-         out_dir=OUT_DIR_PLACEHOLDER,
+         out_dir="<out_dir>",
          params: dict | None = None,
          verbose: bool = True) -> pd.DataFrame:
     """Report what can run on a dataset, why the rest cannot, and each command.
@@ -820,7 +828,7 @@ def scan(dataset: str, category: str | None = None, *,
     >>> df[["method", "modalities", "runnable", "reason"]]
     >>> # what blocks the rest
     >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]
-    >>> print(df.loc[df.files_ok, "command"].iloc[0])  # a ready-to-run shell line
+    >>> print(df.loc[df.files_ok, "command"].iloc[0])  # the line the run executes
     >>> mtb.scan("MYCITE", "vertical", modalities=["rna", "adt"],
     ...          data_path="/path/to/data")
 
@@ -896,7 +904,9 @@ def scan(dataset: str, category: str | None = None, *,
       ``method_info(m)['setup_hint']`` (GLUE's GENCODE annotation file);
     - method scripts that are not on this machine yet: the first real run
       clones them with ``git``; on a host without network, fetch them first
-      with ``multibench fetch --scripts``.
+      with ``multibench fetch --scripts``;
+    - a command that reads a file ``mtb.run`` writes first (see the command
+      column below).
 
     **The command column.**
 
@@ -910,6 +920,10 @@ def scan(dataset: str, category: str | None = None, *,
       (the flags that turn CUDA off where a switch exists).
     - A row blocked only by ``env_ok`` still shows its command - the line to
       put in a job script once the env is built.
+    - Some commands read a file that ``mtb.run`` writes first under
+      ``inputs/`` (Seurat_v3's renamed peak file, a converted input). The
+      ``caveat`` names the file; start such a method with ``mtb.run`` or
+      ``multibench run`` instead of the shell line.
 
     **The modalities column.** ``modalities`` is a ``+``-joined string here
     (``"rna+adt"``); ``run_all`` / ``inputs_for`` take a list
@@ -936,19 +950,23 @@ def scan(dataset: str, category: str | None = None, *,
       ``UserWarning``.
 
     **Modality tokens.** ``modalities`` names one combination, in any
-    order; the rule is the one ``mtb.find_methods`` uses:
+    order. A row is kept when its modalities are exactly that combination.
+    ``mtb.find_methods`` keeps every method that reads at least the named
+    modalities, so the two can list different methods.
 
+    - a list that spells a row's modalities (the column split on ``"+"``)
+      keeps that row; the ``caveat`` column flags an ATAC file of the wrong
+      kind;
     - a base token (``rna``, ``adt`` or its alias ``protein``, ``atac``)
       matches every role of that base: ``atac`` matches ``atac``,
       ``atac_gas``, ``atac_peak`` and numbered roles such as ``atac2``;
     - a representation token (``atac_peak`` / ``peak``, ``atac_gas`` /
       ``gene_activity``) keeps the methods whose ``method_info(m)['atac']``
       is that representation, like ``find_methods(atac=...)``;
+    - ``atac_peak`` together with ``atac_gas`` keeps the rows that read both
+      files (MultiMAP, Seurat_v3);
     - a numbered token (``rna1``) matches that role only;
-    - a row is kept when every token matches one of its roles and every
-      role is matched;
-    - an unknown token raises ``ValueError`` listing the vocabulary, and so
-      do two representations (``atac_peak`` with ``atac_gas``).
+    - an unknown token raises ``ValueError`` listing the vocabulary.
 
     A variant fed a folder (scBridge) has no modality roles. ``modalities=[]``
     selects exactly those variants; any non-empty list leaves them out, and
@@ -1063,8 +1081,9 @@ def scan(dataset: str, category: str | None = None, *,
         # the user must do first, and method scripts not yet on this machine,
         # go to caveat: the files are fine, but the run needs them.
         if rec["files_ok"] and got is not None:
-            rec["command"] = _command_line(spec.id, cat, got, out_dir=out_dir,
-                                           dataset=dataset, params=params.get(spec.id))
+            rec["command"], prepared = _command_line(spec.id, cat, got, out_dir=out_dir,
+                                                     dataset=dataset,
+                                                     params=params.get(spec.id))
             # the setup note in its first sentence: the full hint is one
             # method_info(m)['setup_hint'] away
             notes = [f"setup: {_first_sentence(n[len('setup: '):])}"
@@ -1074,6 +1093,7 @@ def scan(dataset: str, category: str | None = None, *,
                 # a same-cells requirement is checked on the files above;
                 # its caveat appears only when the files fail it
                 notes = [n for n in notes if not n.startswith("setup: ")]
+            notes += prepared
             if notes:
                 rec["caveat"] = "; ".join(x for x in [rec["caveat"], *notes] if x)
         rows.append(rec)
@@ -1643,7 +1663,7 @@ class BatchResult:
         reused                      True when skip_existing reused the output
         env, output_kind, n_tunable the scan row the method ran from
         data_path, multibench_version, started_at   provenance of the run
-        _long                       internal long table; read BatchResult.long instead
+        _long                       internal; read BatchResult.long instead
         ```
 
         **Label-order evidence.** ``label_order_candidates`` holds every
@@ -1706,9 +1726,9 @@ class BatchResult:
     def plot(self, **kw):
         """Bubble figure of every method that produced metrics.
 
-        Rows are methods (best first) and columns metrics; bubble size encodes
-        the method's rank (rank 1 is the largest), colour the value (darker is
-        higher).
+        Rows are methods, best first. Circle size shows the rank within a
+        column (bigger is better). Fill compares the values in a column: the
+        lightest is the lowest in this figure, not zero.
 
         Parameters
         ----------
@@ -2287,9 +2307,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     representation runs without an error and gives a wrong embedding;
     ``mtb.scan`` shows it in ``caveat``.
 
-    **Modality tokens.** ``modalities`` follows the rule of ``mtb.scan``:
+    **Modality tokens.** ``modalities`` follows the rule of ``mtb.scan``: a
+    row is kept when its modalities are exactly the named combination.
     ``atac`` matches every ATAC role, and ``atac_peak`` / ``atac_gas`` keep
-    the methods that need that representation.
+    the methods that need that representation. A scan row's ``modalities``
+    split on ``"+"`` selects that row.
 
     **Errors raised.**
 

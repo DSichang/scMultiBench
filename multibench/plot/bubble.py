@@ -57,8 +57,8 @@ class FamilyBlock:
 class BubbleTable:
     """The numbers behind a bubble figure, as ``mtb.plot.build_table`` returns.
 
-    Rows are ``methods``; the per-family matrices live in ``blocks``. Pass
-    the table to ``mtb.plot.render`` to draw it.
+    Rows are ``methods``; the per-family matrices live in ``blocks``.
+    ``mtb.plot.bubble`` draws the same figure from the long table.
 
     Attributes
     ----------
@@ -108,7 +108,6 @@ class BubbleTable:
     >>> tbl.methods[:3]                  # the best three methods
     >>> tbl.ranks.loc[tbl.methods[0]]    # the best method's max-rank per metric
     >>> tbl.blocks[0].overall            # first family's Overall per method
-    >>> fig = mtb.plot.render(tbl, title="D11")
 
     Notes
     -----
@@ -128,15 +127,13 @@ class BubbleTable:
     **Blocks.** Paper order: DR and clustering (blues), batch correction
     (greens), then "Other" (purples) for any metric outside the two.
 
-    **Drawing.** ``mtb.plot.render(tbl, cmap=None, title=None,
-    show_language=True)`` draws the table; ``mtb.plot.bubble`` is
-    ``build_table`` followed by ``render``.
+    **Drawing.** ``mtb.plot.bubble`` builds this table from the same long
+    table and draws it.
 
     See Also
     --------
-    mtb.plot.build_table : builds a table from a tidy long frame.
-    mtb.plot.render : draws a table as the paper-style figure.
-    mtb.plot.bubble : build and render in one call.
+    mtb.plot.build_table : builds a table from a long table.
+    mtb.plot.bubble : builds the table and draws the figure in one call.
     """
     methods: list             # row order: order= methods first, then best first
     blocks: list              # list[FamilyBlock], in FAMILIES order
@@ -253,7 +250,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Tidy frame with ``method``, ``metric``, ``value`` columns; optional
+        Long table with ``method``, ``metric``, ``value`` columns; optional
         ``dataset``, ``category`` and ``needs_labels`` columns (Notes).
     metrics : list of str | None
         Metric codes to keep, in this order within each family; ``None`` =
@@ -370,16 +367,14 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     **Errors.** A frame that looks like ``mtb.evaluate``'s wide output gets a
     hint to convert it with ``mtb.to_long`` first; an unknown name gets a
-    did-you-mean hint and the values present. Duplicate rows raise rather
-    than being silently averaged: deduplicate, or name the variants
-    distinctly (as ``mtb.sweep`` does). A method with both ``True`` and
-    ``False`` ``needs_labels`` rows, or an empty frame, also raises
-    ``ValueError``.
+    did-you-mean hint and the values present. Duplicate rows raise
+    ``ValueError``: deduplicate, or name the variants distinctly (as
+    ``mtb.sweep`` does). A method with both ``True`` and ``False``
+    ``needs_labels`` rows, or an empty frame, also raises ``ValueError``.
 
     See Also
     --------
-    mtb.plot.bubble : build and render in one call.
-    mtb.plot.render : draw a table returned by this function.
+    mtb.plot.bubble : builds the table and draws the figure in one call.
     mtb.plot.BubbleTable : what is returned, field by field.
     """
     import warnings
@@ -391,11 +386,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         missing = sorted(need - have)
         hint = ""
         if "Value" in have or getattr(long_df, "index", None) is not None and getattr(long_df.index, "name", None) == "metric":
-            hint = (" This looks like evaluate()'s wide output - convert it "
-                    "with mtb.eval.to_long(df, method=..., dataset=..., "
+            hint = (" This looks like evaluate()'s output - convert it "
+                    "with mtb.to_long(df, method=..., dataset=..., "
                     "category=...) first.")
         raise ValueError(
-            f"bubble() needs a tidy long frame with columns "
+            f"bubble() needs a long table with columns "
             f"['method', 'metric', 'value']; missing {missing}.{hint}")
     if aggregate not in ("dataset", "summary"):
         raise ValueError(
@@ -428,7 +423,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         raise ValueError(
             f"{int(dmask.sum())} duplicate rows for the same {tuple(keys)} "
             f"(e.g. {df[dmask][keys].drop_duplicates().head(3).to_dict('records')}); "
-            "bubble() would silently average them - deduplicate, or name the "
+            "bubble() does not average them - deduplicate, or name the "
             "variants distinctly (as sweep() does).")
 
     datasets = (tuple(sorted(map(str, df["dataset"].dropna().unique())))
@@ -550,8 +545,10 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
             rule = ("the family Overall averages the ranks of the metrics a "
                     "method has and a column's ranks count only the methods "
                     "scored in it")
-        msg = ("n/a cells: " + "; ".join(na_cells) + f" - {rule}. Pass na='skip' "
-               "to silence this, na='raise' to refuse an incomplete frame.")
+        from .. import config
+        msg = ("n/a cells: " + "; ".join(na_cells) + f" - {rule}. " + config.hint(
+            "Pass na='skip' to silence this, na='raise' to refuse an incomplete frame.",
+            "Pass --na skip to silence this, --na raise to refuse an incomplete table."))
         if na == "raise":
             raise ValueError(msg)
         warnings.warn(msg, UserWarning, stacklevel=2)
@@ -955,7 +952,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Tidy frame with ``method``, ``metric``, ``value`` and optional
+        Long table with ``method``, ``metric``, ``value`` and optional
         ``dataset`` columns, as from ``mtb.load_results``, ``mtb.to_long`` or
         the ``BatchResult.long`` property (more in Notes).
     metrics : list of str | None
@@ -1132,19 +1129,17 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     **Errors.** A frame that looks like ``mtb.evaluate``'s wide output gets a
     hint to convert it with ``mtb.to_long`` first; an unknown name gets a
-    did-you-mean hint and the values present. Duplicate rows raise rather
-    than being silently averaged: deduplicate, or name the variants
-    distinctly (as ``mtb.sweep`` does). A method with both ``True`` and
-    ``False`` ``needs_labels`` rows, or an empty frame, also raises
-    ``ValueError``.
+    did-you-mean hint and the values present. Duplicate rows raise
+    ``ValueError``: deduplicate, or name the variants distinctly (as
+    ``mtb.sweep`` does). A method with both ``True`` and ``False``
+    ``needs_labels`` rows, or an empty frame, also raises ``ValueError``.
 
     See Also
     --------
     mtb.plot.build_table : the numbers behind the figure, to audit first.
-    mtb.plot.render : draw a ``BubbleTable``; ``bubble`` is ``build_table`` then ``render``.
     mtb.plot.bar : one bar per method across datasets; same ``overall=`` formulas.
-    mtb.to_long : reshape ``mtb.evaluate``'s wide frame into the long frame.
-    mtb.load_results : stored metric tables as a long frame.
+    mtb.to_long : reshape ``mtb.evaluate``'s scores into a long table.
+    mtb.load_results : stored metric tables as a long table.
     """
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,

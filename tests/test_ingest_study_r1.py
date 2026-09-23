@@ -113,13 +113,15 @@ def test_demo_folders_hold_raw_counts(root, ds, cat):
 # ------------------------------------------------------------------ L03 per-batch folders
 def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
     a = _cite()
-    for cat in ("vertical", "diagonal"):
-        with pytest.raises(ValueError, match=f"{cat} methods read one rna.h5: export without "
+    for cat, read in (("vertical", "one rna.h5"), ("diagonal", "one rna.h5 and one ATAC file")):
+        with pytest.raises(ValueError, match=f"{cat} methods read {read}: export without "
                                              r"batch= and pass the batch column to "
-                                             r"evaluate\(batch=\.\.\.\)"):
+                                             r"evaluate\(batch=\.\.\.\)") as ei:
             ingest.export_dataset(a, tmp_path / cat, adt="obsm:protein", batch="obs:batch",
                                   category=cat)
         assert not (tmp_path / cat).exists()
+        # cross is RNA+ADT: never offered to a diagonal (RNA+ATAC) user
+        assert ("category='cross'" in str(ei.value)) == (cat == "vertical")
 
 
 def test_batch_with_atac_and_no_category_warns(tmp_path):
@@ -370,3 +372,57 @@ def test_mudata_global_obs_labels(tmp_path):
     m.obs["rna:ct2"] = m.obs["celltype"].values
     d = ingest.export_dataset(m, tmp_path / "MU2", rna="rna", labels="rna:ct2")
     assert (d / "cty.csv").exists()
+
+
+# ------------------------------------------------------------------ review of round 1
+def _unpaired_mudata():
+    mu = pytest.importorskip("mudata")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = mu.MuData({"rna": _rna(60, "r"), "atac": _atac(50, "a")})
+    # the global obs as muon fills it: prefixed copies, NaN for the other side's cells
+    for mod in ("rna", "atac"):
+        m.obs[f"{mod}:cell_type"] = m[mod].obs["cell_type"].reindex(m.obs_names).values
+    return m
+
+
+@pytest.mark.parametrize("labels", ["rna:cell_type", "atac:cell_type", "cell_type",
+                                    "obs:cell_type"])
+def test_diagonal_mudata_reads_each_modality_obs(tmp_path, labels):
+    m = _unpaired_mudata()
+    assert "cell_type" not in m.obs.columns
+    d = ingest.export_dataset(m, tmp_path / "MU", rna="mod:rna", atac="mod:atac",
+                              atac_kind="peak", labels=labels, category="diagonal")
+    assert pd.read_csv(d / "rna_cty.csv")["x"].tolist() == \
+        m["rna"].obs["cell_type"].tolist()
+    assert pd.read_csv(d / "atac_cty.csv")["x"].tolist() == \
+        m["atac"].obs["cell_type"].tolist()
+
+
+def test_diagonal_mudata_global_obs_labels_with_gaps_are_refused(tmp_path):
+    # the global 'rna:cell_type' column is NaN for every ATAC cell
+    m = _unpaired_mudata()
+    with pytest.raises(ValueError) as ei:
+        ingest.export_dataset(m, tmp_path / "MU", rna="mod:rna", atac="mod:atac",
+                              atac_kind="peak", labels="obs:rna:cell_type",
+                              category="diagonal")
+    msg = str(ei.value)
+    assert "50 of the 50 labels for the ATAC cells (mdata['atac']) are missing" in msg
+    assert "labels='cell_type' reads that column from each modality's own obs" in msg
+    assert "labels='obs:<col>'" not in msg
+    assert not (tmp_path / "MU").exists()
+
+
+@pytest.mark.parametrize("category", [None, "vertical", "diagonal", "cross", "mosaic"])
+@pytest.mark.parametrize("gap", [np.nan, None, ""])
+def test_labels_with_missing_values_are_refused_in_every_category(tmp_path, category, gap):
+    a = _cite(60)
+    lab = a.obs["cell_type"].astype(object).copy()
+    lab.iloc[[3, 7]] = gap
+    a.obs["ct"] = lab
+    kw = {"batch_index": 1} if category in ("cross", "mosaic") else {}
+    with pytest.raises(ValueError, match=r"labels='obs:ct': 2 of the 60 labels for the "
+                                         r"(RNA )?cells \((data.obs|data)\) are missing"):
+        ingest.export_dataset(a, tmp_path / "GAP", adt="obsm:protein", labels="obs:ct",
+                              category=category, **kw)
+    assert not (tmp_path / "GAP").exists()

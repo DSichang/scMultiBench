@@ -963,7 +963,8 @@ def _cmd_plot(args) -> int:
     metrics = _csv_list(args.metrics)
     if args.kind == "bubble":
         kw = dict(metrics=metrics, methods=methods, aggregate=args.aggregate,
-                  title=title, save=args.out, require_complete=args.require_complete)
+                  title=title, save=args.out, require_complete=args.require_complete,
+                  na=getattr(args, "na", "warn"))
         if args.overall is not None:
             kw["overall"] = args.overall
         with _quiet_stdout():
@@ -1059,10 +1060,14 @@ def _cmd_run_all(args) -> int:
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
             print()
+            from .engine.runner import _PREPARED_PREFIX
             print(f"# commands ({len(have)} variant(s) with resolvable inputs; "
-                  f"'[env missing]' = blocked by env_ok only)")
+                  f"'[env missing]' = blocked by env_ok only; '[use multibench run]' = "
+                  f"reads a file under inputs/ that `multibench run` writes first)")
             for _, r in have.iterrows():
                 tag = "" if r["env_ok"] else " [env missing]"
+                if _PREPARED_PREFIX in str(r.get("caveat", "")):
+                    tag += " [use multibench run]"
                 print(f"{r['method']} ({r['modalities']}){tag}: {r['command']}")
         return _EXIT_OK
     with _quiet_stdout(), _leiden_flavor(getattr(args, "leiden_flavor", None)):
@@ -1421,7 +1426,7 @@ def _cmd_env(args) -> int:
     name = getattr(args, "name", None) or expected
     if name == expected:
         banner = (f"# env {name!r} is the name scan/run/env doctor expect for {method} "
-                  f"(mtb.env.default_env_name({method!r})); `multibench env create "
+                  f"(`multibench info {method}` shows it); `multibench env create "
                   f"{method}` builds the same env from its lockfile")
     else:
         banner = (f"# env {name!r} is a custom --name: scan/run/env doctor expect "
@@ -1470,8 +1475,7 @@ class _HelpFormatter(argparse.HelpFormatter):
 _CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
-                  "modality) or cross (several batches with all modalities; batch-effect "
-                  "removal)")
+                  "modality) or cross (several batches, each with RNA and ADT)")
 _TASK_HELP = ("task within the category: clustering, batch or dimension_reduction "
               "(mtb.list_tasks())")
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
@@ -1798,6 +1802,10 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
                          "every dataset instead of warning")
+    pp.add_argument("--na", choices=["warn", "skip", "raise"], default="warn",
+                    help="bubble only: a metric not computed for a method is drawn as "
+                         "a dash; warn = name those cells (default), skip = draw "
+                         "without the warning, raise = refuse an incomplete table")
     pp.add_argument("--group", choices=["clustering", "batch"],
                     help="bar only: metric family shorthand (overrides --metrics)")
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")
@@ -1896,8 +1904,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="run only; do not compute metrics on the outputs")
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                      help="Leiden backend of the clustering sweep when scoring (default: "
-                          "igraph, or mtb.config.DEFAULT.leiden_flavor); leidenalg is "
-                          "the backend of the published tables")
+                          "igraph, or mtb.config.DEFAULT.leiden_flavor); leidenalg "
+                          "matches both stored tables (published and re-run)")
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
 
     # ---- evaluate
@@ -1942,8 +1950,8 @@ def build_parser() -> argparse.ArgumentParser:
                                       "--labels are given")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                     help="Leiden backend of the clustering sweep (default: igraph, "
-                         "or mtb.config.DEFAULT.leiden_flavor); leidenalg is the "
-                         "backend of the published tables")
+                         "or mtb.config.DEFAULT.leiden_flavor); leidenalg matches both "
+                         "stored tables (published and re-run)")
     pe.add_argument("--only", help=argparse.SUPPRESS)     # deprecated spelling of --metrics
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
                                    "embedding (default X_emb; 'X' = .X)")
@@ -1985,8 +1993,8 @@ def build_parser() -> argparse.ArgumentParser:
                                     "and the methods in each.")
     egr.set_defaults(func=_cmd_env, _parser=egr)
     _NAME_HELP = ("environment name (default: the env the package uses for METHOD - "
-                  "mtb.env.default_env_name(METHOD), the same name `multibench scan` "
-                  "shows in its env column and run/env doctor/env create use; e.g. "
+                  "the name `multibench scan` shows in its env column and "
+                  "run/env doctor/env create use; e.g. "
                   "`multibench env recipe Matilda` -> matilda, "
                   "`multibench env recipe UINMF` -> scmb_r)")
     er = ev.add_parser("recipe", help="print the conda/pip commands that build a method's env",
@@ -2001,8 +2009,8 @@ def build_parser() -> argparse.ArgumentParser:
     er.set_defaults(func=_cmd_env, _parser=er)
     ey = ev.add_parser("yml", help="print/write a conda environment.yml for a method",
                        description="Emit an environment.yml for METHOD (stdout, or --out) "
-                                   "whose name: is the env scan/run expect "
-                                   "(mtb.env.default_env_name).")
+                                   "whose name: is the env scan/run expect (the env "
+                                   "column of `multibench scan`).")
     ey.add_argument("method", help="method id")
     ey.add_argument("--name", help=_NAME_HELP)
     ey.add_argument("--out", help="write the yml here instead of stdout")

@@ -355,7 +355,7 @@ def _check_input(role: str, val, *, real: bool) -> str:
         if importlib.util.find_spec("loompy") is None:
             raise ImportError(
                 "reading .loom requires the optional 'loompy' package "
-                "(pip install 'multibench[loom]' or pip install loompy); "
+                "(pip install 'multibench-sc[loom]' or pip install loompy); "
                 "alternatively convert the input to .h5ad/.csv first.")
         return "convert"
     raise ValueError(f"unsupported input format: {p.name}")
@@ -706,8 +706,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     such as an ``.h5mu`` file, are raised by the dry run too.
 
     The dry run prints to stderr what the real run would need first: the
-    method's ``setup_hint`` (``method_info(m)['setup_hint']``), and a note
-    when the method scripts are not on this machine yet.
+    method's ``setup_hint`` (``method_info(m)['setup_hint']``), a note when
+    the method scripts are not on this machine yet, and a note when the
+    command reads a file under ``inputs/`` that the run writes first.
 
     **Variant selection.** Only ``category`` and the modality roles of
     ``inputs`` select the variant. The modality roles are every key except the
@@ -746,8 +747,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     still returns the argv.
 
     **Environment.** With ``cmd_template=None`` the method runs in the env
-    ``mtb.env.group_for(method)`` names, entered in one of two modes, picked
-    per call:
+    ``mtb.method_info(method)['env']`` names, entered in one of two modes,
+    picked per call:
 
     - ``prefix`` whenever ``mtb.env.env_prefix(env)`` finds the env on disk: a
       ``bash -c`` wrapper sets ``CONDA_PREFIX`` / ``CONDA_DEFAULT_ENV``, puts
@@ -992,7 +993,31 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     values = {role: step["value"] for role, step in plan.items()}
     repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
     argv = _argv(variant, method, values, out_str, repo, params, cmd_template)
-    return argv, script_notes(spec, variant, repo)
+    notes = script_notes(spec, variant, repo)
+    prepared = _prepared_note(plan, out_str)
+    return argv, notes + ([prepared] if prepared else [])
+
+
+#: how :func:`_prepared_note` starts, so ``mtb.scan`` can pick it out of the notes
+_PREPARED_PREFIX = "the command reads "
+
+
+def _prepared_note(plan: dict, out_str: str) -> str | None:
+    """The note for a command that reads files the run writes first, or ``None``.
+
+    A converted input (``inputs/<role>.h5``) or a renamed peak file
+    (``inputs/<role>_normpeaks.h5``) exists only after :func:`run` wrote it,
+    so the shell line alone fails on a fresh ``out_dir``.
+    """
+    files = [os.path.relpath(step["value"], out_str) for step in plan.values()
+             if step["convert"] or step["normpeaks_from"]]
+    if not files:
+        return None
+    return f"{_PREPARED_PREFIX}{', '.join(files)}, " + config.hint(
+        "which mtb.run writes first: start the method with mtb.run or mtb.run_all, "
+        "not as a shell line",
+        "which `multibench run` writes first: start the method with `multibench run` "
+        "or `multibench run-all`, not as a shell line")
 
 
 def _fetch_scripts(repo_path) -> Path:

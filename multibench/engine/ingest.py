@@ -228,7 +228,7 @@ def _to_anndata(src):
         except ModuleNotFoundError as exc:
             raise ImportError(
                 "reading .loom requires the optional 'loompy' package "
-                "(pip install 'multibench[loom]' or pip install loompy); "
+                "(pip install 'multibench-sc[loom]' or pip install loompy); "
                 "alternatively convert the input to .h5ad/.csv first."
             ) from exc
         return ad.read_loom(p)
@@ -1125,7 +1125,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     and peaks in one ``X``:
 
     ```python
-    mtb.io.export_dataset(adata, "data/MYARC", rna="X[feature_types=Gene Expression]",
+    mtb.io.export_dataset(adata, "data/MYARC",
+                          rna="X[feature_types=Gene Expression]",
                           atac="X[feature_types=Peaks]", atac_kind="peak",
                           labels="obs:celltype", category="vertical")
     ```
@@ -1168,6 +1169,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     object's own ``.obs`` into ``rna_cty.csv`` and ``atac_cty.csv``. A call
     that writes one modality writes only that modality's label file.
 
+    For a MuData, ``labels='<col>'`` or ``'<mod>:<col>'`` reads ``<col>``
+    from each modality's own ``.obs`` (``mdata['rna'].obs`` for the RNA
+    cells, ``mdata['atac'].obs`` for the ATAC cells). When the two columns
+    have different names, export RNA and ATAC in two calls.
+
     **Batches.** With ``batch``, cells are split per batch value (sorted)
     and numbered files are written: ``rna1.h5``, ``rna2.h5`` ...,
     ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52). Only
@@ -1181,9 +1187,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     ```python
     kw = dict(labels="obs:cell_type", category="mosaic")
-    mtb.io.export_dataset(cite, "data/LAB", adt="obsm:protein", batch_index=1, **kw)
-    mtb.io.export_dataset(multiome, "data/LAB", atac="obsm:atac", atac_kind="peak",
-                          batch_index=2, **kw)
+    mtb.io.export_dataset(cite, "data/LAB", adt="obsm:protein",
+                          batch_index=1, **kw)
+    mtb.io.export_dataset(multiome, "data/LAB", atac="obsm:atac",
+                          atac_kind="peak", batch_index=2, **kw)
     mtb.io.export_dataset(rna_only, "data/LAB", batch_index=3, **kw)
     ```
 
@@ -1227,6 +1234,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
       names the strays);
     - a ``labels`` / ``batch`` Series missing cells, or a sequence of the
       wrong length;
+    - a label that is missing (NaN, None or ``''``): ``mtb.evaluate`` would
+      score it as one more cell type;
     - ``batch`` with ``category='vertical'`` or ``'diagonal'``, or together
       with ``batch_index``;
     - ``batch_index`` that is not a positive integer, or without
@@ -1332,6 +1341,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             vec = _as_obs_vector(data, labels, what="labels", master=m)
             if m is not None and len(vec) != len(m):
                 raise ValueError(f"labels has {len(vec)} entries for {len(m)} cells")
+            _check_labels_complete(
+                vec, spec=labels, where=f"the cells ({_labels_where(data, labels)})",
+                advice="give every cell a label, or subset the data to the labelled cells "
+                       "first")
             lab["rna"] = vec
 
     # --- batches
@@ -1465,7 +1478,10 @@ def _source_name(data, spec, what) -> str:
 
 def _diagonal_labels(data, spec, sides) -> dict:
     """``{side: labels}`` for a diagonal export: each side's labels from its
-    own cells (``'obs:<col>'`` from each object's ``.obs``)."""
+    own cells. ``'obs:<col>'`` reads each object's own ``.obs`` (a MuData's
+    global ``.obs`` when a modality lacks the column); for a MuData,
+    ``'<mod>:<col>'`` and a bare ``'<col>'`` read ``<col>`` from each
+    modality's own ``.obs``."""
     import pandas as pd
 
     present = [side for side in ("rna", "atac") if sides[side]]
@@ -1474,21 +1490,33 @@ def _diagonal_labels(data, spec, sides) -> dict:
             "category='diagonal' with both rna= and atac=: labels= must be 'obs:<col>' "
             "or a Series indexed by barcode; a plain sequence cannot be split between "
             "the RNA and the ATAC cells")
+    mu = _is_mudata(data)
+    col_each = None                     # the column read from each side's own obs
+    if isinstance(spec, str):
+        if spec.startswith("obs:"):
+            col_each = spec[4:]
+        elif mu and not spec.startswith("mod:"):
+            name, sep, col = spec.partition(":")
+            if sep and name in data.mod and col:
+                col_each = col
+            elif not sep:
+                col_each = spec
     out = {}
     for side in present:
         role, a, kw, what, src = sides[side][0]
         bars = [str(x) for x in a.obs_names]
-        if isinstance(spec, str) and spec.startswith("obs:"):
-            col = spec[4:]
-            if col in a.obs.columns:
-                out[side] = np.asarray(a.obs[col])
-                continue
-            if _is_mudata(data) and col in data.obs.columns:
-                ser = data.obs[col]
+        if col_each is not None and col_each in a.obs.columns:
+            out[side] = np.asarray(a.obs[col_each])
+            _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells "
+                                   f"({src})", advice=_diagonal_label_advice(data, spec, sides))
+            continue
+        if col_each is not None:
+            if spec.startswith("obs:") and mu and col_each in data.obs.columns:
+                ser = data.obs[col_each]
             else:
                 raise KeyError(
-                    f"labels={spec!r}: column {col!r} not in obs of the {side.upper()} "
-                    f"object ({src}); available: {list(a.obs.columns)}")
+                    f"labels={spec!r}: column {col_each!r} not in obs of the "
+                    f"{side.upper()} object ({src}); available: {list(a.obs.columns)}")
         elif isinstance(spec, str):
             ser = _select_obs(data, spec, what="labels")
         else:
@@ -1500,13 +1528,60 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 raise ValueError(
                     f"labels={repr(spec) if isinstance(spec, str) else 'Series'}: "
                     f"{len(lack)} of the {len(bars)} {side.upper()} cells have no label "
-                    f"({lack[:5]}{'...' if len(lack) > 5 else ''}); with "
-                    f"category='diagonal' pass labels='obs:<col>' to read each object's "
-                    f"own obs")
+                    f"({lack[:5]}{'...' if len(lack) > 5 else ''}); "
+                    + _diagonal_label_advice(data, spec, sides))
             out[side] = np.asarray(ser)[[idx[b] for b in bars]]
         else:
             out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
+        _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells ({src})",
+                               advice=_diagonal_label_advice(data, spec, sides))
     return out
+
+
+def _diagonal_label_advice(data, spec, sides) -> str:
+    """What to pass instead, for a diagonal label selector that failed."""
+    if _is_mudata(data):
+        col = spec.rsplit(":", 1)[-1] if isinstance(spec, str) else "<col>"
+        where = " and ".join(src + ".obs" for side in ("rna", "atac") for _r, _a, _k, _w, src
+                             in sides[side][:1])
+        return (f"with category='diagonal', labels={col!r} reads that column from each "
+                f"modality's own obs ({where}); when the column names differ, export RNA "
+                f"and ATAC in two calls")
+    return ("with category='diagonal', labels='obs:<col>' reads the column from each "
+            "object's own obs")
+
+
+def _n_missing_labels(vals) -> int:
+    """How many entries of a label vector are NaN, None or an empty string."""
+    import pandas as pd
+
+    s = pd.Series(np.asarray(vals, dtype=object))
+    return int((s.isna() | (s.astype(str).str.strip() == "")).sum())
+
+
+def _check_labels_complete(vals, *, spec, where: str, advice: str) -> None:
+    """Refuse a label vector with missing values: evaluate would score them as
+    one more cell type."""
+    n = _n_missing_labels(vals)
+    if n:
+        shown = repr(spec) if isinstance(spec, str) else type(spec).__name__
+        raise ValueError(
+            f"labels={shown}: {n} of the {len(vals)} labels for {where} are missing "
+            f"(NaN, None or ''); {advice}")
+
+
+def _labels_where(data, spec) -> str:
+    """How an error names the object a paired ``labels`` selector read."""
+    if not isinstance(spec, str):
+        return "the labels you passed"
+    mu = _is_mudata(data)
+    if spec.startswith("obs:"):
+        return "mdata.obs" if mu else "data.obs"
+    if spec.startswith("mod:"):
+        return f"mdata[{spec[4:].partition('.')[0]!r}].obs"
+    if mu:
+        return f"mdata[{spec.partition(':')[0]!r}].obs"
+    return "data.obs"
 
 
 def _export_filename(role: str, suf: str, category: str | None) -> str:

@@ -1,8 +1,10 @@
-"""Filesystem paths and on-disk token maps for multibench.
+"""The paths and settings every multibench function reads.
 
-The benchmark's result tree uses space-named category folders and a singular
-`scib_metric` top-level dir. Callers use clean tokens (e.g. "vertical"); this
-module translates them to the real folder names.
+Change a field of ``mtb.config.DEFAULT`` to use your own data folder, env
+folder or Leiden backend, for example
+``mtb.config.DEFAULT.data_path = "/scratch/data"``. ``help(mtb.config.Config)``
+lists the fields; ``multibench config`` prints each path and where it came
+from.
 """
 from __future__ import annotations
 

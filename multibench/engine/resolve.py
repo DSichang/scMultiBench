@@ -68,6 +68,9 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
     """What to do instead of per-batch files for a vertical / diagonal folder."""
+    if category == "diagonal":
+        return ("diagonal methods read one rna.h5 and one ATAC file: export without "
+                "batch= and pass the batch column to evaluate(batch=...)")
     return (f"{category} methods read one {stem}.h5: export without batch= and pass "
             f"the batch column to evaluate(batch=...)"
             + (", or use category='cross' (RNA+ADT)" if has_adt else ""))
@@ -180,7 +183,10 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         says to pass ``modalities=``.
     """
     if modalities is not None:
-        return spec.select(category, set(modalities), loose=True)
+        v = spec.select(category, set(modalities), loose=True)
+        if set(modalities) != set(v.when.get("modalities") or []):
+            _check_representation(spec, modalities)
+        return v
     candidates = [v for v in spec.variants if v.when.get("category") == category]
     if not candidates:
         raise KeyError(f"{spec.id} has no variant for category={category!r}")
@@ -200,6 +206,32 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         f"modality-sets {available}{folder_note}; pass modalities= to disambiguate, "
         f"e.g. modalities={available[0]}"
     )
+
+
+_READS = {"peak": "peaks", "gene_activity": "gene activity"}
+
+
+def _check_representation(spec, modalities) -> None:
+    """Refuse representation tokens that disagree with what the method reads.
+
+    Applied when ``modalities`` matched a variant only loosely (not its exact
+    roles): ``atac_peak`` / ``atac_gas`` then mean the ATAC representation
+    the method reads, ``method_info(m)['atac']``, as in ``scan`` and
+    ``find_methods``.
+    """
+    reps = {{"atac_peak": "peak", "atac_gas": "gene_activity"}[t] for t in modalities
+            if t in ("atac_peak", "atac_gas")}
+    if not reps or not spec.atac:
+        return
+    reads = _READS.get(spec.atac, spec.atac)
+    if len(reps) > 1:
+        raise KeyError(
+            f"{spec.id} reads {reads}; modalities name peaks and gene activity, which "
+            f"only a variant that reads both files takes (see "
+            f"mtb.method_info({spec.id!r})['supports'])")
+    rep = next(iter(reps))
+    if rep != spec.atac:
+        raise KeyError(f"{spec.id} reads {reads}; modalities name {_READS[rep]}")
 
 
 def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
@@ -352,9 +384,11 @@ def inputs_for(dataset: str, category: str, method: str, *,
     Notes
     -----
     **Variant selection.** With ``modalities``, the variant matching
-    ``(category, modalities)`` is used: exact tokens first, then ``atac``
-    standing for ``atac_gas`` / ``atac_peak`` when that leaves exactly one
-    variant.
+    ``(category, modalities)`` is used: exact role tokens first, then
+    ``atac`` standing for ``atac_gas`` / ``atac_peak`` when that leaves
+    exactly one variant. In the second case a representation token must
+    match what the method reads (``method_info(m)['atac']``): SCALEX with
+    ``["rna", "peak"]`` raises ``KeyError``.
 
     Without ``modalities``, a category with one variant uses it. With several,
     the dataset folder decides: the variant whose input files are all present
@@ -364,13 +398,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
     for ``modalities=``.
 
     **Modality tokens.** ``method_info(m)['supports']`` lists each variant's
-    tokens. Accepted aliases:
+    tokens.
 
-    - ``protein`` for ``adt``;
-    - ``peak`` / ``peaks`` for ``atac_peak``, ``gas`` / ``gene_activity`` for
-      ``atac_gas``;
-    - ``atac`` for either ATAC representation role; the one the method wants
-      is ``method_info(m)['atac']``.
+    - ``protein`` is another spelling of ``adt``;
+    - ``atac`` stands for either ATAC representation role;
+    - the representation tokens ``atac_peak`` (also ``peak``, ``peaks``) and
+      ``atac_gas`` (also ``gas``, ``gene_activity``) name what the method
+      reads; ``method_info(m)['atac']`` says which one that is.
 
     An unknown token raises ``ValueError`` naming the vocabulary.
 
@@ -409,7 +443,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
     **The check argument.**
 
-    - ``False`` (default): the best-effort paths, returned silently.
+    - ``False`` (default): the best-effort paths, with no warning.
     - ``None``: the same paths, plus a ``UserWarning`` listing the missing ones.
     - ``True``: ``FileNotFoundError`` for a missing input, plus the content
       preflight below.
@@ -934,6 +968,10 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
       :data:`GAS_FED_TO_PEAK_CAVEAT` (e.g. moETM/scMM/iPOLNG, whose ``atac_gas``
       role resolved to a real gene-activity ``atac_gas.h5``).
 
+    A method with both an ``atac_peak`` and an ``atac_gas`` role (MultiMAP,
+    Seurat_v3) reads peaks from the first and gene activity from the second;
+    each of those roles is judged by its own name.
+
     The 10-90% band (mixed names) yields no caveat. The wrong representation
     runs to completion and returns a wrong embedding.
 
@@ -954,15 +992,22 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
             if frac is not None and frac >= 0.9:
                 out.append(PEAK_IN_GAS_CAVEAT)
     else:
+        # a method that reads both files (MultiMAP, Seurat_v3) wants gene
+        # activity in its atac_gas role and peaks in its atac_peak role
+        stems = {r.rstrip("0123456789") for r in resolved}
+        both = {"atac_peak", "atac_gas"} <= stems
         for role, path in resolved.items():
             if is_label_role(role) or base_modality(role) != "atac":
                 continue
             frac = _peak_fraction_of(Path(path))
             if frac is None:
                 continue
-            if atac == "gene_activity" and frac >= 0.9:
+            want = atac
+            if both and role.rstrip("0123456789") in ("atac_peak", "atac_gas"):
+                want = "peak" if role.startswith("atac_peak") else "gene_activity"
+            if want == "gene_activity" and frac >= 0.9:
                 out.append(PEAK_FED_TO_GAS_CAVEAT.format(role=role))
-            elif atac == "peak" and frac <= 0.1:
+            elif want == "peak" and frac <= 0.1:
                 out.append(GAS_FED_TO_PEAK_CAVEAT.format(role=role))
     seen = set()
     for role, path in resolved.items():

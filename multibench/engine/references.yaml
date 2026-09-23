@@ -315,7 +315,7 @@ iPOLNG:
 StabMap:
   repo_url: https://github.com/MarioniLab/StabMap
   version: "0.1.8"
-  summary: "Mosaic integration by stabilised mapping onto a reference embedding using shared and unshared features; R, source()d through engine/drivers/run_stabmap.R."
+  summary: "Mosaic integration by stabilised mapping onto a reference embedding using shared and unshared features; R."
   reference:
     doi: 10.1038/s41587-023-01766-z
     title: Stabilized mosaic single-cell data integration using unshared features

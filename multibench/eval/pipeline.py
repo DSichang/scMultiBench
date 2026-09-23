@@ -11,7 +11,7 @@ from . import io
 from .. import _compat, config
 from ..data import catalog
 
-#: the seven columns of the tidy long frame (pinned to
+#: the seven columns of the long table (pinned to
 #: multibench.data.results.COLUMNS by tests/test_eval_reshape.py)
 LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
 
@@ -32,9 +32,9 @@ def _scored_with(attrs) -> str | None:
 def to_long(value_df, *, method: str, dataset: str | None = None,
             category: str | None = None, clustering: str = "default",
             source: str = "user") -> pd.DataFrame:
-    """Reshape ``mtb.evaluate``'s wide frame into the tidy long results frame.
+    """Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``.
 
-    The result has the seven columns of ``mtb.load_results``: your scores
+    The result has the columns of ``mtb.load_results``. Your scores
     concatenate with the stored ones, keep their provenance through a CSV
     round trip, and plot with ``mtb.plot.bubble``.
 
@@ -104,9 +104,11 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     ``scored_with``, such as ``"leidenalg/sweep/0.3.2"``: the Leiden backend,
     where the clusters came from (``sweep`` or ``user``) and the package
     version; ``none`` fills a part that did not apply. The same three values
-    are in ``attrs``. The stored tables have no such column, so it is NaN
-    for their rows after ``pd.concat``, and ``load_results`` does not read it
-    back.
+    are in ``attrs``.
+
+    The stored tables have no ``scored_with`` column, so it is NaN for their
+    rows after ``pd.concat``. ``load_results(result_path=...)`` keeps the
+    column when it reads the CSV back.
 
     **Plot badges.** The bubble figure shows ``?`` for a method name the
     registry does not know. To badge a method of your own as supervised, add
@@ -626,7 +628,7 @@ def evaluate(
     The scib call behind each code::
 
         code       scib function         arguments
-        ARI, NMI   ari, nmi              Leiden clusters of the optimal-resolution sweep
+        ARI, NMI   ari, nmi              Leiden clusters, best sweep resolution
         ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
         iASW       isolated_labels_asw   iso_threshold = number of batches + 1
         iF1        isolated_labels_f1    same threshold; best F1 over the sweep

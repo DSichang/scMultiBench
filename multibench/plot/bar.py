@@ -31,7 +31,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Tidy frame with ``method``, ``metric``, ``value`` columns and an
+        Long table with ``method``, ``metric``, ``value`` columns and an
         optional ``dataset`` (absent = one dataset), e.g. from
         ``mtb.load_results``.
     metrics : list of str | None
@@ -164,7 +164,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     have = set(getattr(long_df, "columns", []))
     if not need.issubset(have):
         raise ValueError(
-            f"bar() needs a tidy long frame with columns ['method', 'metric', "
+            f"bar() needs a long table with columns ['method', 'metric', "
             f"'value']; missing {sorted(need - have)}")
     if len(long_df) == 0:
         raise ValueError(

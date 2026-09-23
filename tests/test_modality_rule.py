@@ -39,9 +39,10 @@ def test_base_token_matches_every_role_of_its_type():
     assert "StabMap" in discover.find_methods("mosaic", modalities=["rna", "adt"])
 
 
-def test_conflicting_representations_raise():
-    with pytest.raises(ValueError, match="two ATAC representations"):
-        discover.find_methods("diagonal", modalities=["rna", "atac_peak", "atac_gas"])
+def test_two_representations_select_the_variants_that_read_both_files():
+    both = discover.find_methods("diagonal", modalities=["rna", "atac_peak", "atac_gas"])
+    assert both == ["MultiMAP", "Seurat_v3"]
+    assert discover.find_methods(modalities=["gas", "peaks"]) == both
     with pytest.raises(ValueError, match="atac='gene_activity'"):
         discover.find_methods("diagonal", modalities=["rna", "atac_peak"], atac="gene_activity")
     # the same representation twice is not a conflict
@@ -72,5 +73,6 @@ def test_recommend_takes_atac_like_find_methods():
 def test_recommend_rejects_a_bad_atac_before_loading(tmp_path):
     with pytest.raises(ValueError, match="unknown atac representation 'binary'"):
         mtb.recommend("diagonal", atac="binary", result_path=tmp_path / "nowhere")
-    with pytest.raises(ValueError, match="two ATAC representations"):
-        mtb.recommend("diagonal", modalities=["atac_peak", "gas"], result_path=tmp_path / "nowhere")
+    with pytest.raises(ValueError, match="unknown modality 'peaks2'"):
+        mtb.recommend("diagonal", modalities=["atac_peak", "peaks2"],
+                      result_path=tmp_path / "nowhere")

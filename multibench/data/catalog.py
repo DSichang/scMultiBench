@@ -1,4 +1,9 @@
-"""Catalog: parse files/*.csv into typed tables with canonical names."""
+"""The benchmark's method, dataset and metric tables, with canonical names.
+
+``mtb.catalog.methods()``, ``datasets()`` and ``metrics()`` return the tables;
+``canonical_id`` and ``canonical_metric`` turn a spelling into the name the
+package uses.
+"""
 from __future__ import annotations
 
 import re
@@ -577,7 +582,7 @@ def datasets(files_dir: Path | str | None = None, *,
 
 
 def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """Table describing the scIB metrics, from ``files/metric_full.csv``.
+    """Table describing the scIB metrics: one row per metric code.
 
     Parameters
     ----------

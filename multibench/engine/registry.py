@@ -315,8 +315,9 @@ def known_modalities() -> set[str]:
 def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
     """Map caller modality spellings to registry tokens, validating each.
 
-    * aliases: ``protein`` -> ``adt``; ``peak``/``peaks`` -> ``atac_peak``;
-      ``gas``/``gene_activity`` -> ``atac_gas``
+    * spellings: ``protein`` -> ``adt``; the representation tokens
+      ``peak``/``peaks`` -> ``atac_peak`` and ``gas``/``gene_activity`` ->
+      ``atac_gas``
     * ``base=True`` further reduces every token to its base type
       (``atac_gas`` -> ``atac``, ``rna1`` -> ``rna``) - what ``find_methods``
       compares against.
@@ -334,9 +335,10 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
         t = MODALITY_ALIASES.get(str(tok).lower(), str(tok))
         if t not in known and not is_label_role(t):
             raise ValueError(
-                f"unknown modality {tok!r}; known: rna, adt (alias: protein), atac "
-                f"(aliases: peak, gas/gene_activity; role tokens: atac_gas, atac_peak, "
-                f"rna1/adt1/atac2 ... for numbered batches)")
+                f"unknown modality {tok!r}; known: rna, adt (alias: protein), atac; "
+                f"the representation tokens atac_peak (also peak, peaks) and atac_gas "
+                f"(also gas, gene_activity) name the ATAC form a method reads; rna1, "
+                f"adt1, atac2 ... name numbered batches")
         if base:
             t = base_modality(t)
         if t not in out:

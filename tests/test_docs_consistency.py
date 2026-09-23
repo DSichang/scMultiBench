@@ -383,7 +383,12 @@ def test_docs_pages_carry_the_colab_speed_round(path):
     fetch_outputs manifest, Config's fields) are pinned on the live objects."""
     import dataclasses
     import multibench as mtb
-    assert "output_urls.json" in (mtb.data.fetch_outputs.__doc__ or "")
+    # the manifest ships and fetch_outputs reads it; its file name is internal
+    # and stays out of the docstring (round-1 review, L61)
+    import importlib
+    _fetch = importlib.import_module("multibench.data.fetch")
+    assert _fetch.OUTPUT_MANIFEST.is_file() and "D11" in _fetch._output_urls()
+    assert "output_urls.json" not in (mtb.data.fetch_outputs.__doc__ or "")
     assert {"envs_dir", "leiden_flavor"} <= {f.name for f in dataclasses.fields(mtb.config.Config)}
     text = path.read_text()
     if path.name == "installation.md":

@@ -91,7 +91,8 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
     Examples
     --------
     >>> import multibench as mtb
-    >>> root = mtb.data.fetch("D11")          # <data_path>/D11/, about 11 MB
+    >>> # the data root; D11 lands in <data_path>/D11/ (about 11 MB)
+    >>> root = mtb.data.fetch("D11")
     >>> mtb.scan("D11", "vertical", data_path=root)
     >>> mtb.data.fetch("D11", "D28", data_path="data", quiet=True)
 
@@ -106,11 +107,9 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
     and is left alone, whatever it holds (even for an id that is not a
     release asset); an empty leftover folder is removed and fetched again.
 
-    **Atomic extraction.** Each archive is extracted into a scratch folder
-    under the data root and moved into place, so an interrupted download or
-    extraction never looks like a complete dataset on the next call. An
-    archive entry that would write outside that folder raises
-    ``RuntimeError``.
+    **Atomic extraction.** Each archive is unpacked into a temporary folder
+    under the data root and then moved into place. An archive entry that
+    would write outside that folder raises ``RuntimeError``.
 
     See Also
     --------
@@ -163,8 +162,8 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
                   quiet: bool = False) -> Path:
     """Download precomputed ``run_all`` outputs for a tutorial dataset.
 
-    A stand-in for running the methods on a host without their conda envs
-    (Colab, a laptop): ``evaluate`` and ``plot`` then run on real embeddings.
+    Use it on a host without the method environments, such as Colab or a
+    laptop. ``evaluate`` and ``plot`` then run on the stored outputs.
 
     Parameters
     ----------
@@ -205,23 +204,20 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     **Tree contents.** Exactly what ``mtb.run_all`` writes and
     ``mtb.load_batch`` reads: ``batch_result.json``, ``long.csv``,
     ``summary.csv`` and one folder per method holding its ``embedding.h5``.
-    The download URLs come from the shipped manifest
-    ``multibench/engine/output_urls.json``.
 
-    **Selecting methods.** ``methods`` only validates the names, so a typo
-    fails here rather than as an empty plot later. To restrict what is
-    loaded, use ``mtb.load_batch(out, methods=[...])``.
+    **Selecting methods.** ``methods`` only checks the names; the whole tree
+    is downloaded. To restrict what is loaded, use
+    ``mtb.load_batch(out, methods=[...])``.
 
     **Idempotence.** When ``<data_path>/outputs/<dataset>/batch_result.json``
     exists nothing is downloaded. An empty leftover folder is replaced; a
     non-empty one without ``batch_result.json`` raises ``RuntimeError`` -
     remove it and call again.
 
-    **Atomic extraction.** The archive is extracted into a scratch folder and
-    moved into place, so an interrupted download never looks like a complete
-    tree on the next call. The archive may be rooted at the tree itself or
-    at one folder (``outputs-D11/``, ``D11/``); an entry that would write
-    outside the scratch folder raises ``RuntimeError``.
+    **Atomic extraction.** The archive is unpacked into a temporary folder
+    and then moved into place. The archive may be rooted at the tree itself
+    or at one folder (``outputs-D11/``, ``D11/``); an entry that would write
+    outside the temporary folder raises ``RuntimeError``.
 
     See Also
     --------
