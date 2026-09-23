@@ -102,7 +102,7 @@ Cobolt:
 scMVP:
   repo_url: https://github.com/bm2-lab/scMVP
   version: "fc61e4d"
-  summary: "Multi-view deep generative model for paired scRNA + scATAC (peaks) with a cross-modal attention mechanism; vertical integration."
+  summary: "Multi-view deep generative model for paired scRNA + scATAC (peaks) with self-attention encoders; vertical integration."
   reference:
     doi: 10.1186/s13059-021-02595-6
     title: A deep generative model for multi-view profiling of single-cell RNA-seq and ATAC-seq data
