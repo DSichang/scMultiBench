@@ -4,9 +4,10 @@ Three mechanical checks, so the docs cannot slip back to the 0.2.1 spellings
 the surface cut retired: (a) no retired spelling survives in the README, the
 notebooks or their generator; (b) every ``mtb.<name>`` the README and the
 docs quickstart mention exists in the live package and sits in the relevant
-``__all__``; (c) every ``mtb.<fn>(...)`` call in a python fence of the README
-and the docs pages binds to the live signature (a keyword that no longer
-exists fails here before a reader hits the TypeError). The signatures
+``__all__``; (c) every ``mtb.<fn>(...)`` call in a python fence of the docs
+pages, and in an inline code span of the README (which has no fence since the
+owner trimmed it in 0cc1aec), binds to the live signature (a keyword that no
+longer exists fails here before a reader hits the TypeError). The signatures
 themselves are rendered from the docstrings (docs/reference/*.md); those
 pages are checked in test_docs_consistency.py.
 """
@@ -126,6 +127,12 @@ def test_every_mtb_name_mentioned_is_public(path):
 
 
 # ---- (c) every mtb.<fn>(...) call in a python fence binds to the live signature
+def _inline_calls(text):
+    """Inline code spans that hold an ``mtb.`` call (the README's only code
+    since 0cc1aec moved install and quick start to the docs site)."""
+    return [span for span in re.findall(r"(?<!`)`([^`\n]+)`(?!`)", text) if "mtb." in span]
+
+
 def _python_fences(text):
     """Each python fence as source; a REPL-style fence (``>>>`` prompts) yields
     one statement per prompt, continuation lines joined, output lines dropped."""
@@ -196,7 +203,10 @@ def _bind(fn, node):
 def test_every_documented_call_binds_to_the_live_signature(path):
     import multibench as mtb
     seen = 0
-    for src in _python_fences(_text(path)):
+    sources = list(_python_fences(_text(path)))
+    if path.name == "README.md":
+        sources += _inline_calls(_text(path))
+    for src in sources:
         for name, node in _calls(src):
             obj = mtb
             for part in name.split(".")[1:]:

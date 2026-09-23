@@ -101,13 +101,16 @@ def test_env_install_cell_is_opt_in_after_pip_and_needs_no_conda():
 
 
 def test_readme_single_install_path():
-    """README: exactly one `pip install multibench-sc` before the first python
-    fence, no 'clone instead'; installation.md (when reachable): one PyPI
+    """README (trimmed by the owner in 0cc1aec: install and quick start live on
+    the docs site): at most one `pip install multibench-sc`, no 'clone
+    instead', and a link to the docs site ([project.urls] Homepage) that
+    carries the install page; installation.md (when reachable): one PyPI
     block, no stale size claim."""
     readme = (ROOT / "README.md").read_text()
-    head = readme.split("```python", 1)[0]
-    assert head.count("pip install multibench-sc") == 1
+    assert readme.count("pip install multibench-sc") <= 1
     assert "clone instead" not in readme
+    homepage = re.search(r'^Homepage\s*=\s*"([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M)
+    assert homepage and homepage.group(1) in readme, "README must link the docs site"
     for path in _docs_md_files():
         if path.name == "installation.md":
             text = path.read_text()
@@ -335,11 +338,14 @@ def test_removed_methods_absent_from_docs_surfaces(path):
     assert not hits, f"{path.name} still names removed method(s) {hits}"
 
 
-def test_printed_examples_match_the_live_package():
-    """The README / quickstart examples the fresh installer re-ran: labels_for
-    returns a dict, method_info(m)['runtime'] carries 'source' inside
-    'observed', the diagonal rna+atac list includes scBridge."""
+def test_printed_examples_match_the_live_package(capsys):
+    """The quickstart examples the fresh installer re-ran: labels_for returns a
+    dict, method_info(m)['runtime'] carries 'source' inside 'observed', the
+    diagonal rna+atac list includes scBridge. The README (trimmed in 0cc1aec)
+    keeps one printed example: the citation lines of `mtb.cite` and the BibTeX
+    of `multibench cite`."""
     import multibench as mtb
+    from multibench import cli
     assert set(mtb.labels_for("D11")) == {"cty"}
     hint = mtb.method_info("SCALEX")["runtime"]
     assert hint["tier"] == "slow" and hint["worst_sec"] == 2233
@@ -347,9 +353,12 @@ def test_printed_examples_match_the_live_package():
     found = mtb.find_methods(category="diagonal", modalities=["rna", "atac"])
     assert "scBridge" in found and len(found) == 14
     readme = (ROOT / "README.md").read_text()
-    assert "mtb.describe_layout(" in readme
-    assert "multibench run --method Matilda --category vertical --input rna=" in readme \
-        and "--dry-run" in readme
+    assert 'mtb.cite("Matilda", "MOFA2")' in readme and "multibench cite Matilda MOFA2" in readme
+    lines = mtb.cite("Matilda", "MOFA2").splitlines()   # the benchmark's reference, then one line per method
+    assert len(lines) == 3 and PAPER_TITLE in lines[0] and PAPER_DOI in lines[0]
+    assert "Matilda" in lines[1] and "MOFA+" in lines[2]
+    assert cli.main(["cite", "Matilda", "MOFA2"]) == 0
+    assert capsys.readouterr().out.count("@article{") == 3
     for path in _docs_md_files():
         if path.name in ("quickstart.md", "installation.md"):
             text = path.read_text()
