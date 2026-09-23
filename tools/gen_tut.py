@@ -6,24 +6,29 @@ run the same calls on their own data, read stored results back. Reference
 material (scan, tunables, metrics, coverage) sits at the end.
 
 Prose has two layers. Visible: 1-3 short sentences per section - what the
-step does and what the reader must do or decide - then the code. Collapsed
-(``details()``, a ``<details>`` block): options, caveats, platform notes, as
-short labelled paragraphs or lists. Internal mechanics, provenance and
-anything the API reference already states are left out; nothing is said
-twice on a page. The notebooks are regenerated from this file - never
-hand-edited - and executed on the benchmark host afterwards.
+step does and what the reader must do or decide - then the code. A fact
+without which a reader gets a silently wrong result (raw counts, which
+category fits, what runs off Linux, which ATAC form a method reads) is
+always visible. Collapsed (``details()``, a ``<details>`` block): options,
+caveats, platform notes, as short plain paragraphs whose first sentence
+names the subject, or lists. No bold lead-in labels in a block of 1-3
+paragraphs, no capitals for emphasis, no internal names, short sentences.
+The notebooks are regenerated from this file - never hand-edited - and
+executed on the benchmark host afterwards.
 
 "Run all" is safe on any host: the method-environment download sits behind
 ``INSTALL_ENVS`` (default False) and a Linux check; the run cells call
-``run_all`` only when ``scan`` finds an environment, else stand in the
-benchmark host's real ``run_all`` outputs (``mtb.data.fetch_outputs``), else
-the stored metric table. The install cell pins numpy and pandas to what the
-interpreter already has, so pip never upgrades a host's stack (Colab pins
+``run_all`` only when ``scan`` finds an environment, else load a replacement:
+the benchmark host's real ``run_all`` outputs (``mtb.data.fetch_outputs``),
+else the stored metric table. The install cell pins numpy and pandas to what
+the interpreter already has, so pip never upgrades a host's stack (Colab pins
 pandas itself), and nothing provisions conda: the packed method environments
 run without a conda binary.
 """
-import nbformat as nbf
+import hashlib
 import os
+
+import nbformat as nbf
 
 OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
@@ -61,7 +66,7 @@ def details(*paras, label="Details"):
     return f"<details>\n<summary>{label}</summary>\n\n{body}\n\n</details>"
 
 
-def stand_in(cat, dataset, methods):
+def fallback_sweep(cat, dataset, methods):
     """Which stored sweep a run cell falls back to on a host without method
     environments: ``(dataset, methods)`` for ``stored_sweep`` in the notebook.
     Read from the live tables at generation time: ``methods`` is kept only when
@@ -98,14 +103,13 @@ def published_note(cat, dataset):
     counted from ``results_coverage`` at generation time."""
     n_pub, n_rerun = stored_method_counts(cat, dataset)
     if n_pub == 0:
-        return (f"**One source.** There are no scIB tables for {cat} under "
-                f"`source=\"published\"`, the default, which raises "
-                f"`FileNotFoundError`; `source=\"rerun\"` is the only stored source.")
-    return (f"**Two sources.** For `{dataset}`, the `published` table holds {n_pub} "
-            f"method{'s' if n_pub != 1 else ''} and the package's own runs "
-            f"(`\"rerun\"`) hold {n_rerun}. `load_results` defaults to "
-            f"`source=\"published\"`, so every call here names its source. Where "
-            f"both hold a method, the values can differ.")
+        return (f"There are no scIB tables for {cat} under `source=\"published\"`, "
+                f"the default of `load_results`. That call raises `FileNotFoundError`, "
+                f"so every call here names `source=\"rerun\"`, the only stored source.")
+    return (f"For `{dataset}`, the published table holds {n_pub} "
+            f"method{'s' if n_pub != 1 else ''} and the package's own runs hold "
+            f"{n_rerun}. `load_results` defaults to `source=\"published\"`, so every "
+            f"call here names its source. Where both hold a method, the values can differ.")
 
 
 def env_size_text(category=None, methods=None):
@@ -116,7 +120,8 @@ def env_size_text(category=None, methods=None):
     import multibench as mtb
     sizes = {}
     for flavor in ("cpu", "gpu"):
-        rows = mtb.env.install(methods, category=category, flavor=flavor)   # dry_run=True: nothing built
+        # dry_run=True (the default): nothing is built
+        rows = mtb.env.install(methods, category=category, flavor=flavor)
         known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
         sizes[flavor] = (("" if len(known) == len(rows) else "at least ")
                          + f"{sum(known) / 1e9:.1f} GB")
@@ -148,11 +153,36 @@ def reordering_methods(cat, dataset):
     return {m: o for m, o in orders.items() if o != default}
 
 
+def atac_forms(cat):
+    """``(gene_activity, peak_only, both)``: the methods of a category by the
+    ATAC form they read, from ``find_methods(cat, atac=...)`` and each
+    variant's modalities at generation time. ``both`` read peaks and gene
+    activity together (``atac_peak`` and ``atac_gas`` in one variant)."""
+    import multibench as mtb
+    gas = sorted(mtb.find_methods(cat, atac="gene_activity"))
+    peak = sorted(mtb.find_methods(cat, atac="peak"))
+    both = [m for m in peak
+            if any(v["category"] == cat and {"atac_peak", "atac_gas"} <= set(v["modalities"])
+                   for v in mtb.method_info(m)["supports"])]
+    return gas, [m for m in peak if m not in both], both
+
+
+def diagonal_atac_sentence():
+    """The visible ATAC-form sentence of the diagonal tutorial's first cell."""
+    gas, peak_only, both = atac_forms("diagonal")
+    if not (peak_only and both and len(gas) > len(peak_only) + len(both)):
+        raise SystemExit("diagonal ATAC forms changed: reword the diagonal title cell")
+    return (f"Most diagonal methods read ATAC as gene-activity scores, made beforehand "
+            f"with a tool such as Signac or ArchR. {and_list(peak_only)} read the peak "
+            f"matrix, and {and_list(both)} need both. `mtb.method_info(m)[\"atac\"]` "
+            f"says which form a method reads.")
+
+
 CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
             "mosaic": ["D45", "D46"], "cross": ["D52"]}
 
-# The ONE install cell every notebook shares (tests/test_docs_consistency.py
-# pins it): the package WITH its dependencies (evaluate() needs scib/scanpy).
+# The one install cell every notebook shares (tests/test_docs_consistency.py
+# pins it): the package with its dependencies (evaluate() needs scib/scanpy).
 # The find_spec guard keeps the cell idempotent and leaves a developer's
 # editable install alone; the numpy / pandas pins keep pip from upgrading the
 # host's stack; the GitHub line covers a PyPI release that lags the docs.
@@ -163,7 +193,8 @@ if importlib.util.find_spec("multibench") is None:
     pins = [f"{p}=={importlib.metadata.version(p)}" for p in ("numpy", "pandas") if importlib.util.find_spec(p)]
     !{sys.executable} -m pip -q install "multibench-sc>=0.3" {" ".join(pins)}
     importlib.invalidate_caches()
-    if importlib.util.find_spec("multibench") is None:        # not on PyPI: install from GitHub
+    # not on PyPI yet: install from GitHub
+    if importlib.util.find_spec("multibench") is None:
         !{sys.executable} -m pip -q install "git+https://github.com/DSichang/scMultiBench.git" {" ".join(pins)}
 else:
     print("multibench already installed")""",
@@ -172,17 +203,17 @@ else:
 # The "Run all" switch (tests/test_tutorial_runall_safety.py pins it): the
 # one download of method environments - `mtb.env.install(..., dry_run=False)`
 # - sits behind INSTALL_ENVS. The size is measured at generation time.
-FLAG_CELL_TEMPLATE = """# False: no environment is downloaded; method cells use stand-in results.
+FLAG_CELL_TEMPLATE = """# False: no environment is downloaded; method cells use stored outputs.
 # True (Linux or Colab): run the methods here; no conda needed.
 # {size}.
 INSTALL_ENVS = False"""
 
 # The one line a run cell prints on a host without method environments
-# (tests pin the phrase), before standing in a result computed elsewhere.
-SKIP_LINE = ("no method environment on this host - the run is skipped; "
-             "a stand-in computed elsewhere covers it")
+# (tests pin the phrase), before it loads a replacement computed elsewhere.
+SKIP_LINE = ("no method environment on this computer: the run is skipped, "
+             "and outputs computed elsewhere replace it")
 
-# The LAST fallback of the run cells: a BatchResult built from the stored
+# The last fallback of the run cells: a BatchResult built from the stored
 # sweep's rows has the same .summary / .plot() as run_all's, so every later
 # cell renders; status='STORED' says nothing ran and nothing is on disk.
 STORED_SWEEP_FN = '''def stored_sweep(dataset, methods=None):
@@ -192,117 +223,160 @@ STORED_SWEEP_FN = '''def stored_sweep(dataset, methods=None):
             for m, g in long.groupby("method")]
     return mtb.BatchResult(recs, dataset, CATEGORY)'''
 
-# The FIRST fallback: the benchmark host's real run_all output tree for the
+# The first fallback: the benchmark host's real run_all output tree for the
 # dataset, downloaded by mtb.data.fetch_outputs and reloaded by load_batch,
 # so .summary carries real statuses and run times and the evaluate cell
 # scores a real embedding. Offline (or before the assets are published) the
-# stored metric table stands in; one printed line says which path was taken.
-STAND_IN_FN = '''def stand_in(dataset, methods, stored):
-    """The benchmark host's run_all outputs for `dataset`; the stored results if that download fails."""
+# stored metric table replaces it; one printed line says which path was taken.
+REPLACEMENT_FN = '''def replacement(dataset, methods, stored):
+    """The run_all outputs for `dataset` from the benchmark's Linux machine; the stored results if that download fails."""
     try:
         res = mtb.load_batch(mtb.data.fetch_outputs(dataset), methods=methods)
-        print(f"stand-in: the benchmark host's run_all outputs for {dataset} (fetch_outputs) - real embeddings and run times")
+        print(f"replacement: the run_all outputs for {dataset} from the benchmark's Linux machine, with embeddings and run times")
         return res
-    except Exception as e:                                   # offline, or the outputs are not published yet
-        print(f"stand-in: the package's stored metric table ({type(e).__name__} from fetch_outputs: {e})")
+    # offline, or the outputs are not published yet
+    except Exception as e:
+        print(f"replacement: the package's stored metric table ({type(e).__name__} from fetch_outputs: {e})")
         return stored_sweep(*stored)'''
 
 # The scoring step on its own, on the embedding one method wrote - run_all's
 # tree and fetch_outputs' tree share the layout <out_dir>/<method>_<dataset>/
 # embedding.h5, and the record says which label files the method's cells
-# follow. Nothing to score on the stored-table stand-in (no file on disk).
+# follow. Nothing to score on the stored-table replacement (no file on disk).
 EVALUATE_CELL_TEMPLATE = '''m, emb = "{method}", None
 if res.out_dir is not None:
     emb = Path(res.out_dir) / f"{{m}}_{{res.dataset}}" / "embedding.h5"
 if emb is None or not emb.is_file():
-    print(f"no embedding on this host for {{m}} - nothing to score")
+    print(f"no embedding on this computer for {{m}}: nothing to score")
     scores = None
 else:
     rec = next(r for r in res.results if r["method"] == m)
-    order = [Path(f).stem for f in rec.get("labels_used") or []] or None    # label files in the method's cell order
+    # the label files in the order the method stacked its cells
+    order = [Path(f).stem for f in rec.get("labels_used") or []] or None
     scores = mtb.evaluate(emb, labels=mtb.labels_for(res.dataset), label_order=order, verbose=False)
 scores.T if scores is not None else None'''
 
 SCEN = {
  "vertical": dict(
-   ds="D11", cells="2,864",
-   blurb=("**Vertical integration** combines modalities measured in the **same "
-          "cells** (here CITE-seq: RNA + surface protein)."),
-   blurb_detail=None,
+   ds="D11",
+   blurb=("Vertical integration combines modalities measured in the same cells. "
+          "Examples are RNA and surface protein from CITE-seq, or RNA and ATAC from "
+          "10x Multiome. This tutorial uses `D11`, a CITE-seq dataset of 2,864 cells."),
    live=("Matilda", '{"epochs": 5}'), live_modalities=["rna", "adt"],
    live_ds=None, live_note=None, summary_note=None,
    own_src="D11", own_trio=["Matilda", "sciPENN", "scMM"],
  ),
  "diagonal": dict(
-   ds="D28", cells="6,408 RNA + 4,606 ATAC",
-   blurb=("**Diagonal integration** combines RNA and ATAC measured in **different "
-          "cells**, with no pairing between them. If your RNA and ATAC come from the "
-          "same cells (10x multiome), use the vertical tutorial."),
-   blurb_detail=("**ATAC input.** Most diagonal methods take ATAC as gene-activity "
-                 "scores, computed beforehand with a tool such as Signac or ArchR. A few "
-                 "take the peak matrix, alone or alongside the scores."),
+   ds="D28",
+   blurb=("Diagonal integration combines RNA and ATAC measured in different cells, "
+          "with no pairing between them. If your RNA and ATAC come from the same "
+          "cells, as in 10x Multiome, use the vertical tutorial. This tutorial uses "
+          "`D28`, with 6,408 RNA cells and 4,606 ATAC cells."),
    live=("online_iNMF", "None"), live_modalities=None,
    live_ds=None, live_note=None, summary_note=None,
    own_src="D28", own_trio=["online_iNMF", "iNMF", "scJoint"],
  ),
  "mosaic": dict(
-   ds="D45", cells="32,151",
-   blurb=("**Mosaic integration** combines batches that share only **some** "
-          "modalities, for example an RNA-only batch, an ATAC-only batch and a paired "
-          "batch that links them. Which methods apply depends on the batch pattern; "
-          "`scan` reports it."),
-   blurb_detail=None,
+   ds="D45",
+   blurb=("Mosaic integration combines batches that share only some modalities. "
+          "For example, a paired RNA + ATAC batch can link an RNA-only batch and an "
+          "ATAC-only batch. Each method accepts one batch pattern, and every mosaic "
+          "method reads ATAC as peaks. This tutorial uses `D45`, with 32,151 cells "
+          "in three batches."),
    live=("StabMap", "None"), live_modalities=None,
    live_ds="D46",
-   live_note=("**Dataset.** These methods run on `D46`, whose batch pattern they "
-              "accept. The stored-results fallback shows the `D45` results instead."),
+   live_note=("These methods run on `D46`, whose batch pattern they accept. The "
+              "stored metric table has no `D46` results, so it shows `D45` instead."),
    summary_note=None,
    own_src="D46", own_trio=["StabMap", "scMoMaT"],
  ),
  "cross": dict(
-   ds="D52", cells="23,478",
-   blurb=("**Cross integration** combines batches that all measure the **same** "
-          "modalities; the task is removing batch effects while keeping the "
-          "biological structure."),
-   blurb_detail=None,
+   ds="D52",
+   blurb=("Cross integration combines batches that all measure the same "
+          "modalities. The task is to remove batch effects and keep the biological "
+          "structure. Every cross method here reads RNA and ADT; for several 10x "
+          "Multiome samples, use the vertical tutorial. This tutorial uses `D52`, "
+          "with 23,478 cells in three batches."),
    live=("StabMap", "None"), live_modalities=None,
    live_ds=None, live_note=None,
-   summary_note=("**UINMF** uses batches 1 and 2 only, so its `emb_shape` counts "
-                 "fewer cells and its metrics cover those cells."),
+   summary_note=("UINMF uses batches 1 and 2 only. Its `emb_shape` counts fewer "
+                 "cells, and its metrics cover only those cells."),
    own_src="D52", own_trio=["UINMF", "sciPENN", "StabMap"],
  ),
 }
 
 # ---------------------------------------------------------------- own data
 # One executed demo per category: an in-memory AnnData (or several) becomes a
-# dataset folder in the layout describe_layout(CATEGORY) prints. export_dataset
-# covers the one-AnnData layouts (vertical; cross via batch=); the two layouts
-# whose batches hold DIFFERENT cells or DIFFERENT modality sets (diagonal,
-# mosaic) are written file by file: to_canonical per matrix, and the label CSV
-# (one header line `x`, one label per cell) with pandas.
+# dataset folder in the layout describe_layout(CATEGORY) prints, written by
+# export_dataset: one call for vertical, diagonal (category="diagonal" pairs
+# no cells) and cross (batch=), one call per batch for mosaic (batch_index=).
+# Each demo writes into a fresh temporary folder, so a re-run never meets the
+# files of an earlier one (export_dataset refuses to replace them).
+OVERWRITE_NOTE = ("A call that would replace a file already in the folder raises "
+                  "`FileExistsError`. Pass `overwrite=True` to replace it.")
 EXPORT_INTRO = {
- "vertical": "`mtb.io.export_dataset` writes the layout from an AnnData, here a synthetic one:",
- "diagonal": ("RNA and ATAC hold different cells, so each file is written on its own: "
-              "`mtb.io.to_canonical` per matrix and one label CSV per modality. Here on "
-              "synthetic data:"),
- "mosaic": ("Each batch has its own set of modalities, so each file is written on its "
-            "own: `mtb.io.to_canonical` per matrix and one label CSV per batch. Here on "
-            "synthetic data with `D46`'s pattern:"),
- "cross": ("`mtb.io.export_dataset` with `batch=` writes one numbered set of files per "
-           "batch, here from a synthetic AnnData:"),
+ "vertical": ("`mtb.io.export_dataset` writes the folder from an AnnData, here a "
+              "synthetic one. `scan` with `modalities=` then lists only the methods for "
+              "RNA + ADT. For RNA + ATAC, each method reads either peaks or gene "
+              "activity: `mtb.method_info(m)[\"atac\"]` says which."),
+ "diagonal": ("`mtb.io.export_dataset` with `category=\"diagonal\"` writes RNA and ATAC "
+              "from different cells, each with its own label file. Here on synthetic "
+              "data, with ATAC as gene-activity scores:"),
+ "mosaic": ("A mosaic project often arrives as one file per batch. "
+            "`mtb.io.export_dataset` with `batch_index=` writes one batch per call; "
+            "number the batches to match a pattern that `describe_layout` lists. The "
+            "ATAC matrix must hold peaks. Here on synthetic data with `D46`'s pattern:"),
+ "cross": ("`mtb.io.export_dataset` with `batch=` splits one AnnData into numbered "
+           "files, one set per batch. Here on a synthetic AnnData:"),
 }
 EXPORT_DETAIL = {
- "vertical": ("**10x multiome (MuData).** `mtb.io.export_dataset(mdata, path, rna=\"rna\", "
-              "atac=\"atac\", atac_kind=\"peak\", labels=\"rna:celltype\", "
-              "category=\"vertical\")` writes `rna.h5`, `atac.h5` and `cty.csv`."),
- "diagonal": None, "mosaic": None, "cross": None,
+ "vertical": [
+     "A 10x Multiome MuData goes in with one call. Here the labels are in "
+     "`mdata.obs`; for labels in `mdata[\"rna\"].obs`, write `labels=\"rna:celltype\"`.\n\n"
+     "```python\n"
+     "mtb.io.export_dataset(mdata, \"data/MYMULTIOME\", rna=\"rna\", atac=\"atac\",\n"
+     "                      atac_kind=\"peak\", labels=\"obs:celltype\",\n"
+     "                      category=\"vertical\")\n"
+     "```",
+     "A cellranger-arc AnnData read with `gex_only=False` holds genes and peaks in "
+     "one `X`. A feature filter splits them: `rna=\"X[feature_types=Gene Expression]\"` "
+     "and `atac=\"X[feature_types=Peaks]\"`.",
+     "Keep several samples in one folder, without `batch=`. Score the batch mixing "
+     "later with `mtb.evaluate(..., batch=...)`.",
+     OVERWRITE_NOTE,
+ ],
+ "diagonal": [
+     "The command line writes the same folder from two .h5ad files:\n\n"
+     "```\n"
+     "multibench convert rna.h5ad data/MYDIAG --rna X --atac-from atac.h5ad \\\n"
+     "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
+     "```",
+     # {peak_only}: filled in from the registry by build_tutorial
+     "For ATAC as a peak matrix only, pass `atac_kind=\"peak\"`. {peak_only} then fit "
+     "the folder, and `scan` shows their setup notes in its `caveat` column.",
+     OVERWRITE_NOTE,
+ ],
+ "mosaic": [
+     "The command line writes one batch per call with `multibench convert ... "
+     "--category mosaic --batch-index N`. `describe_layout` above prints the commands "
+     "for `D46`'s pattern.",
+     OVERWRITE_NOTE,
+ ],
+ "cross": [
+     "For one file per batch, call `export_dataset` once per file with "
+     "`batch_index=N` instead of `batch=`. `describe_layout` above prints the command.",
+     OVERWRITE_NOTE,
+ ],
 }
+EXPORT_DETAIL_LABEL = {"vertical": "Details: 10x Multiome", "diagonal": "Details: export",
+                       "mosaic": "Details: export", "cross": "Details: export"}
 EXPORT_DEMO = {
  "vertical": """import anndata as ad, numpy as np, scipy.sparse as sp, tempfile, os
 rng = np.random.default_rng(0)
 # RNA as raw counts, cells x genes
 demo = ad.AnnData(X=sp.csr_matrix(rng.poisson(0.5, size=(120, 40)).astype(float)))
-demo.obsm["protein"] = rng.poisson(3.0, size=(120, 12)).astype(float)             # ADT, cells x proteins
+# ADT as raw counts, cells x proteins
+demo.obsm["protein"] = rng.poisson(3.0, size=(120, 12)).astype(float)
 demo.uns["protein_names"] = [f"CD{i}" for i in range(12)]
 demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 120)
 demo.obs_names = [f"cell{i}" for i in range(120)]; demo.var_names = [f"gene{i}" for i in range(40)]
@@ -311,65 +385,65 @@ tmp = tempfile.mkdtemp()
 folder = mtb.io.export_dataset(demo, os.path.join(tmp, "MYCITE"),
                                rna="X", adt="obsm:protein", labels="obs:celltype")
 print(sorted(os.listdir(folder)))
-sc = mtb.scan("MYCITE", CATEGORY, data_path=tmp)
-print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file check (the rest want an ATAC matrix too)")""",
+sc = mtb.scan("MYCITE", CATEGORY, data_path=tmp, modalities=["rna", "adt"])
+sc[["method", "modalities", "files_ok"]]""",
  "diagonal": """import anndata as ad, numpy as np, tempfile, os
 rng = np.random.default_rng(0)
 genes = [f"gene{i}" for i in range(40)]
-rna  = ad.AnnData(X=rng.poisson(1.0, size=(120, 40)).astype(float)); rna.var_names = genes
-atac = ad.AnnData(X=rng.poisson(0.5, size=(90, 40)).astype(float));  atac.var_names = genes   # gene-activity scores, other cells
-rna.obs["celltype"]  = rng.choice(["T", "B", "NK"], 120)
+rna = ad.AnnData(X=rng.poisson(1.0, size=(120, 40)).astype(float))
+rna.var_names = genes
+# gene-activity scores of 90 other cells
+atac = ad.AnnData(X=rng.poisson(0.5, size=(90, 40)).astype(float))
+atac.var_names = genes
+rna.obs["celltype"] = rng.choice(["T", "B", "NK"], 120)
 atac.obs["celltype"] = rng.choice(["T", "B", "NK"], 90)
 
-def write_cty(labels, path):                                  # header line "x", then one label per cell
-    pd.Series(np.asarray(labels), name="x").to_csv(path, index=False)
-
-folder = os.path.join(tempfile.mkdtemp(), "MYDIAG"); os.makedirs(folder)
-mtb.io.to_canonical(rna,  folder, modality="rna")        # -> rna.h5
-mtb.io.to_canonical(atac, folder, modality="atac_gas")   # -> atac_gas.h5
-write_cty(rna.obs["celltype"],  os.path.join(folder, "rna_cty.csv"))
-write_cty(atac.obs["celltype"], os.path.join(folder, "atac_cty.csv"))
+folder = mtb.io.export_dataset(rna, os.path.join(tempfile.mkdtemp(), "MYDIAG"),
+                               atac=atac, atac_kind="gene_activity",
+                               labels="obs:celltype", category="diagonal")
 print(sorted(os.listdir(folder)))
-sc = mtb.scan("MYDIAG", CATEGORY, data_path=os.path.dirname(folder))
-print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file check (the rest need a peak matrix)")""",
+sc = mtb.scan("MYDIAG", CATEGORY, data_path=folder.parent)
+# the methods that read peaks fail the file check
+sc[["method", "modalities", "files_ok"]]""",
  "mosaic": """import anndata as ad, numpy as np, tempfile, os
 rng = np.random.default_rng(0)
 def batch(n):
-    a = ad.AnnData(X=rng.poisson(1.0, size=(n, 40)).astype(float)); a.var_names = [f"gene{i}" for i in range(40)]
-    a.obs["celltype"] = rng.choice(["T", "B", "NK"], n); return a
-b1, b2, b3 = batch(100), batch(80), batch(60)                                  # batch 1 RNA + ADT, 2 RNA + ATAC, 3 RNA
+    a = ad.AnnData(X=rng.poisson(1.0, size=(n, 40)).astype(float))
+    a.var_names = [f"gene{i}" for i in range(40)]
+    a.obs["celltype"] = rng.choice(["T", "B", "NK"], n)
+    return a
+# batch 1: RNA + ADT, batch 2: RNA + ATAC peaks, batch 3: RNA only
+b1, b2, b3 = batch(100), batch(80), batch(60)
 b1.obsm["protein"] = rng.poisson(3.0, size=(100, 12)).astype(float)
 b1.uns["protein_names"] = [f"CD{i}" for i in range(12)]
-b2.obsm["peaks"]   = rng.poisson(0.3, size=(80, 50)).astype(float)
+b2.obsm["peaks"] = rng.poisson(0.3, size=(80, 50)).astype(float)
 b2.uns["peaks_names"] = [f"chr1:{100 * i}-{100 * i + 50}" for i in range(50)]
 
-def write_cty(labels, path):                                                   # header line "x", then one label per cell
-    pd.Series(np.asarray(labels), name="x").to_csv(path, index=False)
-
-folder = os.path.join(tempfile.mkdtemp(), "MYMOSAIC"); os.makedirs(folder)
-for i, a in enumerate([b1, b2, b3], start=1):
-    mtb.io.to_canonical(a, os.path.join(folder, f"rna{i}.h5"))
-    write_cty(a.obs["celltype"], os.path.join(folder, f"cty{i}.csv"))
-mtb.io.to_canonical(b1, os.path.join(folder, "adt1.h5"),  modality="adt",  obsm="protein")
-mtb.io.to_canonical(b2, os.path.join(folder, "atac2.h5"), modality="atac", obsm="peaks")
+folder = os.path.join(tempfile.mkdtemp(), "MYMOSAIC")
+kw = dict(labels="obs:celltype", category="mosaic")
+mtb.io.export_dataset(b1, folder, adt="obsm:protein", batch_index=1, **kw)
+mtb.io.export_dataset(b2, folder, atac="obsm:peaks", atac_kind="peak", batch_index=2, **kw)
+mtb.io.export_dataset(b3, folder, batch_index=3, **kw)
 print(sorted(os.listdir(folder)))
 sc = mtb.scan("MYMOSAIC", CATEGORY, data_path=os.path.dirname(folder))
-print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file check - the batch pattern decides which")""",
+# the batch pattern decides which methods fit
+sc[["method", "modalities", "files_ok"]]""",
  "cross": """import anndata as ad, numpy as np, tempfile, os
 rng = np.random.default_rng(0)
-demo = ad.AnnData(X=rng.poisson(1.0, size=(150, 40)).astype(float))            # RNA, cells x genes
+# RNA as raw counts, cells x genes
+demo = ad.AnnData(X=rng.poisson(1.0, size=(150, 40)).astype(float))
 demo.var_names = [f"gene{i}" for i in range(40)]
-demo.obsm["protein"] = rng.poisson(3.0, size=(150, 12)).astype(float)          # ADT
+demo.obsm["protein"] = rng.poisson(3.0, size=(150, 12)).astype(float)
 demo.uns["protein_names"] = [f"CD{i}" for i in range(12)]
 demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 150)
-demo.obs["batch"]    = rng.choice(["donor1", "donor2", "donor3"], 150)
+demo.obs["batch"] = rng.choice(["donor1", "donor2", "donor3"], 150)
 
 folder = mtb.io.export_dataset(demo, os.path.join(tempfile.mkdtemp(), "MYCROSS"),
                                rna="X", adt="obsm:protein", labels="obs:celltype",
-                               batch="obs:batch")
+                               batch="obs:batch", category="cross")
 print(sorted(os.listdir(folder)))
 sc = mtb.scan("MYCROSS", CATEGORY, data_path=folder.parent)
-print(f"{int(sc.files_ok.sum())} of {len(sc)} method variants pass the file check")""",
+sc[["method", "modalities", "files_ok"]]""",
 }
 
 SUBSAMPLE_FN = '''import os
@@ -387,7 +461,8 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0, max_cells=2000, max_fe
         if fn.endswith(".h5"):
             with h5py.File(p) as f:
                 if "matrix/data" in f:
-                    counts[fn] = f["matrix/data"].shape[1]   # features x cells
+                    # matrix/data is features x cells
+                    counts[fn] = f["matrix/data"].shape[1]
         elif fn.endswith(".csv"):
             counts[fn] = len(pd.read_csv(p))
     for n in set(counts.values()):
@@ -412,7 +487,11 @@ def subsample_dataset(src_dir, dst_dir, frac=0.6, seed=0, max_cells=2000, max_fe
     return dst_dir'''
 
 
-def _notebook(cells):
+def _notebook(cells, name):
+    """The notebook, with cell ids derived from its name and cell position,
+    so a regeneration that changes only text leaves the ids alone."""
+    for i, cell in enumerate(cells):
+        cell["id"] = hashlib.sha1(f"{name}:{i}".encode()).hexdigest()[:8]
     return nbf.v4.new_notebook(cells=cells, metadata={
         "kernelspec": {"display_name": "Python 3", "language": "python",
                        "name": "python3"},
@@ -421,15 +500,15 @@ def _notebook(cells):
 
 
 def live_param_note(method, category, params, modalities):
-    """``**Parameters.** ...`` for a run cell that overrides a method's
-    defaults, with the defaults read from ``params_for`` at generation time."""
+    """The sentence for a run cell that overrides a method's defaults, with
+    the defaults read from ``params_for`` at generation time."""
     import ast
     import multibench as mtb
     tunable = mtb.params_for(method, category, modalities)["tunable"]
     parts = [f"{k} {v} instead of its default {tunable[k]['default']}"
              for k, v in ast.literal_eval(params).items()]
-    return (f"**Parameters.** `params={{\"{method}\": {params}}}` runs {method} with "
-            f"{and_list(parts)}.")
+    return (f"`params={{\"{method}\": {params}}}` runs {method} with "
+            f"{and_list(parts)}, so the demo run is short.")
 
 
 def build_tutorial(cat, s):
@@ -443,25 +522,25 @@ def build_tutorial(cat, s):
     trio_text = and_list(trio)
 
     # ------------------------------------------------------------------ title
-    title = (f"# {cat.capitalize()} integration\n\n{s['blurb']} Reference dataset: "
-             f"`{ds}` ({s['cells']} cells).")
-    if s["blurb_detail"]:
-        title += "\n\n" + details(s["blurb_detail"])
+    title = f"# {cat.capitalize()} integration\n\n{s['blurb']}"
+    if cat == "diagonal":
+        title += "\n\n" + diagonal_atac_sentence()
     md(title)
 
     # ---------------------------------------------------------------- install
     md("## 1. Install\n\n"
-       "`pip install multibench-sc` is all this notebook needs. Methods run in their "
-       "own environments, downloaded only when you set `INSTALL_ENVS = True` (Linux "
-       "or Colab).\n\n"
+       "The first cell installs `multibench-sc`. Methods run only on Linux, each in "
+       "its own environment. Set `INSTALL_ENVS = True` on Linux or Colab to download "
+       "the environments. On macOS and Windows every cell still runs and uses stored "
+       "outputs instead.\n\n"
        + details(
-           "**Default.** With `INSTALL_ENVS = False` no environment is downloaded, only "
-           "the reference data and stand-in outputs. Every cell runs; a method cell uses "
-           "those outputs instead.",
-           "**Running methods.** Set `INSTALL_ENVS = True` on Colab or a Linux machine "
-           "to download the prebuilt environments (no conda needed) and run the methods.",
-           "**On Colab**, choose a GPU runtime first (Runtime -> Change runtime type -> "
-           "T4 GPU). On a CPU runtime the smaller CPU builds are installed and training "
+           "With `INSTALL_ENVS = False`, the notebook downloads only the reference data "
+           "and the stored outputs. A method cell then prints one line and loads those "
+           "outputs.",
+           "With `INSTALL_ENVS = True`, the cells download prebuilt environments and "
+           "run the methods, with no conda needed.",
+           "On Colab, choose a GPU runtime first: Runtime -> Change runtime type -> T4 "
+           "GPU. On a CPU runtime the smaller CPU builds are installed, and training "
            "methods are much slower."))
     for cell in INSTALL_CELLS:
         code(cell)
@@ -473,8 +552,9 @@ from pathlib import Path
 import anndata
 import pandas as pd
 from tqdm import TqdmWarning
+# hide library warnings; the warnings of multibench stay visible
 for _w in (FutureWarning, DeprecationWarning, pd.errors.PerformanceWarning,
-           anndata.ImplicitModificationWarning, TqdmWarning):   # library warnings only; multibench's own stay visible
+           anndata.ImplicitModificationWarning, TqdmWarning):
     warnings.filterwarnings("ignore", category=_w)
 pd.set_option("display.max_colwidth", None)
 pd.set_option("display.max_columns", None)
@@ -483,117 +563,129 @@ import multibench as mtb
 
 DATASET  = "{ds}"
 CATEGORY = "{cat}"
-mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})   # the reference data ({download_size(CAT_DATA[cat])}), downloaded once
+# the reference data ({download_size(CAT_DATA[cat])}), downloaded once
+mtb.data.fetch({', '.join(repr(d) for d in CAT_DATA[cat])})
 print("multibench", mtb.__version__)''')
 
     # ------------------------------------------------------------ environments
     md(f"""## 2. Run the analysis
 
-### Environments - only if you will run methods
+### Environments: only if you will run methods
 
-Installs the environments for {trio_text} ({env_size_text(methods=trio)}). The cell skips the download unless `INSTALL_ENVS = True` on Linux.
+The next cell installs the environments for {trio_text}: {env_size_text(methods=trio)}. It downloads nothing unless `INSTALL_ENVS = True` and the computer runs Linux.
 
 """ + details(
-        "**Location.** Environments are unpacked under `mtb.config.DEFAULT.envs_dir` "
-        "(`~/.cache/multibench/envs` on a host without conda); set it before this cell "
-        "to use another disk. Environments already there are skipped.",
-        f"**All {cat} methods.** `multibench env install --category {cat} --packed --run` "
-        f"installs every {cat} environment ({env_size_text(category=cat)}); "
-        f"`multibench env plan --category {cat}` lists the size of each."))
+        "Environments are unpacked under `mtb.config.DEFAULT.envs_dir`. Set it before "
+        "this cell to use another disk. Without conda on the computer, the default is "
+        "`~/.cache/multibench/envs`. An environment that is already there is not "
+        "downloaded again.",
+        f"To install every {cat} environment from a terminal, run `multibench env "
+        f"install --category {cat} --packed --run`. That is "
+        f"{env_size_text(category=cat)}; `multibench env plan --category {cat}` lists "
+        f"the size of each."))
     code(f"""import sys
 if not INSTALL_ENVS:
-    print("INSTALL_ENVS is False - no environment is downloaded")
+    print("INSTALL_ENVS is False: no environment is downloaded")
 elif sys.platform != "linux":
-    print("method environments are linux-64 archives - skipped on", sys.platform)
+    print("method environments run only on Linux: skipped on", sys.platform)
 else:
-    plan = mtb.env.install({trio!r}, category=CATEGORY)              # dry run: sizes only
+    # dry run: sizes only
+    plan = mtb.env.install({trio!r}, category=CATEGORY)
     todo = [r for r in plan if not r["exists"]]
     print(f"{{len(todo)}} of {{len(plan)}} envs to download, {{sum(r['archive_bytes'] or 0 for r in todo) / 1e9:.1f}} GB")
     for r in mtb.env.install({trio!r}, category=CATEGORY, packed=True, dry_run=False):
         print(f"{{r['env']:20s}} {{r['state']}}")""")
 
     # ------------------------------------------------------------- run + plot
-    params_note = f', params={{"{fastm}": {s["live"][1]}}}' if s["live"][1] != "None" else ""
-    si_ds, si_methods = stand_in(cat, ds, trio)
+    params_line = (f'\n                      params={{"{fastm}": {s["live"][1]}}},'
+                   if s["live"][1] != "None" else "")
+    si_ds, si_methods = fallback_sweep(cat, ds, trio)
     si_args = f'("{si_ds}",' + (f" {si_methods!r})" if si_methods else ")")
     run_notes = [
-        "**Stand-in.** When none of these environments is installed, the cell downloads "
-        f"the benchmark host's `run_all` outputs for `{live_ds}` with `mtb.data.fetch_outputs` (embeddings "
-        f"and run times included) and reloads them with `mtb.load_batch`.",
-        "**Offline fallback.** If that download fails, the cell uses the stored results "
-        "(`load_results(source=\"rerun\")`): `status` reads `STORED`, and there is no "
-        "embedding to score.",
+        f"The stored outputs are the `run_all` outputs for `{live_ds}` from the "
+        "benchmark's Linux machine. `mtb.data.fetch_outputs` downloads them and "
+        "`mtb.load_batch` reloads them, so the embeddings and run times are real.",
+        "If that download fails, the cell uses the stored metric table "
+        "(`load_results(source=\"rerun\")`) instead. The `status` column then reads "
+        "`STORED`, and there is no embedding to score.",
     ]
     if s["live"][1] != "None":
         run_notes.append(live_param_note(fastm, cat, s["live"][1], s["live_modalities"]))
     run_notes += [s["live_note"], s["summary_note"]]
     md(f"""### Run the methods
 
-`run_all` runs {trio_text} on `{live_ds}`, each in its own environment, and scores each embedding with scIB metrics. Without environments, the cell prints one line and loads stand-in results.
+`run_all` runs {trio_text} on `{live_ds}`, each in its own environment. Each method writes an embedding. An embedding is a table of numbers with one row per cell. `run_all` scores each embedding with the scIB metrics. Without environments, the cell prints one line and loads stored outputs instead.
 
 """ + details(*run_notes))
     code(f'''{STORED_SWEEP_FN}
 
-{STAND_IN_FN}
+{REPLACEMENT_FN}
 
 check = mtb.scan("{live_ds}", CATEGORY, methods={trio!r})
 if check.env_ok.any():
     res = mtb.run_all("{live_ds}", CATEGORY,
-                      methods={trio!r}{params_note},
+                      methods={trio!r},{params_line}
                       out_dir="/tmp/tutorial_{cat}")
 else:
     print("{SKIP_LINE}")
-    res = stand_in("{live_ds}", {trio!r}, stored={si_args})
+    res = replacement("{live_ds}", {trio!r}, stored={si_args})
 res.summary''')
+    score_notes = [
+        "`label_order=` gives the order in which the method stacked its cells. The "
+        "cell takes it from the run record's `labels_used`.",
+        "`metrics=` selects what is computed:\n\n"
+        "- `None` (the default): every applicable metric\n"
+        "- `\"clustering\"`, `\"batch\"` or `\"all\"`: a family\n"
+        "- a list such as `[\"ARI\", \"NMI\"]`: those metrics\n\n"
+        "Batch metrics need `batch=` or several label files."
+        + (" Here each label file is one modality, so the batch metrics show how "
+           "well the RNA and ATAC cells mix." if cat == "diagonal" else ""),
+        "The default Leiden backend is igraph. To compare your scores with the stored "
+        "tables, set `mtb.config.DEFAULT.leiden_flavor = \"leidenalg\"` before "
+        "`evaluate`. The two backends can move ARI by up to about 0.1.",
+    ]
     md("""### Score one embedding
 
 `run_all` has already scored every method. To score one embedding yourself, pass the file the method wrote and the dataset's label files to `mtb.evaluate`:
 
-""" + details(
-        "**Label order.** `label_order=` passes the order in which the method stacked "
-        "its cells, taken from the run record's `labels_used`.",
-        "**Choosing metrics.** `metrics=` accepts:\n\n"
-        "- `None` (the default): every applicable metric\n"
-        "- `\"clustering\"`, `\"batch\"` or `\"all\"`: a family\n"
-        "- a list such as `[\"ARI\", \"NMI\"]`: those metrics",
-        "Batch metrics need `batch=` or several label files."))
+""" + details(*score_notes))
     code(EVALUATE_CELL_TEMPLATE.format(method=fastm))
     md("""### Plot
 
-`res.plot()` draws a bubble table. Circle size is the method's rank in each column (largest = best); colour is the metric value, scaled within the column (darker = higher).
+`res.plot()` draws a bubble table. Circle size shows the rank within a column; bigger is better. The fill compares the value with the other rows in the same column: the lightest fill is the lowest value in this figure, not zero.
 
 """ + details(
-        "**Columns.** Metrics are grouped by family: blue for dimension reduction and "
-        "clustering, green for batch correction. Each family starts with an **Overall** "
-        "bar; its length and colour both show the family score."))
+        "Metrics are grouped by family: blue for dimension reduction and clustering, "
+        "green for batch correction. Each family starts with an `Overall` bar. Its "
+        "length and colour both show the family score."))
     code("""res.plot()""")
 
     # ------------------------------------------------------------- own data
     md(f"""## 3. Your own data
 
-The same calls on a dataset folder the package has not seen. `describe_layout` prints the files a {cat} dataset needs and their format:""")
+The same calls work on a folder of your own data. Give raw counts for every modality, as in the demo data; the methods normalise the data themselves. `describe_layout` prints the files a {cat} dataset needs:""")
     code("""print(mtb.describe_layout(CATEGORY))""")
     labels_code = """labels = mtb.labels_for(DATASET)            # {file stem: path}
 print({k: Path(v).name for k, v in labels.items()})
 print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n")"""
     if cat == "vertical":
-        md("`labels_for` returns a dataset's label files; a vertical dataset has one, `cty`:")
+        md("`labels_for` returns a dataset's label files. A vertical dataset has one, `cty`:")
     else:
         files = "`rna_cty` then `atac_cty`" if cat == "diagonal" else "`cty1`, `cty2`, ... in that order"
         others = reordering_methods(cat, ds)
         if not others:
             raise SystemExit(f"no {cat} method stacks {ds}'s cells in another order: reword section 3")
-        md(f"""`labels_for` returns a dataset's label files: {files}. Some methods stack their cells in another order; `labels_for(DATASET, CATEGORY, method)` returns the files in that method's order. A wrong order gives wrong scores without an error.
+        md(f"""`labels_for` returns a dataset's label files: {files}. Some methods stack their cells in another order. `labels_for(DATASET, CATEGORY, method)` returns the files in that method's order. A wrong order gives wrong scores without an error.
 
 """ + details(
-            f"**On `{ds}`**, `labels_for` returns another order for "
+            f"On `{ds}`, `labels_for` returns another order for "
             + and_list(f"{m} (`{', '.join(o)}`)" for m, o in others.items()) + ".",
-            "**With `evaluate`.** Pass the dict `labels_for` returns as is. A dict you "
-            "build or reorder yourself goes in as is only in the default order; name "
-            "any other order with `label_order=`.",
-            "**Check.** `run_all` scores every order that fits the cell count and keeps "
-            "the one with the highest ARI; the `label_order` column of `res.summary` "
-            "shows it.", label="Details: label order"))
+            "Pass the dict that `labels_for` returns to `evaluate` unchanged. A dict "
+            "you build or reorder yourself is read in the default order. For any other "
+            "order, name the keys with `label_order=`.",
+            "`run_all` scores every order that fits the cell count and keeps the one "
+            "with the highest ARI. The `label_order` column of `res.summary` shows the "
+            "order it kept.", label="Details: label order"))
         # the printed example is a method that fits the dataset (no scan caveat:
         # Seurat_v5 reorders D28 too, but needs paired files D28 does not have)
         import multibench as mtb
@@ -602,17 +694,20 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
         m0 = next((m for m in others if m in fit), next(iter(others)))
         labels_code += f'\nprint("{m0}:", list(mtb.labels_for(DATASET, CATEGORY, "{m0}")))'
     code(labels_code)
-    md(EXPORT_INTRO[cat] + ("\n\n" + details(EXPORT_DETAIL[cat], label="Details: MuData")
-                            if EXPORT_DETAIL[cat] else ""))
+    export_notes = EXPORT_DETAIL[cat]
+    if cat == "diagonal":
+        export_notes = [p.replace("{peak_only}", and_list(atac_forms(cat)[1]))
+                        for p in export_notes]
+    md(EXPORT_INTRO[cat] + "\n\n" + details(*export_notes, label=EXPORT_DETAIL_LABEL[cat]))
     code(EXPORT_DEMO[cat])
-    md(f"""A real dataset under a new name: a random 60% of `{s['own_src']}`'s cells, capped at 2,000 cells and 5,000 features per file.
+    md(f"""Next, a real dataset under a new name: a random 60% of `{s['own_src']}`'s cells, with at most 2,000 cells and 5,000 features per file.
 
 """ + details(
-        "**Alignment.** Files with the same number of cells keep the same cells in the "
-        "same order, so each modality file stays aligned with its label file. An export "
-        "of your own data must keep this alignment.", label="Details: cell alignment"))
+        "Files with the same number of cells keep the same cells in the same order. "
+        "Each modality file then stays aligned with its label file. An export of your "
+        "own data must keep this alignment too.", label="Details: cell alignment"))
     code(SUBSAMPLE_FN)
-    md("""`scan` checks each method against the folder (`files_ok`) and against this machine's environments (`env_ok`); `runnable` needs both, and `reason` says what failed. The folder check works on any machine.""")
+    md("""`scan` checks each method variant. A variant is one set of input files that a method accepts. `files_ok` checks the folder and works on any computer. `env_ok` checks the environment. A variant is `runnable` only when both pass, and `reason` says what failed.""")
     code(f'''DATA_ROOT = "/tmp/mydata"
 src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
 subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
@@ -620,7 +715,7 @@ subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
 sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
 print(f"files_ok {{int(sc.files_ok.sum())}}, env_ok {{int(sc.env_ok.sum())}}, runnable {{int(sc.runnable.sum())}} of {{len(sc)}} method variants")
 sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)''')
-    own_ds, own_methods = stand_in(cat, ds2, trio)
+    own_ds, own_methods = fallback_sweep(cat, ds2, trio)
     own_args = f'"{own_ds}"' + (f", {own_methods!r}" if own_methods else "")
     code(f'''if sc[sc.method.isin({trio!r})].env_ok.any():
     mine = mtb.run_all(f"MYDATA_{cat}", CATEGORY,
@@ -629,7 +724,8 @@ sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)
                        data_path=DATA_ROOT)
 else:
     print("{SKIP_LINE}")
-    mine = stored_sweep({own_args})   # stored results for {own_ds}, a 60% subsample of {own_ds[:-1]}
+    # the stored results for {own_ds}, a 60% subsample of {own_ds[:-1]}
+    mine = stored_sweep({own_args})
 mine.summary''')
     code("""mine.plot()""")
 
@@ -639,15 +735,16 @@ mine.summary''')
     stored_notes = [published_note(cat, ds)]
     if extra:
         stored_notes.append(
-            f"**Other datasets.** Stored results also exist for "
-            f"{and_list(f'`{d}`' for d in extra)} (`mtb.available_datasets(CATEGORY, "
-            f"source=\"both\")`).")
+            f"Stored results also exist for {and_list(f'`{d}`' for d in extra)}. "
+            f"`mtb.available_datasets(CATEGORY, source=\"both\")` lists them.")
     stored_notes.append(
-        "**Your own runs.** `run_all` saves its results in `out_dir`; "
-        "`mtb.load_batch(out_dir)` reloads them later without running anything.")
+        "`run_all` saves its results in `out_dir`, and `mtb.load_batch(out_dir)` "
+        "reloads them later without running anything. Use one `out_dir` per dataset "
+        "and category: a second `run_all` into the same folder adds its methods to "
+        "the saved results, and one for another dataset raises `ValueError`.")
     md(f"""## 4. Stored results
 
-The package ships stored results for {n_rerun} methods on `{ds}` (`source="rerun"`). `load_results` reads them as a long table and `mtb.plot.bubble` draws it; nothing is run.
+The package ships stored results for {n_rerun} methods on `{ds}`. `load_results(..., source="rerun")` reads them as a long table, and `mtb.plot.bubble` draws it. A long table has one row per method and metric. Nothing is run.
 
 """ + details(*stored_notes, label="Details: sources"))
     code('''long = mtb.load_results(CATEGORY, dataset=DATASET, source="rerun")
@@ -656,13 +753,16 @@ fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
 fig''')
     pair_notes = [
-        "**Bars.** Each metric bar is the method's rank averaged over the datasets, "
-        "min-max scaled; `Overall` summarises the family's metric ranks. Bar length and "
-        "colour both show the value.",
-        "**Missing methods.** Without `require_complete=True`, a method absent from a "
-        "dataset gets the lowest rank there, which pulls its bars down.",
+        "Each metric bar is the method's rank averaged over the datasets, then "
+        "min-max scaled. `Overall` summarises the ranks of the family's metrics. Bar "
+        "length and colour both show the value.",
+        "Without `require_complete=True`, a method that is missing from one dataset "
+        "gets the lowest rank there, which pulls its bars down.",
+        f"`{ds2}` is a random subsample used for the package's second run of the "
+        f"methods. It cannot be downloaded or rebuilt, so a summary that includes your "
+        f"own method uses the full datasets only.",
     ]
-    md(f"""**Across datasets.** `aggregate="summary"` ranks the methods over `{ds}` and `{ds2}`, a 60% cell subsample of `{ds}`; `require_complete=True` keeps only the methods with results on both.
+    md(f"""A summary compares methods scored on the same datasets. `aggregate="summary"` ranks the methods over `{ds}` and `{ds2}`, a random 60% subsample of `{ds}`'s cells. `require_complete=True` keeps only the methods with results on both.
 
 """ + details(*pair_notes, label="Details: summary bars"))
     code(f'''pair = mtb.load_results(CATEGORY, dataset=[DATASET, DATASET + "s"], source="rerun")
@@ -681,11 +781,11 @@ cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
 
 ### What runs on a dataset, and why not
 
-`scan` on `{ds}`, nothing run: the first table lists the variants whose data fits, with the install command for any missing environment (`env_reason`); the second, why the other variants do not fit.
+`scan` on `{ds}` runs nothing. The first table lists the variants whose input files are in place. For a missing environment, `env_reason` gives the install command, or says that the environment runs only on Linux. The second table says why the other variants do not fit.
 
 """ + details(
-        f"**From the shell.** `multibench scan {ds} --category {cat}` prints the scan for "
-        "every variant; `--columns all` adds every column, including `command`, the exact "
+        f"From a terminal, `multibench scan {ds} --category {cat}` prints the same "
+        "scan. `--columns all` adds every column, including `command`: the exact "
         "command `run` would execute."))
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
 print(f"files_ok {int(avail.files_ok.sum())}, env_ok {int(avail.env_ok.sum())}, runnable {int(avail.runnable.sum())} of {len(avail)} method variants")
@@ -696,12 +796,12 @@ not_ok.head(5) if len(not_ok) else "(every method's inputs resolve on this datas
 """)
     md("""### Tuning
 
-The table counts the hyperparameters each variant exposes. `mtb.params_for(method, CATEGORY, modalities)` lists them; `run_all(..., params={"Method": {"key": value}})` sets them.
+The table counts the parameters each variant exposes. `mtb.params_for(method, CATEGORY, modalities)` lists them, and `run_all(..., params={"Method": {"key": value}})` sets them.
 
 """ + details(
-        "**None exposed.** Many upstream scripts set their hyperparameters in code; "
-        "their variants accept no `params`.",
-        "**From the shell.** `multibench params METHOD` prints the table; "
+        "Many upstream scripts set their parameters in code. Their variants accept no "
+        "`params`.",
+        "From a terminal, `multibench params METHOD` prints the table, and "
         "`multibench run-all ... --param METHOD:KEY=VALUE` sets a value."))
     code("""rows = [{"method": m, "modalities": "+".join(v["modalities"]) or "(data_dir)",
          "n_tunable": v["n_tunable"], "needs_labels": v["needs_labels"],
@@ -711,18 +811,19 @@ The table counts the hyperparameters each variant exposes. `mtb.params_for(metho
 pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True]).reset_index(drop=True)""")
     md(f"""### A method's record and citation
 
-`method_info` returns what the registry holds about a method, including its reference and repository; `mtb.cite` returns the citations for the benchmark and the methods you pass. The cell cites {fastm}; for your own work, pass every method you ran.
+`method_info` returns what the package knows about a method, including its reference and repository. `mtb.cite` returns the citations for the benchmark and for the methods you pass. The cell cites {fastm}; for your own work, pass every method you ran.
 
 """ + details(
-        "**needs_labels** is True when any variant needs cell-type labels; each entry of "
-        "`supports` gives it per variant.",
-        "**verbose=True** adds the long notes."))
+        "`needs_labels` is True when any variant of the method needs cell-type labels. "
+        "Each entry of `supports` gives it per variant, together with the modalities "
+        "and the output kind.",
+        "`verbose=True` adds the long notes."))
     code(f'''info = mtb.method_info("{fastm}", verbose=True)
 {{k: info[k] for k in ("id", "env", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
     code(f'''print(mtb.cite(["{fastm}"]))   # fmt="bibtex" for BibTeX entries''')
     md("""### The metrics
 
-Two families; higher is better for every metric.
+There are two families, and higher is better for every metric.
 
 | family | metrics | measures |
 |---|---|---|
@@ -730,21 +831,23 @@ Two families; higher is better for every metric.
 | batch correction | `ASW_batch`, `GC`, `iLISI` (+ opt-in `kBET`) | whether the batches mix within each cell type |
 
 """ + details(
-        "**Range.** All lie in [0, 1] except ARI, which can be slightly negative.",
-        "**Batch metrics** appear only when the dataset has more than one batch.",
-        "**kBET** is computed only when named (`metrics=[\"ASW_batch\", \"GC\", "
-        "\"iLISI\", \"kBET\"]`); it is much slower than the others."))
+        "ARI can fall slightly below 0; about 0 means a random clustering. Every "
+        "other metric lies between 0 and 1. `mtb.catalog.metrics()` describes each one.",
+        "Batch metrics appear only when the dataset has more than one batch.",
+        "kBET is computed only when named, as in `metrics=[\"ASW_batch\", \"GC\", "
+        "\"iLISI\", \"kBET\"]`. It is much slower than the others."))
     coverage_notes = []
     if cat == "mosaic":
         coverage_notes.append(
-            "**UINMF** has no mosaic variant: its script takes the second batch's "
-            "unshared features from the first batch, which fails when the two are "
-            "different modalities, and it accepts exactly two batches, a pattern that "
-            "fits no mosaic dataset here.")
+            "UINMF has no mosaic variant. Its script takes the second batch's unshared "
+            "features from the first batch, which fails when the two are different "
+            "modalities. It also accepts exactly two batches, a pattern that fits no "
+            "mosaic dataset here.")
     md(f"""### Methods from the benchmark study
 
-The cell compares the methods the scMultiBench study benchmarked for {cat} integration with the methods this package has a {cat} variant for, and prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
-    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} on {PAPER_TASKS[cat]}
+The cell compares the methods the scMultiBench study benchmarked for {cat} integration with the methods this package has a {cat} variant for. It prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
+    code(f"""# benchmarked for {cat} on {PAPER_TASKS[cat]}
+paper = {PAPER_METHODS[cat]!r}
 registry = set(mtb.list_methods())
 wired = sorted(m for m in registry
                if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
@@ -759,27 +862,30 @@ if not missing:
     print("every benchmarked method has a variant for this category")""")
 
     # -------------------------------------------------------- troubleshooting
-    siblings = ", ".join(f"**{c}**" for c in SCEN if c != cat)
+    siblings = ", ".join(c for c in SCEN if c != cat)
     md("""## Troubleshooting
 
-When a method is not runnable, `scan`'s `reason` column says why; when a run fails, `res.failures` holds the error.
+When a method is not runnable, the `reason` column of `scan` says why. When a run fails, `res.failures` holds the error.
 
 """ + details(
         """| symptom | fix |
 |---|---|
-| `files_ok` False: input files not found | the reason names the missing file and lists what the folder holds |
-| `env_ok` False | run the `multibench env install ...` command in the reason |
-| `... which is cells x features` | the matrix is transposed: re-export with `mtb.io.to_canonical` or `export_dataset` |
+| `files_ok` False: input files not found | `reason` names the missing file |
+| `env_ok` False on Linux | run the `multibench env install ...` command in `env_reason` |
+| `env_ok` False on macOS or Windows | methods run only on Linux; `mtb.run(..., dry_run=True)` prints the command to run there |
+| `FileExistsError` from `export_dataset` | the folder already holds the file: pass `overwrite=True` to replace it |
+| a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
+| `... which is cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` or `mtb.io.to_canonical` |
 | a method fails | `res.failures.iloc[0]["error"]` ends with the method's stderr |
 | a method times out | raise `timeout=` in `run_all` |
 | low `label_order_confidence` | several label files fit the cell count: check `label_order_candidates` in `res.results` |
-| batch metrics use the wrong batches | `res.rescore(batch=my_vector)` re-scores without re-running |"""))
+| batch metrics use the wrong batches | `res.rescore(batch=my_vector)` scores again without running the methods |"""))
     md(f"""## Next steps
 
 - the other tutorials: {siblings}
 - the [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/): the full benchmark's rankings, no install needed
-- `mtb.recommend(CATEGORY, modalities=[...])`: a ranking of methods from the stored results
-- `mtb.sweep(...)`: one method over a range of values of one hyperparameter""")
+- `mtb.recommend(CATEGORY, modalities=[...])`: a ranking of methods from the stored results, to read as a hint
+- `mtb.sweep(...)`: one method over a range of values of one parameter""")
     return C
 
 
@@ -789,26 +895,30 @@ def build_colab_quickstart():
     code = lambda t: C.append(nbf.v4.new_code_cell(t))
     md("""# scMultiBench API quickstart (Colab)
 
-Installs `multibench-sc`, looks up methods in the registry and draws the stored benchmark results. No method is run, so nothing else is downloaded.
+This notebook installs `multibench-sc`, looks up methods and draws the stored benchmark results. It runs no method, so it downloads nothing else.
 
 """ + details(
-        "**Running methods** needs each method's environment and the reference data. "
-        "The category tutorials download the data, and the environments when you set "
-        "`INSTALL_ENVS = True`."))
+        "Running a method needs its environment and the reference data, and methods "
+        "run only on Linux or Colab. The category tutorials download the data. They "
+        "download the environments when you set `INSTALL_ENVS = True`."))
     for cell in INSTALL_CELLS:
         code(cell)
     code("""%matplotlib inline
 import multibench as mtb
 
-print(len(mtb.list_methods()), "methods in the registry")
+print(len(mtb.list_methods()), "methods in the package")
 mtb.list_methods(category="vertical")""")
     md("""## Inspect a method
 
-`method_info` returns what the registry holds about a method, `find_methods` filters methods by what your data has, and `cite` returns the citations.
+`method_info` returns what the package knows about a method. `find_methods` filters methods by what your data has, and `cite` returns the citations.
 
 """ + details(
-        "**Filters.** A method matches when one of its variants meets every filter "
-        "(category, modalities, `needs_labels`, `atac`)."))
+        "A method matches when one of its variants meets every filter: category, "
+        "modalities, `needs_labels` and `atac`. A variant is one set of input files "
+        "that a method accepts.",
+        "The modality `\"atac\"` matches every method that reads ATAC. "
+        "`\"atac_peak\"` keeps the methods that read peaks, and `\"atac_gas\"` the "
+        "methods that read gene activity."))
     code("""info = mtb.method_info("Matilda")
 {k: info[k] for k in ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference", "supports")}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
@@ -818,10 +928,11 @@ mtb.list_methods(category="vertical")""")
 The package ships stored results, so these figures draw without running anything.
 
 """ + details(
-        "**Sources.** `source=\"published\"` (the default) reads the published scIB "
-        "tables; `source=\"rerun\"` reads the package's own runs of the methods.",
-        "**Two datasets.** `aggregate=\"summary\"` ranks the methods over both datasets; "
-        "`require_complete=True` keeps only the methods with results on both."))
+        "`source=\"published\"`, the default, reads the published scIB tables. "
+        "`source=\"rerun\"` reads the package's own runs of the methods.",
+        "`aggregate=\"summary\"` ranks the methods over both datasets. `D28s` is a "
+        "random 60% subsample of `D28`'s cells. `require_complete=True` keeps only "
+        "the methods with results on both."))
     code("""long = mtb.load_results("vertical", dataset="D11", source="rerun")
 fig = mtb.plot.bubble(long)
 fig.set_dpi(110)
@@ -839,10 +950,11 @@ mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
 if __name__ == "__main__":
     for cat, s in SCEN.items():
         C = build_tutorial(cat, s)
-        path = os.path.join(OUT, f"tutorial_{cat}.ipynb")
-        nbf.write(_notebook(C), path)
+        name = f"tutorial_{cat}"
+        path = os.path.join(OUT, f"{name}.ipynb")
+        nbf.write(_notebook(C, name), path)
         print(f"wrote {path} {len(C)} cells")
     C = build_colab_quickstart()
     path = os.path.join(OUT, "colab_quickstart.ipynb")
-    nbf.write(_notebook(C), path)
+    nbf.write(_notebook(C, "colab_quickstart"), path)
     print(f"wrote {path} {len(C)} cells")
