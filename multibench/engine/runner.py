@@ -81,6 +81,19 @@ def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
     return shlex.split(prefix) + cmd
 
 
+#: The ``cmd_template`` placeholder for the command with the env activation
+#: the default path uses (``{cmd}`` is the bare command).
+ENV_CMD = "{env_cmd}"
+
+
+def _check_template(cmd_template: str | None) -> None:
+    """``ValueError`` for a template that uses both placeholders."""
+    if cmd_template and ENV_CMD in cmd_template and "{cmd}" in cmd_template:
+        raise ValueError(
+            f"cmd_template {cmd_template!r} uses both {{cmd}} and {ENV_CMD}; use "
+            f"{ENV_CMD} to run inside the method env, or {{cmd}} for the bare command")
+
+
 #: The environment variable that forces a run mode (``conda`` | ``prefix``).
 RUN_MODE_VAR = "MULTIBENCH_RUN_MODE"
 RUN_MODES = ("conda", "prefix")
@@ -504,6 +517,10 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     else:
         cmd[1] = str(repo / cmd[1])
     activate = None
+    outer = None
+    if cmd_template is not None and ENV_CMD in cmd_template:
+        # {env_cmd}: the default env wrap below, then the caller's launcher
+        outer, cmd_template = cmd_template.replace(ENV_CMD, "{cmd}"), None
     if cmd_template is None:
         # Resolve the env through the group system provisioning uses
         # (mtb.env.plan/create/create_group), so the env that is provisioned
@@ -533,8 +550,10 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
     if activate is not None:
-        return wrap_prefix(cmd, *activate)
-    return wrap_command(cmd, cmd_template)
+        cmd = wrap_prefix(cmd, *activate)
+    else:
+        cmd = wrap_command(cmd, cmd_template)
+    return wrap_command(cmd, outer) if outer is not None else cmd
 
 
 def cpu_params_for(spec, params: dict | None) -> tuple[dict | None, dict]:
@@ -623,8 +642,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     convert : bool
         Convert modality inputs to the canonical ``.h5`` layout before the run.
     cmd_template : str | None
-        Command wrapper such as ``"conda run -n myenv {cmd}"``; ``None`` =
-        enter the method's own env.
+        Launcher template: ``{cmd}`` = the bare command, ``{env_cmd}`` = the
+        command inside the method env; ``None`` = enter the method env.
     repo_path : Path | None
         Checkout holding ``tools_scripts/``; ``None`` =
         ``mtb.config.DEFAULT.repo_path`` if it has one, else the package root
@@ -754,12 +773,23 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     method's env is not among them, ``EnvironmentError`` (Python's alias of
     ``OSError``) is raised, naming the install command. On Linux, if the
     probe finds no envs at all, the subprocess reports the failure. A
-    ``cmd_template`` takes over env control and skips the check.
+    ``cmd_template`` with ``{cmd}`` takes over env control and skips the
+    check.
 
     **Other systems.** Method environments are Linux-only. On macOS or
     Windows a missing env always raises ``OSError``, and the message starts
     with that fact: preview the command with ``dry_run=True`` and run it on a
     Linux machine.
+
+    **Launcher templates.** ``cmd_template`` wraps the command in your own
+    launcher. ``{env_cmd}`` is the command with the env activation above.
+    ``{cmd}`` is the bare command: the template must then enter an env
+    itself, for example ``"conda run -n myenv {cmd}"``.
+
+    A Slurm job step::
+
+        mtb.run("StabMap", "mosaic", inputs=inp, out_dir="runs/StabMap",
+                cmd_template="srun --gres=gpu:1 {env_cmd}")
 
     **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
     before the argv is built, and ``data_dir`` (like any existing directory)
@@ -795,6 +825,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     mtb.evaluate : scores ``RunResult.output``.
     """
+    _check_template(cmd_template)
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
                               params=params, convert=convert,
@@ -821,11 +852,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # Env preflight: without it a missing env only surfaces after inputs were
     # converted and the subprocess spawned, in a stderr tail with no install
     # hint. Same probe scan() uses (prefixes under envs_dir plus what conda
-    # lists). Skipped when the caller controls the env via cmd_template. On
-    # Linux it is also skipped when the probe finds nothing (no prefixes,
-    # conda absent or broken): the subprocess then reports the failure. Off
-    # Linux a missing env cannot be installed at all, so it always refuses.
-    if cmd_template is None:
+    # lists). Skipped when the caller controls the env via a cmd_template
+    # with {cmd}. On Linux it is also skipped when the probe finds nothing (no
+    # prefixes, conda absent or broken): the subprocess then reports the
+    # failure. Off Linux a missing env cannot be installed at all, so it
+    # always refuses.
+    if cmd_template is None or ENV_CMD in cmd_template:
         env_name = envs.group_for(method)
         linux_only = linux_only_sentence()
         have = envs.installed_envs()
@@ -836,10 +868,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             envs._conda_prefixes.cache_clear()
             have = envs.installed_envs()
         if (have or linux_only) and env_name not in have:
+            py = f" (or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()"
             install = (f"conda env {env_name!r} ({method}) is not installed - run "
-                       f"`multibench env install --methods {method} --packed --run` "
-                       f"(or mtb.env.install([{method!r}], dry_run=False)); see "
-                       f"mtb.env.doctor()")
+                       f"`multibench env install --methods {method} --packed --run`"
+                       + config.hint(py, "; see `multibench env doctor`"))
             if linux_only:
                 install = (f"{linux_only} Preview the command with dry_run=True and "
                            f"run it on a Linux machine.\n{install}")

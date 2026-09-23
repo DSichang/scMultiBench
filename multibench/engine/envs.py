@@ -72,7 +72,7 @@ def _require_linux(force: bool) -> None:
     if problem:
         raise RuntimeError(
             f"{problem} - method envs cannot be built here. Run methods on a "
-            f"Linux host (the registry, stored results, scan's file gate, "
+            f"Linux host (the registry, stored results, scan's file check, "
             f"evaluate and plot all work on this machine); pass force=True / "
             f"--force to try anyway.")
 
@@ -89,11 +89,10 @@ DIFFICULTY = {
          "install.packages() are restored by the env's post-install script",
     "verified": "env built from the lockfile on a fresh machine and the method "
                 "ran end-to-end on its reference dataset",
-    "blocked-script": "the upstream script itself cannot run unmodified from the "
-                      "public checkout (see method_info(m)['setup_hint'] and scan's "
-                      "files_reason); the env builds, and the benchmark host ran the "
-                      "method only with a local shim",
-    "unknown": "no env_spec recipe declared for the method",
+    "blocked-script": "the env builds, but the upstream script cannot run "
+                      "unmodified from the public checkout; it needs extra files "
+                      "(method_info(m)['setup_hint'] and scan's files_reason say which)",
+    "unknown": "no recipe declared for the method",
 }
 
 #: The ``*`` suffix ``env status`` appends to the difficulty tag.
@@ -323,10 +322,30 @@ def _cpu_fallback_warning(env: str, manifest: dict, sizes: dict) -> str:
     msg = f"no CPU archive for {env}; installing the GPU build ({size})"
     key = archive_key(env, "cpu")
     if key in manifest:
-        msg += (f" - {key} is listed in packed_urls.json but has no measured size "
-                f"in packed_sizes.json (not published yet; tools/packed_sizes.py "
-                f"records it after the upload)")
+        msg += f" - the CPU archive {key} is not published yet"
     return msg
+
+
+def auto_flavor_note(flavor: str, *, planning: bool = False) -> str | None:
+    """The one stderr note for ``flavor='auto'`` on a host without a GPU, else ``None``.
+
+    A login node without a GPU picks the CPU builds, under the same env name
+    the GPU jobs later activate. The note names the flavour to pass when the
+    jobs run elsewhere (``--flavor gpu`` on the command line).
+
+    Parameters
+    ----------
+    flavor : str
+        The ``flavor=`` value the caller was given.
+    planning : bool, keyword-only
+        ``True`` for ``multibench env plan`` (sizes only, nothing installed).
+    """
+    if flavor != "auto" or resolve_flavor(flavor) != "cpu":
+        return None
+    what = "sizes are for the CPU builds" if planning else "installing CPU builds"
+    gpu = config.hint("flavor='gpu'", "--flavor gpu")
+    return (f"# {what} (no NVIDIA GPU on this host); if the jobs run on GPU "
+            f"nodes, pass {gpu}")
 
 
 def installed_flavor(env: str, conda: str | None = None) -> str | None:
@@ -407,9 +426,6 @@ def recipe(method: str) -> dict:
     - ``difficulty`` / ``verified_working`` - the same values as in
       ``mtb.env.status``.
     - ``caveats`` - free-text notes on the recipe.
-
-    **Source.** The recipes live in ``engine/env_specs.yaml``, one entry per
-    method id (the method's ``env_spec``).
 
     **Command line.** ``multibench env recipe METHOD`` prints the recipe as
     conda/pip commands and ``multibench env yml METHOD`` as an
@@ -537,7 +553,7 @@ def create_commands(method: str, env_name: str | None = None,
     """
     r = recipe(method)
     if not r:
-        raise ValueError(f"no env_spec recipe declared for {method!r}")
+        raise ValueError(f"no recipe declared for {method!r}")
     return _install_commands(r, env_name or default_env_name(method), conda)
 
 
@@ -549,7 +565,7 @@ def environment_yml(method: str, env_name: str | None = None) -> str:
     """
     r = recipe(method)
     if not r:
-        raise ValueError(f"no env_spec recipe declared for {method!r}")
+        raise ValueError(f"no recipe declared for {method!r}")
     return _environment_yml(r, env_name or default_env_name(method))
 
 
@@ -682,7 +698,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     **Keys.**
 
     - ``env`` - the conda env name, the one ``mtb.run`` activates.
-    - ``shared`` - the env is a shared group of ``env_groups.yaml``.
+    - ``shared`` - the env serves several methods (``multibench env groups``
+      lists these shared envs).
     - ``methods`` - the selected methods this env serves, sorted.
     - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the env is installed here from
       a packed archive, else ``None``.
@@ -690,8 +707,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     **Selection.** ``methods`` takes precedence over ``category``.
 
     **Command line.** ``multibench env plan`` prints the same rows with each
-    archive's download size and unpacked size on disk (from the shipped
-    ``packed_sizes.json``; ``?`` = not measured) and a total line.
+    archive's download size and unpacked size on disk (the sizes recorded
+    for this release; ``?`` = not measured) and a total line.
 
     See Also
     --------
@@ -1432,7 +1449,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     - ``cmds`` - the lockfile commands run, or that would run.
     - ``packed_url`` / ``archive_bytes`` / ``unpacked_bytes`` - the archive
       the flavour selects and its sizes; ``None`` unless ``packed`` and
-      known (a ``null`` in ``packed_sizes.json`` counts as unknown).
+      known (a size not measured yet is ``None``).
     - ``flavor`` - for an installed env, the archive it came from (``None``
       when unrecorded); for a missing env, the flavour the packed path would
       install, or ``None`` when ``packed=False``.
@@ -1466,14 +1483,18 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
       (no ``nvidia-smi -L`` output and no ``/proc/driver/nvidia/version``),
       else ``'gpu'``.
 
-    The dry-run sizes and URL follow the flavour, so a CPU host sees the CPU
-    archives' download total. The flavour installed is recorded in
-    ``<prefix>/.multibench_flavor`` and shown by ``mtb.env.status``,
-    ``mtb.env.doctor`` and ``mtb.env.plan``.
+    The dry-run sizes and URL follow the flavour: a CPU host sees the CPU
+    archives' download total. The flavour installed is recorded in the env
+    prefix and shown by ``mtb.env.status``, ``mtb.env.doctor`` and
+    ``mtb.env.plan``.
+
+    **Installing for other hosts.** ``'auto'`` decides by this host. When it
+    picks the CPU builds, one line on stderr says so; pass ``flavor='gpu'``
+    (``--flavor gpu``) when the envs serve jobs on GPU nodes.
 
     **Order of work** (``dry_run=False``). With ``packed``, each missing env
-    is first tried as an archive (its URL in ``packed_urls.json``, else the
-    release-asset default under ``mtb.env.PACKED_URL``). An HTTP error on
+    is first tried as an archive (the URL recorded for this release, else
+    the default release URL). An HTTP error on
     the download or a failed unpack falls back to the lockfile build; envs
     with no lockfile are reported ``'NO-LOCK'``, not built.
 
@@ -1531,6 +1552,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     f"no conda/mamba on this host; {r['env']} has no packed "
                     f"archive - install conda first")
         if packed:
+            note = auto_flavor_note(flavor) if missing else None
+            if note:
+                print(note, file=sys.stderr, flush=True)
             for r in missing:
                 if install_packed(r["env"], conda=conda, force=force, flavor=flavor):
                     unpacked.add(r["env"])
@@ -1568,6 +1592,10 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     "archive_bytes": sz.get("archive_bytes"),
                     "unpacked_bytes": sz.get("unpacked_bytes"),
                     "flavor": installed if (r["exists"] or env in unpacked) else eff})
+    if dry_run and packed and any(not r["exists"] for r in out):
+        note = auto_flavor_note(flavor)
+        if note:
+            print(note, file=sys.stderr, flush=True)
     return out
 
 
@@ -1621,7 +1649,7 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
 
     - ``env`` / ``methods`` - the env and the selected methods it serves.
     - ``exists`` - the env is installed here (``[x]``).
-    - ``has_lock`` - ``env_locks/<env>.yml`` is shipped, so
+    - ``has_lock`` - the package ships a lockfile for the env, so
       ``multibench env install --run`` can build it (``[L]`` while missing).
       A missing env without one (``[!]``) needs a packed archive or the
       recipe (``mtb.env.recipe``).

@@ -23,29 +23,45 @@ def _linux_no_envs(monkeypatch):
 
 
 # ----------------------------------------------------------------- plan summary
+def total_unknowns(line: str) -> tuple[int, int, int]:
+    """``(n envs, unknown downloads, unknown disks)`` parsed from a ``# total`` line."""
+    n = int(re.search(r"# total \((\d+) envs?\)", line).group(1))
+
+    def unknown(word):
+        m = re.search(word + r": unknown(?: for (?:(\d+) of \d+ envs|(both) envs|all (\d+) envs))?",
+                      line)
+        if m is None:
+            return 0
+        k, both, every = m.groups()
+        return int(k) if k else 2 if both else int(every) if every else n
+    return n, unknown("download"), unknown("disk")
+
+
 def test_size_total_counts_unknowns_per_column():
     rows = [{"env": "a"}, {"env": "b"}, {"env": "c"}]
     sizes = {"a": {"archive_bytes": 1_000_000_000, "unpacked_bytes": 2_000_000_000},
              "b": {"archive_bytes": 1_000_000_000, "unpacked_bytes": None},
              "c": {"archive_bytes": 1_000_000_000}}
     line = cli._size_total_line(rows, sizes)
-    assert "(3 archives; download size unknown for 0, disk size unknown for 2)" in line
-    assert line.startswith("# total at least:")             # a floor once anything is unknown
+    assert total_unknowns(line) == (3, 0, 2)
+    # a partly known column is a floor over the known envs, never a plain total
+    assert "3.0 GB download; disk: unknown for 2 of 3 envs (at least 2.0 GB for the other 1)" in line
+    assert "on disk" not in line
     full = cli._size_total_line(rows[:1], sizes)
-    assert "(1 archive; download size unknown for 0, disk size unknown for 0)" in full
-    assert full.startswith("# total: ")
+    assert total_unknowns(full) == (1, 0, 0)
+    assert full.startswith("# total (1 env): 1.0 GB download, 2.0 GB on disk; ")
 
 
 def test_env_plan_summary_matches_the_question_marks_in_the_rows(capsys):
     rc = cli.main(["env", "plan", "--category", "cross"])
     cap = capsys.readouterr()
     assert rc == 0
-    m = re.search(r"\((\d+) archives?; download size unknown for (\d+), disk size unknown for (\d+)\)", cap.err)
-    assert m, cap.err
+    total = [l for l in cap.err.splitlines() if l.startswith("# total")][0]
+    n, dl, disk = total_unknowns(total)
     rows = [l for l in cap.out.splitlines() if l.strip()]
-    assert int(m.group(1)) == len(rows)
-    assert int(m.group(2)) == sum("? dl" in l for l in rows)
-    assert int(m.group(3)) == sum("? disk" in l for l in rows)
+    assert n == len(rows)
+    assert dl == sum("? dl" in l for l in rows)
+    assert disk == sum("? disk" in l for l in rows)
 
 
 # ----------------------------------------------------------------- recipe

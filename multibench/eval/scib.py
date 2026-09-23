@@ -532,8 +532,11 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             needs = [m for m in ("ARI", "NMI")
                      if cluster is None and (only is None or m in only)] \
                 + (["iF1"] if _needs_isof1 else [])
-            skip = ("clustering= or metrics=[...] without ARI/NMI/iF1"
-                    if cluster is None else "metrics=[...] without iF1")
+            from .. import config as _config
+            skip = (_config.hint("clustering= or metrics=[...] without ARI/NMI/iF1",
+                                 "--clustering, or --metrics without ARI/NMI/iF1")
+                    if cluster is None else
+                    _config.hint("metrics=[...] without iF1", "--metrics without iF1"))
             print(f"scIB clustering metrics: Leiden resolution sweep (10 "
                   f"resolutions, flavor={flavor}) over {n:,} cells for "
                   f"{', '.join(needs)} - typically 30-60 s per 3,000 cells with "
