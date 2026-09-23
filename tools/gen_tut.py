@@ -28,20 +28,28 @@ import os
 OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
 
-# Method sets benchmarked per category in the paper (Nature Methods 22:2449-2460
-# and the PYangLab/scMultiBench README), for the tasks this package covers, so
-# each tutorial states its own coverage instead of letting the reader assume
-# parity.
+# Method sets the paper (Nature Methods 22:2449-2460 and the PYangLab/scMultiBench
+# README) benchmarks per category on the tasks named in PAPER_TASKS - the ones
+# this package scores - so each tutorial states its own coverage instead of
+# letting the reader assume parity. A README list for any other task stays out,
+# and so does every method that is on such a list only.
 PAPER_METHODS = {
  "vertical": ["totalVI","sciPENN","Concerto","scMSI","Matilda","MOFA2","Multigrate",
               "UINMF","scMoMaT","Seurat_WNN","scMM","scMDC","moETM","VIMCCA",
               "iPOLNG","MIRA","UnitedNet","scMVP"],
  "diagonal": ["scBridge","Portal","SCALEX","VIPCCA","Seurat_v3","MultiMAP","Seurat_v5",
               "sciCAN","Conos","iNMF","online_iNMF","scJoint","GLUE","uniPort"],
- "mosaic":   ["MultiVI","scMoMaT","StabMap","Cobolt","UINMF","Multigrate","SMILE",
-              "scMM","moETM","UnitedNet","totalVI","sciPENN"],
+ "mosaic":   ["MultiVI","scMoMaT","StabMap","Cobolt","UINMF","Multigrate","SMILE"],
  "cross":    ["totalVI","scMoMaT","UnitedNet","sciPENN","Concerto","scMDC","StabMap",
               "UINMF","scMM","MOFA2","Multigrate"],
+}
+# The README heading each PAPER_METHODS list comes from, cut to the tasks this
+# package scores; the coverage cell prints it with the count.
+PAPER_TASKS = {
+ "vertical": "dimension reduction and clustering",
+ "diagonal": "dimension reduction, batch correction and clustering",
+ "mosaic":   "dimension reduction, batch correction and clustering",
+ "cross":    "dimension reduction, batch correction and clustering",
 }
 
 
@@ -697,7 +705,7 @@ The table counts the hyperparameters each variant exposes. `mtb.params_for(metho
 pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True]).reset_index(drop=True)""")
     md("""### A method's record and citation
 
-`method_info` returns what the registry holds about a method, including its reference and repository; `mtb.cite` returns the citations for the benchmark and the methods you ran.
+`method_info` returns what the registry holds about a method, including its reference and repository; `mtb.cite` returns the citations for the benchmark and the methods you pass. Pass every method you ran.
 
 """ + details(
         "**needs_labels** is True when any variant needs cell-type labels; each entry of "
@@ -705,7 +713,7 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
         "**verbose=True** adds the long notes."))
     code(f'''info = mtb.method_info("{fastm}", verbose=True)
 {{k: info[k] for k in ("id", "env", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
-    code(f'''print(mtb.cite({trio!r}))   # fmt="bibtex" for BibTeX entries''')
+    code(f'''print(mtb.cite(["{fastm}"]))   # fmt="bibtex" for BibTeX entries''')
     md("""### The metrics
 
 Two families; higher is better for every metric.
@@ -730,16 +738,15 @@ Two families; higher is better for every metric.
     md(f"""### Methods from the benchmark study
 
 The cell compares the methods the scMultiBench study benchmarked for {cat} integration with the methods this package has a {cat} variant for, and prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
-    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} on the tasks this package covers
+    code(f"""paper = {PAPER_METHODS[cat]!r}   # benchmarked for {cat} on {PAPER_TASKS[cat]}
 registry = set(mtb.list_methods())
 wired = sorted(m for m in registry
                if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
 missing = [m for m in paper if m not in wired]
-print(f"the study benchmarks {{len(paper)}} methods for {{CATEGORY}} on the tasks this package covers; this package has a variant for {{len(wired)}}")
+print(f"the study benchmarks {{len(paper)}} {{CATEGORY}} methods on {PAPER_TASKS[cat]}; this package has a {{CATEGORY}} variant for {{len(wired)}}")
 for m in missing:
     if m in registry:
-        info = mtb.method_info(m)
-        print(f"  {{m}}: variants for {{', '.join(info['categories'])}} only (tasks: {{', '.join(info['tasks'])}})")
+        print(f"  {{m}}: variants for {{', '.join(mtb.method_info(m)['categories'])}} only")
     else:
         print(f"  {{m}}: not in the registry")
 if not missing:
