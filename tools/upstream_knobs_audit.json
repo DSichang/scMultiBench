@@ -266,7 +266,7 @@
    }
   ],
   "method": "Conos",
-  "notes": "main_Conos.Rmd takes only positional arguments: the input paths followed by save_path (lines 82-88); main_Conos_classification.Rmd is the classification variant. Line 64 spells the argument k.self.weigh, which R partial matching resolves to k.self.weight; its value 0.01 is a tenth of the library default 0.1. embedGraph alpha=1/2 (line 66) is five times the default 0.1; method='largeVis', target.dims=2 and seed=1 stay at their defaults, and the script never calls set.seed(). The pagoda2 preprocessing on line 62 changes two basicP2proc defaults: nPcs=30 (default 100) and min.transcripts.per.cell=0 (default 100, so no cells are filtered); n.odgenes=3e3 and min.cells.per.gene=0 equal the defaults. n.odgenes=3e3 on line 62 (pagoda2, per-dataset overdispersed genes) and n.odgenes=5e3 on line 64 (conos, per-pair alignment) are different parameters. runConos() reads the global variable num (line 48) instead of using its path_list argument, and lines 49-51 read the third input with a different h5 layout (h5_to_matrix2), so the function depends on the script's top-level context.",
+  "notes": "main_Conos.Rmd (the script described here) takes only positional arguments: the input paths followed by save_path (lines 82-88). Line 64 spells the argument k.self.weigh, which R partial matching resolves to k.self.weight; its value 0.01 is a tenth of the library default 0.1. embedGraph alpha=1/2 (line 66) is five times the default 0.1; method='largeVis', target.dims=2 and seed=1 stay at their defaults, and the script never calls set.seed(). The pagoda2 preprocessing on line 62 changes two basicP2proc defaults: nPcs=30 (default 100) and min.transcripts.per.cell=0 (default 100, so no cells are filtered); n.odgenes=3e3 and min.cells.per.gene=0 equal the defaults. n.odgenes=3e3 on line 62 (pagoda2, per-dataset overdispersed genes) and n.odgenes=5e3 on line 64 (conos, per-pair alignment) are different parameters. runConos() reads the global variable num (line 48) instead of using its path_list argument, and lines 49-51 read the third input with a different h5 layout (h5_to_matrix2), so the function depends on the script's top-level context.",
   "upstream_url": "https://github.com/kharchenkolab/conos/blob/main/R/conclass.R"
  },
  {
@@ -584,7 +584,7 @@
     "name": "lr"
    },
    {
-    "effect": "whether an adversarial classifier is trained to mix the modalities in latent space",
+    "effect": "whether an adversarial discriminator is trained to mix the modalities in latent space",
     "library_default": "True",
     "name": "adversarial_mixing"
    }
@@ -653,7 +653,7 @@
    }
   ],
   "method": "Portal",
-  "notes": "main_Portal.py is described; main_Portal_classification.py is the classification variant. The only literal hyperparameters are on line 53 and both differ from the library defaults: training_steps 3000 (default 2000) and lambdacos 10.0 (default 20.0). model.preprocess (line 54) does not pass hvg_num, so 4000 applies; n_latent=20, npcs=30, batch_size=500 and seed=1234 come from Model.__init__. The vendored tools_scripts/Portal/portal/model.py also fixes lambdaAE=10.0, lambdaLA=10.0, lambdaGAN=1.0, margin=5.0 (lines 34-37) and Adam lr=0.001 (lines 268 and 270), none of which the library exposes as arguments. Model's model_path, data_path and result_path default to the relative directories models, data and results, so their location depends on the working directory.",
+  "notes": "main_Portal.py is described. The only literal hyperparameters are on line 53 and both differ from the library defaults: training_steps 3000 (default 2000) and lambdacos 10.0 (default 20.0). model.preprocess (line 54) does not pass hvg_num, so 4000 applies; n_latent=20, npcs=30, batch_size=500 and seed=1234 come from Model.__init__. The vendored tools_scripts/Portal/portal/model.py also fixes lambdaAE=10.0, lambdaLA=10.0, lambdaGAN=1.0, margin=5.0 (lines 34-37) and Adam lr=0.001 (lines 268 and 270), none of which the library exposes as arguments. Model's model_path, data_path and result_path default to the relative directories models, data and results, so their location depends on the working directory.",
   "upstream_url": "https://raw.githubusercontent.com/YangLabHKUST/Portal/main/portal/model.py"
  },
  {
@@ -983,7 +983,7 @@
    },
    {
     "evidence": "      dims = 2:30) ",
-    "name": "TransferData dims (expression imputation)",
+    "name": "TransferData dims (RNA expression transfer for the co-embedding)",
     "source": "tools_scripts/Seurat_v3/main_Seurat_v3.Rmd:83",
     "value": "2:30"
    },
@@ -1201,7 +1201,7 @@
    }
   ],
   "method": "StabMap",
-  "notes": "main_StabMap.Rmd is described; main_StabMap_imputation.Rmd is the imputation variant. The file defines run_StabMap(file_paths, save_path, reference) and is meant to be source()d; the example call on lines 14-24 is commented out. reference_list comes from the function's third argument (line 41). plot = FALSE (line 43, library default TRUE) suppresses diagnostic plots only. Feature selection is fixed in tools_scripts/StabMap/util.R, sourced on line 9: RNA features need mean > 0.01 and p.value <= 0.05 from scran::modelGeneVar (line 31), ATAC features need mean > 0.25 and p.value <= 0.05 (line 39), and ADT is normalized with CLR (line 45). maxFeatures = Inf replaces the library default 1000.",
+  "notes": "main_StabMap.Rmd is described. The file defines run_StabMap(file_paths, save_path, reference) and is meant to be source()d; the example call on lines 14-24 is commented out. reference_list comes from the function's third argument (line 41). plot = FALSE (line 43, library default TRUE) suppresses diagnostic plots only. Feature selection is fixed in tools_scripts/StabMap/util.R, sourced on line 9: RNA features need mean > 0.01 and p.value <= 0.05 from scran::modelGeneVar (line 31), ATAC features need mean > 0.25 and p.value <= 0.05 (line 39), and ADT is normalized with CLR (line 45). maxFeatures = Inf replaces the library default 1000.",
   "upstream_url": "https://marionilab.github.io/StabMap/reference/StabMap.html"
  },
  {
@@ -2163,7 +2163,7 @@
     "name": "encoder"
    },
    {
-    "effect": "number of soft cluster/prototype heads in the encoder's classifier branch (Cycle_train_wolabel builds it with clf_out=25 when encoder is None)",
+    "effect": "number of soft cluster/prototype heads in the encoder's softmax cluster-assignment branch (Cycle_train_wolabel builds it with clf_out=25 when encoder is None)",
     "library_default": "10",
     "name": "clf_out (via a caller-supplied scCluster)"
    }
@@ -2250,7 +2250,7 @@
    }
   ],
   "method": "totalVI",
-  "notes": "main_totalVI.py is the joint-embedding script; main_totalVI_imputation.py is the imputation variant. The command line takes only --path1, --path2 and --save_path (lines 15-17). vae.train() (line 78) takes no arguments, so max_epochs, lr, batch_size, early_stopping, train_size and KL warm-up are scvi-tools defaults, as are n_latent=20, n_hidden=256, n_layers_encoder=2, n_layers_decoder=1 and dropout_rate_encoder/decoder=0.2. empirical_protein_background_prior=False departs from the library default, which enables the empirical prior for panels of more than 10 proteins; latent_distribution=\"normal\" equals the default. No preprocessing is done: raw counts go to adata.layers[\"counts\"] (line 68) without feature selection or normalization. main_totalVI_imputation.py fixes more: n_top_genes=4000 (line 128), n_layers_decoder=2 (line 135), batch_size=265 (line 136) and n_samples=25 (line 141), and it exposes --seed. Library defaults are those of the scvi-tools main branch; the version pinned in the method's environment may differ.",
+  "notes": "main_totalVI.py is the joint-embedding script. The command line takes only --path1, --path2 and --save_path (lines 15-17). vae.train() (line 78) takes no arguments, so max_epochs, lr, batch_size, early_stopping, train_size and KL warm-up are scvi-tools defaults, as are n_latent=20, n_hidden=256, n_layers_encoder=2, n_layers_decoder=1 and dropout_rate_encoder/decoder=0.2. empirical_protein_background_prior=False departs from the library default, which enables the empirical prior for panels of more than 10 proteins; latent_distribution=\"normal\" equals the default. No preprocessing is done: raw counts go to adata.layers[\"counts\"] (line 68) without feature selection or normalization. Library defaults are those of the scvi-tools main branch; the version pinned in the method's environment may differ.",
   "upstream_url": "https://raw.githubusercontent.com/scverse/scvi-tools/main/src/scvi/model/_totalvi.py"
  }
 ]

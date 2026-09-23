@@ -79,7 +79,7 @@ methods:
 
   - id: scBridge
     language: python
-    tasks: [clustering, batch, classification]
+    tasks: [clustering, batch]
     atac: gene_activity
     status: verified
     # GPU: main_scBridge.py:42 `ce_weight.cuda()` and :46 `Net(...).cuda()` are
@@ -397,10 +397,10 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Matilda
     language: python
-    tasks: [classification, clustering, dimension_reduction]
+    tasks: [clustering, dimension_reduction]
     atac: gene_activity
     status: verified
-    setup_hint: "Runs through the package driver engine/drivers/run_matilda.py, which uses Matilda's object API (`matilda-sc`, import `matilda`; https://pyanglab.github.io/Matilda/). The upstream main_matilda_train.py only trains and writes no embedding; the driver trains once, then runs dimension reduction + classification in one pass."
+    setup_hint: "Runs through the package driver engine/drivers/run_matilda.py, which uses Matilda's object API (`matilda-sc`, import `matilda`; https://pyanglab.github.io/Matilda/). The upstream main_matilda_train.py only trains and writes no embedding; the driver trains once, then writes the joint embedding in the same pass."
     variants:
       # --- CITE-seq (rna + adt) ---
       - when: {category: vertical, modalities: [rna, adt]}
@@ -554,7 +554,7 @@ methods:
     # caller. Applied by the runner on a host without a GPU.
     cpu_params: {use_cuda: ""}
     language: python
-    tasks: [batch, classification, clustering]
+    tasks: [batch, clustering]
     atac: gene_activity
     status: verified
     variants:
@@ -612,7 +612,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: sciPENN
     language: python
-    tasks: [batch, clustering, dimension_reduction, imputation]
+    tasks: [batch, clustering, dimension_reduction]
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -653,7 +653,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: UnitedNet
     language: python
-    tasks: [clustering, classification]
+    tasks: [clustering]
     # GPU: main_UnitedNet.py:32 hardcodes `device = "cuda:0"` (passed to
     # UnitedNet(..., device=device) at :217, which .to()s the model onto it,
     # src/interface.py:25); the argparse (:15-21) has no device flag.
@@ -861,7 +861,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Seurat_v3
     language: R
-    tasks: [batch, classification, clustering]
+    tasks: [batch, clustering]
     atac: peak
     status: verified
     variants:

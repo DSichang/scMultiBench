@@ -1,4 +1,4 @@
-"""Goal 2, rigorous version: classify the ATAC file each method ACTUALLY receives.
+"""Goal 2, rigorous version: identify the kind of ATAC file each method ACTUALLY receives.
 
 Take 1 judged by role name and produced 5 false positives: it assumed `atac` and
 `atac_gas` mean gene activity because describe_layout says so, but D12/D13's
@@ -24,7 +24,7 @@ MODE_DEPENDENT = {"Seurat_v3", "uniPort", "UINMF"}
 PEAK_RE = re.compile(r"^(chr)?[0-9XYMT]+[:_-]\d+[-_]\d+", re.I)
 
 
-def classify(path):
+def atac_kind(path):
     try:
         with h5py.File(path, "r") as f:
             if "matrix/features" not in f:
@@ -69,7 +69,7 @@ for m in sorted(mtb.list_methods()):
                           if "atac" in r and str(p).endswith(".h5")}
             if not atac_paths:
                 continue
-            got = {r: classify(p) for r, p in atac_paths.items()}
+            got = {r: atac_kind(p) for r, p in atac_paths.items()}
             seen[m] = (want, ds, cat, got)
             break
         if m in seen:

@@ -1085,9 +1085,8 @@ _CATEGORY_HELP = ("integration category: vertical (several modalities measured i
                   "cells, no pairing), mosaic (several batches, only some share a "
                   "modality) or cross (several batches with all modalities; batch-effect "
                   "removal)")
-_TASK_HELP = ("task within the category: clustering (default), batch, "
-              "dimension_reduction, classification, imputation "
-              "(mtb.list_tasks())")
+_TASK_HELP = ("task within the category: clustering (default), batch or "
+              "dimension_reduction (mtb.list_tasks())")
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
 _FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "

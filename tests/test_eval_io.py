@@ -52,9 +52,9 @@ def test_evaluate_rejects_non_scib():
     import pytest
     from multibench.eval import pipeline
     with pytest.raises(ValueError) as exc:
-        pipeline.evaluate(output="x.h5", category="mosaic", metrics="imputation",
+        pipeline.evaluate(output="x.h5", category="mosaic", metrics="dimension_reduction",
                           labels="c.csv")
-    assert "imputation" in str(exc.value) and "METRIC FAMILY" in str(exc.value)
+    assert "dimension_reduction" in str(exc.value) and "METRIC FAMILY" in str(exc.value)
 
 
 def test_evaluate_requires_labels_and_clustering(tmp_path):

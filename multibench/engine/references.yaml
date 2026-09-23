@@ -69,7 +69,7 @@ scBridge:
 totalVI:
   repo_url: https://docs.scvi-tools.org/en/stable/tutorials/notebooks/multimodal/totalVI.html
   version: "1.1.2"
-  summary: "Joint probabilistic model of CITE-seq RNA + protein counts (scvi-tools); yields a joint latent space and protein imputation; no labels needed."
+  summary: "Joint probabilistic model of CITE-seq RNA + protein counts (scvi-tools); yields a joint latent space and denoised protein values; no labels needed."
   reference:
     doi: 10.1038/s41592-020-01050-x
     title: Joint probabilistic modeling of single-cell multi-omic data with totalVI
@@ -102,7 +102,7 @@ Cobolt:
 scMVP:
   repo_url: https://github.com/bm2-lab/scMVP
   version: "fc61e4d"
-  summary: "Multi-view deep generative model for paired scRNA + scATAC (peaks) with attention-based cross-modal imputation; vertical integration."
+  summary: "Multi-view deep generative model for paired scRNA + scATAC (peaks) with a cross-modal attention mechanism; vertical integration."
   reference:
     doi: 10.1186/s13059-021-02595-6
     title: A deep generative model for multi-view profiling of single-cell RNA-seq and ATAC-seq data
@@ -179,7 +179,7 @@ Concerto:
 Matilda:
   repo_url: https://github.com/PYangLab/Matilda
   version: "7d71480"
-  summary: "Multi-task VAE for CITE-seq / SHARE-seq / TEA-seq: one latent space serves classification, dimension reduction and feature selection; supervised - needs labels."
+  summary: "Multi-task VAE for CITE-seq / SHARE-seq / TEA-seq: one latent space serves dimension reduction and feature selection; supervised - needs labels."
   reference:
     doi: 10.1093/nar/gkad157
     title: Multi-task learning from multimodal single-cell omics with Matilda
@@ -277,7 +277,7 @@ MultiMAP:
 sciPENN:
   repo_url: https://github.com/jlakkis/sciPENN
   version: "1.0.0"
-  summary: "Deep learning for CITE-seq / scRNA-seq integration with surface-protein prediction and imputation; vertical and cross integration."
+  summary: "Deep learning for CITE-seq / scRNA-seq integration with surface-protein prediction; vertical and cross integration."
   reference:
     doi: 10.1038/s42256-022-00545-w
     title: A multi-use deep learning method for CITE-seq and single-cell RNA-seq data integration with cell surface protein prediction and imputation
