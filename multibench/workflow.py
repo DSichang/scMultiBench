@@ -926,8 +926,8 @@ def scan(dataset: str, category: str | None = None, *,
       unconditionally (``method_info(m)['requires_gpu']``), ``env_ok`` also
       needs an NVIDIA GPU (``mtb.env.host_has_gpu()``); without one,
       ``env_reason`` carries the sentence ``run`` would raise (``"<method>
-      needs an NVIDIA GPU: the upstream script calls CUDA unconditionally
-      (<file>:<line>) ..."``).
+      needs an NVIDIA GPU; this computer has none. See ..."``); the
+      ``file:line`` evidence is in ``method_info(m)['gpu_evidence']``.
     - ``assume_gpu=True`` (``multibench scan --assume-gpu``) skips that GPU
       test, for a check on a login node before a GPU-node job. The row's
       ``caveat`` then says ``assumes the job runs on a GPU node``, and

@@ -860,8 +860,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     params, applied = cpu_params_for(spec, params)
 
     # A script that calls CUDA unconditionally cannot finish on a GPU-less
-    # host: refuse here, with the file:line, instead of leaving the user a
-    # "Torch not compiled with CUDA enabled" traceback minutes later.
+    # host: refuse here, pointing at method_info, instead of leaving the
+    # user a "Torch not compiled with CUDA enabled" traceback minutes later.
     check_gpu_requirement(spec)
     if applied:
         print(f"[run] no GPU on this host: applying {method} cpu_params {applied}",

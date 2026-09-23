@@ -108,6 +108,15 @@ def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypa
     assert "tools_scripts" not in row["reason"] and "method_info(" not in row["reason"]
 
 
+def test_scan_notes_quote_the_gpu_refusal_run_raises():
+    """scan's Notes quote the env_reason of a GPU-only row; after M20 that is
+    the one plain sentence, not the old CUDA/file:line text."""
+    notes = " ".join(inspect.getdoc(W.scan).split())
+    lead = registry.get("moETM").requires_gpu_reason.split(";")[0].replace("moETM", "<method>")
+    assert f'{lead}; this computer has none.' in notes
+    assert "calls CUDA unconditionally (<file>:<line>)" not in notes
+
+
 def test_moetm_gpu_evidence_names_both_scripts():
     ev = mtb.method_info("moETM")["gpu_evidence"]
     assert "tools_scripts/moETM/main_moETM_rna_adt.py:109" in ev
