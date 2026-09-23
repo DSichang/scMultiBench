@@ -18,28 +18,86 @@ _ROLE_FILE_CANDIDATES = {
     "atac_gas": ("atac_gas", "atac"),    # ATAC gene-activity score
     "atac_peak": ("atac_peak", "peak"),  # raw ATAC peaks
 }
+# Numbered (per-batch) roles: ``atac<i>`` also reads ``atac_peak<i>.h5``, the
+# name 0.3.1's export_dataset wrote for mosaic (every mosaic method reads peaks).
+_NUMBERED_ROLE_RE = re.compile(r"^(rna|adt|atac)(\d+)$")
+_NUMBERED_FILE_CANDIDATES = {"atac": ("atac", "atac_peak")}
+
+
+def _role_stems(role: str) -> tuple[tuple[str, ...], bool]:
+    """``(file stems to try, numbered)`` for a role.
+
+    ``atac2`` -> ``(('atac2', 'atac_peak2'), True)``; ``atac_gas`` ->
+    ``(('atac_gas', 'atac'), False)``; ``cty1`` -> ``(('cty1',), True)``.
+    A numbered role never tries another batch number.
+    """
+    m = _NUMBERED_ROLE_RE.match(role)
+    if m:
+        base, digits = m.groups()
+        return tuple(f"{b}{digits}" for b in _NUMBERED_FILE_CANDIDATES.get(base, (base,))), True
+    return _ROLE_FILE_CANDIDATES.get(role, (role,)), role[-1:].isdigit()
 
 
 def _resolve_role(ds_dir: Path, role: str) -> Path:
     """Pick the real on-disk file for a modality role in a flat dataset dir.
 
-    Tries the role token and known aliases. Label roles (anything matching
-    ``cty`` or ``label``) try ``.csv`` before ``.h5`` since cell-type files
-    are CSV; each extension is tried as ``<base><ext>`` then ``<base>1<ext>``
-    (some datasets number their files per batch). Returns the canonical
-    ``<base>.h5`` (``.csv`` for label roles) when nothing matches.
+    Tries the role token and known aliases (:func:`_role_stems`). Label
+    roles (anything matching ``cty`` or ``label``) try ``.csv`` before
+    ``.h5`` since cell-type files are CSV. An unnumbered role also takes
+    ``<base>1<ext>`` when the folder holds that one numbered file only: with
+    ``<base>2<ext>`` present the folder is per batch, and the role stays
+    unresolved. Returns the canonical ``<base>.h5`` (``.csv`` for label
+    roles) when nothing matches.
     """
     is_label = ("cty" in role) or ("label" in role)
-    bases = _ROLE_FILE_CANDIDATES.get(role, (role,))
+    stems, numbered = _role_stems(role)
     exts = (".csv", ".h5") if is_label else (".h5",)
-    for base in bases:
+    for stem in stems:
         for ext in exts:
-            for suffix in (ext, f"1{ext}"):
-                p = ds_dir / f"{base}{suffix}"
-                if p.exists():
-                    return p
+            p = ds_dir / f"{stem}{ext}"
+            if p.exists():
+                return p
+            if numbered:
+                continue
+            p1 = ds_dir / f"{stem}1{ext}"
+            if p1.exists() and not (ds_dir / f"{stem}2{ext}").exists():
+                return p1
     fallback_ext = ".csv" if is_label else ".h5"
-    return ds_dir / f"{bases[0]}{fallback_ext}"
+    return ds_dir / f"{stems[0]}{fallback_ext}"
+
+
+def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
+    """What to do instead of per-batch files for a vertical / diagonal folder."""
+    return (f"{category} methods read one {stem}.h5: export without batch= and pass "
+            f"the batch column to evaluate(batch=...)"
+            + (", or use category='cross' (RNA+ADT)" if has_adt else ""))
+
+
+#: modality file stems whose numbered copies (rna1.h5, rna2.h5) mark a per-batch folder
+_PER_BATCH_STEMS = ("rna", "adt", "atac", "atac_peak", "atac_gas")
+
+
+def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | None:
+    """Hint for a vertical / diagonal folder that holds per-batch files.
+
+    Fires when, for one of ``stems`` (default: the modality stems),
+    ``<stem>1.h5`` and ``<stem>2.h5`` exist but ``<stem>.h5`` does not - what
+    ``export_dataset(batch=...)`` writes. ``None`` otherwise.
+    """
+    if category not in ("vertical", "diagonal") or not Path(ds_dir).is_dir():
+        return None
+    ds_dir = Path(ds_dir)
+    numbered = [b for b in _PER_BATCH_STEMS
+                if (ds_dir / f"{b}1.h5").is_file() and (ds_dir / f"{b}2.h5").is_file()
+                and not (ds_dir / f"{b}.h5").is_file()]
+    hit = [b for b in numbered if stems is None or b in stems]
+    if not hit:
+        return None
+    ex = hit[0]
+    return (f"this folder holds per-batch files ({ex}1.h5, {ex}2.h5, ...); "
+            + _one_file_advice(category, stem=ex,
+                               has_adt="adt" in numbered
+                               and not any(b.startswith("atac") for b in numbered)))
 
 
 def _resolve_data_dir(ds_dir: Path) -> str:
@@ -185,9 +243,8 @@ def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
         return name
     warnings.warn(
         f"dataset {name!r} is not a folder under {base}, but {same[0]!r} is - using "
-        f"that on-disk spelling (this filesystem matched the two case-insensitively; "
-        f"frames, out_dir names and saved records carry {same[0]!r} so they line up "
-        f"with the stored results and with Linux, where {name!r} would not exist)",
+        f"that on-disk spelling (this file system ignores letter case; Linux does "
+        f"not, and results, out_dir names and records carry {same[0]!r})",
         UserWarning, stacklevel=stacklevel)
     return same[0]
 
@@ -231,7 +288,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
                check: bool | None = False) -> dict:
     """Return the input files a method reads from a dataset folder, by role.
 
-    Paths are ABSOLUTE, ready for ``mtb.run(inputs=...)``. Pass
+    Paths are absolute, ready for ``mtb.run(inputs=...)``. Pass
     ``check=True`` to verify the files before a long run.
 
     Parameters
@@ -320,18 +377,28 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
     **File resolution.** The dataset tree is flat
     (``<data_path>/<dataset>/<file>``). Each role resolves to the file present
-    in the folder: the role token, or a known alias (``atac_peak`` ->
-    ``peak.h5``, ``atac_gas`` -> ``atac.h5``), also numbered (``<name>1.h5``).
-    Label roles look for ``.csv`` first. When nothing matches, the role falls
-    back to ``<role>.h5`` (``<role>.csv`` for a label role), a path that does
-    not exist (see ``check``).
+    in the folder: the role token or a known alias. Label roles look for
+    ``.csv`` first. When nothing matches, the role falls back to ``<role>.h5``
+    (``<role>.csv`` for a label role), a path that does not exist (see
+    ``check``).
+
+    ATAC files: vertical methods read ``atac.h5``; ``method_info(m)['atac']``
+    says whether it must hold peaks or gene activity. Diagonal methods read
+    ``atac_peak.h5`` (peaks) and ``atac_gas.h5`` (gene activity). Mosaic
+    methods read ``atac<i>.h5`` (peaks). ``peak.h5``, and ``atac.h5`` for gene
+    activity, are accepted as older names, and so is ``atac_peak<i>.h5``.
+
+    Numbered files: an unnumbered role (``rna``) also takes ``rna1.h5`` when
+    the folder holds no ``rna2.h5``. A folder with ``rna1.h5`` and
+    ``rna2.h5`` is per batch: vertical and diagonal roles stay unresolved,
+    and the error says to export without ``batch=``.
 
     A ``data_dir`` role (scBridge) resolves to the first of
     ``<dataset>/processed/`` and the dataset folder that holds a ``.h5ad``
     file; when neither does, to ``processed/`` if that folder exists, else to
     the dataset folder itself.
 
-    **Absolute paths.** Every returned path is ABSOLUTE (a relative
+    **Absolute paths.** Every returned path is absolute (a relative
     ``data_path`` is resolved against the current directory), and a
     ``data_dir`` value ends with the path separator. ``mtb.run`` executes the
     method with ``cwd=out_dir``, where a relative path would point at the
@@ -345,7 +412,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
       preflight below.
 
     The missing-file error or warning names an ATAC-family sibling that is
-    present, e.g. ``atac_peak.h5`` when a vertical variant reads ``atac.h5``.
+    present, e.g. ``atac_peak.h5`` when a vertical variant reads ``atac.h5``,
+    and says when the folder holds per-batch files.
 
     **Content preflight** (``check=True``). The same checks ``mtb.scan``
     reports per row as ``files_ok`` / ``files_reason``:
@@ -354,8 +422,9 @@ def inputs_for(dataset: str, category: str, method: str, *,
       features;
     - label length: ``ValueError`` when a label CSV has a different number of
       rows than the modality file it labels, including the numbered
-      ``cty<i>.csv`` of a cross/mosaic batch (no method takes it as an input
-      role, but every evaluation reads it);
+      ``cty<i>.csv`` of a cross/mosaic batch and the diagonal ``rna_cty.csv``
+      / ``atac_cty.csv`` (read by every evaluation, even when the method
+      does not take them);
     - ``data_dir`` content: ``FileNotFoundError`` when a file scBridge names
       inside ``data_dir`` (``rna.h5``, ``atac_gas.h5``, the two label CSVs) is
       absent.
@@ -389,6 +458,10 @@ def inputs_for(dataset: str, category: str, method: str, *,
     out = _resolve_variant_inputs(variant, ds_dir, method)
     missing = {r: p for r, p in out.items() if not Path(p).exists()}
     near = _near_miss_hints(ds_dir, missing, category)
+    batch_hint = _per_batch_hint(
+        ds_dir, category, {st for r in missing for st in _role_stems(r)[0]})
+    if batch_hint:
+        near.append(batch_hint)
     if check:
         if missing:
             raise FileNotFoundError(
@@ -423,13 +496,13 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
     """For each missing ATAC-family role, name the sibling file that is there.
 
     The ``atac`` role reads ``atac.h5``; ``atac_gas`` reads ``atac_gas.h5``
-    (falling back to ``atac.h5``) and ``atac_peak`` reads ``atac_peak.h5``
-    (falling back to ``peak.h5``). A folder exported for the other layout
-    would otherwise fail with a bare "atac.h5 not found" although
-    ``atac_peak.h5`` sits next to it. Return one hint per such role, e.g.
-    ``"atac.h5 not found; found atac_peak.h5 - vertical methods read atac.h5
-    (pass the representation this method wants: see method_info(m)['atac'])"``;
-    nothing for roles that are not ATAC or have no sibling.
+    (falling back to ``atac.h5``), ``atac_peak`` reads ``atac_peak.h5``
+    (falling back to ``peak.h5``) and a numbered ``atac<i>`` reads
+    ``atac<i>.h5`` or ``atac_peak<i>.h5``. Return one hint per such role,
+    e.g. ``"atac.h5 not found; found atac_peak.h5 - vertical methods read
+    atac.h5 (pass the representation this method wants: see
+    method_info(m)['atac'])"``; nothing for roles that are not ATAC or have
+    no sibling.
     """
     hints: list[str] = []
     if not ds_dir.is_dir():
@@ -437,18 +510,20 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str) -> list[str]:
     for role in missing:
         if base_modality(role) != "atac" or is_label_role(role):
             continue
-        bases = _ROLE_FILE_CANDIDATES.get(role, (role,))
-        digits = role[len(base_modality(role)):] if role[-1:].isdigit() else ""
-        accepted = [f"{b}{digits}.h5" for b in bases]
+        stems, _ = _role_stems(role)
+        m = _NUMBERED_ROLE_RE.match(role)
+        digits = m.group(2) if m else ""
+        accepted = [f"{st}.h5" for st in stems]
         found = sorted(f"{b}{digits}.h5" for b in _ATAC_FILE_BASES
                        if f"{b}{digits}.h5" not in accepted
                        and (ds_dir / f"{b}{digits}.h5").is_file())
         if not found:
             continue
+        why = ("every mosaic method reads peaks" if m else
+               "pass the representation this method wants: see method_info(m)['atac']")
         hints.append(
             f"{accepted[0]} not found; found {', '.join(found)} - {category} methods "
-            f"read {' or '.join(accepted)} (pass the representation this method "
-            f"wants: see method_info(m)['atac'])")
+            f"read {' or '.join(accepted)} ({why})")
     return hints
 
 
@@ -621,6 +696,8 @@ def _check_label_lengths(method, dataset, category, resolved):
                 f"{q.name} has {n_cell} cells (matrix/barcodes) - batch {batch}: "
                 f"every cell of a batch needs exactly one label in cty{batch}.csv, "
                 f"in the same order as the cells (see mtb.describe_layout({category!r}))")
+    if category == "diagonal":
+        _check_diagonal_label_files(method, dataset, resolved)
     for role, path in resolved.items():
         if not is_label_role(role):
             continue
@@ -648,6 +725,38 @@ def _check_label_lengths(method, dataset, category, resolved):
                     f"(see mtb.describe_layout({category!r}))")
 
 
+def _check_diagonal_label_files(method, dataset, resolved):
+    """Diagonal: ``rna_cty.csv`` / ``atac_cty.csv`` next to the modality files
+    must have one row per cell of ``rna.h5`` / the ATAC file, also when the
+    variant does not read them (every evaluation does)."""
+    for role, path in resolved.items():
+        if is_label_role(role) or role == "data_dir" or role[-1:].isdigit():
+            continue
+        base = base_modality(role)
+        if base not in ("rna", "atac"):
+            continue
+        label_role = f"{base}_cty"
+        if label_role in resolved:          # an input role: the caller checks it
+            continue
+        q = Path(path)
+        lab = q.parent / f"{label_role}.csv"
+        if q.suffix != ".h5" or not q.is_file() or not lab.is_file():
+            continue
+        n_lab = _count_label_rows(str(lab), lab.stat().st_mtime_ns)
+        sniff = _sniff_h5(str(q), q.stat().st_mtime_ns)
+        if n_lab is None or sniff is None:
+            continue
+        shape, n_feat, n_cell = sniff
+        if n_feat == n_cell:
+            continue
+        if n_lab != n_cell:
+            raise ValueError(
+                f"{method}/{dataset}/diagonal: {lab.name} has {n_lab} labels but "
+                f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
+                f"exactly one label, in the same order as the cells "
+                f"(see mtb.describe_layout('diagonal'))")
+
+
 def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
     """Does a ``data_dir`` really hold what the method needs? -> (ok, why).
 
@@ -667,14 +776,58 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
 
 
 #: Caveat text appended by scan() when an ``atac_gas`` role resolves to a peak matrix.
-PEAK_IN_GAS_CAVEAT = "atac_gas resolved to a PEAK matrix (features look like chr:start-end)"
+PEAK_IN_GAS_CAVEAT = "atac_gas resolved to a peak matrix (features look like chr:start-end)"
 #: ``.format(role=...)`` templates of the two representation-mismatch caveats
 #: reported when the method's wanted ATAC representation is known
 #: (``_preflight_caveats(resolved, atac=method_info(m)['atac'])``).
-PEAK_FED_TO_GAS_CAVEAT = ("{role} resolved to a PEAK matrix (features look like "
-                          "chr:start-end); this method expects GENE ACTIVITY")
+PEAK_FED_TO_GAS_CAVEAT = ("{role} resolved to a peak matrix (features look like "
+                          "chr:start-end); this method expects gene activity")
 GAS_FED_TO_PEAK_CAVEAT = ("{role} resolved to a matrix whose features do not look "
-                          "like peaks (chr:start-end); this method expects PEAKS")
+                          "like peaks (chr:start-end); this method expects peaks")
+#: ``.format(file=...)`` caveat for a modality file whose sampled values are not
+#: whole numbers (log-normalised data).
+NOT_COUNTS_CAVEAT = "{file} holds non-integer values; methods expect raw counts"
+#: Caveat for a diagonal folder whose only label file is ``cty.csv``.
+DIAGONAL_CTY_CAVEAT = ("label files: cty.csv found; diagonal needs rna_cty.csv "
+                       "and atac_cty.csv")
+# file stems (batch digits allowed) whose values must be raw counts
+_COUNT_FILE_RE = re.compile(r"^(rna|adt|atac_peak)\d*$")
+
+
+@functools.lru_cache(maxsize=512)
+def _h5_has_fraction(path: str, mtime_ns: int) -> bool | None:
+    """Raw-count check of a canonical .h5 (cached by mtime): ``True`` when a
+    sample of up to 5,000 stored non-zero values holds a non-whole number,
+    ``None`` when the file cannot be read. Reads a few chunks only."""
+    import h5py
+    import numpy as np
+
+    from .ingest import _COUNT_SAMPLE, _has_fraction
+
+    try:
+        with h5py.File(path, "r") as f:
+            if "matrix/data" not in f:
+                return None
+            d = f["matrix/data"]
+            if d.ndim != 2 or 0 in d.shape:
+                return None
+            if d.dtype.kind != "f":
+                return False
+            n_r, n_c = d.shape
+            cr, cc = d.chunks or (max(1, min(n_r, 200_000 // n_c)), n_c)
+            vals, got = [], 0
+            for r, c in zip(np.linspace(0, n_r - 1, 4).astype(int),
+                            np.linspace(0, n_c - 1, 4).astype(int)):
+                r0, c0 = (r // cr) * cr, (c // cc) * cc
+                x = np.asarray(d[r0:r0 + cr, c0:c0 + cc]).ravel()
+                x = x[x != 0]
+                vals.append(x)
+                got += x.size
+                if got >= _COUNT_SAMPLE:
+                    break
+            return _has_fraction(np.concatenate(vals))
+    except (OSError, KeyError, ValueError):
+        return None
 
 
 def _peak_fraction_of(path: Path) -> float | None:
@@ -690,16 +843,17 @@ def _peak_fraction_of(path: Path) -> float | None:
     return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
 
 
-def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
+def _preflight_caveats(resolved, *, atac: str | None = None,
+                       category: str | None = None) -> list[str]:
     """Non-fatal content observations about resolved inputs (never raises).
 
-    Without ``atac`` (wanted representation unknown) one check runs: when the
-    ``atac_gas`` role fell back to ``atac.h5`` (no ``atac_gas.h5`` present) and
-    >= 90% of the first 50 feature names look like peaks (``chr1:1-200`` /
-    ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`. Without the wanted
-    representation this would also flag the methods that expect peaks behind
-    the ``atac_gas`` role name (``atac: peak`` in the registry), so
-    :func:`multibench.scan` always passes ``atac=``.
+    Without ``atac`` (wanted representation unknown) one ATAC check runs: when
+    the ``atac_gas`` role fell back to ``atac.h5`` (no ``atac_gas.h5``
+    present) and >= 90% of the first 50 feature names look like peaks
+    (``chr1:1-200`` / ``chr1_1_200``), report :data:`PEAK_IN_GAS_CAVEAT`.
+    Without the wanted representation this would also flag the methods that
+    expect peaks behind the ``atac_gas`` role name (``atac: peak`` in the
+    registry), so :func:`multibench.scan` always passes ``atac=``.
 
     With ``atac=`` - the representation the method expects,
     ``method_info(m)['atac']`` (``'peak'`` / ``'gene_activity'``) - every
@@ -714,8 +868,12 @@ def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
       role resolved to a real gene-activity ``atac_gas.h5``).
 
     The 10-90% band (mixed names) yields no caveat. The wrong representation
-    runs to completion and returns a plausible but wrong embedding, which is
-    why these are surfaced at scan time.
+    runs to completion and returns a wrong embedding.
+
+    Always: a ``rna*.h5`` / ``adt*.h5`` / ``atac_peak*.h5`` whose sampled
+    values are not whole numbers -> :data:`NOT_COUNTS_CAVEAT`. With
+    ``category='diagonal'``: a folder whose only label file is ``cty.csv``
+    -> :data:`DIAGONAL_CTY_CAVEAT`.
     """
     out: list[str] = []
     if atac is None:
@@ -724,17 +882,34 @@ def _preflight_caveats(resolved, *, atac: str | None = None) -> list[str]:
             frac = _peak_fraction_of(p)
             if frac is not None and frac >= 0.9:
                 out.append(PEAK_IN_GAS_CAVEAT)
-        return out
+    else:
+        for role, path in resolved.items():
+            if is_label_role(role) or base_modality(role) != "atac":
+                continue
+            frac = _peak_fraction_of(Path(path))
+            if frac is None:
+                continue
+            if atac == "gene_activity" and frac >= 0.9:
+                out.append(PEAK_FED_TO_GAS_CAVEAT.format(role=role))
+            elif atac == "peak" and frac <= 0.1:
+                out.append(GAS_FED_TO_PEAK_CAVEAT.format(role=role))
+    seen = set()
     for role, path in resolved.items():
-        if is_label_role(role) or base_modality(role) != "atac":
+        p = Path(path)
+        if is_label_role(role) or role == "data_dir" or p in seen:
             continue
-        frac = _peak_fraction_of(Path(path))
-        if frac is None:
+        seen.add(p)
+        if p.suffix != ".h5" or not _COUNT_FILE_RE.match(p.stem) or not p.is_file():
             continue
-        if atac == "gene_activity" and frac >= 0.9:
-            out.append(PEAK_FED_TO_GAS_CAVEAT.format(role=role))
-        elif atac == "peak" and frac <= 0.1:
-            out.append(GAS_FED_TO_PEAK_CAVEAT.format(role=role))
+        if _h5_has_fraction(str(p), p.stat().st_mtime_ns):
+            out.append(NOT_COUNTS_CAVEAT.format(file=p.name))
+    if category == "diagonal" and resolved:
+        ds_dir = next((Path(v) if k == "data_dir" else Path(v).parent
+                       for k, v in resolved.items()), None)
+        if ds_dir is not None and (ds_dir / "cty.csv").is_file() \
+                and not (ds_dir / "rna_cty.csv").is_file() \
+                and not (ds_dir / "atac_cty.csv").is_file():
+            out.append(DIAGONAL_CTY_CAVEAT)
     return out
 
 
@@ -805,7 +980,8 @@ class LabelFiles(dict):
 
 def labels_for(dataset: str, category: str | None = None, method: str | None = None,
                *, modalities: list[str] | set[str] | None = None,
-               data_path: Path | str | None = None) -> dict:
+               data_path: Path | str | None = None,
+               check: bool | None = None) -> dict:
     """Return a dataset's cell-type label files, in cell-stacking order.
 
     Hand the dict to ``mtb.evaluate(labels=...)`` as is; it matches an
@@ -829,6 +1005,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
+    check : bool | None
+        Vertical or diagonal ``category`` on a per-batch folder: ``None``
+        warns, ``True`` raises, ``False`` = no check.
 
     Returns
     -------
@@ -843,7 +1022,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     FileNotFoundError
         ``<data_path>/<dataset>`` does not exist.
     ValueError
-        Unknown ``category``; the message lists the valid ones.
+        Unknown ``category``; or ``check=True`` and a per-batch folder for vertical / diagonal.
     KeyError
         Unknown ``method``, or it has no variant for ``category``.
 
@@ -851,6 +1030,8 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     -----
     UserWarning
         ``dataset`` matches a folder only up to letter case.
+    UserWarning
+        ``check=None`` and a per-batch folder for a vertical or diagonal ``category``.
 
     Examples
     --------
@@ -872,10 +1053,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     dataset only, never on ``category`` or ``method``.
 
     **Default order.** Without ``category`` and ``method``, the order is
-    NOT alphabetical:
+    not alphabetical:
 
     1. ``cty`` (one file, cells already paired) first;
-    2. numbered ``cty1, cty2, ..., cty10``, ascending NUMERICALLY (batch
+    2. numbered ``cty1, cty2, ..., cty10``, in numeric order (batch
        order);
     3. modality-named files in the canonical modality order **rna, adt, atac**
        (``peak_cty`` counts as atac) - the diagonal methods other than uniPort
@@ -883,11 +1064,14 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     4. any other ``*cty*`` file, alphabetically, last.
 
     **Per-method order.** With ``category`` and ``method``, each file goes
-    where the cells it labels sit in that variant's output. That is the
-    variant's argument order unless the registry declares another
-    (``output.cell_order`` in ``methods.yaml``): StabMap stacks its reference
-    batch first (``cty3, cty1, cty2`` on ``D52``), uniPort its ATAC cells
-    before its RNA cells.
+    where the cells it labels sit in that variant's output: the order of its
+    inputs, unless the method stacks its cells in another order. uniPort
+    puts its ATAC cells before its RNA cells.
+
+    StabMap uses a fixed reference batch: batch 3 in cross, batch 1 in
+    mosaic (``method_info('StabMap')['supports'][i]['reference_batch']``). It
+    stacks that batch first (``cty3, cty1, cty2`` on ``D52``). Number the
+    donor you want as reference accordingly.
 
     The variant is chosen as ``mtb.inputs_for`` does: by ``modalities=``, else
     the category's only variant or the one whose files the folder holds. If
@@ -905,6 +1089,13 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     **Validation.** ``category`` and ``method`` are validated whenever given:
     ``ValueError`` listing the four categories on a typo, ``KeyError`` with a
     did-you-mean hint for a method. Either one alone changes nothing.
+
+    **Per-batch folders.** A folder written with ``export_dataset(batch=...)``
+    holds ``rna1.h5``, ``rna2.h5`` ... and ``cty1.csv``, ``cty2.csv`` ....
+    Vertical and diagonal methods read one ``rna.h5`` and one label file.
+    With such a ``category``, ``check=None`` warns and ``check=True`` raises.
+    Export without ``batch=`` and pass the batch column to
+    ``mtb.evaluate(batch=...)``.
 
     **Paths and names.** Paths are absolute. A dataset spelling that differs
     from the folder only in case (``'d52'`` for ``D52``) is replaced by the
@@ -935,6 +1126,12 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         raise FileNotFoundError(f"no dataset dir at {ds_dir}")
+    hint = _per_batch_hint(ds_dir, category) if check is not False else None
+    if hint:
+        msg = f"labels_for({dataset!r}, {category!r}): {hint}"
+        if check:
+            raise ValueError(msg)
+        warnings.warn(msg, UserWarning, stacklevel=2)
     files = {p.stem: str(p) for p in ds_dir.glob("*cty*.csv")
              if "scjoint" not in p.name.lower()}
     stems = sorted(files, key=_label_sort_key)

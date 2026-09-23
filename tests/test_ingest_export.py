@@ -120,11 +120,13 @@ def test_export_dataset_atac_kinds(tmp_path):
 
 
 def test_export_dataset_rewrites_existing_atac_link(tmp_path):
-    # re-export into the same folder must not fail on the existing hard link
+    # re-export into the same folder (overwrite=True) must not fail on the
+    # existing hard link
     peaks = ad.AnnData(np.ones((5, 2)))
     peaks.var_names = ["chr1_1_2", "chr1_3_4"]
     for _ in range(2):
-        ingest.export_dataset(peaks, tmp_path / "P", rna=None, atac="X", atac_kind="peak")
+        ingest.export_dataset(peaks, tmp_path / "P", rna=None, atac="X", atac_kind="peak",
+                              overwrite=True)
     assert (tmp_path / "P" / "atac.h5").exists()
 
 
@@ -142,10 +144,10 @@ def test_export_dataset_batch_numbering(tmp_path):
     assert _h5(d / "adt2.h5")[0].shape == (6, 35)
     assert pd.read_csv(d / "cty1.csv")["x"].tolist() == a.obs["ct"].astype(str).tolist()[:25]
     assert len(pd.read_csv(d / "cty2.csv")) == 35
-    # the numbered layout resolves like the shipped D52 (rna1.h5 / cty1.csv)
-    got = _resolve.inputs_for("B", "vertical", "Matilda", modalities=["rna", "adt"],
-                              data_path=tmp_path, check=True)
-    assert got["rna"].endswith("rna1.h5")
+    # the numbered layout resolves like the shipped D52 (rna1.h5 / cty1.csv),
+    # for a cross method (a vertical role no longer reads batch 1 only: L03)
+    got = _resolve.inputs_for("B", "cross", "UINMF", data_path=tmp_path, check=True)
+    assert got["rna1"].endswith("rna1.h5") and got["adt2"].endswith("adt2.h5")
 
 
 def test_export_dataset_cell_count_mismatch(tmp_path):

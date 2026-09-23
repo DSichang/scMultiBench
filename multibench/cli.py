@@ -318,7 +318,7 @@ def _cmd_layout(args) -> int:
     return _EXIT_OK
 
 
-_EXPORT_FLAGS = ("rna", "adt", "atac", "atac_kind", "labels", "batch")
+_EXPORT_FLAGS = ("rna", "adt", "atac", "atac_kind", "labels", "batch", "atac_from")
 
 
 def _rewrite_canonical(src, out, dtype: str) -> bool:
@@ -356,6 +356,15 @@ def _rewrite_canonical(src, out, dtype: str) -> bool:
     return True
 
 
+def _folder_state(folder) -> dict:
+    """``{name: (inode, mtime_ns, size)}`` of the files in ``folder`` ({} if absent)."""
+    d = Path(folder)
+    if not d.is_dir():
+        return {}
+    return {q.name: (st.st_ino, st.st_mtime_ns, st.st_size)
+            for q in d.iterdir() if q.is_file() for st in (q.stat(),)}
+
+
 def _cmd_convert(args) -> int:
     """``multibench convert``: one canonical ``.h5`` (``to_canonical``) or a whole
     dataset folder (``export_dataset``), chosen by the flags given.
@@ -389,17 +398,31 @@ def _cmd_convert(args) -> int:
                          "--batch); put the selector in the flag value instead, "
                          "e.g. --adt obsm:protein")
         if args.rna is None and args.adt is None and args.atac is None \
-                and args.labels is None:
+                and args.labels is None and args.atac_from is None:
             _usage_error(args, "dataset export needs at least one of --rna, "
                          "--adt, --atac, --labels (note: --rna has no default "
                          "on the command line; pass --rna X to export adata.X)")
+        atac = args.atac
+        if args.atac_from is not None:
+            if category != "diagonal":
+                _usage_error(args, "--atac-from is for --category diagonal (RNA and "
+                             "ATAC from different cells)")
+            atac = ingest._select_object(ingest._to_anndata(args.atac_from),
+                                         args.atac or "X", what="atac")
         data = ingest._to_anndata(args.src)
+        before = _folder_state(args.out)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
-                                  atac=args.atac, atac_kind=args.atac_kind,
+                                  atac=atac, atac_kind=args.atac_kind,
                                   labels=args.labels, batch=args.batch,
-                                  dtype=args.dtype, category=category)
-        print(f"wrote dataset folder {p} (files: "
-              f"{', '.join(sorted(q.name for q in Path(p).iterdir()))})")
+                                  dtype=args.dtype, category=category,
+                                  overwrite=args.overwrite)
+        after = _folder_state(p)
+        wrote = sorted(n for n in after if before.get(n) != after[n])
+        kept = sorted(n for n in after if n not in wrote)
+        print(f"wrote dataset folder {p} (files: {', '.join(wrote)})")
+        if kept:
+            print(f"# already in the folder: {', '.join(kept)} (not written by this call)",
+                  file=sys.stderr)
         return _EXIT_OK
     if args.layer is not None and args.obsm is not None:
         _usage_error(args, "--layer and --obsm are mutually exclusive")
@@ -1235,7 +1258,14 @@ def build_parser() -> argparse.ArgumentParser:
                     "atac_gas.h5 is appended). (2) Whole dataset: any of --rna/--adt/"
                     "--atac/--labels/--batch switches to export_dataset, which "
                     "reads SRC (.h5ad or .h5mu) and writes OUT/ as a dataset folder "
-                    "ready for `multibench scan OUT_NAME --data-path <parent>`.")
+                    "ready for `multibench scan OUT_NAME --data-path <parent>`. "
+                    "Give raw counts: the methods normalise the data themselves.",
+        epilog="Genes and peaks in one X (10x Multiome read with gex_only=False): "
+               "multibench convert B.h5ad data/LAB --rna \"X[feature_types=Gene "
+               "Expression]\" --atac \"X[feature_types=Peaks]\" --atac-kind peak "
+               "--labels obs:cell_type --category vertical. Unpaired RNA and ATAC: "
+               "multibench convert rna.h5ad data/LUNG --rna X --atac-from atac.h5ad "
+               "--atac-kind peak --labels obs:cell_type --category diagonal.")
     pc.add_argument("src", help="input: .h5ad, .h5mu (then --mod or mod: selectors), "
                                ".csv/.tsv (cells x features), .loom, or an already "
                                "canonical .h5 (copied to OUT, --dtype honoured; "
@@ -1243,11 +1273,12 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("out", help="output .h5 file (mode 1; or an existing directory - or a "
                                "path ending in / - with --modality) or the dataset "
                                "folder to create (mode 2)")
-    pc.add_argument("--category", help=_CATEGORY_HELP + ". Changes only the ATAC "
-                    "filename: vertical writes atac.h5 (the paired-multiome role) "
-                    "whatever --atac-kind/--modality say; diagonal/mosaic/cross (or "
-                    "no --category) write atac_gas.h5 / atac_peak.h5 (mtb.io.to_canonical "
-                    "/ export_dataset category=)")
+    pc.add_argument("--category", help=_CATEGORY_HELP + ". Sets the ATAC "
+                    "filename: vertical writes atac.h5 whatever --atac-kind/--modality "
+                    "say; diagonal (and cross, or no --category) writes atac_peak.h5 / "
+                    "atac_gas.h5; mosaic writes atac<i>.h5. Diagonal pairs no barcodes "
+                    "and writes the labels as rna_cty.csv / atac_cty.csv "
+                    "(mtb.io.to_canonical / export_dataset category=)")
     pc.add_argument("--modality", help="mode 1: rna | adt | atac | atac_peak | atac_gas "
                                        "(aliases protein, peak, gas/gene_activity); "
                                        "validated, picks the filename when OUT is a "
@@ -1257,20 +1288,30 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--obsm", help="mode 1: take the matrix from adata.obsm[OBSM] "
                                    "(e.g. protein for CITE-seq ADT)")
     pc.add_argument("--mod", help="mode 1: for .h5mu input, the modality to export")
-    pc.add_argument("--rna", help="mode 2: where the RNA matrix lives: X, obsm:<key>, "
-                                  "layer:<key>, mod:<name> (no default - omit to skip RNA)")
+    pc.add_argument("--rna", help="mode 2: where the raw-count RNA matrix lives: X, "
+                                  "obsm:<key>, layer:<key>, mod:<name> (no default - omit "
+                                  "to skip RNA); append [<var column>=<value>] to keep "
+                                  "some features, e.g. \"X[feature_types=Gene Expression]\"")
     pc.add_argument("--adt", help="mode 2: where the ADT/protein matrix lives "
                                   "(same grammar, e.g. obsm:protein)")
-    pc.add_argument("--atac", help="mode 2: where the ATAC matrix lives (same grammar); "
-                                   "requires --atac-kind")
+    pc.add_argument("--atac", help="mode 2: where the ATAC matrix lives (same grammar, "
+                                   "e.g. \"X[feature_types=Peaks]\"); requires --atac-kind")
+    pc.add_argument("--atac-from", dest="atac_from", metavar="PATH",
+                    help="mode 2, --category diagonal: a second .h5ad/.h5mu with the "
+                         "ATAC cells; --atac then selects from it (default X)")
     pc.add_argument("--atac-kind", dest="atac_kind", choices=["peak", "gene_activity"],
-                    help="mode 2: peak -> atac_peak.h5 (+ atac.h5); gene_activity -> "
-                         "atac_gas.h5; with --category vertical both write atac.h5")
-    pc.add_argument("--labels", help="mode 2: cell-type column, obs:<col> (or "
-                                     "mod:<name>.obs:<col>) -> cty.csv")
+                    help="mode 2: peak -> atac_peak.h5 (+ atac.h5 without --category); "
+                         "gene_activity -> atac_gas.h5; --category vertical writes atac.h5 "
+                         "and mosaic atac<i>.h5 for both")
+    pc.add_argument("--labels", help="mode 2: cell-type column, obs:<col> (the MuData's "
+                                     "global obs) or <mod>:<col> -> cty.csv (diagonal: "
+                                     "rna_cty.csv / atac_cty.csv)")
     pc.add_argument("--batch", help="mode 2: batch column (same grammar); cells are "
                                     "split per batch into numbered files rna1.h5, "
-                                    "rna2.h5, cty1.csv ...")
+                                    "rna2.h5, cty1.csv ..., read by mosaic and cross methods")
+    pc.add_argument("--overwrite", action="store_true",
+                    help="mode 2: replace files already in OUT (default: refuse and "
+                         "list them)")
     pc.add_argument("--dtype", default="float64",
                     help="stored dtype of matrix/data (default float64 like the "
                          "shipped files; float32 halves the size)")

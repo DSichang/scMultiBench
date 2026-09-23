@@ -77,8 +77,8 @@ def test_labels_for_follows_the_variants_modality_order_when_method_and_category
 
 def test_labels_for_docstring_documents_the_order():
     doc = inspect.getdoc(resolve.labels_for)
-    assert "NOT alphabetical" in doc and "rna, adt, atac" in doc
-    assert "NUMERICALLY" in doc and "list(labels_for(ds).values())" in doc
+    assert "not alphabetical" in doc and "rna, adt, atac" in doc
+    assert "numeric order" in doc and "list(labels_for(ds).values())" in doc
     assert "evaluate(labels=" in doc and "modalities" in doc
 
 
@@ -96,7 +96,7 @@ def test_gas_fed_to_peak_method_is_flagged(tmp_path):
     assert got["atac_gas"].endswith("atac_gas.h5")
     cav = resolve._preflight_caveats(got, atac="peak")
     assert cav == ["atac_gas resolved to a matrix whose features do not look like peaks "
-                   "(chr:start-end); this method expects PEAKS"]
+                   "(chr:start-end); this method expects peaks"]
     # legacy call (no atac=): today's single check, nothing for this case
     assert resolve._preflight_caveats(got) == []
     # a peak file satisfies a peak method
@@ -113,8 +113,8 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     got = resolve.inputs_for("PK", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
     cav = resolve._preflight_caveats(got, atac="gene_activity")
-    assert cav == ["atac resolved to a PEAK matrix (features look like chr:start-end); "
-                   "this method expects GENE ACTIVITY"]
+    assert cav == ["atac resolved to a peak matrix (features look like chr:start-end); "
+                   "this method expects gene activity"]
     # the legacy atac_gas-role check is unchanged
     _h5(d / "atac.h5", 40, 50, feats=PEAKS)
     got2 = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path)
