@@ -48,10 +48,9 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
 
 
 def load_batch(out_dir, *, methods=None) -> "BatchResult":
-    """Reload a ``BatchResult`` from the folder ``BatchResult.save`` wrote.
+    """Reload a saved ``run_all`` result.
 
-    ``run_all`` saves every sweep, so a finished one can be re-plotted,
-    re-scored or inspected later without re-running any method.
+    Use it to inspect, re-plot or re-score a finished sweep.
 
     Parameters
     ----------
@@ -878,8 +877,7 @@ def scan(dataset: str, category: str | None = None, *,
       needs an NVIDIA GPU: the upstream script calls CUDA unconditionally
       (<file>:<line>) ..."``).
 
-    The file check always runs, whether or not any conda env is installed,
-    so a laptop without envs still tells you whether your layout is right.
+    The file check runs whether or not any conda env is installed.
 
     **Reason columns.** ``reason`` joins the non-empty reasons with ``"; "``
     and is empty only when the row is runnable. It is the short form. A
@@ -1378,9 +1376,8 @@ def _check_save_target(d: Path, dataset: str, category: str) -> None:
 class BatchResult:
     """Outcome of ``mtb.run_all`` - a summary table, a long table and a figure.
 
-    Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. The
-    per-method records are kept, so a finished sweep can be re-scored or
-    re-plotted without re-running any method.
+    Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. It keeps
+    the per-method records; ``rescore`` and ``plot`` work from them.
 
     Parameters
     ----------
@@ -1520,10 +1517,8 @@ class BatchResult:
 
         **Label order.** ``label_order`` is which label file(s), in which
         order, the metrics were computed against (e.g.
-        ``rna_cty.csv+atac_cty.csv``). For unpaired/diagonal data the
-        embedding holds two disjoint cell sets stacked in a method-specific
-        order, so this is the difference between a meaningful ARI and a
-        meaningless one.
+        ``rna_cty.csv+atac_cty.csv``). For diagonal data the embedding stacks
+        two disjoint cell sets in a method-specific order.
 
         **Label-order confidence.** ``label_order_confidence`` is
         ``(best - runner_up) / best`` over the candidate orderings' ARI, on a
@@ -1533,9 +1528,9 @@ class BatchResult:
         comparably well, which should not happen for a correct one; treat
         that row with suspicion.
 
-        **Why a ratio.** The runner-up sits near chance, so a difference is
-        bounded above by the ARI itself and a method scoring 0.3 could never
-        look well-separated.
+        The score is a ratio, not a difference: the runner-up sits near
+        chance, so a difference is bounded above by the ARI itself and a
+        method scoring 0.3 could never look well-separated.
 
         **Optimistic bias.** When more than one ordering is possible the
         reported metrics are those of the ordering with the highest ARI, so
@@ -1629,8 +1624,7 @@ class BatchResult:
     def results(self) -> list:
         """The raw per-method records: status, out_dir, metrics and the orderings tried.
 
-        Keeps a long sweep's outputs addressable, so you can re-score or
-        re-plot without re-running the methods.
+        Each record keeps the method's ``out_dir``, which ``rescore`` reads.
 
         Returns
         -------
@@ -1681,8 +1675,7 @@ class BatchResult:
     def failures(self) -> pd.DataFrame:
         """Methods that failed, timed out or could not be scored.
 
-        ``run_all`` records failures instead of raising, so always check this -
-        a sweep can finish with several methods having failed.
+        ``run_all`` records failures instead of raising. Check this frame.
 
         Returns
         -------
@@ -1782,9 +1775,8 @@ class BatchResult:
                 verbose: bool = False) -> "BatchResult":
         """Re-evaluate the stored outputs with different labels / batch / metrics.
 
-        Nothing is re-run: each record's embedding is read back from its
-        ``out_dir`` and scored again, so an overnight sweep can be re-scored
-        in minutes.
+        Scores the saved outputs again; no method is re-run. Each record's
+        embedding is read back from its ``out_dir``.
 
         Parameters
         ----------
@@ -1921,8 +1913,7 @@ class BatchResult:
         - ``failures.csv`` - the ``failures`` frame.
         - ``batch_result.json`` - dataset, category and the per-method records.
 
-        Reload with ``mtb.load_batch`` to re-score or re-plot later without
-        re-running any method.
+        Reload it with ``mtb.load_batch``.
 
         **Saving into a folder that has a result.** When the folder already
         holds ``batch_result.json`` for the same dataset and category, the
@@ -2232,15 +2223,15 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     Examples
     --------
     >>> import multibench as mtb
-    >>> plan = mtb.run_all("D11", "vertical", dry_run=True)  # free: what would run?
+    >>> plan = mtb.run_all("D11", "vertical", dry_run=True)  # what would run?
     >>> plan[["method", "modalities", "runnable", "reason"]]
     >>> res = mtb.run_all("D11", "vertical", out_dir="out/", timeout=3600)
     >>> res.summary        # one row per method, metrics as columns
-    >>> res.failures       # always check: failures are recorded, not raised
+    >>> res.failures       # failures are recorded, not raised
 
     Notes
     -----
-    **Dry run.** ``dry_run=True`` is free; do it first. It returns the
+    **Dry run.** ``dry_run=True`` runs nothing and returns the
     ``mtb.scan`` frame for the same selection: blocked rows are kept with
     their ``reason``, and ``command`` is rendered for ``out_dir`` (or the
     literal ``'<out_dir>'`` placeholder). Filter ``plan[plan.runnable]`` for
@@ -2257,8 +2248,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     as ``TIMEOUT``, and the sweep moves on; a ``params`` key the variant does
     not accept is a ``FAIL`` too. Check ``res.failures``.
 
-    **Timeout.** Strongly recommended for unattended runs: without a cap a
-    single hanging method blocks everything. Size it from the
+    **Timeout.** Without a cap, one method that hangs stops the whole
+    sweep. Size it from the
     ``runtime_tier`` / ``observed_worst_sec`` columns of ``mtb.scan`` (or
     ``method_info(m)['runtime']``); the slowest methods take more than 4 h.
     The cap covers the run and its scoring; off the main thread it is
@@ -2276,8 +2267,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     time should use one ``out_dir`` each; combine them with
     ``multibench plot --input dir1 --input dir2``.
 
-    **Resuming.** ``skip_existing=True`` skips the hours an interrupted
-    sweep already did. Reuse only checks that the output file exists, not
+    **Resuming.** ``skip_existing=True`` reuses each method's existing
+    output. Reuse only checks that the output file exists, not
     that it is complete: a method killed mid-write leaves a truncated file
     that would be reused as if it had succeeded. After a hard kill, delete
     that method's sub-directory before resuming.
@@ -2343,7 +2334,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     mtb.sweep : one method over a range of one hyperparameter.
 
-    mtb.load_batch : reload a saved sweep without re-running anything.
+    mtb.load_batch : reload a saved sweep.
 
     mtb.run : one method, one variant, with explicit inputs.
     """
@@ -2580,8 +2571,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     **Failed settings.** A setting that fails is not fatal: ``run_all``
     records it, so that value's row appears with ``status`` ``FAIL`` (or
     ``TIMEOUT``) and empty metrics rather than aborting the sweep. Check the
-    ``status`` column before reading the curve - a failed setting and a poor
-    one must not be confused.
+    ``status`` column before reading the curve.
 
     **Untunable methods.** Check ``mtb.params_for`` first: a method whose
     ``tunable`` is empty hardcodes its hyperparameters upstream and cannot be

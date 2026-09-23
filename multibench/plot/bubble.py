@@ -1065,8 +1065,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
       down.
     - ``"mean_overall"`` (bar's default): ``mean over datasets of
       minmax(mean over metrics of within-dataset max-rank)`` - each dataset
-      gets its own min-max-scaled overall, averaged over the datasets the
-      method was run on (absence is skipped, not penalised).
+      gets its own min-max-scaled overall, and these are averaged; a dataset
+      the method lacks is skipped.
 
     **Bubble and bar.** ``mtb.plot.bar`` uses the same formulas and the same
     tie-break (alphabetical within a tie). With ``aggregate="summary"``, the
