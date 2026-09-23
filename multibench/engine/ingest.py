@@ -9,14 +9,13 @@ Entry points (exposed as ``mtb.io``):
   .loom) -> one canonical ``.h5``; sparse-safe, gzip-compressed, with
   ``modality=`` / ``layer=`` / ``obsm=`` / ``mod=`` selectors.
 * :func:`export_dataset` - a whole AnnData/MuData -> a canonical dataset folder
-  (``rna.h5``, ``adt.h5``, ``atac_peak.h5``/``atac_gas.h5``, ``cty.csv``),
-  optionally split per batch (``rna1.h5`` ...). A MuData's modalities can be
-  named directly (``rna='rna'``).
+  (``rna.h5``, ``adt.h5``, the ATAC file, ``cty.csv``), optionally per batch
+  (``rna1.h5`` ...) or as unpaired diagonal data. A MuData's modalities can
+  be named directly (``rna='rna'``).
 * :func:`read_canonical` - the inverse (canonical ``.h5`` -> AnnData).
 * :func:`normalize_peak_names` - rewrite peak ids to ``chr:start-end``.
 
-The single-column ``x`` label CSV the benchmark reads is written by the
-private :func:`_write_labels` (``export_dataset`` calls it per batch).
+Label files are single-column CSVs: a header ``x``, then one label per cell.
 """
 from __future__ import annotations
 
@@ -54,9 +53,81 @@ _ATAC_KINDS = ("peak", "gene_activity")
 #: :func:`to_canonical` warns when ``matrix/data`` (stored dense, features x
 #: cells) would exceed this many bytes uncompressed on disk.
 DENSE_WARN_BYTES = 10 ** 9
-#: ``category=`` values accepted by to_canonical / export_dataset. Only
-#: ``vertical`` changes anything (its ATAC role reads plain ``atac.h5``).
+#: ``category=`` values accepted by to_canonical / export_dataset.
 _CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
+#: Roles whose matrix must hold raw counts. Gene-activity scores (atac_gas)
+#: and the representation-free ``atac`` role are not checked.
+_COUNT_ROLES = ("rna", "adt", "atac_peak")
+#: Stored non-zero values sampled by the raw-count check.
+_COUNT_SAMPLE = 5000
+# '<selector>[<var column>=<value>]': keep the features whose var column equals value
+_VAR_FILTER_RE = re.compile(r"^(?P<base>.*?)\[(?P<col>[^\[\]=]+)=(?P<val>[^\[\]]*)\]$")
+
+
+def _has_fraction(vals) -> bool:
+    """True when a sample of up to ``_COUNT_SAMPLE`` non-zero values of
+    ``vals`` holds a value whose fractional part exceeds 1e-6."""
+    v = np.asarray(vals).ravel()
+    if v.size == 0 or v.dtype.kind != "f":
+        return False                    # integer / bool storage: whole numbers
+    if v.size > 20 * _COUNT_SAMPLE:     # thin out before the non-zero filter
+        v = v[np.linspace(0, v.size - 1, 20 * _COUNT_SAMPLE).astype(int)]
+    v = v[(v != 0) & np.isfinite(v)]
+    if v.size > _COUNT_SAMPLE:
+        v = v[np.linspace(0, v.size - 1, _COUNT_SAMPLE).astype(int)]
+    return bool(np.any(np.abs(v - np.round(v)) > 1e-6))
+
+
+def _matrix_has_fraction(X) -> bool | None:
+    """Raw-count check of an in-memory matrix (cells x features): ``True``
+    when sampled stored values are not whole numbers, ``None`` when ``X``
+    cannot be read."""
+    import scipy.sparse as sp
+    try:
+        if sp.issparse(X):
+            return _has_fraction(X.data if getattr(X, "format", None) in ("csr", "csc", "coo")
+                                 else X.tocsr().data)
+        arr = np.asarray(X)
+        if arr.ndim != 2 or arr.size == 0:
+            return None
+        rows = np.unique(np.linspace(0, arr.shape[0] - 1, min(arr.shape[0], 500)).astype(int))
+        return _has_fraction(arr[rows])
+    except Exception:                   # backed or exotic storage: no verdict
+        return None
+
+
+def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int) -> None:
+    """``UserWarning`` when ``X`` holds non-integer values (log-normalised?)."""
+    if _matrix_has_fraction(X):
+        warnings.warn(
+            f"{name} values are not whole numbers (log-normalised?). The methods "
+            f"normalise raw counts themselves: export raw counts, e.g. {hint}.",
+            UserWarning, stacklevel=stacklevel + 1)
+
+
+def _split_var_filter(spec: str):
+    """``'X[feature_types=Peaks]'`` -> ``('X', ('feature_types', 'Peaks'))``;
+    a selector without a filter -> ``(spec, None)``."""
+    m = _VAR_FILTER_RE.match(spec)
+    if not m:
+        return spec, None
+    return m.group("base"), (m.group("col").strip(), m.group("val").strip())
+
+
+def _filter_var(adata, flt, *, what, spec):
+    """The features of ``adata`` whose ``var[col]`` equals ``value`` (a view)."""
+    col, val = flt
+    if col not in adata.var.columns:
+        raise KeyError(f"{what}={spec!r}: var column {col!r} not found; available: "
+                       f"{list(adata.var.columns)}")
+    vals = adata.var[col].astype(str).to_numpy()
+    mask = vals == val
+    if not mask.any():
+        levels = sorted(set(vals.tolist()))
+        shown = levels[:20] + (["..."] if len(levels) > 20 else [])
+        raise ValueError(f"{what}={spec!r}: no feature has var[{col!r}] == {val!r}; "
+                         f"the values of var[{col!r}] are {shown}")
+    return adata[:, mask]
 
 
 def _check_category(category):
@@ -125,7 +196,7 @@ def _to_anndata(src):
             f"{p} has no dataset 'matrix/data'; found keys {keys} - a canonical "
             f"input .h5 holds matrix/data (features x cells), matrix/features and "
             f"matrix/barcodes"
-            + (" (a top-level 'data' dataset is a method OUTPUT such as "
+            + (" (a top-level 'data' dataset is a method output such as "
                "out/<method>/embedding.h5, which mtb.evaluate reads)" if "data" in keys else "")
             + "; pass an AnnData / .h5ad / .csv to convert instead")
     if suf == ".h5ad":
@@ -243,7 +314,7 @@ def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
     size = int(n_feat) * int(n_cell) * itemsize
     if size > DENSE_WARN_BYTES:
         warnings.warn(
-            f"{out.name}: matrix/data is stored DENSE (features x cells): "
+            f"{out.name}: matrix/data is stored dense (features x cells): "
             f"{n_feat} x {n_cell} x {itemsize} B = {size / 1e9:.1f} GB uncompressed "
             f"on disk (limit for this warning: {DENSE_WARN_BYTES / 1e9:.0f} GB); "
             f"filter to highly-variable genes / informative peaks before export, "
@@ -374,7 +445,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     Warns
     -----
     UserWarning
-        Feature names contradict an ATAC ``modality`` or are missing; a dense matrix over 1 GB.
+        Values not whole numbers; feature names missing or contradicting ``modality``; size over 1 GB.
 
     Examples
     --------
@@ -411,22 +482,32 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     1. ``feature_names``;
     2. the columns, when the ``obsm`` entry is a DataFrame;
     3. ``adata.uns[f'{obsm}_names']``, when its length matches;
-    4. ``feature_0..``, with a ``UserWarning`` (the protein names would be
-       lost in every downstream readout).
+    4. ``feature_0..``, with a ``UserWarning``: pass ``feature_names`` to
+       keep the protein names.
 
-    **ATAC filenames.** Without ``category``, and for ``'diagonal'`` /
-    ``'mosaic'`` / ``'cross'``, the file is named after the representation:
-    ``atac_peak.h5``, ``atac_gas.h5``, or ``atac.h5`` for the plain
-    ``'atac'`` role. ``category='vertical'`` writes ``atac.h5`` whatever the
-    representation, because that is the one name every vertical (paired
-    multiome) variant resolves and none reads ``atac_peak.h5``.
+    **ATAC filenames.** Vertical methods read ``atac.h5``;
+    ``method_info(m)['atac']`` says whether it must hold peaks or gene
+    activity. Diagonal methods read ``atac_peak.h5`` (peaks) and
+    ``atac_gas.h5`` (gene activity). Mosaic methods read ``atac<i>.h5``
+    (peaks). ``peak.h5``, and ``atac.h5`` for gene activity, are accepted as
+    older names.
+
+    With ``out`` a directory, ``category='vertical'`` writes ``atac.h5`` for
+    either representation. Any other ``category``, or none, names the file
+    after the representation: ``atac_peak.h5``, ``atac_gas.h5``, or
+    ``atac.h5`` for the plain ``'atac'`` role. For a mosaic batch, pass the
+    numbered file as ``out`` (``'data/MYMOSAIC/atac2.h5'``).
 
     **Check the ATAC kind.** Without ``category='vertical'``,
-    ``to_canonical(atac, d, modality='peak')`` writes ``atac_peak.h5`` and
+    ``to_canonical(atac, d, modality='peak')`` writes ``atac_peak.h5``, and
     ``mtb.scan(d, 'vertical')`` finds no ATAC method runnable. The
-    representation is recorded NOWHERE on disk: whether a vertical method
-    expects peaks or gene activity in ``atac.h5`` is
-    ``method_info(m)['atac']``.
+    representation is not recorded on disk: ``method_info(m)['atac']`` says
+    which kind a method expects.
+
+    **Raw counts.** Methods normalise the data themselves; give raw counts.
+    For ``modality`` ``'rna'``, ``'adt'`` or ``'atac_peak'``, a
+    ``UserWarning`` says when sampled values are not whole numbers
+    (log-normalised data); ``layer='counts'`` usually holds the counts.
 
     **Streaming.** Sparse matrices (CSR/CSC, in memory or inside an
     ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
@@ -437,9 +518,9 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
 
     **Size on disk.** ``matrix/data`` is stored dense (features x cells x
     itemsize): gzip shrinks the file, but every reader densifies it. A
-    ``UserWarning`` states the size when it exceeds ``DENSE_WARN_BYTES``
-    (1 GB) and suggests filtering features or ``dtype='float32'``, which
-    h5py / rhdf5 / hdf5r read (as double in R).
+    ``UserWarning`` states the size when it exceeds 1 GB and suggests
+    filtering features or ``dtype='float32'``, which h5py / rhdf5 / hdf5r
+    read (as double in R).
 
     **Errors.** ``ValueError`` is raised for:
 
@@ -505,6 +586,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
                             feature_names=feature_names, what=modality)
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
+    if modality in _COUNT_ROLES:
+        _warn_not_counts(X, modality, "layer='counts'", stacklevel=2)
     if getattr(X, "ndim", 0) == 2:
         _warn_dense_size(out, X.shape[1], X.shape[0], dtype)
     return _write_canonical(out, X, feats, bars, dtype=dtype,
@@ -605,15 +688,14 @@ def normalize_peak_names(src, dst):
     is rewritten as ``<chr>:<start>-<end>``.
 
     **Everything else is kept.** Other features (gene symbols, ids without
-    two numbers) pass through unchanged, so the file stays usable whatever
-    the matrix holds. ``matrix/data`` and ``matrix/barcodes`` are copied as
-    they are; only ``matrix/features`` is replaced.
+    two numbers) pass through unchanged. ``matrix/data`` and
+    ``matrix/barcodes`` are copied as they are; only ``matrix/features`` is
+    replaced.
 
-    **Inside ``mtb.run``.** ``mtb.run`` applies this itself for the variants
-    whose registry entry declares ``normalize_peaks`` roles, writing a
-    per-run ``<role>_normpeaks.h5`` copy next to the converted inputs. Call
-    it by hand only to prepare a file for a script you run outside the
-    wrapper.
+    **Inside ``mtb.run``.** ``mtb.run`` applies this itself for the methods
+    that need it, writing a per-run ``<role>_normpeaks.h5`` copy next to the
+    converted inputs. Call it by hand only to prepare a file for a script
+    you run outside the wrapper.
 
     See Also
     --------
@@ -674,13 +756,14 @@ def _select(data, spec, *, what):
 
     Selectors: ``'X'`` | ``'obsm:<key>'`` | ``'layer:<key>'`` |
     ``'mod:<name>'`` (MuData; ``adata.X`` of that modality) |
-    ``'mod:<name>.obsm:<key>'`` / ``'mod:<name>.layer:<key>'``.
+    ``'mod:<name>.obsm:<key>'`` / ``'mod:<name>.layer:<key>'``, each
+    optionally followed by a feature filter ``[<var column>=<value>]``.
     """
     if not isinstance(spec, str) or not spec:
         raise ValueError(f"{what}= must be a selector string like 'X', 'obsm:<key>', "
                          f"'layer:<key>' or 'mod:<name>', got {spec!r}")
+    rest, flt = _split_var_filter(spec)
     adata = data
-    rest = spec
     if rest.startswith("mod:"):
         if not _is_mudata(data):
             raise ValueError(f"{what}={spec!r}: 'mod:<name>' selectors need a MuData "
@@ -694,41 +777,80 @@ def _select(data, spec, *, what):
         raise ValueError(f"{what}={spec!r}: MuData input needs a 'mod:<name>' selector "
                          f"(found mods: {list(data.mod)})")
     if rest == "X":
-        return adata, {}
-    if rest.startswith("obsm:"):
-        return adata, {"obsm": rest[5:]}
-    if rest.startswith("layer:"):
-        return adata, {"layer": rest[6:]}
-    raise ValueError(f"{what}={spec!r}: unknown selector; use 'X', 'obsm:<key>', "
-                     f"'layer:<key>' or 'mod:<name>[.obsm:<key>|.layer:<key>]'")
+        kw = {}
+    elif rest.startswith("obsm:"):
+        kw = {"obsm": rest[5:]}
+    elif rest.startswith("layer:"):
+        kw = {"layer": rest[6:]}
+    else:
+        raise ValueError(f"{what}={spec!r}: unknown selector; use 'X', 'obsm:<key>', "
+                         f"'layer:<key>' or 'mod:<name>[.obsm:<key>|.layer:<key>]', "
+                         f"optionally followed by [<var column>=<value>]")
+    if flt is not None:
+        if "obsm" in kw:
+            raise ValueError(f"{what}={spec!r}: a [<column>=<value>] filter selects "
+                             f"features by adata.var; an obsm matrix has no var")
+        adata = _filter_var(adata, flt, what=what, spec=spec)
+    return adata, kw
+
+
+def _mudata_selector(mdata, spec):
+    """A bare modality name (``'rna'``, ``'rna[feature_types=...]'``) of a
+    MuData -> the full ``'mod:<name>...'`` selector; anything else unchanged."""
+    if not isinstance(spec, str):
+        return spec
+    base, flt = _split_var_filter(spec)
+    if base in mdata.mod:
+        return f"mod:{base}" + (spec[len(base):] if flt else "")
+    return spec
+
+
+def _obs_column(obs, col, *, what, spec, where):
+    if col not in obs.columns:
+        raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched {where}; "
+                       f"available: {list(obs.columns)}")
+    return obs[col]
 
 
 def _select_obs(data, spec, *, what):
-    """Parse an obs-column selector ``'obs:<col>'`` / ``'mod:<name>.obs:<col>'``
-    (also ``'<name>:<col>'`` for MuData) into a pandas Series."""
+    """Parse an obs-column selector into a pandas Series.
+
+    ``'obs:<col>'`` reads ``data.obs`` (a MuData's global ``.obs``);
+    ``'mod:<name>.obs:<col>'`` reads ``mdata[name].obs``; for a MuData,
+    ``'<name>:<col>'`` reads ``mdata[name].obs``, then muon's prefixed copy
+    ``mdata.obs['<name>:<col>']``.
+    """
     if not isinstance(spec, str) or not spec:
         raise ValueError(f"{what}= must be 'obs:<col>' or 'mod:<name>.obs:<col>', got {spec!r}")
-    obj = data
-    rest = spec
-    if rest.startswith("mod:"):
-        if not _is_mudata(data):
+    mu = _is_mudata(data)
+    if spec.startswith("mod:"):
+        if not mu:
             raise ValueError(f"{what}={spec!r}: 'mod:<name>' needs a MuData input")
-        name, _, rest = rest[4:].partition(".")
+        name, _, rest = spec[4:].partition(".")
         if name not in data.mod:
             raise KeyError(f"{what}={spec!r}: mod {name!r} not in MuData; found: {list(data.mod)}")
-        obj = data.mod[name]
-    elif _is_mudata(data) and not rest.startswith("obs:"):
-        # MuData convenience: 'rna:celltype' = mod:rna.obs:celltype
-        name, _, col = rest.partition(":")
+        if not rest.startswith("obs:"):
+            raise ValueError(f"{what}={spec!r}: use 'obs:<col>' (or 'mod:<name>.obs:<col>')")
+        return _obs_column(data.mod[name].obs, rest[4:], what=what, spec=spec,
+                           where=f"mdata[{name!r}].obs")
+    if spec.startswith("obs:"):
+        return _obs_column(data.obs, spec[4:], what=what, spec=spec,
+                           where="mdata.obs" if mu else "data.obs")
+    if mu:
+        name, _, col = spec.partition(":")
         if name in data.mod and col:
-            obj, rest = data.mod[name], f"obs:{col}"
-    if not rest.startswith("obs:"):
-        raise ValueError(f"{what}={spec!r}: use 'obs:<col>' (or 'mod:<name>.obs:<col>')")
-    col = rest[4:]
-    if col not in obj.obs.columns:
-        raise KeyError(f"{what}={spec!r}: column {col!r} not in obs; available: "
-                       f"{list(obj.obs.columns)}")
-    return obj.obs[col]
+            obs = data.mod[name].obs
+            if col in obs.columns:
+                return obs[col]
+            if f"{name}:{col}" in data.obs.columns:
+                return data.obs[f"{name}:{col}"]
+            msg = (f"{what}={spec!r}: column {col!r} not in obs: searched "
+                   f"mdata[{name!r}].obs and mdata.obs[{name + ':' + col!r}]; "
+                   f"mdata[{name!r}].obs has {list(obs.columns)}")
+            if col in data.obs.columns:
+                msg += f". The global mdata.obs has {col!r}: pass {what}='obs:{col}'"
+            raise KeyError(msg)
+    raise ValueError(f"{what}={spec!r}: use 'obs:<col>' (or 'mod:<name>.obs:<col>')")
 
 
 def _link_or_copy(src: Path, dst: Path):
@@ -817,12 +939,15 @@ def _align_cells(a, *, master, master_name, role):
     if unique:
         stray = [x for x in names if x not in set(master)]
         lack = [x for x in master if x not in set(names)]
+        disjoint = len(stray) == len(names)
         raise ValueError(
             f"{role} has {len(names)} cells but {len(stray)} barcodes are not in "
             f"{master_name} ({stray[:5]}{'...' if len(stray) > 5 else ''}"
             f"{'; ' + str(len(lack)) + ' of ' + master_name + ' missing from ' + role if lack else ''}); "
             f"all modalities of one dataset must cover the same cells, in one order - "
-            f"subset every modality to the shared barcodes first")
+            f"subset every modality to the shared barcodes first"
+            + ("; RNA and ATAC from different cells is diagonal integration: pass "
+               "category='diagonal'" if disjoint and "atac" in (role, master_name) else ""))
     if len(names) != len(master):
         raise ValueError(
             f"{role}: {len(names)} cells but {master_name} has {len(master)}; "
@@ -884,12 +1009,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    batch=None, dtype: str = "float64",
                    compression: str | None = "gzip",
                    category: str | None = None,
-                   adt_names: list | None = None) -> Path:
+                   adt_names: list | None = None,
+                   batch_index: int | None = None,
+                   overwrite: bool = False) -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
     Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
     ``adt.h5``, ATAC files, ``cty.csv``), so ``mtb.scan`` and
-    ``mtb.run_all`` work on your own data.
+    ``mtb.run_all`` work on your own data. Give raw counts.
 
     Parameters
     ----------
@@ -900,32 +1027,40 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         Folder to create; its name is the dataset id for ``mtb.scan`` /
         ``mtb.run_all``, and its parent their ``data_path``.
     rna : str, AnnData, DataFrame, array or None
-        RNA matrix: a selector against ``data`` (``'X'``, ``'layer:counts'``)
-        or an object (forms in Notes); ``None`` = no RNA.
+        Raw-count matrix for RNA: a selector against ``data`` (``'layer:counts'``,
+        ``'X[feature_types=Gene Expression]'``) or an object (Notes); ``None`` = no RNA.
     adt : str, AnnData, DataFrame, array or None
-        Protein (ADT) matrix, same forms as ``rna`` (e.g. ``'obsm:protein'``);
-        ``None`` = no ADT.
+        Raw-count matrix for protein (ADT), same forms as ``rna`` (e.g.
+        ``'obsm:protein'``); ``None`` = no ADT.
     atac : str, AnnData, DataFrame, array or None
-        ATAC matrix, same forms as ``rna``; needs ``atac_kind``. ``None`` = no ATAC.
+        ATAC matrix, same forms as ``rna`` (e.g. ``'X[feature_types=Peaks]'``);
+        needs ``atac_kind``. ``None`` = no ATAC.
     atac_kind : str or None
         What ``atac`` holds: ``'peak'`` or ``'gene_activity'``; decides the
         ATAC filename.
     labels : str, Series, sequence or None
-        Cell-type labels for ``cty.csv``: ``'obs:<col>'``, a Series indexed by
-        barcode, or a sequence in cell order.
+        Cell-type labels: ``'obs:<col>'`` (a MuData's global ``.obs``),
+        ``'<mod>:<col>'`` (``mdata[mod].obs``), a Series indexed by barcode, or
+        a sequence.
     batch : str, Series, sequence or None
-        Batch per cell, same forms as ``labels``; splits every file per batch
-        (``rna1.h5``, ``rna2.h5``, ...).
+        Batch per cell, same forms as ``labels``; splits the files per batch
+        (``rna1.h5``, ``rna2.h5``, ...) for mosaic or cross.
     dtype : str
         Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
     compression : str or None
         h5py compression filter, forwarded to ``mtb.io.to_canonical``.
     category : str or None
         Integration category the folder is for (``vertical``, ``diagonal``,
-        ``mosaic`` or ``cross``); changes the ATAC filenames (Notes).
+        ``mosaic`` or ``cross``); sets the ATAC and label filenames (Notes).
     adt_names : list or None
         Protein names for the ADT matrix; they override any it carries and
         are needed when it has none.
+    batch_index : int or None
+        Write the whole object as batch ``N`` (``rna<N>.h5``, ``cty<N>.csv``);
+        mosaic or cross, one call per batch file.
+    overwrite : bool
+        ``True`` = replace files already in ``dataset_dir``; ``False`` = raise
+        before writing anything.
 
     Returns
     -------
@@ -937,19 +1072,24 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ValueError
         Missing or conflicting arguments, or cells that do not pair across modalities (Notes).
     KeyError
-        A selector names a ``mod``, ``obsm``, ``layer`` or ``obs`` column that is absent.
+        A selector names a ``mod``, ``obsm``, ``layer``, ``obs`` or ``var`` column that is absent.
+    FileExistsError
+        A file this call would write exists and ``overwrite`` is ``False``.
 
     Warns
     -----
     UserWarning
-        Feature names missing or contradicting ``atac_kind``; non-unique barcodes; a dense matrix over 1 GB.
+        Values that are not whole numbers, feature-name problems, and the other cases in Notes.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.io.export_dataset(adata, "data/MYCITE", adt="obsm:protein", labels="obs:celltype")
-    >>> mtb.io.export_dataset(mdata, "data/MYMU", rna="rna", atac="atac", atac_kind="peak",
-    ...                       labels="rna:celltype", batch="rna:sample")    # MuData, per batch
+    >>> mtb.io.export_dataset(adata, "data/MYCITE", rna="layer:counts", adt="obsm:protein",
+    ...                       labels="obs:celltype")
+    >>> mtb.io.export_dataset(mdata, "data/MYMULTIOME", rna="rna", atac="atac",
+    ...                       atac_kind="peak", labels="obs:celltype", category="vertical")
+    >>> mtb.io.export_dataset(rna, "data/LUNG", atac=atac, atac_kind="peak",
+    ...                       labels="obs:cell_type", category="diagonal")
     >>> mtb.scan("MYCITE", "vertical", data_path="data")
 
     Notes
@@ -976,12 +1116,29 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                           atac_kind="peak", labels=rna_adata.obs["celltype"])
     ```
 
+    **Feature filter.** A selector may end with ``[<var column>=<value>]``.
+    Only the features whose ``adata.var`` column equals the value are
+    written. A 10x Multiome AnnData read with ``gex_only=False`` holds genes
+    and peaks in one ``X``:
+
+    ```python
+    mtb.io.export_dataset(adata, "data/MYARC", rna="X[feature_types=Gene Expression]",
+                          atac="X[feature_types=Peaks]", atac_kind="peak",
+                          labels="obs:celltype", category="vertical")
+    ```
+
+    **Raw counts.** Methods normalise the data themselves; give raw counts. A
+    ``UserWarning`` says when sampled RNA, ADT or peak values are not whole
+    numbers (log-normalised data). ``rna='layer:counts'`` usually selects the
+    counts. Gene-activity scores are not checked.
+
     **MuData.** A bare modality name selects ``mdata.mod[name].X``
-    (``rna='rna'``); a full ``'mod:<name>'`` selector works too. Every
-    modality of a MuData needs one of these, so the default ``rna='X'``
-    raises: pass ``rna=<mod name>`` or ``rna=None``. ``labels`` / ``batch``
-    accept ``'<mod>:<obs column>'`` (``'rna:celltype'``) or
-    ``'mod:<mod>.obs:<col>'``.
+    (``rna='rna'``); a full ``'mod:<name>'`` selector works too. The default
+    ``rna='X'`` raises for a MuData: pass ``rna=<mod name>`` or ``rna=None``.
+
+    ``labels`` / ``batch`` read ``'obs:<col>'`` from the global ``mdata.obs``.
+    ``'<mod>:<col>'`` reads ``mdata[mod].obs``, then muon's copy
+    ``mdata.obs['<mod>:<col>']``; ``'mod:<mod>.obs:<col>'`` works too.
 
     **Master cell order.** Every modality is written in one order -
     ``data.obs_names`` when ``data`` is given, else the first modality
@@ -1002,67 +1159,108 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     barcodes; a plain ``RangeIndex`` of the right length is taken
     positionally.
 
+    **Diagonal.** ``category='diagonal'`` pairs no barcodes: RNA and ATAC may
+    come from different cells. ``rna`` is written as ``rna.h5`` and ``atac``
+    as ``atac_peak.h5`` or ``atac_gas.h5``. ``labels`` is read from each
+    object's own ``.obs`` into ``rna_cty.csv`` and ``atac_cty.csv``. A call
+    that writes one modality writes only that modality's label file.
+
     **Batches.** With ``batch``, cells are split per batch value (sorted)
-    and numbered files are written instead: ``rna1.h5``, ``rna2.h5`` ...,
-    ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52).
+    and numbered files are written: ``rna1.h5``, ``rna2.h5`` ...,
+    ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52). Only
+    cross and mosaic methods read numbered files. For a vertical folder,
+    export without ``batch`` and pass the batch column to
+    ``mtb.evaluate(batch=...)``.
 
-    **ATAC filenames.**
+    **One file per batch.** ``batch_index=N`` writes the whole object as
+    batch ``N``. A mosaic delivery of one file per batch (the D46 pattern:
+    CITE-seq, Multiome, RNA only) is one call per file:
 
-    - no ``category``: ``atac_kind='peak'`` (``chr:start-end`` features) is
-      written as ``atac_peak.h5`` plus a hard-linked ``atac.h5`` (copied when
-      the filesystem refuses); ``'gene_activity'`` as ``atac_gas.h5`` only,
-      so the gene-activity role never silently falls back to a peak matrix;
-    - ``category='vertical'``: plain ``atac.h5`` only, for both kinds - the
-      one name every vertical (paired multiome) variant resolves;
-    - ``'diagonal'`` / ``'mosaic'`` / ``'cross'``: ``atac_peak.h5`` or
-      ``atac_gas.h5`` exactly as named, and no ``atac.h5`` link.
+    ```python
+    kw = dict(labels="obs:cell_type", category="mosaic")
+    mtb.io.export_dataset(cite, "data/LAB", adt="obsm:protein", batch_index=1, **kw)
+    mtb.io.export_dataset(multiome, "data/LAB", atac="obsm:atac", atac_kind="peak",
+                          batch_index=2, **kw)
+    mtb.io.export_dataset(rna_only, "data/LAB", batch_index=3, **kw)
+    ```
 
-    The ``atac.h5`` link exists because most vertical multiome methods that
-    read the plain ``atac`` role want peaks (Matilda wants gene activity;
-    see ``method_info(m)['atac']``). Editing a hard-linked file edits both.
+    ``mtb.describe_layout('mosaic')`` lists the batch patterns the methods
+    read.
 
-    **Check the ATAC kind.** The representation is recorded nowhere on
-    disk, so check that ``method_info(m)['atac']`` is the kind exported: a
-    gene-activity ``atac.h5`` fed to a peak method runs and returns a wrong
-    embedding (``mtb.scan`` flags the mismatch as a caveat).
+    **ATAC filenames.** Vertical methods read ``atac.h5``;
+    ``method_info(m)['atac']`` says whether it must hold peaks or gene
+    activity. Diagonal methods read ``atac_peak.h5`` (peaks) and
+    ``atac_gas.h5`` (gene activity). Mosaic methods read ``atac<i>.h5``
+    (peaks). ``peak.h5``, and ``atac.h5`` for gene activity, are accepted as
+    older names. By ``category``:
+
+    - ``'vertical'``: ``atac.h5`` for both kinds;
+    - ``'diagonal'`` / ``'cross'``: ``atac_peak.h5`` or ``atac_gas.h5``;
+    - ``'mosaic'``: ``atac<i>.h5``;
+    - no ``category``: ``atac_peak.h5`` plus a hard-linked ``atac.h5`` (a
+      copy when the file system refuses links), or ``atac_gas.h5`` only.
+      Editing a hard-linked file edits both.
+
+    **Check the ATAC kind.** The representation is not recorded on disk.
+    Check that ``method_info(m)['atac']`` is the kind exported: a
+    gene-activity ``atac.h5`` given to a peak method runs and returns a wrong
+    embedding. ``mtb.scan`` reports the mismatch in its ``caveat`` column.
+
+    **Existing files.** Every check runs before ``dataset_dir`` is created;
+    a failed call writes nothing. When a file the call would write already
+    exists, ``FileExistsError`` lists it; pass ``overwrite=True`` to replace
+    it. Other files in the folder are kept.
 
     **Errors.** ``ValueError`` is raised for:
 
     - nothing to export (``rna``, ``adt``, ``atac`` and ``labels`` all ``None``);
     - ``atac`` without a valid ``atac_kind``, or ``atac_kind`` without ``atac``;
     - an unknown ``category``;
-    - a selector string with ``data=None``, or a malformed selector;
+    - a selector string with ``data=None``, a malformed selector, or a
+      feature filter that matches nothing;
     - a bare array whose cell order cannot be checked (no barcodes anywhere)
       or with the wrong row count;
     - a modality whose barcodes differ from the master order (the message
       names the strays);
     - a ``labels`` / ``batch`` Series missing cells, or a sequence of the
-      wrong length.
+      wrong length;
+    - ``batch`` with ``category='vertical'`` or ``'diagonal'``, or together
+      with ``batch_index``;
+    - ``batch_index`` that is not a positive integer, or without
+      ``category='mosaic'`` / ``'cross'``;
+    - ``category='diagonal'`` with labels but no matrix, or with a plain
+      label sequence for both RNA and ATAC.
 
     The ``KeyError`` message lists the names the object does have.
 
-    **Warnings.** ``UserWarning`` is emitted for feature names that
-    contradict ``atac_kind``; a bare array or ``obsm`` matrix without
-    feature names (``feature_0..`` written; for ADT pass ``adt_names``,
-    otherwise a DataFrame or AnnData); non-unique barcodes (paired
-    positionally); a dense ``matrix/data`` over 1 GB.
+    **Warnings.** ``UserWarning`` is emitted for:
+
+    - RNA, ADT or peak values that are not whole numbers;
+    - feature names that contradict ``atac_kind``, or none at all
+      (``feature_0..`` is written; for ADT pass ``adt_names``);
+    - non-unique barcodes (paired positionally);
+    - a dense ``matrix/data`` over 1 GB;
+    - ``batch`` with ``atac`` and no ``category``: only mosaic methods read
+      numbered ATAC files;
+    - ``category='mosaic'`` with ``atac_kind='gene_activity'``: every mosaic
+      method reads peaks;
+    - ``category='mosaic'`` or ``'cross'`` without ``batch`` or
+      ``batch_index``.
 
     See Also
     --------
-    mtb.io.to_canonical : one matrix -> one canonical file (what this calls per modality).
+    mtb.io.to_canonical : one matrix -> one canonical file.
     mtb.describe_layout : the layout being produced and the role -> filename mapping.
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
     out = Path(dataset_dir)
-    out.mkdir(parents=True, exist_ok=True)
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
         rna = None                      # no data to select from: no RNA
     if _is_mudata(data):
         # a bare modality name selects mdata.mod[name].X; full
         # 'mod:<name>[...]' selectors pass through
-        rna, adt, atac = (f"mod:{x}" if isinstance(x, str) and x in data.mod else x
-                          for x in (rna, adt, atac))
+        rna, adt, atac = (_mudata_selector(data, x) for x in (rna, adt, atac))
     if atac is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(
             f"atac={atac!r} needs atac_kind= one of {list(_ATAC_KINDS)} "
@@ -1072,62 +1270,260 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise ValueError("atac_kind= given without atac=")
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
+    _check_batch_args(batch, batch_index, category, adt=adt, atac=atac)
+    diagonal = category == "diagonal"
+    if diagonal and labels is not None and rna is None and adt is None and atac is None:
+        raise ValueError(
+            "category='diagonal' names the label file after the modality it labels "
+            "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
+    if category == "mosaic" and atac is not None and atac_kind == "gene_activity":
+        warnings.warn("atac_kind='gene_activity' with category='mosaic': every mosaic "
+                      "method reads peaks (atac<i>.h5)", UserWarning, stacklevel=2)
+    if category in ("mosaic", "cross") and batch is None and batch_index is None:
+        warnings.warn(f"category={category!r} methods read numbered files (rna1.h5, "
+                      f"cty1.csv, ...): pass batch_index= (this object is one batch) "
+                      f"or batch= (a column that splits it)", UserWarning, stacklevel=2)
 
-    # master cell order: data's obs_names, else the first modality object's
-    master, master_name = None, None
-    if data is not None and hasattr(data, "obs_names"):
-        master, master_name = [str(x) for x in data.obs_names], "data"
-    else:
-        for what, spec in (("rna", rna), ("adt", adt), ("atac", atac)):
-            if spec is not None and (_is_anndata(spec) or hasattr(spec, "index")):
-                master = [str(x) for x in (spec.obs_names if _is_anndata(spec) else spec.index)]
-                master_name = what
-                break
-
-    mats = []   # (role_base, adata, kwargs, user-facing name)
+    # --- the modality matrices, each re-indexed to its side's cell order.
+    # Paired categories have one side; diagonal keeps the ATAC cells apart.
+    sides = {"rna": [], "atac": []}     # side -> [(role, adata, kw, what, source)]
+    first = _first_master(data, [("rna", rna), ("adt", adt)]
+                          + ([] if diagonal else [("atac", atac)]), diagonal=diagonal)
+    master, master_name = first
     for what, spec in (("rna", rna), ("adt", adt)):
         if spec is not None:
             a, kw = _as_modality(data, spec, what=what, master=master,
                                  feature_names=adt_names if what == "adt" else None)
-            mats.append((what, a, kw, what))
+            sides["rna"].append((what, a, kw, what, _source_name(data, spec, what)))
     if atac is not None:
-        a, kw = _as_modality(data, atac, what="atac", master=master)
-        mats.append(("atac_peak" if atac_kind == "peak" else "atac_gas", a, kw, "atac"))
-    if master is None and mats:
-        master, master_name = [str(x) for x in mats[0][1].obs_names], mats[0][3]
-    mats = [(role, _align_cells(a, master=master, master_name=master_name, role=what), kw)
-            for role, a, kw, what in mats]
-    n_ref = len(master) if master is not None else None
-    lab = _as_obs_vector(data, labels, what="labels", master=master) if labels is not None else None
-    if lab is not None and n_ref is not None and len(lab) != n_ref:
-        raise ValueError(f"labels has {len(lab)} entries for {n_ref} cells")
+        atac_master = master
+        if diagonal:
+            atac_master = _names_of(atac) or (
+                [str(x) for x in data.obs_names] if _is_anndata(data) and not _is_mudata(data)
+                else None)
+        a, kw = _as_modality(data, atac, what="atac", master=atac_master)
+        role = "atac_peak" if atac_kind == "peak" else "atac_gas"
+        sides["atac" if diagonal else "rna"].append(
+            (role, a, kw, "atac", _source_name(data, atac, "atac")))
+    masters = {}
+    for side, mats in sides.items():
+        if not mats:
+            continue
+        if side == "rna" and master is not None:
+            m, mname = master, master_name
+        else:
+            m, mname = [str(x) for x in mats[0][1].obs_names], mats[0][3]
+        masters[side] = m
+        sides[side] = [(role, _align_cells(a, master=m, master_name=mname, role=what), kw, what, src)
+                       for role, a, kw, what, src in mats]
+    if not masters and master is not None:
+        masters["rna"] = master         # labels only
 
-    if batch is None:
-        groups = [(None, None)]
-    else:
-        bvals = _as_obs_vector(data, batch, what="batch", master=master)
-        if n_ref is not None and len(bvals) != n_ref:
-            raise ValueError(f"batch has {len(bvals)} entries for {n_ref} cells")
+    # --- labels: one vector per side (diagonal) or one for the paired cells
+    lab = {}
+    if labels is not None:
+        if diagonal:
+            lab = _diagonal_labels(data, labels, sides)
+        else:
+            m = masters.get("rna")
+            vec = _as_obs_vector(data, labels, what="labels", master=m)
+            if m is not None and len(vec) != len(m):
+                raise ValueError(f"labels has {len(vec)} entries for {len(m)} cells")
+            lab["rna"] = vec
+
+    # --- batches
+    if batch is not None:
+        m = masters.get("rna")
+        bvals = _as_obs_vector(data, batch, what="batch", master=m)
+        if m is not None and len(bvals) != len(m):
+            raise ValueError(f"batch has {len(bvals)} entries for {len(m)} cells")
         keys = sorted(set(bvals.tolist()), key=lambda v: str(v))
-        groups = [(i + 1, np.flatnonzero(bvals == k)) for i, k in enumerate(keys)]
+        groups = [(str(i + 1), np.flatnonzero(bvals == k)) for i, k in enumerate(keys)]
+    elif batch_index is not None:
+        groups = [(str(int(batch_index)), None)]
+    else:
+        groups = [("", None)]
 
-    for idx, mask in groups:
-        suf = "" if idx is None else str(idx)
-        for role, a, kw in mats:
-            sub = a if mask is None else a[mask]
-            # vertical: the plain atac.h5 the `atac` role reads, nothing else;
-            # an explicit other category: the representation-named file only;
-            # no category: representation-named file (+ atac.h5 link for peaks)
-            fname = (f"atac{suf}.h5" if category == "vertical" and role.startswith("atac")
-                     else f"{role}{suf}.h5")
-            names = adt_names if role == "adt" else None
-            p = to_canonical(sub, out / fname, modality=role,
-                             dtype=dtype, compression=compression,
-                             feature_names=names, **kw)
+    # --- select every matrix and run the content checks, before any write
+    prepared = []                       # (side, role, X, feats, bars, what)
+    for side, mats in sides.items():
+        for role, a, kw, what, src in mats:
+            if role == "adt" and not kw and len(getattr(a, "obsm", {})):
+                raise ValueError(
+                    f"adt requested but obsm= not given; found obsm keys {list(a.obsm)} - "
+                    "pass obsm='<key>' (or layer=) to select the protein matrix, otherwise "
+                    "adata.X (usually the RNA) would be written as adt.h5")
+            X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"),
+                                    feature_names=adt_names if role == "adt" else None,
+                                    what=role)
+            _check_peak_names(role, feats)
+            if role in _COUNT_ROLES:
+                _warn_not_counts(X, what, f"{what}='layer:counts' (MuData: "
+                                 f"{what}='mod:{what}.layer:counts')", stacklevel=2)
+            prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
+
+    # --- the files this call writes
+    plan = []                           # (path, kind, payload)
+    for suf, mask in groups:
+        for side, role, X, feats, bars, what in prepared:
+            sub = X if mask is None else X[mask]
+            sub_bars = bars if mask is None else [bars[i] for i in mask]
+            path = out / _export_filename(role, suf, category)
+            plan.append((path, "matrix", (sub, feats, sub_bars)))
             if role == "atac_peak" and category is None:
-                _link_or_copy(p, out / f"atac{suf}.h5")
-        if lab is not None:
-            _write_labels(lab if mask is None else np.asarray(lab)[mask],
-                          out / f"cty{suf}.csv")
+                plan.append((out / f"atac{suf}.h5", "link", path))
+        for side, vec in lab.items():
+            name = (f"{side}_cty.csv" if diagonal else f"cty{suf}.csv")
+            plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask]))
+    existing = [pth.name for pth, _, _ in plan if pth.exists() or pth.is_symlink()]
+    if existing and not overwrite:
+        raise FileExistsError(
+            f"{out} already holds {existing}, which this call would write; "
+            f"pass overwrite=True (--overwrite) to replace them")
+    for pth, kind, payload in plan:
+        if kind == "matrix":
+            sub, feats, sub_bars = payload
+            if getattr(sub, "ndim", 0) == 2:
+                _warn_dense_size(pth, sub.shape[1], sub.shape[0], dtype)
+
+    out.mkdir(parents=True, exist_ok=True)
+    for pth, kind, payload in plan:
+        if pth.exists() or pth.is_symlink():
+            pth.unlink()                # also breaks an old hard link
+        if kind == "matrix":
+            sub, feats, sub_bars = payload
+            _write_canonical(pth, sub, feats, sub_bars, dtype=dtype,
+                             compression=compression, block=1024)
+        elif kind == "link":
+            _link_or_copy(payload, pth)
+        else:
+            _write_labels(payload, pth)
     return out
 
+
+def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
+    """Refuse the batch / batch_index combinations no method can read."""
+    if batch is not None and batch_index is not None:
+        raise ValueError("pass batch= or batch_index=, not both: batch= splits the object "
+                         "by a column, batch_index= writes the whole object as one batch")
+    if batch_index is not None:
+        if isinstance(batch_index, bool) or not isinstance(batch_index, (int, np.integer)) \
+                or batch_index < 1:
+            raise ValueError(f"batch_index= must be a positive integer (1 writes rna1.h5), "
+                             f"got {batch_index!r}")
+        if category not in ("mosaic", "cross"):
+            raise ValueError(
+                f"batch_index= writes numbered files (rna{batch_index}.h5, ...), which only "
+                f"mosaic and cross methods read: pass category='mosaic' or category='cross' "
+                f"(got category={category!r})")
+    if batch is not None and category in ("vertical", "diagonal"):
+        from .resolve import _one_file_advice
+        raise ValueError(
+            "batch= writes per-batch files (rna1.h5, rna2.h5, ...); "
+            + _one_file_advice(category, has_adt=adt is not None and atac is None))
+    if batch is not None and category is None and atac is not None:
+        warnings.warn(
+            "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic "
+            "pass category='mosaic'; otherwise export without batch= and pass the batch "
+            "column to evaluate(batch=...)", UserWarning, stacklevel=3)
+
+
+def _names_of(spec):
+    """Cell barcodes an AnnData / DataFrame argument carries, else ``None``."""
+    if _is_anndata(spec):
+        return [str(x) for x in spec.obs_names]
+    if hasattr(spec, "index") and hasattr(spec, "columns"):
+        return [str(x) for x in spec.index]
+    return None
+
+
+def _first_master(data, specs, *, diagonal):
+    """``(barcodes, name)`` of the paired cell order: ``data.obs_names``, else
+    the first modality object's. A diagonal MuData has no single order (its
+    global ``obs_names`` joins both sides); the RNA side then sets it."""
+    if data is not None and hasattr(data, "obs_names") and not (diagonal and _is_mudata(data)):
+        return [str(x) for x in data.obs_names], "data"
+    for what, spec in specs:
+        names = _names_of(spec) if spec is not None else None
+        if names is not None:
+            return names, what
+    return None, None
+
+
+def _source_name(data, spec, what) -> str:
+    """How an error names the object a modality came from."""
+    if isinstance(spec, str):
+        if spec.startswith("mod:"):
+            name = _split_var_filter(spec)[0][4:].partition(".")[0]
+            return f"mdata[{name!r}]"
+        return "data"
+    return what
+
+
+def _diagonal_labels(data, spec, sides) -> dict:
+    """``{side: labels}`` for a diagonal export: each side's labels from its
+    own cells (``'obs:<col>'`` from each object's ``.obs``)."""
+    import pandas as pd
+
+    present = [side for side in ("rna", "atac") if sides[side]]
+    if not isinstance(spec, (str, pd.Series)) and len(present) > 1:
+        raise ValueError(
+            "category='diagonal' with both rna= and atac=: labels= must be 'obs:<col>' "
+            "or a Series indexed by barcode; a plain sequence cannot be split between "
+            "the RNA and the ATAC cells")
+    out = {}
+    for side in present:
+        role, a, kw, what, src = sides[side][0]
+        bars = [str(x) for x in a.obs_names]
+        if isinstance(spec, str) and spec.startswith("obs:"):
+            col = spec[4:]
+            if col in a.obs.columns:
+                out[side] = np.asarray(a.obs[col])
+                continue
+            if _is_mudata(data) and col in data.obs.columns:
+                ser = data.obs[col]
+            else:
+                raise KeyError(
+                    f"labels={spec!r}: column {col!r} not in obs of the {side.upper()} "
+                    f"object ({src}); available: {list(a.obs.columns)}")
+        elif isinstance(spec, str):
+            ser = _select_obs(data, spec, what="labels")
+        else:
+            ser = spec
+        if isinstance(ser, pd.Series):
+            idx = {str(k): i for i, k in enumerate(ser.index)}
+            lack = [b for b in bars if b not in idx]
+            if lack:
+                raise ValueError(
+                    f"labels={repr(spec) if isinstance(spec, str) else 'Series'}: "
+                    f"{len(lack)} of the {len(bars)} {side.upper()} cells have no label "
+                    f"({lack[:5]}{'...' if len(lack) > 5 else ''}); with "
+                    f"category='diagonal' pass labels='obs:<col>' to read each object's "
+                    f"own obs")
+            out[side] = np.asarray(ser)[[idx[b] for b in bars]]
+        else:
+            out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
+    return out
+
+
+def _export_filename(role: str, suf: str, category: str | None) -> str:
+    """On-disk name of one modality file of :func:`export_dataset`."""
+    if role.startswith("atac") and category in ("vertical", "mosaic"):
+        return f"atac{suf}.h5"
+    return f"{role}{suf}.h5"
+
+
+def _select_object(obj, spec: str, *, what: str):
+    """An AnnData holding the matrix ``spec`` selects from ``obj`` (with its
+    ``.obs``): what the CLI's ``--atac-from`` passes on as ``atac=``."""
+    import anndata as ad
+
+    if _is_mudata(obj):
+        spec = _mudata_selector(obj, spec)
+    a, kw = _select(obj, spec, what=what)
+    if not kw:
+        return a
+    X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"), what=what)
+    b = ad.AnnData(X, obs=a.obs.copy())
+    b.var_names = [str(x) for x in feats]
+    return b

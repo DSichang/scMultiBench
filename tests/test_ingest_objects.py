@@ -125,13 +125,13 @@ def test_to_canonical_rejects_h5_without_matrix_data(tmp_path):
         ingest.to_canonical(p, tmp_path / "x.h5")
     msg = str(e.value)
     assert "no dataset 'matrix/data'" in msg and "found keys ['data']" in msg
-    assert "method OUTPUT" in msg and "evaluate" in msg
+    assert "method output" in msg and "evaluate" in msg
 
 
 def test_to_canonical_warns_above_dense_size_threshold(tmp_path, monkeypatch):
     a = ad.AnnData(np.ones((40, 30)))
     monkeypatch.setattr(ingest, "DENSE_WARN_BYTES", 40 * 30 * 8 - 1)
-    with pytest.warns(UserWarning, match="stored DENSE") as rec:
+    with pytest.warns(UserWarning, match="stored dense") as rec:
         ingest.to_canonical(a, tmp_path / "big.h5")
     msg = str(rec[0].message)
     assert "30 x 40 x 8 B" in msg and "float32" in msg and "highly-variable" in msg

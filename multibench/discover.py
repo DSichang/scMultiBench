@@ -256,6 +256,14 @@ def _effective(v) -> dict:
     return eff
 
 
+def _reference_batch(variant):
+    """Batch ``N`` of a variant's ``reference`` const ``data<N>``, else ``None``."""
+    ref = next((a.const for a in variant.args
+                if getattr(a, "role", None) == "reference" and a.const), None)
+    ref = str(ref) if ref is not None else ""
+    return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
+
+
 def method_info(method: str, *, verbose: bool = False) -> dict:
     """Return everything known about one method as a flat dict.
 
@@ -313,9 +321,10 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       ``mtb.cite`` formats it.
     - ``notes`` - the short third-person summary from engine/references.yaml.
     - ``supports`` - one entry per variant: ``category``, ``modalities``,
-      ``output_kind``, ``n_tunable``, ``needs_labels`` and ``labels`` (the
+      ``output_kind``, ``n_tunable``, ``needs_labels``, ``labels`` (the
       label roles the variant reads, e.g. ``['cty']`` / ``['rna_cty']`` /
-      ``[]``).
+      ``[]``) and ``reference_batch`` (the batch a variant uses as its fixed
+      reference, e.g. 3 for StabMap in cross; ``None`` elsewhere).
     - ``params`` - keyed per variant as ``'category:mods'``, each with
       ``defaults``, ``tunable`` and ``effective`` (see ``mtb.params_for``).
     - ``fixed_in_script`` / ``upstream_knobs`` / ``upstream_url`` - what the
@@ -422,7 +431,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
                       "output_kind": v.output.kind,
                       "n_tunable": len(v.tunable),
                       "needs_labels": v.needs_labels,
-                      "labels": [r for r in v.roles() if is_label_role(r)]}
+                      "labels": [r for r in v.roles() if is_label_role(r)],
+                      "reference_batch": _reference_batch(v)}
                      for v in s.variants],
         # what the caller may pass to run(params=...): see params_for()
         "params": {_variant_key(v): {"defaults": dict(v.params),

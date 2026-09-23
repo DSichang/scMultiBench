@@ -61,7 +61,7 @@ def test_to_canonical_peak_vertical_makes_scan_find_a_runnable_layout(tmp_path):
 def test_to_canonical_docstring_says_representation_is_not_recorded():
     import inspect
     doc = inspect.getdoc(ingest.to_canonical)
-    assert "recorded NOWHERE on disk" in doc and "category='vertical'" in doc
+    assert "not recorded on disk" in doc and "category='vertical'" in doc
 
 
 def test_export_dataset_vertical_writes_plain_atac_only(tmp_path):
@@ -74,11 +74,13 @@ def test_export_dataset_vertical_writes_plain_atac_only(tmp_path):
                                 labels="obs:ct", category="vertical")
     assert sorted(p.name for p in out.iterdir()) == ["atac.h5", "cty.csv"]
     assert list(ingest.read_canonical(out / "atac.h5").var_names) == list(g.var_names)
-    # batch numbering keeps the plain name with the suffix
+    # per-batch files are what no vertical method reads: refused before any write
     g.obs["b"] = ["x"] * 3 + ["y"] * 3
-    out = ingest.export_dataset(g, tmp_path / "VB", rna=None, atac="X", atac_kind="gene_activity",
-                                batch="obs:b", category="vertical")
-    assert sorted(p.name for p in out.iterdir()) == ["atac1.h5", "atac2.h5"]
+    with pytest.raises(ValueError, match="vertical methods read one rna.h5: export "
+                                         "without batch="):
+        ingest.export_dataset(g, tmp_path / "VB", rna=None, atac="X",
+                              atac_kind="gene_activity", batch="obs:b", category="vertical")
+    assert not (tmp_path / "VB").exists()
 
 
 def test_export_dataset_explicit_other_category_keeps_representation_names(tmp_path):
@@ -87,9 +89,15 @@ def test_export_dataset_explicit_other_category_keeps_representation_names(tmp_p
                                 category="diagonal")
     assert sorted(p.name for p in out.iterdir()) == ["atac_peak.h5"]     # no atac.h5 link
     g = _genes()
-    out = ingest.export_dataset(g, tmp_path / "MG", rna=None, atac="X", atac_kind="gene_activity",
-                                category="mosaic")
-    assert sorted(p.name for p in out.iterdir()) == ["atac_gas.h5"]
+    out = ingest.export_dataset(g, tmp_path / "CG", rna=None, atac="X", atac_kind="gene_activity",
+                                category="cross", batch_index=1)
+    assert sorted(p.name for p in out.iterdir()) == ["atac_gas1.h5"]
+    # mosaic: the atac<i>.h5 every mosaic variant reads, whatever the kind (L06)
+    with pytest.warns(UserWarning, match="every mosaic method reads peaks"):
+        out = ingest.export_dataset(g, tmp_path / "MG", rna=None, atac="X",
+                                    atac_kind="gene_activity", category="mosaic",
+                                    batch_index=2)
+    assert sorted(p.name for p in out.iterdir()) == ["atac2.h5"]
     # category=None: today's behaviour (atac_peak.h5 + hard-linked atac.h5)
     out = ingest.export_dataset(pk, tmp_path / "NP", rna=None, atac="X", atac_kind="peak")
     assert sorted(p.name for p in out.iterdir()) == ["atac.h5", "atac_peak.h5"]

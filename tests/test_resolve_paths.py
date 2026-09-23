@@ -34,7 +34,7 @@ def test_inputs_for_returns_absolute_paths_for_relative_data_path(tmp_path, monk
 
 def test_inputs_for_docstring_promises_absolute_paths():
     import inspect
-    assert "ABSOLUTE" in inspect.getdoc(mtb.inputs_for)
+    assert "Paths are absolute" in inspect.getdoc(mtb.inputs_for)
 
 
 def test_atac_means_any_atac_role(tmp_path):

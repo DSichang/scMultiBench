@@ -192,12 +192,12 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
     df = mtb.scan("PEAKY", "diagonal", data_path=tmp_path)
     portal = df[df["method"] == "Portal"].iloc[0]          # wants gene activity
     assert portal["files_ok"]
-    assert "atac_gas resolved to a PEAK matrix" in portal["caveat"]
+    assert "atac_gas resolved to a peak matrix" in portal["caveat"]
     assert "chr:start-end" in portal["caveat"]
     # a method that WANTS peaks behind the atac_gas role gets no caveat
     peak_wanters = df[(df["atac"] == "peak") & df["modalities"].str.contains("atac_gas")]
     assert len(peak_wanters) > 0
-    assert not peak_wanters["caveat"].str.contains("PEAK matrix").any()
+    assert not peak_wanters["caveat"].str.contains("peak matrix").any()
 
 
 # --- run_all(dry_run=True) is the scan frame, never silently empty ------------
