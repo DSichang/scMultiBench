@@ -90,3 +90,26 @@ def test_near_miss_hint_names_the_rename_when_the_kind_matches(tmp_path, monkeyp
     hints = resolve._near_miss_hints(d, {"atac": str(d / "atac.h5")}, "vertical",
                                      atac="gene_activity")
     assert "pass the representation this method wants" in hints[0]
+
+
+def test_incomplete_matrix_warning_names_the_overall_flag_on_the_cli(monkeypatch):
+    """M19 intent after the merge: the whole incomplete-matrix message uses CLI
+    spellings under the CLI, not only its last sentence."""
+    import pandas as pd
+    from multibench import config
+    from multibench.plot import style
+    a = pd.DataFrame({"ARI": [0.1, 0.2]}, index=["M1", "M2"])
+    b2 = pd.DataFrame({"ARI": [0.3, 0.5]}, index=["M1", "M3"])
+    parts = {"D1": a, "D2": b2}
+
+    def incomplete():
+        return next(m for m in style.coverage_warnings(parts, basis="rank",
+                                                       incomplete_fix="FIX.")
+                    if m.startswith("summary ranks an incomplete"))
+    monkeypatch.setattr(config, "_CLI", False)
+    py = incomplete()
+    assert "under overall='rank' and is skipped under overall='mean_overall'" in py
+    monkeypatch.setattr(config, "_CLI", True)
+    cli = incomplete()
+    assert "under --overall rank and is skipped under --overall mean_overall" in cli
+    assert "overall='" not in cli

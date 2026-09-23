@@ -195,6 +195,7 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
     - a dataset that holds one method while the frame holds several: one
       message per such dataset, since that method is ranked against nothing.
     """
+    from .. import config
     out = []
     n = len(parts)
     cov = coverage(parts)
@@ -207,8 +208,10 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
             f"summary ranks an incomplete method x dataset matrix ({n} "
             f"datasets): " + ", ".join(f"{m} seen in {c}/{n}" for m, c in part.items())
             + "; a method absent from a dataset scores rank 0 there under "
-            "overall='rank' and is skipped under overall='mean_overall'. "
-            + incomplete_fix)
+            + config.hint("overall='rank'", "--overall rank")
+            + " and is skipped under "
+            + config.hint("overall='mean_overall'", "--overall mean_overall")
+            + ". " + incomplete_fix)
     out += _lone_method_messages(
         parts, "its Overall there is always 1.0" if basis == "mean_overall"
         else "its rank there is always the lowest")
