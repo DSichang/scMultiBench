@@ -593,7 +593,12 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
             "**Check.** `run_all` scores every order that fits the cell count and keeps "
             "the one with the highest ARI; the `label_order` column of `res.summary` "
             "shows it.", label="Details: label order"))
-        m0 = next(iter(others))
+        # the printed example is a method that fits the dataset (no scan caveat:
+        # Seurat_v5 reorders D28 too, but needs paired files D28 does not have)
+        import multibench as mtb
+        fit = mtb.scan(ds, cat, methods=list(others), verbose=False)
+        fit = set(fit.loc[fit["caveat"] == "", "method"])
+        m0 = next((m for m in others if m in fit), next(iter(others)))
         labels_code += f'\nprint("{m0}:", list(mtb.labels_for(DATASET, CATEGORY, "{m0}")))'
     code(labels_code)
     md(EXPORT_INTRO[cat] + ("\n\n" + details(EXPORT_DETAIL[cat], label="Details: MuData")
