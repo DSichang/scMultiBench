@@ -72,10 +72,9 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
     for ds in mtb.available_datasets("diagonal"):
         if ds in set(df.dataset):
             assert "diagonal" in df.set_index("dataset").loc[ds, "category"]
-    # paper-derived columns exist and are nullable (empty until transcribed)
-    for c in catalog.PAPER_COLUMNS:
-        assert c in df.columns
-    assert df[catalog.PAPER_COLUMNS].isna().all().all()
+    # the paper-derived columns are empty in the shipped CSV, so none is returned
+    # (study round 1, L56; tests/test_catalog_text.py covers a CSV that fills one)
+    assert not set(catalog.PAPER_COLUMNS) & set(df.columns)
     # category filter; D45s (the re-run subsample) ships mosaic results too
     assert set(catalog.datasets(files_dir, category="mosaic").dataset) == {"D45", "D45s"}
 
