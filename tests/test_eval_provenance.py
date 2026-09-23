@@ -5,6 +5,7 @@ clusters behind ARI/NMI came from the sweep or from the user, and the package
 version: those decide whether two rows are comparable (S4-11).
 """
 import warnings
+from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
@@ -36,7 +37,8 @@ def test_evaluate_records_a_sweep():
     emb, lab = _blobs()
     wide = mtb.evaluate(emb, labels=lab, metrics=["ARI", "ASW"])
     assert wide.attrs == {"leiden_flavor": _flavor(), "clustering": "sweep",
-                          "multibench_version": mtb.__version__}
+                          "multibench_version": mtb.__version__,
+                          "scib_version": version("scib")}
 
 
 def test_evaluate_records_user_clusters_and_no_sweep():
@@ -50,7 +52,8 @@ def test_evaluate_without_clustering_metrics_records_none():
     emb, lab = _blobs()
     wide = mtb.evaluate(emb, labels=lab, metrics=["ASW"])
     assert wide.attrs == {"leiden_flavor": None, "clustering": None,
-                          "multibench_version": mtb.__version__}
+                          "multibench_version": mtb.__version__,
+                          "scib_version": version("scib")}
 
 
 def test_evaluate_records_the_configured_backend(monkeypatch):
@@ -73,14 +76,20 @@ def test_to_long_writes_scored_with_and_keeps_the_attrs():
     assert set(asw["scored_with"]) == {f"none/none/{mtb.__version__}"}
 
 
-def test_to_long_of_a_frame_without_provenance_keeps_seven_columns(tmp_path):
+def test_to_long_of_a_frame_without_provenance_says_unknown(tmp_path):
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    assert mtb.to_long(w, method="M").columns.tolist() == pipeline.LONG_COLUMNS
+    with pytest.warns(UserWarning, match="no record of how they were scored"):
+        long = mtb.to_long(w, method="M")
+    assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
+    assert set(long["scored_with"]) == {"unknown"}
     # a CSV read back carries no attrs either
     emb, lab = _blobs()
     mtb.evaluate(emb, labels=lab, metrics=["ASW"]).to_csv(tmp_path / "w.csv")
     back = pd.read_csv(tmp_path / "w.csv", index_col=0)
-    assert mtb.to_long(back, method="M").columns.tolist() == pipeline.LONG_COLUMNS
+    with pytest.warns(UserWarning, match="no record of how they were scored"):
+        long = mtb.to_long(back, method="M")
+    assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
+    assert set(long["scored_with"]) == {"unknown"}
 
 
 def _mine():

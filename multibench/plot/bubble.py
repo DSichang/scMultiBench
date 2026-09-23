@@ -33,8 +33,18 @@ NA_MARK = "\u2013"
 SCORE_SCALE_NOTE = "(scaled per column)"
 
 #: legend line explaining the chips left of each row (drawn when show_language)
-CHIP_KEY = ("Py / R = language \u00b7 L = consumes cell-type labels (supervised) "
+CHIP_KEY = ("Py / R = language \u00b7 L = uses cell-type labels "
             "\u00b7 ? = not a registry method")
+
+#: fill of a column whose rows all hold the same value (and of every marker in
+#: a one-method figure): the colour ramp would draw it at its "High" end
+CONSTANT_FILL = "#bfbfbf"
+
+#: last sentence of the footnote under every figure: how the rows are ordered
+ROW_ORDER_NOTE = "Rows: best mean Overall first."
+#: footnote under an ``aggregate="dataset"`` figure: what the Overall bar shows
+OVERALL_NOTE = ("Overall: each method's mean rank over the metrics, scaled 0-1. "
+                + ROW_ORDER_NOTE)
 
 
 @dataclass
@@ -124,6 +134,9 @@ class BubbleTable:
 
     **Scaled values.** ``matrix`` and ``norm`` are per-column min-max values
     in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
+    The figure draws a column whose rows all hold one value in grey, not at
+    the ``High`` end of the Score legend, and names it in the footnote. Every
+    column of a one-method figure is grey.
 
     **Blocks.** Paper order: DR and clustering (blues), batch correction
     (greens), then "Other" (purples) for any metric outside the two.
@@ -307,8 +320,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         ``require_complete=True`` dropped methods; each is named with the
         datasets it lacks.
     UserWarning
-        Under ``"summary"``: a dataset holds one method, or no method spans
-        two datasets.
+        A dataset holds one method, or no method spans two datasets.
+    UserWarning
+        A column has the same value in every row, or there is one method.
+    UserWarning
+        Rows scored with the igraph Leiden backend are shown with stored rows.
 
     Examples
     --------
@@ -348,10 +364,25 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     MyRandom (missing D52s)"``). It has no effect under
     ``aggregate="dataset"``.
 
-    **A new dataset.** A summary compares methods only on the datasets they
-    share. Under ``"summary"``, a ``UserWarning`` names a dataset that holds
-    one method, and says so when no method spans two of the datasets. Plot
-    such a dataset on its own, or score the same methods on it.
+    **A new dataset.** A figure compares methods only where they share a
+    dataset. A ``UserWarning`` names a dataset that holds one method, and
+    says so when no method spans two of the datasets. Plot such a dataset on
+    its own, or score the same methods on it.
+
+    Under ``"dataset"``, the several-datasets warning suggests
+    ``aggregate="summary"`` only when every method has rows in at least two
+    datasets and no dataset holds a single method.
+
+    **No comparison.** A column whose rows all hold the same value, and
+    every column of a one-method figure, compares nothing: one
+    ``UserWarning`` names the columns, and the figure draws them in grey.
+    Ranks and scores stay as computed.
+
+    **Leiden backend.** The stored tables were clustered with leidenalg.
+    When rows whose ``scored_with`` starts with ``igraph/`` meet stored
+    rows, and ARI, NMI or iF1 is shown, one ``UserWarning`` names those
+    methods and the fix: set ``mtb.config.DEFAULT.leiden_flavor =
+    "leidenalg"`` before ``mtb.evaluate``.
 
     **Input columns.** ``dataset`` groups rows for ``aggregate="summary"``
     (absent = one dataset) and is part of the duplicate-row key. A boolean
@@ -434,6 +465,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         method_datasets = {m: sorted(map(str, g["dataset"].dropna().unique()))
                            for m, g in df.groupby("method")}
 
+    stored = style.stored_datasets(df)
     cov = None
     parts = None
     if aggregate == "summary":
@@ -473,19 +505,22 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     "Pass require_complete=True to restrict to the complete "
                     "intersection.",
                     "Pass --require-complete to keep only the methods scored on "
-                    "every dataset.")):
+                    "every dataset."),
+                stored=stored):
             warnings.warn(msg, UserWarning, stacklevel=2)
         raw_all = style.mean_rank_matrix(parts)
     else:
         if len(datasets) > 1:
-            warnings.warn(
-                f"aggregate='dataset' but the frame holds {len(datasets)} datasets "
-                f"({', '.join(datasets)}): values are averaged per method across "
-                "them and rows mix datasets. Pass aggregate='summary' for the "
-                "paper's rank-averaged panel, or filter to one dataset.",
-                UserWarning, stacklevel=2)
+            # the same per-dataset view as the summary, only to see which
+            # datasets share methods; the figure itself shows raw values
+            for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df),
+                                                   stored=stored):
+                warnings.warn(msg, UserWarning, stacklevel=2)
         raw_all = df.pivot_table(index="method", columns="metric", values="value",
                                  aggfunc="mean")
+    backend = style.backend_warning(df)
+    if backend:
+        warnings.warn(backend, UserWarning, stacklevel=2)
 
     def _block(label, cmap, raw):
         if aggregate == "summary" and overall == "mean_overall":
@@ -560,6 +595,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
             raise ValueError(msg)
         warnings.warn(msg, UserWarning, stacklevel=2)
 
+    msg = _no_comparison_message(idx, style.constant_columns(
+        pd.concat([b.raw for b in blocks], axis=1)))
+    if msg:
+        warnings.warn(msg, UserWarning, stacklevel=2)
+
     return BubbleTable(
         methods=idx, blocks=blocks,
         matrix=pd.concat([b.norm for b in blocks], axis=1),
@@ -574,6 +614,35 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         needs_labels=needs_labels,
         na_cells=na_cells,
     )
+
+
+def _no_comparison_message(methods, constant: dict) -> str | None:
+    """The warning for a figure whose fill and rank compare nothing somewhere.
+
+    One method: every column. Several: the columns in ``constant`` (from
+    :func:`multibench.plot.style.constant_columns`). ``render`` draws those
+    fills in :data:`CONSTANT_FILL`.
+    """
+    if len(methods) == 1:
+        return (f"only one method ({methods[0]}) in this figure: fill and rank "
+                f"show no comparison, so the fills are grey. Plot {methods[0]} "
+                f"with methods scored on the same dataset.")
+    if constant:
+        cols = ", ".join(f"{c} ({v:.3f})" for c, v in constant.items())
+        which = "that column is" if len(constant) == 1 else "those columns are"
+        return (f"all rows have the same value in {cols}: fill and rank show no "
+                f"comparison there, so {which} grey.")
+    return None
+
+
+def _constant_note(methods, constant: dict) -> str | None:
+    """The footnote line naming the grey columns (``None`` when there are none)."""
+    if len(methods) == 1:
+        return "Grey fill: one method, nothing to compare."
+    if constant:
+        return "Grey fill: all rows equal in " + ", ".join(
+            f"{c} ({v:.3f})" for c, v in constant.items()) + "."
+    return None
 
 
 def _na_report(blocks, parts, aggregate: str) -> list:
@@ -787,6 +856,16 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         return pd.Series(np.maximum(rad, 0.12), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
+    # a column whose rows all hold one value (every column of a one-method
+    # figure) is all ones after min-max: drawn from the ramp it would read as
+    # "High", so it gets a neutral fill; the ranks and scores are unchanged
+    constant = style.constant_columns(pd.concat([b.raw for b in tbl.blocks], axis=1))
+    flat_overall = {fi for fi, b in enumerate(tbl.blocks)
+                    if style.constant_columns(b.overall.to_frame("o"))}
+
+    def _fill(mp, value, flat):
+        return colors.to_rgba(CONSTANT_FILL) if flat else mp.to_rgba(value)
+
     n_na = 0          # NaN metric cells drawn as a dash (legend added if any)
     for x, fi, kind, name in col_meta:
         b, mp = tbl.blocks[fi], mappers[fi]
@@ -802,7 +881,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 _floor = min(0.30, 1.2 / max(n_rows, 1))
                 L = 1.24 * max(_floor, float(length[i]))
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
-                                       facecolor=mp.to_rgba(float(v)),
+                                       facecolor=_fill(mp, float(v), fi in flat_overall),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
 
         elif tbl.aggregate == "summary":
@@ -821,7 +900,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 _floor = min(0.30, 1.2 / max(n_rows, 1))
                 L = 0.95 * max(_floor, float(normv.loc[m]))
                 ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), L, ROW_H - 0.32,
-                                       facecolor=mp.to_rgba(float(normv.loc[m])),
+                                       facecolor=_fill(mp, float(normv.loc[m]),
+                                                       name in constant),
                                        edgecolor="#333333", linewidth=0.4, zorder=3))
         else:
             vals, normv = b.raw[name], b.norm[name]
@@ -835,7 +915,8 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                     continue
                 y = n_rows - i - 0.5
                 ax.add_patch(Circle((x + 0.55, y), R_MAX * float(rad.loc[m]) * 0.9,
-                                    facecolor=mp.to_rgba(float(normv.loc[m])),
+                                    facecolor=_fill(mp, float(normv.loc[m]),
+                                                    name in constant),
                                     edgecolor="#333333", linewidth=0.4, zorder=3))
 
     # ---- column titles: slanted 30deg above the table, with tick marks -----
@@ -898,16 +979,20 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     y_bottom = -2.9 if tbl.aggregate != "summary" else -1.8
     if tbl.aggregate == "summary":
         basis = getattr(tbl, "overall_basis", "rank")
-        what = ("minmax of re-ranked mean ranks" if basis == "rank"
-                else "mean of per-dataset overall")
-        note = (f"Overall = overall='{basis}' ({what}); "
-                "rows ordered by mean of family Overall")
+        what = ("each method's mean rank over datasets and metrics, scaled 0-1"
+                if basis == "rank" else
+                "the mean of each method's per-dataset Overall")
+        note = f"Overall (overall='{basis}'): {what}. {ROW_ORDER_NOTE}"
     else:
-        note = ("Overall = minmax(mean metric rank); "
-                "rows ordered by mean of family Overall")
+        note = OVERALL_NOTE
     y_text = y_bottom - 0.55
     ax.text(-0.9, y_text, note, fontsize=6.4, ha="left", va="center",
             color="#666666")
+    grey = _constant_note(methods, constant)
+    if grey:
+        y_text -= 0.45
+        ax.text(-0.9, y_text, grey, fontsize=6.4, ha="left", va="center",
+                color="#666666")
     if n_na:
         y_text -= 0.45
         ax.text(-0.9, y_text, f"{NA_MARK} = n/a (metric not computed for that method"
@@ -1024,8 +1109,11 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         ``require_complete=True`` dropped methods; each is named with the
         datasets it lacks.
     UserWarning
-        Under ``"summary"``: a dataset holds one method, or no method spans
-        two datasets.
+        A dataset holds one method, or no method spans two datasets.
+    UserWarning
+        A column has the same value in every row, or there is one method.
+    UserWarning
+        Rows scored with the igraph Leiden backend are shown with stored rows.
 
     Examples
     --------
@@ -1056,8 +1144,10 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
       ``order`` moves rows but never changes a rank or a score.
     - *Rank* legend: 1 = best, whereas ``BubbleTable.ranks`` /
       ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
-    - Footnote: the Overall formula in use, the ``n/a`` rule when a dash is
-      drawn, and the chip key.
+    - Grey fill: every row of that column holds the same value, or the
+      figure has one method, so there is nothing to compare.
+    - Footnote: the Overall formula in use, the grey columns, the ``n/a``
+      rule when a dash is drawn, and the chip key.
 
     **Overall formulas.** ``overall=`` sets the family *Overall* under
     ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
@@ -1115,9 +1205,14 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     **A new dataset.** The stored tables hold only the demo datasets, so
     rows from your own dataset have nothing stored to rank against. Plot
     that dataset on its own, or score your method on the demo dataset of
-    its category and add that row. Under ``"summary"``, a ``UserWarning``
-    names a dataset that holds one method, and says so when no method spans
-    two datasets.
+    its category and add that row. A ``UserWarning`` names a dataset that
+    holds one method, and says so when no method spans two datasets.
+
+    **Leiden backend.** The stored tables were clustered with leidenalg; the
+    igraph default can move ARI by up to about 0.1. When your rows say
+    ``igraph/...`` in ``scored_with`` and ARI, NMI or iF1 is shown, a
+    ``UserWarning`` names them. Set ``mtb.config.DEFAULT.leiden_flavor =
+    "leidenalg"`` before ``mtb.evaluate`` to compare them.
 
     **Name matching.** ``metrics``, ``methods`` and ``order`` match the
     frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
@@ -1128,7 +1223,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     - Chip: ``Py`` / ``R`` = the registry method's language; ``?`` = not a
       registry method (your own, a sweep variant).
-    - ``L`` badge: the method consumes cell-type labels (supervised), so its
+    - ``L`` badge: the method uses cell-type labels (supervised), so its
       clustering scores are not comparable with unsupervised rows. It
       follows the variants of the frame's single ``category`` (scMoMaT is
       supervised in mosaic only); without one, the registry's method-level

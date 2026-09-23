@@ -32,7 +32,7 @@ def test_to_long_exposed_top_level():
     wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
     long = mtb.to_long(wide, method="M", dataset="D", category="vertical")
     assert list(long.columns) == ["metric", "value", "method", "dataset", "category",
-                                  "clustering", "source"]
+                                  "clustering", "source", "scored_with"]
 
 
 def test_namespace_all_hygiene():

@@ -16,7 +16,30 @@ from ..data import catalog
 LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
 
 #: the ``attrs`` keys evaluate() sets on its frame and to_long() carries over
+#: (and joins into ``scored_with``); evaluate() also records ``scib_version``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
+
+#: ``scored_with`` of rows whose frame carries no record of how it was scored
+UNKNOWN_SCORING = "unknown"
+
+#: to_long's warning for such a frame (a hand-made frame, a wide CSV read back)
+NO_SCORING_RECORD = (
+    "these scores carry no record of how they were scored, so scored_with is "
+    "\"unknown\". A wide CSV read back loses that record. To keep it, save the "
+    "mtb.to_long(...) table instead of the wide one.")
+
+
+def _scib_version() -> str | None:
+    """The installed scib version, or ``None`` when it cannot be read."""
+    try:
+        from importlib.metadata import version
+        return version("scib")
+    except Exception:  # noqa: BLE001 - not installed, or no metadata
+        try:
+            import scib
+            return getattr(scib, "__version__", None)
+        except Exception:  # noqa: BLE001
+            return None
 
 
 def _scored_with(attrs) -> str | None:
@@ -61,14 +84,20 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     -------
     pandas.DataFrame
         One row per metric, with the columns ``metric, value, method,
-        dataset, category, clustering, source``, plus ``scored_with`` when
-        ``value_df`` comes from ``mtb.evaluate``.
+        dataset, category, clustering, source, scored_with``. ``scored_with``
+        is ``"unknown"`` for a frame not from ``mtb.evaluate``.
 
     Raises
     ------
     ValueError
         ``value_df`` is already long, lacks ``Value`` or string metric names,
         or repeats a name.
+
+    Warns
+    -----
+    UserWarning
+        ``value_df`` has no record of how it was scored; ``scored_with`` is
+        ``"unknown"``.
 
     Examples
     --------
@@ -100,11 +129,16 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     gives a user file without a category column. The published tables use
     ``clustering`` values ``"louvain"`` / ``"kmeans"`` for their variants.
 
-    **Provenance.** A frame from ``mtb.evaluate`` gets one more column,
-    ``scored_with``, such as ``"leidenalg/sweep/0.3.2"``: the Leiden backend,
-    where the clusters came from (``sweep`` or ``user``) and the package
-    version; ``none`` fills a part that did not apply. The same three values
-    are in ``attrs``.
+    **Provenance.** The ``scored_with`` column of a frame from
+    ``mtb.evaluate`` reads like ``"leidenalg/sweep/0.3.2"``: the Leiden
+    backend, where the clusters came from (``sweep`` or ``user``) and the
+    package version; ``none`` fills a part that did not apply. The same
+    three values and ``scib_version`` are in ``attrs``.
+
+    Any other frame, such as a hand-made one or a wide CSV read back, has no
+    such record. Its rows get ``scored_with = "unknown"`` and a
+    ``UserWarning``. To keep the record, save the long table:
+    ``mtb.to_long(...).to_csv(path, index=False)``.
 
     The stored tables have no ``scored_with`` column, so it is NaN for their
     rows after ``pd.concat``. ``load_results(result_path=...)`` keeps the
@@ -193,13 +227,14 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     out["clustering"] = clustering
     out["source"] = source
     stamp = _scored_with(getattr(value_df, "attrs", None))
-    cols = list(LONG_COLUMNS)
-    if stamp is not None:
-        out["scored_with"] = stamp
-        cols.append("scored_with")
-    out = out[cols].reset_index(drop=True)
-    if stamp is not None:
+    out["scored_with"] = UNKNOWN_SCORING if stamp is None else stamp
+    out = out[LONG_COLUMNS + ["scored_with"]].reset_index(drop=True)
+    if stamp is None:
+        warnings.warn(NO_SCORING_RECORD, UserWarning, stacklevel=2)
+    else:
         out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
+        if "scib_version" in value_df.attrs:
+            out.attrs["scib_version"] = value_df.attrs["scib_version"]
     return out
 
 
@@ -614,28 +649,41 @@ def evaluate(
     (``ASW``, ``iASW``, ``cLISI``, the batch family). ``clustering=``
     removes the need for ``ARI`` / ``NMI`` only; ``iF1`` always sweeps.
 
-    **Metric definitions.** Every value lies in 0-1 and higher is better.
-    ARI can fall below 0; about 0 means a random clustering. Each metric is
-    a scib 1.x function on the embedding, with scanpy's default neighbour
-    graph (15 neighbours).
+    **Metric definitions.** All metrics are scaled so that higher is better.
+    Most lie between 0 and 1; ARI can be slightly below 0, which means a
+    random clustering.
+
+    Each metric is a scib function on the embedding. The package requires
+    ``scib >= 1.1``; ``attrs["scib_version"]`` records the installed version.
+
+    The metrics look at different neighbourhoods:
+
+    - the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default
+      neighbour graph (15 neighbours);
+    - cLISI and iLISI use k0 = 90 neighbours (scib default; perplexity
+      k0/3);
+    - ASW, iASW and ASW_batch use distances in the embedding;
+    - kBET builds its own neighbour graph.
 
     The sweep clusters at 10 resolutions (0.2 to 2.0) and keeps the one with
     the highest NMI. ``iso_threshold`` = number of batches + 1 counts every
     cell type as isolated; scib's default counts only types found in few
     batches.
 
-    The scib call behind each code::
+    The scib call behind each code:
 
-        code       scib function         arguments
-        ARI, NMI   ari, nmi              Leiden clusters, best sweep resolution
-        ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
-        iASW       isolated_labels_asw   iso_threshold = number of batches + 1
-        iF1        isolated_labels_f1    same threshold; best F1 over the sweep
-        cLISI      clisi_graph           type_="embed"; scaled to 0-1 by scib
-        ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
-        GC         graph_connectivity    on the 15-neighbour graph
-        iLISI      ilisi_graph           type_="embed"; scaled to 0-1 by scib
-        kBET       kBET                  computed only when named in metrics=[...]
+    ```text
+    code       scib function         arguments
+    ARI, NMI   ari, nmi              Leiden clusters, best sweep resolution
+    ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
+    iASW       isolated_labels_asw   iso_threshold = number of batches + 1
+    iF1        isolated_labels_f1    same threshold; best F1 over the sweep
+    cLISI      clisi_graph           type_="embed", k0 = 90; scaled to 0-1
+    ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
+    GC         graph_connectivity    on the 15-neighbour graph
+    iLISI      ilisi_graph           type_="embed", k0 = 90; scaled to 0-1
+    kBET       kBET                  computed only when named in metrics=[...]
+    ```
 
     The re-run tables were scored by multibench 0.2.1's ``evaluate`` with
     these definitions and the leidenalg backend. The published tables were
@@ -663,11 +711,15 @@ def evaluate(
     metric, one column ``Value``, never empty. ``mtb.to_long`` makes the
     long frame (lowercase ``value``) that ``load_results`` returns.
 
-    **Provenance.** ``attrs`` holds ``leiden_flavor`` (the backend of the
-    Leiden sweep; ``None`` when no sweep ran), ``clustering`` (where the
-    clusters ARI and NMI scored came from: ``"sweep"`` or ``"user"``;
-    ``None`` without ARI and NMI) and ``multibench_version``.
-    ``mtb.to_long`` writes them to a ``scored_with`` column.
+    **Provenance.** ``attrs`` records how the scores were computed:
+
+    - ``leiden_flavor`` - the backend of the Leiden sweep; ``None`` when no
+      sweep ran;
+    - ``clustering`` - where the clusters ARI and NMI scored came from:
+      ``"sweep"`` or ``"user"``; ``None`` without ARI and NMI;
+    - ``multibench_version`` and ``scib_version`` - the installed versions.
+
+    ``mtb.to_long`` writes the first three to a ``scored_with`` column.
 
     **Output formats.** A file path may be ``.h5`` (dataset ``data``, the
     benchmark's ``embedding.h5``), ``.h5ad`` (read as an AnnData),
@@ -774,6 +826,7 @@ def evaluate(
     from .. import __version__
     out.attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
     out.attrs["multibench_version"] = __version__
+    out.attrs["scib_version"] = _scib_version()
     if out.empty:
         # unreachable after _plan_metrics; kept so a future metric family
         # mismatch fails loudly instead of handing back a (0, 1) frame
