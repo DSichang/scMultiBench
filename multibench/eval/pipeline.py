@@ -633,10 +633,10 @@ def evaluate(
     ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
     iASW       isolated_labels_asw   iso_threshold = number of batches + 1
     iF1        isolated_labels_f1    same threshold; best F1 over the sweep
-    cLISI      clisi_graph           type_="embed"; scaled to 0-1 by scib
+    cLISI      clisi_graph           type_="embed", k0 = 90; scaled to 0-1
     ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
     GC         graph_connectivity    on the 15-neighbour graph
-    iLISI      ilisi_graph           type_="embed"; scaled to 0-1 by scib
+    iLISI      ilisi_graph           type_="embed", k0 = 90; scaled to 0-1
     kBET       kBET                  computed only when named in metrics=[...]
     ```
 
