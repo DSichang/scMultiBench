@@ -364,8 +364,8 @@ def list_tasks() -> list[str]:
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.list_tasks()                        # ['batch', 'classification', 'clustering', ...]
-    >>> mtb.find_methods(task="imputation")
+    >>> mtb.list_tasks()                        # ['batch', 'clustering', 'dimension_reduction']
+    >>> mtb.find_methods(task="dimension_reduction")
 
     See Also
     --------

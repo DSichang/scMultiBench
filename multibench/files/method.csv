@@ -2,7 +2,7 @@ Methods,Programming Language,Deep Learning,Peak/Gene Activity,Output,CellType In
 SCALEX,python,Yes,Gene Activity,embedding,No,diagonal,clustering;batch
 Multigrate,python,Yes,-,embedding,No,mosaic;vertical;cross,clustering;batch
 Seurat_v5,R,No,Peak,embedding,No,diagonal,clustering;batch
-scBridge,python,Yes,Gene Activity,embedding,Yes,diagonal,clustering;batch;classification
+scBridge,python,Yes,Gene Activity,embedding,Yes,diagonal,clustering;batch
 totalVI,python,Yes,-,embedding,No,vertical;mosaic;cross,clustering
 MultiVI,python,Yes,-,embedding,No,mosaic,clustering
 Cobolt,python,Yes,-,embedding,No,mosaic,clustering
@@ -19,10 +19,10 @@ SMILE,python,Yes,-,embedding,No,mosaic,clustering
 Portal,python,Yes,Gene Activity,embedding,No,diagonal,clustering
 uniPort,python,Yes,Gene Activity,embedding,No,diagonal,clustering
 sciCAN,python,Yes,Gene Activity,embedding,No,diagonal,clustering
-scJoint,python,Yes,-,embedding,No,diagonal,classification
+scJoint,python,Yes,-,embedding,No,diagonal,clustering;batch
 GLUE,python,Yes,-,embedding,No,diagonal,clustering
 MultiMAP,python,Yes,Peak,embedding,No,diagonal,clustering
-sciPENN,python,Yes,-,embedding,No,mosaic,imputation
+sciPENN,python,Yes,-,embedding,No,mosaic,clustering;batch;dimension_reduction
 scMSI,python,Yes,-,embedding,No,vertical,clustering
 UnitedNet,python,Yes,-,embedding,No,cross,clustering
 iPOLNG,python,Yes,-,embedding,No,vertical,clustering

@@ -203,7 +203,7 @@ class ArgSpec:
 
 @dataclass
 class OutputSpec:
-    kind: str               # embedding | graph | labels (io.load_output also accepts imputed | markers)
+    kind: str               # embedding | graph | labels (io.load_output also accepts markers)
     file: str               # filename written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
     # Order of the cells in the output's rows, for a script that does not

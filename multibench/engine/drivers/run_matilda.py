@@ -5,8 +5,8 @@ the train stage, which writes no embedding. Matilda's documented API
 (https://pyanglab.github.io/Matilda/) is the object API: `matilda.train()` fits
 the shared model, then `matilda.task()` runs any combination of tasks on it.
 
-The driver trains once, then runs dimension reduction + classification in one
-pass (the model loads once), writing:
+The driver trains once, then runs Matilda's task step once on the trained model
+(the model loads once), writing:
   <save_path>/embedding.h5   dataset "data"  -> the integrated latent space (cells x z_dim)
   <save_path>/predict.csv                    -> per-cell predictions (when available)
 

@@ -541,7 +541,7 @@ def scan(dataset: str, category: str | None = None, *,
         ``mtb.config.DEFAULT.data_path``.
     out_dir : path | str
         Root the ``command`` lines write under; default the literal
-        placeholder ``'<out_dir>'``. Pass the real one for paste-ready lines.
+        placeholder ``'<out_dir>'``. Pass the real one for ready-to-run lines.
     params : dict | None
         ``{method: {key: value}}`` hyperparameter overrides, rendered into
         ``command`` and checked against the keys each method accepts.
@@ -579,7 +579,7 @@ def scan(dataset: str, category: str | None = None, *,
     >>> df = mtb.scan("D11", "vertical")
     >>> df[["method", "modalities", "runnable", "reason"]]
     >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]   # what blocks the rest
-    >>> print(df.loc[df.files_ok, "command"].iloc[0])                  # a paste-ready shell line
+    >>> print(df.loc[df.files_ok, "command"].iloc[0])                  # a ready-to-run shell line
     >>> mtb.scan("MYCITE", "vertical", data_path="/path/to/data", out_dir="out/")
 
     Notes
@@ -650,7 +650,7 @@ def scan(dataset: str, category: str | None = None, *,
     - On a GPU-less host it already carries each method's ``cpu_params``
       (the flags that turn CUDA off where a switch exists).
     - A row blocked only by ``env_ok`` still shows its command - the line to
-      paste into a job script once the env is built.
+      put in a job script once the env is built.
 
     **The modalities column.** ``modalities`` is a ``+``-joined string here
     (``"rna+adt"``); ``run_all`` / ``inputs_for`` take a list

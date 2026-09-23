@@ -5,8 +5,10 @@ the tests here pin shape and reachability, not truth - do not add a DOI from
 memory (see the header of references.yaml).
 """
 import re
+from pathlib import Path
 
 import pytest
+import yaml
 
 import multibench as mtb
 from multibench.engine import registry
@@ -51,7 +53,10 @@ def test_notes_long_only_verbose():
     info = mtb.method_info("totalVI")
     assert "notes_long" not in info
     v = mtb.method_info("totalVI", verbose=True)
-    assert len(v["notes_long"]) > 1000
+    # the upstream audit note verbatim, far longer than the one-line summary
+    audit = yaml.safe_load((Path(registry.__file__).parent / "upstream_knobs.yaml").read_text())
+    assert v["notes_long"] == audit["totalVI"]["notes"]
+    assert len(v["notes_long"]) > 3 * len(v["notes"])
     assert mtb.method_info("Multigrate", verbose=True)["notes_long"] is None   # unaudited
     # the other keys are unchanged by verbose (it adds notes_long)
     assert {k: val for k, val in v.items() if k != "notes_long"} == info

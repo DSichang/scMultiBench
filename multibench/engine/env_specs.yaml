@@ -98,7 +98,7 @@ totalVI:
   package_source: 'PyPI: scvi-tools. totalVI is scvi.model.TOTALVI; there is no separate totalVI package.'
   difficulty: verified
   verified_working: true
-  caveats: numpy<2 is a precaution for the scvi-tools/scanpy stack; the scripts use no API removed in numpy 2.0. torch, seaborn and scrublet are imported only by main_totalVI_imputation.py; scrublet is never called but must be installed for the import to succeed. muon is imported by neither script.
+  caveats: numpy<2 is a precaution for the scvi-tools/scanpy stack; the scripts use no API removed in numpy 2.0. torch, seaborn and scrublet are imported only by the second upstream script in tools_scripts/totalVI/, not by main_totalVI.py, which the package runs; scrublet is never called but must be installed for the import to succeed. muon is imported by neither script.
 MultiVI:
   python_version: '3.9'
   conda_channels: []
@@ -518,7 +518,7 @@ sciPENN:
   package_source: 'PyPI: sciPENN (upstream jlakkis/sciPENN).'
   difficulty: easy
   verified_working: false
-  caveats: sciPENN declares numba<=0.50.0, which predates Python 3.9 support; if pip cannot resolve it, install sciPENN with --no-deps and then the packages listed here. numpy<2 is a precaution for the scanpy/anndata stack. run_scipenn_classification.sh calls main_sciPENN_classification.py, which is not in tools_scripts/sciPENN/.
+  caveats: sciPENN declares numba<=0.50.0, which predates Python 3.9 support; if pip cannot resolve it, install sciPENN with --no-deps and then the packages listed here. numpy<2 is a precaution for the scanpy/anndata stack.
 scMSI:
   python_version: '3.9'
   conda_channels: []
@@ -600,7 +600,7 @@ StabMap:
   package_source: 'Bioconductor: StabMap (conda: bioconductor-stabmap); development version at MarioniLab/StabMap.'
   difficulty: R
   verified_working: false
-  caveats: R only. The scripts load StabMap, rhdf5, SingleCellExperiment, scran, Seurat and HDF5Array, and source util.R / util_imputation.R from the working directory. util.R deletes an existing output file with system('rm ...'), so a Unix shell is assumed.
+  caveats: R only. The scripts load StabMap, rhdf5, SingleCellExperiment, scran, Seurat and HDF5Array, and source a helper R file (util.R for main_StabMap.Rmd) from the working directory. util.R deletes an existing output file with system('rm ...'), so a Unix shell is assumed.
 UINMF:
   python_version: ''
   conda_channels:
@@ -679,7 +679,7 @@ Conos:
   package_source: 'CRAN: conos and pagoda2 (conda: r-conos, r-pagoda2; upstream kharchenkolab); Bioconductor: rhdf5 and HDF5Array.'
   difficulty: R
   verified_working: true
-  caveats: R only. conos and pagoda2 compile C++ and depend on igraph; the conda packages avoid building them from source. The scripts load conos, pagoda2, ggplot2, rhdf5 and HDF5Array; main_Conos_classification.Rmd also loads glue.
+  caveats: R only. conos and pagoda2 compile C++ and depend on igraph; the conda packages avoid building them from source. The scripts load conos, pagoda2, ggplot2, rhdf5 and HDF5Array; glue is loaded only by the second upstream script, not by main_Conos.Rmd, which the package runs.
 MOFA2:
   python_version: '3.9'
   conda_channels:
