@@ -1618,9 +1618,15 @@ class BatchResult:
                 # seven columns (clustering/source) as an attached one
                 wide = pd.DataFrame({"Value": list(r["metrics"].values())},
                                     index=list(r["metrics"]))
-                frames.append(_to_long(wide, method=r.get("method"),
-                                       dataset=r.get("dataset", self.dataset),
-                                       category=r.get("category", self.category)))
+                with warnings.catch_warnings():
+                    # a metrics dict has no scoring record: keep the seven
+                    # columns without to_long's wide-CSV warning
+                    warnings.simplefilter("ignore", UserWarning)
+                    frames.append(_to_long(
+                        wide, method=r.get("method"),
+                        dataset=r.get("dataset", self.dataset),
+                        category=r.get("category", self.category)
+                    ).drop(columns="scored_with"))
         if not frames:
             return pd.DataFrame(columns=cols)
         return pd.concat(frames, ignore_index=True)

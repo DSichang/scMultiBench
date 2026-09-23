@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from . import style
+from .. import config as _config
 from .style import compute_overall, minmax, rank_max
 
 # scIB metric families, so a summary can be split the way the benchmark reports
@@ -79,6 +80,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         Several datasets and a method missing from some of them.
     UserWarning
         A dataset holds one method, or no method spans two datasets.
+    UserWarning
+        Rows scored with the igraph Leiden backend are shown with stored rows.
 
     Examples
     --------
@@ -144,6 +147,12 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     methods missing from some dataset. Plot a new dataset with the methods
     scored on it.
 
+    **Leiden backend.** The stored tables were clustered with leidenalg. A
+    ``UserWarning`` names your methods whose ``scored_with`` starts with
+    ``igraph/`` when ARI, NMI or iF1 is scored next to stored rows. Set
+    ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` before
+    ``mtb.evaluate`` to compare them.
+
     **Errors.** An unknown ``metrics`` code gets a did-you-mean hint and the
     list of metrics present. Batch metrics need a multi-batch dataset: a
     single-batch design has none to compute, which is what the
@@ -194,9 +203,17 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     # always ranks within each dataset first
     for msg in style.coverage_warnings(
             parts, basis=overall,
-            incomplete_fix="Filter long_df to the methods scored on every "
-                           "dataset to compare like with like."):
+            incomplete_fix=_config.hint(
+                "Filter long_df to the methods scored on every dataset to compare "
+                "like with like.",
+                "Pass --methods with the methods scored on every dataset to compare "
+                "like with like."),
+            stored=style.stored_datasets(long_df)):
         warnings.warn(msg, UserWarning, stacklevel=2)
+    shown = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
+    backend = style.backend_warning(shown)
+    if backend:
+        warnings.warn(backend, UserWarning, stacklevel=2)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed
     # so the best method is drawn on top

@@ -43,4 +43,8 @@ def test_cli_plot_category_relies_on_api_warning(tmp_path):
                         "--category", "cross", "--dataset", "D52", "--out", str(out)],
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
-    assert r.stderr.count("only one method") == 1, r.stderr   # the API warning, once
+    # the API warnings only: load_results' note once, and the figure's own
+    # one-method warning (grey fills); never the CLI's --input note
+    assert r.stderr.count("only one method (scMoMaT) in the published table") == 1, r.stderr
+    assert r.stderr.count("only one method (scMoMaT) in this figure") == 1, r.stderr
+    assert "only one method in this table" not in r.stderr

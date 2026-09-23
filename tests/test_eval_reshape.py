@@ -11,7 +11,9 @@ def test_to_long_shape_and_canonicalization():
     df = pd.DataFrame({"Value": [0.8, 0.6]}, index=["ARI", "NMI"])
     out = to_long(df, method="SCALEX", dataset="D27", category="diagonal")
     assert list(out.columns) == ["metric", "value", "method", "dataset", "category",
-                                 "clustering", "source"]
+                                 "clustering", "source", "scored_with"]
+    # a hand-made frame carries no scoring record
+    assert set(out["scored_with"]) == {"unknown"}
     assert set(out["clustering"]) == {"default"} and set(out["source"]) == {"user"}
     # values preserved
     vals = dict(zip(out["metric"], out["value"]))
@@ -52,7 +54,7 @@ def test_to_long_rejects_colliding_metric_names():
     out = to_long(df, method="M", dataset="D", category="vertical")
     assert out["metric"].tolist() == ["NMI"]
     assert list(out.columns) == ["metric", "value", "method", "dataset", "category",
-                                 "clustering", "source"]
+                                 "clustering", "source", "scored_with"]
     # a named index (e.g. read back from CSV) still becomes 'metric'
     df = pd.DataFrame({"Value": [0.5]}, index=pd.Index(["ARI"], name="Metric"))
     assert to_long(df, method="M", dataset="D", category="vertical")["metric"].tolist() == ["ARI"]
@@ -66,7 +68,8 @@ def test_to_long_columns_pin_results_columns():
     from multibench.data.results import COLUMNS
     from multibench.eval.pipeline import LONG_COLUMNS
     w = pd.DataFrame({"Value": [0.5]}, index=["ARI"])
-    assert to_long(w, method="M", dataset="D", category="vertical").columns.tolist() == COLUMNS == LONG_COLUMNS
+    cols = to_long(w, method="M", dataset="D", category="vertical").columns.tolist()
+    assert cols[:7] == COLUMNS == LONG_COLUMNS and cols[7:] == ["scored_with"]
 
 
 def test_to_long_provenance_override_and_keyword_only_call():
@@ -86,7 +89,7 @@ def test_to_long_dataset_and_category_default_to_placeholders():
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
     out = to_long(w, method="M")
     assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
-                                    "clustering", "source"]
+                                    "clustering", "source", "scored_with"]
     assert set(out.dataset) == {"all"} and set(out.category) == {"user"}
 
 
@@ -151,7 +154,8 @@ def test_to_long_accepts_plain_read_csv_of_evaluate_frame(tmp_path):
     assert out.metric.tolist() == ["ARI", "NMI"]
     assert out.value.tolist() == wide["Value"].tolist()
     assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
-                                    "clustering", "source"]
+                                    "clustering", "source", "scored_with"]
+    assert set(out["scored_with"]) == {"unknown"}            # the CSV lost the record
     # the documented read-back gives the same rows
     same = to_long(pd.read_csv(f, index_col=0), method="M", dataset="D", category="vertical")
     pd.testing.assert_frame_equal(out, same)

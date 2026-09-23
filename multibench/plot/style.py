@@ -27,6 +27,8 @@ def minmax(x: np.ndarray) -> np.ndarray:
 
     Values are compared after rounding to :data:`TIE_DECIMALS` places, so a
     column that differs only by floating-point noise counts as constant.
+    The bubble figure draws such a column in a neutral grey
+    (:func:`constant_columns`); the numbers stay as in R.
     """
     x = _tie_round(x)
     lo = np.nanmin(x) if np.isfinite(x).any() else np.nan
@@ -127,16 +129,67 @@ def coverage(parts: dict) -> pd.Series:
     return pd.Series(counts, dtype=int).sort_index()
 
 
-def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
+#: ``source`` values of the stored tables (``mtb.load_results``)
+STORED_SOURCES = ("published", "rerun")
+
+
+def stored_datasets(df: pd.DataFrame) -> tuple:
+    """Datasets that hold rows of a stored table (``source`` published or rerun).
+
+    ``()`` when the frame has no ``dataset`` or ``source`` column. The
+    cross-dataset warnings use it to name the dataset a user's own method
+    should be scored on.
+    """
+    if not {"dataset", "source"} <= set(df.columns):
+        return ()
+    mask = df["source"].isin(STORED_SOURCES)
+    return tuple(sorted(map(str, df.loc[mask, "dataset"].dropna().unique())))
+
+
+def _no_overlap_message(parts: dict, stored=()) -> str | None:
+    """The message for datasets that share no method, else ``None``.
+
+    With stored rows in some datasets and a user's rows in others, the
+    remedy names the stored dataset(s) to score the user's method on.
+    """
+    n = len(parts)
+    cov = coverage(parts)
+    if not (n > 1 and len(cov) and (cov <= 1).all()):
+        return None
+    names = [str(ds) for ds in parts]
+    stored = [ds for ds in names if ds in set(map(str, stored))]
+    own = [ds for ds in names if ds not in stored]
+    if stored and own:
+        remedy = (f"score your method on {' or '.join(stored)} and add it to "
+                  f"that table")
+    else:
+        remedy = "score the same methods on every dataset"
+    return (f"rows come from {n} datasets ({', '.join(names)}) that share no "
+            f"method, so the figure ranks unrelated rows against each other. "
+            f"Plot each dataset on its own, or {remedy}.")
+
+
+def _lone_method_messages(parts: dict, consequence: str) -> list:
+    """One message per dataset that holds one method while the frame holds several."""
+    if len(coverage(parts)) <= 1:
+        return []
+    return [f"dataset {ds} has only one method ({mat.index[0]}), so {consequence}. "
+            f"Plot it with methods scored on the same dataset."
+            for ds, mat in parts.items() if len(mat.index) == 1]
+
+
+def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
+                      stored=()) -> list:
     """The warnings a cross-dataset summary of ``parts`` needs, as messages.
 
     ``parts`` is the dict from :func:`per_dataset_ranks`; ``basis`` the
     ``overall=`` in use; ``incomplete_fix`` the last sentence of the
-    incomplete-matrix message (it names the caller's own remedy). Shared by
-    ``plot.build_table`` (``aggregate="summary"``) and ``plot.bar``.
+    incomplete-matrix message (it names the caller's own remedy);
+    ``stored`` the datasets holding stored rows (:func:`stored_datasets`).
+    Shared by ``plot.build_table`` (``aggregate="summary"``) and ``plot.bar``.
 
     - no method is scored on two of several datasets: one message that the
-      summary ranks unrelated rows (it replaces the incomplete-matrix one);
+      figure ranks unrelated rows (it replaces the incomplete-matrix one);
     - otherwise, a method missing from some dataset: the incomplete-matrix
       message;
     - a dataset that holds one method while the frame holds several: one
@@ -145,12 +198,9 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
     out = []
     n = len(parts)
     cov = coverage(parts)
-    names = ", ".join(map(str, parts))
-    if n > 1 and len(cov) and (cov <= 1).all():
-        out.append(
-            f"no method is scored on more than one of these {n} datasets "
-            f"({names}); a summary across them ranks unrelated rows. Plot each "
-            f"dataset on its own, or score the same methods on every dataset.")
+    none_shared = _no_overlap_message(parts, stored)
+    if none_shared:
+        out.append(none_shared)
     elif n > 1 and (cov < n).any():
         part = cov[cov < n].sort_values()
         out.append(
@@ -159,16 +209,96 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
             + "; a method absent from a dataset scores rank 0 there under "
             "overall='rank' and is skipped under overall='mean_overall'. "
             + incomplete_fix)
-    if len(cov) > 1:
-        for ds, mat in parts.items():
-            if len(mat.index) != 1:
-                continue
-            what = ("its Overall there is 1.0 by construction" if basis == "mean_overall"
-                    else "its rank there is 1 by construction, the lowest possible")
-            out.append(
-                f"dataset {ds} has one method ({mat.index[0]}): {what}; plot it "
-                f"with the methods scored on the same dataset")
+    out += _lone_method_messages(
+        parts, "its Overall there is always 1.0" if basis == "mean_overall"
+        else "its rank there is always the lowest")
     return out
+
+
+def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
+    """The warnings a figure of raw values from several datasets needs.
+
+    ``aggregate="dataset"`` of ``plot.build_table``: rows from different
+    datasets are ranked against each other. ``aggregate="summary"`` is
+    suggested only when every method has rows in at least two datasets and
+    no dataset holds a single method; otherwise the summary would warn in
+    turn.
+    """
+    from .. import config
+    n = len(parts)
+    if n <= 1:
+        return []
+    lone = _lone_method_messages(
+        parts, "its row is ranked against rows from other datasets")
+    none_shared = _no_overlap_message(parts, stored)
+    if none_shared:
+        return [none_shared] + lone
+    names = ", ".join(map(str, parts))
+    msg = (config.hint("aggregate='dataset' but the frame",
+                       "--aggregate dataset but the table")
+           + f" holds {n} datasets ({names}): values are averaged per method "
+           "across them and rows mix datasets. ")
+    if (coverage(parts) >= 2).all() and not lone:
+        msg += config.hint(
+            "Pass aggregate='summary' for the paper's rank-averaged panel, or "
+            "filter to one dataset.",
+            "Pass --aggregate summary for the paper's rank-averaged panel, or "
+            "filter with --dataset.")
+    else:
+        msg += config.hint("Plot each dataset on its own.",
+                           "Plot each dataset on its own with --dataset.")
+    return [msg] + lone
+
+
+def constant_columns(mat: pd.DataFrame) -> dict:
+    """``{column: value}`` for the columns whose values are all equal.
+
+    Values are compared after rounding to :data:`TIE_DECIMALS` places; NaN
+    cells are ignored and an all-NaN column is left out. A one-row frame
+    lists every column that has a value.
+    """
+    out = {}
+    for col in mat.columns:
+        v = _tie_round(mat[col].to_numpy())
+        v = v[np.isfinite(v)]
+        if len(v) and (v == v[0]).all():
+            out[col] = float(v[0])
+    return out
+
+
+#: metrics whose value depends on the Leiden backend of the clustering sweep
+LEIDEN_METRICS = ("ARI", "NMI", "iF1")
+
+
+def backend_warning(df: pd.DataFrame) -> str | None:
+    """The message for igraph-scored rows plotted next to stored rows, else ``None``.
+
+    The stored tables were clustered with leidenalg. A row is affected when
+    its ``scored_with`` starts with ``igraph/`` and its metric came from the
+    sweep: iF1 always, ARI and NMI when the clusters part is ``sweep``.
+    Rows without ``scored_with`` (NaN) never trigger it.
+    """
+    from .. import config
+    if not {"source", "scored_with", "metric", "method"} <= set(df.columns):
+        return None
+    if not df["source"].isin(STORED_SOURCES).any():
+        return None
+    parts = df["scored_with"].astype("string").str.split("/")
+    flavor = parts.str[0].fillna("")
+    clusters = parts.str[1].fillna("")
+    hit = (flavor == "igraph") & (
+        (df["metric"] == "iF1")
+        | (df["metric"].isin(["ARI", "NMI"]) & (clusters == "sweep")))
+    if not hit.any():
+        return None
+    names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
+    return (f"rows for {names} were clustered with the igraph Leiden backend; "
+            f"the stored tables used leidenalg, which can move ARI by up to "
+            f"about 0.1. " + config.hint(
+                "Set mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before "
+                "evaluate to compare them.",
+                "Score them with multibench evaluate --leiden-flavor leidenalg "
+                "to compare them."))
 
 
 def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
