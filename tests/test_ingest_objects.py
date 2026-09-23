@@ -56,10 +56,10 @@ def test_export_raises_when_barcodes_differ(tmp_path):
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(rna, tmp_path / "X", atac=atac, atac_kind="peak")
     msg = str(e.value)
-    assert "atac has 30 cells but 30 barcodes are not in data" in msg
-    assert "all modalities of one dataset must cover the same cells" in msg
-    # a different cell count still says so (old phrase kept)
-    with pytest.raises(ValueError, match="all modalities of one dataset must cover the same cells"):
+    assert msg.startswith("RNA and ATAC have no cells in common.")
+    assert 'pass category="diagonal"' in msg
+    # a different cell count, no barcode in common: the same message
+    with pytest.raises(ValueError, match="RNA and ATAC have no cells in common"):
         ingest.export_dataset(rna, tmp_path / "Y", atac=atac[:10].copy(), atac_kind="peak")
 
 

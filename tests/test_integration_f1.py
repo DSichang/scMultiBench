@@ -97,9 +97,12 @@ def test_a_constant_placeholder_is_not_a_modality_the_variant_reads():
 def test_scan_has_no_setup_note_for_the_checked_bridge_requirement(root):
     sc = mtb.scan("D28", "diagonal", methods=["Seurat_v5"], data_path=root / "data",
                   verbose=False)
-    cav = sc.iloc[0]["caveat"]
-    assert "setup:" not in cav
-    assert "which need the same cells; these files hold different cells" in cav
+    row = sc.iloc[0]
+    assert "setup:" not in row["caveat"]
+    # the requirement is a file check now (study round 2, M15), not a caveat
+    assert not row["files_ok"]
+    assert "needs RNA and ATAC from the same cells as its bridge; these files hold " \
+        "different cells" in row["reason"]
     assert mtb.method_info("Seurat_v5")["setup_hint"]           # still in method_info
 
 

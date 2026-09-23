@@ -143,14 +143,16 @@ def and_list(items):
 
 def reordering_methods(cat, dataset):
     """``{method: [stem, ...]}`` for the methods whose
-    ``labels_for(dataset, cat, method)`` differs from the default
-    ``labels_for(dataset)``, read from the live package at generation time.
-    Needs the dataset on disk (``config.DEFAULT.data_path``); a missing one
-    raises instead of dropping the list from the tutorial."""
+    ``labels_for(dataset, cat, method)`` puts the files in another order than
+    the default ``labels_for(dataset)``, read from the live package at
+    generation time. A method that reads only some batches (UINMF: cty1, cty2)
+    keeps the default order of its files and is not listed. Needs the dataset
+    on disk (``config.DEFAULT.data_path``); a missing one raises instead of
+    dropping the list from the tutorial."""
     import multibench as mtb
     default = list(mtb.labels_for(dataset))
     orders = {m: list(mtb.labels_for(dataset, cat, m)) for m in sorted(mtb.list_methods(cat))}
-    return {m: o for m, o in orders.items() if o != default}
+    return {m: o for m, o in orders.items() if o != [s for s in default if s in o]}
 
 
 def atac_forms(cat):
@@ -352,8 +354,10 @@ EXPORT_DETAIL = {
      "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
      "```",
      # {peak_only}: filled in from the registry by build_tutorial
-     "For ATAC as a peak matrix only, pass `atac_kind=\"peak\"`. {peak_only} then fit "
-     "the folder, and `scan` shows their setup notes in its `caveat` column.",
+     "For ATAC as a peak matrix only, pass `atac_kind=\"peak\"`. {peak_only} read "
+     "peaks. Seurat_v5 also needs RNA and ATAC from the same cells, because it uses "
+     "them as its paired bridge. `scan` shows a method's setup note in its `caveat` "
+     "column.",
      OVERWRITE_NOTE,
  ],
  "mosaic": [
@@ -686,11 +690,12 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
             "`run_all` scores every order that fits the cell count and keeps the one "
             "with the highest ARI. The `label_order` column of `res.summary` shows the "
             "order it kept.", label="Details: label order"))
-        # the printed example is a method that fits the dataset (no scan caveat:
-        # Seurat_v5 reorders D28 too, but needs paired files D28 does not have)
+        # the printed example is a method that fits the dataset (files_ok, no
+        # scan caveat: Seurat_v5 reorders D28 too, but needs paired files D28
+        # does not have)
         import multibench as mtb
         fit = mtb.scan(ds, cat, methods=list(others), verbose=False)
-        fit = set(fit.loc[fit["caveat"] == "", "method"])
+        fit = set(fit.loc[fit["files_ok"] & (fit["caveat"] == ""), "method"])
         m0 = next((m for m in others if m in fit), next(iter(others)))
         labels_code += f'\nprint("{m0}:", list(mtb.labels_for(DATASET, CATEGORY, "{m0}")))'
     code(labels_code)

@@ -17,6 +17,10 @@ from .schema import AmbiguousVariantError, base_modality, is_label_role
 _ROLE_FILE_CANDIDATES = {
     "atac_gas": ("atac_gas", "atac"),    # ATAC gene-activity score
     "atac_peak": ("atac_peak", "peak"),  # raw ATAC peaks
+    # paired labels: export_dataset writes cty.csv; older folders named the
+    # same labels after the RNA cells (UnitedNet's variant read rna_cty.csv).
+    # Not next to atac_cty.csv: see _resolve_role.
+    "cty": ("cty", "rna_cty"),
 }
 # Numbered (per-batch) roles: ``atac<i>`` also reads ``atac_peak<i>.h5``, the
 # name 0.3.1's export_dataset wrote for mosaic (every mosaic method reads peaks).
@@ -51,6 +55,10 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     """
     is_label = ("cty" in role) or ("label" in role)
     stems, numbered = _role_stems(role)
+    if role == "cty" and (ds_dir / "atac_cty.csv").exists():
+        # rna_cty.csv next to atac_cty.csv labels the RNA cells of unpaired
+        # (diagonal) data, not the paired cells a cty role reads
+        stems = ("cty",)
     exts = (".csv", ".h5") if is_label else (".h5",)
     for stem in stems:
         for ext in exts:
@@ -359,6 +367,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
         (``mtb.AmbiguousVariantError``).
     ValueError
         ``check=True``: a transposed matrix, or label rows differ from the cell count.
+    ValueError
+        ``check=True``: files that must hold the same cells, in one order, do not.
     FileNotFoundError
         ``check=True``: an input file is missing, or ``data_dir`` lacks a file the method names.
 
@@ -419,6 +429,10 @@ def inputs_for(dataset: str, category: str, method: str, *,
     (``<role>.csv`` for a label role), a path that does not exist (see
     ``check``).
 
+    Label files: the ``cty`` role of paired data reads ``cty.csv``. An older
+    paired folder may name it ``rna_cty.csv``; that file is read when the
+    folder has neither ``cty.csv`` nor ``atac_cty.csv``.
+
     ATAC files: vertical methods read ``atac.h5``; ``method_info(m)['atac']``
     says whether it must hold peaks or gene activity. Diagonal methods read
     ``atac_peak.h5`` (peaks) and ``atac_gas.h5`` (gene activity). Mosaic
@@ -464,7 +478,14 @@ def inputs_for(dataset: str, category: str, method: str, *,
       does not take them);
     - ``data_dir`` content: ``FileNotFoundError`` when a file scBridge names
       inside ``data_dir`` (``rna.h5``, ``atac_gas.h5``, the two label CSVs) is
-      absent.
+      absent;
+    - same cells: ``ValueError`` when Seurat_v5's ``rna.h5`` and
+      ``atac_peak.h5`` hold different cells. Seurat_v5 builds its paired
+      bridge from these two files;
+    - ATAC cell order (diagonal): ``ValueError`` when the ``atac_gas.h5`` a
+      method reads holds other cells than ``atac_peak.h5``, or lists them in
+      another order. ``atac_cty.csv`` follows ``atac_peak.h5``. Barcodes that
+      differ only in a ``-1`` / ``-2`` suffix count as the same cell.
 
     **Dataset name case.** A spelling that differs from the folder only in
     case (``'d52'`` for ``D52`` on a case-insensitive filesystem) is replaced
@@ -508,14 +529,18 @@ def inputs_for(dataset: str, category: str, method: str, *,
                 + (" - " + "; ".join(near) if near else "")
             )
         _check_orientation(method, dataset, category, out)
+        _check_same_cells(method, dataset, category, out)
+        if category == "diagonal":
+            _check_atac_gas_cells(method, dataset, out)
         _check_label_lengths(method, dataset, category, out)
         if "data_dir" in out:
             ok, why = _check_data_dir(variant, out["data_dir"])
             if not ok:
                 raise FileNotFoundError(f"{method}/{dataset}/{category}: {why}")
             if category == "diagonal":
-                _check_diagonal_label_files(method, dataset,
-                                            _data_dir_files(variant, out["data_dir"]))
+                named = _data_dir_files(variant, out["data_dir"])
+                _check_atac_gas_cells(method, dataset, named)
+                _check_diagonal_label_files(method, dataset, named)
     elif check is None and missing:
         warnings.warn(
             f"{method}/{dataset}/{category}: {len(missing)} resolved input path(s) "
@@ -828,21 +853,30 @@ def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
     return True, ""
 
 
-#: Caveat text appended by scan() when an ``atac_gas`` role resolves to a peak matrix.
-PEAK_IN_GAS_CAVEAT = "atac_gas resolved to a peak matrix (features look like chr:start-end)"
-#: ``.format(role=...)`` templates of the two representation-mismatch caveats
+# Every caveat leads with the problem: the compact CLI table clips the caveat
+# column to 40 characters, so the first 30 carry the warning.
+#: Caveat text appended by scan() when an ``atac_gas`` role falls back to a
+#: peak matrix in ``atac.h5`` (the wanted representation not given).
+PEAK_IN_GAS_CAVEAT = ("expects gene activity; atac.h5 holds peaks (features look like "
+                      "chr:start-end)")
+#: ``.format(file=...)`` templates of the two representation-mismatch caveats
 #: reported when the method's wanted ATAC representation is known
 #: (``_preflight_caveats(resolved, atac=method_info(m)['atac'])``).
-PEAK_FED_TO_GAS_CAVEAT = ("{role} resolved to a peak matrix (features look like "
-                          "chr:start-end); this method expects gene activity")
-GAS_FED_TO_PEAK_CAVEAT = ("{role} resolved to a matrix whose features do not look "
-                          "like peaks (chr:start-end); this method expects peaks")
+PEAK_FED_TO_GAS_CAVEAT = ("expects gene activity; {file} holds peaks (features look like "
+                          "chr:start-end)")
+GAS_FED_TO_PEAK_CAVEAT = ("expects peaks; {file} holds gene activity (features do not "
+                          "look like chr:start-end)")
 #: ``.format(file=...)`` caveat for a modality file whose sampled values are not
 #: whole numbers (log-normalised data).
-NOT_COUNTS_CAVEAT = "{file} holds non-integer values; methods expect raw counts"
+NOT_COUNTS_CAVEAT = "expects raw counts; {file} holds non-integer values"
 #: Caveat for a diagonal folder whose only label file is ``cty.csv``.
-DIAGONAL_CTY_CAVEAT = ("label files: cty.csv found; diagonal needs rna_cty.csv "
-                       "and atac_cty.csv")
+DIAGONAL_CTY_CAVEAT = ("needs rna_cty.csv and atac_cty.csv for diagonal; the folder has "
+                       "only cty.csv")
+#: ``.format(used=, n=, unused=)`` caveat for a variant that reads fewer numbered
+#: batches than the folder holds: ``reads batches 1-2 of 3; batch 3 is not used``.
+UNUSED_BATCHES_CAVEAT = "reads batches {used} of {n}; {unused}"
+_UNUSED_BATCHES_RE = re.compile(r"reads batches [\d, and-]+ of \d+; batch(?:es)? "
+                                r"[\d, and-]+ (?:is|are) not used")
 # file stems (batch digits allowed) whose values must be raw counts
 _COUNT_FILE_RE = re.compile(r"^(rna|adt|atac_peak)\d*$")
 
@@ -897,17 +931,27 @@ def _peak_fraction_of(path: Path) -> float | None:
 
 
 #: methods whose script needs the same cells in two of its input roles:
-#: Seurat_v5 builds its bridge from rna + atac_peak (main_Seurat_v5.Rmd:39-44)
+#: Seurat_v5 builds its bridge from rna + atac_peak (main_Seurat_v5.Rmd:39-44;
+#: ``obj.multi[["ATAC"]] <- ...`` accepts only the cells the object holds)
 _SAME_CELL_ROLES = {"Seurat_v5": ("rna", "atac_peak")}
-#: ``.format(method=, a=, b=, n_a=, n_b=, shared=)`` template of that caveat
-SAME_CELLS_CAVEAT = ("{method} builds its bridge from {a} and {b}, which need the same "
-                     "cells; these files hold different cells ({n_a:,} and {n_b:,} "
-                     "cells, {shared:,} shared)")
+#: ``.format(method=, n_a=, n_b=, shared=)`` template of the file-check failure
+#: when those two files hold different barcode sets
+SAME_CELLS_REASON = ("{method} needs RNA and ATAC from the same cells as its bridge; these "
+                     "files hold different cells ({n_a:,} and {n_b:,}, {shared:,} shared)")
+#: ``.format(gas=, peak=, n_gas=, n_peak=, shared=)``: a diagonal gene-activity
+#: file whose cells are not the cells of the peak file next to it
+GAS_OTHER_CELLS_REASON = ("{gas} and {peak} hold different cells ({n_gas:,} and "
+                          "{n_peak:,}, {shared:,} shared). Both files need the same "
+                          "ATAC cells")
+#: ``.format(gas=, peak=, write=)``: the same cells in another order
+GAS_OTHER_ORDER_REASON = ("{gas} lists the ATAC cells in another order than {peak}; "
+                          "atac_cty.csv follows {peak}. Write it again with {write}")
 
 
 @functools.lru_cache(maxsize=64)
-def _sniff_barcodes(path: str, mtime_ns: int) -> frozenset | None:
-    """The ``matrix/barcodes`` of a canonical .h5 (cached by mtime), or None."""
+def _sniff_barcode_list(path: str, mtime_ns: int) -> tuple | None:
+    """The ``matrix/barcodes`` of a canonical .h5 in file order (cached by
+    mtime), or None."""
     import h5py
 
     try:
@@ -917,30 +961,127 @@ def _sniff_barcodes(path: str, mtime_ns: int) -> frozenset | None:
             raw = f["matrix/barcodes"][:]
     except OSError:
         return None
-    return frozenset(x.decode() if isinstance(x, (bytes, bytearray)) else str(x)
-                     for x in raw)
+    return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
 
 
-def _same_cells_caveat(method: str | None, resolved) -> list[str]:
-    """The :data:`SAME_CELLS_CAVEAT` when ``method`` needs two roles to hold the
-    same cells and their files' barcodes differ; ``[]`` otherwise (also for a
-    file that is not a readable canonical ``.h5``)."""
+def _barcodes_of(path) -> tuple | None:
+    """Barcodes of a readable canonical ``.h5``, else None."""
+    p = Path(path)
+    if p.suffix != ".h5" or not p.is_file():
+        return None
+    return _sniff_barcode_list(str(p), p.stat().st_mtime_ns)
+
+
+def _check_same_cells(method, dataset, category, resolved) -> None:
+    """``ValueError`` (:data:`SAME_CELLS_REASON`) when ``method`` needs two
+    roles to hold the same cells and their files' barcode sets differ. The
+    order may differ; a file that is not a readable canonical ``.h5`` is left
+    alone."""
     roles = _SAME_CELL_ROLES.get(method or "")
     if not roles or not all(r in resolved for r in roles):
-        return []
-    sets = []
-    for r in roles:
-        p = Path(resolved[r])
-        bars = (_sniff_barcodes(str(p), p.stat().st_mtime_ns)
-                if p.suffix == ".h5" and p.is_file() else None)
-        if bars is None:
-            return []
-        sets.append(bars)
-    if sets[0] == sets[1]:
-        return []
-    a, b = (Path(resolved[r]).name for r in roles)
-    return [SAME_CELLS_CAVEAT.format(method=method, a=a, b=b, n_a=len(sets[0]),
-                                     n_b=len(sets[1]), shared=len(sets[0] & sets[1]))]
+        return
+    bars = [_barcodes_of(resolved[r]) for r in roles]
+    if any(b is None for b in bars):
+        return
+    a, b = (set(x) for x in bars)
+    if a == b:
+        return
+    raise ValueError(f"{method}/{dataset}/{category}: " + SAME_CELLS_REASON.format(
+        method=method, n_a=len(a), n_b=len(b), shared=len(a & b)))
+
+
+def _check_atac_gas_cells(method, dataset, resolved) -> None:
+    """Diagonal: the gene-activity file a variant reads must list the cells of
+    the peak file next to it (``atac_peak.h5``, else ``peak.h5``), in its
+    order, because ``atac_cty.csv`` labels the peak file's cells.
+
+    Barcodes that differ only in a trailing ``-<n>`` suffix count as the same
+    cell when the suffix-free names stay unique (D28's two ATAC files end in
+    ``-1`` and ``-2``). Non-unique barcodes, or a file that is not a readable
+    canonical ``.h5``, are left alone.
+    """
+    from .ingest import _cell_order
+
+    gas = resolved.get("atac_gas")
+    if not gas:
+        return
+    gas = Path(gas)
+    peak = next((gas.parent / n for n in ("atac_peak.h5", "peak.h5")
+                 if (gas.parent / n).is_file()), None)
+    if peak is None or peak.name == gas.name:
+        return
+    a, b = _barcodes_of(gas), _barcodes_of(peak)
+    if a is None or b is None:
+        return
+    kind, _ = _cell_order(a, b)
+    if kind == "other":
+        why = GAS_OTHER_CELLS_REASON.format(gas=gas.name, peak=peak.name, n_gas=len(a),
+                                            n_peak=len(b), shared=len(set(a) & set(b)))
+    elif kind == "order":
+        why = GAS_OTHER_ORDER_REASON.format(
+            gas=gas.name, peak=peak.name,
+            write=config.hint("mtb.io.to_canonical(..., modality='gas')",
+                              "`multibench convert SRC DIR --modality gas`"))
+    else:
+        return
+    raise ValueError(f"{method}/{dataset}/diagonal: {why}")
+
+
+#: file names that carry a batch number: ``rna2.h5``, ``atac_peak3.h5``, ``cty1.csv``
+_BATCH_FILE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas)(\d+)\.h5$|^cty(\d+)\.csv$")
+#: role tokens that carry a batch number
+_BATCH_ROLE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas|cty)(\d+)$")
+
+
+def _variant_batches(roles) -> set[int]:
+    """Batch numbers named by numbered roles (``rna1``, ``adt2``, ``cty3``)."""
+    return {int(m.group(1)) for r in roles if (m := _BATCH_ROLE_RE.match(str(r)))}
+
+
+def _folder_batches(ds_dir: Path) -> set[int]:
+    """Batch numbers of the numbered modality and label files in ``ds_dir``."""
+    out = set()
+    for p in Path(ds_dir).iterdir():
+        m = _BATCH_FILE_RE.match(p.name)
+        if m:
+            out.add(int(m.group(1) or m.group(2)))
+    return out
+
+
+def _span(nums) -> str:
+    """``[1, 2]`` -> ``'1-2'``; ``[1, 3]`` -> ``'1 and 3'``; ``[3]`` -> ``'3'``."""
+    nums = sorted(nums)
+    if len(nums) > 1 and nums == list(range(nums[0], nums[-1] + 1)):
+        return f"{nums[0]}-{nums[-1]}"
+    if len(nums) > 2:
+        return ", ".join(map(str, nums[:-1])) + f" and {nums[-1]}"
+    return " and ".join(map(str, nums))
+
+
+def _unused_batches_note(resolved) -> str | None:
+    """:data:`UNUSED_BATCHES_CAVEAT` when the numbered roles of ``resolved``
+    name fewer batches than the folder holds (UINMF reads batches 1-2 of a
+    3-batch cross folder), else None."""
+    numbered = [(r, p) for r, p in resolved.items() if _BATCH_ROLE_RE.match(r)]
+    if not numbered:
+        return None
+    ds_dir = Path(numbered[0][1]).parent
+    if not ds_dir.is_dir():
+        return None
+    used = _variant_batches(r for r, _ in numbered)
+    held = _folder_batches(ds_dir) | used
+    unused = sorted(held - used)
+    if not unused:
+        return None
+    verb = "batch {} is not used" if len(unused) == 1 else "batches {} are not used"
+    return UNUSED_BATCHES_CAVEAT.format(used=_span(used), n=len(held),
+                                        unused=verb.format(_span(unused)))
+
+
+def unused_batches_in(caveat) -> str | None:
+    """The ``reads batches ... not used`` note inside a scan ``caveat`` text, or None."""
+    m = _UNUSED_BATCHES_RE.search(str(caveat or ""))
+    return m.group(0) if m else None
 
 
 def _preflight_caveats(resolved, *, atac: str | None = None,
@@ -980,11 +1121,16 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     ``category='diagonal'``: a folder whose only label file is ``cty.csv``
     -> :data:`DIAGONAL_CTY_CAVEAT`.
 
-    With ``method=`` a method that needs the same cells in two roles
-    (``_SAME_CELL_ROLES``: Seurat_v5's rna and atac_peak) also gets
-    :data:`SAME_CELLS_CAVEAT` when the two files' barcodes differ.
+    First of all: numbered roles that name fewer batches than the folder
+    holds -> :data:`UNUSED_BATCHES_CAVEAT`.
+
+    ``method`` is accepted and not used: the same-cells rule
+    (``_SAME_CELL_ROLES``) is a file check of :func:`inputs_for`.
     """
-    out: list[str] = _same_cells_caveat(method, resolved)
+    out: list[str] = []
+    note = _unused_batches_note(resolved)
+    if note:
+        out.append(note)
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":
@@ -1006,9 +1152,9 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
             if both and role.rstrip("0123456789") in ("atac_peak", "atac_gas"):
                 want = "peak" if role.startswith("atac_peak") else "gene_activity"
             if want == "gene_activity" and frac >= 0.9:
-                out.append(PEAK_FED_TO_GAS_CAVEAT.format(role=role))
+                out.append(PEAK_FED_TO_GAS_CAVEAT.format(file=Path(path).name))
             elif want == "peak" and frac <= 0.1:
-                out.append(GAS_FED_TO_PEAK_CAVEAT.format(role=role))
+                out.append(GAS_FED_TO_PEAK_CAVEAT.format(file=Path(path).name))
     seen = set()
     for role, path in resolved.items():
         p = Path(path)
@@ -1169,8 +1315,12 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     **Which files.** The benchmark stores cell-type labels as ``*cty*.csv`` in
     the flat dataset folder, under dataset-specific names (``cty.csv``,
     ``rna_cty.csv``, ``cty1.csv`` ...). All of them are returned except the
-    tool-specific ``*_scjoint*`` reformats. The set of files depends on the
-    dataset only, never on ``category`` or ``method``.
+    tool-specific ``*_scjoint*`` reformats.
+
+    One exception: with ``category`` and ``method``, a variant that reads
+    fewer numbered batches than the folder holds gets only the label files
+    of its batches. UINMF's cross variant reads batches 1 and 2, so on
+    ``D52`` the dict holds ``cty1`` and ``cty2``.
 
     **Default order.** Without ``category`` and ``method``, the order is
     not alphabetical:
@@ -1263,6 +1413,13 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         except AmbiguousVariantError:
             cand = None                 # still ambiguous: canonical order
         if cand is not None:
+            # a variant that reads fewer batches than the folder holds (UINMF:
+            # batches 1-2) gets only the label files of its batches
+            used = _variant_batches(r for a in cand.args
+                                    for r in (getattr(a, "roles", None) or [a.role]) if r)
+            if used:
+                stems = [st for st in stems
+                         if not re.fullmatch(r"cty\d+", st) or int(st[3:]) in used]
             rank = _variant_label_rank(stems, cand)
             if rank is not None:
                 stems = sorted(stems, key=lambda st: rank[st])
