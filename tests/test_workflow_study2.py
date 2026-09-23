@@ -58,7 +58,9 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert r["reason"].endswith("; " + r["env_reason"])      # env half verbatim
         assert "--packed --run" in r["reason"]                    # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
-    assert "{'atac_gas': 'atac_gas.h5', 'rna_cty': 'rna_cty.csv'}" in row["reason"]
+    # the meaning first for ATAC, then the other missing files by name (L31)
+    assert row["reason"].startswith("needs gene-activity ATAC (atac.h5); not in the folder; "
+                                    "missing rna_cty.csv; ")
 
 
 def test_scan_docs_name_the_four_columns():
@@ -151,10 +153,12 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
         with pytest.raises(ValueError) as e:
             mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False, **kw)
         msg = str(e.value)
-        assert "\nNote: method environments are linux-64" in msg
-        assert "run methods on a Linux host" in msg
-        assert not re.search(r"\n  Note", msg)          # never looks like a variant line
+        # the platform sentence is the first line after the head (L18)
+        assert msg.splitlines()[1].startswith(
+            "Methods run only on Linux (this computer is darwin/arm64).")
+        assert "run the methods on a Linux machine" in msg
+        assert not re.search(r"\n  Methods", msg)       # never looks like a variant line
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused", verbose=False)
-    assert "Note: method environments" not in str(e.value)
+    assert "Methods run only on Linux" not in str(e.value)

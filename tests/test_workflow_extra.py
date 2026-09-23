@@ -14,15 +14,18 @@ def test_list_categories_names_all_four():
 def test_describe_layout_names_files_and_flags_the_atac_trap():
     txt = mtb.describe_layout("vertical")
     assert "rna.h5" in txt and "adt.h5" in txt and "cty.csv" in txt
-    # a peak matrix dropped into atac.h5 runs everything on the wrong representation
-    assert "peak.h5" in txt and "atac.h5" in txt
+    # vertical reads atac.h5, and the method decides what it must hold (L34):
+    # a peak matrix in atac.h5 is wrong only for the gene-activity methods
+    assert "atac.h5" in txt and "method_info(m)['atac']" in txt
     # assert the SUBSTANCE of the warning, not one word of its phrasing: the
-    # text must say the ATAC representation can differ from what the role name
-    # implies, and that feeding the wrong one does not raise.
+    # text must say which representation each method needs, and that feeding
+    # the wrong one does not raise.
     low = txt.lower()
-    assert "atac_gas" in txt and "atac_peak" in txt
     assert "peaks" in low and ("gene activity" in low or "gene-activity" in low)
     assert "wrong" in low, "must warn that the wrong representation is silently wrong"
+    # the diagonal text names both representation files and the older name
+    diag = mtb.describe_layout("diagonal")
+    assert "atac_peak.h5" in diag and "atac_gas.h5" in diag and "peak.h5" in diag
 
 
 def test_package_docstring_has_import_and_categories():
@@ -47,7 +50,8 @@ def test_skip_existing_with_params_is_refused():
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
                     params={"Matilda": {"epochs": 5}}, skip_existing=True)
-    assert "OLD parameters" in str(e.value)
+    assert "earlier parameters" in str(e.value)
+    assert "OLD" not in str(e.value)                  # no emphasis by capitals (L61)
 
 
 def test_batch_result_attributes_are_documented():
@@ -161,29 +165,33 @@ def test_describe_layout_is_category_specific():
     unpaired user was told to write a single cty.csv - which silently mis-scores."""
     diag = mtb.describe_layout("diagonal")
     assert "rna_cty.csv" in diag and "atac_cty.csv" in diag
-    assert "LAYOUT FOR DIAGONAL" in diag
+    assert "\ndiagonal: " in diag
     vert = mtb.describe_layout("vertical")
-    assert "LAYOUT FOR VERTICAL" in vert
-    # the LAYOUT block is category-specific; the role table below it is a general
-    # reference and legitimately lists every role, so scope the check to the block
-    block = vert.split("LAYOUT FOR VERTICAL")[1].split("Modality roles")[0]
-    assert "atac_cty.csv" not in block
-    diag_block = diag.split("LAYOUT FOR DIAGONAL")[1].split("Modality roles")[0]
-    assert "atac_cty.csv" in diag_block
+    assert "\nvertical: " in vert
+    # per-category output prints only that category (L33): no role table of
+    # the others, so the whole text is checked, not a block of it
+    assert "atac_cty.csv" not in vert and "rna_cty.csv" not in vert
+    assert "\ndiagonal: " not in vert and "\nvertical: " not in diag
 
 
 # --- handover: registry-generated describe_layout lists, validated tokens -------
 
 def test_describe_layout_atac_lists_come_from_registry():
-    txt = mtb.describe_layout("diagonal")
-    gas_line = next(l for l in txt.splitlines() if "need GENE ACTIVITY" in l)
-    peak_line = next(l for l in txt.splitlines() if "need PEAKS" in l)
-    assert set(mtb.find_methods(atac="gene_activity")) == set(gas_line.split(":", 1)[1].strip().split("/"))
-    assert set(mtb.find_methods(atac="peak")) == set(peak_line.split(":", 1)[1].strip().split("/"))
-    # moETM and scMM declare role atac_gas yet consume PEAKS - registry, not prose
-    assert "moETM" in peak_line and "scMM" in peak_line
-    assert "Portal" in gas_line and "SCALEX" in gas_line
-    assert "WRONG" in txt
+    for cat in ("vertical", "diagonal"):
+        txt = mtb.describe_layout(cat)
+        gas_line = next(l for l in txt.splitlines() if "need gene activity:" in l)
+        peak_line = next(l for l in txt.splitlines() if "need peaks:" in l)
+        assert set(mtb.find_methods(cat, atac="gene_activity")) == \
+            set(gas_line.split(":", 1)[1].strip().split(", "))
+        assert set(mtb.find_methods(cat, atac="peak")) == \
+            set(peak_line.split(":", 1)[1].strip().split(", "))
+        # the wrong representation is named plainly, without capitals (L61)
+        assert "wrong embedding" in txt and "WRONG" not in txt and "!!" not in txt
+        if cat == "vertical":
+            # moETM and scMM declare role atac_gas yet consume PEAKS - registry, not prose
+            assert "moETM" in peak_line and "scMM" in peak_line
+        else:
+            assert "Portal" in gas_line and "SCALEX" in gas_line
 
 
 def test_describe_layout_rejects_typo():
@@ -194,11 +202,13 @@ def test_describe_layout_rejects_typo():
 
 def test_describe_layout_export_route():
     txt = mtb.describe_layout("cross")
-    assert "export_dataset" in txt and "float64" in txt and "gzip" in txt
-    # the vertical text keeps every praised sentence
+    # the export route per batch file; the storage dtype / compression are
+    # export_dataset's own parameters, no longer repeated here (L33)
+    assert "export_dataset" in txt and "--batch-index" in txt
+    # the vertical text keeps every needed fact, in plain case (L61)
     vert = mtb.describe_layout("vertical")
-    for s_ in ("FEATURES x CELLS", "TRANSPOSE", "single-column CSV", "FALLS BACK",
-               "to_canonical"):
+    for s_ in ("features x cells", "transpose", "single-column CSV",
+               "method_info(m)['atac']", "to_canonical"):
         assert s_ in vert
     assert "files_ok" in vert and "env_ok" in vert
 

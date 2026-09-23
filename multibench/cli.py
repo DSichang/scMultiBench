@@ -84,9 +84,14 @@ _TRUNCATE_COLUMNS = ("reason", "files_reason", "env_reason", "caveat", "command"
 
 
 def _truncate(text, width: int = _TRUNCATE_WIDTH) -> str:
-    """Clip ``text`` to ``width`` characters with a trailing ``...``."""
+    """Clip ``text`` to ``width`` characters with a trailing ``...``, at a
+    word boundary so a file name is never cut in the middle."""
     t = "" if text is None else str(text)
-    return t if len(t) <= width else t[: width - 3] + "..."
+    if len(t) <= width:
+        return t
+    head = t[: width - 3]
+    cut = head.rstrip().rfind(" ")
+    return (head[:cut].rstrip(" ;,") if cut > 0 else head) + "..."
 
 
 def _resolve_columns(df, columns, fmt: str, compact=None) -> list | None:

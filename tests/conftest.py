@@ -33,6 +33,21 @@ def _pin_conda_run_mode(request, monkeypatch):
     monkeypatch.setenv("MULTIBENCH_RUN_MODE", "conda")
 
 
+# ---- host-agnostic platform -------------------------------------------------
+# Method environments are Linux-only. Off Linux, scan / run / run_all word their
+# environment messages for that ("Linux-only environment ..."), and run()
+# refuses a missing env even when the env probe finds nothing. Most tests
+# assert the Linux behaviour, so pin the platform to Linux everywhere except in
+# the tests of the platform check itself. A test that needs another host
+# monkeypatches envs.host_platform_problem in its body, which overrides this.
+@_pytest.fixture(autouse=True)
+def _pin_linux_platform(request, monkeypatch):
+    if request.node.fspath.basename in ("test_envs_platform.py",):
+        return
+    from multibench.engine import envs
+    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+
+
 # ---- a results root with every published layout the loader reads ------------
 def _metric_csv(path: Path, **values: float) -> None:
     """Write a published-style metric table (unnamed index column + Value)."""

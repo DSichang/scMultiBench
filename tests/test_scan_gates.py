@@ -65,7 +65,9 @@ def test_scan_file_gate_runs_without_envs(tmp_path, no_envs):
     # class, no absolute paths); the env half is verbatim (it carries the
     # install command).
     for _, r in rows.iterrows():
-        assert r["reason"] == f"{W._short_reason(r['files_reason'], r['method'], 'ONLYRNA', 'vertical')}; {r['env_reason']}"
+        # the file half is built from the resolved paths (L31): the missing
+        # file by name, never cut; the folder listing stays in files_reason
+        assert r["reason"] == f"missing adt.h5; {r['env_reason']}"
         assert r["reason"].endswith("; " + r["env_reason"])
         assert "adt.h5" in r["reason"] and "not installed" in r["reason"]
         assert "FileNotFoundError" in r["files_reason"] and str(tmp_path) in r["files_reason"]
