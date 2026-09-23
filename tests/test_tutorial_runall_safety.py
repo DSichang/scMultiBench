@@ -163,11 +163,11 @@ def test_run_cells_execute_only_when_scan_finds_an_environment(cat):
                     f"tutorial_{cat}: run_all not gated on scan().env_ok: {ast.unparse(node)[:80]}"
                 assert GEN.SKIP_LINE in src, \
                     f"tutorial_{cat}: a skipped run prints the one line"
-                assert "stand_in(" in src or "stored_sweep(" in src, \
-                    f"tutorial_{cat}: a skipped run stands in a result computed elsewhere"
+                assert "replacement(" in src or "stored_sweep(" in src, \
+                    f"tutorial_{cat}: a skipped run loads a replacement computed elsewhere"
     assert n_runs == 2, f"tutorial_{cat}: section 2 and section 3 each run once"
-    assert GEN.SKIP_LINE == ("no method environment on this host - the run is skipped; "
-                             "a stand-in computed elsewhere covers it")
+    assert GEN.SKIP_LINE == ("no method environment on this computer: the run is skipped, "
+                             "and outputs computed elsewhere replace it")
 
 
 @pytest.mark.parametrize("cat", CATS)
@@ -177,7 +177,7 @@ def test_section_2_stand_in_uses_fetch_outputs_then_the_stored_table(cat):
     stored metric table only when that raises, one printed line each."""
     cells = [src for src in _code(f"tutorial_{cat}") if "mtb.run_all(" in src]
     src = cells[0]                                   # section 2, "One call"
-    assert GEN.STAND_IN_FN in src and GEN.STORED_SWEEP_FN in src
+    assert GEN.REPLACEMENT_FN in src and GEN.STORED_SWEEP_FN in src
     tree = _tree(src)
     fetch = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
              and ast.unparse(n.func) == "mtb.data.fetch_outputs"]
@@ -190,12 +190,12 @@ def test_section_2_stand_in_uses_fetch_outputs_then_the_stored_table(cat):
     # the stand-in is called with the live dataset and the trio the run cell names
     live = GEN.SCEN[cat]["live_ds"] or GEN.SCEN[cat]["ds"]
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
-             and isinstance(n.func, ast.Name) and n.func.id == "stand_in"]
+             and isinstance(n.func, ast.Name) and n.func.id == "replacement"]
     assert len(calls) == 1
     assert ast.literal_eval(calls[0].args[0]) == live
     assert ast.literal_eval(calls[0].args[1]) == GEN.SCEN[cat]["own_trio"]
     assert calls[0].keywords[0].arg == "stored"
-    assert "stand-in:" in src
+    assert "replacement:" in src
 
 
 @pytest.mark.parametrize("cat", CATS)
@@ -209,7 +209,7 @@ def test_stored_sweep_stand_in_renders_summary_and_figure(cat):
     import multibench as mtb
     ns = {"mtb": mtb, "CATEGORY": cat}
     exec(GEN.STORED_SWEEP_FN, ns)
-    ds, methods = GEN.stand_in(cat, GEN.SCEN[cat]["ds"], GEN.SCEN[cat]["own_trio"])
+    ds, methods = GEN.fallback_sweep(cat, GEN.SCEN[cat]["ds"], GEN.SCEN[cat]["own_trio"])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         res = ns["stored_sweep"](ds, methods)
@@ -237,7 +237,7 @@ class _StubData:
 
 
 class _StubMtb:
-    """Just enough of ``mtb`` for the notebook's ``stand_in`` helper."""
+    """Just enough of ``mtb`` for the notebook's ``replacement`` helper."""
 
     def __init__(self, data, loaded="HOST"):
         self.data = data
@@ -252,8 +252,8 @@ class _StubMtb:
 def _stand_in_ns(mtb):
     ns = {"mtb": mtb, "CATEGORY": "vertical",
           "stored_sweep": lambda *a: ("STORED", *a)}
-    exec(GEN.STAND_IN_FN, ns)
-    return ns["stand_in"]
+    exec(GEN.REPLACEMENT_FN, ns)
+    return ns["replacement"]
 
 
 def test_stand_in_takes_the_benchmark_host_outputs_when_fetch_outputs_works(capsys):
@@ -262,7 +262,7 @@ def test_stand_in_takes_the_benchmark_host_outputs_when_fetch_outputs_works(caps
     assert res == "HOST"
     assert mtb.load_batch_calls == [(Path("/x/outputs/D11"), ["Matilda"])]
     out = capsys.readouterr().out
-    assert "stand-in: the benchmark host's run_all outputs for D11 (fetch_outputs)" in out
+    assert "replacement: the run_all outputs for D11 from the benchmark's Linux machine" in out
     assert "stored metric table" not in out
 
 
@@ -277,8 +277,8 @@ def test_stand_in_falls_back_to_the_stored_table_when_fetch_outputs_raises(exc, 
     assert res == ("STORED", "D45")
     assert mtb.load_batch_calls == []
     out = capsys.readouterr().out
-    assert f"stand-in: the package's stored metric table ({type(exc).__name__} from fetch_outputs" in out
-    assert "benchmark host's run_all outputs" not in out
+    assert f"replacement: the package's stored metric table ({type(exc).__name__} from fetch_outputs" in out
+    assert "the benchmark's Linux machine" not in out
 
 
 def test_stand_in_against_the_live_package_today(capsys):
@@ -289,15 +289,15 @@ def test_stand_in_against_the_live_package_today(capsys):
     import multibench as mtb
     ns = {"mtb": mtb, "CATEGORY": "vertical"}
     exec(GEN.STORED_SWEEP_FN, ns)
-    exec(GEN.STAND_IN_FN, ns)
+    exec(GEN.REPLACEMENT_FN, ns)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = ns["stand_in"]("D11", ["Matilda", "sciPENN", "scMM"],
+        res = ns["replacement"]("D11", ["Matilda", "sciPENN", "scMM"],
                              stored=("D11", ["Matilda", "sciPENN", "scMM"]))
     assert isinstance(res, mtb.BatchResult)
     assert set(res.summary.method) == {"Matilda", "sciPENN", "scMM"}
     out = capsys.readouterr().out
-    assert out.count("stand-in:") == 1
+    assert out.count("replacement:") == 1
 
 
 # ------------------------------------------------------------ the evaluate cell
@@ -349,7 +349,7 @@ def test_evaluate_cell_skips_the_stored_table_stand_in(capsys):
     ns = _evaluate_cell_ns(res, calls)
     exec(GEN.EVALUATE_CELL_TEMPLATE.format(method="Matilda"), ns)
     assert calls == [] and ns["scores"] is None
-    assert "no embedding on this host" in capsys.readouterr().out
+    assert "no embedding on this computer" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("cat", CATS)
@@ -472,9 +472,9 @@ def test_published_note_counts_are_measured():
 
 
 def test_stand_in_keeps_methods_only_when_the_sweep_has_them():
-    assert GEN.stand_in("cross", "D52", ["UINMF", "sciPENN", "StabMap"]) == \
+    assert GEN.fallback_sweep("cross", "D52", ["UINMF", "sciPENN", "StabMap"]) == \
         ("D52", ["UINMF", "sciPENN", "StabMap"])
-    assert GEN.stand_in("mosaic", "D45", ["StabMap", "scMoMaT"]) == ("D45", None)
+    assert GEN.fallback_sweep("mosaic", "D45", ["StabMap", "scMoMaT"]) == ("D45", None)
 
 
 # ------------------------------------- the end-to-end tutorial (hand-maintained)
@@ -534,9 +534,9 @@ def test_end_to_end_run_cell_is_gated_on_env_ok_and_stands_in_otherwise():
     assert _guarded_by(call, "env_ok"), f"{E2E}: mtb.run not gated on scan().env_ok"
     assert "mtb.scan(" in src and GEN.SKIP_LINE in src
     gate = next(n for n in ast.walk(_tree(src)) if isinstance(n, ast.If) and "env_ok" in ast.unparse(n.test))
-    assert "stand_in(DATASET" in ast.unparse(ast.Module(body=gate.orelse, type_ignores=[])), \
-        "a skipped run stands in the benchmark host's output"
-    helper = ast.parse(_e2e_function("stand_in"))
+    assert "replacement(DATASET" in ast.unparse(ast.Module(body=gate.orelse, type_ignores=[])), \
+        "a skipped run loads the benchmark host's output instead"
+    helper = ast.parse(_e2e_function("replacement"))
     names = {ast.unparse(n.func) for n in ast.walk(helper) if isinstance(n, ast.Call)}
     assert {"mtb.data.fetch_outputs", "mtb.load_batch"} <= names
     assert any(isinstance(n, ast.Try) for n in ast.walk(helper)), "a failed download is caught"
@@ -555,15 +555,15 @@ def test_end_to_end_stand_in_reads_the_host_embedding_or_returns_none(tmp_path, 
 
     mtb = _StubMtb(_StubData(root), loaded=_Batch())
     ns = {"mtb": mtb, "Path": Path, "h5py": h5py}
-    exec(_e2e_function("stand_in"), ns)
-    assert ns["stand_in"]("D11", "Matilda").shape == (3, 2)
+    exec(_e2e_function("replacement"), ns)
+    assert ns["replacement"]("D11", "Matilda").shape == (3, 2)
     assert mtb.load_batch_calls == [(root, ["Matilda"])]
-    assert "stand-in: Matilda's embedding from the benchmark host's run_all outputs for D11" \
+    assert "replacement: Matilda's embedding from the run_all outputs for D11 of the benchmark's Linux machine" \
         in capsys.readouterr().out
 
     ns = {"mtb": _StubMtb(_StubData(OSError("offline"))), "Path": Path, "h5py": h5py}
-    exec(_e2e_function("stand_in"), ns)
-    assert ns["stand_in"]("D11", "Matilda") is None
+    exec(_e2e_function("replacement"), ns)
+    assert ns["replacement"]("D11", "Matilda") is None
     assert "(OSError from fetch_outputs: offline)" in capsys.readouterr().out
 
 
@@ -591,7 +591,7 @@ def test_end_to_end_evaluate_cell_without_an_embedding_shows_the_stored_scores(c
     assert ns["scores"]["Value"].to_dict() == stored.set_index("metric")["value"].to_dict()
     long = mtb.to_long(ns["scores"], method="Matilda", dataset="D11", category="vertical")
     assert sorted(long.metric) == sorted(stored.metric)
-    assert "no embedding on this host for Matilda" in capsys.readouterr().out
+    assert "no embedding on this computer for Matilda" in capsys.readouterr().out
 
 
 def test_end_to_end_stored_tables_do_not_need_the_results_folder(tmp_path):
@@ -663,7 +663,7 @@ def test_end_to_end_label_order_claims_match_labels_for_and_the_stored_summaries
     md = " ".join(next(src for kind, src in _cells(E2E)
                        if kind == "markdown" and src.startswith("### Label order")).split())
     assert "`labels_for(dataset, category, method)` returns the label files in that order" in md
-    assert 'mtb.labels_for("D52", "cross", "StabMap")) # cty3, cty1, cty2' in md
+    assert '# StabMap\'s order: cty3, cty1, cty2 mtb.evaluate(emb, labels=mtb.labels_for("D52", "cross", "StabMap"))' in md
 
     def stored(ds, method):
         df = pd.read_csv(ROOT / "notebooks" / "results" / f"summary_{ds}.csv")
@@ -678,7 +678,7 @@ def test_end_to_end_label_order_claims_match_labels_for_and_the_stored_summaries
     assert '`labels_for("D52", "cross", "Concerto")` returns `cty1, cty2, cty3`' in md
     assert list(mtb.labels_for("D52", "cross", "Concerto")) == ["cty1", "cty2", "cty3"]
     assert stored("D52", "Concerto") == ["cty3", "cty1", "cty2"]
-    assert "`mtb.run` has them listed in batch order" in md
+    assert "`mtb.run` lists them by batch number" in md
     from multibench.engine import registry
     assert all(v.driver == "engine/drivers/run_concerto.py"
                for v in registry.get("Concerto").variants if v.when["category"] == "cross")
