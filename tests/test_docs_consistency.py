@@ -870,3 +870,76 @@ def test_landing_card_has_content_without_the_animation():
     assert re.search(r"if \(REDUCED_MOTION\) \{ taskFlow\(\); return; \}", init)
     flow = js[js.index("const taskFlow = () => {"):js.index("const tocSlider")]
     assert "tfStill(scenes[0])" in flow and "master.seek(builtAt[0])" in flow
+
+
+# ---- round 2 of the student study: facts the pages keep in visible text -----
+def _visible(text):
+    """The page without its collapsed ``??? `` Details blocks (an indented
+    block ends at the first non-blank line that is not indented)."""
+    out, skip = [], False
+    for line in text.splitlines():
+        if line.startswith("??? "):
+            skip = True
+            continue
+        if skip and line.strip() and not line.startswith("    "):
+            skip = False
+        if not skip:
+            out.append(line)
+    return "\n".join(out)
+
+
+@needs_docs
+def test_get_started_pages_keep_the_round2_facts():
+    """Quickstart: the laptop tab compares an RNA PCA on 2,000 genes with an
+    ADT PCA, scores with the stored tables' Leiden backend, links the
+    peaks-only section and defines cell order; the unpaired tab lives on
+    tutorials/run only. Installation: the cluster recipe pins the build that
+    has --assume-gpu and asks for a GPU only for the GPU method (M05-M07)."""
+    docs = _docs_root()
+    quick = (docs / "quickstart.md").read_text()
+    for fact in ("highly_variable_genes(pc, n_top_genes=2000)", '"ADT PCA"',
+                 'leiden_flavor = "leidenalg"', "#my-atac-is-peaks-only"):
+        assert fact in quick, fact
+    assert re.search(r"^    cell order\n    :   ", quick, re.M)
+    assert '=== "Unpaired RNA + ATAC"' not in quick
+    install = (docs / "installation.md").read_text()
+    for fact in ("multibench-sc>=0.3.2", "--assume-gpu", "sbatch --gres=gpu:1 job.sh scMoMaT"):
+        assert fact in install, fact
+    assert "#SBATCH --gres" not in install
+
+
+@needs_docs
+def test_guides_keep_the_round2_facts_visible():
+    """The facts a reader copies sit in the visible text of the guides: the
+    D11 panel scores with leidenalg, a scanpy baseline loads D11 from
+    data_path, the run guide shows the setup steps, {env_cmd} and a Slurm
+    tab, evaluate saves the long table, discover explains grand_score and the
+    Seurat_v5 bridge (M04, M09, M10, M11)."""
+    docs = _docs_root()
+    plot, run, evaluate, discover = (
+        _visible((docs / "tutorials" / name).read_text())
+        for name in ("plot.md", "run.md", "evaluate.md", "discover.md"))
+    panel = plot.split('```python title="d11_panel.py"', 1)[1].split("```", 1)[0]
+    assert 'mtb.config.DEFAULT.leiden_flavor = "leidenalg"' in panel
+    assert "### A scanpy baseline on D11" in plot and "mtb.config.DEFAULT.data_path" in plot
+    assert "release_43.html" in run and "`multibench config` prints `repo_path`" in run
+    assert "{env_cmd}" in run and '=== "Slurm job step"' in run
+    assert 'mtb.find_methods("diagonal", atac="peak")' in run
+    assert "mtb.to_long(metrics" in evaluate and 'metrics.to_csv("metric.csv")' not in evaluate
+    assert "How few cell types" not in evaluate
+    assert "`grand_score` compares the ranked methods" in discover
+    assert "cannot run on unpaired data" in discover
+
+
+@needs_docs
+def test_each_guide_warning_appears_once_on_the_site():
+    """Each of these warnings has one home page; the other pages link to it
+    instead of repeating it (M04, M10, M12)."""
+    docs = _docs_root()
+    flat = {p.relative_to(docs).as_posix(): " ".join(p.read_text().split()).lower()
+            for p in docs.rglob("*.md")}
+    for phrase, home in (("compare ranks, not decimals", "tutorials/evaluate.md"),
+                         ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md"),
+                         ("runs without an error but gives a wrong result", "tutorials/run.md")):
+        found = {page: text.count(phrase) for page, text in flat.items() if phrase in text}
+        assert found == {home: 1}, (phrase, found)
