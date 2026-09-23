@@ -1552,7 +1552,7 @@ def recommend(
         notes.append(
             f"dropped {len(degenerate)} dataset(s) with fewer than {min_methods} "
             f"methods ({', '.join(map(str, degenerate))}) - a min-max score over "
-            f"one method is 1.0 by construction")
+            f"one method is always 1.0")
     if foreign:
         notes.append(
             f"also scored in the {table_noun} but not run by this package for "
