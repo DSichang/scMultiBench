@@ -372,7 +372,7 @@ def test_install_cell_pins_the_host_stack():
             'if importlib.util.find_spec(p)]') in src
     pip_lines = [l for l in src.splitlines() if "pip -q install" in l]
     assert len(pip_lines) == 2 and all('{" ".join(pins)}' in l for l in pip_lines)
-    assert '"multibench-sc>=0.3"' in pip_lines[0] and "git+https://github.com/DSichang/scMultiBench.git" in pip_lines[1]
+    assert '"multibench-sc>=0.3.2"' in pip_lines[0] and "git+https://github.com/DSichang/scMultiBench.git" in pip_lines[1]
     assert "import importlib.metadata" in src
 
 
@@ -567,9 +567,10 @@ def test_end_to_end_stand_in_reads_the_host_embedding_or_returns_none(tmp_path, 
     assert "(OSError from fetch_outputs: offline)" in capsys.readouterr().out
 
 
-def test_end_to_end_evaluate_cell_without_an_embedding_shows_the_stored_scores(capsys):
+def test_end_to_end_evaluate_cell_without_an_embedding_shows_the_stored_scores(capsys, monkeypatch):
     """The offline stand-in leaves ``emb = None``: section 5 then shows
-    Matilda's stored scores in evaluate's shape, so section 6 still plots."""
+    Matilda's stored scores in evaluate's shape, and section 6 plots the
+    stored table alone (tests/test_tutorial_round2.py runs that cell)."""
     import warnings
     import multibench as mtb
     import pandas as pd
@@ -583,14 +584,15 @@ def test_end_to_end_evaluate_cell_without_an_embedding_shows_the_stored_scores(c
             raise AssertionError("nothing to evaluate without an embedding")
 
     src = next(s for s in _code(E2E) if "mtb.evaluate(" in s)
+    # the cell sets the Leiden backend: restore it after the test
+    monkeypatch.setattr(mtb.config.DEFAULT, "leiden_flavor", mtb.config.DEFAULT.leiden_flavor)
     ns = {"mtb": _Mtb(), "pd": pd, "emb": None, "DATASET": "D11", "CATEGORY": "vertical"}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         exec(src, ns)
         stored = mtb.load_results("vertical", dataset="D11", source="rerun", methods=["Matilda"])
     assert ns["scores"]["Value"].to_dict() == stored.set_index("metric")["value"].to_dict()
-    long = mtb.to_long(ns["scores"], method="Matilda", dataset="D11", category="vertical")
-    assert sorted(long.metric) == sorted(stored.metric)
+    assert sorted(ns["scores"].index) == sorted(stored.metric)
     assert "no embedding on this computer for Matilda" in capsys.readouterr().out
 
 
@@ -682,5 +684,6 @@ def test_end_to_end_label_order_claims_match_labels_for_and_the_stored_summaries
     from multibench.engine import registry
     assert all(v.driver == "engine/drivers/run_concerto.py"
                for v in registry.get("Concerto").variants if v.when["category"] == "cross")
-    assert 'UINMF on D52 uses `label_order=["cty1", "cty2"]`' in md
-    assert stored("D52", "UINMF") == ["cty1", "cty2"]
+    # a method that reads only some batches gets only their label files (M31)
+    assert '`labels_for("D52", "cross", "UINMF")` returns `cty1` and `cty2`' in md
+    assert list(mtb.labels_for("D52", "cross", "UINMF")) == stored("D52", "UINMF") == ["cty1", "cty2"]
