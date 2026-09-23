@@ -404,12 +404,15 @@ def _missing_script(variant, *, method: str | None = None) -> str:
             gone = [h for h in (getattr(variant, "helpers", None) or [])
                     if not (root / ep).parent.joinpath(h).exists()]
             if gone:
-                who = f"mtb.method_info({method!r})" if method else "method_info(m)"
+                who = config.hint(
+                    (f"mtb.method_info({method!r})" if method else "method_info(m)")
+                    + "['setup_hint']",
+                    f"`multibench info {method or 'METHOD'}` (setup_hint)")
                 return (f"method script {ep.name} imports the local module(s) {gone} from "
                         f"its own directory, which the public scMultiBench repository "
                         f"does not ship (none next to it in the checkout at {root}); "
                         f"the benchmark host runs it with a local shim - supply the "
-                        f"file(s) beside {ep.name}, see {who}['setup_hint']")
+                        f"file(s) beside {ep.name}, see {who}")
             return ""
     return ""            # no checkout yet: run()/run_all() fetch one
 
@@ -446,7 +449,7 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
     alt = f" (or --category {category})" if category else ""
     return (f"conda env {env!r} is not installed - run "
             f"`multibench env install --methods {method} --packed --run`{alt}; "
-            f"see mtb.env.doctor()")
+            f"see {config.hint('mtb.env.doctor()', '`multibench env doctor`')}")
 
 
 def _truncate_tail(msg: str, limit: int = 500) -> str:
@@ -722,8 +725,11 @@ def scan(dataset: str, category: str | None = None, *,
         dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
         raise FileNotFoundError(
             f"dataset folder '{ds_dir}' does not exist; folders present under {base}: "
-            f"{dirs}. dataset= is the folder name and data_path= the folder that "
-            f"contains it (see mtb.describe_layout())")
+            f"{dirs}. "
+            + config.hint("dataset= is the folder name and data_path= the folder that "
+                          "contains it (see mtb.describe_layout())",
+                          "DATASET is the folder name and --data-path the folder that "
+                          "contains it (see `multibench layout`)"))
     installed = _installed_envs()
     rows = []
     dropped_dirs: list[str] = []
@@ -794,8 +800,9 @@ def scan(dataset: str, category: str | None = None, *,
         # rather than as a silently empty frame
         raise ValueError(
             f"no {category!r} variant matches dataset={dataset!r} methods={methods} "
-            f"modalities={modalities}; see mtb.method_info(m)['supports'] and "
-            f"mtb.scan({dataset!r})")
+            f"modalities={modalities}; see "
+            + config.hint(f"mtb.method_info(m)['supports'] and mtb.scan({dataset!r})",
+                          f"`multibench info METHOD` and `multibench scan {dataset}`"))
     if params:
         _check_param_keys(df, params)       # a typo'd key must not start a sweep
     if dropped_dirs:
@@ -1626,24 +1633,35 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     Scoped to what the caller asked for: with ``methods=`` every requested
     variant is listed with its own reason (one per line); without it the
     first three blocked variants are shown and the message says how many
-    there are in total. Reasons of methods the caller did not request are
-    never listed: they would point at the wrong fix.
+    there are in total. Rows whose input files are in place come first
+    (then by method): an env install unblocks those. Reasons of methods the
+    caller did not request are never listed: they would point at the wrong
+    fix.
     """
     def _line(r):
         return f"  {r['method']} ({r['modalities']}): {r['reason']}"
+    # rows whose files are in place first: they are the ones an env install fixes
+    if "files_ok" in blocked.columns:
+        blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
+            ["_files", "method"], kind="stable").drop(columns="_files")
     head = f"nothing is runnable for dataset={dataset!r} category={category!r}"
+    doctor = config.hint("mtb.env.doctor()", "`multibench env doctor`")
     if methods:
         lines = [_line(r) for _, r in blocked.iterrows()]
+        where = config.hint(f"mtb.scan({dataset!r}, {category!r}, methods={list(methods)})",
+                            f"`multibench scan {dataset} --category {category} "
+                            f"--methods {','.join(methods)}`")
         return (f"{head} (methods={list(methods)}). Blocked - one line per requested "
                 f"variant:\n" + "\n".join(lines) +
-                f"\nfiles_ok / env_ok in mtb.scan({dataset!r}, {category!r}, "
-                f"methods={list(methods)}) say which gate failed; mtb.env.doctor() "
+                f"\nfiles_ok / env_ok in {where} say which check failed; {doctor} "
                 f"for envs." + _platform_suffix(blocked))
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
+    where = config.hint(f"mtb.scan({dataset!r}, {category!r})",
+                        f"`multibench scan {dataset} --category {category}`")
     return (f"{head}. First {k} of {n} blocked variants:\n" + "\n".join(lines) +
-            f"\nInspect mtb.scan({dataset!r}, {category!r}) for the full table "
-            f"(files_ok / env_ok say which gate failed; mtb.env.doctor() for envs)."
+            f"\nInspect {where} for the full table "
+            f"(files_ok / env_ok say which check failed; {doctor} for envs)."
             + _platform_suffix(blocked))
 
 
@@ -1987,8 +2005,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         # runnable" with other methods' reasons attached
         raise ValueError(
             f"no {category!r} variant matches dataset={dataset!r} methods={methods} "
-            f"modalities={modalities}; see mtb.method_info(m)['supports'] and "
-            f"mtb.scan({dataset!r})")
+            f"modalities={modalities}; see "
+            + config.hint(f"mtb.method_info(m)['supports'] and mtb.scan({dataset!r})",
+                          f"`multibench info METHOD` and `multibench scan {dataset}`"))
     if dry_run:
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)

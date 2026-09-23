@@ -226,15 +226,13 @@ def test_install_packed_cpu_falls_back_with_one_warning(envs_dir, tmp_path, monk
     assert (envs_dir / "scmb_r" / envs.FLAVOR_FILE).read_text() == "gpu\n"
     assert envs.installed_flavor("scmb_r") == "gpu"
     # listed, but the size is still null: the placeholder of an archive not
-    # uploaded yet - the warning says what is missing and which tool fills it
+    # uploaded yet - the warning says the CPU archive is not published yet
     with pytest.warns(UserWarning) as rec:
         assert envs.install_packed("scmb_torch", flavor="auto") is True
     assert len(rec) == 1
     assert str(rec[0].message) == (
         "no CPU archive for scmb_torch; installing the GPU build (4.5 GB) - "
-        "scmb_torch-cpu is listed in packed_urls.json but has no measured size in "
-        "packed_sizes.json (not published yet; tools/packed_sizes.py records it "
-        "after the upload)")
+        "the CPU archive scmb_torch-cpu is not published yet")
     assert fetched[-1] == "https://x/scmb_torch.tar.gz"
     # an unmeasured GPU archive prints '?' for the size, never a guess
     monkeypatch.setattr(envs, "packed_sizes", lambda: {})
@@ -477,10 +475,10 @@ def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monke
         and "https://x/matilda-cpu.tar.gz" in lines["matilda"]
     assert "4.5 GB dl" in lines["scmb_torch"] and "https://x/scmb_torch.tar.gz" in lines["scmb_torch"]
     total = [l for l in cap.err.splitlines() if l.startswith("# total")][0]
-    assert total.startswith("# total at least: 6.2 GB to download, 2.5 GB on disk (3 archives; "
-                            "download size unknown for 0, disk size unknown for 2)")
+    assert total.startswith("# total (3 envs): 6.2 GB to download; disk: unknown for 2 of 3 "
+                            "envs (at least 2.5 GB for the other 1)")
     assert "; summed the cpu archives; 2 of 3 envs have no CPU archive yet, their GPU archive " \
-           "is counted; sizes are the shipped snapshot engine/packed_sizes.json" in total
+           "is counted; sizes are those recorded for this release" in total
     assert "(auto:" not in total
     # auto on a CPU host says so; gpu sums the CUDA archives and never falls back
     assert cli.main(["env", "install", "--packed"]) == 0
@@ -488,8 +486,9 @@ def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monke
     assert "summed the cpu archives (auto: no NVIDIA GPU visible on this host); 2 of 3" in total
     assert cli.main(["env", "install", "--packed", "--flavor", "gpu"]) == 0
     total = [l for l in capsys.readouterr().err.splitlines() if l.startswith("# total")][0]
-    assert total.startswith("# total at least: 8.4 GB to download, 9.0 GB on disk (3 archives; ")
-    assert "; summed the gpu archives; sizes are the shipped" in total
+    assert total.startswith("# total (3 envs): 8.4 GB to download; disk: unknown for 2 of 3 "
+                            "envs (at least 9.0 GB for the other 1)")
+    assert "; summed the gpu archives; sizes are those recorded" in total
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     assert cli.main(["env", "install", "--packed"]) == 0
     total = [l for l in capsys.readouterr().err.splitlines() if l.startswith("# total")][0]
@@ -503,15 +502,15 @@ def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
     lines = {l.split()[0]: l for l in cap.out.splitlines()}
     assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"]
     assert "4.5 GB dl" in lines["scmb_torch"] and "0.9 GB dl" in lines["scmb_r"]
-    assert cap.err.startswith("# total at least: 6.2 GB download, 2.5 GB on disk (3 archives; "
-                              "download size unknown for 0, disk size unknown for 2); summed the "
+    assert cap.err.startswith("# total (3 envs): 6.2 GB download; disk: unknown for 2 of 3 "
+                              "envs (at least 2.5 GB for the other 1); summed the "
                               "cpu archives; 2 of 3 envs have no CPU archive yet, their GPU "
                               "archive is counted; sizes are")
     assert cli.main(["env", "plan", "--methods", "Matilda", "--flavor", "gpu"]) == 0
     cap = capsys.readouterr()
     assert "3.0 GB dl" in cap.out and "9.0 GB disk" in cap.out
-    assert cap.err.startswith("# total: 3.0 GB download, 9.0 GB on disk (1 archive; download size "
-                              "unknown for 0, disk size unknown for 0); summed the gpu archives; ")
+    assert cap.err.startswith("# total (1 env): 3.0 GB download, 9.0 GB on disk; summed the "
+                              "gpu archives; ")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     assert cli.main(["env", "plan", "--methods", "Matilda"]) == 0        # auto
     cap = capsys.readouterr()
@@ -550,9 +549,8 @@ def test_size_total_line_without_flavor_is_unchanged():
              "b": {"archive_bytes": 5_000_000_000, "unpacked_bytes": None},
              "b-cpu": {"archive_bytes": 1_000_000_000, "unpacked_bytes": None}}
     line = cli._size_total_line(rows, sizes)
-    assert line == ("# total at least: 2.0 GB download, 2.0 GB on disk (2 archives; download "
-                    "size unknown for 0, disk size unknown for 1); sizes are the shipped "
-                    "snapshot engine/packed_sizes.json")
+    assert line == ("# total (2 envs): 2.0 GB download; disk: unknown for 1 of 2 envs (at "
+                    "least 2.0 GB for the other 1); sizes are those recorded for this release")
     assert cli._flavor_token("cpu") == " flavor=cpu" and cli._flavor_token(None) == ""
     assert cli._flavor_token("tpu") == ""
 

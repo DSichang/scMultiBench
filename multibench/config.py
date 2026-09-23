@@ -47,8 +47,40 @@ _CACHE = (Path(_os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
           / "multibench")
 _BASE = _ROOT if _IN_REPO else _CACHE
 
-#: The environment variable that pins :attr:`Config.envs_dir`.
+#: The environment variables that set :class:`Config` paths. Each wins over
+#: the built-in default; a value assigned in Python wins over the variable.
 ENVS_DIR_VAR = "MULTIBENCH_ENVS_DIR"
+DATA_PATH_VAR = "MULTIBENCH_DATA_PATH"
+REPO_PATH_VAR = "MULTIBENCH_REPO_PATH"
+
+#: ``True`` while ``multibench.cli.main`` runs a command. Messages built with
+#: :func:`hint` then name the shell command instead of the Python call.
+_CLI = False
+
+
+def hint(py: str, cli: str) -> str:
+    """The ``cli`` spelling while the command line runs a command, else ``py`` (internal).
+
+    Messages that tell the user what to call next use it, e.g.
+    ``hint("mtb.env.doctor()", "multibench env doctor")``.
+    """
+    return cli if _CLI else py
+
+
+def _from_env(var: str) -> Path | None:
+    """The path in environment variable ``var`` (``~`` expanded), or ``None`` when unset or empty."""
+    value = _os.environ.get(var)
+    return Path(value).expanduser() if value else None
+
+
+def _default_data_path() -> Path:
+    """``$MULTIBENCH_DATA_PATH``, else ``<base>/data`` (see :attr:`Config.data_path`)."""
+    return _from_env(DATA_PATH_VAR) or _BASE / "data"
+
+
+def _default_repo_path() -> Path:
+    """``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref`` (see :attr:`Config.repo_path`)."""
+    return _from_env(REPO_PATH_VAR) or _BASE / "scMultiBench_ref"
 
 
 @functools.lru_cache(maxsize=1)
@@ -68,24 +100,33 @@ def _conda_envs_dir() -> Path | None:
 
 def _default_envs_dir() -> Path:
     """Resolve where method env prefixes live (see :attr:`Config.envs_dir`)."""
-    override = _os.environ.get(ENVS_DIR_VAR)
-    if override:
-        return Path(override).expanduser()
+    override = _from_env(ENVS_DIR_VAR)
+    if override is not None:
+        return override
     found = _conda_envs_dir()
     if found is not None:
         return found
     return _CACHE / "envs"
 
 
-class _LazyEnvsDir:
-    """Descriptor behind the ``envs_dir`` field: resolved on first read.
+class _LazyPath:
+    """Descriptor behind a path field whose default is resolved on read.
 
-    A plain ``default_factory`` would run ``conda info --json`` every time a
-    ``Config`` is built - including ``config.DEFAULT`` at import - on every
-    host that has conda. The descriptor keeps the field settable
-    (``cfg.envs_dir = Path(...)``) and runs the probe only when the directory
-    is needed (``env_prefix``, ``install_packed``, the runner's prefix mode).
+    ``envs_dir`` uses it with ``cache=True``: a plain ``default_factory``
+    would run ``conda info --json`` every time a ``Config`` is built,
+    including ``config.DEFAULT`` at import, so the probe runs on the first
+    read only and its answer is kept. ``data_path`` / ``repo_path`` use
+    ``cache=False``: their environment variable is read again on every read
+    until a value is assigned.
+
+    The field stays settable (``cfg.data_path = "/scratch/data"``); a string
+    is converted to ``pathlib.Path`` and ``None`` returns the field to its
+    default.
     """
+
+    def __init__(self, resolve, *, cache: bool):
+        self._resolve = resolve
+        self._cache = cache
 
     def __set_name__(self, owner, name):
         self._slot = "_" + name
@@ -95,14 +136,16 @@ class _LazyEnvsDir:
             return self          # the dataclass default: "unset", see __set__
         value = obj.__dict__.get(self._slot)
         if value is None:
-            value = _default_envs_dir()
-            obj.__dict__[self._slot] = value
+            value = self._resolve()
+            if self._cache:
+                obj.__dict__[self._slot] = value
         return value
 
     def __set__(self, obj, value):
         # dataclass __init__ assigns the class-level default, i.e. this very
         # descriptor, which means "not given": stay lazy
-        obj.__dict__[self._slot] = None if isinstance(value, _LazyEnvsDir) else Path(value)
+        unset = value is None or isinstance(value, _LazyPath)
+        obj.__dict__[self._slot] = None if unset else Path(value).expanduser()
 
 
 def category_folder(token: str) -> str:
@@ -176,11 +219,12 @@ class Config:
         ``metric_full.csv``). Default ``<package root>/multibench/files``.
     repo_path : pathlib.Path
         Checkout holding the upstream ``tools_scripts/`` (the method scripts),
-        cloned on first use when absent. Default ``<base>/scMultiBench_ref``.
+        cloned on first use when absent. Default ``$MULTIBENCH_REPO_PATH``,
+        else ``<base>/scMultiBench_ref``.
     data_path : pathlib.Path
-        Data root that holds the dataset folders: ``mtb.data.fetch`` puts
-        datasets there, ``mtb.scan`` / ``mtb.run_all`` look for
-        ``<data_path>/<dataset>/``. Default ``<base>/data``.
+        Data root that holds the dataset folders; ``mtb.data.fetch``,
+        ``mtb.scan`` and ``mtb.run_all`` use it. Default
+        ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     leiden_flavor : str
         Leiden backend of the scIB clustering sweep in ``mtb.evaluate``:
         ``"igraph"`` (default) or ``"leidenalg"``.
@@ -190,24 +234,35 @@ class Config:
 
     Examples
     --------
-    >>> from pathlib import Path
     >>> import multibench as mtb
-    >>> mtb.config.DEFAULT.data_path = Path("/scratch/data")    # a Path; a str fails in fetch / scan
-    >>> mtb.config.DEFAULT.envs_dir = Path("/scratch/envs")     # before mtb.env.install(...)
-    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"          # the leidenalg backend, not igraph
-    >>> cfg = mtb.config.Config(data_path=Path("/data/mine"))   # a separate instance
+    >>> mtb.config.DEFAULT.data_path = "/scratch/data"
+    >>> mtb.config.DEFAULT.envs_dir = "/scratch/envs"         # before mtb.env.install(...)
+    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"        # the backend of the published tables
+    >>> cfg = mtb.config.Config(data_path="/data/mine")       # a separate instance
 
     Notes
     -----
-    **Where ``<base>`` is.** The repository root in a checkout or editable
-    install (``pyproject.toml`` next to the package), and the per-user cache
-    ``~/.cache/multibench`` (``$XDG_CACHE_HOME`` honoured) for a wheel
-    install, so ``site-packages`` never accumulates datasets or clones.
+    **Environment variables.** Set them in the shell, a job script or a
+    module file, and every process that sees them uses the paths. A value
+    assigned in Python wins over the variable. ``multibench config`` prints
+    each resolved path and where it came from.
 
-    **Assigning paths.** Assign ``pathlib.Path`` objects. Only ``envs_dir``
-    converts a string on assignment; ``mtb.data.fetch``, ``mtb.scan`` and
-    ``mtb.load_results`` use ``data_path`` / ``result_path`` as they are and
-    fail on a plain string.
+    ::
+
+        MULTIBENCH_DATA_PATH   data_path
+        MULTIBENCH_REPO_PATH   repo_path
+        MULTIBENCH_ENVS_DIR    envs_dir
+
+    **Where ``<base>`` is.** The repository root in a checkout or editable
+    install (``pyproject.toml`` next to the package). For a wheel install it
+    is the per-user cache ``~/.cache/multibench`` (``$XDG_CACHE_HOME``
+    honoured).
+
+    **Assigning paths.** ``data_path``, ``repo_path`` and ``envs_dir``
+    accept a string and store a ``pathlib.Path``; assigning ``None`` returns
+    the field to its default. Assign ``result_path`` and ``files_path`` as
+    ``pathlib.Path`` objects: ``mtb.load_results`` and ``mtb.catalog`` use
+    them as they are.
 
     **How ``envs_dir`` is resolved.** Lazily, on first read, from the first
     of:
@@ -218,8 +273,8 @@ class Config:
 
     It is what ``mtb.env.install`` unpacks packed archives into and what the
     runner's prefix mode activates. The first read may run ``conda info
-    --json`` (once per process, never at import); assigning a value skips
-    the probe. It is settable like every other field.
+    --json`` (once per process, not at import); assigning a value skips
+    the probe.
 
     **Leiden backends.** ``"igraph"`` is scanpy's igraph implementation,
     several times faster; ``"leidenalg"`` is the backend the published
@@ -233,14 +288,74 @@ class Config:
 
     result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result")
     files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
-    repo_path: Path = field(default_factory=lambda: _BASE / "scMultiBench_ref")
-    data_path: Path = field(default_factory=lambda: _BASE / "data")
+    repo_path: Path = _LazyPath(_default_repo_path, cache=False)
+    data_path: Path = _LazyPath(_default_data_path, cache=False)
     leiden_flavor: str = "igraph"
-    envs_dir: Path = _LazyEnvsDir()
+    envs_dir: Path = _LazyPath(_default_envs_dir, cache=True)
 
 
 # module-level default instance; callers may replace its fields
 DEFAULT = Config()
+
+
+def _base_source() -> str:
+    """Where ``<base>`` is, in words (see the Config Notes)."""
+    return "the repository checkout" if _IN_REPO else f"the user cache {_CACHE}"
+
+
+def scripts_present(cfg: Config | None = None) -> bool:
+    """Whether :func:`ensure_repo` would find the method scripts without a download (internal)."""
+    cfg = DEFAULT if cfg is None else cfg
+    return (Path(cfg.repo_path) / "tools_scripts").is_dir() or (_ROOT / "tools_scripts").is_dir()
+
+
+def _sources(cfg: Config | None = None) -> list[dict]:
+    """Each setting of ``cfg`` with its resolved value and where it came from (internal).
+
+    Backs ``multibench config``. Returns one dict per setting, in the order
+    ``data_path``, ``envs_dir``, ``repo_path``, ``result_path``,
+    ``leiden_flavor``, with the keys ``name``, ``value`` and ``source``.
+    """
+    cfg = DEFAULT if cfg is None else cfg
+    rows = []
+
+    def _var_or_default(name: str, var: str, default_text: str) -> str:
+        if cfg.__dict__.get("_" + name) is not None:
+            return "set in Python"
+        if _from_env(var) is not None:
+            return f"environment variable {var}"
+        return default_text
+
+    rows.append({"name": "data_path", "value": cfg.data_path,
+                 "source": _var_or_default("data_path", DATA_PATH_VAR,
+                                           f"default <base>/data; <base> = {_base_source()}")})
+    value, var_dir = cfg.envs_dir, _from_env(ENVS_DIR_VAR)
+    conda_dir = None if var_dir is not None else _conda_envs_dir()
+    if var_dir is not None and value == var_dir:
+        envs_src = f"environment variable {ENVS_DIR_VAR}"
+    elif conda_dir is not None and value == conda_dir:
+        envs_src = "the envs directory of the conda/mamba on PATH"
+    elif var_dir is None and conda_dir is None and value == _CACHE / "envs":
+        envs_src = "default: the user cache, no conda/mamba on PATH"
+    else:
+        envs_src = "set in Python"
+    rows.append({"name": "envs_dir", "value": cfg.envs_dir, "source": envs_src})
+    repo_src = _var_or_default("repo_path", REPO_PATH_VAR,
+                               f"default <base>/scMultiBench_ref; <base> = {_base_source()}")
+    if (Path(cfg.repo_path) / "tools_scripts").is_dir():
+        repo_src += "; method scripts present"
+    elif (_ROOT / "tools_scripts").is_dir():
+        repo_src += f"; method scripts are used from {_ROOT}"
+    else:
+        repo_src += "; method scripts not fetched yet (multibench fetch --scripts)"
+    rows.append({"name": "repo_path", "value": cfg.repo_path, "source": repo_src})
+    rows.append({"name": "result_path", "value": cfg.result_path,
+                 "source": ("default: the tables shipped with the package"
+                            if cfg.result_path == _ROOT / "multibench" / "result"
+                            else "set in Python")})
+    rows.append({"name": "leiden_flavor", "value": cfg.leiden_flavor,
+                 "source": "default" if cfg.leiden_flavor == "igraph" else "set in Python"})
+    return rows
 
 
 def ensure_repo(path=None):
@@ -266,8 +381,8 @@ def ensure_repo(path=None):
         # clone; refuse to guess and never delete a directory not created here
         raise RuntimeError(
             f"{p} exists but has no tools_scripts/ - remove it (or point "
-            f"repo_path elsewhere) and the method scripts will be fetched "
-            f"fresh")
+            f"repo_path or {REPO_PATH_VAR} elsewhere) and the method scripts "
+            f"will be fetched fresh")
     print(f"method scripts not found - fetching PYangLab/scMultiBench (once) into {p} ...",
           flush=True)
     part = p.with_name(p.name + ".partial")

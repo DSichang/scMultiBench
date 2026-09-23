@@ -101,7 +101,9 @@ def test_cli_scan_default_table_is_compact(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     header = out.splitlines()[0].split()
-    assert header == cli._COMPACT_PLAN_COLUMNS
+    # the compact set, plus atac because D11's vertical variants read ATAC
+    assert header == cli._compact_plan_columns(mtb.scan("D11", "vertical", verbose=False))
+    assert [c for c in header if c not in ("atac", "caveat")] == cli._COMPACT_PLAN_COLUMNS
     assert _widest(out) <= 160, _widest(out)
     assert "..." in out                      # long reasons are clipped
     assert "env_reason" not in out
@@ -133,7 +135,13 @@ def test_cli_scan_columns_all_and_machine_formats_are_full(capsys):
     # compare against the frame instead of asserting the marker is absent
     # (on a host with the envs installed the rna+adt row has no reason at all,
     # so check every printed row's reason rather than one fixed phrase)
-    _frame = multibench.scan("D11", "vertical", methods=["Matilda"])
+    # the reasons name `multibench ...` commands when printed by the CLI
+    from multibench import config
+    config._CLI = True
+    try:
+        _frame = multibench.scan("D11", "vertical", methods=["Matilda"])
+    finally:
+        config._CLI = False
     assert rc == 0 and all(str(r) in out for r in _frame["reason"] if r)
 
 
@@ -151,7 +159,8 @@ def test_cli_run_all_dry_run_is_compact_too(capsys, tmp_path):
     cap = capsys.readouterr()
     assert rc == 0
     table = cap.out.split("\n# commands")[0]
-    assert table.splitlines()[0].split() == cli._COMPACT_PLAN_COLUMNS
+    assert table.splitlines()[0].split() == cli._compact_plan_columns(
+        mtb.scan("D11", "vertical", verbose=False))
     assert _widest(table) <= 160
     assert "# dry run" in cap.err and "# dry run" not in cap.out
 

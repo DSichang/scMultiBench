@@ -620,7 +620,9 @@ def _check_label_lengths(method, dataset, category, resolved):
                 f"{method}/{dataset}/{category}: {lab.name} has {n_lab} labels but "
                 f"{q.name} has {n_cell} cells (matrix/barcodes) - batch {batch}: "
                 f"every cell of a batch needs exactly one label in cty{batch}.csv, "
-                f"in the same order as the cells (see mtb.describe_layout({category!r}))")
+                f"in the same order as the cells (see "
+                + config.hint(f"mtb.describe_layout({category!r})",
+                              f"`multibench layout {category}`") + ")")
     for role, path in resolved.items():
         if not is_label_role(role):
             continue
@@ -644,8 +646,9 @@ def _check_label_lengths(method, dataset, category, resolved):
                 raise ValueError(
                     f"{method}/{dataset}/{category}: {p.name} has {n_lab} labels but "
                     f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
-                    f"exactly one label, in the same order as the cells "
-                    f"(see mtb.describe_layout({category!r}))")
+                    f"exactly one label, in the same order as the cells (see "
+                    + config.hint(f"mtb.describe_layout({category!r})",
+                                  f"`multibench layout {category}`") + ")")
 
 
 def _check_data_dir(variant, data_dir) -> tuple[bool, str]:

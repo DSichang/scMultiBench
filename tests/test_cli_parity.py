@@ -492,9 +492,9 @@ def test_cli_evaluate_clustering_alias(monkeypatch):
         rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", flag, "x.h5"])
         assert rc == 0 and captured["clustering"] == "x.h5"
     assert "obsm" not in captured and "column" not in captured
-    assert captured["metrics"] == "clustering"          # --task's default family
+    assert captured["metrics"] is None                  # Python's default metric set
     rc = cli.main(["evaluate", "--output", "e.h5ad", "--labels", "l.csv", "--obsm", "X_pca",
-                   "--task", "all", "--batch", "b.csv"])
+                   "--metrics", "all", "--batch", "b.csv"])
     assert rc == 0
     assert captured["obsm"] == "X_pca" and "column" not in captured
     assert captured["metrics"] == "all" and captured["batch"] == "b.csv"

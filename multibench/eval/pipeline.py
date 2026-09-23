@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from . import io
-from .. import _compat
+from .. import _compat, config
 from ..data import catalog
 
 #: the seven columns of the tidy long frame (pinned to
@@ -344,8 +344,10 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         if want_bat and not has_batch:
             raise ValueError(
                 f"batch labels required for batch metric(s) {want_bat}: pass "
-                f"batch=<vector> (or labels as a list of two or more files, whose "
-                f"file of origin then serves as the batch)")
+                + config.hint("batch=<vector> (or labels as a list of two or more "
+                              "files, whose file of origin then serves as the batch)",
+                              "--batch CSV (or two or more --labels files; each file "
+                              "then counts as one batch)"))
         group = "all" if (want_bat and want_clu) else ("batch" if want_bat else "clustering")
         only, slow = set(sel.codes), "kBET" in sel.codes
     elif sel.family == "all":
@@ -357,22 +359,28 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
             if not has_batch:
                 raise ValueError(
                     "batch labels required for metrics='all' (batch family "
-                    f"{bat}): pass batch=<vector>, or metrics='clustering'")
+                    f"{bat}): pass "
+                    + config.hint("batch=<vector>, or metrics='clustering'",
+                                  "--batch CSV, or --metrics clustering"))
             group = "all"
         only, slow = None, False
     elif sel.family == "batch":
         if not has_batch:
             raise ValueError(
                 f"batch labels required for metrics='batch' ({bat}): pass "
-                f"batch=<vector> (or labels as a list of two or more files)")
+                + config.hint("batch=<vector> (or labels as a list of two or more files)",
+                              "--batch CSV (or two or more --labels files)"))
         group, only, slow = "batch", None, False
     else:
         group, only, slow = "clustering", None, False
     if group == "clustering" and batch_given:
         warnings.warn(
-            f"batch= was given but metrics={metrics!r} computes no batch metric "
-            f"({bat}); pass metrics='all' (or 'batch', or name a batch metric in "
-            f"the list) to compute them - batch changes nothing here",
+            config.hint(f"batch= was given but metrics={metrics!r}",
+                        f"--batch was given but --metrics {metrics}")
+            + f" computes no batch metric ({bat}); pass "
+            + config.hint("metrics='all' (or 'batch', or name a batch metric in the list)",
+                          "--metrics all (or batch, or name a batch metric)")
+            + " to compute them - batch changes nothing here",
             UserWarning, stacklevel=4)
     return group, only, slow
 
