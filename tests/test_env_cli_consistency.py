@@ -135,8 +135,11 @@ def test_missing_helper_module_blocks_the_script_gate(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path)
     v = SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py", helpers=["logger.py"])
     why = workflow._missing_script(v, method="MIRA")
-    assert "main_MIRA.py imports the local module(s) ['logger.py']" in why
-    assert "does not ship" in why and "mtb.method_info('MIRA')['setup_hint']" in why
+    # user wording (L17): what is missing and where it goes, no host jargon
+    assert "MIRA's script imports logger.py" in why
+    assert "put a logger.py next to main_MIRA.py" in why
+    assert "does not include" in why and "mtb.method_info('MIRA')['setup_hint']" in why
+    assert "shim" not in why and "benchmark host" not in why
     (script.parent / "logger.py").write_text("")
     assert workflow._missing_script(v, method="MIRA") == ""
     # a variant without helpers (every other method) is untouched

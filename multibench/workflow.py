@@ -8,15 +8,14 @@ This module works from the dataset instead:
     res = mtb.run_all("D11", "vertical", out_dir="out/")  # run all of it, with metrics
     res.plot()                            # one figure
 
-It also handles two traps that otherwise yield wrong numbers without an error:
+It also handles two common mistakes that give wrong numbers without an error:
 
-* **output kind** - not every method returns an embedding. Methods emitting a
-  graph are recorded as such instead of being scored with embedding metrics
+* **output kind** - not every method returns an embedding. A method that
+  writes a graph is recorded as such, not scored with embedding metrics
   (scoring a KNN index matrix gives ARI ~ 0).
-* **label order** - ``evaluate`` needs labels in the embedding's cell order, and
-  matching by length cannot distinguish orders because every permutation has the
-  same length. Candidate orders are scored and the best kept, with the full
-  spread recorded so the choice stays auditable.
+* **label order** - ``evaluate`` needs labels in the embedding's cell order,
+  and length alone cannot tell two orders apart. Candidate orders are scored,
+  the best is kept, and the scores of all of them are recorded.
 """
 from __future__ import annotations
 
@@ -38,6 +37,7 @@ from . import config
 from .discover import _runtimes, _runtime_hint
 from .engine import envs, registry, resolve as _resolve
 from .engine import runner as _runner
+from .engine.schema import base_modality as _schema_base
 from .engine.runner import run as _run
 from .eval import io as _eio, scib as _escib
 from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
@@ -86,7 +86,7 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     -----
     **Files read.** ``batch_result.json`` holds the per-method records.
     ``long.csv``, written when the run produced metrics, restores each
-    method's unrounded tidy frame; without it ``BatchResult.long`` is rebuilt
+    method's unrounded long table; without it ``BatchResult.long`` is rebuilt
     from the records' rounded ``metrics``.
 
     **Record order.** ``methods=`` only filters: the kept records stay in the
@@ -135,21 +135,24 @@ CATEGORIES = {
 }
 
 #: Modality role -> the file the loader looks for in <data_path>/<dataset>/.
+#: One canonical name per role: the file ``mtb.io.export_dataset`` writes.
 ROLES = {
-    "rna":       "rna.h5      - gene expression",
-    "adt":       "adt.h5      - surface protein (CITE-seq antibody-derived tags)",
-    "atac":      "atac.h5     - chromatin accessibility",
-    "atac_gas":  "atac.h5     - ATAC as gene-activity scores  <-- note: plain atac.h5",
-    "atac_peak": "peak.h5     - ATAC as peaks                 <-- note: peak.h5, not atac.h5",
-    "rna1/rna2/...": "rna1.h5, rna2.h5, ... - one file per batch (mosaic/cross)",
-    "adt1/adt2/...": "adt1.h5, adt2.h5, ... - one file per batch (mosaic/cross)",
-    "cty":       "cty.csv     - cell-type labels, one label set (vertical)",
+    "rna":       "rna.h5         - gene expression",
+    "adt":       "adt.h5         - surface protein (CITE-seq antibody-derived tags)",
+    "atac":      "atac.h5        - ATAC; method_info(m)['atac'] says peaks or gene activity",
+    "atac_peak": "atac_peak.h5   - ATAC as peaks (diagonal)",
+    "atac_gas":  "atac_gas.h5    - ATAC as gene-activity scores (diagonal)",
+    "rna1/adt1/atac2 ...": "rna1.h5, adt1.h5, atac2.h5 ... - one file per batch (mosaic, cross)",
+    "cty":       "cty.csv        - cell-type labels, one per cell (vertical)",
     "rna_cty / atac_cty":
-                 "rna_cty.csv, atac_cty.csv - one label file per modality, used when "
-                 "RNA and ATAC come from different cells (diagonal)",
-    "cty1/cty2/...":
-                 "cty1.csv, cty2.csv, ... - one label file per batch (mosaic/cross)",
+                 "rna_cty.csv, atac_cty.csv - one label file per modality (diagonal)",
+    "cty1/cty2 ...":
+                 "cty1.csv, cty2.csv ... - one label file per batch (mosaic, cross)",
 }
+
+#: Older file names the loader still reads, in one line.
+OLDER_NAMES = ("Older names still read: peak.h5 for peaks, and atac.h5 for gene "
+               "activity.")
 
 
 def list_categories() -> dict:
@@ -177,14 +180,14 @@ def list_categories() -> dict:
 def describe_layout(category: str | None = None) -> str:
     """Return the directory layout the package expects for your own dataset.
 
-    Start here when bringing your own data, then confirm the folder with
+    Start here when bringing your own data, then check the folder with
     ``mtb.scan``.
 
     Parameters
     ----------
     category : str | None
-        Integration category whose layout block to include; ``None`` = all
-        four.
+        Integration category to describe; ``None`` = an overview of all four
+        and the full file table.
 
     Returns
     -------
@@ -199,32 +202,27 @@ def describe_layout(category: str | None = None) -> str:
     Examples
     --------
     >>> import multibench as mtb
-    >>> print(mtb.describe_layout("vertical"))    # CITE-seq / multiome, cells already matched
-    >>> print(mtb.describe_layout("cross"))       # numbered batches
-    >>> print(mtb.describe_layout())              # everything
+    >>> print(mtb.describe_layout("vertical"))    # CITE-seq or multiome
+    >>> print(mtb.describe_layout("mosaic"))      # the batch patterns methods accept
+    >>> print(mtb.describe_layout())              # every category
 
     Notes
     -----
-    **What the text covers.** The role -> filename mapping, the numbered
-    per-batch files, the ATAC representation trap, the ``.h5`` file format,
-    the label CSV and the conda envs.
+    **What the text covers.** For one category: the files its methods read,
+    one name per file, as ``mtb.io.export_dataset`` writes them. It also
+    gives the ATAC representation each method needs, the ``.h5`` and label
+    formats, and the install command. For mosaic and cross it lists each
+    batch pattern the methods accept.
 
-    **Roles.** A "role" is the name of one input a method takes. For
-    CITE-seq the roles are ``rna`` (``rna.h5``) and ``adt`` (``adt.h5``,
-    surface protein / antibody-derived tags), plus ``cty.csv`` for cell-type
-    labels:
+    **One rule for ATAC files.** Vertical reads ``atac.h5``;
+    ``method_info(m)["atac"]`` says whether it must hold peaks or gene
+    activity. Diagonal reads ``atac_peak.h5`` (peaks) and ``atac_gas.h5``
+    (gene activity). Mosaic reads ``atac<i>.h5`` (peaks). ``peak.h5``, and
+    ``atac.h5`` for gene activity, are accepted as older names.
 
-    ```text
-    <data_path>/MYCITE/
-        rna.h5
-        adt.h5
-        cty.csv
-    ```
-
-    **Several batches.** Mosaic and cross integration use one numbered file
-    per batch, in the same flat directory - not sub-folders, and not one
-    pre-concatenated matrix. Batch membership is carried by the file
-    numbering; there is no batch column. Three batches of CITE-seq:
+    **Several batches.** Mosaic and cross use one numbered file per batch in
+    the same folder, not sub-folders and not one concatenated matrix. The
+    file number is the batch; there is no batch column:
 
     ```text
     <data_path>/COREBATCH/
@@ -233,106 +231,211 @@ def describe_layout(category: str | None = None) -> str:
         rna3.h5   adt3.h5   cty3.csv     # batch 3
     ```
 
-    **ATAC method lists.** The methods that need gene-activity vs peak ATAC
-    matrices are listed from the method registry at call time
-    (``find_methods(atac=...)``), so they always agree with ``method_info``
-    and the ``atac`` column of ``mtb.scan``.
-
-    **Errors.** An unknown ``category`` raises a ``ValueError`` that lists the
-    four.
+    **Source of the lists.** The methods per ATAC representation and the
+    batch patterns are read from the method registry at call time, so they
+    agree with ``method_info`` and ``mtb.find_methods``.
 
     See Also
     --------
     mtb.list_categories : the four categories with a description of each.
 
-    mtb.scan : confirms a laid-out folder (``files_ok`` / ``files_reason`` per method).
+    mtb.scan : checks a laid-out folder (``files_ok`` / ``files_reason`` per method).
 
     mtb.io.export_dataset : writes a whole dataset in this layout from an AnnData.
     """
     registry.check_category(category)       # None passes; typo -> ValueError
-    # ATAC representation lists come from the registry, so they cannot go stale.
-    from .discover import find_methods as _find_methods
-    gas_methods = _find_methods(atac="gene_activity")
-    peak_methods = _find_methods(atac="peak")
-    lines = ["Put your files in  <data_path>/<DATASET_NAME>/ , e.g. ./data/MYDATA/",
-             "  (dataset = the folder name; data_path = the folder that contains it)",
-             ""]
-    LAYOUTS = {
-        "vertical": ["  rna.h5 + adt.h5 (CITE-seq)  or  rna.h5 + atac.h5 (multiome)",
-                     "  cty.csv        <- one label file; the cells are already matched"],
-        "diagonal": ["  rna.h5         <- the RNA cells",
-                     "  atac.h5        <- the ATAC cells (gene activity); peak.h5 for peaks",
-                     "  rna_cty.csv and atac_cty.csv",
-                     "                 <- one label file per modality. The two cell sets are",
-                     "                    disjoint, so they cannot share a single cty.csv."],
-        "mosaic":   ["  rna1.h5 rna2.h5 atac2.h5 atac3.h5   <- numbered, one per batch",
-                     "  cty1.csv cty2.csv cty3.csv          <- one per batch"],
-        "cross":    ["  rna1.h5 rna2.h5 rna3.h5 + adt1.h5 adt2.h5 adt3.h5",
-                     "  cty1.csv cty2.csv cty3.csv          <- one per batch"],
-    }
-    if category in LAYOUTS:
-        lines += [f"LAYOUT FOR {category.upper()}:"] + LAYOUTS[category] + [""]
-    else:
-        for _c, _ls in LAYOUTS.items():
-            lines += [f"{_c}:"] + _ls
-        lines += [""]
-    lines += ["  (numbered files live in the same flat dir; there is no batch column)",
-             "", "Modality roles and the filenames they resolve to:"]
-    lines += [f"    {k:16s} {v}" for k, v in ROLES.items()]
-    lines += ["",
-              "!! ATAC: the role name does not guarantee the representation.",
-              "   atac_gas resolves to atac_gas.h5 if present, otherwise FALLS BACK",
-              "   to atac.h5 - and a multiome atac.h5 usually holds peaks, not gene",
-              "   activity. Check the feature names: chr1:3094772-3095489 is a peak,",
-              "   a gene symbol is gene activity.",
-              "   atac_peak resolves to atac_peak.h5, else peak.h5.",
-              "   This matters because methods disagree (lists from the registry;",
-              "   see mtb.find_methods(atac=...) / mtb.method_info(m)['atac']):",
-              f"     need GENE ACTIVITY: {'/'.join(gas_methods)}",
-              f"     need PEAKS:         {'/'.join(peak_methods)}",
-              "   Feeding the wrong one runs to completion and returns a plausible",
-              "   but WRONG embedding - no error.",
-              "   Check what you actually have before trusting a cross-dataset result.",
-              "   scan() flags the commonest trap in its `caveat` column: an atac_gas",
-              "   role that fell back to an atac.h5 whose features are chr:start-end.",
+    cats = [category] if category else list(CATEGORIES)
+    lines = ["Put the files of one dataset in one folder: <data_path>/<DATASET>/, "
+             "for example ./data/MYDATA/.",
+             "The dataset name is the folder name; data_path is the folder that "
+             "contains it.", ""]
+    for cat in cats:
+        lines += _layout_block(cat, full=category is not None) + [""]
+    if category is None:
+        lines += ["Every file name the loader reads:"]
+        lines += [f"  {k:20s} {v}" for k, v in ROLES.items()]
+        lines += [f"  {OLDER_NAMES}", ""]
+    lines += ["Each .h5 file holds matrix/data (features x cells, the transpose of "
+              "AnnData.X),",
+              "matrix/features and matrix/barcodes. mtb.io.export_dataset writes the "
+              "whole folder",
+              "from an AnnData or MuData; mtb.io.to_canonical writes one file.",
+              "A label file is a single-column CSV: one header line, then one label "
+              "per cell.",
               "",
-              "MODALITY FILE FORMAT (.h5) - easiest route first:",
-              "  mtb.io.to_canonical(src, dst)   converts an .h5ad and writes",
-              "  everything below correctly. Prefer it over building the file by hand.",
-              "  For a whole dataset in one call (every modality + labels, numbered",
-              "  per batch when batch= is given):",
-              "    mtb.io.export_dataset(adata, '<data_path>/MYDATA', rna='X',",
-              "                          adt='obsm:protein', labels='obs:cell_type')",
-              "  Both store matrix/data as float64, gzip-compressed and chunked, like",
-              "  the shipped files (a 3000x2000 8%-dense matrix is ~1.5 MB on disk).",
-              "",
-              "  If you do build it yourself, all three datasets are required:",
-              "    matrix/data      the matrix, stored FEATURES x CELLS",
-              "    matrix/features  one entry per feature (row of matrix/data)",
-              "    matrix/barcodes  one entry per cell    (column of matrix/data)",
-              "  e.g. 2,000 genes x 5,000 cells -> matrix/data has shape (2000, 5000),",
-              "  matrix/features has 2000 entries and matrix/barcodes has 5000.",
-              "  Note: this is the TRANSPOSE of the scanpy/AnnData convention",
-              "  (AnnData.X is cells x genes). scan() rejects a transposed file, and",
-              "  a file with only matrix/data fails with a KeyError about 'features'.",
-              "Labels are a single-column CSV: one header line (typically 'x'),",
-              "then one cell-type label per cell; the evaluator reads the first",
-              "column and skips the header.", ""]
-    if category:
-        lines += [f"{category}: {CATEGORIES.get(category, '(unknown category)')}", ""]
-    lines += ["", "ENVIRONMENTS",
-              "  Every method runs in its own conda env (they need mutually",
-              "  incompatible framework versions). scan() checks two gates per row -",
-              "  files_ok (the inputs are on disk, oriented and labelled) and env_ok",
-              "  (that conda env exists) - and marks a method runnable only when both",
-              "  pass, so a sweep never starts one that cannot finish.",
-              "      multibench env doctor          # what is needed / what is missing",
-              "      multibench env install --run   # build them all from lockfiles",
-              "      multibench env install --methods X --packed --run   # just one",
-              ""]
-    lines += ["Then:  mtb.scan('MYDATA')  ->  mtb.run_all('MYDATA', '<category>', out_dir=...)"]
+              "Each method runs in its own environment, on Linux. Install one with:",
+              "  multibench env install --methods X --packed --run",
+              "mtb.scan checks the files and the environment for each method "
+              "(columns files_ok, env_ok).",
+              f"Next: mtb.scan('MYDATA', '{category or '<category>'}'), then "
+              f"mtb.run_all('MYDATA', '{category or '<category>'}', out_dir='out/')"]
     return "\n".join(lines)
 
+
+#: The modality files of the downloadable demo datasets (``mtb.data.fetch``).
+#: ``describe_layout`` names the demo that has each batch pattern;
+#: tests/test_workflow_layout.py checks this table against the data folders.
+DEMO_FILES = {
+    "D11": ("rna", "adt"),
+    "D28": ("rna", "atac_peak", "atac_gas"),
+    "D45": ("rna1", "rna2", "atac2", "atac3"),
+    "D46": ("rna1", "rna2", "rna3", "adt1", "atac2"),
+    "D52": ("rna1", "rna2", "rna3", "adt1", "adt2", "adt3"),
+}
+
+
+def _demo_for(roles) -> str:
+    """The demo dataset whose files match ``roles`` (as a set), or ``""``."""
+    from .engine.schema import modality_family
+    want = {modality_family(r) for r in roles}
+    for ds, files in DEMO_FILES.items():
+        if {modality_family(r) for r in files} == want:
+            return ds
+    return ""
+
+
+def batch_patterns(category: str) -> list[tuple[tuple, list[str]]]:
+    """The batch patterns a category's variants accept, with their methods.
+
+    Returns ``[(roles, methods), ...]``: ``roles`` sorted by batch then
+    modality (``('rna1', 'rna2', 'atac2', 'atac3')``), ``methods`` in
+    registry order. Variants that read the same set of files share one
+    pattern whatever their argument order (Cobolt and MultiVI).
+    """
+    from .engine.schema import _batch_of, base_modality, modality_family
+    order = {"rna": 0, "adt": 1, "atac": 2}
+    pats: dict = {}
+    for spec, v, _cat, mods in _variant_rows(category):
+        if not mods:
+            continue
+        key = tuple(sorted((modality_family(m) for m in mods),
+                           key=lambda r: (_batch_of(r) or 0,
+                                          order.get(base_modality(r), 9), r)))
+        ids = pats.setdefault(key, [])
+        if spec.id not in ids:
+            ids.append(spec.id)
+    return list(pats.items())
+
+
+def _atac_lines(category: str) -> list[str]:
+    """The ATAC part of one category's layout: which representation each
+    method needs, from the registry (``find_methods(category, atac=...)``)."""
+    from .discover import find_methods as _find
+    peak = _find(category, atac="peak")
+    gas = _find(category, atac="gene_activity")
+    if not peak and not gas:
+        return []
+    out = []
+    if category == "vertical":
+        out.append("atac.h5 holds peaks or gene activity; each method needs one of them:")
+    elif category == "diagonal":
+        out.append("Give atac_peak.h5, atac_gas.h5 or both; each method needs one of them:")
+        both = [s.id for s, v, _c, mods in _variant_rows("diagonal")
+                if {"atac_peak", "atac_gas"} <= set(mods)]
+        if both:
+            out.append(f"  need both files:       {', '.join(dict.fromkeys(both))}")
+    elif gas:
+        out.append("atac<i>.h5 holds peaks or gene activity; each method needs one of them:")
+    else:
+        out.append(f"atac<i>.h5 holds peaks: every {category} method that reads ATAC "
+                   f"needs peaks.")
+    if category in ("vertical", "diagonal") or gas:
+        if peak:
+            out.append(f"  need peaks:            {', '.join(peak)}")
+        if gas:
+            out.append(f"  need gene activity:    {', '.join(gas)}")
+    out.append("A method given the other ATAC representation still runs but gives a "
+               "wrong embedding; check method_info(m)['atac'].")
+    if category == "diagonal":
+        out.append(OLDER_NAMES)
+    return out
+
+
+#: How ``describe_layout`` shows a batch's modalities as ``convert`` flags.
+_CONVERT_FLAGS = {
+    ("rna",): ("h5ad", "--rna X"),
+    ("adt", "rna"): ("h5ad", "--rna X --adt obsm:protein"),
+    ("atac", "rna"): ("h5mu", "--rna mod:rna --atac mod:atac --atac-kind peak"),
+}
+
+
+def _batch_recipe(category: str, patterns) -> list[str]:
+    """One ``multibench convert`` line per batch of the most varied pattern,
+    plus the ``export_dataset`` form of the first batch."""
+    from .engine.schema import _batch_of, base_modality
+
+    def per_batch(roles):
+        per: dict = {}
+        for r in roles:
+            per.setdefault(_batch_of(r), set()).add(base_modality(r))
+        return {b: tuple(sorted(ms)) for b, ms in per.items()}
+
+    usable = [p for p, _ in patterns
+              if all(ms in _CONVERT_FLAGS for ms in per_batch(p).values())]
+    if not usable:
+        return []
+    batches = per_batch(max(usable, key=lambda p: len(set(per_batch(p).values()))))
+    lines = ["Write one file per batch, numbered to match the pattern:"]
+    same = len(set(batches.values())) == 1
+    for b, ms in batches.items():
+        ext, flags = _CONVERT_FLAGS[ms]
+        lines.append(f"  multibench convert batch{b}.{ext} data/MYDATA {flags} "
+                     f"--labels obs:cell_type --category {category} --batch-index {b}")
+        if same:
+            rest = [str(k) for k in batches if k != b]
+            if rest:
+                lines.append(f"  (the same for batch{'es' if len(rest) > 1 else ''} "
+                             f"{' and '.join(rest)}, with --batch-index "
+                             f"{' and '.join(rest)})")
+            break
+    first = next(iter(batches.values()))
+    kw = "rna='X', adt='obsm:protein'" if "adt" in first else "rna='X'"
+    lines.append(f"  in Python: mtb.io.export_dataset(adata, 'data/MYDATA', {kw}, "
+                 f"labels='obs:cell_type', category='{category}', batch_index=1)")
+    return lines
+
+
+def _layout_block(category: str, *, full: bool) -> list[str]:
+    """The lines that describe one category's folder (``full`` adds the ATAC
+    and batch-pattern details that ``describe_layout(category)`` prints)."""
+    from .engine.schema import _batch_of, base_modality
+    head = f"{category}: {CATEGORIES[category]}"
+    if category == "vertical":
+        demo = _demo_for(["rna", "adt"])
+        files = ["  rna.h5 + adt.h5    CITE-seq" + (f" (demo {demo})" if demo else ""),
+                 "  rna.h5 + atac.h5   multiome",
+                 "  cty.csv            cell-type labels, one per cell"]
+    elif category == "diagonal":
+        demo = _demo_for(["rna", "atac_peak", "atac_gas"])
+        files = ["  rna.h5             the RNA cells" + (f" (demo {demo})" if demo else ""),
+                 "  atac_peak.h5       the ATAC cells, as peaks",
+                 "  atac_gas.h5        the same ATAC cells, as gene-activity scores",
+                 "  rna_cty.csv        labels of the RNA cells",
+                 "  atac_cty.csv       labels of the ATAC cells"]
+    else:
+        seen = [r for roles, _ in batch_patterns(category) for r in roles]
+        example = ", ".join(f"{r}.h5" for r in list(dict.fromkeys(seen))[:4])
+        files = [f"  One numbered file per batch and modality ({example} ...)",
+                 "  and one label file per batch (cty1.csv, cty2.csv ...), in the same "
+                 "folder."]
+    if not full:
+        return [head] + files
+    lines = [head] + files
+    if category in ("mosaic", "cross"):
+        patterns = batch_patterns(category)
+        lines.append("Each method accepts one batch pattern. Number your batches to "
+                     "match one of them:")
+        for roles, ids in patterns:
+            per: dict = {}
+            for r in roles:
+                per.setdefault(_batch_of(r), []).append(base_modality(r))
+            desc = ", ".join(f"{b} = {'+'.join(ms)}" for b, ms in per.items())
+            demo = _demo_for(roles)
+            lines.append(f"  batch {desc}: {', '.join(ids)}"
+                         + (f" (demo {demo})" if demo else ""))
+        lines += _batch_recipe(category, patterns)
+    lines += _atac_lines(category)
+    return lines
 
 
 # --------------------------------------------------------------------------- scan
@@ -405,11 +508,11 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                     if not (root / ep).parent.joinpath(h).exists()]
             if gone:
                 who = f"mtb.method_info({method!r})" if method else "method_info(m)"
-                return (f"method script {ep.name} imports the local module(s) {gone} from "
-                        f"its own directory, which the public scMultiBench repository "
-                        f"does not ship (none next to it in the checkout at {root}); "
-                        f"the benchmark host runs it with a local shim - supply the "
-                        f"file(s) beside {ep.name}, see {who}['setup_hint']")
+                name = f"{method}'s script" if method else f"script {ep.name}"
+                files = " and ".join(gone)
+                return (f"{name} imports {files}, which the public scMultiBench "
+                        f"repository does not include; put {'a ' if len(gone) == 1 else ''}"
+                        f"{files} next to {ep.name} ({who}['setup_hint'])")
             return ""
     return ""            # no checkout yet: run()/run_all() fetch one
 
@@ -442,16 +545,91 @@ OUT_DIR_PLACEHOLDER = "<out_dir>"
 
 def _env_hint(env: str, method: str, category: str | None) -> str:
     """The env_reason text: names the env, the method-specific install command
-    and the category-wide alternative, and where to look."""
+    and the category-wide alternative, and where to look.
+
+    Off Linux the install command refuses, so the reason only names the
+    environment and says it cannot be installed here; the scan summary line
+    says what this computer can do instead.
+    """
+    if _runner.linux_only_sentence():
+        return f"Linux-only environment {env} (not installable on this computer)"
     alt = f" (or --category {category})" if category else ""
     return (f"conda env {env!r} is not installed - run "
             f"`multibench env install --methods {method} --packed --run`{alt}; "
             f"see mtb.env.doctor()")
 
 
-def _truncate_tail(msg: str, limit: int = 500) -> str:
-    # cut the middle, keep the tail: the filename sits at the end of the message
-    return msg if len(msg) <= limit else msg[:100] + " ... " + msg[-(limit - 120):]
+#: The second sentence of the scan summary line off Linux.
+LINUX_ONLY_SUMMARY = ("Method environments are Linux-only: here you can check files, "
+                      "score embeddings and plot; copy the command column to a Linux "
+                      "machine.")
+
+
+def _first_sentence(text: str) -> str:
+    """The first sentence of ``text`` (up to a '.', '!' or '?' followed by a
+    space or the end); a dotted file name does not end it."""
+    m = re.match(r"(.+?[.!?])(\s|$)", text.strip(), re.S)
+    return (m.group(1) if m else text).strip()
+
+
+def _atac_kind_of(path: Path) -> str:
+    """What an ATAC-family file holds, from its name, else from its features."""
+    stem = path.stem.rstrip("0123456789")
+    if stem in ("atac_peak", "peak"):
+        return "peaks"
+    if stem == "atac_gas":
+        return "gene activity"
+    frac = _resolve._peak_fraction_of(path)
+    if frac is not None and frac >= 0.9:
+        return "peaks"
+    if frac is not None and frac <= 0.1:
+        return "gene activity"
+    return "ATAC"
+
+
+def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str,
+                          data_path) -> str:
+    """The ``reason`` text for input files that are not on disk, or ``""``.
+
+    Built from the resolved paths, not from the exception text, so no path
+    is ever cut. An ATAC file leads with what the method needs and what the
+    folder holds instead: ``needs gene-activity ATAC (atac_gas.h5); folder
+    has peaks (atac_peak.h5)``. Other files follow as ``missing adt.h5``.
+    """
+    try:
+        paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
+                                    data_path=data_path, check=False)
+    except Exception:           # noqa: BLE001 - fall back to the exception text
+        return ""
+    from .engine.schema import is_label_role
+    missing = {r: Path(p) for r, p in paths.items() if not Path(p).exists()}
+    if not missing:
+        return ""
+    atac_parts, other = [], []
+    for role, p in missing.items():
+        if is_label_role(role) or _schema_base(role) != "atac":
+            other.append(p.name)
+            continue
+        digits = role[len(role.rstrip("0123456789")):]
+        stem = role.rstrip("0123456789")
+        want_file = f"atac{digits}.h5" if category == "vertical" else p.name
+        if stem == "atac_peak":
+            want = "peak"
+        elif stem == "atac_gas" and category != "vertical":
+            want = "gene-activity"
+        else:
+            want = {"peak": "peak", "gene_activity": "gene-activity"}.get(spec.atac or "", "")
+        need = f"needs {want + ' ' if want else ''}ATAC ({want_file})"
+        found = [p.parent / f"{b}{digits}.h5" for b in ("atac", "atac_peak", "atac_gas", "peak")]
+        found = [f for f in found if f.is_file() and f.name != want_file]
+        if found:
+            has = ", ".join(f"{_atac_kind_of(f)} ({f.name})" for f in found)
+            atac_parts.append(f"{need}; folder has {has}")
+        else:
+            atac_parts.append(f"{need}; not in the folder")
+    if other:
+        atac_parts.append("missing " + ", ".join(other))
+    return "; ".join(atac_parts)
 
 
 _ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}(),:;]*")
@@ -488,10 +666,55 @@ _list_of_ids = registry.check_id_list
 
 
 def _variant_consumes_atac(variant) -> bool:
-    """Whether this variant takes an ATAC input (role or const filename)."""
-    if "atac" in variant.modality_types:
-        return True
+    """Whether this variant takes an ATAC input.
+
+    Judged on the declared modalities, not on every argument: Seurat_WNN's
+    rna+adt variant passes its unused ATAC slot as a constant ``NULL``. A
+    variant fed a folder (scBridge) declares none; its constant file names
+    decide.
+    """
+    mods = variant.when.get("modalities") or []
+    if mods:
+        return any(_schema_base(m) == "atac" for m in mods)
     return any(a.const and "atac" in str(a.const) for a in variant.args)
+
+
+def _modality_matcher(modalities):
+    """A test ``(spec, variant_modalities) -> bool`` for ``scan(modalities=)``.
+
+    One rule, shared with ``find_methods``: a base token (``rna``, ``adt`` /
+    ``protein``, ``atac``) matches every role of that base (``atac`` matches
+    ``atac``, ``atac_gas``, ``atac_peak`` and the numbered ``atac2``); a
+    representation token (``atac_peak`` / ``peak``, ``atac_gas`` /
+    ``gene_activity``) matches the ATAC roles of a method whose
+    ``method_info(m)['atac']`` is that representation; a numbered token
+    (``rna1``) matches that role. A variant matches when every token matches
+    one of its roles and every role is matched: the tokens name one
+    combination, in any order. ``[]`` matches only the variants fed a folder.
+    Unknown tokens raise ``ValueError`` (``registry.normalize_modalities``).
+    """
+    from .engine.schema import modality_family
+    registry.normalize_modalities(modalities)          # ValueError on unknown tokens
+    toks = []
+    for tok in modalities:
+        t = registry.MODALITY_ALIASES.get(str(tok).lower(), str(tok))
+        stem = t.rstrip("0123456789")
+        rep = {"atac_peak": "peak", "atac_gas": "gene_activity"}.get(stem)
+        fam = modality_family(t)
+        toks.append((fam, rep, fam in ("rna", "adt", "atac")))
+
+    def covers(tok, role):
+        fam, _rep, is_base = tok
+        return (_schema_base(role) == fam) if is_base else modality_family(role) == fam
+
+    def match(spec, mods) -> bool:
+        if not mods or not toks:
+            return not mods and not toks
+        if any(rep and spec.atac != rep for _f, rep, _b in toks):
+            return False
+        return (all(any(covers(t, r) for r in mods) for t in toks)
+                and all(any(covers(t, r) for t in toks) for r in mods))
+    return match
 
 
 def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset: str,
@@ -503,11 +726,12 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
     """
     import shlex
     try:
-        # the runner itself, not the module-level ``_run`` hook the dispatch
-        # tests replace: a preview must never count as a dispatch
-        argv = _runner.run(method, category, inputs=inputs,
-                           out_dir=Path(out_dir) / f"{method}_{dataset}",
-                           params=params, dry_run=True)
+        # the runner's preview, not the module-level ``_run`` hook the
+        # dispatch tests replace: a preview must never count as a dispatch.
+        # Its notes are not printed here; scan puts them in ``caveat``.
+        argv, _notes = _runner.preview(method, category, inputs=inputs,
+                                       out_dir=Path(out_dir) / f"{method}_{dataset}",
+                                       params=params)
         return shlex.join(argv)
     except Exception as e:  # noqa: BLE001 - a preview must never abort the scan
         return f"(no preview: {type(e).__name__}: {e})"
@@ -580,12 +804,11 @@ def scan(dataset: str, category: str | None = None, *,
     >>> df[["method", "modalities", "runnable", "reason"]]
     >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]   # what blocks the rest
     >>> print(df.loc[df.files_ok, "command"].iloc[0])                  # a ready-to-run shell line
-    >>> mtb.scan("MYCITE", "vertical", data_path="/path/to/data", out_dir="out/")
+    >>> mtb.scan("MYCITE", "vertical", modalities=["rna", "adt"], data_path="/path/to/data")
 
     Notes
     -----
-    **Column reference.** The full frame is 18 columns wide
-    (``SCAN_COLUMNS``):
+    **Column reference.** The full frame has 18 columns:
 
     ```text
     method              registry id
@@ -597,13 +820,13 @@ def scan(dataset: str, category: str | None = None, *,
     n_tunable           number of command-line hyperparameters
     runtime_tier        fast / medium / slow / very_slow / unknown
     observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
-    caveat              known content trap for this method x dataset, or ""
+    caveat              what the run needs besides the files, or ""
     runnable            files_ok & env_ok
     reason              short form of the non-empty reasons, "; "-joined
     files_ok            the inputs resolve, are oriented and labelled
-    files_reason        verbatim file-gate text, full paths
+    files_reason        full file-check text, full paths
     env_ok              the env exists (and a GPU, when the script needs one)
-    env_reason          verbatim env-gate text with the install command
+    env_reason          full env-check text
     needs_labels        this variant demands a label file as an input
     atac                ATAC representation the method expects: 'peak' /
                         'gene_activity'; None when the variant takes no ATAC
@@ -611,8 +834,8 @@ def scan(dataset: str, category: str | None = None, *,
                         inputs do not resolve
     ```
 
-    **Two gates.** Every row carries two independent gates, each a flag plus
-    a reason, and ``runnable = files_ok & env_ok``:
+    **Two checks.** Every row carries two independent checks, each a flag
+    plus a reason, and ``runnable = files_ok & env_ok``:
 
     - ``files_ok`` / ``files_reason`` - the method's script is present, the
       input files resolve on disk and are oriented features x cells, every
@@ -620,7 +843,8 @@ def scan(dataset: str, category: str | None = None, *,
       ``data_dir`` method (scBridge) finds the files it names.
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command
-      (``multibench env install --methods X --packed --run``).
+      (``multibench env install --methods X --packed --run``). On macOS
+      and Windows it says the environment is Linux-only.
     - ``env_ok`` on a GPU-only method - when the upstream script calls CUDA
       unconditionally (``method_info(m)['requires_gpu']``), ``env_ok`` also
       needs an NVIDIA GPU (``mtb.env.host_has_gpu()``); without one,
@@ -628,16 +852,28 @@ def scan(dataset: str, category: str | None = None, *,
       needs an NVIDIA GPU: the upstream script calls CUDA unconditionally
       (<file>:<line>) ..."``).
 
-    The file gate always runs, whether or not any conda env is installed, so
-    a laptop without envs still tells you whether your layout is right.
+    The file check always runs, whether or not any conda env is installed,
+    so a laptop without envs still tells you whether your layout is right.
 
     **Reason columns.** ``reason`` joins the non-empty reasons with ``"; "``
-    and is empty iff the row is runnable. It is the short form: the file half
-    drops the exception class, the ``method/dataset/category:`` prefix and
-    the absolute directory (``input files not found on disk: {'atac':
-    'atac.h5'}. Available files in D11: [...]``). ``files_reason`` /
-    ``env_reason`` keep the verbatim text with full paths; read them for a
-    row you are debugging.
+    and is empty only when the row is runnable. It is the short form. A
+    missing ATAC file leads with what the method needs and what the folder
+    holds (``needs gene-activity ATAC (atac_gas.h5); folder has peaks
+    (atac_peak.h5)``); other missing files read ``missing adt.h5``.
+
+    File names are never cut. ``files_reason`` / ``env_reason`` keep the
+    full text with full paths; read them for a row you are debugging.
+
+    **The caveat column.** ``caveat`` lists what a row with ``files_ok``
+    still needs, or what may go wrong without an error:
+
+    - an ATAC file that holds the other representation (a peak matrix where
+      the method needs gene activity);
+    - ``setup: ...`` - a step the user must do first, the first sentence of
+      ``method_info(m)['setup_hint']`` (GLUE's GENCODE annotation file);
+    - method scripts that are not on this machine yet: the first real run
+      clones them with ``git``; on a host without network, fetch them first
+      with ``multibench fetch --scripts``.
 
     **The command column.**
 
@@ -659,9 +895,7 @@ def scan(dataset: str, category: str | None = None, *,
     files (scBridge); for it, pass no ``modalities`` at all.
 
     **Sizing a sweep.** ``runtime_tier`` / ``observed_worst_sec`` (see
-    ``method_info(m)['runtime']``) let you size a sweep before launching it;
-    ``caveat`` carries known content traps (e.g. an ``atac_gas`` role that
-    fell back to a peak matrix).
+    ``method_info(m)['runtime']``) let you size a sweep before launching it.
 
     **Selection and input checks.**
 
@@ -670,29 +904,43 @@ def scan(dataset: str, category: str | None = None, *,
     - ``methods`` - an unknown id raises ``KeyError`` with a did-you-mean
       hint; blocked rows of the selected methods are kept, with their reason.
       A selection with no variant under ``category`` (a known id with no
-      diagonal variant, say) raises ``ValueError`` - never a silently empty
-      frame.
-    - ``modalities`` - an exact selector: ``protein`` is accepted for
-      ``adt``, ``modalities=[]`` selects exactly the directory-input
-      variants, and any non-empty list excludes them (a ``UserWarning`` names
-      them and says ``modalities=[]`` selects them).
+      diagonal variant, say) raises ``ValueError`` instead of returning an
+      empty frame.
     - ``params`` - a key no variant of that method accepts raises
-      ``KeyError`` naming the accepted keys, so a typo is caught here rather
-      than hours into a sweep.
+      ``KeyError`` naming the accepted keys.
     - ``dataset`` - a spelling that differs from the folder only in case
       (``'d52'`` on macOS) is replaced by the on-disk spelling, with a
       ``UserWarning``.
+
+    **Modality tokens.** ``modalities`` names one combination, in any
+    order; the rule is the one ``mtb.find_methods`` uses:
+
+    - a base token (``rna``, ``adt`` or its alias ``protein``, ``atac``)
+      matches every role of that base: ``atac`` matches ``atac``,
+      ``atac_gas``, ``atac_peak`` and numbered roles such as ``atac2``;
+    - a representation token (``atac_peak`` / ``peak``, ``atac_gas`` /
+      ``gene_activity``) keeps the methods whose ``method_info(m)['atac']``
+      is that representation, like ``find_methods(atac=...)``;
+    - a numbered token (``rna1``) matches that role only;
+    - a row is kept when every token matches one of its roles and every
+      role is matched;
+    - an unknown token raises ``ValueError`` listing the vocabulary.
+
+    A variant fed a folder (scBridge) has no modality roles. ``modalities=[]``
+    selects exactly those variants; any non-empty list leaves them out, and
+    a ``UserWarning`` names them.
 
     **Choosing a category.** A CITE-seq folder (``rna.h5`` + ``adt.h5`` +
     ``cty.csv``) is ``vertical`` with modalities ``["rna", "adt"]``; RNA and
     ATAC from different cells is ``diagonal``. See ``mtb.list_categories``
     and ``mtb.describe_layout``.
 
-    **Environments and CLI.** Each method runs in its own conda environment
-    (they need mutually incompatible framework versions). List them with
-    ``multibench env doctor``; build them with
-    ``multibench env install --run``. ``multibench scan`` prints a compact
-    view by default; ``--columns all`` adds the rest, including ``command``.
+    **Environments and CLI.** Each method runs in its own conda environment,
+    on Linux. List them with ``multibench env doctor``; install one with
+    ``multibench env install --methods X --packed --run``. Off Linux the
+    summary line says what this computer can do. ``multibench scan`` prints
+    a compact view by default; ``--columns all`` adds the rest, including
+    ``command``.
 
     See Also
     --------
@@ -700,7 +948,7 @@ def scan(dataset: str, category: str | None = None, *,
 
     mtb.describe_layout : how to lay out a dataset folder so ``files_ok`` passes.
 
-    mtb.env.doctor : the env gate on its own, per env.
+    mtb.env.doctor : the env check on its own, per env.
 
     mtb.inputs_for : the ``{role: path}`` resolution behind ``files_ok``.
     """
@@ -712,9 +960,7 @@ def scan(dataset: str, category: str | None = None, *,
     params = params or {}
     for _m in params:                       # KeyError (did-you-mean) before any I/O
         registry.check_method(_m)
-    want_mods = None
-    if modalities is not None:
-        want_mods = "+".join(registry.normalize_modalities(modalities)) or "(data_dir)"
+    wanted = _modality_matcher(modalities) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     dataset = _resolve.canonical_dataset(base, dataset)
     ds_dir = base / dataset
@@ -725,14 +971,15 @@ def scan(dataset: str, category: str | None = None, *,
             f"{dirs}. dataset= is the folder name and data_path= the folder that "
             f"contains it (see mtb.describe_layout())")
     installed = _installed_envs()
+    repo = _runner._repo_root_no_fetch()
     rows = []
     dropped_dirs: list[str] = []
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
             continue
         mod_str = "+".join(mods) or "(data_dir)"
-        if want_mods is not None and mod_str != want_mods:
-            if mod_str == "(data_dir)" and spec.id not in dropped_dirs:
+        if wanted is not None and not wanted(spec, mods):
+            if not mods and spec.id not in dropped_dirs:
                 dropped_dirs.append(spec.id)
             continue
         rt = _runtimes().get(spec.id, {})
@@ -746,13 +993,15 @@ def scan(dataset: str, category: str | None = None, *,
                "needs_labels": bool(v.needs_labels),
                "atac": spec.atac if _variant_consumes_atac(v) else None,
                "command": ""}
-        # --- gate 1: files. Runs whether or not any env is installed. -------
+        # --- check 1: files. Runs whether or not any env is installed. ------
         # Both halves are checked (the method's script and the dataset's files)
         # so a missing script does not hide a layout problem or vice versa.
-        file_problems = []
+        # files_reason keeps every text in full; reason gets the short form.
+        file_problems, short_problems = [], []
         why_script = _missing_script(v, method=spec.id)
         if why_script:
             file_problems.append(why_script)
+            short_problems.append(_short_reason(why_script, spec.id, dataset, cat))
         got = None
         try:
             got = _resolve.inputs_for(dataset, cat, spec.id, modalities=mods or None,
@@ -761,10 +1010,14 @@ def scan(dataset: str, category: str | None = None, *,
             if extra:
                 rec["caveat"] = "; ".join(x for x in [rec["caveat"], *extra] if x)
         except Exception as e:  # missing files / no variant / bad layout
-            file_problems.append(_truncate_tail(f"{type(e).__name__}: {e}"))
+            full = f"{type(e).__name__}: {e}"
+            file_problems.append(full)
+            short_problems.append(
+                _missing_files_reason(spec, v, cat, mods, dataset, data_path)
+                or _short_reason(full, spec.id, dataset, cat))
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, "; ".join(file_problems)
-        # --- gate 2: env. -----------------------------------------------------
+        # --- check 2: env. ----------------------------------------------------
         if rec["env"] and rec["env"] not in installed:
             rec["env_ok"] = False
             rec["env_reason"] = _env_hint(rec["env"], spec.id, cat)
@@ -776,14 +1029,21 @@ def scan(dataset: str, category: str | None = None, *,
             rec["env_reason"] = "; ".join(
                 r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"])
-        rec["reason"] = "; ".join(
-            r for r in (_short_reason(rec["files_reason"], spec.id, dataset, cat),
-                        rec["env_reason"]) if r)
+        rec["reason"] = "; ".join(r for r in (*short_problems, rec["env_reason"]) if r)
         # --- the command line: only when the files resolved (something to
-        # hand the script); an env-blocked row still gets one
+        # hand the script); an env-blocked row still gets one. A setup step
+        # the user must do first, and method scripts not yet on this machine,
+        # go to caveat: the files are fine, but the run needs them.
         if rec["files_ok"] and got is not None:
             rec["command"] = _command_line(spec.id, cat, got, out_dir=out_dir,
                                            dataset=dataset, params=params.get(spec.id))
+            # the setup note in its first sentence: the full hint is one
+            # method_info(m)['setup_hint'] away
+            notes = [f"setup: {_first_sentence(n[len('setup: '):])}"
+                     if n.startswith("setup: ") else n
+                     for n in _runner.script_notes(spec, v, repo)]
+            if notes:
+                rec["caveat"] = "; ".join(x for x in [rec["caveat"], *notes] if x)
         rows.append(rec)
     df = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     df = df.sort_values(["runnable", "category", "method"],
@@ -798,9 +1058,9 @@ def scan(dataset: str, category: str | None = None, *,
             f"mtb.scan({dataset!r})")
     if params:
         _check_param_keys(df, params)       # a typo'd key must not start a sweep
-    if dropped_dirs:
-        # the selector is exact by design (a sweep must not silently grow);
-        # say what it excluded rather than dropping the rows in silence
+    if dropped_dirs and modalities:
+        # a variant fed a folder names no modality roles, so no token can
+        # select it; say what was left out rather than dropping it unnoticed
         warnings.warn(
             f"scan: modalities={list(modalities)} excludes {len(dropped_dirs)} "
             f"directory-input method(s) ({', '.join(dropped_dirs)}: they take a "
@@ -809,8 +1069,11 @@ def scan(dataset: str, category: str | None = None, *,
             UserWarning, stacklevel=2)
     if verbose:
         n = len(df)
-        print(f"[scan] files OK for {int(df['files_ok'].sum())}/{n} method rows; "
-              f"{int(df['env_ok'].sum())}/{n} envs installed", flush=True)
+        line = (f"[scan] files OK for {int(df['files_ok'].sum())}/{n} method rows; "
+                f"{int(df['env_ok'].sum())}/{n} envs installed")
+        if _runner.linux_only_sentence():
+            line += f". {LINUX_ONLY_SUMMARY}"
+        print(line, flush=True)
     return df
 
 
@@ -1035,8 +1298,28 @@ def _with_label_order_note(sm: "pd.DataFrame") -> "pd.DataFrame":
     return sm
 
 
+def _check_save_target(d: Path, dataset: str, category: str) -> None:
+    """Raise ``ValueError`` when ``d`` holds a saved result of another
+    dataset or category: merging those records would mix two sweeps."""
+    p = Path(d) / "batch_result.json"
+    if not p.exists():
+        return
+    try:
+        with open(p) as fh:
+            blob = json.load(fh)
+    except (OSError, ValueError) as e:
+        raise ValueError(f"{p} exists but cannot be read ({e}); save to another "
+                         f"folder or remove it") from e
+    have = (blob.get("dataset"), blob.get("category"))
+    if have != (dataset, category):
+        raise ValueError(
+            f"{d} already holds a saved result for dataset={have[0]!r} "
+            f"category={have[1]!r}; this one is dataset={dataset!r} "
+            f"category={category!r}. Save it to another folder.")
+
+
 class BatchResult:
-    """Outcome of ``mtb.run_all`` - a summary table, a tidy frame and a figure.
+    """Outcome of ``mtb.run_all`` - a summary table, a long table and a figure.
 
     Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. The
     per-method records are kept, so a finished sweep can be re-scored or
@@ -1066,7 +1349,7 @@ class BatchResult:
     summary : pandas.DataFrame
         One row per method with its status, timing and metrics (property).
     long : pandas.DataFrame
-        Tidy ``metric, value, method, dataset, category, ...`` frame for
+        Long table ``metric, value, method, dataset, category, ...`` for
         plotting (property).
     results : list[dict]
         The raw records, including every label ordering tried (property).
@@ -1237,7 +1520,7 @@ class BatchResult:
 
     @property
     def long(self) -> pd.DataFrame:
-        """Tidy frame (``metric, value, method, dataset, category``) for plotting.
+        """Long table (``metric, value, method, dataset, category``) for plotting.
 
         This is what ``plot`` and ``mtb.plot.bubble`` consume.
 
@@ -1265,7 +1548,7 @@ class BatchResult:
         --------
         BatchResult.plot : draws the bubble figure from this frame.
 
-        mtb.to_long : the wide -> tidy conversion used for the metrics dict.
+        mtb.to_long : the wide -> long conversion used for the metrics dict.
         """
         cols = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
         frames = []
@@ -1322,7 +1605,7 @@ class BatchResult:
         reused                      True when skip_existing reused the output
         env, output_kind, n_tunable the scan row the method ran from
         data_path, multibench_version, started_at   provenance of the run
-        _long                       internal tidy frame; read BatchResult.long instead
+        _long                       internal long table; read BatchResult.long instead
         ```
 
         **Label-order evidence.** ``label_order_candidates`` holds every
@@ -1558,6 +1841,11 @@ class BatchResult:
         Path
             The folder written.
 
+        Raises
+        ------
+        ValueError
+            The folder holds a saved result of another dataset or category.
+
         Examples
         --------
         >>> res = mtb.load_batch("out/")
@@ -1577,31 +1865,58 @@ class BatchResult:
         Reload with ``mtb.load_batch`` to re-score or re-plot later without
         re-running any method.
 
+        **Saving into a folder that has a result.** When the folder already
+        holds ``batch_result.json`` for the same dataset and category, the
+        records are merged. A method in this result replaces its earlier
+        record; the other earlier records are kept, and all four files are
+        rewritten from the merged set. This result object is not changed.
+
+        A line ``# merged with N earlier record(s) in <folder> (StabMap)``
+        names the kept methods.
+
+        **Jobs in parallel.** Jobs running at the same time should use one
+        ``out_dir`` each; combine them with
+        ``multibench plot --input dir1 --input dir2``.
+
         **Blank confidence on disk.** In ``summary.csv`` the
         ``label_order_note`` column says why ``label_order_confidence`` is
-        empty on a row, so that a "single ordering" result is not confused
-        with a run that never scored.
+        empty on a row: "single ordering", "winner at chance" or "not scored".
 
         See Also
         --------
         mtb.load_batch : reads the folder back.
         """
         d = Path(out_dir or self.out_dir or ".")
+        _check_save_target(d, self.dataset, self.category)
+        mine = {r.get("method") for r in self.records}
+        kept = []
+        if (d / "batch_result.json").exists():
+            kept = [r for r in load_batch(d).records if r.get("method") not in mine]
+        merged = BatchResult(kept + list(self.records), self.dataset, self.category,
+                             out_dir=d) if kept else self
         d.mkdir(parents=True, exist_ok=True)
-        sm = self.summary.copy()
+        sm = merged.summary.copy()
         # "single ordering" is a result, "never ran" an absence, and a bare NaN
         # cannot tell them apart on disk. The note has its own column: a sentinel
         # string in the numeric one breaks `> 0.5` and `.isna()` and trips a
         # pandas incompatible-dtype FutureWarning.
         sm = _with_label_order_note(sm)
         sm.to_csv(d / "summary.csv", index=False)
-        if not self.long.empty:
-            self.long.to_csv(d / "long.csv", index=False)
-        self.failures.to_csv(d / "failures.csv", index=False)
-        slim = [{k: v for k, v in r.items() if k != "_long"} for r in self.records]
+        lng = merged.long
+        if not lng.empty:
+            lng.to_csv(d / "long.csv", index=False)
+        elif (d / "long.csv").exists():
+            # an earlier long.csv would attach stale metrics on load_batch
+            (d / "long.csv").unlink()
+        merged.failures.to_csv(d / "failures.csv", index=False)
+        slim = [{k: v for k, v in r.items() if k != "_long"} for r in merged.records]
         with open(d / "batch_result.json", "w") as fh:
             json.dump({"dataset": self.dataset, "category": self.category,
                        "records": slim}, fh, indent=1, default=str)
+        if kept:
+            names = ", ".join(dict.fromkeys(str(r.get("method")) for r in kept))
+            print(f"# merged with {len(kept)} earlier record(s) in {d} ({names})",
+                  flush=True)
         return d
 
     def __len__(self):
@@ -1627,37 +1942,37 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     variant is listed with its own reason (one per line); without it the
     first three blocked variants are shown and the message says how many
     there are in total. Reasons of methods the caller did not request are
-    never listed: they would point at the wrong fix.
+    never listed: they would point at the wrong fix. Off Linux, when an
+    environment blocks a row, the line after the head says where methods run.
     """
     def _line(r):
         return f"  {r['method']} ({r['modalities']}): {r['reason']}"
     head = f"nothing is runnable for dataset={dataset!r} category={category!r}"
+    platform = _platform_line(blocked)
     if methods:
         lines = [_line(r) for _, r in blocked.iterrows()]
-        return (f"{head} (methods={list(methods)}). Blocked - one line per requested "
-                f"variant:\n" + "\n".join(lines) +
+        return (f"{head} (methods={list(methods)}).\n{platform}Blocked, one line per "
+                f"requested variant:\n" + "\n".join(lines) +
                 f"\nfiles_ok / env_ok in mtb.scan({dataset!r}, {category!r}, "
-                f"methods={list(methods)}) say which gate failed; mtb.env.doctor() "
-                f"for envs." + _platform_suffix(blocked))
+                f"methods={list(methods)}) say which check failed; mtb.env.doctor() "
+                f"for envs.")
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
-    return (f"{head}. First {k} of {n} blocked variants:\n" + "\n".join(lines) +
+    return (f"{head}.\n{platform}First {k} of {n} blocked variants:\n" + "\n".join(lines) +
             f"\nInspect mtb.scan({dataset!r}, {category!r}) for the full table "
-            f"(files_ok / env_ok say which gate failed; mtb.env.doctor() for envs)."
-            + _platform_suffix(blocked))
+            f"(files_ok / env_ok say which check failed; mtb.env.doctor() for envs).")
 
 
-def _platform_suffix(blocked: pd.DataFrame) -> str:
-    """One extra sentence for the "nothing is runnable" error on a non-Linux
-    host whose rows are blocked by the env gate: the install command every
-    reason quotes will refuse here, so say where to run instead of sending
-    the user to a download that fails."""
-    problem = envs.host_platform_problem()
-    if not problem or "env_ok" not in blocked or blocked["env_ok"].all():
+def _platform_line(blocked: pd.DataFrame) -> str:
+    """The platform sentence (with its newline) for the "nothing is runnable"
+    error on a non-Linux host whose rows are blocked by the env check, else
+    ``""``. It comes right after the head: the environments cannot be
+    installed here, so the per-row reasons are not the fix."""
+    linux_only = _runner.linux_only_sentence()
+    if not linux_only or "env_ok" not in blocked or blocked["env_ok"].all():
         return ""
-    return (f"\nNote: {problem} - the `multibench env install` commands above "
-            f"refuse on this host; run methods on a Linux host (plan / scan / "
-            f"evaluate / plot work here).")
+    return (f"{linux_only} Here you can check files, score embeddings and plot; run "
+            f"the methods on a Linux machine.\n")
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
@@ -1830,8 +2145,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     FileNotFoundError
         ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
     ValueError
-        Unknown ``category``, no matching variant, nothing runnable, or
-        ``skip_existing`` with ``params``.
+        Unknown ``category``, no matching variant, nothing runnable, a
+        mismatched ``out_dir``, or ``skip_existing`` with ``params``.
     KeyError
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
@@ -1862,11 +2177,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     what will be attempted - ``len(plan)`` is not the sweep size.
     ``multibench run-all --dry-run --format csv`` writes the same frame.
 
-    **Before the sweep.** Every attempted row passed both ``mtb.scan`` gates
+    **Before the sweep.** Every attempted row passed both ``mtb.scan`` checks
     (input files and conda env, plus a GPU where the script needs one), so a
-    missing env is reported up front rather than hours in
-    (``multibench env doctor`` / ``env install --run``). Methods take minutes
-    to hours each.
+    missing env is reported before any method starts (``multibench env
+    doctor``). Methods take minutes to hours each.
 
     **Failures are recorded.** In a real run a method that raises is
     recorded as ``FAIL`` (with its ``error``), one that exceeds ``timeout``
@@ -1884,6 +2198,13 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     (``summary.csv``, ``failures.csv``, ``batch_result.json``, and
     ``long.csv`` when some method produced metrics); reload it with
     ``mtb.load_batch``.
+
+    **Several jobs, one folder.** A later run into the same ``out_dir`` is
+    merged with the records already there: methods it re-ran are replaced,
+    the others kept. An ``out_dir`` that holds another dataset or category
+    raises ``ValueError`` before any method runs. Jobs running at the same
+    time should use one ``out_dir`` each; combine them with
+    ``multibench plot --input dir1 --input dir2``.
 
     **Resuming.** ``skip_existing=True`` skips the hours an interrupted
     sweep already did. Reuse only checks that the output file exists, not
@@ -1908,14 +2229,17 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     that method ``RUN_OK_EVAL_FAILED`` (``batch has N entries, embedding has M
     cells``). Re-score a finished sweep with ``BatchResult.rescore``.
 
-    **ATAC representation.** Besides ``["rna", "adt"]``, ``modalities``
-    takes ``["rna", "atac_gas"]`` (RNA + ATAC gene activity) and
-    ``["rna", "atac_peak"]`` (RNA + ATAC peaks); ``mtb.describe_layout``
-    lists every role name. The two ATAC representations do not map to the
-    obvious filenames: gene activity is ``atac.h5`` but peaks are
-    ``peak.h5``. A peak matrix in ``atac.h5`` runs every method on the
-    wrong representation without an error; the numbers are plausible and
-    wrong.
+    **ATAC files.** Vertical reads ``atac.h5``; ``method_info(m)["atac"]``
+    says whether it must hold peaks or gene activity. Diagonal reads
+    ``atac_peak.h5`` (peaks) and ``atac_gas.h5`` (gene activity). Mosaic
+    reads ``atac<i>.h5`` (peaks). ``peak.h5``, and ``atac.h5`` for gene
+    activity, are accepted as older names. A method given the other
+    representation runs without an error and gives a wrong embedding;
+    ``mtb.scan`` shows it in ``caveat``.
+
+    **Modality tokens.** ``modalities`` follows the rule of ``mtb.scan``:
+    ``atac`` matches every ATAC role, and ``atac_peak`` / ``atac_gas`` keep
+    the methods that need that representation.
 
     **Errors raised.**
 
@@ -1925,14 +2249,15 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     - A selection that matches no variant - ``ValueError`` ("no 'cross'
       variant matches ..."); a dry run is never empty.
     - A dry run with a ``params`` key no planned variant of that method
-      accepts - ``KeyError`` naming the accepted keys, instead of the typo
-      being discovered hours in.
-    - Variants exist but not one passes both gates - the "nothing is
+      accepts - ``KeyError`` naming the accepted keys.
+    - Variants exist but not one passes both checks - the "nothing is
       runnable ..." ``ValueError``. Its message lists the reason of every
       requested variant (or the first 3 of N when ``methods`` was not
-      given), never the reasons of methods you did not ask for. On a
-      non-Linux host with env-blocked rows it adds that the install commands
-      refuse there.
+      given), never the reasons of methods you did not ask for. On macOS or
+      Windows, when an environment blocks a row, its second line says that
+      methods run only on Linux.
+    - An ``out_dir`` holding a saved result of another dataset or category
+      - ``ValueError``, before any method runs.
 
     **Dataset spelling.** A ``dataset`` that differs from the folder only in
     case (``'d52'``) is replaced by the on-disk spelling, with a
@@ -1961,8 +2286,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         registry.check_method(_m)
     if not dry_run and skip_existing and params:
         raise ValueError(
-            "skip_existing=True with params=... would silently return results computed "
-            "with the OLD parameters (reuse is keyed on the output file, not on params). "
+            "skip_existing=True with params=... would return results computed with the "
+            "earlier parameters (reuse is keyed on the output file, not on params). "
             "Use a fresh out_dir per parameter setting, or skip_existing=False.")
     # the on-disk spelling, decided once here so out_dir names, records and
     # every downstream call agree (and warn once, not per method)
@@ -1996,7 +2321,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                    f"{dataset} ({category})")
             if n > k:
                 msg += (f"; {n - k} blocked - see the reason column "
-                        f"(files_ok / env_ok say which gate; mtb.env.doctor() for envs)")
+                        f"(files_ok / env_ok say which check; mtb.env.doctor() for envs)")
             print(msg, flush=True)
         return plan_df                     # = scan(): runnable rows first, blocked rows keep `reason`
     blocked = plan_df[~plan_df["runnable"]]
@@ -2010,6 +2335,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     batch_vec = None if batch is None else _eio.as_vector(batch, what="batch")
     out_dir = Path(out_dir)
+    # a folder holding another dataset's saved result would refuse the save
+    # after the sweep; refuse now, before any method runs
+    _check_save_target(out_dir, dataset, category)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []
 
@@ -2111,11 +2439,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 def sweep(dataset: str, category: str, method: str, param: str, values, *,
           out_dir, modalities=None, data_path=None, timeout=None,
           verbose: bool = True) -> pd.DataFrame:
-    """Run one method repeatedly over a range of one hyperparameter.
-
-    Replaces a hand-written loop and its two usual mistakes: settings that
-    share one ``out_dir`` and overwrite each other, and results that no
-    longer say which value produced them.
+    """Run one method once per value of one hyperparameter, each in its own out_dir.
 
     Parameters
     ----------
@@ -2148,7 +2472,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     -------
     pandas.DataFrame
         The settings' ``BatchResult.summary`` rows stacked, the swept value
-        first (column named ``param``). A tidy frame for plotting is in
+        first (column named ``param``). A long table for plotting is in
         ``df.attrs["long"]``.
 
     Raises
@@ -2171,7 +2495,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     ``.`` -> ``p`` and ``-`` -> ``m`` (``lr=0.001`` runs under
     ``<out_dir>/lr_0p001/``).
 
-    **The tidy frame.** ``df.attrs["long"]`` makes each setting a separate
+    **The long table.** ``df.attrs["long"]`` makes each setting a separate
     series (``"Multigrate (lr=0.001)"``), so it can go straight into
     ``mtb.plot.bubble``; ``.long`` keys rows by method, so without it every
     setting would collapse onto one row. ``DataFrame.attrs`` does not

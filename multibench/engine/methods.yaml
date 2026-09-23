@@ -330,7 +330,6 @@ methods:
     # `.cuda()` (:130-131 / :145-146); neither script has a device flag.
     requires_gpu: true
     gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:109
-    setup_hint: "Runs in the `env_moETM` conda env."
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/moETM/main_moETM_rna_adt.py
@@ -356,7 +355,7 @@ methods:
     # main_MIRA.py needs a local logger.py that upstream does not ship - hence
     # env_specs' `blocked-script` tag and the `helpers` line below, which makes
     # scan say so instead of failing at import.
-    setup_hint: "main_MIRA.py does `from logger import *` (line 9), but the public tools_scripts/MIRA/ holds only main_MIRA.py, so from a fresh checkout the script fails at import. The env (scmb_mira: pip install mira-multiome scanpy) builds normally. scan() reports the missing helper in files_reason; supply a logger.py next to main_MIRA.py to run it."
+    setup_hint: "MIRA needs a logger.py next to main_MIRA.py in <repo_path>/tools_scripts/MIRA/: the script imports it, and the public scMultiBench repository does not include it. The environment (scmb_mira) builds normally."
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py
@@ -400,7 +399,6 @@ methods:
     tasks: [clustering, dimension_reduction]
     atac: gene_activity
     status: verified
-    setup_hint: "Runs through the package driver engine/drivers/run_matilda.py, which uses Matilda's object API (`matilda-sc`, import `matilda`; https://pyanglab.github.io/Matilda/). The upstream main_matilda_train.py only trains and writes no embedding; the driver trains once, then writes the joint embedding in the same pass."
     variants:
       # --- CITE-seq (rna + adt) ---
       - when: {category: vertical, modalities: [rna, adt]}
@@ -584,7 +582,7 @@ methods:
     tasks: [batch, clustering]
     atac: peak
     status: verified
-    setup_hint: "Runs in the `glue` env (scglue). GLUE_human.py reads a gencode GTF by relative name (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz), so the file must sit in the GLUE script directory, which `cwd_at_script: true` makes the working directory."
+    setup_hint: "GLUE needs the GENCODE v43 human annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in <repo_path>/tools_scripts/GLUE/. The wrapper runs the human script only, so mouse data is not supported through multibench."
     variants:
       - when: {category: diagonal, modalities: [rna, atac_peak]}
         entrypoint: tools_scripts/GLUE/GLUE_human.py

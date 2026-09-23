@@ -5,37 +5,62 @@ import os
 import shlex
 import subprocess
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
 from .. import config
 from . import builder, io, ingest, registry, envs
+from .schema import _batch_of, base_modality
 
 
 @dataclass
 class RunResult:
-    """What :func:`run` returns for a single method.
+    """What ``mtb.run`` returns for one method.
 
     Attributes
     ----------
-    method : the method id that was run.
-    out_dir : directory holding everything the method wrote. The primary file is
-        named by the variant's ``output.file`` (usually ``embedding.h5``).
-    cmd : the exact argv that was executed - useful for reproducing a run by hand.
-    output : the primary output, already loaded. For an embedding method this is a
-        numpy array; pass it straight to :func:`multibench.evaluate`. Note it may be
-        dims x cells rather than cells x dims - ``evaluate`` re-orients a raw array
-        against the label count for you.
-    extra : ``{filename: loaded object}`` for any ``extra_outputs`` the variant
-        declares (e.g. scMoMaT's UMAP embedding alongside its KNN graph).
-    stdout, stderr : captured output of the method process. ``stderr`` is where a
-        method's own diagnostics go and is the first place to look when a run
-        produced a file but the numbers look wrong.
+    method : str
+        The method id that ran.
+    out_dir : Path
+        Folder holding everything the method wrote.
+    cmd : list[str]
+        The argv that ran; ``shlex.join(res.cmd)`` repeats the run by hand.
+    output : object
+        The primary output, loaded; an embedding array for most methods.
+    extra : dict
+        ``{filename: loaded object}`` for the variant's extra outputs.
+    stdout : str
+        Captured standard output of the method.
+    stderr : str
+        Captured standard error; read it first when a result looks wrong.
+    obs_names : list[str] | None
+        Cell barcodes of the output, in the order the method stacks the cells;
+        ``None`` when they could not be matched.
 
-    Not every method returns an embedding: check
-    ``registry.get(method).select(...).output.kind`` first (``embedding`` /
-    ``graph``). :func:`multibench.run_all` does this for you, which is
-    why it is the recommended entry point.
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> inp = mtb.inputs_for("D11", "vertical", "totalVI")
+    >>> res = mtb.run("totalVI", "vertical", inputs=inp, out_dir="out/totalVI_D11")
+    >>> adata.obsm["X_totalVI"] = res.output      # rows match res.obs_names
+    >>> assert list(adata.obs_names) == res.obs_names
+
+    Notes
+    -----
+    **Row order.** Rows follow the input cells in the order the method stacks
+    them, which is the order ``mtb.labels_for(dataset, category, method)``
+    uses. ``obs_names`` holds the barcodes from the input files in that
+    order. It is ``None``, with a ``UserWarning``, when their number differs
+    from the output's cells or the inputs are a folder (scBridge).
+
+    **Orientation.** Most methods write cells x dims. When
+    ``res.output.shape[0] != len(res.obs_names)`` the output is dims x cells:
+    store ``res.output.T``. ``mtb.evaluate`` orients a raw array itself.
+
+    **Output kind.** Not every method returns an embedding: Seurat_WNN
+    writes only a neighbour graph. ``mtb.run_all`` reads the kind of each
+    method and scores only embeddings.
     """
 
     method: str
@@ -45,6 +70,7 @@ class RunResult:
     extra: dict                     # role/file -> loaded extra outputs
     stdout: str = ""
     stderr: str = ""
+    obs_names: list | None = None   # input barcodes in the output's cell order
 
 
 def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
@@ -214,6 +240,216 @@ def _repo_root_no_fetch() -> Path:
     if (root / "tools_scripts").is_dir():
         return root
     return p
+
+
+#: The shell command that fetches the method scripts ahead of a run.
+FETCH_SCRIPTS_CMD = "multibench fetch --scripts"
+
+
+def linux_only_sentence() -> str | None:
+    """``"Methods run only on Linux (this computer is darwin/arm64)."``, or
+    ``None`` on Linux (where ``envs.host_platform_problem()`` is ``None``).
+
+    The platform part comes from ``host_platform_problem()``'s own sentence
+    ("... this host is <os>/<arch>"), so a patched value in a test and the
+    real one read alike.
+    """
+    problem = envs.host_platform_problem()
+    if not problem:
+        return None
+    marker = "this host is "
+    host = problem.rsplit(marker, 1)[1].strip() if marker in problem else sys.platform
+    return f"Methods run only on Linux (this computer is {host})."
+
+
+def script_notes(spec, variant, repo: Path) -> list[str]:
+    """Setup facts a preview must show before the real run fails on them.
+
+    - the method's ``setup_hint`` (a file the user must supply, such as
+      GLUE's GENCODE annotation), when it has one. A variant whose declared
+      helper files (MIRA's ``logger.py``) are all in place needs no hint;
+    - a method script that is not on disk: without any checkout, the first
+      real run clones the scripts with ``git``, which an offline compute
+      node cannot do.
+
+    Returns plain sentences, without a comment marker; :func:`run` prints
+    them to stderr on a dry run and ``mtb.scan`` adds them to ``caveat``.
+    The setup note always comes first and starts with ``"setup: "``.
+    """
+    notes = []
+    ep = Path(variant.entrypoint)
+    helpers = getattr(variant, "helpers", None) or []
+    done = bool(helpers) and all((repo / ep).parent.joinpath(h).exists() for h in helpers)
+    if spec.setup_hint and not done:
+        notes.append(f"setup: {spec.setup_hint}")
+    if not (repo / ep).exists():
+        if (repo / "tools_scripts").is_dir():
+            notes.append(f"method script {ep} not found in the checkout at {repo}: "
+                         f"update it with git pull, or delete it so the next run "
+                         f"fetches a fresh copy")
+        else:
+            notes.append(f"method scripts not found under {repo}: the first real run "
+                         f"clones PYangLab/scMultiBench with git; on a host without "
+                         f"network, fetch them first ({FETCH_SCRIPTS_CMD})")
+    return notes
+
+
+def _is_modality_role(role: str) -> bool:
+    """A role whose value ``run`` converts to a canonical ``.h5`` (not an
+    auxiliary role, not a label file)."""
+    return role not in _AUX_ROLES and "cty" not in role and "label" not in role
+
+
+def _check_input(role: str, val, *, real: bool) -> str:
+    """Validate one modality input without reading or writing it.
+
+    Returns ``"pass"`` when the value is a canonical ``.h5``, else
+    ``"convert"``. Raises the error the conversion would raise, so a dry run
+    fails exactly where the real run would. A path that does not exist
+    raises ``FileNotFoundError`` in a real run (``real=True``); a preview
+    may name files of another host, so it passes an ``.h5`` path through.
+    """
+    if not isinstance(val, (str, os.PathLike)):
+        if ingest._is_mudata(val):
+            mods = list(getattr(val, "mod", {}) or {})
+            raise ValueError(
+                f"inputs[{role!r}] is a MuData; pass one modality, e.g. "
+                f"inputs={{{role!r}: mdata.mod[{(mods or [role])[0]!r}]}} (modalities: "
+                f"{mods}), or write a dataset folder with mtb.io.export_dataset")
+        if hasattr(val, "X") and hasattr(val, "obs"):
+            return "convert"
+        raise TypeError(f"inputs[{role!r}] must be a file path or an AnnData, "
+                        f"got {type(val).__name__}")
+    p = Path(val)
+    suf = p.suffix.lower()
+    if suf == ".h5mu":
+        raise ValueError(
+            f"inputs[{role!r}] is a MuData file ({p.name}); pass one modality as an "
+            f".h5ad or AnnData (mdata.mod[{role!r}]), or write a dataset folder with "
+            f"mtb.io.export_dataset")
+    if not p.exists():
+        if real:
+            raise FileNotFoundError(f"input file does not exist: {p} (cwd {os.getcwd()})")
+        return "pass" if suf == ".h5" else "convert"
+    if suf == ".h5":
+        if ingest._is_canonical_h5(p):
+            return "pass"
+        ingest._to_anndata(p)          # raises the "no dataset 'matrix/data'" error
+    if suf in (".h5ad", ".csv", ".tsv"):
+        return "convert"
+    if suf == ".loom":
+        import importlib.util
+        if importlib.util.find_spec("loompy") is None:
+            raise ImportError(
+                "reading .loom requires the optional 'loompy' package "
+                "(pip install 'multibench[loom]' or pip install loompy); "
+                "alternatively convert the input to .h5ad/.csv first.")
+        return "convert"
+    raise ValueError(f"unsupported input format: {p.name}")
+
+
+def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, convert: bool,
+                 real: bool) -> dict:
+    """The file each role hands the script, and how it gets there.
+
+    ``{role: {"value": <what the argv gets>, "src": <input>, "convert": bool,
+    "normpeaks_from": <path or None>}}``. Shared by the real run and the dry
+    run, so the preview names the files the run will pass: a canonical
+    ``.h5`` as is, anything else ``<out_dir>/inputs/<role>.h5``, and a
+    ``normalize_peaks`` role ``<out_dir>/inputs/<role>_normpeaks.h5``.
+    Nothing is written; every format check the conversion applies runs here.
+    """
+    plan: dict = {}
+    for role, val in inputs.items():
+        step = {"value": val, "src": val, "convert": False, "normpeaks_from": None}
+        if _is_modality_role(role):
+            if convert:
+                if _check_input(role, val, real=real) == "convert":
+                    step["value"], step["convert"] = str(inputs_dir / f"{role}.h5"), True
+                else:
+                    step["value"] = str(val)
+            elif not isinstance(val, (str, os.PathLike)):
+                raise ValueError(f"convert=False needs file paths; inputs[{role!r}] is "
+                                 f"a {type(val).__name__}")
+        plan[role] = step
+    for role in (getattr(variant, "normalize_peaks", None) or []):
+        if role in plan:
+            plan[role]["normpeaks_from"] = plan[role]["value"]
+            plan[role]["value"] = str(inputs_dir / f"{role}_normpeaks.h5")
+    return plan
+
+
+def _cell_group_roles(variant) -> list[list[str]]:
+    """The variant's input roles grouped by the cells they hold, in the
+    order the output stacks the groups (``Variant.stacked_roles``).
+
+    Vertical inputs share one set of cells. Diagonal inputs hold one set per
+    base modality (``atac_peak`` and ``atac_gas`` are the same ATAC cells).
+    Mosaic and cross inputs hold one set per batch (``rna1`` + ``adt1``).
+    """
+    category = variant.when.get("category")
+    groups: dict = {}
+    for r in variant.stacked_roles():
+        if category == "vertical":
+            key = "cells"
+        elif category == "diagonal":
+            key = base_modality(r)
+        else:
+            key = _batch_of(r) if _batch_of(r) is not None else r
+        groups.setdefault(key, []).append(r)
+    return list(groups.values())
+
+
+def _read_barcodes(path) -> list[str]:
+    import h5py
+    with h5py.File(path, "r") as f:
+        return [b.decode() if isinstance(b, bytes) else str(b)
+                for b in f["matrix/barcodes"][:]]
+
+
+def _obs_names(method: str, variant, values: dict, output) -> list[str] | None:
+    """The input barcodes in the output's cell order, or ``None`` with a warning.
+
+    Each cell group (:func:`_cell_group_roles`) contributes the barcodes of
+    its first role with a readable canonical file. The list is kept only
+    when its length equals one axis of ``output`` (the cell axis, as
+    ``evaluate`` orients a raw array).
+    """
+    why = None
+    names: list[str] = []
+    # a const argument (Seurat_WNN's atac 'NULL') is not an input: only roles
+    # the call was given can hold cells
+    groups = [[r for r in g if r in values] for g in _cell_group_roles(variant)]
+    groups = [g for g in groups if g]
+    if not groups:
+        why = "the method reads a folder, not modality files"
+    for roles in groups:
+        got = None
+        for r in roles:
+            v = values[r]
+            if isinstance(v, (str, os.PathLike)) and str(v).endswith(".h5"):
+                try:
+                    got = _read_barcodes(v)
+                    break
+                except (OSError, KeyError):
+                    continue
+        if got is None:
+            why = f"no barcodes readable for input role(s) {roles}"
+            break
+        names += got
+    if why is None:
+        shape = tuple(getattr(output, "shape", ()) or ())
+        if not shape and isinstance(output, (list, tuple)):
+            shape = (len(output),)
+        if len(names) not in shape[:2]:
+            why = (f"the inputs hold {len(names)} cells but the output has shape "
+                   f"{shape}")
+    if why is None:
+        return names
+    warnings.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
+                  f"the order of mtb.labels_for(dataset, category, {method!r})",
+                  UserWarning, stacklevel=3)
+    return None
 
 
 def _host_run_env(run_env: dict | None) -> dict:
@@ -400,16 +636,24 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     -------
     RunResult or list[str]
         ``RunResult`` - read ``output`` (the primary output, loaded),
-        ``out_dir`` and ``stderr``. With ``dry_run=True``, the argv list.
+        ``obs_names`` (its cell barcodes) and ``stderr``. With
+        ``dry_run=True``, the argv list.
 
     Raises
     ------
     KeyError
         Unknown method, or no variant fits ``category`` and the input roles.
+    ValueError
+        An input the run cannot convert, such as an ``.h5mu`` file or a MuData.
     OSError
         The method needs a GPU this host lacks, or its env is not installed.
     RuntimeError
-        The method exited with a non-zero status.
+        The method exited with a non-zero status, or its scripts could not be fetched.
+
+    Warns
+    -----
+    UserWarning
+        The input barcodes do not match the output's cells; ``obs_names`` is ``None``.
 
     Examples
     --------
@@ -419,26 +663,31 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     >>> res = mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
     ...               params={"epochs": 20})
     >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))
+    >>> adata.obsm["X_Matilda"] = res.output      # rows match res.obs_names
 
     Notes
     -----
     **Result.** ``RunResult`` carries ``output`` (the primary output, loaded),
+    ``obs_names`` (the input barcodes in the output's row order),
     ``extra`` (``{file: loaded object}`` for the variant's extra outputs),
     ``cmd`` (the argv that ran), ``stdout``, ``stderr``, ``out_dir`` (an
     absolute path) and ``method``.
 
-    **Dry run.** ``dry_run=True`` returns the argv the call would execute,
-    built from the same pieces as a real run: variant selection, the command
-    builder, the ``driver`` / ``pty`` wrapping and the real env wrap (the
-    prefix activation or ``conda run -n <env>``). It creates nothing: no
-    ``out_dir``, no ``inputs/`` copies, no env preflight, no fetch of the
-    script checkout. ``shlex.join`` it for a shell line.
+    **Dry run.** ``dry_run=True`` returns the argv the real run would
+    execute. It uses the same variant selection, input plan, command builder
+    and env wrap as a real run. It creates nothing: no ``out_dir``, no
+    ``inputs/`` copies, no env check, no fetch of the method scripts.
+    ``shlex.join`` it for a shell line.
 
-    The preview shows the inputs absolute, as the run passes them. A real run
-    first copies non-canonical inputs to ``<out_dir>/inputs/<role>.h5``;
-    canonical ``.h5`` files pass through unchanged, so for a laid-out dataset
-    the preview is the real command, except for a variant that first rewrites
-    peak names into ``inputs/<role>_normpeaks.h5``.
+    The preview names the files the run passes. A canonical ``.h5`` passes
+    through. An AnnData or any other file becomes
+    ``<out_dir>/inputs/<role>.h5``, and a peak role the method renames
+    becomes ``<out_dir>/inputs/<role>_normpeaks.h5``. Input-format errors,
+    such as an ``.h5mu`` file, are raised by the dry run too.
+
+    The dry run prints to stderr what the real run would need first: the
+    method's ``setup_hint`` (``method_info(m)['setup_hint']``), and a note
+    when the method scripts are not on this machine yet.
 
     **Variant selection.** Only ``category`` and the modality roles of
     ``inputs`` select the variant. The modality roles are every key except the
@@ -448,7 +697,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     alone selects it: pass no modality roles with it.
 
     ``method_info(m)['supports']`` lists every variant. A misspelt method id
-    raises ``KeyError`` naming the closest registry id; a category and role
+    raises ``KeyError`` naming the closest method id; a category and role
     set with no variant raises ``KeyError`` listing the declared
     ``(category, modalities)`` pairs.
 
@@ -456,10 +705,15 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     ``target_data`` / ``source_cty`` / ``target_cty``) and label files are
     never converted to the canonical ``.h5``.
 
+    **Inputs.** A MuData, in memory or as an ``.h5mu`` file, raises
+    ``ValueError``: pass one modality per role (``mdata.mod["rna"]``), or
+    write the folder with ``mtb.io.export_dataset``. With ``convert=False``
+    every modality input must already be a file path.
+
     **GPU and CPU.** On a host without an NVIDIA GPU
-    (``mtb.env.host_has_gpu()`` is False), the registry ``cpu_params`` - the
+    (``mtb.env.host_has_gpu()`` is False), the method's ``cpu_params`` - the
     flags that turn CUDA off in a script that has it on by default,
-    ``method_info(m)['cpu_params']`` - are merged into ``params`` first, so a
+    ``method_info(m)['cpu_params']`` - are merged into ``params`` first. A
     key you pass always wins.
 
     The dry run shows these flags too; a real run prints ``[run] no GPU on
@@ -486,20 +740,25 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     ``mtb.env.install``; any other value raises ``ValueError``.
 
     The method process gets ``PYTHONNOUSERSITE=1``, so user site-packages
-    cannot shadow the env, and ``MPLBACKEND=Agg`` unless the variant sets its
+    cannot shadow the env, and ``MPLBACKEND=Agg`` unless the method sets its
     own backend.
 
-    A variant's own variables (its registry ``run_env``) are set over yours.
-    A value made of absolute paths, such as ``LD_PRELOAD``, is applied only
-    for the paths that exist on this machine; when none does, the variable
+    Environment variables the method itself needs are set over yours. A
+    value made of absolute paths, such as ``LD_PRELOAD``, is applied only
+    for the paths that exist on this machine. When none does, the variable
     is left as you set it, or unset, so the tool's default lookup applies.
 
-    **Env preflight.** Before any file is written, the env is looked up with
+    **Env check.** Before any file is written, the env is looked up with
     the probe ``mtb.scan`` uses. If envs are found on this machine and the
     method's env is not among them, ``EnvironmentError`` (Python's alias of
-    ``OSError``) is raised, naming the install command. If the probe finds no
-    envs at all, the subprocess reports the failure. A ``cmd_template`` takes
-    over env control and skips the preflight.
+    ``OSError``) is raised, naming the install command. On Linux, if the
+    probe finds no envs at all, the subprocess reports the failure. A
+    ``cmd_template`` takes over env control and skips the check.
+
+    **Other systems.** Method environments are Linux-only. On macOS or
+    Windows a missing env always raises ``OSError``, and the message starts
+    with that fact: preview the command with ``dry_run=True`` and run it on a
+    Linux machine.
 
     **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
     before the argv is built, and ``data_dir`` (like any existing directory)
@@ -518,9 +777,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     it). If the call is interrupted - Ctrl-C, or a ``run_all`` timeout - the
     method's whole process tree is killed before the exception propagates.
 
-    **Method scripts.** The upstream scripts are never modified. A variant
-    with a package-side ``driver`` runs the driver, which loads the unmodified
-    script from its own directory.
+    **Method scripts.** The upstream scripts are never modified. A method
+    with a package-side driver runs the driver, which loads the unmodified
+    script from its own directory. The first run on a machine clones them
+    with ``git``. On a host without network, fetch them first with
+    ``multibench fetch --scripts``; a failed clone raises ``RuntimeError``
+    naming that command.
 
     See Also
     --------
@@ -528,23 +790,24 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     mtb.run_all : every runnable method on a dataset, scored, with failures recorded.
 
-    mtb.scan : previews the same command per method, with the file and env gates.
+    mtb.scan : previews the same command per method, with the file and env checks.
 
     mtb.evaluate : scores ``RunResult.output``.
     """
+    if dry_run:
+        argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
+                              params=params, convert=convert,
+                              cmd_template=cmd_template, repo_path=repo_path)
+        for note in notes:
+            print(f"# {note}", file=sys.stderr, flush=True)
+        return argv
+
     spec = registry.get(method)
     variant = spec.select(category, _modality_roles(inputs))
     # The CPU switch of a CUDA-by-default script, on a host without a GPU
     # (a caller's explicit key wins). Applied to the preview too, so
     # dry_run / scan()['command'] show the flags the real run emits.
     params, applied = cpu_params_for(spec, params)
-
-    if dry_run:
-        # the preview: absolute paths as the run passes them, the checkout
-        # located but never fetched, nothing written
-        values, out_str = normalize_paths(inputs, out_dir)
-        repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
-        return _argv(variant, method, values, out_str, repo, params, cmd_template)
 
     # A script that calls CUDA unconditionally cannot finish on a GPU-less
     # host: refuse here, with the file:line, instead of leaving the user a
@@ -557,23 +820,29 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # Env preflight: without it a missing env only surfaces after inputs were
     # converted and the subprocess spawned, in a stderr tail with no install
     # hint. Same probe scan() uses (prefixes under envs_dir plus what conda
-    # lists). Skipped when the caller controls the env via cmd_template, and
-    # when the probe finds nothing (no prefixes, conda absent or broken): the
-    # subprocess then reports the failure.
+    # lists). Skipped when the caller controls the env via cmd_template. On
+    # Linux it is also skipped when the probe finds nothing (no prefixes,
+    # conda absent or broken): the subprocess then reports the failure. Off
+    # Linux a missing env cannot be installed at all, so it always refuses.
     if cmd_template is None:
         env_name = envs.group_for(method)
+        linux_only = linux_only_sentence()
         have = envs.installed_envs()
-        if have and env_name not in have:
+        if (have or linux_only) and env_name not in have:
             # conda's env list is cached per process; an env created outside
             # this process since then is only missing from the cache, so
             # re-probe once before refusing
             envs._conda_prefixes.cache_clear()
             have = envs.installed_envs()
-        if have and env_name not in have:
-            raise EnvironmentError(
-                f"conda env {env_name!r} ({method}) is not installed - run "
-                f"`multibench env install --methods {method} --packed --run` "
-                f"(or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()")
+        if (have or linux_only) and env_name not in have:
+            install = (f"conda env {env_name!r} ({method}) is not installed - run "
+                       f"`multibench env install --methods {method} --packed --run` "
+                       f"(or mtb.env.install([{method!r}], dry_run=False)); see "
+                       f"mtb.env.doctor()")
+            if linux_only:
+                install = (f"{linux_only} Preview the command with dry_run=True and "
+                           f"run it on a Linux machine.\n{install}")
+            raise EnvironmentError(install)
 
     # Absolute paths + trailing separator on directory roles before conversion,
     # so canonical passthrough files are absolute too; converted copies live
@@ -581,8 +850,11 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     inputs, out_str = normalize_paths(inputs, out_dir)
     out = Path(out_str)
     workdir = out
-    workdir.mkdir(parents=True, exist_ok=True)
     inputs_dir = workdir / "inputs"
+    # every input-format check before anything is written or fetched
+    plan = _plan_inputs(variant, inputs, inputs_dir, convert=convert, real=True)
+    repo = _fetch_scripts(repo_path)
+    workdir.mkdir(parents=True, exist_ok=True)
     # inputs/ holds the canonical copies of a file-role method; a data_dir
     # method (scBridge) gets none.
     if _modality_roles(inputs):
@@ -595,21 +867,16 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # `modality='adt'` would refuse an AnnData that has obsm keys, and in-memory
     # AnnData inputs must keep working unchanged.
     values: dict = {}
-    for role, val in inputs.items():
-        if convert and role not in _AUX_ROLES and "cty" not in role and "label" not in role:
+    for role, step in plan.items():
+        if step["convert"]:
             hint = role.rstrip("0123456789")
             kw = {"modality": hint} if hint in ("atac_gas", "atac_peak") else {}
-            values[role] = str(ingest.to_canonical(val, out=inputs_dir / f"{role}.h5", **kw))
-        else:
-            values[role] = val
-
-    # Some methods (Seurat_v3 etc.) require ATAC peak ids in chr:start-end form;
-    # normalize the declared peak roles into per-run copies (originals untouched).
-    for role in (getattr(variant, "normalize_peaks", None) or []):
-        if role in values:
-            npath = inputs_dir / f"{role}_normpeaks.h5"
-            values[role] = str(ingest.normalize_peak_names(values[role], npath))
-    repo = Path(config.ensure_repo(repo_path))
+            ingest.to_canonical(step["src"], out=inputs_dir / f"{role}.h5", **kw)
+        # Some methods (Seurat_v3 etc.) require ATAC peak ids in chr:start-end
+        # form: the declared peak roles get per-run copies (originals untouched).
+        if step["normpeaks_from"] is not None:
+            ingest.normalize_peak_names(step["normpeaks_from"], step["value"])
+        values[role] = step["value"]
     cmd = _argv(variant, method, values, out_str, repo, params, cmd_template)
 
     # Isolate the method env from user site-packages (~/.local): a broken or
@@ -661,4 +928,50 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     primary = io.load_output(out, variant.output)
     extra = {o.file: io.load_output(out, o) for o in variant.extra_outputs}
     return RunResult(method=method, out_dir=out, cmd=cmd, output=primary, extra=extra,
-                     stdout=proc.stdout, stderr=proc.stderr)
+                     stdout=proc.stdout, stderr=proc.stderr,
+                     obs_names=_obs_names(method, variant, values, primary))
+
+
+def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
+            convert: bool = True, cmd_template: str | None = None,
+            repo_path=None) -> tuple[list[str], list[str]]:
+    """The argv a run would execute, plus the setup notes to show with it.
+
+    What ``run(..., dry_run=True)`` computes before it prints the notes to
+    stderr; ``mtb.scan`` calls it for the ``command`` column and puts the
+    notes in ``caveat``. Nothing is written, fetched or launched.
+
+    Returns
+    -------
+    tuple[list[str], list[str]]
+        ``(argv, notes)``; see :func:`script_notes` for the notes.
+    """
+    spec = registry.get(method)
+    variant = spec.select(category, _modality_roles(inputs))
+    params, _ = cpu_params_for(spec, params)
+    # absolute paths as the run passes them, the input plan the run follows,
+    # the checkout located but never fetched
+    values, out_str = normalize_paths(inputs, out_dir)
+    plan = _plan_inputs(variant, values, Path(out_str) / "inputs", convert=convert,
+                        real=False)
+    values = {role: step["value"] for role, step in plan.items()}
+    repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
+    argv = _argv(variant, method, values, out_str, repo, params, cmd_template)
+    return argv, script_notes(spec, variant, repo)
+
+
+def _fetch_scripts(repo_path) -> Path:
+    """``config.ensure_repo`` with an error that names the offline route.
+
+    The first run on a machine clones the method scripts with ``git``; on a
+    host without network that clone fails with git's own message only.
+    """
+    try:
+        return Path(config.ensure_repo(repo_path))
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        target = Path(repo_path) if repo_path else Path(config.DEFAULT.repo_path)
+        raise RuntimeError(
+            f"could not clone the method scripts (PYangLab/scMultiBench) into "
+            f"{target}: {e}. On a host without network, fetch them first on a "
+            f"connected machine with `{FETCH_SCRIPTS_CMD}` and copy the folder, or "
+            f"point repo_path at an existing checkout") from e
