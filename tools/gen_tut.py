@@ -155,6 +155,35 @@ def reordering_methods(cat, dataset):
     return {m: o for m, o in orders.items() if o != [s for s in default if s in o]}
 
 
+def partial_label_methods(cat, dataset, methods=None):
+    """``{method: [stem, ...]}`` for the methods whose
+    ``labels_for(dataset, cat, method)`` holds fewer label files than
+    ``labels_for(dataset)``: the variant reads only some batches (UINMF on
+    D52: cty1, cty2). Read from the live package at generation time."""
+    import multibench as mtb
+    default = list(mtb.labels_for(dataset))
+    out = {}
+    for m in sorted(methods or mtb.list_methods(cat)):
+        stems = list(mtb.labels_for(dataset, cat, m))
+        if len(stems) < len(default):
+            out[m] = stems
+    return out
+
+
+def partial_batch_note(cat, dataset, methods):
+    """The run-section sentence for each method of ``methods`` that reads only
+    some of ``dataset``'s batches, or ``None``."""
+    import multibench as mtb
+    n = len(mtb.labels_for(dataset))
+    notes = []
+    for m, stems in partial_label_methods(cat, dataset, methods).items():
+        batches = and_list(s.removeprefix("cty") for s in stems)
+        notes.append(f"{m} reads only batches {batches} of {n}, and `scan` says so in its "
+                     f"`caveat` column. Its `emb_shape` counts fewer cells, and its "
+                     f"metrics cover only those cells.")
+    return " ".join(notes) or None
+
+
 def atac_forms(cat):
     """``(gene_activity, peak_only, both)``: the methods of a category by the
     ATAC form they read, from ``find_methods(cat, atac=...)`` and each
@@ -174,10 +203,14 @@ def diagonal_atac_sentence():
     gas, peak_only, both = atac_forms("diagonal")
     if not (peak_only and both and len(gas) > len(peak_only) + len(both)):
         raise SystemExit("diagonal ATAC forms changed: reword the diagonal title cell")
+    import multibench as mtb
+    if "same cells" not in mtb.method_info("Seurat_v5")["setup_hint"]:
+        raise SystemExit("Seurat_v5's setup hint changed: reword the diagonal title cell")
     return (f"Most diagonal methods read ATAC as gene-activity scores, made beforehand "
             f"with a tool such as Signac or ArchR. {and_list(peak_only)} read the peak "
-            f"matrix, and {and_list(both)} need both. `mtb.method_info(m)[\"atac\"]` "
-            f"says which form a method reads.")
+            f"matrix, and {and_list(both)} need both. Seurat_v5 also needs RNA and ATAC "
+            f"from the same cells. `mtb.method_info(m)[\"atac\"]` says which form a "
+            f"method reads.")
 
 
 CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
@@ -188,12 +221,15 @@ CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
 # The find_spec guard keeps the cell idempotent and leaves a developer's
 # editable install alone; the numpy / pandas pins keep pip from upgrading the
 # host's stack; the GitHub line covers a PyPI release that lags the docs.
+# The floor is the first release with every call the notebooks make
+# (export_dataset(batch_index=, overwrite=) and the round-2 checks are not in
+# 0.3.1), so an older PyPI release fails at install instead of mid-notebook.
 INSTALL_CELLS = [
 """import importlib.metadata, importlib.util, sys
 if importlib.util.find_spec("multibench") is None:
     # keep the numpy / pandas this interpreter already has
     pins = [f"{p}=={importlib.metadata.version(p)}" for p in ("numpy", "pandas") if importlib.util.find_spec(p)]
-    !{sys.executable} -m pip -q install "multibench-sc>=0.3" {" ".join(pins)}
+    !{sys.executable} -m pip -q install "multibench-sc>=0.3.2" {" ".join(pins)}
     importlib.invalidate_caches()
     # not on PyPI yet: install from GitHub
     if importlib.util.find_spec("multibench") is None:
@@ -301,8 +337,7 @@ SCEN = {
           "with 23,478 cells in three batches."),
    live=("StabMap", "None"), live_modalities=None,
    live_ds=None, live_note=None,
-   summary_note=("UINMF uses batches 1 and 2 only. Its `emb_shape` counts fewer "
-                 "cells, and its metrics cover only those cells."),
+   summary_note=None,
    own_src="D52", own_trio=["UINMF", "sciPENN", "StabMap"],
  ),
 }
@@ -358,6 +393,10 @@ EXPORT_DETAIL = {
      "peaks. Seurat_v5 also needs RNA and ATAC from the same cells, because it uses "
      "them as its paired bridge. `scan` shows a method's setup note in its `caveat` "
      "column.",
+     "With both ATAC files, `atac_gas.h5` must list the cells of `atac_peak.h5` in "
+     "the same order, because `atac_cty.csv` follows `atac_peak.h5`. `scan` checks "
+     "this. `mtb.io.to_canonical(..., modality=\"gas\")` into a folder with "
+     "`atac_peak.h5` writes the rows in that order.",
      OVERWRITE_NOTE,
  ],
  "mosaic": [
@@ -615,7 +654,8 @@ else:
     ]
     if s["live"][1] != "None":
         run_notes.append(live_param_note(fastm, cat, s["live"][1], s["live_modalities"]))
-    run_notes += [s["live_note"], s["summary_note"]]
+    run_notes += [s["live_note"], s["summary_note"],
+                  partial_batch_note(cat, live_ds, trio)]
     md(f"""### Run the methods
 
 `run_all` runs {trio_text} on `{live_ds}`, each in its own environment. Each method writes an embedding. An embedding is a table of numbers with one row per cell. `run_all` scores each embedding with the scIB metrics. Without environments, the cell prints one line and loads stored outputs instead.
@@ -661,7 +701,9 @@ res.summary''')
 """ + details(
         "Metrics are grouped by family: blue for dimension reduction and clustering, "
         "green for batch correction. Each family starts with an `Overall` bar. Its "
-        "length and colour both show the family score."))
+        "length and colour both show the family score.",
+        "A column whose rows all hold the same value is drawn grey, and the note "
+        "under the figure names it. A figure of one method is grey everywhere."))
     code("""res.plot()""")
 
     # ------------------------------------------------------------- own data
@@ -679,11 +721,15 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
         others = reordering_methods(cat, ds)
         if not others:
             raise SystemExit(f"no {cat} method stacks {ds}'s cells in another order: reword section 3")
+        partial = partial_label_methods(cat, ds)
         md(f"""`labels_for` returns a dataset's label files: {files}. Some methods stack their cells in another order. `labels_for(DATASET, CATEGORY, method)` returns the files in that method's order. A wrong order gives wrong scores without an error.
 
 """ + details(
             f"On `{ds}`, `labels_for` returns another order for "
             + and_list(f"{m} (`{', '.join(o)}`)" for m, o in others.items()) + ".",
+            ("A method that reads only some batches gets only their label files: "
+             + and_list(f"`{', '.join(o)}` for {m}" for m, o in partial.items()) + ".")
+            if partial else None,
             "Pass the dict that `labels_for` returns to `evaluate` unchanged. A dict "
             "you build or reorder yourself is read in the default order. For any other "
             "order, name the keys with `label_order=`.",
@@ -786,16 +832,18 @@ cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
 
 ### What runs on a dataset, and why not
 
-`scan` on `{ds}` runs nothing. The first table lists the variants whose input files are in place. For a missing environment, `env_reason` gives the install command, or says that the environment runs only on Linux. The second table says why the other variants do not fit.
+`scan` on `{ds}` runs nothing. The first table lists the variants whose input files are in place, and `caveat` says what to check before a run. The second table says why the other variants do not fit.
 
 """ + details(
+        "For a missing environment, `env_reason` gives the install command, or says "
+        "that the environment runs only on Linux.",
         f"From a terminal, `multibench scan {ds} --category {cat}` prints the same "
         "scan. `--columns all` adds every column, including `command`: the exact "
         "command `run` would execute."))
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
 print(f"files_ok {int(avail.files_ok.sum())}, env_ok {int(avail.env_ok.sum())}, runnable {int(avail.runnable.sum())} of {len(avail)} method variants")
 avail[avail.files_ok][["method", "modalities", "env", "env_ok", "env_reason",
-                       "output_kind", "needs_labels", "runtime_tier"]]""")
+                       "output_kind", "needs_labels", "runtime_tier", "caveat"]]""")
     code("""not_ok = avail[~avail.files_ok][["method", "modalities", "files_reason"]]
 not_ok.head(5) if len(not_ok) else "(every method's inputs resolve on this dataset)"
 """)
@@ -822,9 +870,11 @@ pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True])
         "`needs_labels` is True when any variant of the method needs cell-type labels. "
         "Each entry of `supports` gives it per variant, together with the modalities "
         "and the output kind.",
+        "`gpu` says how the method uses a GPU: `required`, `used when present`, "
+        "`not used` or `unknown`.",
         "`verbose=True` adds the long notes."))
     code(f'''info = mtb.method_info("{fastm}", verbose=True)
-{{k: info[k] for k in ("id", "env", "needs_labels", "atac", "notes", "repo_url", "version", "reference")}}''')
+{{k: info[k] for k in ("id", "env", "needs_labels", "atac", "gpu", "notes", "repo_url", "version", "reference")}}''')
     code(f'''print(mtb.cite(["{fastm}"]))   # fmt="bibtex" for BibTeX entries''')
     md("""### The metrics
 
@@ -878,6 +928,7 @@ When a method is not runnable, the `reason` column of `scan` says why. When a ru
 | `files_ok` False: input files not found | `reason` names the missing file |
 | `env_ok` False on Linux | run the `multibench env install ...` command in `env_reason` |
 | `env_ok` False on macOS or Windows | methods run only on Linux; `mtb.run(..., dry_run=True)` prints the command to run there |
+| `env_ok` False: the method needs an NVIDIA GPU | run it on a GPU machine; `mtb.scan(..., assume_gpu=True)` checks everything else on a computer without one |
 | `FileExistsError` from `export_dataset` | the folder already holds the file: pass `overwrite=True` to replace it |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... which is cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` or `mtb.io.to_canonical` |
