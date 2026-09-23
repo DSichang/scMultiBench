@@ -128,6 +128,7 @@ dependencies:
       - fonttools==4.60.2
       - fsspec==2025.10.0
       - get-annotations==0.1.2
+      - gpsa==0.8
       - greenlet==3.2.5
       - grpcio==1.80.0
       - h5py==3.14.0
@@ -198,6 +199,8 @@ dependencies:
       - pandas==1.5.3
       - pandocfilters==1.5.1
       - parse==1.22.1
+      - paste-bio==1.4.0
+      - paste2==1.0.1
       - pathlib2==2.3.7.post1
       - patsy==1.0.2
       - pillow==11.3.0

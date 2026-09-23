@@ -38,10 +38,8 @@ TASKS = ["batch", "clustering", "dimension_reduction"]
 
 # ---- the three exceptions ---------------------------------------------------
 #: lockfile pins (``- name==version`` / ``- name=version``) that freeze a real
-#: env's contents; exempt by package name only, and only in env_locks/*.yml.
-#: gpsa, paste-bio and paste2 were dropped from scmb_torch(_v2): they served
-#: only removed methods, and no remaining pin requires them.
-LOCK_PINS = {"spatial-eggplant"}
+#: env's contents; exempt by package name only, and only in env_locks/*.yml
+LOCK_PINS = {"gpsa", "paste-bio", "paste2", "spatial-eggplant"}
 _PIN_LINE = re.compile(r"^\s*-\s*(?P<name>[A-Za-z0-9_.\-]+)\s*(?:==|=)\s*\S+\s*$")
 
 #: upstream API keywords a driver must pass verbatim, per driver file
