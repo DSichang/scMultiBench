@@ -144,7 +144,7 @@ def test_metrics_filters_by_family(result_dir):
     with pytest.raises(ValueError, match=r"unknown metrics= token 'bogus'; valid: 'all', 'clustering', 'batch'"):
         results.load_results("diagonal", dataset="D28", metrics="bogus", result_path=result_dir)
     # a list_tasks() token in the metrics slot is explained, not just rejected
-    with pytest.raises(ValueError, match="selects a METRIC FAMILY, not a mtb.list_tasks"):
+    with pytest.raises(ValueError, match="selects a metric family, not a mtb.list_tasks"):
         results.load_results("diagonal", metrics="dimension_reduction", result_path=result_dir)
     # everything after category is keyword-only: the positional slip is a TypeError
     with pytest.raises(TypeError):

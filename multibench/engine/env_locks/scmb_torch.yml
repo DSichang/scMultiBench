@@ -40,7 +40,6 @@ dependencies:
       - fonttools==4.60.2
       - fsspec==2025.10.0
       - get-annotations==0.1.2
-      - gpsa==0.8
       - h5py==3.14.0
       - harmonypy==0.0.9
       - igraph==1.0.0
@@ -84,8 +83,6 @@ dependencies:
       - nvidia-nvtx-cu12==12.8.90
       - packaging==26.2
       - pandas==2.3.3
-      - paste-bio==1.4.0
-      - paste2==1.0.1
       - pathlib2==2.3.7.post1
       - patsy==1.0.2
       - pillow==11.3.0

@@ -179,5 +179,6 @@ def test_every_declared_cell_order_parses(root):
                 for s in registry.load() for v in s.variants if v.output.cell_order}
     assert declared == {("StabMap", "cross"): "reference_first",
                         ("StabMap", "mosaic"): "reference_first",
-                        ("uniPort", "diagonal"): ["atac_gas", "rna"]}
+                        ("uniPort", "diagonal"): ["atac_gas", "rna"],
+                        ("Seurat_v5", "diagonal"): ["atac_peak", "rna"]}
     assert type(mtb.labels_for("D11", data_path=root / "data")) is resolve.LabelFiles

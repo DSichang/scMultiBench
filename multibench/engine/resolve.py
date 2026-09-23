@@ -843,8 +843,56 @@ def _peak_fraction_of(path: Path) -> float | None:
     return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
 
 
+#: methods whose script needs the same cells in two of its input roles:
+#: Seurat_v5 builds its bridge from rna + atac_peak (main_Seurat_v5.Rmd:39-44)
+_SAME_CELL_ROLES = {"Seurat_v5": ("rna", "atac_peak")}
+#: ``.format(method=, a=, b=, n_a=, n_b=, shared=)`` template of that caveat
+SAME_CELLS_CAVEAT = ("{method} builds its bridge from {a} and {b}, which need the same "
+                     "cells; these files hold different cells ({n_a:,} and {n_b:,} "
+                     "cells, {shared:,} shared)")
+
+
+@functools.lru_cache(maxsize=64)
+def _sniff_barcodes(path: str, mtime_ns: int) -> frozenset | None:
+    """The ``matrix/barcodes`` of a canonical .h5 (cached by mtime), or None."""
+    import h5py
+
+    try:
+        with h5py.File(path, "r") as f:
+            if "matrix/barcodes" not in f:
+                return None
+            raw = f["matrix/barcodes"][:]
+    except OSError:
+        return None
+    return frozenset(x.decode() if isinstance(x, (bytes, bytearray)) else str(x)
+                     for x in raw)
+
+
+def _same_cells_caveat(method: str | None, resolved) -> list[str]:
+    """The :data:`SAME_CELLS_CAVEAT` when ``method`` needs two roles to hold the
+    same cells and their files' barcodes differ; ``[]`` otherwise (also for a
+    file that is not a readable canonical ``.h5``)."""
+    roles = _SAME_CELL_ROLES.get(method or "")
+    if not roles or not all(r in resolved for r in roles):
+        return []
+    sets = []
+    for r in roles:
+        p = Path(resolved[r])
+        bars = (_sniff_barcodes(str(p), p.stat().st_mtime_ns)
+                if p.suffix == ".h5" and p.is_file() else None)
+        if bars is None:
+            return []
+        sets.append(bars)
+    if sets[0] == sets[1]:
+        return []
+    a, b = (Path(resolved[r]).name for r in roles)
+    return [SAME_CELLS_CAVEAT.format(method=method, a=a, b=b, n_a=len(sets[0]),
+                                     n_b=len(sets[1]), shared=len(sets[0] & sets[1]))]
+
+
 def _preflight_caveats(resolved, *, atac: str | None = None,
-                       category: str | None = None) -> list[str]:
+                       category: str | None = None,
+                       method: str | None = None) -> list[str]:
     """Non-fatal content observations about resolved inputs (never raises).
 
     Without ``atac`` (wanted representation unknown) one ATAC check runs: when
@@ -874,8 +922,12 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     values are not whole numbers -> :data:`NOT_COUNTS_CAVEAT`. With
     ``category='diagonal'``: a folder whose only label file is ``cty.csv``
     -> :data:`DIAGONAL_CTY_CAVEAT`.
+
+    With ``method=`` a method that needs the same cells in two roles
+    (``_SAME_CELL_ROLES``: Seurat_v5's rna and atac_peak) also gets
+    :data:`SAME_CELLS_CAVEAT` when the two files' barcodes differ.
     """
-    out: list[str] = []
+    out: list[str] = _same_cells_caveat(method, resolved)
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":
@@ -926,7 +978,7 @@ def _label_sort_key(stem: str):
     3. ``<modality>_cty`` in the canonical modality order rna, adt, atac
        (``peak_cty`` is treated as atac) - the order in which most diagonal /
        vertical methods stack their cells in the embedding (RNA cells first,
-       then ATAC cells; uniPort declares the reverse, see
+       then ATAC cells; uniPort and Seurat_v5 declare the reverse, see
        ``Variant.stacked_roles``);
     4. anything else (``source_cty`` ...) alphabetically, last.
     """
@@ -1060,13 +1112,13 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
        order);
     3. modality-named files in the canonical modality order **rna, adt, atac**
        (``peak_cty`` counts as atac) - the diagonal methods other than uniPort
-       emit the RNA cells first, then the ATAC cells;
+       and Seurat_v5 emit the RNA cells first, then the ATAC cells;
     4. any other ``*cty*`` file, alphabetically, last.
 
     **Per-method order.** With ``category`` and ``method``, each file goes
     where the cells it labels sit in that variant's output: the order of its
-    inputs, unless the method stacks its cells in another order. uniPort
-    puts its ATAC cells before its RNA cells.
+    inputs, unless the method stacks its cells in another order. uniPort and
+    Seurat_v5 put their ATAC cells before their RNA cells.
 
     StabMap uses a fixed reference batch: batch 3 in cross, batch 1 in
     mosaic (``method_info('StabMap')['supports'][i]['reference_batch']``). It

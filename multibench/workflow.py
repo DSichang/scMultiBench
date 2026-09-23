@@ -1006,7 +1006,8 @@ def scan(dataset: str, category: str | None = None, *,
         try:
             got = _resolve.inputs_for(dataset, cat, spec.id, modalities=mods or None,
                                       data_path=data_path, check=True)
-            extra = _resolve._preflight_caveats(got, atac=spec.atac, category=cat)
+            extra = _resolve._preflight_caveats(got, atac=spec.atac, category=cat,
+                                                method=spec.id)
             if extra:
                 rec["caveat"] = "; ".join(x for x in [rec["caveat"], *extra] if x)
         except Exception as e:  # missing files / no variant / bad layout

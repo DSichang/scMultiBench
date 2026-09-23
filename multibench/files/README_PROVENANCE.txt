@@ -20,7 +20,8 @@ dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
   assay, tissue, n_cells, n_batches, source
                To be transcribed from the dataset table in the scMultiBench
                paper's supplement; nothing in this repository holds them, so
-               they ship empty. Do not fill them from the data tree (n_cells
+               they ship empty, and catalog.datasets() returns only the ones
+               that hold a value. Do not fill them from the data tree (n_cells
                of a processed file is not the paper's n_cells). When
                transcribed, record the supplementary-table version here.
   Computed by catalog.datasets() at call time, not stored in the CSV:
@@ -32,7 +33,10 @@ dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
                ...) are appended.
 
 metric_full.csv - one row per scIB metric of the clustering and batch
-  families, with a short description. PCR, which catalog.known_metrics() also
-  lists, has no row.
+  families, with a short description that states the range and that higher
+  is better. The descriptions follow what multibench.evaluate computes
+  (multibench/eval/scib.py): Leiden clusters from the optimal-resolution
+  sweep for ARI/NMI/iF1, every cell type counted as an isolated label for
+  iASW/iF1. PCR, which catalog.known_metrics() also lists, has no row.
 
 An official scMultiBench file with the same columns can replace any of these.

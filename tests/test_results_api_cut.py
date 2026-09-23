@@ -34,7 +34,7 @@ def test_compare_signatures_are_the_contract():
     rc = inspect.signature(results.results_coverage).parameters
     assert list(rc) == ["category", "source", "result_path"]
     re_ = inspect.signature(results.recommend).parameters
-    assert list(re_) == ["category", "modalities", "methods", "metrics", "long_df",
+    assert list(re_) == ["category", "modalities", "atac", "methods", "metrics", "long_df",
                          "min_methods", "source", "result_path"]
     assert all(re_[n].kind is inspect.Parameter.KEYWORD_ONLY for n in list(re_)[1:])
     for fn in (results.load_results, results.available_datasets):

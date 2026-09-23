@@ -426,9 +426,9 @@ def test_labels_for_prose_warns_that_a_wrong_order_scores_silently(cat):
     assert others, f"{cat}: no method with another order on {ds}"
     for m, order in others.items():
         assert f"{m} (`{', '.join(order)}`)" in md
-    m0 = next(iter(others))
-    assert any(f'mtb.labels_for(DATASET, CATEGORY, "{m0}")' in src
-               for src in _code(f"tutorial_{cat}"))
+    # the example is one of them (gen_tut prefers one the dataset fits)
+    assert any(f'mtb.labels_for(DATASET, CATEGORY, "{m}")' in src
+               for m in others for src in _code(f"tutorial_{cat}"))
 
 
 @pytest.mark.parametrize("cat", CATS)

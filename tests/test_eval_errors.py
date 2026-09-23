@@ -29,7 +29,7 @@ def test_metrics_token_typo_is_a_value_error_listing_valid_values():
         evaluate(emb, labels=lab, metrics="clusterin")
     # a declared benchmark task is not a metric family: the error says which
     # slot this is, without the word "v1"
-    with pytest.raises(ValueError, match="selects a METRIC FAMILY, not a mtb.list_tasks") as e:
+    with pytest.raises(ValueError, match="selects a metric family, not a mtb.list_tasks") as e:
         evaluate(emb, labels=lab, metrics="dimension_reduction")
     assert "dimension_reduction" in str(e.value) and "v1" not in str(e.value)
 

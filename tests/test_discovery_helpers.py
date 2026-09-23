@@ -111,7 +111,7 @@ def test_recommend_ranks_with_coverage(result_dir):
         r = recommend("diagonal", result_path=result_dir)
     assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
-                               "env", "output_kind"]
+                               "env", "output_kind", "datasets"]
     assert (r.n_datasets == r.n_datasets_total).all() and (r.coverage == 1.0).all()
     assert (r.n_datasets_total == 3).all() and r.grand_score.notna().all()
     scored = r.grand_score.dropna()
@@ -231,10 +231,10 @@ def test_recommend_lists_unscored_methods(result_dir):
     assert (nan_rows.n_datasets == 0).all() and (nan_rows.coverage == 0.0).all()
     assert (nan_rows.n_datasets_total == r.n_datasets_total.iloc[0]).all()
     assert nan_rows.env.notna().all() and nan_rows.runtime_tier.notna().all()
-    # column list unchanged; scored rows first
+    # column list (datasets appended in study round 1); scored rows first
     assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
-                               "env", "output_kind"]
+                               "env", "output_kind", "datasets"]
     assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
     assert r.attrs["family"] == "clustering" and r.attrs["metrics"] == "clustering"
     assert r.attrs["source"] == "published"

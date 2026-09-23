@@ -313,7 +313,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         except Exception:
             tasks = []
         if metrics in tasks:
-            hint = (f" - {kw}= selects a METRIC FAMILY, not a mtb.list_tasks() token; "
+            hint = (f" - {kw}= selects a metric family, not a mtb.list_tasks() token; "
                     f"'dimension_reduction' and 'clustering' share the 'clustering' "
                     f"family, and the scIB families are the only metrics computed")
         elif canonical_metric(metrics) in known_metrics():
@@ -401,11 +401,11 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     - ``needs_labels`` - bool, the method needs cell-type labels;
     - ``categories`` / ``tasks`` - lists of integration categories and tasks.
 
-    **Registry overlay.** ``needs_labels``, ``atac``, ``categories`` and
-    ``tasks`` come from the method registry for every row whose id is
-    registered, so the table cannot disagree with ``mtb.method_info`` /
-    ``mtb.scan``; a row without a registry entry keeps the CSV values.
-    ``language``, ``deep_learning`` and ``output`` come from ``method.csv``.
+    **Registry overlay.** For every registered id, ``needs_labels``,
+    ``atac``, ``categories`` and ``tasks`` come from the method registry,
+    the source ``mtb.method_info`` and ``mtb.scan`` read. A row without a
+    registry entry keeps the CSV values. ``language``, ``deep_learning`` and
+    ``output`` come from ``method.csv``.
 
     See Also
     --------
@@ -456,9 +456,9 @@ def _dataset_sort_key(ds: str):
     return (m.group(1).upper(), int(m.group(2)), m.group(3))
 
 
-#: columns of dataset.csv to be transcribed from the paper's supplementary
-#: dataset table. Nothing in this repository holds them, so they ship empty
-#: (nullable); see files/README_PROVENANCE.txt.
+#: descriptive columns of dataset.csv, to be transcribed from the paper's
+#: supplementary dataset table. The shipped file leaves them empty, and
+#: datasets() returns only the ones a CSV fills (files/README_PROVENANCE.txt).
 PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 
@@ -504,20 +504,25 @@ def datasets(files_dir: Path | str | None = None, *,
       (published or re-run) contain the dataset, ``";"``-joined; ``None``
       when no stored results exist;
     - ``has_results`` - bool, a stored metric table (``mtb.load_results``)
-      covers it;
-    - ``assay``, ``tissue``, ``n_cells``, ``n_batches``, ``source`` - the
-      paper's descriptive columns, nullable; empty until transcribed from
-      the supplementary table (see ``files/README_PROVENANCE.txt``).
+      covers it.
+
+    A ``dataset.csv`` passed through ``files_dir`` may also fill the
+    descriptive columns ``assay``, ``tissue``, ``n_cells``, ``n_batches`` and
+    ``source``; each one that holds a value is added. The shipped file
+    leaves them empty.
 
     **Row set.** The rows are the union of ``dataset.csv`` and every id with
     stored results (``mtb.available_datasets(source="both")``), so
-    ``D11s``/``D28s``/``D45s``/``D52s`` (the re-run subsamples) and ``D24``
-    (published tables only) are listed although ``dataset.csv`` does not
-    name them. Ids missing from the CSV are appended after it, in natural
-    order.
+    ``D11s``/``D28s``/``D45s``/``D52s`` and ``D24`` (published tables only)
+    are listed although ``dataset.csv`` does not name them. Ids missing from
+    the CSV are appended after it, in natural order.
 
-    **Freshness.** ``category`` and ``has_results`` are derived at call time
-    from ``mtb.available_datasets``, so they never go stale; a missing or
+    **Subsamples.** D11s, D28s, D45s and D52s are random subsamples of the
+    full datasets, used for the second re-run sweep; they cannot be fetched.
+    D28s holds 60% of D28's cells.
+
+    **When the columns are computed.** ``category`` and ``has_results`` are
+    derived at each call from ``mtb.available_datasets``; a missing or
     unreadable result tree leaves them empty instead of raising.
 
     See Also
@@ -557,8 +562,11 @@ def datasets(files_dir: Path | str | None = None, *,
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
     out["has_results"] = out["dataset"].isin(cat_of.keys())
 
+    # a descriptive column is shown only when the CSV fills it: the shipped
+    # file leaves all five empty
     for col in PAPER_COLUMNS:
-        out[col] = raw[col].values if col in raw.columns else pd.NA
+        if col in raw.columns and raw[col].notna().any():
+            out[col] = raw[col].values
     if category is not None:
         config.category_folder(category)
         out = out[out["category"].fillna("").str.split(";").map(lambda cs: category in cs)]

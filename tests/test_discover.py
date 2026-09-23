@@ -187,11 +187,13 @@ def test_find_methods_modalities_aliases():
     prot = discover.find_methods(modalities=["rna", "protein"])
     assert prot == discover.find_methods(modalities=["rna", "adt"])
     assert "totalVI" in prot
-    # the tutorial cell: role tokens reduce to their base type
+    # numbered role tokens reduce to their base type; a representation token
+    # (atac_gas / peak) selects by what the method reads (study round 1, L13)
+    assert discover.find_methods(modalities=["rna1", "adt2"]) == prot
     diag = discover.find_methods(category="diagonal", modalities=["rna", "atac_gas"])
-    assert diag == discover.find_methods(category="diagonal", modalities=["rna", "atac"])
-    assert diag and "SCALEX" in diag
-    assert discover.find_methods(modalities=["rna", "peak"]) == discover.find_methods(modalities=["rna", "atac"])
+    assert diag == discover.find_methods(category="diagonal", atac="gene_activity")
+    assert diag and "SCALEX" in diag and "GLUE" not in diag
+    assert discover.find_methods(modalities=["rna", "peak"]) == discover.find_methods(atac="peak")
 
 
 def test_method_info_unknown_method_points_at_mtb_list_methods():

@@ -569,6 +569,33 @@ def evaluate(
     **Leiden backend.** ``mtb.config.DEFAULT.leiden_flavor``: ``"igraph"``
     (default) or ``"leidenalg"`` (the classic backend scib itself runs).
 
+    **Metric definitions.** Every value lies in 0-1 and higher is better.
+    ARI can fall below 0; about 0 means a random clustering. Each metric is
+    a scib 1.x function on the embedding, with scanpy's default neighbour
+    graph (15 neighbours).
+
+    The sweep clusters at 10 resolutions (0.2 to 2.0) and keeps the one with
+    the highest NMI. ``iso_threshold`` = number of batches + 1 counts every
+    cell type as isolated; scib's default counts only types found in few
+    batches.
+
+    The scib call behind each code::
+
+        code       scib function         arguments
+        ARI, NMI   ari, nmi              Leiden clusters of the optimal-resolution sweep
+        ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
+        iASW       isolated_labels_asw   iso_threshold = number of batches + 1
+        iF1        isolated_labels_f1    same threshold; best F1 over the sweep
+        cLISI      clisi_graph           type_="embed"; scaled to 0-1 by scib
+        ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
+        GC         graph_connectivity    on the 15-neighbour graph
+        iLISI      ilisi_graph           type_="embed"; scaled to 0-1 by scib
+        kBET       kBET                  computed only when named in metrics=[...]
+
+    The re-run tables were scored by multibench 0.2.1's ``evaluate`` with
+    these definitions and the leidenalg backend. The published tables were
+    computed by the benchmark; see the paper's Methods.
+
     **Batch.** The batch family (``ASW_batch, GC, iLISI, kBET``) needs batch
     labels. When ``labels`` is a list (or dict) of two or more files and
     ``batch`` is omitted, the file of origin (1, 2, ...) serves as the

@@ -24,6 +24,49 @@ def _modality_types(spec) -> set[str]:
     return spec.modality_types
 
 
+#: representation role tokens -> the ``atac=`` value they stand for
+_REPRESENTATION_TOKENS = {"atac_peak": "peak", "atac_gas": "gene_activity"}
+
+
+def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
+    """The one modality rule of ``find_methods`` and ``recommend``.
+
+    Returns ``(base types every matching variant must consume, atac)``. A base
+    token (``rna``, ``adt``/``protein``, ``atac``, or a numbered role such as
+    ``rna1``) matches every role of that type. A representation token
+    (``atac_peak``/``peak``/``peaks``, ``atac_gas``/``gas``/``gene_activity``)
+    means base ``atac`` plus the representation the method reads
+    (``method_info(m)['atac']``), the same as ``atac='peak'`` /
+    ``atac='gene_activity'``: the role name alone does not say what the script
+    reads (moETM takes ``atac_gas`` and reads peaks).
+
+    Raises ``TypeError`` for a bare string, ``ValueError`` for an unknown
+    token or ``atac`` value, for two representations, or for a
+    representation that contradicts ``atac=``.
+    """
+    if isinstance(modalities, str):
+        raise TypeError(
+            f"modalities must be a list of modality tokens, got the string "
+            f"{modalities!r} - did you mean modalities=[{modalities!r}]?")
+    atac = registry.check_atac(atac)
+    if modalities is None:
+        return None, atac
+    toks = registry.normalize_modalities(modalities)
+    reps = sorted({_REPRESENTATION_TOKENS[t] for t in toks if t in _REPRESENTATION_TOKENS})
+    if len(reps) > 1:
+        raise ValueError(
+            f"modalities={list(modalities)} names two ATAC representations (peak and "
+            f"gene activity); name one of atac_peak / atac_gas to select methods by "
+            f"what they read, or 'atac' for every ATAC method")
+    if reps:
+        if atac is not None and atac != reps[0]:
+            raise ValueError(
+                f"modalities={list(modalities)} selects methods that read "
+                f"{reps[0].replace('_', ' ')} but atac={atac!r}; pass one of the two")
+        atac = reps[0]
+    return {_base_modality(t) for t in toks}, atac
+
+
 def _variant_matches(v, category, want, needs_labels, atac) -> bool:
     """Whether one variant satisfies every per-variant filter at once.
 
@@ -50,8 +93,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
                  tunable: bool | None = None) -> list[str]:
     """Return the method ids that match every filter you pass.
 
-    Filters combine with AND. A method matches when one of its variants meets
-    ``category``, ``modalities``, ``needs_labels`` and ``atac`` together.
+    A method matches when one of its variants meets ``category``,
+    ``modalities``, ``needs_labels`` and ``atac`` together.
 
     Parameters
     ----------
@@ -67,7 +110,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         ATAC representation the script expects: ``"peak"`` or
         ``"gene_activity"``; ``None`` = no filter.
     modalities : list[str] | set[str] | None
-        Modalities a variant must consume, all of them, e.g. ``["rna", "adt"]``;
+        Modalities a variant must consume, e.g. ``["rna", "adt"]``;
+        ``"atac_peak"`` / ``"atac_gas"`` also select by ATAC representation.
         ``None`` = no filter.
     runnable : bool | None
         ``True`` = methods wired with at least one variant (not a check of
@@ -86,8 +130,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     Raises
     ------
     ValueError
-        Unknown ``category``, ``task``, ``atac`` or modality token; the message
-        lists valid ones.
+        Unknown ``category``, ``task``, ``atac`` or modality token, or two ATAC
+        representations.
     TypeError
         ``modalities`` is a bare string, not a list.
 
@@ -96,14 +140,14 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     >>> import multibench as mtb
     >>> mtb.find_methods("vertical", modalities=["rna", "adt"])
     >>> mtb.find_methods("vertical", modalities=["rna", "adt"], needs_labels=False)
-    >>> mtb.find_methods(atac="peak")                 # methods that want peak matrices
+    >>> mtb.find_methods("diagonal", modalities=["rna", "atac_peak"])
+    >>> mtb.find_methods(atac="gene_activity")
     >>> mtb.find_methods(tunable=True)
 
     Notes
     -----
     **Per-variant matching.** ``task``, ``runnable`` and ``tunable`` are
-    method-level; the other four filters hold per VARIANT, as the summary
-    says. Two consequences:
+    method-level; the other four filters hold per variant. Two consequences:
 
     - ``find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)``
       keeps scMoMaT: its vertical rna+adt variant takes no labels; only its
@@ -112,21 +156,30 @@ def find_methods(category: str | None = None, *, task: str | None = None,
       Multigrate: rna+atac exists only as a mosaic variant, so
       ``inputs_for(..., 'vertical', modalities=['rna', 'atac'])`` would raise.
 
-    **Modality tokens.** ``protein`` = ``adt``; ``peak`` / ``gas`` and role
-    tokens such as ``atac_gas`` or ``rna1`` reduce to their base type
-    (``rna``, ``adt``, ``atac``).
+    **Modality tokens.** A base token matches every role of its type:
+    ``atac`` matches the ``atac``, ``atac_gas`` and ``atac_peak`` roles,
+    ``rna`` matches ``rna1``, and ``protein`` is ``adt``.
+
+    A representation token selects by what the method reads. ``atac_peak``
+    (also ``peak``) is ``atac`` plus ``atac='peak'``; ``atac_gas`` (also
+    ``gas``, ``gene_activity``) is ``atac`` plus ``atac='gene_activity'``.
+    Two representations, or one that contradicts ``atac=``, raise
+    ``ValueError``.
 
     **Directory-fed methods.** scBridge is fed a directory and is judged by
     the bare filenames its variant names: ``rna.h5`` / ``atac_gas.h5`` make it
     an rna+atac method.
 
-    **ATAC representation.** ``atac`` is what the upstream script consumes,
+    **ATAC representation.** ``atac`` is what the upstream script reads,
     which is not always what its role name suggests: moETM, scMM and iPOLNG
-    take role ``atac_gas`` but consume peaks. Only a variant that consumes an
-    ATAC input satisfies it: Multigrate declares ``atac: peak`` for its mosaic
-    rna+atac variant, so ``find_methods('vertical', atac='peak')`` omits it.
-    Accepted spellings: ``peak`` / ``peaks`` and ``gene_activity`` /
-    ``gene-activity`` / ``gas``, in any case.
+    take the role ``atac_gas`` but read peaks. MultiMAP and Seurat_v3 read
+    peaks and gene activity; they are listed under ``peak``.
+
+    Only a variant with an ATAC input satisfies ``atac``: Multigrate reads
+    peaks only in its mosaic rna+atac variant, so
+    ``find_methods('vertical', atac='peak')`` omits it. Accepted spellings:
+    ``peak`` / ``peaks`` and ``gene_activity`` / ``gene-activity`` / ``gas``,
+    in any case.
 
     **Labels.** ``needs_labels`` here is per variant.
     ``method_info(m)['needs_labels']`` is the method-level flag (any variant
@@ -147,15 +200,9 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
     mtb.scan : which of these methods can actually run on a given dataset.
     """
-    if isinstance(modalities, str):
-        raise TypeError(
-            f"modalities must be a list of modality tokens, got the string "
-            f"{modalities!r} - did you mean modalities=[{modalities!r}]?")
     registry.check_category(category)
     registry.check_task(task)
-    atac = registry.check_atac(atac)
-    want = (set(registry.normalize_modalities(modalities, base=True))
-            if modalities is not None else None)
+    want, atac = _modality_filter(modalities, atac)
     out = []
     for s in registry.load():
         if category and category not in s.categories:
@@ -319,7 +366,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       the benchmark ran.
     - ``reference`` - ``{doi, title, authors, journal, year}`` or ``None``;
       ``mtb.cite`` formats it.
-    - ``notes`` - the short third-person summary from engine/references.yaml.
+    - ``notes`` - a short summary of the method.
     - ``supports`` - one entry per variant: ``category``, ``modalities``,
       ``output_kind``, ``n_tunable``, ``needs_labels``, ``labels`` (the
       label roles the variant reads, e.g. ``['cty']`` / ``['rna_cty']`` /
@@ -354,8 +401,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     These are measurements, not predictions: use them to choose a sensible
     ``run_all(timeout=...)``, not to promise a finish time.
 
-    **Labels.** ``needs_labels`` is the METHOD-level flag: True when
-    ANY variant takes a cell-type-label (``cty``) role as a required input.
+    **Labels.** ``needs_labels`` is the method-level flag: ``True`` when
+    any variant takes a cell-type-label (``cty``) role as a required input.
     It is not per category: scMoMaT is True because its mosaic variant takes
     ``cty1..3``, while its vertical and cross variants take no labels. For
     the per-variant answer read ``supports[i]['needs_labels']``;
@@ -574,10 +621,10 @@ def params_for(method: str, category: str | None = None,
       read from, or ``None``.
 
     **Methods with nothing to tune.** An empty ``tunable`` means the upstream
-    script exposes no hyperparameters on its command line; method scripts are
-    never modified, so such a method cannot be tuned through the wrapper. Its
-    settings are reported under ``fixed_in_script`` and ``upstream_knobs``
-    (both empty for methods outside the upstream audit).
+    script exposes no hyperparameters on its command line. The package runs
+    each script unchanged, so such a method cannot be tuned through the
+    wrapper. Its settings are reported under ``fixed_in_script`` and
+    ``upstream_knobs`` (both empty for methods outside the upstream audit).
 
     **Variant selection.** ``category`` and ``modalities`` select the variant
     exactly like ``run``. Either may be omitted when the rest leaves one
@@ -771,10 +818,9 @@ def cite(*methods, fmt: str = "text") -> str:
     - ``"bibtex"`` - one ``@article{<id>_<year>, ...}`` per entry, separated
       by a blank line; the benchmark's key is ``scMultiBench_<year>``.
 
-    **Methods without a reference.** A method whose DOI is not curated in
-    engine/references.yaml is emitted as a ``% <id>: no verified reference
-    ...; see <repo_url>`` comment (bibtex) or the same line without ``%``
-    (text), rather than silently dropped.
+    **Methods without a reference.** A method without a verified reference
+    is emitted as a ``% <id>: no verified reference; see <repo_url>``
+    comment (bibtex) or the same line without ``%`` (text).
 
     See Also
     --------
@@ -794,7 +840,7 @@ def cite(*methods, fmt: str = "text") -> str:
         if bad:
             raise TypeError(
                 f"cite(): method ids must be strings, got {type(bad[0]).__name__}; "
-                f"pass ONE list (cite(['Matilda', 'MOFA2'])) or one id per argument")
+                f"pass one list (cite(['Matilda', 'MOFA2'])) or one id per argument")
         ids = [registry.check_method(m) for m in args]
     parts = [_format_entry("scMultiBench", registry.benchmark_reference(), fmt)]
     for m in ids:
@@ -804,6 +850,6 @@ def cite(*methods, fmt: str = "text") -> str:
             parts.append(_format_entry(m, ref, fmt))
         else:
             url = (s.reference or {}).get("repo_url") or "(no repo_url)"
-            note = f"{m}: no verified reference in engine/references.yaml; see {url}"
+            note = f"{m}: no verified reference; see {url}"
             parts.append(("% " + note) if fmt == "bibtex" else note)
     return "\n\n".join(parts) if fmt == "bibtex" else "\n".join(parts)

@@ -1,4 +1,4 @@
-"""find_methods filters per VARIANT.
+"""find_methods filters per variant.
 
 Workshop findings (Priya, Tomás, Aisha, Chen, Elena): needs_labels was the
 method-level OR over all variants so scMoMaT vanished from
@@ -82,9 +82,9 @@ def test_per_variant_semantics_on_a_synthetic_spec(monkeypatch):
 def test_find_methods_docstring_states_per_variant_rule():
     import inspect
     doc = inspect.getdoc(discover.find_methods)
-    assert "per VARIANT" in doc and "scMoMaT" in doc
+    assert "per variant" in doc and "scMoMaT" in doc
     doc2 = inspect.getdoc(discover.method_info)
-    assert "METHOD-level" in doc2 and "ANY variant" in doc2
+    assert "method-level" in doc2 and "any variant" in doc2
 
 
 # ----------------------------------------------------------------- removed API
