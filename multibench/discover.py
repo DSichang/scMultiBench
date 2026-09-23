@@ -411,8 +411,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``fixed_in_script`` / ``upstream_knobs`` / ``upstream_url`` - what the
       script pins and what its library documents (see ``mtb.params_for``).
     - ``runtime`` - observed cost; see **Runtime**.
-    - ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` - see **GPU and
-      CPU**.
+    - ``gpu`` / ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` - see
+      **GPU and CPU**.
     - ``notes_long`` (``verbose=True`` only) - the raw upstream-knob audit
       prose, ``None`` for methods outside the audit.
     - Not in this dict: the paper-only catalog columns (``deep_learning``,
@@ -430,7 +430,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       ``summary_csv`` (the shipped re-run sweeps) or ``recorded`` (the
       recorded end-to-end runs).
     - ``host`` / ``note`` - ``'gpu'`` and a sentence saying the times come
-      from the GPU benchmark host.
+      from the GPU benchmark host; for a method that uses a GPU it adds that
+      a CPU-only host takes longer.
 
     These are measurements, not predictions: use them to choose a sensible
     ``run_all(timeout=...)``, not to promise a finish time.
@@ -447,9 +448,13 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     and the method was executed end to end on a reference dataset;
     ``'declared'`` = wired but not run.
 
-    **GPU and CPU.** ``cpu_params``, ``requires_gpu`` and ``gpu_evidence``
-    are the GPU/CPU contract of the upstream script, read from its source:
+    **GPU and CPU.** ``gpu``, ``cpu_params``, ``requires_gpu`` and
+    ``gpu_evidence`` are the GPU/CPU contract of the upstream script, read
+    from its source:
 
+    - ``gpu`` - how the method uses an NVIDIA GPU: ``'required'`` (see
+      ``requires_gpu``), ``'used when present'`` (it runs on the CPU
+      otherwise), ``'not used'``, or ``'unknown'`` (not checked yet).
     - ``cpu_params`` - the command-line values that turn CUDA off in a script
       that has it on by default (``{}`` for most methods): ``{'use_cuda': ''}``
       for scJoint (its argparse ``--use_cuda`` is ``type=bool``, so only the
@@ -460,7 +465,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       unconditionally (no flag, no ``torch.cuda.is_available()`` fallback).
       On a GPU-less host ``run`` refuses such a method with ``OSError``
       before launching and ``scan`` reports it ``env_ok=False``.
-    - ``gpu_evidence`` - the ``file:line`` of that CUDA call, else ``None``.
+    - ``gpu_evidence`` - the ``file:line`` of that CUDA call (one per script,
+      joined by ``', '``), else ``None``.
 
     None of the three says anything about the CPU archive of the method's env
     (``mtb.env.install(..., flavor=...)``).
@@ -535,6 +541,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     info["runtime"] = _runtime_hint(s.id)
     # the GPU/CPU contract of the upstream script (methods.yaml, read from
     # its source): what run() merges on a GPU-less host, and what it refuses
+    info["gpu"] = s.gpu
     info["cpu_params"] = dict(s.cpu_params)
     info["requires_gpu"] = bool(s.requires_gpu)
     info["gpu_evidence"] = s.gpu_evidence or None
@@ -568,10 +575,13 @@ def _runtime_hint(method: str) -> dict:
     registry.check_method(method)
     rt = dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
                                        "observed": []}))
-    # every observation in runtimes.yaml was taken on the GPU benchmark host
+    # every observation in runtimes.yaml was taken on the GPU benchmark host;
+    # the CPU slowdown applies only to a method that may use that GPU
     rt["host"] = "gpu"
-    rt["note"] = ("times observed on the benchmark host (NVIDIA RTX 4090); on a "
-                  "CPU-only host expect training methods to take many times longer")
+    rt["note"] = "times observed on the benchmark host (NVIDIA RTX 4090)"
+    if registry.get(method).gpu != "not used":
+        rt["note"] += ("; on a CPU-only host expect training methods to take many "
+                       "times longer")
     return rt
 
 

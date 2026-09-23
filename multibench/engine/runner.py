@@ -37,6 +37,14 @@ class RunResult:
     obs_names : list[str] | None
         Cell barcodes of the output, in the order the method stacks the cells;
         ``None`` when they could not be matched.
+    scripts_commit : str | None
+        Commit of the method scripts that ran; ``None`` when they are not a
+        git checkout.
+    env_flavor : str
+        ``'cpu'`` or ``'gpu'`` build of the method's environment, else
+        ``'unknown'``.
+    hostname : str
+        Name of the computer that ran the method.
 
     Examples
     --------
@@ -71,6 +79,10 @@ class RunResult:
     stdout: str = ""
     stderr: str = ""
     obs_names: list | None = None   # input barcodes in the output's cell order
+    # provenance (config.run_provenance): what ran where
+    scripts_commit: str | None = None
+    env_flavor: str = "unknown"
+    hostname: str = ""
 
 
 def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
@@ -790,10 +802,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     ``{cmd}`` is the bare command: the template must then enter an env
     itself, for example ``"conda run -n myenv {cmd}"``.
 
-    A Slurm job step::
+    A Slurm job step:
 
-        mtb.run("StabMap", "mosaic", inputs=inp, out_dir="runs/StabMap",
-                cmd_template="srun --gres=gpu:1 {env_cmd}")
+    ```python
+    mtb.run("StabMap", "mosaic", inputs=inp, out_dir="runs/StabMap",
+            cmd_template="srun --gres=gpu:1 {env_cmd}")
+    ```
 
     **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
     before the argv is built, and ``data_dir`` (like any existing directory)
@@ -917,6 +931,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             ingest.normalize_peak_names(step["normpeaks_from"], step["value"])
         values[role] = step["value"]
     cmd = _argv(variant, method, values, out_str, repo, params, cmd_template)
+    # a {cmd} template runs the method in the caller's env, whose build is not ours
+    ours = cmd_template is None or ENV_CMD in cmd_template
+    provenance = config.run_provenance(envs.group_for(method) if ours else None, repo)
 
     # Isolate the method env from user site-packages (~/.local): a broken or
     # mismatched ~/.local can shadow the conda env (e.g. a libcublas-less torch
@@ -968,7 +985,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     extra = {o.file: io.load_output(out, o) for o in variant.extra_outputs}
     return RunResult(method=method, out_dir=out, cmd=cmd, output=primary, extra=extra,
                      stdout=proc.stdout, stderr=proc.stderr,
-                     obs_names=_obs_names(method, variant, values, primary))
+                     obs_names=_obs_names(method, variant, values, primary),
+                     **provenance)
 
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,

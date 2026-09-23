@@ -40,7 +40,7 @@ from .workflow import (scan, run_all, BatchResult, list_categories,
                        describe_layout, load_batch, sweep)
 from ._compat import deprecated_alias as _deprecated_alias
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 __all__ = [
     # sub-namespaces

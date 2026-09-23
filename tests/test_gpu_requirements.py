@@ -118,12 +118,13 @@ def test_gpu_evidence_names_a_cuda_call():
         if not info["requires_gpu"]:
             assert ev is None, m
             continue
-        path, _, line = ev.rpartition(":")
-        assert path.startswith("tools_scripts/") and line.isdigit(), (m, ev)
-        f = root / path
-        if f.is_file():
-            text = f.read_text(errors="replace").splitlines()[int(line) - 1]
-            assert "cuda" in text.lower(), (m, ev, text)
+        for entry in ev.split(", "):          # moETM names one call per script
+            path, _, line = entry.rpartition(":")
+            assert path.startswith("tools_scripts/") and line.isdigit(), (m, ev)
+            f = root / path
+            if f.is_file():
+                text = f.read_text(errors="replace").splitlines()[int(line) - 1]
+                assert "cuda" in text.lower(), (m, entry, text)
 
 
 def test_method_info_keys_and_defaults():
@@ -191,8 +192,8 @@ def test_schema_accepts_the_two_valid_shapes():
     spec = _parse(requires_gpu=True, gpu_evidence="tools_scripts/X/main.py:12")
     assert spec.requires_gpu and spec.cpu_params == {}
     assert spec.requires_gpu_reason == (
-        'X needs an NVIDIA GPU: the upstream script calls CUDA unconditionally '
-        '(tools_scripts/X/main.py:12); see method_info(m)["requires_gpu"]')
+        'X needs an NVIDIA GPU; this computer has none. '
+        'See method_info("X")["requires_gpu"].')
     # absent keys -> the defaults
     spec = _parse()
     assert spec.cpu_params == {} and spec.requires_gpu is False and spec.gpu_evidence == ""
@@ -321,9 +322,8 @@ def test_real_run_is_silent_on_gpu_host_and_with_explicit_key(tmp_path, monkeypa
 
 # ------------------------------------------------------------ runner: requires_gpu
 
-MOETM_REASON = ('moETM needs an NVIDIA GPU: the upstream script calls CUDA '
-                'unconditionally (tools_scripts/moETM/main_moETM_rna_adt.py:109); '
-                'see method_info(m)["requires_gpu"]')
+MOETM_REASON = ('moETM needs an NVIDIA GPU; this computer has none. '
+                'See method_info("moETM")["requires_gpu"].')
 
 
 def test_requires_gpu_raises_before_launching(tmp_path, no_gpu, monkeypatch):

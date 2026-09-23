@@ -295,10 +295,10 @@ def _platform_note() -> str | None:
     from .engine import envs
     problem = envs.host_platform_problem()
     if problem:
-        print(f"warning: {problem}; `multibench env install --run` refuses on this "
-              f"host (--force overrides) - run methods on a Linux host; everything "
-              f"else (registry, stored results, scan's file check, evaluate, plot) "
-              f"works here", file=sys.stderr)
+        print(f"warning: {envs.linux_only_text(problem)} `multibench env install "
+              f"--run` refuses here; --force tries anyway. The registry, stored "
+              f"results, scan's file check, evaluate and plot work on this computer.",
+              file=sys.stderr)
     return problem
 
 
@@ -612,11 +612,12 @@ def _cmd_fetch(args) -> int:
     """``multibench fetch``: :func:`multibench.data.fetch` (or ``fetch_outputs``)
     for the datasets named, and the method scripts with ``--scripts``.
 
-    ``--scripts`` runs the clone the first ``mtb.run`` would run
-    (``PYangLab/scMultiBench`` into ``repo_path``, with ``git``), or reports
-    the scripts present; a compute node without network then needs no
-    download. One ``<id>: <folder>`` line per dataset goes to stdout,
-    download progress to stderr.
+    ``--scripts`` runs the fetch the first ``mtb.run`` would run
+    (``PYangLab/scMultiBench`` into ``repo_path``, with ``git``; ``--ref`` or
+    ``MULTIBENCH_SCRIPTS_REF`` picks a commit or tag), or reports the scripts
+    present, with the commit either way; a compute node without network then
+    needs no download. One ``<id>: <folder>`` line per dataset goes to
+    stdout, download progress to stderr.
     """
     from . import config
     from .data.fetch import AVAILABLE, fetch, fetch_outputs
@@ -625,12 +626,16 @@ def _cmd_fetch(args) -> int:
         _usage_error(args, "name the dataset ids to download (e.g. multibench fetch D11 "
                      f"D46; available: {', '.join(sorted(AVAILABLE))}), or pass "
                      "--scripts for the method scripts")
+    if args.ref and not args.scripts:
+        _usage_error(args, "--ref picks the commit or tag of the method scripts; use it "
+                     "with --scripts")
     if args.scripts:
         present = config.scripts_present()
         with _quiet_stdout():                 # the clone's progress -> stderr
-            repo = config.ensure_repo()
+            repo = config.ensure_repo(ref=args.ref)
         state = "present" if present else "fetched"
-        print(f"method scripts {state}: {Path(repo) / 'tools_scripts'}")
+        print(config.scripts_line(repo).replace("method scripts:",
+                                                f"method scripts {state}:", 1))
     for ds in ids:
         with _quiet_stdout():
             if args.outputs:
@@ -672,10 +677,11 @@ def _cmd_info(args) -> int:
     """``multibench info METHOD``: the facts of :func:`multibench.method_info`
     a user checks before running the method.
 
-    Prints the env, whether a GPU and labels are needed, which ATAC
-    representation it reads, its variants (category and input roles), the
-    observed runtime with the host it was measured on, and the setup hint.
-    ``--format json`` prints the whole ``method_info`` dict.
+    Prints the env, how the method uses a GPU (``method_info(m)['gpu']``),
+    whether labels are needed, which ATAC representation it reads, its
+    variants (category and input roles), each observed runtime with its cell
+    count, the host the times come from, and the setup hint. ``--format
+    json`` prints the whole ``method_info`` dict.
     """
     import textwrap
 
@@ -685,7 +691,7 @@ def _cmd_info(args) -> int:
         print(json.dumps(info, indent=1, default=str))
         return _EXIT_OK
     print(f"{info['id']} ({info.get('language') or '?'}), env {info['env']}")
-    print(f"  requires_gpu: {_yes_no(info.get('requires_gpu'))}")
+    print(f"  GPU:          {info.get('gpu') or 'unknown'}")
     print(f"  needs_labels: {_yes_no(info.get('needs_labels'))}")
     print(f"  atac:         {info.get('atac') or 'none (reads no ATAC)'}")
     print("  variants:")
@@ -695,18 +701,17 @@ def _cmd_info(args) -> int:
         print(f"    {v.get('category'):9} {mods}{labels}")
     rt = info.get("runtime") or {}
     if rt:
-        worst = rt.get("worst_sec")
-        where = next((o.get("dataset") for o in rt.get("observed") or []
-                      if o.get("sec") == worst), None)
-        line = f"  runtime:      {rt.get('tier') or '?'}"
-        if worst is not None:
-            line += f", longest observed {worst} s" + (f" on {where}" if where else "")
-        if rt.get("host") and not rt.get("note"):
-            line += f" ({rt['host']} host)"
-        print(line)
-        if rt.get("note"):
-            print(textwrap.fill(rt["note"], width=88, initial_indent="                ",
-                                subsequent_indent="                "))
+        observed = sorted(rt.get("observed") or [], key=lambda o: -(o.get("sec") or 0))
+        pad = " " * 16
+        print(f"  runtime:      {rt.get('tier') or '?'}"
+              + ("" if observed else " (never measured)"))
+        for o in observed:
+            cells = o.get("cells")
+            size = f"{cells:,} cells" if isinstance(cells, int) else "cells not recorded"
+            print(f"{pad}{o.get('sec')} s on {o.get('dataset')} ({size})")
+        if observed and rt.get("note"):
+            print(textwrap.fill(rt["note"], width=88, initial_indent=pad,
+                                subsequent_indent=pad))
     hint = (info.get("setup_hint") or "").strip()
     print("  setup_hint:" + ("   none" if not hint else ""))
     if hint:
@@ -1076,8 +1081,13 @@ def _cmd_run_all(args) -> int:
     under ``--out-dir`` (reload with ``multibench plot bubble --input
     OUT_DIR``). Progress lines go to stderr; tables to stdout. ``--param
     METHOD:KEY=VALUE`` (repeatable) becomes ``params={METHOD: {KEY: value}}``.
+    ``--out-dir`` is optional with ``--dry-run`` only: the commands then show
+    the ``<out_dir>`` placeholder, as ``run_all(dry_run=True)`` does.
     """
     import multibench
+    if args.out is None and not args.dry_run:
+        # the text argparse prints for a missing required option
+        _usage_error(args, "the following arguments are required: --out-dir/--out")
     params = _parse_params(args.param, args) or None
     columns = _csv_list(args.columns)
     if getattr(args, "assume_gpu", False) and not args.dry_run:
@@ -1156,6 +1166,15 @@ def _evaluate_labels(args, stack):
         if args.dataset is None or args.method is None or args.category is None:
             _usage_error(args, "need --labels CSV (repeatable), or --dataset, --method "
                          "and --category to read the dataset's label files")
+        from .engine import registry
+        try:
+            registry.check_method(args.method)
+        except KeyError as e:
+            # the label order comes from a registry method; the user's own
+            # method passes its label files instead
+            raise KeyError(f"{e.args[0]}; for your own method, pass the label files "
+                           f"with --labels, once per file, in your embedding's cell "
+                           f"order") from None
         labels = multibench.labels_for(args.dataset, args.category, args.method,
                                        data_path=args.data_path)
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
@@ -1316,8 +1335,9 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
             note += (" (auto: NVIDIA GPU visible on this host)" if eff == "gpu"
                      else " (auto: no NVIDIA GPU visible on this host)")
         if fell_back:
-            note += (f"; {fell_back} of {_envs(n)} {'has' if fell_back == 1 else 'have'} "
-                     f"no CPU archive yet, their GPU archive is counted")
+            note += (f"; {fell_back} of {_envs(n)} " + (
+                "has no CPU archive yet; its GPU archive is counted" if fell_back == 1
+                else "have no CPU archive yet; their GPU archives are counted"))
     return (f"# total ({_envs(n)}): {dl_part}{sep}{disk_part}{note}; "
             f"sizes are those recorded for this release")
 
@@ -1337,7 +1357,9 @@ def _cmd_env(args) -> int:
     """
     from .engine import envs, registry
     cmd = args.env_cmd
-    if cmd in ("status", "plan", "doctor", "install"):
+    refusing = (cmd == "install" and getattr(args, "run", False)
+                and not getattr(args, "force", False))
+    if cmd in ("status", "plan", "doctor", "install") and not refusing:
         _platform_note()                     # once, first, on stderr
     if cmd == "status":
         _mlist = _csv_list(getattr(args, "methods", None))
@@ -1516,6 +1538,27 @@ class _HelpFormatter(argparse.HelpFormatter):
         return super()._fill_text(text, width, indent)
 
 
+def _status_epilog() -> str:
+    """The ``env status`` help epilog: one difficulty tag per line."""
+    import textwrap
+
+    from .engine.envs import DIFFICULTY, MARK_LEGEND, VERIFIED_STAR
+    rows = [(tag, text) for tag, text in DIFFICULTY.items()]
+    star, _, star_text = VERIFIED_STAR.partition(" = ")
+    field, _, what = star_text.partition(": ")
+    rows.append((star, f"after a tag: {what} ({field})"))
+    width = max(len(tag) for tag, _ in rows) + 2
+    lines = ["difficulty tags (how hard the environment is to build from its recipe):"]
+    for tag, text in rows:
+        lines += textwrap.wrap(text, width=78, initial_indent=f"  {tag:<{width}}",
+                               subsequent_indent=" " * (width + 2),
+                               break_on_hyphens=False)
+    lines += [""] + textwrap.wrap("marks: " + MARK_LEGEND, width=78,
+                                  subsequent_indent="  ", break_on_hyphens=False)
+    lines.append("The same legend is printed on stderr.")
+    return "\n".join(lines)
+
+
 _CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
@@ -1532,8 +1575,8 @@ _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' a
                 "name is the same whatever the flavour; env status/doctor show which "
                 "flavour is installed. Installing on a login node for jobs on GPU "
                 "nodes: pass gpu")
-_FORCE_HELP = ("build even though this host is not linux-64 (the packed archives and "
-               "lockfiles are; without --force a non-Linux host refuses before any "
+_FORCE_HELP = ("try anyway on a computer that is not Linux (method environments run "
+               "only on Linux; without --force the command refuses there before any "
                "download)")
 #: the family tokens ``--metrics`` accepts besides a comma list of codes
 _METRIC_FAMILIES = ("clustering", "batch", "all")
@@ -1620,10 +1663,11 @@ def build_parser() -> argparse.ArgumentParser:
     pin = sub.add_parser(
         "info", help="one method's env, GPU and label needs, ATAC input, variants and "
                      "runtime (mtb.method_info)",
-        description="Print what to check before running METHOD: its env, whether it "
-                    "needs a GPU or labels, which ATAC representation it reads, its "
-                    "variants (category and input roles), the longest observed runtime "
-                    "and the host it was measured on, and the setup hint.")
+        description="Print what to check before running METHOD: its env, how it uses "
+                    "a GPU (required, used when present, not used or unknown), whether "
+                    "it needs labels, which ATAC representation it reads, its variants "
+                    "(category and input roles), each observed runtime with its cell "
+                    "count and host, and the setup hint.")
     pin.add_argument("method", help="method id (see `multibench list`)")
     pin.add_argument("--format", choices=["text", "json"], default="text",
                      help="text (default) or json (the whole mtb.method_info dict)")
@@ -1635,7 +1679,7 @@ def build_parser() -> argparse.ArgumentParser:
                       "(mtb.data.fetch / mtb.data.fetch_outputs)",
         description="Download the demo datasets named into the data root (skipping "
                     "those present), or with --outputs their stored run-all outputs. "
-                    "--scripts fetches the method scripts the first run would clone, so "
+                    "--scripts fetches the method scripts the first run would fetch, so "
                     "compute nodes without network need no download.")
     pfe.add_argument("datasets", nargs="*", metavar="DATASET",
                      help="dataset ids, space- or comma-separated (mtb.data.fetchable() "
@@ -1645,8 +1689,12 @@ def build_parser() -> argparse.ArgumentParser:
                           "(D11, D28, D46, D52; mtb.data.fetch_outputs), under "
                           "<data root>/outputs/")
     pfe.add_argument("--scripts", action="store_true",
-                     help="clone the method scripts (PYangLab/scMultiBench, with git) "
-                          "into repo_path, or report them present")
+                     help="fetch the method scripts (PYangLab/scMultiBench, with git) "
+                          "into repo_path, or report them present; prints the commit")
+    pfe.add_argument("--ref", metavar="REF",
+                     help="with --scripts: fetch this commit or tag instead of the "
+                          "default branch (default: $MULTIBENCH_SCRIPTS_REF); scripts "
+                          "already present must be at it")
     pfe.add_argument("--data-path", dest="data_path",
                      help="data root to download into (default: the configured "
                           "data_path, see `multibench config`)")
@@ -1892,9 +1940,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "params METHOD` lists them (mtb.params_for(METHOD, category, "
                          "modalities))")
     pr.add_argument("--dry-run", dest="dry_run", action="store_true",
-                    help="print the exact command line run() would execute (conda run "
-                         "-n <env> python <script> ...; inputs as given, params merged) "
-                         "and execute nothing")
+                    help="print the exact command line run() would execute, "
+                         "environment activation included, and execute nothing")
     pr.set_defaults(func=_cmd_run, _parser=pr)
 
     # ---- run-all
@@ -1906,9 +1953,10 @@ def build_parser() -> argparse.ArgumentParser:
                     "summary, long.csv and figure under --out-dir.")
     pra.add_argument("dataset", help="dataset id = the folder name under --data-path")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)
-    pra.add_argument("--out-dir", "--out", dest="out", required=True,
+    pra.add_argument("--out-dir", "--out", dest="out",
                     help="directory for all outputs (one sub-folder per method); "
-                         "--out is an alias")
+                         "required unless --dry-run, whose commands then show "
+                         "<out_dir>; --out is an alias")
     pra.add_argument("--methods", help=_METHODS_HELP + "; only those (default: every "
                                                        "runnable method)")
     pra.add_argument("--modalities", help="comma-separated modalities to restrict the "
@@ -1986,8 +2034,9 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--batch", help="per-cell batch labels CSV; without --metrics the "
                                     "batch metrics are then computed too")
     pe.add_argument("--clustering", "--cluster", dest="cluster", metavar="PATH",
-                    help="precomputed cluster assignment (CSV, or an .h5 read from "
-                         "/obs/cluster_leiden); skips the Leiden resolution sweep. "
+                    help="precomputed clusters (CSV, or an .h5 read from "
+                         "/obs/cluster_leiden); they replace the sweep for ARI and NMI "
+                         "(iF1 still sweeps unless --metrics leaves it out). "
                          "--cluster is an alias")
     pe.add_argument("--metrics", help="what to compute (mtb.evaluate(metrics=)): a family "
                                       "(clustering | batch | all) or a comma-separated "
@@ -2006,9 +2055,10 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")
-    pe.add_argument("--method", help="label the rows with this method name and write "
-                                     "the long format (needs --dataset and --category); "
-                                     "without --labels it also sets the label order")
+    pe.add_argument("--method", help="method name for the rows of the long format "
+                                     "(needs --dataset and --category); without "
+                                     "--labels it must be a registry method, which "
+                                     "sets the label order")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
                                       "--method and --category); without --labels its "
                                       "label files are read")
@@ -2025,14 +2075,10 @@ def build_parser() -> argparse.ArgumentParser:
                     "--packed --run`.")
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
-    from .engine.envs import DIFFICULTY as _DIFF, VERIFIED_STAR as _STAR
     es = ev.add_parser("status", help="per method: env installed? env name, difficulty",
-                       description="One line per method: [x] installed / [ ] not, the "
-                                   "env the package uses for it (the same name scan/run/"
-                                   "doctor/recipe use) and a difficulty tag saying how "
-                                   "hard the env is to build from its recipe - "
-                                   + "; ".join(f"{k} = {v}" for k, v in _DIFF.items())
-                                   + f". {_STAR}. A legend line is printed on stderr.")
+                       description="One line per method: installed or not, the "
+                                   "environment name and a difficulty tag.",
+                       epilog=_status_epilog(), formatter_class=_HelpFormatter)
     es.add_argument("--category", help=_CATEGORY_HELP + " (only its methods)")
     es.add_argument("--methods", help=_METHODS_HELP + "; only those")
     es.set_defaults(func=_cmd_env, _parser=es)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multibench-sc"
-version = "0.3.1"
+dynamic = ["version"]
 description = "Clean Python API wrapping the scMultiBench benchmark: run methods, evaluate, and plot."
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
@@ -27,6 +27,10 @@ multibench = "multibench.cli:main"
 
 [tool.setuptools]
 packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.engine"]
+
+[tool.setuptools.dynamic]
+# one source: the string in multibench/__init__.py (read statically, no import)
+version = {attr = "multibench.__version__"}
 
 [tool.setuptools.package-data]
 multibench = ["engine/methods.yaml", "engine/env_specs.yaml", "engine/env_groups.yaml", "engine/params.yaml", "engine/upstream_knobs.yaml", "engine/runtimes.yaml", "engine/env_locks/*.yml", "engine/env_locks/*.sh", "engine/drivers/*", "engine/packed_urls.json", "engine/packed_sizes.json", "engine/output_urls.json", "engine/references.yaml", "files/*", "result/rerun/*.csv", "result/scib_metric/*/*/*/*.csv", "result/scib_metric/*/*/*/*/*.csv"]

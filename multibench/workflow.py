@@ -1725,6 +1725,7 @@ class BatchResult:
         reused                      True when skip_existing reused the output
         env, output_kind, n_tunable the scan row the method ran from
         data_path, multibench_version, started_at   provenance of the run
+        scripts_commit, env_flavor, hostname        the scripts, env build and computer
         _long                       internal; read BatchResult.long instead
         ```
 
@@ -2580,6 +2581,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         if verbose:
             print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) "
                   f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
+        rec.update(config.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
         records.append(rec)
 
     result = BatchResult(records, dataset, category, out_dir)

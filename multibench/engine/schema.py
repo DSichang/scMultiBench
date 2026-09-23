@@ -107,13 +107,18 @@ def modality_family(role: str) -> str:
 
 
 #: the per-method keys of the GPU/CPU contract in methods.yaml (see MethodSpec)
-GPU_FIELDS = ("cpu_params", "requires_gpu", "gpu_evidence")
+GPU_FIELDS = ("cpu_params", "requires_gpu", "gpu_evidence", "gpu_use")
+#: every value of ``MethodSpec.gpu`` (``method_info(m)['gpu']``), in that order
+GPU_USE_VALUES = ("required", "used when present", "not used", "unknown")
+#: the values ``gpu_use`` may declare; ``required`` and ``unknown`` are derived
+GPU_USE_DECLARED = ("used when present", "not used")
 #: what a ``cpu_params`` value may be: a command-line token (``""`` included -
 #: scJoint's ``--use_cuda ""``), a number, or ``True`` for a bare flag
 _CPU_PARAM_VALUE_TYPES = (str, int, float, bool)
 
 
-def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence) -> None:
+def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence,
+                        gpu_use="") -> None:
     """Check the GPU/CPU contract of one method (``methods.yaml`` keys).
 
     Parameters
@@ -125,8 +130,13 @@ def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence) 
         allowed), numbers or ``True``.
     requires_gpu : the ``requires_gpu`` value - a bool.
     gpu_evidence : the ``gpu_evidence`` value - a ``"<file>:<line>"`` string
-        naming the unconditional CUDA call; required when ``requires_gpu``
+        naming the unconditional CUDA call, or several joined by ``", "``
+        (one per script, e.g. moETM's two); required when ``requires_gpu``
         is True and forbidden otherwise.
+    gpu_use : the ``gpu_use`` value - ``""`` (not declared), or one of
+        :data:`GPU_USE_DECLARED`, read from the script or its environment.
+        Forbidden with ``requires_gpu`` (then it is ``required``); with
+        ``cpu_params`` only ``"used when present"`` fits.
 
     Raises
     ------
@@ -134,7 +144,8 @@ def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence) 
         With ``"<method>: ..."`` naming the offending key, when a value has
         the wrong shape, when ``requires_gpu`` and ``cpu_params`` are both
         set (a script cannot both need a GPU and have a switch that turns
-        CUDA off), or when ``gpu_evidence`` and ``requires_gpu`` disagree.
+        CUDA off), when ``gpu_evidence`` and ``requires_gpu`` disagree, or
+        when ``gpu_use`` contradicts them.
     """
     if not isinstance(cpu_params, dict):
         raise ValueError(
@@ -172,11 +183,24 @@ def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence) 
             f"{method_id}: gpu_evidence {gpu_evidence!r} is set but requires_gpu "
             f"is false - remove it or set requires_gpu: true")
     if requires_gpu:
-        path, sep, line = gpu_evidence.strip().rpartition(":")
-        if not sep or not path or not line.isdigit():
-            raise ValueError(
-                f"{method_id}: gpu_evidence must be '<file>:<line>', got "
-                f"{gpu_evidence!r}")
+        for entry in gpu_evidence.split(","):
+            path, sep, line = entry.strip().rpartition(":")
+            if not sep or not path or not line.isdigit():
+                raise ValueError(
+                    f"{method_id}: gpu_evidence must be '<file>:<line>' (several "
+                    f"joined by ', '), got {gpu_evidence!r}")
+    if gpu_use not in ("",) + GPU_USE_DECLARED:
+        raise ValueError(
+            f"{method_id}: gpu_use must be one of {list(GPU_USE_DECLARED)}, got "
+            f"{gpu_use!r}")
+    if gpu_use and requires_gpu:
+        raise ValueError(
+            f"{method_id}: gpu_use {gpu_use!r} is set but requires_gpu is true - "
+            f"a method that requires a GPU reads gpu 'required'; remove gpu_use")
+    if cpu_params and gpu_use not in ("", "used when present"):
+        raise ValueError(
+            f"{method_id}: gpu_use {gpu_use!r} contradicts cpu_params - a script "
+            f"with a switch that turns CUDA off uses the GPU when one is present")
 
 
 @dataclass
@@ -412,15 +436,35 @@ class MethodSpec:
     # `requires_gpu`: the script calls CUDA unconditionally; `gpu_evidence` is
     # the `file:line` of that call, quoted in the refusal. A method may not
     # carry both. Described for users in mtb.method_info (Notes).
+    # `gpu_use`: whether the script uses a GPU when one is present, read from
+    # its source or its environment ("used when present" / "not used"); ""
+    # = not checked. The public value is the derived `gpu` property.
     cpu_params: dict = field(default_factory=dict)
     requires_gpu: bool = False
     gpu_evidence: str = ""
+    gpu_use: str = ""
 
     def __post_init__(self):
         if not self.categories:
             self.categories = self.wired_categories
         validate_gpu_fields(self.id, self.cpu_params, self.requires_gpu,
-                            self.gpu_evidence)
+                            self.gpu_evidence, self.gpu_use)
+
+    @property
+    def gpu(self) -> str:
+        """How the method uses an NVIDIA GPU: one of :data:`GPU_USE_VALUES`.
+
+        ``required`` when ``requires_gpu``; else the declared ``gpu_use``;
+        else ``used when present`` for a method with ``cpu_params`` (its
+        script has CUDA on by default); else ``unknown``.
+        """
+        if self.requires_gpu:
+            return "required"
+        if self.gpu_use:
+            return self.gpu_use
+        if self.cpu_params:
+            return "used when present"
+        return "unknown"
 
     @property
     def requires_gpu_reason(self) -> str:
@@ -428,17 +472,22 @@ class MethodSpec:
         ``""`` when ``requires_gpu`` is False.
 
         The one text the runner's ``OSError`` and ``scan``'s ``env_reason``
-        share, so a tutorial and a traceback read the same sentence::
+        share, so a tutorial and a traceback read the same sentence. The
+        pointer names ``method_info`` in Python and ``multibench info`` on the
+        command line (``config.hint``); the ``file:line`` evidence stays in
+        ``method_info(m)["gpu_evidence"]``. For example:
 
-            scBridge needs an NVIDIA GPU: the upstream script calls CUDA
-            unconditionally (tools_scripts/scBridge/main_scBridge.py:46);
-            see method_info(m)["requires_gpu"]
+        ```text
+        scBridge needs an NVIDIA GPU; this computer has none.
+        See method_info("scBridge")["requires_gpu"].
+        ```
         """
         if not self.requires_gpu:
             return ""
-        return (f"{self.id} needs an NVIDIA GPU: the upstream script calls CUDA "
-                f"unconditionally ({self.gpu_evidence}); "
-                f'see method_info(m)["requires_gpu"]')
+        from .. import config
+        see = config.hint(f'method_info("{self.id}")["requires_gpu"]',
+                          f"multibench info {self.id}")
+        return f"{self.id} needs an NVIDIA GPU; this computer has none. See {see}."
 
     @property
     def wired_categories(self) -> list[str]:

@@ -121,6 +121,7 @@ def _parse_method(d: dict) -> MethodSpec:
         cpu_params=d["cpu_params"] if d.get("cpu_params") is not None else {},
         requires_gpu=d.get("requires_gpu", False),
         gpu_evidence=d.get("gpu_evidence", "") or "",
+        gpu_use=d.get("gpu_use", "") or "",
     )
     # A cpu_params flag the script does not accept would be emitted anyway
     # (the runner merges it below the params check) and argparse would then

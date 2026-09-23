@@ -1,6 +1,7 @@
 methods:
   - id: SCALEX
     language: python
+    gpu_use: used when present   # torch env with CPU and GPU archives; main_SCALEX.py:50 passes gpu=0
     tasks: [clustering, batch]
     atac: gene_activity
     status: verified
@@ -54,6 +55,7 @@ methods:
 
   - id: Seurat_v5
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [clustering, batch]
     atac: peak
     status: verified
@@ -181,6 +183,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMVP
     language: python
+    gpu_use: not used   # run_env hides the GPU: CUDA_VISIBLE_DEVICES=""
     tasks: [clustering]
     atac: peak
     status: verified
@@ -200,6 +203,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMM
     language: python
+    gpu_use: not used   # params pass --no_cuda (see the variant comment)
     tasks: [batch, clustering]
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
     atac: peak
@@ -272,6 +276,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMoMaT
     language: python
+    gpu_use: used when present   # main_scMoMaT.py:78 falls back on torch.cuda.is_available()
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -338,7 +343,7 @@ methods:
     # and main_moETM_rna_atac.py:124-126 - and the encoders are moved back with
     # `.cuda()` (:130-131 / :145-146); neither script has a device flag.
     requires_gpu: true
-    gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:109
+    gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:109, tools_scripts/moETM/main_moETM_rna_atac.py:124
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/moETM/main_moETM_rna_adt.py
@@ -405,6 +410,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Matilda
     language: python
+    gpu_use: used when present   # the driver passes device='auto'
     tasks: [clustering, dimension_reduction]
     atac: gene_activity
     status: verified
@@ -516,6 +522,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: uniPort
     language: python
+    gpu_use: used when present   # torch env with CPU and GPU archives
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -604,6 +611,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MultiMAP
     language: python
+    gpu_use: not used   # UMAP-based, no CUDA call; it only shares the torch env
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -619,6 +627,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: sciPENN
     language: python
+    gpu_use: used when present   # torch env with CPU and GPU archives
     tasks: [batch, clustering, dimension_reduction]
     status: verified
     variants:
@@ -640,6 +649,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: scMSI
     language: python
+    gpu_use: not used   # run_env hides the GPU: CUDA_VISIBLE_DEVICES=""
     tasks: [clustering]
     status: verified
     variants:
@@ -713,6 +723,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: StabMap
     language: R
+    gpu_use: not used   # R; no CUDA call in the script or the driver
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -768,6 +779,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
   - id: UINMF
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -803,6 +815,7 @@ methods:
 
   - id: iNMF
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -818,6 +831,7 @@ methods:
         run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: online_iNMF
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -833,6 +847,7 @@ methods:
         run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: Conos
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -847,6 +862,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MOFA2
     language: R
+    gpu_use: used when present   # main_MOFA2.Rmd:38 sets gpu_mode TRUE; the env has cupy
     tasks: [clustering]
     status: verified
     variants:
@@ -870,6 +886,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Seurat_v3
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -895,6 +912,7 @@ methods:
           - {kind: labels, file: predict.csv}
   - id: Seurat_WNN
     language: R
+    gpu_use: not used   # R; no CUDA call in the script
     tasks: [clustering]
     atac: peak
     status: verified
