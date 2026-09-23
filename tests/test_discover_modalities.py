@@ -41,7 +41,7 @@ def test_method_info_supports_exposes_labels():
     for m in mtb.list_methods():
         for s in mtb.method_info(m)["supports"]:
             assert isinstance(s["labels"], list)
-    assert mtb.method_info("UnitedNet")["supports"][0]["labels"] == ["rna_cty"]
+    assert mtb.method_info("UnitedNet")["supports"][0]["labels"] == ["cty"]
     assert mtb.method_info("Matilda")["supports"][0]["labels"] == ["cty"]
     assert mtb.method_info("SCALEX")["supports"][0]["labels"] == []
 

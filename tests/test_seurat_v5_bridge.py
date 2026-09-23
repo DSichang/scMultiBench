@@ -4,7 +4,8 @@ main_Seurat_v5.Rmd builds its bridge object from rna.h5 plus atac_peak.h5
 (lines 39-44), which Seurat accepts only for the same cells, and writes
 rbind(ATAC query, RNA reference) (lines 84-86, 109). Before the fix
 labels_for returned rna_cty first and scan marked an unpaired folder
-file-ready with no caveat. Source-level evidence: a host run on D27 has not
+file-ready with no caveat. Since study round 2 (M15) an unpaired folder
+fails the file check. Source-level evidence: a host run on D27 has not
 confirmed the order yet (WORK_DIARY).
 """
 import h5py
@@ -35,11 +36,9 @@ def _folder(root, name, rna_cells, atac_cells):
     pd.DataFrame({"x": ["A"] * len(atac_cells)}).to_csv(d / "atac_cty.csv", index=False)
 
 
-def _caveat(tmp_path, name):
+def _row(tmp_path, name):
     df = mtb.scan(name, "diagonal", methods=["Seurat_v5"], data_path=tmp_path, verbose=False)
-    row = df[df.method == "Seurat_v5"].iloc[0]
-    assert row["files_ok"], row["files_reason"]
-    return row["caveat"]
+    return df[df.method == "Seurat_v5"].iloc[0]
 
 
 def test_labels_for_puts_the_atac_cells_first(root):
@@ -50,20 +49,23 @@ def test_labels_for_puts_the_atac_cells_first(root):
 def test_scan_flags_unpaired_bridge_files(tmp_path):
     cells = [f"c{i}" for i in range(50)]
     _folder(tmp_path, "UNPAIRED", cells, [f"a{i}" for i in range(45)])
-    cav = _caveat(tmp_path, "UNPAIRED")
-    assert ("Seurat_v5 builds its bridge from rna.h5 and atac_peak.h5, which need the "
-            "same cells; these files hold different cells (50 and 45 cells, 0 shared)") in cav
+    row = _row(tmp_path, "UNPAIRED")
+    assert not row["files_ok"]
+    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge; these files "
+            "hold different cells (50 and 45, 0 shared)") in row["reason"]
     _folder(tmp_path, "PAIRED", cells, list(reversed(cells)))     # same cells, any order
-    assert "bridge" not in _caveat(tmp_path, "PAIRED")
+    row = _row(tmp_path, "PAIRED")
+    assert row["files_ok"], row["files_reason"]
+    assert "bridge" not in row["caveat"]
 
 
-def test_the_caveat_is_only_for_methods_that_need_paired_files(tmp_path):
+def test_the_check_is_only_for_methods_that_need_paired_files(tmp_path):
     _folder(tmp_path, "UNP", [f"c{i}" for i in range(50)], [f"a{i}" for i in range(45)])
-    got = resolve.inputs_for("UNP", "diagonal", "GLUE", data_path=tmp_path)
-    assert resolve._same_cells_caveat("GLUE", got) == []
+    got = resolve.inputs_for("UNP", "diagonal", "GLUE", data_path=tmp_path, check=True)
+    assert resolve._check_same_cells("GLUE", "UNP", "diagonal", got) is None
     assert resolve._preflight_caveats(got, atac="peak") == []
 
 
 def test_setup_hint_states_the_requirement():
     hint = mtb.method_info("Seurat_v5")["setup_hint"]
-    assert "rna.h5 and atac_peak.h5" in hint and "same cells" in hint
+    assert "RNA and ATAC files" in hint and "same cells" in hint

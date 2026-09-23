@@ -156,7 +156,7 @@ def test_export_dataset_cell_count_mismatch(tmp_path):
     b = ad.AnnData(np.ones((7, 2)))
     mu = pytest.importorskip("mudata")
     m = mu.MuData({"rna": a, "adt": b})
-    with pytest.raises(ValueError, match="all modalities of one dataset must cover the same cells"):
+    with pytest.raises(ValueError, match="All modalities of one dataset must hold the same cells"):
         ingest.export_dataset(m, tmp_path / "M", rna="mod:rna", adt="mod:adt")
 
 

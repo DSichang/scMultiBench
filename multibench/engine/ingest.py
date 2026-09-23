@@ -28,6 +28,8 @@ from pathlib import Path
 import h5py
 import numpy as np
 
+from .. import config
+
 __all__ = ["export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"]
 
 
@@ -103,6 +105,71 @@ def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int) -> None:
             f"{name} values are not whole numbers (log-normalised?). The methods "
             f"normalise raw counts themselves: export raw counts, e.g. {hint}.",
             UserWarning, stacklevel=stacklevel + 1)
+
+
+#: a trailing ``-<n>`` (10x GEM-well) suffix of a cell barcode
+_BARCODE_SUFFIX_RE = re.compile(r"-\d+$")
+
+
+def _cell_order(names, ref):
+    """How barcodes ``names`` relate to ``ref``.
+
+    Returns ``("same", None)`` (same cells, same order), ``("order", idx)``
+    (same cells; ``names[idx]`` is in ``ref`` order), ``("other", None)``
+    (different cells) or ``("unknown", None)`` (non-unique barcodes). Names
+    that differ only in a trailing ``-<n>`` suffix count as the same cell when
+    the suffix-free names stay unique on both sides.
+    """
+    names, ref = [str(x) for x in names], [str(x) for x in ref]
+    judged = False
+    for key in (None, _BARCODE_SUFFIX_RE):
+        a = names if key is None else [key.sub("", x) for x in names]
+        b = ref if key is None else [key.sub("", x) for x in ref]
+        if len(set(a)) != len(a) or len(set(b)) != len(b):
+            continue
+        judged = True
+        if a == b:
+            return "same", None
+        if set(a) == set(b):
+            pos = {k: i for i, k in enumerate(a)}
+            return "order", [pos[k] for k in b]
+    return ("other" if judged else "unknown"), None
+
+
+def _follow_peak_order(out: Path, X, bars):
+    """``(X, bars)`` of a gene-activity matrix put in the cell order of the
+    ``atac_peak.h5`` next to ``out``, which ``atac_cty.csv`` follows.
+
+    Same cells in another order: rows reordered, one note on stderr.
+    Different cells: ``UserWarning``. No peak file, or the same order:
+    unchanged.
+    """
+    import sys
+
+    import scipy.sparse as sp
+
+    folder = Path(out).parent
+    peak = folder / "atac_peak.h5"
+    if Path(out).name == peak.name or not _is_canonical_h5(peak):
+        return X, bars
+    with h5py.File(peak, "r") as f:
+        ref = [x.decode() if isinstance(x, bytes) else str(x)
+               for x in f["matrix/barcodes"][:]] if "matrix/barcodes" in f else None
+    if ref is None:
+        return X, bars
+    kind, idx = _cell_order(bars, ref)
+    if kind == "order":
+        X = X.tocsr()[idx] if sp.issparse(X) else np.asarray(X)[idx]
+        bars = [bars[i] for i in idx]
+        print(f"to_canonical: wrote the rows of {Path(out).name} in the cell order of "
+              f"{peak}, which atac_cty.csv follows", file=sys.stderr, flush=True)
+    elif kind == "other":
+        shared = len(set(bars) & set(ref))
+        warnings.warn(
+            f"{Path(out).name} holds different cells than {peak} ({len(bars):,} and "
+            f"{len(ref):,}, {shared:,} shared). Diagonal methods need gene activity for "
+            f"the ATAC cells of atac_peak.h5.", UserWarning, stacklevel=3)
+    return X, bars
 
 
 def _split_var_filter(spec: str):
@@ -446,6 +513,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     -----
     UserWarning
         Values not whole numbers; feature names missing or contradicting ``modality``; size over 1 GB.
+    UserWarning
+        ``modality='gas'`` for other cells than the ``atac_peak.h5`` next to ``out``.
 
     Examples
     --------
@@ -506,10 +575,19 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     representation is not recorded on disk: ``method_info(m)['atac']`` says
     which kind a method expects.
 
+    **Gene activity next to peaks.** With ``modality='gas'`` (no
+    ``category``, or ``'diagonal'``) and an ``atac_peak.h5`` in the output
+    folder, the rows are written in that file's cell order, because
+    ``atac_cty.csv`` follows it. One line on stderr says so. Gene activity
+    for other cells gives a ``UserWarning``.
+    A canonical ``.h5`` is returned untouched: to reorder an existing
+    ``atac_gas.h5``, pass ``mtb.io.read_canonical(path)`` as ``src``.
+
     **Raw counts.** Methods normalise the data themselves; give raw counts.
     For ``modality`` ``'rna'``, ``'adt'`` or ``'atac_peak'``, a
     ``UserWarning`` says when sampled values are not whole numbers
-    (log-normalised data); ``layer='counts'`` usually holds the counts.
+    (log-normalised data); ``layer='counts'`` usually holds the counts, and
+    for an ADT matrix taken with ``obsm=``, another ``obsm`` key.
 
     **Streaming.** Sparse matrices (CSR/CSC, in memory or inside an
     ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
@@ -589,7 +667,12 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
-        _warn_not_counts(X, modality, "layer='counts'", stacklevel=2)
+        hint = (config.hint("obsm='protein_counts'", "--obsm protein_counts")
+                if obsm is not None and modality == "adt"
+                else config.hint("layer='counts'", "--layer counts"))
+        _warn_not_counts(X, modality, hint, stacklevel=2)
+    if modality == "atac_gas" and category in (None, "diagonal"):
+        X, bars = _follow_peak_order(out, X, bars)
     if getattr(X, "ndim", 0) == 2:
         _warn_dense_size(out, X.shape[1], X.shape[0], dtype)
     return _write_canonical(out, X, feats, bars, dtype=dtype,
@@ -617,15 +700,25 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
         ``.X`` as float, cells x features; names taken from the file when it
         has them.
 
+    Raises
+    ------
+    FileNotFoundError
+        ``path`` does not exist; the message names ``mtb.config.DEFAULT.data_path``.
+
     Examples
     --------
     >>> import multibench as mtb
-    >>> a = mtb.io.read_canonical("data/D11/rna.h5")
-    >>> a.shape, a.var_names[:3]
-    >>> dense = mtb.io.read_canonical("data/D11/adt.h5", sparse=False)
+    >>> d = mtb.config.DEFAULT.data_path / "D11"
+    >>> rna = mtb.io.read_canonical(d / "rna.h5")
+    >>> rna.shape, rna.var_names[:3]
+    >>> adt = mtb.io.read_canonical(d / "adt.h5", sparse=False)
 
     Notes
     -----
+    **Where the demo data is.** ``mtb.data.fetch("D11")`` downloads a demo
+    dataset into ``mtb.config.DEFAULT.data_path``, not into the current
+    directory.
+
     **Memory.** The whole matrix is read densely and transposed before the
     sparsity decision, so memory peaks at the dense size (features x cells
     x 8 bytes) even when the result is CSR. It is meant for the shipped
@@ -642,6 +735,10 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
     """
     import anndata as ad
     import scipy.sparse as sp
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"{os.fspath(path)} not found. Demo datasets are under "
+            f"mtb.config.DEFAULT.data_path ({config.DEFAULT.data_path}).")
     with h5py.File(path, "r") as f:
         data = np.array(f["matrix/data"]).T  # features x cells -> cells x features
         X = np.asarray(data, dtype=float)
@@ -952,21 +1049,30 @@ def _align_cells(a, *, master, master_name, role):
     if unique and set(names) == set(master):
         return a[master]
     if unique:
-        stray = [x for x in names if x not in set(master)]
-        lack = [x for x in master if x not in set(names)]
-        disjoint = len(stray) == len(names)
-        raise ValueError(
-            f"{role} has {len(names)} cells but {len(stray)} barcodes are not in "
-            f"{master_name} ({stray[:5]}{'...' if len(stray) > 5 else ''}"
-            f"{'; ' + str(len(lack)) + ' of ' + master_name + ' missing from ' + role if lack else ''}); "
-            f"all modalities of one dataset must cover the same cells, in one order - "
-            f"subset every modality to the shared barcodes first"
-            + ("; RNA and ATAC from different cells is diagonal integration: pass "
-               "category='diagonal'" if disjoint and "atac" in (role, master_name) else ""))
+        in_master, in_names = set(master), set(names)
+        stray = [x for x in names if x not in in_master]
+        lack = [x for x in master if x not in in_names]
+        same = "All modalities of one dataset must hold the same cells."
+        if len(stray) == len(names):            # no cell in common
+            pair = {role, master_name}
+            if "atac" in pair and pair & {"rna", "data"}:
+                raise ValueError(
+                    "RNA and ATAC have no cells in common. For RNA and ATAC from "
+                    "different cells (diagonal integration), pass "
+                    + config.hint('category="diagonal"', "--category diagonal") + ".")
+            raise ValueError(f"{role} and {master_name} have no cells in common. {same}")
+        if stray:
+            head = (f"{role} has {len(names):,} cells, and {len(stray):,} of them are not "
+                    f"in {master_name}, for example {stray[:3]}.")
+        else:
+            head = (f"{role} has {len(names):,} cells and {master_name} has "
+                    f"{len(master):,}. {len(lack):,} cells of {master_name} are not in "
+                    f"{role}.")
+        raise ValueError(f"{head} {same} Subset each modality to the shared barcodes first.")
     if len(names) != len(master):
         raise ValueError(
-            f"{role}: {len(names)} cells but {master_name} has {len(master)}; "
-            f"all modalities of one dataset must cover the same cells")
+            f"{role} has {len(names):,} cells and {master_name} has {len(master):,}. "
+            f"All modalities of one dataset must hold the same cells.")
     warnings.warn(
         f"{role}: obs_names are not unique, so the cells cannot be matched to "
         f"{master_name} by barcode; pairing them positionally", UserWarning, stacklevel=4)
@@ -1387,8 +1493,17 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                     what=role)
             _check_peak_names(role, feats)
             if role in _COUNT_ROLES:
-                _warn_not_counts(X, what, f"{what}='layer:counts' (MuData: "
-                                 f"{what}='mod:{what}.layer:counts')", stacklevel=2)
+                # the hint follows the selector: raw ADT counts of a CITE-seq
+                # object usually sit in another obsm key, not in a layer
+                if role == "adt" and kw.get("obsm") is not None:
+                    hint = config.hint("adt='obsm:protein_counts'",
+                                       "--adt obsm:protein_counts")
+                else:
+                    hint = config.hint(f"{what}='layer:counts' (MuData: "
+                                       f"{what}='mod:{what}.layer:counts')",
+                                       f"--{what} layer:counts (MuData: "
+                                       f"--{what} mod:{what}.layer:counts)")
+                _warn_not_counts(X, what, hint, stacklevel=2)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
     # --- the files this call writes

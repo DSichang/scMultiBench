@@ -95,8 +95,8 @@ def test_gas_fed_to_peak_method_is_flagged(tmp_path):
                              data_path=tmp_path, check=True)
     assert got["atac_gas"].endswith("atac_gas.h5")
     cav = resolve._preflight_caveats(got, atac="peak")
-    assert cav == ["atac_gas resolved to a matrix whose features do not look like peaks "
-                   "(chr:start-end); this method expects peaks"]
+    assert cav == ["expects peaks; atac_gas.h5 holds gene activity (features do not look "
+                   "like chr:start-end)"]
     # legacy call (no atac=): today's single check, nothing for this case
     assert resolve._preflight_caveats(got) == []
     # a peak file satisfies a peak method
@@ -113,14 +113,14 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     got = resolve.inputs_for("PK", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
     cav = resolve._preflight_caveats(got, atac="gene_activity")
-    assert cav == ["atac resolved to a peak matrix (features look like chr:start-end); "
-                   "this method expects gene activity"]
+    assert cav == ["expects gene activity; atac.h5 holds peaks (features look like "
+                   "chr:start-end)"]
     # the legacy atac_gas-role check is unchanged
     _h5(d / "atac.h5", 40, 50, feats=PEAKS)
     got2 = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path)
     assert resolve._preflight_caveats(got2) == [resolve.PEAK_IN_GAS_CAVEAT]
     assert resolve._preflight_caveats(got2, atac="gene_activity") == [
-        resolve.PEAK_FED_TO_GAS_CAVEAT.format(role="atac_gas")]
+        resolve.PEAK_FED_TO_GAS_CAVEAT.format(file="atac.h5")]
     # mixed names (10-90 %) -> no verdict either way
     _h5(d / "atac.h5", 40, 50, feats=PEAKS[:20] + [f"g{i}" for i in range(20)])
     got3 = resolve.inputs_for("PK", "vertical", "Matilda", modalities=["rna", "atac"],

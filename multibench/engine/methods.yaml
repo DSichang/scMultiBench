@@ -59,9 +59,10 @@ methods:
     status: verified
     # main_Seurat_v5.Rmd:39-44 builds the bridge object from the 2nd (rna) and
     # 3rd (atac_peak) arguments: CreateSeuratObject(rna) then obj[["ATAC"]] <-
-    # the peak assay, which Seurat accepts only for the same cells. scan()
-    # reports a caveat when the two files hold different cells.
-    setup_hint: "Seurat_v5 builds its bridge from rna.h5 and atac_peak.h5, so the two files must hold the same cells."
+    # the peak assay, which Seurat accepts only for the same cells. The wrapper
+    # passes the user's rna.h5 / atac_peak.h5 there, so inputs_for(check=True)
+    # and scan's files_ok fail when the two files hold different cells.
+    setup_hint: "Seurat_v5 uses your RNA and ATAC files as its paired bridge, so both must hold the same cells. Unpaired data cannot run through the package."
     variants:
       # Bridge integration. LD_PRELOAD supplies the R CXXABI (else "namespace load
       # failed for Seurat"). sctransform exports ~520 MiB of globals to `future`
@@ -680,7 +681,9 @@ methods:
         args:
           - {role: rna, flag: "--train_path1", repeat: true}
           - {role: atac_gas, flag: "--train_path2", repeat: true}
-          - {role: rna_cty, flag: "--train_cty_path", repeat: true}
+          # cty.csv, as for Matilda: vertical cells are paired, so the one
+          # label file labels the RNA cells (an older rna_cty.csv still resolves)
+          - {role: cty, flag: "--train_cty_path", repeat: true}
           - {role: rna, flag: "--test_path1", repeat: true}
           - {role: atac_gas, flag: "--test_path2", repeat: true}
           - {role: out_dir, flag: "--save_path"}

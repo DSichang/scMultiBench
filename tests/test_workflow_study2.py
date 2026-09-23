@@ -58,9 +58,9 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert r["reason"].endswith("; " + r["env_reason"])      # env half verbatim
         assert "--packed --run" in r["reason"]                    # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
-    # the meaning first for ATAC, then the other missing files by name (L31)
-    assert row["reason"].startswith("needs gene-activity ATAC (atac.h5); not in the folder; "
-                                    "missing rna_cty.csv; ")
+    # the meaning first for ATAC (L31); D11's cty.csv is UnitedNet's label file (M21)
+    assert row["reason"].startswith("needs gene-activity ATAC (atac.h5); not in the folder; ")
+    assert "cty" not in row["reason"]
 
 
 def test_scan_docs_name_the_four_columns():

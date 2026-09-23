@@ -1095,6 +1095,11 @@ def _cmd_run_all(args) -> int:
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
               f"{args.dataset} ({args.category}); commands below are what run() "
               f"would execute (rows without files_ok have none)", file=sys.stderr)
+        from .engine.resolve import unused_batches_in
+        for _, r in df.iterrows():
+            note = unused_batches_in(r.get("caveat"))
+            if note:        # the compact table clips the caveat column
+                print(f"# {r['method']} {note}", file=sys.stderr)
         _print_frame(df, columns=columns, fmt=args.format, compact=_compact_plan_columns(df))
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]

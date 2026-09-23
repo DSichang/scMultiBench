@@ -95,7 +95,7 @@ def test_scan_caveat_names_the_non_integer_file(tmp_path):
     sc = mtb.scan("LOG", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
     assert sc["files_ok"].all()                      # a caveat, not a file failure
     assert sc["caveat"].str.contains(
-        "rna.h5 holds non-integer values; methods expect raw counts").all()
+        "expects raw counts; rna.h5 holds non-integer values").all()
     assert not sc["caveat"].str.contains("adt.h5").any()
     b = _cite()
     ingest.export_dataset(b, tmp_path / "INT", adt="obsm:protein", labels="obs:cell_type")
@@ -168,8 +168,9 @@ def test_diagonal_label_column_missing_names_the_object(tmp_path):
 
 
 def test_disjoint_barcodes_point_at_diagonal_and_leave_no_folder(tmp_path):
-    with pytest.raises(ValueError, match="RNA and ATAC from different cells is diagonal "
-                                         "integration: pass category='diagonal'"):
+    with pytest.raises(ValueError, match=r"^RNA and ATAC have no cells in common\. For RNA "
+                                         r"and ATAC from different cells \(diagonal "
+                                         r"integration\), pass category=\"diagonal\"\.$"):
         ingest.export_dataset(_rna(), tmp_path / "X", atac=_atac(), atac_kind="peak",
                               labels="obs:cell_type")
     assert not (tmp_path / "X").exists()
@@ -217,7 +218,7 @@ def test_scan_checks_diagonal_label_rows_and_flags_a_lone_cty(tmp_path):
     sc = mtb.scan("LC", "diagonal", data_path=tmp_path)
     glue = sc[sc["method"] == "GLUE"].iloc[0]
     assert glue["files_ok"]
-    assert ("label files: cty.csv found; diagonal needs rna_cty.csv and atac_cty.csv"
+    assert ("needs rna_cty.csv and atac_cty.csv for diagonal; the folder has only cty.csv"
             in glue["caveat"])
 
 

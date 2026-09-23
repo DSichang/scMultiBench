@@ -1325,6 +1325,10 @@ def recommend(
     modality that none of the ranked datasets measured, a ``UserWarning``
     says so.
 
+    The stored Seurat_v5 diagonal scores come from runs with a separate paired
+    bridge dataset; ``mtb.scan`` marks Seurat_v5 runnable only when your RNA and
+    ATAC files hold the same cells.
+
     **Frame attrs.** ``frame.attrs`` records the choices the ranking was
     made under:
 

@@ -499,9 +499,10 @@ def _installed_envs() -> frozenset:
 #: the files exist and the env is installed, but the content stops the method.
 #: Surfaced by scan() so a sweep does not discover them hours in.
 _CAVEATS = {
-    ("GLUE", "D28"): ("GLUE parses coordinates out of peak names and needs them "
-                      "colon-delimited (chr1:1-200); D28's are underscore-delimited "
-                      "and it IndexErrors. Use D27, or rename the peaks."),
+    ("GLUE", "D28"): ("fails on D28's peak names: GLUE parses coordinates out of "
+                      "peak names and needs them colon-delimited (chr1:1-200); D28's "
+                      "are underscore-delimited, which raises IndexError. Use D27, or "
+                      "rename the peaks."),
 }
 
 
@@ -914,7 +915,9 @@ def scan(dataset: str, category: str | None = None, *,
     - ``files_ok`` / ``files_reason`` - the method's script is present, the
       input files resolve on disk and are oriented features x cells, every
       label CSV has one row per cell of the modality it labels, and a
-      ``data_dir`` method (scBridge) finds the files it names.
+      ``data_dir`` method (scBridge) finds the files it names. Seurat_v5's
+      ``rna.h5`` and ``atac_peak.h5`` must hold the same cells. A diagonal
+      ``atac_gas.h5`` must list the cells of ``atac_peak.h5`` in its order.
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command
       (``multibench env install --methods X --packed --run``). On macOS
@@ -950,7 +953,8 @@ def scan(dataset: str, category: str | None = None, *,
       methods expect raw counts;
     - diagonal: a folder whose only label file is ``cty.csv``; diagonal
       needs ``rna_cty.csv`` and ``atac_cty.csv``;
-    - Seurat_v5: ``rna.h5`` and ``atac_peak.h5`` that hold different cells;
+    - a method that reads fewer numbered batches than the folder holds
+      (``reads batches 1-2 of 3; batch 3 is not used``);
     - ``setup: ...`` - a step the user must do first, the first sentence of
       ``method_info(m)['setup_hint']`` (GLUE's GENCODE annotation file);
     - method scripts that are not on this machine yet: the first real run
@@ -2457,6 +2461,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                 msg += (f"; {n - k} blocked - see the reason column "
                         f"(files_ok / env_ok say which check; {doctor} for envs)")
             print(msg, flush=True)
+            for _, r in plan_df.iterrows():
+                note = _resolve.unused_batches_in(r["caveat"])
+                if note:
+                    print(f"[run_all] {r['method']} {note}", flush=True)
         return plan_df                     # = scan(): runnable rows first, blocked rows keep `reason`
     blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
@@ -2491,6 +2499,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         t0 = time.time()
         if verbose:
             print(f"[run_all] {m} ({category}/{dataset}) ...", flush=True)
+            note = _resolve.unused_batches_in(row["caveat"])
+            if note:
+                print(f"[run_all]   {m} {note}", flush=True)
         _deadline_prev = _NOT_ARMED
         try:
             _deadline_prev = _arm_deadline(timeout)
