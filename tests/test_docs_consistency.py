@@ -101,13 +101,15 @@ def test_env_install_cell_is_opt_in_after_pip_and_needs_no_conda():
 
 
 def test_readme_single_install_path():
-    """README (trimmed by the owner in 0cc1aec: install and quick start live on
-    the docs site): at most one `pip install multibench-sc`, no 'clone
-    instead', and a link to the docs site ([project.urls] Homepage) that
-    carries the install page; installation.md (when reachable): one PyPI
-    block, no stale size claim."""
+    """README (trimmed by the owner in 0cc1aec): the install text and the quick
+    start stay out - no `pip install multibench-sc`, no Install or Quick start
+    section, no code fence, no 'clone instead' - and the README links the docs
+    site ([project.urls] Homepage), which carries them; installation.md (when
+    reachable): one PyPI block, no stale size claim."""
     readme = (ROOT / "README.md").read_text()
-    assert readme.count("pip install multibench-sc") <= 1
+    assert "pip install multibench-sc" not in readme
+    assert not re.search(r"^## (Install|Quick start)\b", readme, re.M)
+    assert "```" not in readme
     assert "clone instead" not in readme
     homepage = re.search(r'^Homepage\s*=\s*"([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M)
     assert homepage and homepage.group(1) in readme, "README must link the docs site"

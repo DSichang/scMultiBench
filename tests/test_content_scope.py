@@ -3,8 +3,10 @@
 The owner's rule: three benchmark tasks and four removed methods are never
 mentioned where a user can see them - API return values, CLI help, and every
 text file the package ships (docstrings, YAML, CSV, drivers). This file pins
-that on the live objects and on the shipped files, with three exceptions that
-are spelled out below and fail loudly when they go stale:
+that on the live objects, on the shipped files and on the docs surfaces
+(notebooks, SETUP.md, the notebook generator, and the site's source when it is
+reachable), with three exceptions that are spelled out below and fail loudly
+when they go stale:
 
 - frozen lockfile pins of real envs (``engine/env_locks/*.yml``), by package name;
 - an upstream API keyword in a driver (Matilda's own ``task()`` argument);
@@ -14,6 +16,8 @@ Everything else that matches FORBIDDEN is a finding: reword it, do not add an
 exception for it.
 """
 import argparse
+import json
+import os
 import re
 import warnings
 from pathlib import Path
@@ -40,7 +44,11 @@ _PIN_LINE = re.compile(r"^\s*-\s*(?P<name>[A-Za-z0-9_.\-]+)\s*(?:==|=)\s*\S+\s*$
 
 #: upstream API keywords a driver must pass verbatim, per driver file
 DRIVER_KEYWORDS = {
-    "engine/drivers/run_matilda.py": ["classification=True"],   # matilda.task(..., classification=True)
+    # matilda.task(..., classification=True). The embedding comes from the same
+    # call; the keyword goes once a benchmark-host run shows that dim_reduce=True
+    # alone writes the same embedding.h5 (then drop predict.csv from the driver
+    # and from the Matilda variants' extra_outputs too).
+    "engine/drivers/run_matilda.py": ["classification=True"],
 }
 
 #: paper titles (Crossref-checked citation facts), per method id in references.yaml
@@ -167,6 +175,44 @@ def test_shipped_text_files_stay_in_scope():
 def test_pypi_page_and_metadata_stay_in_scope():
     for name in ("README.md", "pyproject.toml"):
         assert not _hits((ROOT / name).read_text()), name
+
+
+# ---- docs surfaces outside the package ---------------------------------------
+def _docs_surfaces():
+    """Text a user reads that lives outside the package tree: the notebooks,
+    SETUP.md and tools/gen_tut.py (which writes the notebooks); with
+    SCMULTIBENCH_DOCS=<docs dir> (the site's source is a separate repository)
+    also every page, script and stylesheet of the site and its theme overrides."""
+    paths = sorted((ROOT / "notebooks").glob("*.ipynb"))
+    paths += [ROOT / "SETUP.md", ROOT / "tools" / "gen_tut.py"]
+    docs = os.environ.get("SCMULTIBENCH_DOCS")
+    if docs and Path(docs).is_dir():
+        docs = Path(docs).resolve()
+        paths += sorted(docs.rglob("*.md"))
+        paths += sorted((docs / "javascripts").glob("*.js"))
+        paths += sorted((docs / "stylesheets").glob("*.css"))
+        paths += sorted((docs.parent / "overrides").rglob("*.html"))
+    return paths
+
+
+def _surface_id(path):
+    """``path`` relative to the package root, or to the docs repository root."""
+    for base in (ROOT, Path(os.environ.get("SCMULTIBENCH_DOCS") or ROOT).resolve().parent):
+        try:
+            return path.relative_to(base).as_posix()
+        except ValueError:
+            pass
+    return path.name
+
+
+@pytest.mark.parametrize("path", _docs_surfaces(), ids=_surface_id)
+def test_docs_surfaces_stay_in_scope(path):
+    """A notebook is checked by its cell sources: its outputs come from an
+    execution, and the API values they print are pinned above."""
+    text = path.read_text(encoding="utf-8")
+    if path.suffix == ".ipynb":
+        text = "\n".join("".join(c["source"]) for c in json.loads(text)["cells"])
+    assert not _hits(text), f"{path}: {_hits(text)}"
 
 
 def test_exceptions_are_still_needed():
