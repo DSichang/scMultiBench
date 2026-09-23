@@ -130,3 +130,24 @@ def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch
         exec(compile(cell, "tutorial_vertical", "exec"), ns)
     assert not [w for w in seen if "whole numbers" in str(w.message)]
     assert not ns["sc"]["caveat"].str.contains("non-integer").any()
+
+
+def test_scan_checks_label_rows_for_a_folder_fed_method(tmp_path):
+    """scBridge reads rna.h5 / atac_gas.h5 and their label files from the folder:
+    a label file with the wrong number of rows fails its row as it fails the
+    file-role methods (L05 with the data_dir variant)."""
+    d = tmp_path / "SB"
+    d.mkdir()
+    _h5(d / "rna.h5", 20, 50)
+    _h5(d / "atac_gas.h5", 20, 40)
+    pd.DataFrame({"x": ["T"] * 50}).to_csv(d / "rna_cty.csv", index=False)
+    pd.DataFrame({"x": ["T"] * 10}).to_csv(d / "atac_cty.csv", index=False)
+    sc = mtb.scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
+                  verbose=False)
+    row = sc.iloc[0]
+    assert not row["files_ok"]
+    assert "atac_cty.csv has 10 labels but atac_gas.h5 has 40 cells" in row["files_reason"]
+    pd.DataFrame({"x": ["T"] * 40}).to_csv(d / "atac_cty.csv", index=False)
+    sc = mtb.scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
+                  verbose=False)
+    assert sc.iloc[0]["files_ok"], sc.iloc[0]["files_reason"]

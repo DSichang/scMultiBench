@@ -479,6 +479,9 @@ def inputs_for(dataset: str, category: str, method: str, *,
             ok, why = _check_data_dir(variant, out["data_dir"])
             if not ok:
                 raise FileNotFoundError(f"{method}/{dataset}/{category}: {why}")
+            if category == "diagonal":
+                _check_diagonal_label_files(method, dataset,
+                                            _data_dir_files(variant, out["data_dir"]))
     elif check is None and missing:
         warnings.warn(
             f"{method}/{dataset}/{category}: {len(missing)} resolved input path(s) "
@@ -762,6 +765,15 @@ def _check_diagonal_label_files(method, dataset, resolved):
                 f"exactly one label, in the same order as the cells (see "
                 + config.hint("mtb.describe_layout('diagonal')",
                               "`multibench layout diagonal`") + ")")
+
+
+def _data_dir_files(variant, data_dir) -> dict:
+    """``{stem: path}`` of the ``.h5`` files a ``data_dir`` method names as
+    ``const`` args (scBridge: ``rna.h5``, ``atac_gas.h5``), for the checks
+    that take resolved roles."""
+    d = Path(data_dir)
+    return {Path(str(a.const)).stem: str(d / str(a.const)) for a in variant.args
+            if a.const and str(a.const).endswith(".h5")}
 
 
 def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
