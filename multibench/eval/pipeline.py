@@ -15,6 +15,19 @@ from ..data import catalog
 #: multibench.data.results.COLUMNS by tests/test_eval_reshape.py)
 LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
 
+#: the ``attrs`` keys evaluate() sets on its frame and to_long() carries over
+PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
+
+
+def _scored_with(attrs) -> str | None:
+    """``"<leiden flavor>/<clusters>/<version>"`` from evaluate()'s ``attrs``,
+    e.g. ``"leidenalg/sweep/0.3.2"``; ``None`` when the frame carries none
+    (a hand-made frame or a CSV read back). ``none`` fills a part that did
+    not apply (no sweep ran, no ARI/NMI)."""
+    if not attrs or attrs.get("multibench_version") is None:
+        return None
+    return "/".join(str(attrs.get(k) or "none") for k in PROVENANCE_ATTRS)
+
 
 def to_long(value_df, *, method: str, dataset: str | None = None,
             category: str | None = None, clustering: str = "default",
@@ -47,8 +60,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     Returns
     -------
     pandas.DataFrame
-        One row per metric, with exactly the columns ``metric, value, method,
-        dataset, category, clustering, source``.
+        One row per metric, with the columns ``metric, value, method,
+        dataset, category, clustering, source``, plus ``scored_with`` when
+        ``value_df`` comes from ``mtb.evaluate``.
 
     Raises
     ------
@@ -60,10 +74,11 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     --------
     >>> import multibench as mtb, pandas as pd
     >>> wide = mtb.evaluate(emb, labels=labels, metrics=["ARI", "NMI"])
-    >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11", category="vertical")
+    >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11",
+    ...                    category="vertical")
     >>> stored = mtb.load_results("vertical", dataset="D11", source="rerun")
     >>> pd.concat([stored, mine]).to_csv("all.csv", index=False)
-    >>> mtb.load_results(result_path="all.csv", source="user")      # your rows only
+    >>> mtb.load_results(result_path="all.csv", source="user")   # your rows only
 
     Notes
     -----
@@ -84,6 +99,14 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     blank. ``category=None`` writes ``"user"``, the value ``load_results``
     gives a user file without a category column. The published tables use
     ``clustering`` values ``"louvain"`` / ``"kmeans"`` for their variants.
+
+    **Provenance.** A frame from ``mtb.evaluate`` gets one more column,
+    ``scored_with``, such as ``"leidenalg/sweep/0.3.2"``: the Leiden backend,
+    where the clusters came from (``sweep`` or ``user``) and the package
+    version; ``none`` fills a part that did not apply. The same three values
+    are in ``attrs``. The stored tables have no such column, so it is NaN
+    for their rows after ``pd.concat``, and ``load_results`` does not read it
+    back.
 
     **Plot badges.** The bubble figure shows ``?`` for a method name the
     registry does not know. To badge a method of your own as supervised, add
@@ -168,7 +191,15 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     out["category"] = "user" if category is None else category
     out["clustering"] = clustering
     out["source"] = source
-    return out[list(LONG_COLUMNS)].reset_index(drop=True)
+    stamp = _scored_with(getattr(value_df, "attrs", None))
+    cols = list(LONG_COLUMNS)
+    if stamp is not None:
+        out["scored_with"] = stamp
+        cols.append("scored_with")
+    out = out[cols].reset_index(drop=True)
+    if stamp is not None:
+        out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
+    return out
 
 
 def _name_or_blank(v) -> bool:
@@ -279,7 +310,7 @@ def _labels_from_dict(d: dict, label_order) -> list:
             f"labels: got a dict with {len(d)} label files {keys} that is not "
             f"an unchanged mtb.labels_for dict and is not in the default "
             f"stacking order (cty1, cty2, ... numerically; rna before adt before "
-            f"atac - NOT alphabetical); pass the dict "
+            f"atac; this is not alphabetical order); pass the dict "
             f"mtb.labels_for(dataset, method=<method>, category=<category>) "
             f"returns, unchanged (it is in that method's stacking order), a list "
             f"of paths in cell order, or label_order=[...] naming the keys in "
@@ -455,11 +486,12 @@ def evaluate(
     Parameters
     ----------
     output
-        The embedding, cells x dims: an array, DataFrame, sparse matrix,
-        AnnData (``.obsm[obsm]``) or a file path (formats in Notes).
+        Embedding, cells x dims: array, DataFrame, sparse matrix, AnnData or
+        MuData (``.obsm[obsm]``; ``labels``/``batch`` may name ``.obs``
+        columns), or file path (Notes).
     labels
         Cell types, one per cell (required): CSV path(s), a
-        ``mtb.labels_for`` dict, a 1-D array-like, or an ``obs`` column name
+        ``mtb.labels_for`` dict, a 1-D array-like, or an ``.obs`` column name
         (forms in Notes).
     category : str, optional
         Integration category, one of ``mtb.list_categories()``; validated,
@@ -475,8 +507,8 @@ def evaluate(
         Precomputed cluster assignment, in the forms ``labels`` accepts or an
         ``.h5`` path; ``None`` = derive one with the Leiden sweep.
     obsm : str
-        ``.obsm`` key used when ``output`` is an AnnData or ``.h5ad``;
-        ``'X'`` means ``.X``.
+        ``.obsm`` key of an AnnData, MuData or ``.h5ad`` ``output``, such as
+        ``'X_pca'``; ``'X'`` means ``.X``.
     label_order : list of str
         Keys of a multi-entry ``labels`` dict, in the method's stacking
         order; a subset selects those files. ``None`` works for an unchanged
@@ -489,8 +521,8 @@ def evaluate(
     -------
     pandas.DataFrame
         One row per metric, indexed by the canonical metric name (``ARI``,
-        ``NMI``, ...), with one column ``Value`` - the ``metric.csv`` shape.
-        Never empty.
+        ``NMI``, ...), with one column ``Value``. ``attrs`` records how the
+        scores were computed (Notes).
 
     Raises
     ------
@@ -505,10 +537,13 @@ def evaluate(
     Examples
     --------
     >>> import multibench as mtb
-    >>> labels = mtb.labels_for("D11")                      # {'cty': '.../D11/cty.csv'}
-    >>> scores = mtb.evaluate(res.output, labels=labels)    # res = mtb.run(...)
-    >>> mtb.evaluate(res.output, labels=labels, metrics=["ASW", "cLISI"])   # no Leiden sweep
-    >>> mtb.evaluate(adata, labels="celltype", batch="batch", metrics="all")
+    >>> labels = mtb.labels_for("D11")                    # {'cty': '.../cty.csv'}
+    >>> scores = mtb.evaluate(res.output, labels=labels)  # res = mtb.run(...)
+    >>> # ASW and cLISI need no Leiden sweep
+    >>> mtb.evaluate(res.output, labels=labels, metrics=["ASW", "cLISI"])
+    >>> mtb.evaluate(adata, labels="celltype", obsm="X_pca")
+    >>> mtb.evaluate(mdata, labels="celltype", batch="sample", obsm="X_joint",
+    ...              metrics="all")
 
     Notes
     -----
@@ -522,7 +557,8 @@ def evaluate(
       rules under **Label dicts.**);
     - a 1-D ``ndarray`` / ``Series`` / ``Categorical`` / list, or a
       single-column DataFrame;
-    - when ``output`` is an AnnData, the name of an ``obs`` column.
+    - when ``output`` is an AnnData or MuData, the name of an ``.obs``
+      column.
 
     A multi-column CSV / DataFrame raises: pass the one column
     (``df["celltype"]``) itself. ``batch`` and ``clustering`` take the same
@@ -532,7 +568,7 @@ def evaluate(
 
     **Label dicts.** A dict with several entries needs a known order:
 
-    - a dict from ``mtb.labels_for``, unchanged, goes in AS IS, in the
+    - a dict from ``mtb.labels_for``, unchanged, is used as it is, in the
       order ``labels_for`` gave it (with ``category`` and ``method``, that
       method's stacking order);
     - any other dict goes in as is only in the default order
@@ -586,6 +622,16 @@ def evaluate(
     When ``output`` is a bare array there is nothing to align against: the
     Series is matched positionally and a ``UserWarning`` says so (pass
     ``labels.to_numpy()`` to silence it).
+
+    **Result shape.** The frame has the ``metric.csv`` shape: index =
+    metric, one column ``Value``, never empty. ``mtb.to_long`` makes the
+    long frame (lowercase ``value``) that ``load_results`` returns.
+
+    **Provenance.** ``attrs`` holds ``leiden_flavor`` (the backend of the
+    Leiden sweep; ``None`` when no sweep ran), ``clustering`` (where the
+    clusters ARI and NMI scored came from: ``"sweep"`` or ``"user"``;
+    ``None`` without ARI and NMI) and ``multibench_version``.
+    ``mtb.to_long`` writes them to a ``scored_with`` column.
 
     **Output formats.** A file path may be ``.h5`` (dataset ``data``, the
     benchmark's ``embedding.h5``), ``.h5ad`` (read as an AnnData),
@@ -689,6 +735,9 @@ def evaluate(
     # of a metric
     out.index = pd.Index([catalog.canonical_metric(m) for m in out.index],
                          name=out.index.name)
+    from .. import __version__
+    out.attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
+    out.attrs["multibench_version"] = __version__
     if out.empty:
         # unreachable after _plan_metrics; kept so a future metric family
         # mismatch fails loudly instead of handing back a (0, 1) frame

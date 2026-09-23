@@ -76,10 +76,10 @@ def read_embedding(path: Path | str) -> np.ndarray:
             keys = sorted(f.keys())
             hint = ""
             if "matrix" in keys:
-                hint = (" - this looks like a canonical INPUT matrix (matrix/data, "
+                hint = (" - this looks like a canonical input matrix (matrix/data, "
                         "matrix/barcodes, matrix/features: rna.h5 / adt.h5 / "
                         "atac.h5), not an embedding; evaluate() wants a method "
-                        "OUTPUT such as out/<method>/embedding.h5 (or pass an "
+                        "output such as out/<method>/embedding.h5 (or pass an "
                         "AnnData / .npy / .csv embedding)")
             raise ValueError(
                 f"{path} has no dataset 'data'; found keys {keys}{hint}")
@@ -284,9 +284,9 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
     return (
         f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
         f"fix the cell order, and the order must be the method's stacking order "
-        f"(the order the method concatenated its input cells - NOT "
-        f"alphabetical; for most methods numbered files ascending, cty1, cty2, "
-        f"..., and rna before atac). "
+        f"(the order in which the method concatenated its input cells, which "
+        f"is not alphabetical; for most methods numbered files ascending, cty1, "
+        f"cty2, ..., and rna before atac). "
         f"{fix}, or a list of paths in cell order. "
         f"mtb.labels_for(dataset, method=<method>, category=<category>) returns "
         f"the files in that order.")

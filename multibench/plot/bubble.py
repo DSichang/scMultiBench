@@ -28,6 +28,9 @@ FAMILIES = [
 #: glyph drawn in a cell whose metric was not computed for that method
 NA_MARK = "\u2013"
 
+#: second line of the Score legend title: the fill is scaled within each column
+SCORE_SCALE_NOTE = "(scaled per column)"
+
 #: legend line explaining the chips left of each row (drawn when show_language)
 CHIP_KEY = ("Py / R = language \u00b7 L = consumes cell-type labels (supervised) "
             "\u00b7 ? = not a registry method")
@@ -102,9 +105,9 @@ class BubbleTable:
     --------
     >>> import multibench as mtb
     >>> tbl = mtb.plot.build_table(mtb.load_results("vertical", dataset="D11"))
-    >>> tbl.methods[:3]                       # the best three methods
-    >>> tbl.ranks.loc[tbl.methods[0]]         # the best method's max-rank per metric
-    >>> tbl.blocks[0].overall                 # first family's Overall per method
+    >>> tbl.methods[:3]                  # the best three methods
+    >>> tbl.ranks.loc[tbl.methods[0]]    # the best method's max-rank per metric
+    >>> tbl.blocks[0].overall            # first family's Overall per method
     >>> fig = mtb.plot.render(tbl, title="D11")
 
     Notes
@@ -114,6 +117,10 @@ class BubbleTable:
     ``ties.method="max"``). A method with no value in a column is NaN there,
     and the column's ``n`` counts only the scored methods. The figure's
     *Rank* legend counts 1 = best instead.
+
+    **Ties.** Values that agree to 9 decimal places count as equal in
+    ``ranks``, ``norm`` and the Overall scores. An iLISI of ``2.2e-16``
+    therefore ties with ``0.0``.
 
     **Scaled values.** ``matrix`` and ``norm`` are per-column min-max values
     in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
@@ -301,6 +308,9 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     UserWarning
         ``require_complete=True`` dropped methods; each is named with the
         datasets it lacks.
+    UserWarning
+        Under ``"summary"``: a dataset holds one method, or no method spans
+        two datasets.
 
     Examples
     --------
@@ -309,7 +319,9 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     >>> tbl.methods                      # rows, best first
     >>> tbl.ranks                        # max-ranks per metric (n = best)
     >>> multi = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
-    >>> mtb.plot.build_table(multi, aggregate="summary", require_complete=True).coverage
+    >>> tbl = mtb.plot.build_table(multi, aggregate="summary",
+    ...                            require_complete=True)
+    >>> tbl.coverage                     # datasets per method
 
     Notes
     -----
@@ -333,10 +345,15 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     order - the tie-break ``mtb.plot.bar`` uses. Ranks and scores always
     come from the whole filtered frame; ``order`` only moves rows.
 
-    **require_complete.** It never drops silently: one ``UserWarning`` names
-    each dropped method and the datasets it lacks (``"require_complete=True
-    dropped 1 method(s) ...: MyRandom (missing D52s)"``). It has no effect
-    under ``aggregate="dataset"``.
+    **require_complete.** One ``UserWarning`` names each dropped method and
+    the datasets it lacks (``"require_complete=True dropped 1 method(s) ...:
+    MyRandom (missing D52s)"``). It has no effect under
+    ``aggregate="dataset"``.
+
+    **A new dataset.** A summary compares methods only on the datasets they
+    share. Under ``"summary"``, a ``UserWarning`` names a dataset that holds
+    one method, and says so when no method spans two of the datasets. Plot
+    such a dataset on its own, or score the same methods on it.
 
     **Input columns.** ``dataset`` groups rows for ``aggregate="summary"``
     (absent = one dataset) and is part of the duplicate-row key. A boolean
@@ -451,15 +468,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                 df = df[df["method"].isin(keep)]
                 parts = style.per_dataset_ranks(df)
                 cov = style.coverage(parts)
-        elif n > 1 and (cov < n).any():
-            part = cov[cov < n].sort_values()
-            warnings.warn(
-                f"summary ranks an incomplete method x dataset matrix ({n} "
-                f"datasets): " + ", ".join(f"{m} seen in {c}/{n}" for m, c in part.items())
-                + "; a method absent from a dataset scores rank 0 there under "
-                "overall='rank' and is skipped under overall='mean_overall'. "
-                "Pass require_complete=True to restrict to the complete "
-                "intersection.", UserWarning, stacklevel=2)
+        for msg in style.coverage_warnings(
+                parts, basis=overall,
+                incomplete_fix="Pass require_complete=True to restrict to the "
+                               "complete intersection."):
+            warnings.warn(msg, UserWarning, stacklevel=2)
         raw_all = style.mean_rank_matrix(parts)
     else:
         if len(datasets) > 1:
@@ -535,7 +548,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     "summary rule)")
         else:
             rule = ("the family Overall averages the ranks of the metrics a "
-                    "method HAS and a column's ranks count only the methods "
+                    "method has and a column's ranks count only the methods "
                     "scored in it")
         msg = ("n/a cells: " + "; ".join(na_cells) + f" - {rule}. Pass na='skip' "
                "to silence this, na='raise' to refuse an incomplete frame.")
@@ -687,9 +700,10 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     min-max-scaled value; each family's Overall as a horizontal bar whose
     length is the min-max-scaled family score; alternating #DDDDDD row
     stripes; column titles slanted 30 degrees above the table; a Score
-    colour-ramp legend and a Rank circle-size legend underneath. With
-    ``aggregate="summary"`` every metric becomes a horizontal bar too, as in
-    the Shiny summary tables and the paper's summary panels (no error bars).
+    colour-ramp legend (scaled per column) and a Rank circle-size legend
+    underneath. With ``aggregate="summary"`` every metric becomes a
+    horizontal bar too, as in the Shiny summary tables and the paper's
+    summary panels (no error bars).
     No rank numbers are drawn - marker size carries the rank.
     """
     from matplotlib.figure import Figure
@@ -843,6 +857,10 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     # ---- legends: Score ramps + Rank size, under the table (scIB layout) ---
     ly = -1.1
     ax.text(-0.9, ly, "Score", fontsize=8, fontweight="bold", va="center")
+    # the fill is min-max scaled within each column: the lightest fill is the
+    # lowest value of its column, not zero. A second line keeps the legend
+    # layout (one line this long would run into the "Low" label).
+    ax.text(-0.9, ly - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center")
     for fi, b in enumerate(tbl.blocks):
         xoff = 1.2 + fi * 4.6
         for k in range(40):
@@ -1001,12 +1019,16 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     UserWarning
         ``require_complete=True`` dropped methods; each is named with the
         datasets it lacks.
+    UserWarning
+        Under ``"summary"``: a dataset holds one method, or no method spans
+        two datasets.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> df = mtb.load_results("vertical", dataset="D11")
-    >>> fig = mtb.plot.bubble(df, metrics=["ARI", "NMI", "ASW"], title="D11", save="d11.pdf")
+    >>> fig = mtb.plot.bubble(df, metrics=["ARI", "NMI", "ASW"], title="D11",
+    ...                       save="d11.pdf")
     >>> multi = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
     >>> fig = mtb.plot.bubble(multi, aggregate="summary", require_complete=True)
 
@@ -1015,11 +1037,14 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     **Reading the figure.** What each mark encodes:
 
     - Metric circle (``aggregate="dataset"``): radius = within-column rank,
-      ``0.85 * sqrt(rank / n)`` with ``n`` = the methods SCORED in that column
+      ``0.85 * sqrt(rank / n)`` with ``n`` = the methods scored in that column
       (n/a cells excluded), so the largest is the best; fill = the min-max
-      scaled value on the family's colour ramp.
+      scaled value on the family's colour ramp. The lightest fill is the
+      lowest value of that column in this figure, not zero.
     - Metric bar (``aggregate="summary"``): length and fill = the min-max
       scaled mean rank.
+    - *Score* legend: the colour ramp, labelled "(scaled per column)":
+      ``Low`` and ``High`` are the lowest and highest value of each column.
     - Family *Overall* bar: length = the family score min-max scaled across
       the rows; fill = the score itself (the two differ only under
       ``overall="mean_overall"``).
@@ -1082,6 +1107,13 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     To draw your own runs next to the stored table, concatenate the frames:
     ``pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])``,
     with ``res`` from ``mtb.run_all``.
+
+    **A new dataset.** The stored tables hold only the demo datasets, so
+    rows from your own dataset have nothing stored to rank against. Plot
+    that dataset on its own, or score your method on the demo dataset of
+    its category and add that row. Under ``"summary"``, a ``UserWarning``
+    names a dataset that holds one method, and says so when no method spans
+    two datasets.
 
     **Name matching.** ``metrics``, ``methods`` and ``order`` match the
     frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or

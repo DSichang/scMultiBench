@@ -1011,6 +1011,10 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
         # hand the winning clustering to the full evaluation so it does not
         # repeat the sweep
         val = _full(lab, bat, clustering=clus)
+        if clus is not None and val.attrs.get("clustering") == "user":
+            # the clusters came from the screening sweep, not from the user
+            val.attrs.update(clustering="sweep",
+                             leiden_flavor=sweep_adata.uns.get("leiden_flavor"))
     except Exception as e:
         raise RuntimeError(
             f"evaluation failed for the winning label order {names}: "

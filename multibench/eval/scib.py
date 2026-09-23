@@ -155,6 +155,34 @@ def _lisi_helper_problem() -> str | None:
 #: Leiden backends ``leiden_sweep`` / ``compute`` accept
 LEIDEN_FLAVORS = ("igraph", "leidenalg")
 
+#: metrics whose scIB definition is bounded by [0, 1] (scaled LISI, the ASW
+#: family, graph connectivity); ``compute`` clips them to that range
+BOUNDED_METRICS = ("ASW", "iASW", "cLISI", "ASW_batch", "GC", "iLISI")
+
+#: distance from 0 (and, for BOUNDED_METRICS, from 1) below which a metric
+#: value is floating-point residue and recorded as the bound itself
+_SNAP = 1e-12
+
+
+def _tidy_value(name: str, value) -> float:
+    """``value`` as a float, with floating-point residue at the bounds removed.
+
+    ``|value| < 1e-12`` becomes ``0.0``; a metric in :data:`BOUNDED_METRICS`
+    is clipped to [0, 1] and a value within ``1e-12`` of 1 becomes ``1.0``.
+    NaN passes through. Without this, an iLISI of ``2.2e-16`` next to
+    ``0.0`` would rank as a real difference in the plots.
+    """
+    v = float(value)
+    if np.isnan(v):
+        return v
+    if abs(v) < _SNAP:
+        return 0.0
+    if name in BOUNDED_METRICS:
+        if abs(v - 1.0) < _SNAP:
+            return 1.0
+        return min(max(v, 0.0), 1.0)
+    return v
+
 
 _igraph_support: bool | None = None     # probed once per process; tests may set it
 
@@ -294,7 +322,7 @@ def leiden_sweep(emb, *, flavor=None):
     ----------
     emb : array-like
         Embedding, cells x dims.
-    flavor : {"igraph", "leidenalg"}, keyword-only, optional
+    flavor : {None, "igraph", "leidenalg"}
         Leiden backend. ``None`` (default) reads ``config.DEFAULT.leiden_flavor``
         (``"igraph"``: scanpy's igraph backend with ``n_iterations=2``,
         ``directed=False``; ``"leidenalg"``: the classic backend scib itself
@@ -306,7 +334,8 @@ def leiden_sweep(emb, *, flavor=None):
         ``(adata, keys)``. The caller assigns ``adata.obs["celltype"]`` and
         scores with scib's own ``nmi``/``ari`` against each key, so the
         selection protocol stays identical to ``cluster_optimal_resolution``'s
-        rather than being reimplemented.
+        rather than being reimplemented. ``adata.uns["leiden_flavor"]`` is
+        the backend that ran.
 
     Raises
     ------
@@ -321,6 +350,7 @@ def leiden_sweep(emb, *, flavor=None):
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
     sc.pp.neighbors(adata, use_rep="X_emb")
+    adata.uns["leiden_flavor"] = flavor
     keys = []
     for res in get_resolutions(n=10, max=2):
         key = f"_mb_res_{res}"
@@ -424,7 +454,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         Print one stderr line when the Leiden sweep starts. ``None``
         (default): only for embeddings with more than 2,000 cells; ``True``
         always; ``False`` never.
-    flavor : {"igraph", "leidenalg"}, keyword-only, optional
+    flavor : {None, "igraph", "leidenalg"}
         Leiden backend for the resolution sweep. ``None`` (default) reads
         ``config.DEFAULT.leiden_flavor``; see :func:`leiden_sweep`.
 
@@ -432,6 +462,17 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     -------
     pandas.DataFrame
         ``metric.csv``-shaped: index = metric, one column ``Value``.
+        ``attrs["leiden_flavor"]`` is the sweep's backend (``None`` when no
+        sweep ran); ``attrs["clustering"]`` is where the clusters ARI and
+        NMI scored came from: ``"user"``, ``"sweep"``, or ``None`` without
+        ARI and NMI.
+
+    Notes
+    -----
+    Values within ``1e-12`` of 0 are recorded as ``0.0``. The metrics
+    bounded by [0, 1] (``ASW``, ``iASW``, ``cLISI``, ``ASW_batch``, ``GC``,
+    ``iLISI``) are clipped to that range, with values within ``1e-12`` of 1
+    recorded as ``1.0``. An iLISI of ``2.2e-16`` is therefore ``0.0``.
     """
     if only is not None:
         only = set(only)
@@ -538,7 +579,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             with contextlib.redirect_stdout(io.StringIO()), \
                     warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                out[name] = float(fn())
+                out[name] = _tidy_value(name, fn())
         except Exception as exc:  # noqa: BLE001 - report and continue
             warnings.warn(
                 f"scib metric {name!r} could not be computed "
@@ -576,4 +617,10 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         if slow_metrics:
             _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))
 
-    return pd.DataFrame.from_dict(out, orient="index", columns=["Value"])
+    frame = pd.DataFrame.from_dict(out, orient="index", columns=["Value"])
+    # how the clustering metrics were scored, for evaluate()'s provenance
+    scored_clusters = want_clu and any(m in out for m in ("ARI", "NMI"))
+    frame.attrs["leiden_flavor"] = flavor if _sweep_keys else None
+    frame.attrs["clustering"] = (None if not scored_clusters
+                                 else "user" if cluster is not None else "sweep")
+    return frame

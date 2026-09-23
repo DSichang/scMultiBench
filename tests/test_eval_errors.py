@@ -74,7 +74,7 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
     with pytest.raises(ValueError, match=r"has no dataset 'data'; found keys \['matrix'\]") as e:
         evaluate(str(f), labels=["a", "b", "c"])
     msg = str(e.value)
-    assert "looks like a canonical INPUT matrix (matrix/data" in msg
+    assert "looks like a canonical input matrix (matrix/data" in msg
     assert "not an embedding" in msg and "out/<method>/embedding.h5" in msg
     # any other h5 without 'data' lists its keys, without the input hint
     g2 = tmp_path / "other.h5"
@@ -82,7 +82,7 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
         h.create_dataset("X", data=np.zeros((3, 4)))
     with pytest.raises(ValueError, match=r"found keys \['X'\]") as e2:
         eio.read_embedding(g2)
-    assert "INPUT matrix" not in str(e2.value)
+    assert "input matrix" not in str(e2.value)
     with pytest.raises(ValueError, match="/obs/cluster_leiden"):
         eio.read_clustering(g2)
 
@@ -116,7 +116,7 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
 
 def test_docstrings_match_the_code():
     doc = " ".join(evaluate.__doc__.split())
-    assert "goes in AS IS, in the order ``labels_for`` gave it" in doc
+    assert "is used as it is, in the order ``labels_for`` gave it" in doc
     assert "any other dict goes in as is only in the default order" in doc
     assert "otherwise needs ``label_order=``" in doc
     assert "Leiden sweep" in doc and "minutes for ~10^4" in doc

@@ -1,6 +1,8 @@
 """Summary bar chart: one bar per method, aggregated across datasets."""
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -35,7 +37,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     metrics : list of str | None
         Metric codes to score; ``None`` = every metric. Ignored when
         ``group`` is given.
-    group : {"clustering", "batch"} | None
+    group : {None, "clustering", "batch"}
         Score one metric family only (the benchmark's two summary panels);
         ``None`` = the ``metrics`` selection.
     top : int | None
@@ -52,7 +54,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         ``overall="mean_overall"`` with several datasets.
     save : str | None
         File to write the figure to (140 dpi, tight bounding box).
-    overall : {"rank", "mean_overall"}
+    overall : {"mean_overall", "rank"}
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
         dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
         (missing dataset skipped).
@@ -71,10 +73,18 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     ValueError
         ``group`` names a family with no metric in the frame.
 
+    Warns
+    -----
+    UserWarning
+        Several datasets and a method missing from some of them.
+    UserWarning
+        A dataset holds one method, or no method spans two datasets.
+
     Examples
     --------
     >>> import multibench as mtb
-    >>> df = mtb.load_results("diagonal")            # every dataset with a table in the category
+    >>> # every dataset of the category that has a stored table
+    >>> df = mtb.load_results("diagonal")
     >>> fig = mtb.plot.bar(df, group="clustering", top=10, save="clustering.png")
     >>> fig = mtb.plot.bar(df, group="batch")
     >>> fig = mtb.plot.bar(df, overall="rank")       # bubble's default formula
@@ -127,6 +137,13 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     frame for your own runs. ``metrics`` is case- and alias-tolerant
     (``"ari"`` -> ``"ARI"``).
 
+    **A new dataset.** Each dataset's scores rank only the methods scored on
+    it. A method alone on its dataset gets an Overall of 1.0 there under
+    ``"mean_overall"``, so a ``UserWarning`` names such a dataset. Another
+    warning says when no method spans two of the datasets, and names the
+    methods missing from some dataset. Plot a new dataset with the methods
+    scored on it.
+
     **Errors.** An unknown ``metrics`` code gets a did-you-mean hint and the
     list of metrics present. Batch metrics need a multi-batch dataset: a
     single-batch design has none to compute, which is what the
@@ -173,6 +190,13 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
             f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
 
     parts = style.per_dataset_ranks(long_df, metrics)
+    # the same cross-dataset checks as bubble(aggregate="summary"): bar
+    # always ranks within each dataset first
+    for msg in style.coverage_warnings(
+            parts, basis=overall,
+            incomplete_fix="Filter long_df to the methods scored on every "
+                           "dataset to compare like with like."):
+        warnings.warn(msg, UserWarning, stacklevel=2)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed
     # so the best method is drawn on top

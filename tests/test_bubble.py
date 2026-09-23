@@ -435,7 +435,7 @@ def test_na_warn_default_names_method_and_rule():
     with pytest.warns(UserWarning, match=r"B: DR and clustering Overall over 2 of 3 metrics \(NMI n/a\)") as rec:
         tbl = bubble.build_table(_with_gap())
     msg = str([w for w in rec if "n/a cells" in str(w.message)][0].message)
-    assert "averages the ranks of the metrics a method HAS" in msg
+    assert "averages the ranks of the metrics a method has" in msg
     assert "na='skip'" in msg and "na='raise'" in msg
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
     # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
@@ -491,4 +491,4 @@ def test_radius_uses_methods_scored_in_the_column():
     # the best circle of the NMI column (2 of 3 scored) is still full size
     best = max(c.radius for c in circles)
     assert best == pytest.approx(0.5 * 0.85 * 0.9)
-    assert "methods SCORED in that column" in bubble.__doc__
+    assert "methods scored in that column" in bubble.__doc__

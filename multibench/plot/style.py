@@ -12,20 +12,36 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+#: values that agree to this many decimal places are ties: floating-point
+#: noise (an iLISI of 2.2e-16 next to 0.0) must not decide a rank or a fill
+TIE_DECIMALS = 9
+
+
+def _tie_round(x) -> np.ndarray:
+    """``x`` as floats rounded to :data:`TIE_DECIMALS` places (NaN kept)."""
+    return np.round(np.asarray(x, dtype=float), TIE_DECIMALS)
+
 
 def minmax(x: np.ndarray) -> np.ndarray:
-    """Scale to [0,1]; constant or all-NaN -> all ones (matches R behaviour)."""
-    x = np.asarray(x, dtype=float)
-    lo = np.nanmin(x)
-    hi = np.nanmax(x)
+    """Scale to [0,1]; constant or all-NaN -> all ones (matches R behaviour).
+
+    Values are compared after rounding to :data:`TIE_DECIMALS` places, so a
+    column that differs only by floating-point noise counts as constant.
+    """
+    x = _tie_round(x)
+    lo = np.nanmin(x) if np.isfinite(x).any() else np.nan
+    hi = np.nanmax(x) if np.isfinite(x).any() else np.nan
     if not np.isfinite(lo) or lo == hi:
         return np.ones_like(x)
     return (x - lo) / (hi - lo)
 
 
 def rank_max(x: np.ndarray) -> np.ndarray:
-    """Rank ascending with ties assigned the maximum rank (R ties.method='max')."""
-    s = pd.Series(np.asarray(x, dtype=float))
+    """Rank ascending with ties assigned the maximum rank (R ties.method='max').
+
+    Values that agree to :data:`TIE_DECIMALS` places share a rank.
+    """
+    s = pd.Series(_tie_round(x))
     return s.rank(method="max").to_numpy()
 
 
@@ -109,6 +125,50 @@ def coverage(parts: dict) -> pd.Series:
         for m in mat.index:
             counts[m] = counts.get(m, 0) + 1
     return pd.Series(counts, dtype=int).sort_index()
+
+
+def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
+    """The warnings a cross-dataset summary of ``parts`` needs, as messages.
+
+    ``parts`` is the dict from :func:`per_dataset_ranks`; ``basis`` the
+    ``overall=`` in use; ``incomplete_fix`` the last sentence of the
+    incomplete-matrix message (it names the caller's own remedy). Shared by
+    ``plot.build_table`` (``aggregate="summary"``) and ``plot.bar``.
+
+    - no method is scored on two of several datasets: one message that the
+      summary ranks unrelated rows (it replaces the incomplete-matrix one);
+    - otherwise, a method missing from some dataset: the incomplete-matrix
+      message;
+    - a dataset that holds one method while the frame holds several: one
+      message per such dataset, since that method is ranked against nothing.
+    """
+    out = []
+    n = len(parts)
+    cov = coverage(parts)
+    names = ", ".join(map(str, parts))
+    if n > 1 and len(cov) and (cov <= 1).all():
+        out.append(
+            f"no method is scored on more than one of these {n} datasets "
+            f"({names}); a summary across them ranks unrelated rows. Plot each "
+            f"dataset on its own, or score the same methods on every dataset.")
+    elif n > 1 and (cov < n).any():
+        part = cov[cov < n].sort_values()
+        out.append(
+            f"summary ranks an incomplete method x dataset matrix ({n} "
+            f"datasets): " + ", ".join(f"{m} seen in {c}/{n}" for m, c in part.items())
+            + "; a method absent from a dataset scores rank 0 there under "
+            "overall='rank' and is skipped under overall='mean_overall'. "
+            + incomplete_fix)
+    if len(cov) > 1:
+        for ds, mat in parts.items():
+            if len(mat.index) != 1:
+                continue
+            what = ("its Overall there is 1.0 by construction" if basis == "mean_overall"
+                    else "its rank there is 1 by construction, the lowest possible")
+            out.append(
+                f"dataset {ds} has one method ({mat.index[0]}): {what}; plot it "
+                f"with the methods scored on the same dataset")
+    return out
 
 
 def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
