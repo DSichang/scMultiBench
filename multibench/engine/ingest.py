@@ -938,7 +938,6 @@ def _select_obs(data, spec, *, what):
             # muon keeps a modality's labels in mdata[mod].obs: name that spelling
             has = [n for n in data.mod if col in data.mod[n].obs.columns]
             if has:
-                from .. import config
                 raise KeyError(
                     f"{what}={spec!r}: column {col!r} not in obs: searched mdata.obs; "
                     f"available: {list(data.obs.columns)}. mdata[{has[0]!r}].obs has "
@@ -958,7 +957,6 @@ def _select_obs(data, spec, *, what):
                    f"mdata[{name!r}].obs and mdata.obs[{name + ':' + col!r}]; "
                    f"mdata[{name!r}].obs has {list(obs.columns)}")
             if col in data.obs.columns:
-                from .. import config
                 msg += (f". The global mdata.obs has {col!r}: pass "
                         + config.hint(f"{what}='obs:{col}'", f"--{what} obs:{col}"))
             raise KeyError(msg)
@@ -1521,7 +1519,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask]))
     existing = [pth.name for pth, _, _ in plan if pth.exists() or pth.is_symlink()]
     if existing and not overwrite:
-        from .. import config
         raise FileExistsError(
             f"{out} already holds {existing}, which this call would write; "
             f"pass {config.hint('overwrite=True', '--overwrite')} to replace them")
