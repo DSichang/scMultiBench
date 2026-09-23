@@ -703,9 +703,9 @@ The table counts the hyperparameters each variant exposes. `mtb.params_for(metho
         for m in sorted(mtb.list_methods(category=CATEGORY))
         for v in mtb.method_info(m)["supports"] if v["category"] == CATEGORY]
 pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True]).reset_index(drop=True)""")
-    md("""### A method's record and citation
+    md(f"""### A method's record and citation
 
-`method_info` returns what the registry holds about a method, including its reference and repository; `mtb.cite` returns the citations for the benchmark and the methods you pass. Pass every method you ran.
+`method_info` returns what the registry holds about a method, including its reference and repository; `mtb.cite` returns the citations for the benchmark and the methods you pass. The cell cites {fastm}; for your own work, pass every method you ran.
 
 """ + details(
         "**needs_labels** is True when any variant needs cell-type labels; each entry of "
