@@ -10,7 +10,10 @@ Each work package fixed its own half; these pin the joins:
   (L13, L32);
 - scan does not repeat Seurat_v5's paired-files requirement as a setup note:
   it checks the files and reports only a mismatch (L14 with L61's setup
-  caveat).
+  caveat);
+- off Linux, scan's summary line and run()'s refusal say to make the
+  commands on the Linux machine, as the docs do (L18 with L19): the commands
+  hold this computer's absolute paths, so a copied command does not run there.
 """
 import h5py
 import numpy as np
@@ -110,8 +113,42 @@ def test_run_off_linux_names_the_cli_flag_under_the_cli(tmp_path, monkeypatch):
     with pytest.raises(OSError) as e:
         mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
-    assert "Preview the command with --dry-run and run it on a Linux machine." in str(e.value)
+    assert ("Run this command on a Linux machine; --dry-run previews the method's "
+            "command here.") in str(e.value)
     assert "`multibench env doctor`" in str(e.value)
+
+
+def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
+        tmp_path, monkeypatch, capsys):
+    """scan's command column and a dry run hold this computer's absolute
+    paths. Off Linux, the scan summary line says to run scan again on the
+    Linux machine, and run()'s refusal says to run the call there; neither
+    tells the user to copy a command across."""
+    import os
+    import shlex
+    from multibench import workflow as W
+    from multibench.engine import envs, runner
+    monkeypatch.setattr(envs, "host_platform_problem",
+                        lambda: "method environments are linux-64 conda envs (packed "
+                                "archives + lockfiles); this host is darwin/arm64")
+    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: [])
+
+    df = mtb.scan("D11", "vertical", methods=["totalVI"])
+    out = capsys.readouterr().out
+    rna = [a for a in shlex.split(df.iloc[0]["command"]) if a.endswith("rna.h5")]
+    assert rna and os.path.isabs(rna[0]), "the command holds this computer's absolute paths"
+    assert "copy the command" not in out
+    assert ("The commands use this computer's paths, so run scan again on the "
+            "Linux machine.") in out
+
+    with pytest.raises(OSError) as e:
+        mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
+                out_dir=str(tmp_path / "out"))
+    msg = str(e.value)
+    assert ("Run this call on a Linux machine; dry_run=True previews the method's "
+            "command here.") in msg
+    assert "run it on a Linux machine" not in msg
 
 
 def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch):

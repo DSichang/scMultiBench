@@ -829,3 +829,39 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     (site / "b.ipynb").unlink()
     _write_nb(site / "a.ipynb", cells)
     assert gate.on_config(config) is config                    # current copies deploy
+
+
+# ---- round 1 of the student study: facts the pages keep in visible text -----
+@needs_docs
+def test_guides_keep_the_round1_facts_visible():
+    """The run guide says to give raw counts and shows batch_index= for a
+    per-batch delivery; the discover guide has the peaks-only ATAC section
+    the quickstart links to (L02, L12)."""
+    docs = _docs_root()
+    run = (docs / "tutorials" / "run.md").read_text()
+    assert "Give raw counts" in run and "batch_index=" in run
+    discover = (docs / "tutorials" / "discover.md").read_text()
+    assert re.search(r"^### My ATAC is peaks only$", discover, re.M)
+
+
+@needs_docs
+def test_landing_card_has_content_without_the_animation():
+    """The landing card shows the run -> evaluate -> plot steps when the GSAP
+    timeline does not play (L62): index.md holds a static fallback inside the
+    card's scene group, reduced motion still runs taskFlow (the script does
+    not return before it), and taskFlow draws the first scene's finished
+    frame at once: a still frame without GSAP, a seek with it."""
+    docs = _docs_root()
+    index = (docs / "index.md").read_text()
+    scenes = re.search(r'<g class="tf-scenes">(.*?)</g></svg>', index, re.S)
+    assert scenes and 'class="tf-fallback"' in scenes.group(1)
+    for step in ("Run a method", "Evaluate", "Plot"):
+        assert f">{step}</text>" in scenes.group(1)
+    js = (docs / "javascripts" / "animations.js").read_text()
+    start = js.index("(function () {")
+    assert "return" not in js[start:js.index("const ", start)], \
+        "the script must not return before the landing card runs"
+    init = js[js.index("const init = () => {"):]
+    assert re.search(r"if \(REDUCED_MOTION\) \{ taskFlow\(\); return; \}", init)
+    flow = js[js.index("const taskFlow = () => {"):js.index("const tocSlider")]
+    assert "tfStill(scenes[0])" in flow and "master.seek(builtAt[0])" in flow

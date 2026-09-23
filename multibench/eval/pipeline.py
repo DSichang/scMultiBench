@@ -693,7 +693,7 @@ def evaluate(
     **Retired keywords.** ``task=``, ``family=`` and ``only=`` still work
     as spellings of ``metrics=``, with a ``DeprecationWarning``;
     ``slow_metrics=``, ``column=`` and ``metric_set=`` raise ``TypeError``
-    naming the replacement. The API overview lists them.
+    naming the replacement. The Changes page lists them.
 
     See Also
     --------

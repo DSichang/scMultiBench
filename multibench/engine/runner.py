@@ -778,8 +778,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     **Other systems.** Method environments are Linux-only. On macOS or
     Windows a missing env always raises ``OSError``, and the message starts
-    with that fact: preview the command with ``dry_run=True`` and run it on a
-    Linux machine.
+    with that fact: run the call on a Linux machine. ``dry_run=True``
+    previews the command here; the command holds this computer's paths.
 
     **Launcher templates.** ``cmd_template`` wraps the command in your own
     launcher. ``{env_cmd}`` is the command with the env activation above.
@@ -873,9 +873,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
                        f"`multibench env install --methods {method} --packed --run`"
                        + config.hint(py, "; see `multibench env doctor`"))
             if linux_only:
+                this = config.hint("this call", "this command")
                 preview_with = config.hint("dry_run=True", "--dry-run")
-                install = (f"{linux_only} Preview the command with {preview_with} and "
-                           f"run it on a Linux machine.\n{install}")
+                install = (f"{linux_only} Run {this} on a Linux machine; {preview_with} "
+                           f"previews the method's command here.\n{install}")
             raise EnvironmentError(install)
 
     # Absolute paths + trailing separator on directory roles before conversion,

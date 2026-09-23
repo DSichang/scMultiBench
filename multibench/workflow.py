@@ -562,10 +562,10 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
             f"see {config.hint('mtb.env.doctor()', '`multibench env doctor`')}")
 
 
-#: The second sentence of the scan summary line off Linux.
+#: What the scan summary line adds off Linux, after the counts.
 LINUX_ONLY_SUMMARY = ("Method environments are Linux-only: here you can check files, "
-                      "score embeddings and plot; copy the command column to a Linux "
-                      "machine.")
+                      "score embeddings and plot. The commands use this computer's "
+                      "paths, so run scan again on the Linux machine.")
 
 
 def _first_sentence(text: str) -> str:

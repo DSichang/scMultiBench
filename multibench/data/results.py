@@ -716,7 +716,7 @@ def load_results(
 
     **Retired keywords.** ``method=``, ``metric=``, ``task=`` and
     ``family=`` still work, with a ``DeprecationWarning``; ``metric_set=``
-    raises ``TypeError``. The API overview lists the replacements.
+    raises ``TypeError``. The Changes page lists the replacements.
 
     See Also
     --------

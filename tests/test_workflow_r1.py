@@ -173,8 +173,8 @@ def test_run_off_linux_starts_with_the_platform(off_linux, tmp_path, monkeypatch
                     out_dir=str(tmp_path / "out"))
         msg = str(e.value)
         assert msg.startswith("Methods run only on Linux (this computer is darwin/arm64). "
-                              "Preview the command with dry_run=True and run it on a "
-                              "Linux machine.")
+                              "Run this call on a Linux machine; dry_run=True previews "
+                              "the method's command here.")
         assert "is not installed" in msg and "--methods totalVI --packed --run" in msg
         assert not (tmp_path / "out").exists()
 
