@@ -619,10 +619,13 @@ def load_results(
     Examples
     --------
     >>> import multibench as mtb
-    >>> pub = mtb.load_results("diagonal", dataset="D28")                 # published tables
-    >>> rr = mtb.load_results("diagonal", dataset="D28", source="rerun")  # package re-runs
-    >>> both = mtb.load_results("cross", dataset="D52", source="both", metrics="batch")
-    >>> mine = mtb.load_results(result_path="mine.csv", source="user")    # your own rows
+    >>> pub = mtb.load_results("diagonal", dataset="D28")   # published tables
+    >>> # package re-runs
+    >>> rr = mtb.load_results("diagonal", dataset="D28", source="rerun")
+    >>> both = mtb.load_results("cross", dataset="D52", source="both",
+    ...                         metrics="batch")
+    >>> # your own rows
+    >>> mine = mtb.load_results(result_path="mine.csv", source="user")
 
     Notes
     -----
@@ -963,9 +966,9 @@ def available_datasets(
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.available_datasets()                     # ['D11', 'D24', 'D25', 'D28', 'D52']
-    >>> mtb.available_datasets("diagonal")           # ['D24', 'D25', 'D28']
-    >>> mtb.available_datasets(source="rerun")       # ['D11', 'D11s', 'D28', ...]
+    >>> mtb.available_datasets()  # ['D11', 'D24', 'D25', 'D28', 'D52']
+    >>> mtb.available_datasets("diagonal")  # ['D24', 'D25', 'D28']
+    >>> mtb.available_datasets(source="rerun")  # ['D11', 'D11s', 'D28', ...]
 
     Notes
     -----
@@ -1070,8 +1073,8 @@ def results_coverage(
     --------
     >>> import multibench as mtb
     >>> cov = mtb.results_coverage("cross")
-    >>> cov[cov.dataset == "D52"]           # scMoMaT (published) + 8 methods (rerun)
-    >>> cov.attrs["rerun_version"]          # '0.2.1'
+    >>> cov[cov.dataset == "D52"]     # scMoMaT (published) + 8 methods (rerun)
+    >>> cov.attrs["rerun_version"]    # '0.2.1'
     >>> cov.groupby(["category", "source"]).method.nunique()
 
     Notes
@@ -1224,8 +1227,8 @@ def recommend(
     >>> import multibench as mtb
     >>> r = mtb.recommend("vertical", modalities=["rna", "adt"])
     >>> r[["method", "grand_score", "coverage"]]
-    >>> r.attrs["not_scored"]                        # wired, but no published rows
-    >>> mtb.recommend("cross", source="rerun")       # cross has one published method
+    >>> r.attrs["not_scored"]                   # wired, but no published rows
+    >>> mtb.recommend("cross", source="rerun")  # cross has one published method
     >>> mtb.recommend("diagonal", metrics="batch", source="rerun")
 
     Notes

@@ -1413,10 +1413,11 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.env.install(["Matilda"])                       # dry run: the plan, sizes, URLs
-    >>> mtb.env.install(["Matilda"], dry_run=False)        # packed archive, flavor='auto'
+    >>> mtb.env.install(["Matilda"])  # dry run: the plan, sizes, URLs
+    >>> mtb.env.install(["Matilda"], dry_run=False)  # packed archive, flavor='auto'
     >>> mtb.env.install(category="vertical", dry_run=False, flavor="cpu")
-    >>> mtb.env.install(["Matilda"], packed=False, dry_run=False)   # lockfile build via conda
+    >>> # lockfile build via conda
+    >>> mtb.env.install(["Matilda"], packed=False, dry_run=False)
 
     Notes
     -----
@@ -1610,7 +1611,8 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
     --------
     >>> import multibench as mtb
     >>> mtb.env.doctor("vertical", as_frame=True)
-    >>> [r["env"] for r in mtb.env.doctor(methods=["Matilda", "totalVI"]) if not r["exists"]]
+    >>> rows = mtb.env.doctor(methods=["Matilda", "totalVI"])
+    >>> [r["env"] for r in rows if not r["exists"]]
 
     Notes
     -----

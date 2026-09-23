@@ -14,7 +14,7 @@ class AmbiguousVariantError(ValueError, KeyError):
     Examples
     --------
     >>> from multibench import params_for, AmbiguousVariantError
-    >>> params_for("Matilda")                              # raises: rna+adt or rna+atac
+    >>> params_for("Matilda")  # raises: rna+adt or rna+atac
     >>> params_for("Matilda", "vertical", ["rna", "adt"])  # selects one
 
     Notes

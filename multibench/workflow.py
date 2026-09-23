@@ -199,7 +199,8 @@ def describe_layout(category: str | None = None) -> str:
     Examples
     --------
     >>> import multibench as mtb
-    >>> print(mtb.describe_layout("vertical"))    # CITE-seq / multiome, cells already matched
+    >>> # CITE-seq / multiome, cells already matched
+    >>> print(mtb.describe_layout("vertical"))
     >>> print(mtb.describe_layout("cross"))       # numbered batches
     >>> print(mtb.describe_layout())              # everything
 
@@ -578,8 +579,9 @@ def scan(dataset: str, category: str | None = None, *,
     >>> import multibench as mtb
     >>> df = mtb.scan("D11", "vertical")
     >>> df[["method", "modalities", "runnable", "reason"]]
-    >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]   # what blocks the rest
-    >>> print(df.loc[df.files_ok, "command"].iloc[0])                  # a ready-to-run shell line
+    >>> # what blocks the rest
+    >>> df.loc[~df.runnable, ["method", "files_reason", "env_reason"]]
+    >>> print(df.loc[df.files_ok, "command"].iloc[0])  # a ready-to-run shell line
     >>> mtb.scan("MYCITE", "vertical", data_path="/path/to/data", out_dir="out/")
 
     Notes
@@ -1123,7 +1125,8 @@ class BatchResult:
         --------
         >>> res = mtb.load_batch("out/")
         >>> res.summary[["method", "status", "ARI", "label_order_confidence"]]
-        >>> res.summary.query("status == 'CHAIN_OK'").sort_values("ARI", ascending=False)
+        >>> ok = res.summary.query("status == 'CHAIN_OK'")
+        >>> ok.sort_values("ARI", ascending=False)
 
         Notes
         -----
@@ -1305,7 +1308,7 @@ class BatchResult:
         --------
         >>> res = mtb.load_batch("out/")
         >>> [r["out_dir"] for r in res.results]
-        >>> res.results[0].get("label_order_candidates")    # None with a single ordering
+        >>> res.results[0].get("label_order_candidates")  # None with a single ordering
 
         Notes
         -----
@@ -1474,7 +1477,8 @@ class BatchResult:
         --------
         >>> res = mtb.load_batch("out/")
         >>> res.rescore(metrics=["ARI", "NMI"]).summary
-        >>> res.rescore(batch="data/D11/donor.csv").summary[["method", "batch_source", "iLISI"]]
+        >>> new = res.rescore(batch="data/D11/donor.csv")
+        >>> new.summary[["method", "batch_source", "iLISI"]]
         >>> res.rescore(labels=my_labels).save("out/rescored")
 
         Notes
@@ -1851,11 +1855,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     Examples
     --------
     >>> import multibench as mtb
-    >>> plan = mtb.run_all("D11", "vertical", dry_run=True)       # free: what would run?
+    >>> plan = mtb.run_all("D11", "vertical", dry_run=True)  # free: what would run?
     >>> plan[["method", "modalities", "runnable", "reason"]]
     >>> res = mtb.run_all("D11", "vertical", out_dir="out/", timeout=3600)
-    >>> res.summary                                # one row per method, metrics as columns
-    >>> res.failures                               # always check: failures are recorded, not raised
+    >>> res.summary        # one row per method, metrics as columns
+    >>> res.failures       # always check: failures are recorded, not raised
 
     Notes
     -----
@@ -2163,7 +2167,8 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.params_for("Multigrate", "vertical", ["rna", "adt"])["tunable"]   # what can be swept
+    >>> # what can be swept
+    >>> mtb.params_for("Multigrate", "vertical", ["rna", "adt"])["tunable"]
     >>> df = mtb.sweep("MYDATA", "vertical", "Multigrate", "lr",
     ...                [1e-4, 1e-3, 1e-2], out_dir="out/lr")
     >>> df[["lr", "status", "ARI", "NMI"]]

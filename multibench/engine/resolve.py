@@ -284,10 +284,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
     --------
     >>> import multibench as mtb
     >>> mtb.inputs_for("D11", "vertical", "Matilda")
-    {'rna': '/abs/data/D11/rna.h5', 'adt': '/abs/data/D11/adt.h5', 'cty': '/abs/data/D11/cty.csv'}
-    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"], check=True)
+    {'rna': '/abs/data/D11/rna.h5', 'adt': '/abs/data/D11/adt.h5',
+     'cty': '/abs/data/D11/cty.csv'}
+    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda",
+    ...                      modalities=["rna", "adt"], check=True)
     >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11")
-    >>> mtb.inputs_for("D28", "diagonal", "scBridge")   # {'data_dir': '/abs/data/D28/'}
+    >>> mtb.inputs_for("D28", "diagonal", "scBridge")
+    {'data_dir': '/abs/data/D28/'}
 
     Notes
     -----
@@ -855,12 +858,16 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.labels_for("D28")                       # diagonal: RNA cells first, then ATAC
-    {'rna_cty': '/abs/data/D28/rna_cty.csv', 'atac_cty': '/abs/data/D28/atac_cty.csv'}
-    >>> mtb.labels_for("D52", "cross", "StabMap")    # StabMap: its reference batch first
-    {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv', 'cty2': '/abs/data/D52/cty2.csv'}
-    >>> res = mtb.run("StabMap", "cross", inputs=mtb.inputs_for("D52", "cross", "StabMap"),
-    ...               out_dir="out/StabMap_D52")
+    >>> # diagonal: RNA cells first, then ATAC
+    >>> mtb.labels_for("D28")
+    {'rna_cty': '/abs/data/D28/rna_cty.csv',
+     'atac_cty': '/abs/data/D28/atac_cty.csv'}
+    >>> # StabMap: its reference batch first
+    >>> mtb.labels_for("D52", "cross", "StabMap")
+    {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv',
+     'cty2': '/abs/data/D52/cty2.csv'}
+    >>> inp = mtb.inputs_for("D52", "cross", "StabMap")
+    >>> res = mtb.run("StabMap", "cross", inputs=inp, out_dir="out/StabMap_D52")
     >>> mtb.evaluate(res.output, labels=mtb.labels_for("D52", "cross", "StabMap"))
 
     Notes

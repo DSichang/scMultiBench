@@ -91,7 +91,7 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
     Examples
     --------
     >>> import multibench as mtb
-    >>> root = mtb.data.fetch("D11")                     # <data_path>/D11/, about 11 MB
+    >>> root = mtb.data.fetch("D11")          # <data_path>/D11/, about 11 MB
     >>> mtb.scan("D11", "vertical", data_path=root)
     >>> mtb.data.fetch("D11", "D28", data_path="data", quiet=True)
 
