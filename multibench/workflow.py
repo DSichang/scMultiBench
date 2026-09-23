@@ -597,7 +597,9 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
     Built from the resolved paths, not from the exception text, so no path
     is ever cut. An ATAC file leads with what the method needs and what the
     folder holds instead: ``needs gene-activity ATAC (atac_gas.h5); folder
-    has peaks (atac_peak.h5)``. Other files follow as ``missing adt.h5``.
+    has peaks (atac_peak.h5)``. Other files follow as ``missing adt.h5``,
+    then the per-batch hint of ``inputs_for`` when the folder holds
+    ``rna1.h5, rna2.h5, ...`` for a vertical or diagonal method.
     """
     try:
         paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
@@ -632,6 +634,12 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
             atac_parts.append(f"{need}; not in the folder")
     if other:
         atac_parts.append("missing " + ", ".join(other))
+    # rna1.h5 + rna2.h5 where a vertical / diagonal method reads one rna.h5
+    ds_dir = next(iter(missing.values())).parent
+    batch_hint = _resolve._per_batch_hint(
+        ds_dir, category, {st for r in missing for st in _resolve._role_stems(r)[0]})
+    if batch_hint:
+        atac_parts.append(batch_hint)
     return "; ".join(atac_parts)
 
 
@@ -694,10 +702,14 @@ def _modality_matcher(modalities):
     (``rna1``) matches that role. A variant matches when every token matches
     one of its roles and every role is matched: the tokens name one
     combination, in any order. ``[]`` matches only the variants fed a folder.
-    Unknown tokens raise ``ValueError`` (``registry.normalize_modalities``).
+    Unknown tokens, and two ATAC representations, raise ``ValueError`` as in
+    ``find_methods``.
     """
+    from .discover import _modality_filter
     from .engine.schema import modality_family
-    registry.normalize_modalities(modalities)          # ValueError on unknown tokens
+    # find_methods' checks: ValueError on an unknown token or on two ATAC
+    # representations, TypeError on a bare string
+    _modality_filter(modalities, None)
     toks = []
     for tok in modalities:
         t = registry.MODALITY_ALIASES.get(str(tok).lower(), str(tok))
@@ -788,7 +800,8 @@ def scan(dataset: str, category: str | None = None, *,
     FileNotFoundError
         ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
     ValueError
-        Unknown ``category``, or no variant of ``methods`` exists under ``category``.
+        Unknown ``category`` or modality token, or no variant of ``methods``
+        exists under ``category``.
     KeyError
         Unknown id in ``methods`` or ``params``, or a ``params`` key no variant accepts.
     TypeError
@@ -874,6 +887,11 @@ def scan(dataset: str, category: str | None = None, *,
 
     - an ATAC file that holds the other representation (a peak matrix where
       the method needs gene activity);
+    - an RNA, ADT or peak file whose values are not whole numbers: the
+      methods expect raw counts;
+    - diagonal: a folder whose only label file is ``cty.csv``; diagonal
+      needs ``rna_cty.csv`` and ``atac_cty.csv``;
+    - Seurat_v5: ``rna.h5`` and ``atac_peak.h5`` that hold different cells;
     - ``setup: ...`` - a step the user must do first, the first sentence of
       ``method_info(m)['setup_hint']`` (GLUE's GENCODE annotation file);
     - method scripts that are not on this machine yet: the first real run
@@ -929,7 +947,8 @@ def scan(dataset: str, category: str | None = None, *,
     - a numbered token (``rna1``) matches that role only;
     - a row is kept when every token matches one of its roles and every
       role is matched;
-    - an unknown token raises ``ValueError`` listing the vocabulary.
+    - an unknown token raises ``ValueError`` listing the vocabulary, and so
+      do two representations (``atac_peak`` with ``atac_gas``).
 
     A variant fed a folder (scBridge) has no modality roles. ``modalities=[]``
     selects exactly those variants; any non-empty list leaves them out, and
@@ -1051,6 +1070,10 @@ def scan(dataset: str, category: str | None = None, *,
             notes = [f"setup: {_first_sentence(n[len('setup: '):])}"
                      if n.startswith("setup: ") else n
                      for n in _runner.script_notes(spec, v, repo)]
+            if spec.id in _resolve._SAME_CELL_ROLES:
+                # a same-cells requirement is checked on the files above;
+                # its caveat appears only when the files fail it
+                notes = [n for n in notes if not n.startswith("setup: ")]
             if notes:
                 rec["caveat"] = "; ".join(x for x in [rec["caveat"], *notes] if x)
         rows.append(rec)

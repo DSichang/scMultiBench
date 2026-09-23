@@ -345,10 +345,15 @@ class Variant:
         ``source_data`` / ``target_data`` roles: scBridge takes the dataset
         directory and names its matrices ``rna.h5`` / ``atac_gas.h5`` as
         constants, so its only resolved role is ``data_dir`` and the role-based
-        answer alone would be empty (mirrors :attr:`consumes_atac`).
+        answer alone would be empty (mirrors :attr:`consumes_atac`). A role
+        whose argument is another constant is a placeholder, not an input:
+        Seurat_WNN's rna+adt variant passes ``NULL`` for ``atac``.
         """
+        placeholders = {a.role for a in self.args
+                        if a.const and a.role not in ("source_data", "target_data")}
         out = {base_modality(r) for r in self.roles()
-               if r not in _NON_MODALITY_ROLES and not is_label_role(r)}
+               if r not in _NON_MODALITY_ROLES and not is_label_role(r)
+               and r not in placeholders}
         for a in self.args:
             if a.const and a.role in ("source_data", "target_data"):
                 stem = PurePath(str(a.const)).stem

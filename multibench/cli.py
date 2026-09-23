@@ -412,10 +412,10 @@ _EXPORT_FLAGS = ("rna", "adt", "atac", "atac_kind", "labels", "batch", "batch_in
 #: RNA+ATAC, batch 3 RNA).
 _CONVERT_EPILOG = """\
 Genes and peaks in one X (10x Multiome read with gex_only=False):
-  multibench convert B.h5ad data/MULTIOME --rna "X[feature_types=Gene Expression]" --atac "X[feature_types=Peaks]" --atac-kind peak --labels obs:cell_type --category vertical
+  multibench convert B.h5ad data/multiome --rna "X[feature_types=Gene Expression]" --atac "X[feature_types=Peaks]" --atac-kind peak --labels obs:cell_type --category vertical
 
 RNA and ATAC from different cells (diagonal):
-  multibench convert rna.h5ad data/LUNG --rna X --atac-from atac.h5ad --atac-kind peak --labels obs:cell_type --category diagonal
+  multibench convert rna.h5ad data/lung --rna X --atac-from atac.h5ad --atac-kind peak --labels obs:cell_type --category diagonal
 
 One file per batch (mosaic or cross): write each file as its batch number.
   multibench convert A.h5ad data/LAB --rna X --adt obsm:protein --labels obs:cell_type --category mosaic --batch-index 1

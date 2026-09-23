@@ -300,7 +300,8 @@ EXPORT_DETAIL = {
 EXPORT_DEMO = {
  "vertical": """import anndata as ad, numpy as np, scipy.sparse as sp, tempfile, os
 rng = np.random.default_rng(0)
-demo = ad.AnnData(X=sp.random(120, 40, density=0.2, random_state=0, format="csr"))  # RNA, cells x genes
+# RNA as raw counts, cells x genes
+demo = ad.AnnData(X=sp.csr_matrix(rng.poisson(0.5, size=(120, 40)).astype(float)))
 demo.obsm["protein"] = rng.poisson(3.0, size=(120, 12)).astype(float)             # ADT, cells x proteins
 demo.uns["protein_names"] = [f"CD{i}" for i in range(12)]
 demo.obs["celltype"] = rng.choice(["T", "B", "NK"], 120)

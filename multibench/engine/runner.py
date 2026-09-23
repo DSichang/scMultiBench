@@ -873,7 +873,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
                        f"`multibench env install --methods {method} --packed --run`"
                        + config.hint(py, "; see `multibench env doctor`"))
             if linux_only:
-                install = (f"{linux_only} Preview the command with dry_run=True and "
+                preview_with = config.hint("dry_run=True", "--dry-run")
+                install = (f"{linux_only} Preview the command with {preview_with} and "
                            f"run it on a Linux machine.\n{install}")
             raise EnvironmentError(install)
 
