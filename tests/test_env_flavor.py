@@ -477,8 +477,8 @@ def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monke
     total = [l for l in cap.err.splitlines() if l.startswith("# total")][0]
     assert total.startswith("# total (3 envs): 6.2 GB to download; disk: unknown for 2 of 3 "
                             "envs (at least 2.5 GB for the other 1)")
-    assert "; summed the cpu archives; 2 of 3 envs have no CPU archive yet, their GPU archive " \
-           "is counted; sizes are those recorded for this release" in total
+    assert "; summed the cpu archives; 2 of 3 envs have no CPU archive yet; their GPU " \
+           "archives are counted; sizes are those recorded for this release" in total
     assert "(auto:" not in total
     # auto on a CPU host says so; gpu sums the CUDA archives and never falls back
     assert cli.main(["env", "install", "--packed"]) == 0
@@ -504,8 +504,8 @@ def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
     assert "4.5 GB dl" in lines["scmb_torch"] and "0.9 GB dl" in lines["scmb_r"]
     assert cap.err.startswith("# total (3 envs): 6.2 GB download; disk: unknown for 2 of 3 "
                               "envs (at least 2.5 GB for the other 1); summed the "
-                              "cpu archives; 2 of 3 envs have no CPU archive yet, their GPU "
-                              "archive is counted; sizes are")
+                              "cpu archives; 2 of 3 envs have no CPU archive yet; their GPU "
+                              "archives are counted; sizes are")
     assert cli.main(["env", "plan", "--methods", "Matilda", "--flavor", "gpu"]) == 0
     cap = capsys.readouterr()
     assert "3.0 GB dl" in cap.out and "9.0 GB disk" in cap.out

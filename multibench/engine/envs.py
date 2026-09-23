@@ -64,6 +64,28 @@ def host_platform_problem() -> str | None:
             f"lockfiles); this host is {sys.platform}/{_platform.machine() or '?'}")
 
 
+def _host_of(problem: str) -> str:
+    """``'darwin/arm64'`` out of a :func:`host_platform_problem` text.
+
+    Read from the text itself (after ``"this host is "``), so a value a test
+    patches in and the real one name the same host.
+    """
+    marker = "this host is "
+    if marker in problem:
+        return problem.rsplit(marker, 1)[1].strip().rstrip(".")
+    return f"{sys.platform}/{_platform.machine() or '?'}"
+
+
+def linux_only_text(problem: str) -> str:
+    """The first sentence every off-Linux env message starts with.
+
+    ``"Method environments run only on Linux (this computer is
+    darwin/arm64)."`` - worded like the runner's ``"Methods run only on
+    Linux ..."``.
+    """
+    return f"Method environments run only on Linux (this computer is {_host_of(problem)})."
+
+
 def _require_linux(force: bool) -> None:
     """Raise ``RuntimeError`` before any download or build on a non-Linux host.
 
@@ -72,17 +94,15 @@ def _require_linux(force: bool) -> None:
     problem = None if force else host_platform_problem()
     if problem:
         raise RuntimeError(
-            f"{problem} - method envs cannot be built here. Run methods on a "
-            f"Linux host (the registry, stored results, scan's file check, "
-            f"evaluate and plot all work on this machine); pass force=True / "
-            f"--force to try anyway.")
+            f"{linux_only_text(problem)} Run the install on a Linux machine; "
+            f"{config.hint('force=True', '--force')} tries anyway.")
 
 
 #: What the ``difficulty`` tag of ``env_specs.yaml`` (shown by ``env status``
 #: and :func:`status`) means. The tag describes how hard the env is to build
 #: from its recipe, not how well the method works.
 DIFFICULTY = {
-    "easy": "modern python/torch stack, builds from the lockfile without surprises",
+    "easy": "modern python/torch stack; builds from the lockfile",
     "old-scvi": "pins an old scvi-tools (<0.20) / old anndata - needs its own env, "
                 "cannot share the modern torch env",
     "old-tensorflow": "pins TensorFlow 1.x/2.4 - needs its own env with matching CUDA",

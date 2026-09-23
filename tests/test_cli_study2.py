@@ -225,13 +225,15 @@ def test_env_doctor_and_install_warn_off_linux(monkeypatch, capsys):
     cap = capsys.readouterr()
     assert rc == 0
     assert cap.out.splitlines()[0].startswith("[L] matilda") and "# legend:" in cap.out
-    assert cap.err.startswith("warning: ") and "linux-64" in cap.err and "--force" in cap.err
+    assert cap.err.startswith("warning: ") and "run only on Linux" in cap.err
+    assert "--force" in cap.err
     assert "warning" not in cap.out
     # --run refuses with error: on stderr, exit 1, nothing on stdout
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
     rc = cli.main(["env", "install", "--run", "--methods", "Matilda"])
     cap = capsys.readouterr()
-    assert rc == 1 and cap.out == "" and "error: " in cap.err and "linux-64" in cap.err
+    assert rc == 1 and cap.out == "" and "error: " in cap.err
+    assert "run only on Linux" in cap.err
     # --force skips the guard (build stubbed)
     built = []
     monkeypatch.setattr(envs, "_run_all", lambda cmds: built.append(cmds))
@@ -253,7 +255,7 @@ def test_env_commands_silent_on_linux(monkeypatch, capsys):
 def test_force_flag_everywhere_it_matters():
     for name in ("install", "create", "create-group"):
         act = next(a for a in _env_sub(name)._actions if a.dest == "force")
-        assert "linux-64" in act.help
+        assert "not Linux" in act.help
 
 
 def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsys):
@@ -317,6 +319,6 @@ def test_env_status_legend_explains_every_tag_on_stderr(monkeypatch, capsys):
     for tag in ("old-scvi", "blocked-script", "R"):
         assert f"{tag} = {envs.DIFFICULTY[tag]}" in cap.err
     assert "verified_working" in cap.err
-    desc = _env_sub("status").description
+    epilog = _env_sub("status").epilog
     for tag in envs.DIFFICULTY:
-        assert tag in desc
+        assert tag in epilog

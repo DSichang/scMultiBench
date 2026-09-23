@@ -383,8 +383,9 @@ def _anndata_matrix(adata, obsm: str) -> np.ndarray:
     try:
         X = adata.obsm[obsm]
     except KeyError:
+        kind = type(adata).__name__            # AnnData, or MuData for a MuData
         raise ValueError(
-            f"obsm={obsm!r} not found in the AnnData; available obsm keys: "
+            f"obsm={obsm!r} not found in the {kind}; available obsm keys: "
             f"{sorted(adata.obsm.keys())} (or obsm='X' for .X)") from None
     X = X.toarray() if hasattr(X, "toarray") else X
     return np.asarray(X, dtype=float)

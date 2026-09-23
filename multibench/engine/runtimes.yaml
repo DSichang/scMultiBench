@@ -9,7 +9,8 @@
 # source: manual (hand-kept row) | summary_csv (run_sec in
 #         notebooks/results/summary_D*.csv) | recorded (wall time of a recorded
 #         end-to-end run). The longest time per (method, dataset) is kept.
-# cells is null where no run recorded the count.
+# cells is null where no run recorded the count; D46's count is the sum of the
+# rna1-3.h5 barcodes of the fetched dataset (8404 + 8845 + 4167).
 # tests/test_runtime_table.py pins these invariants.
 Cobolt:
   observed:
@@ -153,7 +154,7 @@ Seurat_v5:
   worst_sec: 15778
 StabMap:
   observed:
-  - cells: null
+  - cells: 21416
     dataset: D46
     sec: 209
     source: recorded

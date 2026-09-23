@@ -625,18 +625,20 @@ def evaluate(
     cell type as isolated; scib's default counts only types found in few
     batches.
 
-    The scib call behind each code::
+    The scib call behind each code:
 
-        code       scib function         arguments
-        ARI, NMI   ari, nmi              Leiden clusters, best sweep resolution
-        ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
-        iASW       isolated_labels_asw   iso_threshold = number of batches + 1
-        iF1        isolated_labels_f1    same threshold; best F1 over the sweep
-        cLISI      clisi_graph           type_="embed"; scaled to 0-1 by scib
-        ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
-        GC         graph_connectivity    on the 15-neighbour graph
-        iLISI      ilisi_graph           type_="embed"; scaled to 0-1 by scib
-        kBET       kBET                  computed only when named in metrics=[...]
+    ```text
+    code       scib function         arguments
+    ARI, NMI   ari, nmi              Leiden clusters, best sweep resolution
+    ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
+    iASW       isolated_labels_asw   iso_threshold = number of batches + 1
+    iF1        isolated_labels_f1    same threshold; best F1 over the sweep
+    cLISI      clisi_graph           type_="embed"; scaled to 0-1 by scib
+    ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
+    GC         graph_connectivity    on the 15-neighbour graph
+    iLISI      ilisi_graph           type_="embed"; scaled to 0-1 by scib
+    kBET       kBET                  computed only when named in metrics=[...]
+    ```
 
     The re-run tables were scored by multibench 0.2.1's ``evaluate`` with
     these definitions and the leidenalg backend. The published tables were

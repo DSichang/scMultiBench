@@ -55,11 +55,11 @@ def test_info_prints_what_to_check_before_a_run(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert out.startswith("StabMap (R), env scmb_r")
-    assert "requires_gpu: no" in out and "needs_labels: no" in out
+    assert re.search(r"GPU:\s+not used", out) and "needs_labels: no" in out
     assert re.search(r"atac:\s+peak", out)
     assert re.search(r"mosaic\s+rna1\+rna2\+rna3\+adt1\+atac2", out)
     assert re.search(r"cross\s+rna1\+rna2\+rna3\+adt1\+adt2\+adt3", out)
-    assert "longest observed 209 s on D46" in out and "RTX 4090" in out
+    assert "209 s on D46 (21,416 cells)" in out and "RTX 4090" in out
     rc = cli.main(["info", "Matilda", "--format", "json"])
     info = json.loads(capsys.readouterr().out)
     assert rc == 0 and info["id"] == "Matilda" and info["env"] == "matilda"
@@ -135,7 +135,8 @@ def test_fetch_scripts_reports_present_or_clones(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(config.DEFAULT, "repo_path", have)
     rc = cli.main(["fetch", "--scripts"])
     assert rc == 0
-    assert capsys.readouterr().out == f"method scripts present: {have / 'tools_scripts'}\n"
+    assert capsys.readouterr().out == (f"method scripts present: {have / 'tools_scripts'} "
+                                       f"(not a git checkout, commit unknown)\n")
     # absent: the same clone the first run performs (git faked)
     ran = []
 
@@ -149,7 +150,8 @@ def test_fetch_scripts_reports_present_or_clones(monkeypatch, tmp_path, capsys):
     rc = cli.main(["fetch", "--scripts"])
     cap = capsys.readouterr()
     assert rc == 0 and ran and ran[0][:2] == ["git", "clone"]
-    assert cap.out == f"method scripts fetched: {fresh / 'tools_scripts'}\n"
+    assert cap.out == (f"method scripts fetched: {fresh / 'tools_scripts'} "
+                       f"(not a git checkout, commit unknown)\n")
     assert "fetching PYangLab/scMultiBench" in cap.err
 
 
@@ -550,15 +552,15 @@ def test_convert_help_shows_the_per_batch_recipe(capsys):
 def test_help_text_has_no_internal_names_or_capital_emphasis():
     internal = ("packed_sizes.json", "packed_urls.json", ".multibench_flavor", "engine/",
                 "methods.yaml", " gate", "stand-in")
-    # acronyms, placeholder names, the NO-LOCK state value and
-    # mtb.config.DEFAULT are not emphasis
+    # acronyms, placeholder names, environment variable names (MULTIBENCH_*),
+    # the NO-LOCK state value and mtb.config.DEFAULT are not emphasis
     allowed = {"NVIDIA", "CUDA", "ATAC", "JSON", "PATH", "LOCK", "MYCITE", "UINMF", "MOFA",
                "MULTIBENCH", "DEBUG", "DATA", "REPO", "ENVS", "TEMPLATE", "DATASET",
                "METHOD", "VALUE", "ROLE", "NAME", "GROUP", "LONG", "KIND", "COLUMNS",
                "FORMAT", "TASK", "LABELS", "BATCH", "METRICS", "OUTPUT", "CATEGORY",
                "MODALITY", "LAYER", "OBSM", "DTYPE", "MODALITIES", "INPUT", "TITLE",
                "RUNNER", "SOURCE", "OVERALL", "AGGREGATE", "TIMEOUT", "PARAM", "METHODS",
-               "COMMAND", "DEFAULT", "CITE"}
+               "COMMAND", "DEFAULT", "CITE", "SCRIPTS"}
     for parser in _all_parsers():
         text = parser.format_help()
         for word in internal:

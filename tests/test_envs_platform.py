@@ -40,9 +40,9 @@ def test_host_platform_problem_reflects_sys_platform(monkeypatch):
 def test_create_all_run_refuses_off_linux(off_linux, monkeypatch):
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError, match="linux-64") as e:
+    with pytest.raises(RuntimeError, match="run only on Linux") as e:
         envs.create_all(methods=["Matilda"], dry_run=False)
-    assert "force=True / --force" in str(e.value)
+    assert "force=True tries anyway" in str(e.value)
     # the dry run still plans everywhere
     rows = envs.create_all(methods=["Matilda"], dry_run=True)
     assert rows and rows[0]["env"] == "matilda" and rows[0]["exists"] is False
@@ -68,7 +68,7 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
     import urllib.request
     monkeypatch.setattr(urllib.request, "urlretrieve",
                         lambda *a, **k: pytest.fail("download started on a non-Linux host"))
-    with pytest.raises(RuntimeError, match="linux-64"):
+    with pytest.raises(RuntimeError, match="run only on Linux"):
         envs.install_packed("scmb_r")
     # force=True reaches the download (stubbed here to fail loudly)
     monkeypatch.setattr(envs, "_conda_bin", lambda prefer="mamba": "conda")
@@ -94,7 +94,7 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
 ])
 def test_every_builder_refuses_off_linux(off_linux, monkeypatch, fn):
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError, match="linux-64"):
+    with pytest.raises(RuntimeError, match="run only on Linux"):
         fn()
 
 
