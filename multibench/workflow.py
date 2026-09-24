@@ -25,6 +25,7 @@ import itertools
 import json
 import os
 import re
+import shlex
 import time
 import traceback
 import warnings
@@ -60,7 +61,7 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     methods : list[str] | None
         Methods whose records to keep; ``None`` = every record.
     data_path : path-like | None
-        Data root for re-scoring; ``None`` = each record's own.
+        Folder that holds the dataset folder; ``None`` = the path each record saved.
 
     Returns
     -------
@@ -1803,7 +1804,7 @@ def _warn_unsaved_batch(records, result) -> None:
 
 
 class BatchResult:
-    """Outcome of ``mtb.run_all`` - a summary table, a long table and a figure.
+    """The result of ``mtb.run_all``: its summary table, long table and figure.
 
     Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. It keeps
     the per-method records; ``rescore`` and ``plot`` work from them.
@@ -1969,10 +1970,10 @@ class BatchResult:
         label orders, from 0 to 1. Near 1, one order clearly fits. Below about 0.5,
         two orders scored alike; check that row's label order.
 
-        **Optimistic bias.** When more than one ordering is possible the
-        reported metrics are those of the ordering with the highest ARI, so
-        they carry a small optimistic bias; ``label_order_confidence`` shows
-        whether the choice was clear-cut.
+        **Optimistic bias.** When more than one ordering is possible, the
+        reported metrics are those of the ordering with the highest ARI. So
+        they are slightly optimistic. ``label_order_confidence`` shows how far
+        ahead the chosen order was.
 
         **Blank confidence.** The column stays numeric, so ``> 0.5`` and
         ``.isna()`` behave. It is ``None`` in three cases, named by
@@ -2026,16 +2027,17 @@ class BatchResult:
 
     @property
     def long(self) -> pd.DataFrame:
-        """Long table (``metric, value, method, dataset, category``) for plotting.
+        """The scores as a long table, for plotting.
 
         This is what ``plot`` and ``mtb.plot.bubble`` consume.
 
         Returns
         -------
         pandas.DataFrame
-            Columns ``metric, value, method, dataset, category, clustering,
-            source``; empty, with those columns, when no method produced
-            metrics.
+            Columns ``metric``, ``value``, ``method``, ``dataset``,
+            ``category``, ``clustering``, ``source``, and ``scored_with`` for
+            rows ``run_all`` scored, as ``mtb.to_long`` writes them. Empty,
+            with the first seven columns, when no method produced metrics.
 
         Examples
         --------
@@ -2263,7 +2265,7 @@ class BatchResult:
             Metric family (``"clustering"``, ``"batch"``, ``"all"``) or metric
             codes; ``None`` = every metric the batch structure allows.
         verbose : bool
-            Print one line per method.
+            Print one line per method, and one before each label-order ranking.
 
         Returns
         -------
@@ -2328,10 +2330,11 @@ class BatchResult:
         ``batch`` of the wrong length (``batch has N entries, embedding has M
         cells``).
 
-        **Other hosts.** ``mtb.load_batch(data_path=)`` finds moved folders.
-        When the dataset folder is not found, ``labels=None`` gives
-        ``RUN_OK_NO_LABEL_MATCH`` with a ``note``. A Series or CSV is then
-        matched by position, with a warning, and the saved batch is not used.
+        **Other hosts.** When the data folder has moved, give its new location
+        to ``mtb.load_batch(data_path=)``. When the dataset folder is not
+        found, ``labels=None`` gives ``RUN_OK_NO_LABEL_MATCH`` with a
+        ``note``. A Series or CSV is then matched by position, with a warning,
+        and the saved batch is not used.
 
         **Persisting.** ``mtb.load_batch`` keeps returning the original result
         until the new one is saved.
@@ -2590,8 +2593,42 @@ def _error_tail(error, width: int = 200) -> str:
     return "..." + tail
 
 
+def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
+               modalities=None, allow_atac_mismatch: bool = False,
+               assume_gpu: bool = False) -> str:
+    """The ``mtb.scan`` call (``multibench scan`` command under the CLI) that
+    shows the rows a ``run_all`` call with these arguments selected.
+
+    Every argument not at its default is spelled out as the caller gave it
+    (a relative ``data_path`` stays relative), so the hint, run from the same
+    directory, finds the same dataset folder and the same rows. A
+    ``data_path`` that is the default data root is left out, as ``None``.
+    """
+    py, cli = [repr(dataset), repr(category)], [dataset, "--category", category]
+    if data_path is not None and (os.path.realpath(data_path)
+                                  != os.path.realpath(config.DEFAULT.data_path)):
+        py.append(f"data_path={os.fspath(data_path)!r}")
+        cli += ["--data-path", os.fspath(data_path)]
+    if methods:
+        py.append(f"methods={list(methods)}")
+        cli += ["--methods", ",".join(methods)]
+    if modalities:
+        py.append(f"modalities={list(modalities)}")
+        cli += ["--modalities", ",".join(modalities)]
+    if allow_atac_mismatch:
+        py.append("allow_atac_mismatch=True")
+        cli.append("--allow-atac-mismatch")
+    if assume_gpu:
+        py.append("assume_gpu=True")
+        cli.append("--assume-gpu")
+    return config.hint(f"mtb.scan({', '.join(py)})",
+                       "multibench scan " + " ".join(shlex.quote(str(a)) for a in cli))
+
+
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
-                              methods) -> str:
+                              methods, *, data_path=None, modalities=None,
+                              allow_atac_mismatch: bool = False,
+                              assume_gpu: bool = False) -> str:
     """The ``ValueError`` text for "not one requested variant can start".
 
     Scoped to what the caller asked for: with ``methods=`` every requested
@@ -2601,7 +2638,9 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     (then by method): an env install unblocks those. Reasons of methods the
     caller did not request are never listed: they would point at the wrong
     fix. Off Linux, when an environment blocks a row, the line after the
-    head says where methods run.
+    head says where methods run. The last line names the ``scan`` call with
+    the caller's selection (:func:`_scan_hint`); the list counts methods when
+    each method has one row (:func:`_rows_word`).
     """
     def _line(r):
         return f"  {r['method']} ({r['modalities']}): {r['reason']}"
@@ -2611,24 +2650,23 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
             ["_files", "method"], kind="stable").drop(columns="_files")
     platform = _platform_line(blocked)
     doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
+    where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
+                       modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
+                       assume_gpu=assume_gpu)
     if methods:
         lines = [_line(r) for _, r in blocked.iterrows()]
-        where = config.hint(f"mtb.scan({dataset!r}, {category!r}, methods={list(methods)})",
-                            f"multibench scan {dataset} --category {category} "
-                            f"--methods {','.join(methods)}")
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
         return (f"{head}.\n{platform}Blocked, one line per "
-                f"requested row:\n" + "\n".join(lines) +
+                f"requested {_rows_word(blocked, 1)}:\n" + "\n".join(lines) +
                 f"\n{where} shows these rows. Its files_ok and env_ok columns say "
                 f"which check failed. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
-    where = config.hint(f"mtb.scan({dataset!r}, {category!r})",
-                        f"multibench scan {dataset} --category {category}")
-    shown = (f"The first {k} of {n} blocked rows" if n > k
-             else "The blocked row" if n == 1 else f"The {n} blocked rows")
+    rows = _rows_word(blocked, n)
+    shown = (f"The first {k} of {n} blocked {rows}" if n > k
+             else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
     return (f"{head}.\n{platform}{shown}:\n" + "\n".join(lines) +
             f"\n{where} shows every row. Its files_ok and env_ok columns say "
             f"which check failed. {doctor} checks the environments.")
@@ -3393,13 +3431,13 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
       "Matilda does not run on cross data."; a dry run is never empty.
     - A dry run with a ``params`` key no planned variant of that method
       accepts: ``KeyError`` naming the accepted keys.
-    - Nothing runnable: the "No method can run on <dataset> (<category>)."
-      ``ValueError`` ("None of the requested methods ..." with
-      ``methods=``). Its message lists the reason of every requested variant
-      (or the first 3 of N when ``methods`` was not given), never the
-      reasons of methods you did not ask for. On macOS or Windows, when an
-      environment blocks a row, its second line says that methods run only
-      on Linux.
+    - Nothing runnable: ``ValueError``. Its first line is
+      ``No method can run on D11 (vertical).`` With ``methods=``, it starts
+      ``None of the requested methods (Matilda, totalVI) can run on D11 (vertical).``
+      The message lists the reason of every requested variant. Without
+      ``methods``, it gives the first 3 of N. It never lists the reasons of
+      methods you did not ask for. On macOS or Windows, when an environment
+      blocks a row, its second line says that methods run only on Linux.
     - An ``out_dir`` that holds a saved result of another dataset or
       category: ``ValueError``, before any method runs.
     - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
@@ -3500,7 +3538,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         # could start" means the request is wrong (bad dataset name, wrong
         # category, missing files, missing env). An empty result would report
         # "0 failed", which reads as success and hides a typo.
-        raise ValueError(_nothing_runnable_message(dataset, category, blocked, methods))
+        raise ValueError(_nothing_runnable_message(
+            dataset, category, blocked, methods, data_path=data_path,
+            modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
+            assume_gpu=assume_gpu))
 
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
     # saved in out_dir so that rescore can reuse it
