@@ -57,9 +57,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
             source: str = "user") -> pd.DataFrame:
     """Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``.
 
-    The result has the columns of ``mtb.load_results``. Your scores
-    concatenate with the stored ones, keep their provenance through a CSV
-    round trip, and plot with ``mtb.plot.bubble``.
+    The result has the columns of ``mtb.load_results`` and concatenates with
+    the stored tables.
 
     Parameters
     ----------
@@ -123,10 +122,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     Metric names that are not strings, like row numbers ``0, 1, ...``, raise
     instead of being scored.
 
-    **Column values.** ``dataset=None`` writes ``"all"``, the placeholder the
-    plotting layer uses for a frame without datasets, so the column is never
-    blank. ``category=None`` writes ``"user"``, the value ``load_results``
-    gives a user file without a category column. The published tables use
+    **Column values.** ``dataset=None`` writes ``"all"``. ``category=None``
+    writes ``"user"``, the value ``load_results`` gives a user file without a
+    category column. The published tables use
     ``clustering`` values ``"louvain"`` / ``"kmeans"`` for their variants.
 
     **Provenance.** The ``scored_with`` column of a frame from
@@ -328,8 +326,8 @@ def _labels_from_dict(d: dict, label_order) -> list:
 
     One entry needs no order. Several entries need ``label_order`` (keys of
     ``d``; a subset selects those files) unless ``d`` is what ``labels_for``
-    returned, in the order it returned it (a method variant's stacking
-    order, recorded on the dict), or any dict in the default order
+    returned, in the order it returned it (a method variant's cell order,
+    recorded on the dict), or any dict in the default order
     (``_label_sort_key``). Any other order must be explicit: a guess would
     score the embedding against misordered labels without any error.
     """
@@ -345,10 +343,10 @@ def _labels_from_dict(d: dict, label_order) -> list:
         raise ValueError(
             f"labels: got a dict with {len(d)} label files {keys} that is not "
             f"an unchanged mtb.labels_for dict and is not in the default "
-            f"stacking order (cty1, cty2, ... numerically; rna before adt before "
+            f"cell order (cty1, cty2, ... numerically; rna before adt before "
             f"atac; this is not alphabetical order); pass the dict "
             f"mtb.labels_for(dataset, method=<method>, category=<category>) "
-            f"returns, unchanged (it is in that method's stacking order), a list "
+            f"returns, unchanged (it is in that method's cell order), a list "
             f"of paths in cell order, or label_order=[...] naming the keys in "
             f"that order")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
@@ -359,7 +357,7 @@ def _labels_from_dict(d: dict, label_order) -> list:
     if not order:
         raise ValueError(
             f"label_order= is empty; list the keys of the labels dict in the "
-            f"method's stacking order, e.g. {list(map(str, d))!r}")
+            f"method's cell order, e.g. {list(map(str, d))!r}")
     unknown = [k for k in order if k not in d]
     if unknown:
         raise ValueError(
@@ -554,8 +552,8 @@ def evaluate(
         ``.obsm`` key of an AnnData, MuData or ``.h5ad`` ``output``, such as
         ``'X_pca'``; ``'X'`` means ``.X``.
     label_order : list of str
-        Keys of a multi-entry ``labels`` dict, in the method's stacking
-        order; a subset selects those files. ``None`` works for an unchanged
+        Keys of a multi-entry ``labels`` dict, in the method's cell order; a
+        subset selects those files. ``None`` works for an unchanged
         ``mtb.labels_for`` dict (Notes).
     verbose : bool
         ``True`` prints one stderr line when the Leiden sweep starts on more
@@ -614,7 +612,7 @@ def evaluate(
 
     - a dict from ``mtb.labels_for``, unchanged, is used as it is, in the
       order ``labels_for`` gave it (with ``category`` and ``method``, that
-      method's stacking order);
+      method's cell order);
     - any other dict goes in as is only in the default order
       (``cty1, cty2, ...`` numerically; ``rna`` before ``adt`` before
       ``atac``) and otherwise needs ``label_order=`` naming its keys;
@@ -750,7 +748,7 @@ def evaluate(
 
     See Also
     --------
-    mtb.labels_for : the label files of a dataset, in stacking order.
+    mtb.labels_for : the label files of a dataset, in the method's cell order.
 
     mtb.to_long : reshapes the result into the long results frame.
 

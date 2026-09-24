@@ -596,7 +596,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         warnings.warn(msg, UserWarning, stacklevel=2)
 
     msg = _no_comparison_message(idx, style.constant_columns(
-        pd.concat([b.raw for b in blocks], axis=1)))
+        pd.concat([b.raw for b in blocks], axis=1)), aggregate)
     if msg:
         warnings.warn(msg, UserWarning, stacklevel=2)
 
@@ -616,7 +616,19 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     )
 
 
-def _no_comparison_message(methods, constant: dict) -> str | None:
+def _equal_columns(constant: dict, aggregate: str) -> str:
+    """``'all rows have the same value in ARI (0.350)'``, or under
+    ``aggregate="summary"``, where a cell holds a mean rank and not the
+    metric's value, ``'every method has the same mean rank in ARI (1.5)'``."""
+    if aggregate == "summary":
+        return "every method has the same mean rank in " + ", ".join(
+            f"{c} ({round(v, 2):g})" for c, v in constant.items())
+    return "all rows have the same value in " + ", ".join(
+        f"{c} ({v:.3f})" for c, v in constant.items())
+
+
+def _no_comparison_message(methods, constant: dict,
+                           aggregate: str = "dataset") -> str | None:
     """The warning for a figure whose fill and rank compare nothing somewhere.
 
     One method: every column. Several: the columns in ``constant`` (from
@@ -628,20 +640,21 @@ def _no_comparison_message(methods, constant: dict) -> str | None:
                 f"show no comparison, so the fills are grey. Plot {methods[0]} "
                 f"with methods scored on the same dataset.")
     if constant:
-        cols = ", ".join(f"{c} ({v:.3f})" for c, v in constant.items())
         which = "that column is" if len(constant) == 1 else "those columns are"
-        return (f"all rows have the same value in {cols}: fill and rank show no "
+        return (f"{_equal_columns(constant, aggregate)}: fill and rank show no "
                 f"comparison there, so {which} grey.")
     return None
 
 
-def _constant_note(methods, constant: dict) -> str | None:
+def _constant_note(methods, constant: dict, aggregate: str = "dataset") -> str | None:
     """The footnote line naming the grey columns (``None`` when there are none)."""
     if len(methods) == 1:
         return "Grey fill: one method, nothing to compare."
     if constant:
-        return "Grey fill: all rows equal in " + ", ".join(
-            f"{c} ({v:.3f})" for c, v in constant.items()) + "."
+        text = _equal_columns(constant, aggregate)
+        if aggregate != "summary":
+            text = text.replace("all rows have the same value in", "all rows equal in", 1)
+        return f"Grey fill: {text}."
     return None
 
 
@@ -988,7 +1001,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     y_text = y_bottom - 0.55
     ax.text(-0.9, y_text, note, fontsize=6.4, ha="left", va="center",
             color="#666666")
-    grey = _constant_note(methods, constant)
+    grey = _constant_note(methods, constant, tbl.aggregate)
     if grey:
         y_text -= 0.45
         ax.text(-0.9, y_text, grey, fontsize=6.4, ha="left", va="center",

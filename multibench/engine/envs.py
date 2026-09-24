@@ -112,7 +112,7 @@ DIFFICULTY = {
                 "ran end-to-end on its reference dataset",
     "blocked-script": "the env builds, but the upstream script cannot run "
                       "unmodified from the public checkout; it needs extra files "
-                      "(method_info(m)['setup_hint'] and scan's files_reason say which)",
+                      "(the method's setup_hint and scan's files_reason say which)",
     "unknown": "no recipe declared for the method",
 }
 
@@ -679,8 +679,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
          as_frame: bool = False):
     """List the conda envs a set of methods needs, one row per env.
 
-    Methods that share an env collapse into one row, so a whole category
-    needs only a few envs.
+    Methods that share an env collapse into one row.
 
     Parameters
     ----------

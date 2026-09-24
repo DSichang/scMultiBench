@@ -496,7 +496,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
     See Also
     --------
-    mtb.labels_for : the cell-type label CSVs of the same dataset, in stacking order.
+    mtb.labels_for : the cell-type label CSVs of the same dataset, in the method's cell order.
 
     mtb.run : consumes the returned dict as ``inputs=``.
 
@@ -593,9 +593,11 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
         same = [f for f in found if category == "vertical" and not m and atac
                 and _KIND_BY_BASE.get(f[:-len(".h5")]) == atac]
         if same:
+            # one rule for every vertical ATAC role: the atac_gas role of the
+            # peak methods (moETM, scMM, iPOLNG) also reads atac.h5
             hints.append(
-                f"{accepted[0]} not found; found {', '.join(found)} - vertical reads "
-                f"{accepted[0]}: rename {same[0]} to {accepted[0]}, or write it with "
+                f"atac.h5 not found; found {', '.join(found)} - vertical reads "
+                f"atac.h5: rename {same[0]} to atac.h5, or write it with "
                 + config.hint('category="vertical"', "--category vertical"))
             continue
         why = ("every mosaic method reads peaks" if m else
@@ -1006,8 +1008,10 @@ def _check_same_cells(method, dataset, category, resolved) -> None:
 
 def _check_atac_gas_cells(method, dataset, resolved) -> None:
     """Diagonal: the gene-activity file a variant reads must list the cells of
-    the peak file next to it (``atac_peak.h5``, else ``peak.h5``), in its
-    order, because ``atac_cty.csv`` labels the peak file's cells.
+    its peak file in that file's order, because ``atac_cty.csv`` labels the
+    peak file's cells. The peak file is the ``atac_peak`` role when
+    ``resolved`` has one, else the file next to the gene-activity file
+    (``atac_peak.h5``, else ``peak.h5``).
 
     Barcodes that differ only in a trailing ``-<n>`` suffix count as the same
     cell when the suffix-free names stay unique (D28's two ATAC files end in
@@ -1020,9 +1024,13 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
     if not gas:
         return
     gas = Path(gas)
-    peak = next((gas.parent / n for n in ("atac_peak.h5", "peak.h5")
-                 if (gas.parent / n).is_file()), None)
-    if peak is None or peak.name == gas.name:
+    given = resolved.get("atac_peak")
+    if given and Path(given).is_file():
+        peak = Path(given)
+    else:
+        peak = next((gas.parent / n for n in ("atac_peak.h5", "peak.h5")
+                     if (gas.parent / n).is_file()), None)
+    if peak is None or peak.resolve() == gas.resolve():
         return
     a, b = _barcodes_of(gas), _barcodes_of(peak)
     if a is None or b is None:
@@ -1258,10 +1266,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
                *, modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
                check: bool | None = None) -> dict:
-    """Return a dataset's cell-type label files, in cell-stacking order.
+    """Return a dataset's cell-type label files, in the method's cell order.
 
-    Hand the dict to ``mtb.evaluate(labels=...)`` as is; it matches an
-    embedding only if that embedding stacks its cells in the dict's order, so
+    Hand the dict to ``mtb.evaluate(labels=...)`` as is. It matches an
+    embedding only when the embedding's cell order is the dict's order, so
     give ``category`` and ``method`` for a method-specific order.
 
     Parameters
@@ -1273,8 +1281,8 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         ``cross``; with ``method``, selects the variant whose cell order is
         used. ``None`` = the default order.
     method : str | None
-        Registry method id; with ``category``, orders the files as that
-        variant stacks its cells. ``None`` = the default order.
+        Registry method id; with ``category``, orders the files in that
+        variant's cell order. ``None`` = the default order.
     modalities : list[str] | set[str] | None
         Modality tokens that pick one of several variants; used only with
         ``category`` and ``method``.
@@ -1288,8 +1296,8 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     Returns
     -------
     dict
-        ``{stem: absolute path}`` in cell-stacking order, keyed by filename
-        stem (``cty``, ``rna_cty``, ``cty1`` ...).
+        ``{stem: absolute path}`` in the method's cell order, keyed by
+        filename stem (``cty``, ``rna_cty``, ``cty1`` ...).
 
     Raises
     ------
@@ -1336,6 +1344,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     of its batches. UINMF's cross variant reads batches 1 and 2, so on
     ``D52`` the dict holds ``cty1`` and ``cty2``.
 
+    An older paired folder may hold ``rna_cty.csv`` instead of ``cty.csv``.
+    With ``category`` and ``method``, a variant that reads ``cty`` gets that
+    file under the key ``cty``, as ``mtb.inputs_for`` returns it.
+
     **Default order.** Without ``category`` and ``method``, the order is
     not alphabetical:
 
@@ -1349,13 +1361,13 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
 
     **Per-method order.** With ``category`` and ``method``, each file goes
     where the cells it labels sit in that variant's output: the order of its
-    inputs, unless the method stacks its cells in another order. uniPort and
-    Seurat_v5 put their ATAC cells before their RNA cells.
+    inputs, unless the method's cell order differs. uniPort and Seurat_v5
+    put their ATAC cells before their RNA cells.
 
     StabMap uses a fixed reference batch: batch 3 in cross, batch 1 in
-    mosaic (``method_info('StabMap')['supports'][i]['reference_batch']``). It
-    stacks that batch first (``cty3, cty1, cty2`` on ``D52``). Number the
-    donor you want as reference accordingly.
+    mosaic (``method_info('StabMap')['supports'][i]['reference_batch']``).
+    Its cell order starts with that batch (``cty3, cty1, cty2`` on ``D52``).
+    Number the donor you want as reference accordingly.
 
     The variant is chosen as ``mtb.inputs_for`` does: by ``modalities=``, else
     the category's only variant or the one whose files the folder holds. If
@@ -1427,10 +1439,17 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         except AmbiguousVariantError:
             cand = None                 # still ambiguous: canonical order
         if cand is not None:
+            roles = {r for a in cand.args
+                     for r in (getattr(a, "roles", None) or [a.role]) if r}
+            # an older paired folder names cty.csv rna_cty.csv; a variant that
+            # reads the cty role gets it under that key, as inputs_for gives it
+            if "cty" in roles and "cty" not in files \
+                    and _resolve_role(ds_dir, "cty").name == "rna_cty.csv":
+                files = {("cty" if k == "rna_cty" else k): v for k, v in files.items()}
+                stems = ["cty" if st == "rna_cty" else st for st in stems]
             # a variant that reads fewer batches than the folder holds (UINMF:
             # batches 1-2) gets only the label files of its batches
-            used = _variant_batches(r for a in cand.args
-                                    for r in (getattr(a, "roles", None) or [a.role]) if r)
+            used = _variant_batches(roles)
             if used:
                 stems = [st for st in stems
                          if not re.fullmatch(r"cty\d+", st) or int(st[3:]) in used]

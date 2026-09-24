@@ -236,14 +236,15 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     msg = str(exc.value)
     assert "got a dict with 2 label files ['atac_cty', 'rna_cty']" in msg
     assert "label_order=" in msg
-    assert "stacking order" in msg and "cty1, cty2" in msg and "rna before adt before atac" in msg
+    assert "default cell order" in msg and "cty1, cty2" in msg
+    assert "rna before adt before atac" in msg
     assert "not alphabetical" in msg
     assert "mtb.labels_for(dataset, method=<method>, category=<category>)" in msg
     # the same rule reaches as_vector() directly (batch= given as a dict)
     with pytest.raises(ValueError, match="batch: got a dict with 2 label files"):
         io.as_vector(d, what="batch")
     # metrics='all' does not trip over the batch check BEFORE explaining the dict
-    with pytest.raises(ValueError, match="stacking order"):
+    with pytest.raises(ValueError, match="default cell order"):
         evaluate(emb, metrics="all", labels=d)
 
 

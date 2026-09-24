@@ -794,7 +794,7 @@ def _cmd_params(args) -> int:
             frames.append(tbl)
             continue
         print(f"# {p['method']} {p['variant']}: {len(tun)} tunable parameter(s) "
-              f"(--param KEY=VALUE / run(params={{...}}); mtb.params_for)")
+              f"(set with --param KEY=VALUE)")
         if len(tun):
             _print_frame(tbl.drop(columns=["variant"]), fmt="table")
         else:
@@ -991,10 +991,11 @@ def _cmd_plot(args) -> int:
         df = df[df["method"].isin(methods)]
     if len(df) == 0:
         raise ValueError("the results table is empty after filtering - nothing to plot")
-    if df["method"].nunique() == 1 and args.category is None:
+    if df["method"].nunique() == 1 and args.category is None and args.kind == "bar":
         # --category frames come through load_results, which already warns
         # (and names the source that holds more methods); --input-only
-        # frames never pass through it
+        # frames never pass through it. plot.bubble warns about one method
+        # itself, so only bar needs this line
         print("warning: only one method in this table; ranks and Overall bars "
               "are not meaningful with a single method", file=sys.stderr)
     title = args.title
@@ -1057,7 +1058,8 @@ def _cmd_run(args) -> int:
         argv = multibench.run(args.method, args.category, inputs=inputs,
                               out_dir=args.out, params=params.get(args.method),
                               cmd_template=args.runner, dry_run=True)
-        print("# dry run - nothing was executed; run() would execute:", file=sys.stderr)
+        print("# dry run - nothing was executed; multibench run would execute:",
+              file=sys.stderr)
         print(shlex.join(argv))
         return _EXIT_OK
     with _quiet_stdout():                     # library progress -> stderr
@@ -1103,8 +1105,8 @@ def _cmd_run_all(args) -> int:
                                     assume_gpu=getattr(args, "assume_gpu", False))
         k, n = int(df["runnable"].sum()), len(df)
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
-              f"{args.dataset} ({args.category}); commands below are what run() "
-              f"would execute (rows without files_ok have none)", file=sys.stderr)
+              f"{args.dataset} ({args.category}); commands below are what multibench "
+              f"run would execute (rows with files_ok False have none)", file=sys.stderr)
         from .engine.resolve import unused_batches_in
         for _, r in df.iterrows():
             note = unused_batches_in(r.get("caveat"))
@@ -1158,7 +1160,7 @@ def _evaluate_labels(args, stack):
     stacked in the given order with each file one batch (as
     ``mtb.evaluate(labels=[...])``). ``--column`` picks the column of every
     file. Without ``--labels``, ``--dataset/--method/--category`` read the
-    dataset's label files in the method's stacking order (``mtb.labels_for``).
+    dataset's label files in the method's cell order (``mtb.labels_for``).
     """
     import multibench
     files = list(args.labels or [])
@@ -1562,9 +1564,9 @@ def _status_epilog() -> str:
 _CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
-                  "modality) or cross (several batches, each with RNA and ADT)")
-_TASK_HELP = ("task within the category: clustering, batch or dimension_reduction "
-              "(mtb.list_tasks())")
+                  "modality) or cross (several batches, each with RNA and ADT).")
+_TASK_HELP = ("task within the category: clustering, batch or dimension_reduction. "
+              "mtb.list_tasks() lists them.")
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
 _FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
@@ -1603,7 +1605,8 @@ def build_parser() -> argparse.ArgumentParser:
                                      "are mtb.find_methods filters)",
                         description="Print registry method ids, one per line.")
     pl.add_argument("--category", help=_CATEGORY_HELP)
-    pl.add_argument("--task", help=_TASK_HELP + " (mtb.find_methods(task=))")
+    pl.add_argument("--task", help=_TASK_HELP + " The same filter as "
+                                               "mtb.find_methods(task=).")
     pl.add_argument("--runnable", action="store_true",
                     help="only methods with a declared variant (usable by run; "
                          "mtb.find_methods(runnable=True))")
@@ -1649,7 +1652,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "hardcodes its hyperparameters.")
     ppa.add_argument("method", help="method id (see `multibench list`; unknown id -> "
                                     "did-you-mean error)")
-    ppa.add_argument("--category", help=_CATEGORY_HELP + " (only that category's variants)")
+    ppa.add_argument("--category", help=_CATEGORY_HELP + " Only that category's variants.")
     ppa.add_argument("--modalities", help="comma-separated modality roles selecting one "
                                           "variant, e.g. rna,adt ('protein' is accepted "
                                           "for adt)")
@@ -1693,8 +1696,8 @@ def build_parser() -> argparse.ArgumentParser:
                           "into repo_path, or report them present; prints the commit")
     pfe.add_argument("--ref", metavar="REF",
                      help="with --scripts: fetch this commit or tag instead of the "
-                          "default branch (default: $MULTIBENCH_SCRIPTS_REF); scripts "
-                          "already present must be at it")
+                          "default branch (default: $MULTIBENCH_SCRIPTS_REF). Scripts "
+                          "already present must be at that commit or tag.")
     pfe.add_argument("--data-path", dest="data_path",
                      help="data root to download into (default: the configured "
                           "data_path, see `multibench config`)")
@@ -1706,7 +1709,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Print data_path, envs_dir, repo_path, result_path and "
                     "leiden_flavor with the source of each value: an environment "
                     "variable (MULTIBENCH_DATA_PATH, MULTIBENCH_ENVS_DIR, "
-                    "MULTIBENCH_REPO_PATH), the conda probe or the default.")
+                    "MULTIBENCH_REPO_PATH), the conda probe or the default. "
+                    "scripts_commit is the commit of the method scripts in "
+                    "repo_path.")
     pco.add_argument("--get", choices=["data_path", "envs_dir", "repo_path", "result_path",
                                        "leiden_flavor"],
                      help="print only this value, e.g. DATA=$(multibench config --get "
@@ -1729,8 +1734,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "files_reason, env_reason, needs_labels, atac ...")
     ps.add_argument("dataset", help="dataset id = the folder name under --data-path "
                                    "(e.g. D11, or MYCITE for your own data)")
-    ps.add_argument("--category", help=_CATEGORY_HELP + " (default: every category, "
-                                                        "exactly like mtb.scan(dataset))")
+    ps.add_argument("--category", help=_CATEGORY_HELP + " Default: every category, "
+                                                        "as mtb.scan(dataset) does.")
     ps.add_argument("--data-path", dest="data_path",
                     help="folder that contains the dataset folder (default: the "
                          "package data path, see mtb.config)")
@@ -1751,8 +1756,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="exit 1 when nothing requested is runnable (for scripts: "
                          "multibench scan DS --category C --strict && sbatch ...)")
     ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
-                    help="skip this host's GPU test: check on a GPU-less login node a "
-                         "job that runs on a GPU node (mtb.scan(assume_gpu=True))")
+                    help="skip this host's GPU test. Use it on a login node without a "
+                         "GPU to check a job for a GPU node (mtb.scan(assume_gpu=True))")
     ps.set_defaults(func=_cmd_scan, _parser=ps)
 
     # ---- layout
@@ -1760,8 +1765,8 @@ def build_parser() -> argparse.ArgumentParser:
         "layout", help="how to lay out your dataset on disk (mtb.describe_layout)",
         description="Print the directory layout and role -> filename contract the "
                     "package expects, optionally for one category.")
-    play.add_argument("category", nargs="?", help=_CATEGORY_HELP + " (optional: "
-                      "without it the general layout for every category is printed)")
+    play.add_argument("category", nargs="?", help=_CATEGORY_HELP + " Optional: "
+                      "without it, the layout of every category is printed.")
     play.set_defaults(func=_cmd_layout, _parser=play)
 
     # ---- convert
@@ -1785,7 +1790,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("out", help="output .h5 file (mode 1; or an existing directory - or a "
                                "path ending in / - with --modality) or the dataset "
                                "folder to create (mode 2)")
-    pc.add_argument("--category", help=_CATEGORY_HELP + ". Sets the file names. "
+    pc.add_argument("--category", help=_CATEGORY_HELP + " Sets the file names. "
                     "vertical writes atac.h5. diagonal writes atac_peak.h5 or "
                     "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "
                     "mosaic writes atac<i>.h5.")
@@ -1862,8 +1867,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="bubble: paper-style bubble table (methods x metrics, best "
                          "first, Overall bars per family) | bar: one bar per method "
                          "with its across-dataset Overall score")
-    pp.add_argument("--category", help=_CATEGORY_HELP + " (stored results; required "
-                                                        "unless --input is given)")
+    pp.add_argument("--category", help=_CATEGORY_HELP + " Selects the stored results. "
+                                                        "Required unless --input is given.")
     pp.add_argument("--dataset", help="dataset id(s), comma-separated; with --category "
                                       "selects the stored table(s), with --input "
                                       "filters the frame")
@@ -1918,7 +1923,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "on a laid-out dataset folder.")
     pr.add_argument("--method", required=True, help="method id (see `multibench list`)")
     pr.add_argument("--category", required=True, help=_CATEGORY_HELP)
-    pr.add_argument("--task", default="clustering", help=_TASK_HELP + " (default: clustering)")
+    pr.add_argument("--task", default="clustering", help=_TASK_HELP + " Default: clustering.")
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
                     help="one input as role=path, repeatable, e.g. --input rna=rna.h5 "
                          "--input adt=adt.h5 --input cty=cty.csv (roles: see "
@@ -1940,7 +1945,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "params METHOD` lists them (mtb.params_for(METHOD, category, "
                          "modalities))")
     pr.add_argument("--dry-run", dest="dry_run", action="store_true",
-                    help="print the exact command line run() would execute, "
+                    help="print the exact command line the run would execute, "
                          "environment activation included, and execute nothing")
     pr.set_defaults(func=_cmd_run, _parser=pr)
 
@@ -1968,8 +1973,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="print the plan - the mtb.scan frame run_all(dry_run=True) "
                           "returns (one row per method variant: runnable, files_ok, "
                           "env_ok, reason; --columns all for every column) and, per "
-                          "variant whose inputs resolve, the exact command line run() "
-                          "would execute (the 'command' column in csv/tsv/json); "
+                          "variant whose inputs resolve, the exact command line "
+                          "multibench run would execute (the 'command' column in "
+                          "csv/tsv/json); "
                           "execute and create nothing")
     pra.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                      help="with --dry-run: skip this host's GPU test, as scan "
@@ -2016,8 +2022,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="the embedding, cells x dims: .h5 (dataset 'data', the "
                          "benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
                          ".csv/.tsv (a leading barcode column is dropped)")
-    pe.add_argument("--category", help=_CATEGORY_HELP + " (validated when given; "
-                                                        "required with --method/--dataset)")
+    pe.add_argument("--category", help=_CATEGORY_HELP + " Required with --method or "
+                                                        "--dataset.")
     pe.add_argument("--task", choices=["clustering", "batch", "all"],
                     help="deprecated: use --metrics with the same word")
     pe.add_argument("--labels", action="append", metavar="CSV",
@@ -2079,7 +2085,7 @@ def build_parser() -> argparse.ArgumentParser:
                        description="One line per method: installed or not, the "
                                    "environment name and a difficulty tag.",
                        epilog=_status_epilog(), formatter_class=_HelpFormatter)
-    es.add_argument("--category", help=_CATEGORY_HELP + " (only its methods)")
+    es.add_argument("--category", help=_CATEGORY_HELP + " Only that category's methods.")
     es.add_argument("--methods", help=_METHODS_HELP + "; only those")
     es.set_defaults(func=_cmd_env, _parser=es)
     egr = ev.add_parser("groups", help="list the shared env groups and their members",
@@ -2178,7 +2184,8 @@ def build_parser() -> argparse.ArgumentParser:
                        description="Write the lockfile of an installed env (maintainers).")
     ef.add_argument("env", nargs="?", help="env name to freeze")
     ef.add_argument("--all", action="store_true", help="freeze every required env")
-    ef.add_argument("--category", help=_CATEGORY_HELP + " (with --all: only its envs)")
+    ef.add_argument("--category", help=_CATEGORY_HELP + " With --all: only that "
+                                                        "category's envs.")
     ef.set_defaults(func=_cmd_env, _parser=ef)
     return p
 
@@ -2219,7 +2226,12 @@ def main(argv=None) -> int:
     if not os.environ.get("MULTIBENCH_DEBUG"):
         warnings.showwarning = _show
     try:
-        return args.func(args)
+        with warnings.catch_warnings():
+            # a deprecated argument the command passes on (a renamed --input
+            # key) warns at this module's call: show it, as a script would
+            warnings.filterwarnings("default", category=DeprecationWarning,
+                                    module=r"multibench\.cli")
+            return args.func(args)
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
         return 130

@@ -209,7 +209,7 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
       order, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
     * ``dict`` with one entry (what :func:`multibench.labels_for` returns for a
       single-label dataset) - that file. Several entries raise here, because
-      this coercer does not know the method's stacking order; pass the paths
+      this coercer does not know the method's cell order; pass the paths
       as a list in that order. (:func:`multibench.evaluate` takes a
       multi-entry dict as is when it is an unchanged ``labels_for`` dict or
       in the default order, and needs ``label_order=`` otherwise.)
@@ -270,7 +270,7 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
 def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
     """The error for a ``{name: path}`` dict with several entries.
 
-    A dict fixes no cell order, and the order is the method's stacking order -
+    A dict fixes no cell order, and the order is the method's cell order -
     the order in which the method concatenated its input cells - which is not
     alphabetical: for most methods ``cty1 < cty2 < ...`` numerically, and
     ``rna`` before ``atac``. A wrong order raises no error and invalidates
@@ -283,7 +283,7 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
            else "pass the paths as a list in that order")
     return (
         f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
-        f"fix the cell order, and the order must be the method's stacking order "
+        f"fix the cell order, and the order must be the method's cell order "
         f"(the order in which the method concatenated its input cells, which "
         f"is not alphabetical; for most methods numbered files ascending, cty1, "
         f"cty2, ..., and rna before atac). "

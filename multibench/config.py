@@ -442,7 +442,8 @@ def _sources(cfg: Config | None = None) -> list[dict]:
     """Each setting of ``cfg`` with its resolved value and where it came from (internal).
 
     Backs ``multibench config``. Returns one dict per setting, in the order
-    ``data_path``, ``envs_dir``, ``repo_path``, ``result_path``,
+    ``data_path``, ``envs_dir``, ``repo_path``, ``scripts_commit`` (the
+    commit of the method scripts in ``repo_path``), ``result_path``,
     ``leiden_flavor``, with the keys ``name``, ``value`` and ``source``.
     """
     cfg = DEFAULT if cfg is None else cfg
@@ -471,12 +472,17 @@ def _sources(cfg: Config | None = None) -> list[dict]:
     rows.append({"name": "envs_dir", "value": cfg.envs_dir, "source": envs_src})
     repo_src = _var_or_default("repo_path", REPO_PATH_VAR,
                                f"default <base>/scMultiBench_ref; <base> = {_base_source()}")
+    rows.append({"name": "repo_path", "value": cfg.repo_path, "source": repo_src})
     checkout = _scripts_checkout(cfg)
     if checkout is None:
-        repo_src += "; method scripts not fetched yet (multibench fetch --scripts)"
+        commit, commit_src = "not fetched", "multibench fetch --scripts fetches the method scripts"
     else:
-        repo_src += f"; {scripts_line(checkout)}"
-    rows.append({"name": "repo_path", "value": cfg.repo_path, "source": repo_src})
+        sha = scripts_commit(checkout)
+        commit = sha or "unknown"
+        where = Path(checkout) / "tools_scripts"
+        commit_src = (f"the method scripts in {where}" if sha else
+                      f"{where} is not a git checkout")
+    rows.append({"name": "scripts_commit", "value": commit, "source": commit_src})
     rows.append({"name": "result_path", "value": cfg.result_path,
                  "source": ("default: the tables shipped with the package"
                             if cfg.result_path == _ROOT / "multibench" / "result"
@@ -489,7 +495,8 @@ def _sources(cfg: Config | None = None) -> list[dict]:
 def scripts_line(repo) -> str:
     """``'method scripts: <repo>/tools_scripts at <commit>'`` (internal).
 
-    Printed by ``multibench fetch --scripts`` and ``multibench config``.
+    Printed by ``multibench fetch --scripts``; ``multibench config`` shows the
+    commit as its ``scripts_commit`` row.
     """
     sha = scripts_commit(repo)
     where = Path(repo) / "tools_scripts"

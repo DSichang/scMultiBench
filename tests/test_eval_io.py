@@ -272,8 +272,9 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     assert "2 label files" in msg and "cty1" in msg and "cty2" in msg
     assert "list of paths in cell order" in msg
     # 0.3.x: the hint must no longer recommend the alphabetical order; it names
-    # the stacking rule and the label_order= escape hatch instead
-    assert "label_order=" in msg and "stacking order" in msg and "not alphabetical" in msg
+    # the cell-order rule and the label_order= escape hatch instead
+    assert "label_order=" in msg and "default cell order" in msg
+    assert "not alphabetical" in msg
     assert "list(d.values())" not in msg
 
 

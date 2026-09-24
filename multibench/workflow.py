@@ -499,10 +499,8 @@ def _installed_envs() -> frozenset:
 #: the files exist and the env is installed, but the content stops the method.
 #: Surfaced by scan() so a sweep does not discover them hours in.
 _CAVEATS = {
-    ("GLUE", "D28"): ("fails on D28's peak names: GLUE parses coordinates out of "
-                      "peak names and needs them colon-delimited (chr1:1-200); D28's "
-                      "are underscore-delimited, which raises IndexError. Use D27, or "
-                      "rename the peaks."),
+    ("GLUE", "D28"): ("fails on D28's peak names: GLUE needs chr:start-end; rename "
+                      "them with mtb.io.normalize_peak_names"),
 }
 
 
@@ -536,8 +534,7 @@ def _missing_script(variant, *, method: str | None = None) -> str:
         if (root / "tools_scripts").is_dir():
             if not (root / ep).exists():
                 return (f"method script {ep} is missing from the reference checkout at "
-                        f"{root} - update it (git pull) or delete it and let the next "
-                        f"run fetch a fresh copy")
+                        f"{root}: " + _runner.missing_script_fix(root))
             gone = [h for h in (getattr(variant, "helpers", None) or [])
                     if not (root / ep).parent.joinpath(h).exists()]
             if gone:
@@ -552,6 +549,13 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                         f"{files} next to {ep.name} ({who})")
             return ""
     return ""            # no checkout yet: run()/run_all() fetch one
+
+
+def _join_clauses(parts) -> str:
+    """Join caveat clauses with ``"; "``, dropping the period a clause would
+    leave before the separator (``"... names.; setup: ..."``)."""
+    parts = [p for p in parts if p]
+    return "; ".join([p.rstrip().rstrip(".") for p in parts[:-1]] + parts[-1:])
 
 
 def _caveat(method: str, dataset: str) -> str:
@@ -842,8 +846,8 @@ def scan(dataset: str, category: str | None = None, *,
         Print one line ``[scan] files OK for k/n method rows; e/n envs
         installed``.
     assume_gpu : bool
-        ``True`` = skip this host's GPU test, to check on a GPU-less login node
-        a job that runs on a GPU node.
+        ``True`` = skip this host's GPU test; for a login node without a GPU
+        that checks a GPU-node job.
 
     Returns
     -------
@@ -1109,7 +1113,7 @@ def scan(dataset: str, category: str | None = None, *,
             extra = _resolve._preflight_caveats(got, atac=spec.atac, category=cat,
                                                 method=spec.id)
             if extra:
-                rec["caveat"] = "; ".join(x for x in [rec["caveat"], *extra] if x)
+                rec["caveat"] = _join_clauses([rec["caveat"], *extra])
         except Exception as e:  # missing files / no variant / bad layout
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
@@ -1128,7 +1132,7 @@ def scan(dataset: str, category: str | None = None, *,
         # assume_gpu checks a job for a GPU node from a host without one.
         if spec.requires_gpu and not envs.host_has_gpu():
             if assume_gpu:
-                rec["caveat"] = "; ".join(x for x in [rec["caveat"], GPU_NODE_CAVEAT] if x)
+                rec["caveat"] = _join_clauses([rec["caveat"], GPU_NODE_CAVEAT])
             else:
                 rec["env_ok"] = False
                 rec["env_reason"] = "; ".join(
@@ -1155,7 +1159,7 @@ def scan(dataset: str, category: str | None = None, *,
                 notes = [n for n in notes if not n.startswith("setup: ")]
             notes += prepared
             if notes:
-                rec["caveat"] = "; ".join(x for x in [rec["caveat"], *notes] if x)
+                rec["caveat"] = _join_clauses([rec["caveat"], *notes])
         rows.append(rec)
     df = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     df = df.sort_values(["runnable", "category", "method"],
@@ -1415,6 +1419,24 @@ def _with_label_order_note(sm: "pd.DataFrame") -> "pd.DataFrame":
     return sm
 
 
+#: provenance of a reused output when ``out_dir`` holds no earlier record of it
+_UNKNOWN_PROVENANCE = {"scripts_commit": None, "env_flavor": "unknown", "hostname": ""}
+
+
+def _earlier_provenance(d: Path) -> dict:
+    """``{method: {scripts_commit, env_flavor, hostname}}`` from the records
+    saved in ``d/batch_result.json``; ``{}`` when there are none. A field an
+    earlier record lacks gets its :data:`_UNKNOWN_PROVENANCE` value."""
+    p = Path(d) / "batch_result.json"
+    try:
+        with open(p) as fh:
+            recs = json.load(fh).get("records") or []
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return {r["method"]: {k: r.get(k, v) for k, v in _UNKNOWN_PROVENANCE.items()}
+            for r in recs if isinstance(r, dict) and r.get("method")}
+
+
 def _check_save_target(d: Path, dataset: str, category: str) -> None:
     """Raise ``ValueError`` when ``d`` holds a saved result of another
     dataset or category: merging those records would mix two sweeps."""
@@ -1590,9 +1612,8 @@ class BatchResult:
         comparably well, which should not happen for a correct one; treat
         that row with suspicion.
 
-        The score is a ratio, not a difference: the runner-up sits near
-        chance, so a difference is bounded above by the ARI itself and a
-        method scoring 0.3 could never look well-separated.
+        The score is a ratio to the best ARI, not a difference, because the
+        runner-up sits near chance.
 
         **Optimistic bias.** When more than one ordering is possible the
         reported metrics are those of the ordering with the highest ARI, so
@@ -1728,6 +1749,12 @@ class BatchResult:
         scripts_commit, env_flavor, hostname        the scripts, env build and computer
         _long                       internal; read BatchResult.long instead
         ```
+
+        **Reused outputs.** A record with ``reused`` True copies
+        ``scripts_commit``, ``env_flavor`` and ``hostname`` from the method's
+        earlier record in ``out_dir``: the values of the run that made the
+        output. Without an earlier record they are ``None``, ``'unknown'`` and
+        ``''``.
 
         **Label-order evidence.** ``label_order_candidates`` holds every
         ordering tried and the ARI each achieved - the evidence behind
@@ -2346,6 +2373,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     that would be reused as if it had succeeded. After a hard kill, delete
     that method's sub-directory before resuming.
 
+    A reused output's record copies ``scripts_commit``, ``env_flavor`` and
+    ``hostname`` from the method's earlier record in ``out_dir``. Without an
+    earlier record they are ``None``, ``'unknown'`` and ``''``.
+
     **Tuning.** ``skip_existing=True`` together with ``params=...`` raises
     ``ValueError`` on a real run: reuse is keyed on the output file, not on
     ``params``, so it would return results computed with the old parameters.
@@ -2489,6 +2520,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     _check_save_target(out_dir, dataset, category)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []
+    # a reused output keeps the provenance of the run that made it
+    earlier = _earlier_provenance(out_dir) if skip_existing else {}
 
     for _, row in plan_df.iterrows():
         m, mods = row["method"], row["modalities"]
@@ -2581,7 +2614,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         if verbose:
             print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) "
                   f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
-        rec.update(config.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
+        if rec.get("reused"):
+            rec.update(earlier.get(m, _UNKNOWN_PROVENANCE))
+        else:
+            rec.update(config.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
         records.append(rec)
 
     result = BatchResult(records, dataset, category, out_dir)

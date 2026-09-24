@@ -328,7 +328,8 @@ def test_fetch_scripts_and_config_print_the_commit(tmp_path, monkeypatch, capsys
     assert out == f"method scripts present: {tmp_path / 'repo' / 'tools_scripts'} at {head}\n"
     rc = cli.main(["config"])
     out = capsys.readouterr().out
-    assert f"method scripts: {tmp_path / 'repo' / 'tools_scripts'} at {head}" in out
+    assert re.search(rf"^scripts_commit\s+{head}$", out, re.M), out
+    assert f"(the method scripts in {tmp_path / 'repo' / 'tools_scripts'})" in out
 
 
 def test_clone_failure_names_the_offline_route(tmp_path, monkeypatch):

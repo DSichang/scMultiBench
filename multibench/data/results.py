@@ -571,8 +571,7 @@ def load_results(
     """Load the stored benchmark metric tables as one long table.
 
     Reads the published scIB tables, the package's re-run sweeps, or a long
-    CSV of your own. Frames from any source concatenate and go straight to
-    ``mtb.plot.bubble`` or ``mtb.recommend``.
+    CSV of your own. Frames from any source concatenate with each other.
 
     Parameters
     ----------

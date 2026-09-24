@@ -818,9 +818,13 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     _write_nb(site / "b.ipynb", cells)                         # fails closed: nothing to compare with
     assert any(p.startswith("b.ipynb: no package notebook at ") for p in gate.problems(site, pkg))
     assert gate.problems(tmp_path / "nowhere", pkg) == [f"no executed tutorial copies under {tmp_path / 'nowhere'}"]
-    # the mkdocs events: only gh-deploy (or DEPLOY_GATE=1) is gated
+    # the mkdocs events: only gh-deploy (or DEPLOY_GATE=1) is gated. The
+    # release check passes here (its own test follows); no network is used
     config = {"docs_dir": str(tmp_path / "docs")}
     gate.package_checkout = lambda cfg: tmp_path / "pkg"
+    (tmp_path / "pkg" / "multibench").mkdir(parents=True)
+    (tmp_path / "pkg" / "multibench" / "__init__.py").write_text('__version__ = "9.9.9"\n')
+    gate.pypi_releases = lambda *a, **k: {"9.9.9"}
     monkeypatch.delenv("DEPLOY_GATE", raising=False)
     gate.on_startup(command="build", dirty=False)
     assert gate.on_config(config) is config
@@ -834,6 +838,68 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     (site / "b.ipynb").unlink()
     _write_nb(site / "a.ipynb", cells)
     assert gate.on_config(config) is config                    # current copies deploy
+
+
+@needs_docs
+def test_deploy_gate_refuses_a_version_that_is_not_on_pypi(tmp_path, monkeypatch):
+    """The pages tell readers to pip install the version they describe. The
+    gate refuses gh-deploy until the checkout's __version__ is a PyPI release,
+    and fails closed when PyPI cannot be read (review of the round-2
+    integration, M14)."""
+    import importlib.util
+    import urllib.error
+    from mkdocs.exceptions import Abort
+    repo = _docs_root().parent
+    spec = importlib.util.spec_from_file_location("deploy_gate", repo / "hooks" / "deploy_gate.py")
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+    pkg = tmp_path / "pkg"
+    (pkg / "multibench").mkdir(parents=True)
+    (pkg / "multibench" / "__init__.py").write_text('"doc"\n__version__ = "0.3.2"\n')
+    assert gate.checkout_version(pkg) == "0.3.2"
+    import multibench
+    assert gate.checkout_version(ROOT) == multibench.__version__
+    assert gate.release_problems(pkg, {"0.3.1", "0.3.2"}) == []
+    (msg,) = gate.release_problems(pkg, {"0.2.0", "0.3.1"})
+    assert msg.startswith("multibench-sc 0.3.2 (the version of ") and "is not on PyPI" in msg
+    assert "releases: 0.2.0, 0.3.1" in msg and "upload 0.3.2 before the deploy" in msg
+    assert gate.release_problems(tmp_path / "nowhere", set()) == [
+        f"no __version__ in {tmp_path / 'nowhere' / 'multibench' / '__init__.py'}"]
+    # a yanked release, or one without files, is not installable
+    blob = {"releases": {"0.3.1": [{"yanked": False}], "0.3.2": [{"yanked": True}],
+                         "0.4.0": []}}
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, *a):
+            return json.dumps(blob).encode()
+    monkeypatch.setattr(gate.urllib.request, "urlopen", lambda *a, **k: _Resp())
+    assert gate.pypi_releases() == {"0.3.1"}
+
+    # PyPI out of reach: the gate fails closed
+    def offline(*a, **k):
+        raise urllib.error.URLError("no network")
+    monkeypatch.setattr(gate.urllib.request, "urlopen", offline)
+    (msg,) = gate.release_problems(pkg)
+    assert msg.startswith("could not read the releases of multibench-sc")
+    # gh-deploy refuses; nothing is built or pushed
+    site = tmp_path / "docs" / "tutorials"
+    _write_nb(pkg / "notebooks" / "tutorial_a.ipynb", [("code", "x = 1")], executed=False)
+    _write_nb(site / "a.ipynb", [("code", "x = 1")])
+    gate.package_checkout = lambda cfg: pkg
+    monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1"})
+    gate.on_startup(command="gh-deploy", dirty=False)
+    with pytest.raises(Abort, match=r"multibench-sc 0\.3\.2 .* is not on PyPI") as e:
+        gate.on_config({"docs_dir": str(tmp_path / "docs")})
+    assert "nothing was built or pushed" in str(e.value)
+    monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1", "0.3.2"})
+    config = {"docs_dir": str(tmp_path / "docs")}
+    assert gate.on_config(config) is config
 
 
 # ---- round 1 of the student study: facts the pages keep in visible text -----
@@ -927,7 +993,7 @@ def test_guides_keep_the_round2_facts_visible():
     assert 'mtb.find_methods("diagonal", atac="peak")' in run
     assert "mtb.to_long(metrics" in evaluate and 'metrics.to_csv("metric.csv")' not in evaluate
     assert "How few cell types" not in evaluate
-    assert "`grand_score` compares the ranked methods" in discover
+    assert "`grand_score` compares a category's methods" in discover
     assert "cannot run on unpaired data" in discover
 
 

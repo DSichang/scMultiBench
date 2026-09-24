@@ -81,12 +81,14 @@ def test_config_prints_each_path_with_its_source(monkeypatch, tmp_path, capsys):
     assert rc == 0
     lines = out.splitlines()
     names = [l.split()[0] for l in lines if not l.startswith(" ")]
-    assert names == ["data_path", "envs_dir", "repo_path", "result_path", "leiden_flavor"]
+    assert names == ["data_path", "envs_dir", "repo_path", "scripts_commit", "result_path",
+                     "leiden_flavor"]
     i = names.index("data_path") * 2
     assert lines[i].split()[1] == str(tmp_path / "data")
     assert "environment variable MULTIBENCH_DATA_PATH" in lines[i + 1]
     assert "environment variable MULTIBENCH_ENVS_DIR" in out
-    assert "method scripts" in out            # repo_path says whether the scripts are there
+    # the scripts_commit row says whether the scripts are there, and at which commit
+    assert "scripts_commit" in out
     rc = cli.main(["config", "--get", "data_path"])
     assert rc == 0 and capsys.readouterr().out == f"{tmp_path / 'data'}\n"
     rc = cli.main(["config", "--format", "json"])

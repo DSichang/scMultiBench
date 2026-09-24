@@ -35,8 +35,8 @@ class RunResult:
     stderr : str
         Captured standard error; read it first when a result looks wrong.
     obs_names : list[str] | None
-        Cell barcodes of the output, in the order the method stacks the cells;
-        ``None`` when they could not be matched.
+        Cell barcodes of the output, in the method's cell order; ``None`` when
+        they could not be matched.
     scripts_commit : str | None
         Commit of the method scripts that ran; ``None`` when they are not a
         git checkout.
@@ -56,11 +56,11 @@ class RunResult:
 
     Notes
     -----
-    **Row order.** Rows follow the input cells in the order the method stacks
-    them, which is the order ``mtb.labels_for(dataset, category, method)``
-    uses. ``obs_names`` holds the barcodes from the input files in that
-    order. It is ``None``, with a ``UserWarning``, when their number differs
-    from the output's cells or the inputs are a folder (scBridge).
+    **Row order.** Rows follow the method's cell order, which is the order
+    ``mtb.labels_for(dataset, category, method)`` uses. ``obs_names`` holds
+    the barcodes from the input files in that order. It is ``None``, with a
+    ``UserWarning``, when their number differs from the output's cells or the
+    inputs are a folder (scBridge).
 
     **Orientation.** Most methods write cells x dims. When
     ``res.output.shape[0] != len(res.obs_names)`` the output is dims x cells:
@@ -250,6 +250,45 @@ def _modality_roles(inputs: dict) -> set[str]:
     return {k for k in inputs if k not in _AUX_ROLES and "cty" not in k and "label" not in k}
 
 
+#: input keys a method's variant renamed, ``{method: {old key: new key}}``.
+#: UnitedNet's label role was ``rna_cty`` up to 0.3.1 and is ``cty`` now.
+_RENAMED_ROLES = {"UnitedNet": {"rna_cty": "cty"}}
+
+
+def _rename_old_roles(method: str, inputs: dict) -> dict:
+    """``inputs`` with a renamed key (:data:`_RENAMED_ROLES`) spelled the new
+    way, with a ``DeprecationWarning`` naming the new key. A dict that
+    already holds the new key is returned unchanged."""
+    renamed = _RENAMED_ROLES.get(method) or {}
+    old = [k for k in inputs if k in renamed and renamed[k] not in inputs]
+    if not old:
+        return inputs
+    for k in old:
+        warnings.warn(f"inputs key {k!r} of {method} is deprecated and will be removed "
+                      f"in 0.4; use {renamed[k]!r} (the same file)",
+                      DeprecationWarning, stacklevel=3)
+    return {renamed.get(k, k) if k in old else k: v for k, v in inputs.items()}
+
+
+def _check_input_cells(method: str, category: str, inputs: dict) -> None:
+    """The cell checks of ``inputs_for(check=True)`` on explicit input paths.
+
+    Seurat_v5's ``rna`` and ``atac_peak`` must hold the same cells, and a
+    diagonal ``atac_gas`` file must list the cells of its ``atac_peak`` file
+    (the one given, else the one next to it) in the same order. Raises the
+    ``ValueError`` of the file check. Values that are not readable canonical
+    ``.h5`` paths (an AnnData, an ``.h5ad``) are not checked.
+    """
+    from . import resolve
+    paths = {r: v for r, v in inputs.items() if isinstance(v, (str, os.PathLike))}
+    if not paths:
+        return
+    dataset = Path(next(iter(paths.values()))).parent.name or "inputs"
+    resolve._check_same_cells(method, dataset, category, paths)
+    if category == "diagonal":
+        resolve._check_atac_gas_cells(method, dataset, paths)
+
+
 def _repo_root_no_fetch() -> Path:
     """Where :func:`run` looks for ``tools_scripts/`` - without cloning it.
 
@@ -287,6 +326,22 @@ def linux_only_sentence() -> str | None:
     return f"Methods run only on Linux (this computer is {host})."
 
 
+def missing_script_fix(repo) -> str:
+    """What to do about a method script missing from the checkout at ``repo``.
+
+    A git checkout is updated or fetched again. A folder that is not a git
+    checkout is most often one made by hand before the scripts were fetched
+    (to hold GLUE's annotation): ``git pull`` does not apply there, and the
+    folder blocks the fetch until it is moved away.
+    """
+    if config.scripts_commit(repo) is not None:
+        return ("update it with git pull, or delete it so the next run fetches a "
+                "fresh copy")
+    return (f"that folder is not a git checkout. If you made it by hand, move out "
+            f"the files you added, delete it, run `{FETCH_SCRIPTS_CMD}` and put the "
+            f"files back; otherwise copy a full scripts checkout there")
+
+
 def script_notes(spec, variant, repo: Path) -> list[str]:
     """Setup facts a preview must show before the real run fails on them.
 
@@ -310,8 +365,7 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
     if not (repo / ep).exists():
         if (repo / "tools_scripts").is_dir():
             notes.append(f"method script {ep} not found in the checkout at {repo}: "
-                         f"update it with git pull, or delete it so the next run "
-                         f"fetches a fresh copy")
+                         + missing_script_fix(repo))
         else:
             notes.append(f"method scripts not found under {repo}: the first real run "
                          f"clones PYangLab/scMultiBench with git; on a host without "
@@ -679,6 +733,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         Unknown method, or no variant fits ``category`` and the input roles.
     ValueError
         An input the run cannot convert, such as an ``.h5mu`` file or a MuData.
+    ValueError
+        Input files that must hold the same cells, in one order, do not.
     OSError
         The method needs a GPU this host lacks, or its env is not installed.
     RuntimeError
@@ -688,6 +744,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     -----
     UserWarning
         The input barcodes do not match the output's cells; ``obs_names`` is ``None``.
+    DeprecationWarning
+        UnitedNet's labels passed under the old key ``rna_cty``; the key is ``cty``.
 
     Examples
     --------
@@ -745,6 +803,15 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     ``ValueError``: pass one modality per role (``mdata.mod["rna"]``), or
     write the folder with ``mtb.io.export_dataset``. With ``convert=False``
     every modality input must already be a file path.
+
+    **Cell checks.** Before anything runs, the dry run included, canonical
+    ``.h5`` inputs get the cell checks of ``mtb.inputs_for(check=True)``.
+    Seurat_v5's ``rna`` and ``atac_peak`` must hold the same cells. A
+    diagonal ``atac_gas`` file must list the cells of its ``atac_peak``
+    file, the one given or the one next to it, in the same order.
+
+    UnitedNet's label input is ``cty``. The older key ``rna_cty`` still
+    works, with a ``DeprecationWarning``.
 
     **GPU and CPU.** On a host without an NVIDIA GPU
     (``mtb.env.host_has_gpu()`` is False), the method's ``cpu_params`` - the
@@ -844,6 +911,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     mtb.evaluate : scores ``RunResult.output``.
     """
     _check_template(cmd_template)
+    inputs = _rename_old_roles(method, inputs)
+    # the cell checks scan and inputs_for(check=True) apply, before anything runs
+    _check_input_cells(method, category, inputs)
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
                               params=params, convert=convert,

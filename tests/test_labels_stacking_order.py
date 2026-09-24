@@ -107,7 +107,7 @@ def test_a_copied_or_reordered_dict_is_checked_like_any_dict(tmp_path):
     assert "unchanged" in msg
     moved = mtb.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
     moved["cty2"] = moved.pop("cty2")          # same keys, cty2 moved to the end
-    with pytest.raises(ValueError, match="stacking order"):
+    with pytest.raises(ValueError, match="default cell order"):
         mtb.evaluate(emb, labels=moved, metrics=["ASW"], verbose=False)
     # label_order= still overrides the recorded order
     got = mtb.evaluate(emb, labels=d, label_order=["cty2", "cty1", "cty3"],
