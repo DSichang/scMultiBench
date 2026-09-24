@@ -174,15 +174,17 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
     with pytest.raises(ValueError, match=r"^batch: the first column of d_rep\.csv repeats "
                                          r"1 id"):
         mtb.run_all("MYCITE", "vertical", dry_run=True, batch=drep, data_path=data, **KW)
-    # a file with several columns: the fix names no column= argument
+    # a file with several columns: the fix names no column= argument (R6-03:
+    # it suggests a Series)
     wide = tmp_path / "wide.csv"
     pd.DataFrame({"sample": SAMPLES, "donor": SAMPLES, "day": SAMPLES}).to_csv(wide,
                                                                               index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(wide), metrics=["iLISI"])
-    assert str(e.value) == ("batch: wide.csv has 3 columns ['sample', 'donor', 'day'], "
-                            "and none is named x. Keep one column in the file, or the "
-                            "cell ids and one column.")
+    assert str(e.value) == ("batch: wide.csv has several columns: sample, donor, day. "
+                            "Pass one column as a Series, for example "
+                            f'pd.read_csv("{wide}")["sample"].')
+    assert "column=" not in str(e.value)
 
 
 def test_run_all_cli_names_the_label_files_not_a_python_call(cite, tmp_path, capsys):

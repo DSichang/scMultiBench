@@ -304,16 +304,18 @@ def test_read_labels_ambiguous_multicolumn_raises_unless_column_given(tmp_path):
     with pytest.raises(ValueError) as exc:
         io.read_labels(p)
     msg = str(exc.value)
-    assert "2 columns" in msg and "pass column=<name>" in msg
+    assert "several columns: celltype, batch" in msg and "Pass column=<name>" in msg
     assert list(io.read_labels(p, column="celltype")) == ct
     assert list(io.read_labels(p, column="batch")) == ["a", "a", "b", "b"]
-    # barcode index + two columns: ambiguous, and the hint names the index
+    # barcode index + two columns: ambiguous, and the message lists the
+    # columns after the barcodes, without pandas' 'Unnamed: 0'
     p2 = tmp_path / "meta2.csv"
     pd.DataFrame({"celltype": ct, "batch": ["a", "a", "b", "b"]},
                  index=[f"bc{i}" for i in range(4)]).to_csv(p2)
     with pytest.raises(ValueError) as exc:
         io.read_labels(p2)
-    assert "looks like cell barcodes" in str(exc.value) and "index=False" in str(exc.value)
+    assert "after the cell ids: celltype, batch" in str(exc.value)
+    assert "Unnamed" not in str(exc.value)
     assert list(io.read_labels(p2, column="celltype")) == ct
     with pytest.raises(ValueError) as exc:
         io.read_labels(p2, column="nope")

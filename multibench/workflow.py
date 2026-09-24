@@ -2610,13 +2610,11 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     order of ``labels_for(dataset)``). ``stacklevel`` is that of the CSV
     warning, which is raised one call deeper than the Series warning.
     """
-    from .eval.pipeline import _carries_ids
+    from .eval.pipeline import _carries_ids, _pick
     order = order or config.hint(f"the order of mtb.labels_for({dataset!r})",
                                  f"the order of the label files of {dataset}")
     if isinstance(x, (str, Path)):
-        vals, first = _eio.read_labels_ids(
-            x, what=what, pick="Keep one column in the file, or the cell ids and one "
-                                "column.")
+        vals, first = _eio.read_labels_ids(x, what=what, pick=_pick(what))
         if first is None:
             return np.asarray(vals), False
         return _eio.by_id_column(

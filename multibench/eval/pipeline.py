@@ -332,10 +332,36 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
     return io.as_vector(x, what=what, column=column)
 
 
-def _pick(what: str) -> str:
-    """How to fix a label file with several columns and no clear label column."""
-    py = "Keep one column in the file, or the cell ids and one column."
-    return config.hint(py, "Pass --column <name>.") if what == "labels" else py
+def _pick(what: str):
+    """How to fix a per-cell file with several columns and no chosen column.
+
+    The ``pick`` of :func:`multibench.eval.io.read_labels_ids`: a function of
+    the pandas call that reads one column of the file as a Series. The
+    command line names the flag that chooses the column.
+    """
+    def fix(example: str) -> str:
+        py = f"Pass one column as a Series, for example {example}"
+        if what == "labels":
+            return config.hint(f"{py}, or name the label column x.",
+                               "Choose one with --column, or name the label column x.")
+        cli = ("Choose one with --batch-column." if what == "batch"
+               else "Keep the cell ids and one column in the file.")
+        return config.hint(f"{py}.", cli)
+    return fix
+
+
+def _one_column_file(path, column: str, stack, *, what: str = "batch") -> str:
+    """A copy of the per-cell file ``path`` with only ``column`` (as ``x``)
+    after its first column, in a folder that ``stack`` (an ``ExitStack``)
+    removes. ``multibench evaluate/run-all --batch-column`` pass it on; the
+    copy keeps the file name, so the messages name the file typed."""
+    import tempfile
+    path = io._require_file(path, f"{_FLAGS[what]} file")
+    vals, first = io.read_labels_ids(path, column, what=what)
+    out = Path(stack.enter_context(tempfile.TemporaryDirectory())) / path.name
+    cols = {"x": vals} if first is None else {"id": first.to_numpy(), "x": vals}
+    pd.DataFrame(cols).to_csv(out, index=False, sep=io._sep_for(out))
+    return str(out)
 
 
 def _no_ids(ids) -> str:

@@ -17,6 +17,7 @@ Three groups:
 """
 from __future__ import annotations
 
+import json
 import warnings
 from pathlib import Path
 
@@ -111,16 +112,17 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
 
     Column choice, in order:
 
-    1. ``column`` when given (must exist; error lists the header otherwise);
+    1. ``column`` when given (must exist; error lists the columns otherwise);
     2. the column named ``x`` when present;
     3. the only column when the file has one;
     4. the last column when the file has exactly two and the first is all
-       unique (an index / barcode column);
-    5. otherwise the file is ambiguous and a ``ValueError`` asks for
-       ``column=``: a silent pick could score the wrong column without any
-       error. When the first of two columns is an index that repeats a
-       barcode (text without a header, or 90% distinct), the ``ValueError``
-       names the repeated ids instead.
+       unique or has no header (an index / barcode column);
+    5. otherwise the file is ambiguous and a ``ValueError`` lists the
+       columns after the cell ids and asks for ``column=``: a silent pick
+       could score the wrong column without any error. When the first of
+       two columns is an index that repeats a barcode (text without a
+       header, or 90% distinct), the ``ValueError`` names the repeated ids
+       instead.
 
     Parameters
     ----------
@@ -145,26 +147,31 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
 
 
 def read_labels_ids(path: Path | str, column: str | None = None, *,
-                    what: str | None = None, pick: str | None = None):
+                    what: str | None = None, pick=None):
     """:func:`read_labels`, plus the first column it left out.
 
     Returns ``(values, first)``. ``first`` is the file's first column (a
     ``pandas.Series``) when ``column`` or rule 2 picked another column, or
-    rule 4 dropped a unique first column; it may hold cell ids. Otherwise
+    rule 4 dropped the first of two columns; it may hold cell ids. Otherwise
     ``first`` is ``None``.
 
-    ``what`` ("labels", "batch") starts the messages of the errors; ``pick``
-    is the sentence an ambiguous file's error ends with, for callers that
-    have no ``column`` argument (default: pass ``column=``).
+    ``what`` ("labels", "batch", "clustering") starts the messages of the
+    errors. ``pick`` ends an ambiguous file's error: a sentence, or a
+    function of the Python expression that reads one column of the file as
+    a Series (:func:`_series_example`), for callers that have no ``column``
+    argument (default: pass ``column=``).
     """
     path = _require_file(path, "labels file")
     d = pd.read_csv(path, sep=_sep_for(path))
-    cols = [str(c) for c in d.columns]
+    head = f"{what}: {path.name}" if what else str(path)
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
     if column is not None:
         if column not in d.columns:
-            raise ValueError(
-                f"{path}: no column named {column!r}; columns are {cols}")
+            kind, names = _data_columns(d)
+            after = f" after the {kind}" if kind else ""
+            have = (f"Its only column{after} is {names[0]}." if len(names) == 1 else
+                    f"Its columns{after} are {', '.join(names)}.")
+            raise ValueError(f"{head} has no column named {column!r}. {have}")
         other = first is not None and str(d.columns[0]) != str(column)
         return d[column].to_numpy(), (first if other else None)
     if "x" in d.columns:
@@ -172,27 +179,73 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
         return d["x"].to_numpy(), (first if extra else None)
     if d.shape[1] == 1:
         return d.iloc[:, 0].to_numpy(), None
-    first_unique = first.is_unique
-    if d.shape[1] == 2 and first_unique:
+    no_header = _no_header(d.columns[0])
+    if d.shape[1] == 2 and first.is_unique:
         # index/barcode column + one label column: the obs-style export
         return d.iloc[:, -1].to_numpy(), first
     # barcodes with a repeat, not a sample or batch column: an index written
     # without a header (pandas' and R's to_csv), or text that is 90% distinct
-    index_like = str(d.columns[0]).startswith("Unnamed: ") or (
-        len(first) >= 10 and first.nunique() >= 0.9 * len(first))
+    index_like = no_header or (len(first) >= 10 and first.nunique() >= 0.9 * len(first))
     if d.shape[1] == 2 and _looks_like_ids(first) and index_like:
         dup = pd.Index(first[first.duplicated()].astype(str)).unique()
         raise ValueError(
             f"{what or path}: the first column of {path.name} repeats "
             f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
-    if pick:
-        raise ValueError(f"{what or path}: {path.name} has {d.shape[1]} columns {cols}, "
-                         f"and none is named x. {pick}")
-    hint = (" The first column looks like cell barcodes (all unique); write the "
-            "CSV with index=False to drop it." if first_unique else "")
-    raise ValueError(
-        f"{path}: {d.shape[1]} columns {cols}; cannot tell which holds the "
-        f"labels - pass column=<name>.{hint}")
+    if d.shape[1] == 2 and no_header:
+        # an index without a header that repeats numbers, such as the
+        # RangeIndex of pd.concat([...]).to_csv(path): the other column
+        return d.iloc[:, -1].to_numpy(), first
+    kind, names = _data_columns(d)
+    if callable(pick):
+        # barcodes become the Series index; row numbers would not match any cell
+        pick = pick(_series_example(path, names, index=kind == "cell ids", what=what))
+    after = f" after the {kind}" if kind else ""
+    raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. "
+                     f"{pick or 'Pass column=<name>.'}")
+
+
+def _no_header(name) -> bool:
+    """A column that had no header: pandas reads it as ``Unnamed: <i>``."""
+    return str(name).startswith("Unnamed: ")
+
+
+def _data_columns(d: pd.DataFrame) -> tuple[str | None, list]:
+    """The columns of a per-cell file that may hold values, for messages.
+
+    Returns ``(kind, names)``. When the first column is an index (no
+    header, or unique text such as a barcode column), ``kind`` says what it
+    holds (``"cell ids"`` or ``"row numbers"``) and ``names`` are the
+    columns after it; otherwise ``kind`` is ``None`` and ``names`` are all
+    the columns. pandas' ``Unnamed: <i>`` is not listed.
+    """
+    cols = [str(c) for c in d.columns]
+    first = d.iloc[:, 0]
+    ids = _looks_like_ids(first)
+    if d.shape[1] > 1 and (_no_header(cols[0]) or (ids and first.is_unique)):
+        kind = "cell ids" if ids else "row numbers"
+        return kind, [c for c in cols[1:] if not _no_header(c)] or cols[1:]
+    return None, [c for c in cols if not _no_header(c)] or cols
+
+
+#: words in a column name that suggest what the column holds, by ``what``;
+#: the example of an ambiguous file's error takes the first such column
+_COLUMN_HINTS = {"labels": ("celltype", "cell_type", "cell type", "label", "cty"),
+                 "batch": ("batch", "sample", "donor"),
+                 "clustering": ("cluster", "leiden", "louvain")}
+
+
+def _series_example(path: Path, names: list, *, index: bool, what: str | None) -> str:
+    """The pandas call that reads one column of ``path`` as a Series:
+    ``pd.read_csv("obs.csv", index_col=0)["sample"]``. The column is the
+    first of ``names`` whose name suggests ``what``, else the last one."""
+    hints = _COLUMN_HINTS.get(what or "", ())
+    col = next((n for n in names if any(h in n.lower() for h in hints)), names[-1])
+    args = [json.dumps(str(path), ensure_ascii=False)]
+    if _sep_for(path) == "\t":
+        args.append('sep="\\t"')
+    if index:
+        args.append("index_col=0")
+    return f"pd.read_csv({', '.join(args)})[{json.dumps(col, ensure_ascii=False)}]"
 
 
 def _n_ids(n: int) -> str:
