@@ -177,10 +177,11 @@ def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatc
     assert calls[-1] == "Matilda"
     assert "[run_all]   Matilda expects gene activity; atac.h5 holds peaks" in log
     sm = res.summary
-    assert sm.columns[-1] == "caveat"
+    # R5-03: reason follows caveat as the last column
+    assert list(sm.columns[-2:]) == ["caveat", "reason"]
     assert sm["caveat"].iloc[0].startswith("expects gene activity; atac.h5 holds peaks")
     disk = pd.read_csv(tmp_path / "named" / "summary.csv")
-    assert list(disk.columns)[-1] == "caveat"
+    assert list(disk.columns)[-2:] == ["caveat", "reason"]
     assert disk["caveat"].iloc[0].startswith("expects gene activity")
     blob = json.loads((tmp_path / "named" / "batch_result.json").read_text())
     assert blob["records"][0]["caveat"].startswith("expects gene activity")
@@ -214,7 +215,7 @@ def test_scan_strict_counts_the_wrong_atac_kind_apart(tmp_path, capsys):
 def test_old_records_without_a_caveat_still_summarise():
     rec = {"method": "Matilda", "status": "RUN_OK", "run_sec": 1.0}
     sm = W.BatchResult([rec], "D11", "vertical").summary
-    assert sm.columns[-1] == "caveat" and sm["caveat"].isna().all()
+    assert list(sm.columns[-2:]) == ["caveat", "reason"] and sm["caveat"].isna().all()
 
 
 @pytest.mark.parametrize("dataset,category", [("D11", "vertical"), ("D28", "diagonal"),

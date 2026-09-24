@@ -141,10 +141,12 @@ def test_run_all_parser_accepts_batch_and_its_help_is_two_lines():
     assert cli.build_parser().parse_args(
         ["run-all", "D11", "--category", "vertical", "--dry-run"]).batch is None
     lines = _rendered_help(_sub("run-all"), "--batch")
-    assert len(lines) <= 2, lines
+    # R5-02 added the barcode clause: three lines
+    assert len(lines) <= 3, lines
     text = " ".join(" ".join(lines).split())
     # the order the ids follow: the label files', as run_all puts them per method
     assert "evaluate --batch" in text and "cells in the order of the label files" in text
+    assert "a first column of barcodes is aligned by barcode" in text
     assert "(default: one batch per label file)" in text
 
 

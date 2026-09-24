@@ -301,6 +301,8 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
       :func:`multibench.eval.io.align_vector` (raises on missing/extra ids);
     * a ``Series``/``DataFrame`` with a non-default index, when the output is
       a bare array -> positional, with a ``UserWarning`` saying so;
+    * a CSV whose first column holds the output's cell ids -> aligned by
+      that column (:func:`multibench.eval.io.by_id_column`);
     * anything else -> :func:`multibench.eval.io.as_vector` (positional).
     """
     if adata is not None and isinstance(x, str):
@@ -311,14 +313,23 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
                 f"{what}={x!r} is neither an obs column of the AnnData (obs "
                 f"columns: {list(map(str, adata.obs.columns))}) nor an existing "
                 f"file")
+    if isinstance(x, (str, Path)) and column is None:
+        vals, first = io.read_labels_ids(x)
+        unique = ids is not None and pd.Index(ids).is_unique
+        return io.by_id_column(
+            vals, first, ids if unique else None, what=what, name=Path(x).name,
+            target="the output", order="the rows of the output",
+            no_ids="the output repeats cell ids" if ids is not None
+            else "the output has no cell ids", stacklevel=5)[0]
     if _carries_ids(x):
         if ids is not None:
             return io.align_vector(x, ids, what=what, column=column)
         warnings.warn(
-            f"{what} {type(x).__name__} has a non-default index; matched "
-            f"positionally because the embedding carries no cell ids - pass "
-            f"{what}.to_numpy() to silence, or an AnnData/DataFrame with cell "
-            f"ids to align", UserWarning, stacklevel=3)
+            f"The {what} {type(x).__name__} is matched by position, because the "
+            f"embedding has no cell ids. Check that it follows the embedding rows, "
+            f"or pass an AnnData whose obs_names are the barcodes.",
+            # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
+            UserWarning, stacklevel=4)
     return io.as_vector(x, what=what, column=column)
 
 
@@ -776,9 +787,15 @@ def evaluate(
     output's order, and a missing or extra id raises ``ValueError`` naming
     the first ones.
 
+    A CSV whose first column holds the output's cell ids, as
+    ``obs[["batch"]].to_csv(path)`` writes it, is aligned by that column in
+    the same way. A first column where only some values are cell ids
+    raises ``ValueError``. Text with no cell id gives a match by position,
+    with a ``UserWarning``.
+
     When ``output`` is a bare array there is nothing to align against: the
-    Series is matched positionally and a ``UserWarning`` says so (pass
-    ``labels.to_numpy()`` to silence it).
+    Series, or a CSV with text in its first column, is matched positionally
+    and a ``UserWarning`` says so.
 
     **Result shape.** The frame has the ``metric.csv`` shape: index =
     metric, one column ``Value``, never empty. ``mtb.to_long`` makes the

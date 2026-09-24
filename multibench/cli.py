@@ -23,8 +23,10 @@ Exit codes and streams
 as ``error: ...`` on stderr; set ``MULTIBENCH_DEBUG=1`` to get the traceback);
 ``2`` a usage error (argparse: unknown flag, missing required flag, bad
 choice, or a flag combination the subcommand rejects); ``3`` ``run-all``
-finished and saved its files, but a method of this run failed or was
-skipped. Its line on stderr names it.
+finished and saved its files, but a method failed, or a method named in
+``--methods`` was skipped. Without ``--methods``, a skipped method is only
+logged and marked ``SKIPPED`` in ``summary.csv``. A line on stderr names
+the methods.
 
 Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
 lines); diagnostics go to stderr (``error: ...``, ``warning: ...``, progress
@@ -1154,7 +1156,9 @@ def _cmd_run_all(args) -> int:
         from .eval import io as eio
         eio._require_file(batch, "--batch file")   # exit 1 before any method runs
         if args.dry_run:
-            batch_vec = eio.as_vector(batch, what="batch")   # a file it cannot read fails
+            from .workflow import _batch_vector
+            # a file it cannot read, or ids that are not cells of the dataset, fail
+            batch_vec = _batch_vector(batch, args.dataset, args.data_path)
     if args.dry_run:
         from .workflow import _batch_length_problem, _dry_run_notes
         with _quiet_stdout():
@@ -1207,6 +1211,9 @@ def _cmd_run_all(args) -> int:
                                                            False))
     _print_frame(res.summary, columns=columns, fmt=args.format)
     print(f"saved under {args.out}", file=sys.stderr)
+    not_run = _not_run_line(res, Path(args.out) / "summary.csv")
+    if not_run:
+        print(not_run, file=sys.stderr)
     failed = _failed_line(res, Path(args.out) / "failures.csv")
     if failed:
         print(failed, file=sys.stderr)
@@ -1214,36 +1221,90 @@ def _cmd_run_all(args) -> int:
     return _EXIT_OK
 
 
+#: how the stderr line of ``run-all`` counts the statuses of ``failures``, in its order
+_FAILED_WORDS = ("failed", "timed out", "not scored", "skipped")
+
+
+def _failed_word(status) -> str:
+    """The word :func:`_failed_line` counts a ``failures`` status under."""
+    s = str(status)
+    if s == "SKIPPED":
+        return "skipped"
+    if s.startswith("TIMEOUT"):
+        return "timed out"
+    if s in ("RUN_OK_EVAL_FAILED", "RUN_OK_NO_LABEL_MATCH"):
+        return "not scored"
+    return "failed"
+
+
+def _saved_methods(where, status=None) -> set | None:
+    """The methods of a saved CSV (with ``status`` when given); ``None``
+    when the file cannot be read."""
+    import pandas as pd
+    try:
+        df = pd.read_csv(where)
+    except Exception:  # noqa: BLE001 - no saved file to compare with
+        return None
+    if status is not None:
+        df = df[df["status"] == status]
+    return set(df["method"].astype(str))
+
+
+def _kept_sentence(methods) -> str:
+    """`` The folder keeps the earlier record of X.`` for methods whose
+    ``SKIPPED`` record did not replace an earlier one; ``""`` for none."""
+    return (f" The folder keeps the earlier record of {', '.join(methods)}."
+            if methods else "")
+
+
 def _failed_line(res, where) -> str | None:
     """The stderr line of a finished ``run-all`` whose ``failures`` is not empty.
 
-    ``# 1 of 2 methods failed: StabMap (FAIL). See runs/failures.csv.``;
-    ``None`` when nothing failed. Counts are methods of this run, not of
-    records merged from an earlier run in the same folder. A ``SKIPPED``
-    record of a method that ``--methods`` did not name is not counted. A
-    method that the saved ``failures.csv`` does not list (a ``SKIPPED``
-    record never replaces an earlier record) says ``earlier record kept``.
+    ``# 1 failed (Seurat_WNN), 1 skipped (totalVI). See runs/failures.csv.``;
+    ``None`` when nothing failed. Failures and skips are counted apart
+    (:func:`_failed_word`), over the methods of this run, not the records
+    merged from an earlier run in the same folder. Only a ``SKIPPED``
+    record of a method that ``--methods`` named is here. A method that the
+    saved ``failures.csv`` does not list (a ``SKIPPED`` record never
+    replaces an earlier record) is named in a last sentence.
     """
-    import pandas as pd
     bad = res.failures
     if bad.empty:
         return None
-    try:
-        saved = set(pd.read_csv(where)["method"].astype(str))
-    except Exception:  # noqa: BLE001 - no saved file to compare with
-        saved = None
-    named = list(dict.fromkeys(
-        f"{m} ({s})" if saved is None or str(m) in saved
-        else f"{m} ({s}, earlier record kept)"
-        for m, s in zip(bad["method"], bad["status"])))
-    n_bad = len(set(bad["method"]))
-    n_all = len({r.get("method") for r in res.records
-                 if r.get("status") != "SKIPPED" or r.get("requested")}
-                | set(bad["method"]))
+    saved = _saved_methods(where)
+    groups: dict = {w: [] for w in _FAILED_WORDS}
+    for m, s in zip(bad["method"], bad["status"]):
+        if str(m) not in groups[_failed_word(s)]:
+            groups[_failed_word(s)].append(str(m))
+    counts = ", ".join(f"{len(ms)} {w} ({', '.join(ms)})" for w, ms in groups.items()
+                       if ms)
+    kept = [str(m) for m in dict.fromkeys(bad["method"])
+            if saved is not None and str(m) not in saved]
     see = (f" See {where}." if saved is None or saved & set(map(str, bad["method"]))
            else "")
-    return (f"# {n_bad} of {n_all} method{'s' if n_all != 1 else ''} failed: "
-            f"{', '.join(named)}.{see}")
+    return f"# {counts}.{see}{_kept_sentence(kept)}"
+
+
+def _not_run_line(res, where) -> str | None:
+    """The stderr line naming the ``SKIPPED`` methods ``--methods`` did not name.
+
+    ``# Not run: MIRA, moETM (SKIPPED). The reason column of summary.csv
+    says why.``; ``None`` when there are none. Those methods are not in
+    ``failures`` and do not set exit 3. A method whose ``SKIPPED`` record
+    did not replace an earlier record in the saved ``summary.csv`` is named
+    in a last sentence.
+    """
+    skipped = list(dict.fromkeys(str(r.get("method"))
+                                 for r in getattr(res, "records", None) or []
+                                 if r.get("status") == "SKIPPED"
+                                 and not r.get("requested")))
+    if not skipped:
+        return None
+    saved = _saved_methods(where, status="SKIPPED")
+    kept = [m for m in skipped if saved is not None and m not in saved]
+    why = (" The reason column of summary.csv says why."
+           if saved is None or set(skipped) - set(kept) else "")
+    return f"# Not run: {', '.join(skipped)} (SKIPPED).{why}{_kept_sentence(kept)}"
 
 
 @contextlib.contextmanager
@@ -1850,8 +1911,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "one function of the Python API (import multibench as mtb).",
         epilog="Exit codes: 0 ok, 1 runtime error (error: ... on stderr; "
                "MULTIBENCH_DEBUG=1 shows the traceback), 2 usage error, 3 run-all "
-               "finished but a method of this run failed or was skipped (a line on "
-               "stderr names it). "
+               "finished, but a method failed, or a method named in --methods was "
+               "skipped. Without --methods, a skipped method is only logged and "
+               "marked SKIPPED in summary.csv. "
                "Run `multibench <command> --help` for the flags of a command.")
     p.add_argument("--version", action="version",
                    version=f"%(prog)s {_version()}",
@@ -2221,8 +2283,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "on <data-path>/<DATASET>/, evaluate each output and save "
                     "summary.csv, long.csv, failures.csv and batch_result.json under "
                     "--out-dir. multibench plot bubble --input OUT draws the figure.",
-        epilog="Exit code 3: the run finished, but a method of this run failed or was "
-               "skipped. A line on stderr names it.")
+        epilog="Exit code 3: the run finished, but a method failed, or a method named "
+               "in --methods was skipped. Without --methods, a skipped method is only "
+               "logged and marked SKIPPED in summary.csv.")
     pra.add_argument("dataset", help="dataset id = the folder name under --data-path")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pra.add_argument("--out-dir", "--out", dest="out",
@@ -2271,7 +2334,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="run only; do not compute metrics on the outputs")
     pra.add_argument("--batch", metavar="CSV",
                      help="CSV as for evaluate --batch, cells in the order of the label "
-                          "files (default: one batch per label file)")
+                          "files; a first column of barcodes is aligned by barcode "
+                          "(default: one batch per label file)")
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                      help="Leiden backend of the clustering sweep when scoring (default: "
                           "see `multibench config`); leidenalg matches both stored "
@@ -2297,7 +2361,9 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--labels", action="append", metavar="CSV",
                     help="cell-type labels CSV, one row per cell in the embedding's "
                          "order (header row; column 'x', the only column, or see "
-                         "--column). Repeat it for several files: they are stacked in "
+                         "--column). A first column of barcodes is aligned to the "
+                         "obs_names of an .h5ad --output. Repeat it for several files: "
+                         "they are stacked in "
                          "the order given and each file counts as one batch. Without "
                          "it, --dataset/--method/--category read the dataset's label "
                          "files (mtb.labels_for)")
@@ -2305,8 +2371,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="with --dataset/--method/--category and no --labels: the "
                          "folder that holds the dataset folder (default: the "
                          "configured data_path, see `multibench config`)")
-    pe.add_argument("--batch", help="per-cell batch labels CSV; without --metrics the "
-                                    "batch metrics are then computed too")
+    pe.add_argument("--batch", help="per-cell batch labels CSV; a first column of "
+                                    "barcodes is aligned as for --labels. Without "
+                                    "--metrics the batch metrics are then computed too")
     pe.add_argument("--clustering", "--cluster", dest="cluster", metavar="PATH",
                     help="precomputed clusters (CSV, or an .h5 read from "
                          "/obs/cluster_leiden); they replace the sweep for ARI and NMI "

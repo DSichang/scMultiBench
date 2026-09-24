@@ -27,15 +27,15 @@ def test_failed_line_does_not_count_unnamed_skipped_methods():
                          _rec("scMDC", "SKIPPED", error="needs a GPU", requested=False)],
                         "MYCITE", "vertical")
     assert cli._failed_line(res, "out/failures.csv") == (
-        "# 1 of 2 methods failed: totalVI (FAIL). See out/failures.csv.")
+        "# 1 failed (totalVI). See out/failures.csv.")
 
 
 def test_failed_line_counts_a_named_skipped_method():
     res = W.BatchResult([_rec("Matilda", "CHAIN_OK"),
                          _rec("UnitedNet", "SKIPPED", error="needs a GPU", requested=True)],
                         "MYCITE", "vertical")
-    assert cli._failed_line(res, "f.csv") == (
-        "# 1 of 2 methods failed: UnitedNet (SKIPPED). See f.csv.")
+    # R5-03: a named skip is counted as skipped, not failed
+    assert cli._failed_line(res, "f.csv") == "# 1 skipped (UnitedNet). See f.csv."
 
 
 def test_strict_with_allow_atac_mismatch_still_needs_fetched_scripts(tmp_path, monkeypatch,

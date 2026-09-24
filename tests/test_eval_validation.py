@@ -43,7 +43,7 @@ def _ari(df):
 
 
 def _no_alignment_warning(rec):
-    return [w for w in rec if "non-default index" in str(w.message)]
+    return [w for w in rec if "is matched by position" in str(w.message)]
 
 
 # ------------------------------------------------------------------ I1: metrics=
@@ -179,14 +179,15 @@ def test_labels_series_with_ids_against_bare_array_is_positional_with_warning():
     ser = pd.Series(ct, index=ids)
     with pytest.warns(UserWarning) as rec:
         got = evaluate(emb, labels=ser, metrics=["ARI"])
-    msgs = [str(w.message) for w in rec if "non-default index" in str(w.message)]
+    msgs = [str(w.message) for w in rec if "is matched by position" in str(w.message)]
     assert len(msgs) == 1, msgs
-    assert ("labels Series has a non-default index; matched positionally because "
-            "the embedding carries no cell ids - pass labels.to_numpy() to silence, "
-            "or an AnnData/DataFrame with cell ids to align") in msgs[0]
+    # R5-01: the warning says how to put the vector in order, not how to silence it
+    assert msgs[0] == ("The labels Series is matched by position, because the embedding "
+                       "has no cell ids. Check that it follows the embedding rows, or "
+                       "pass an AnnData whose obs_names are the barcodes.")
     assert _ari(got) == pytest.approx(1.0)         # positional and in order: fine
     # batch= gets its own (one) warning
-    with pytest.warns(UserWarning, match="batch Series has a non-default index"):
+    with pytest.warns(UserWarning, match="The batch Series is matched by position"):
         evaluate(emb, labels=ct, batch=pd.Series(["s1", "s2"] * 45, index=ids),
                  metrics=["GC"])
 

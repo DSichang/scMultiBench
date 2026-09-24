@@ -12,9 +12,12 @@ Three groups:
 * ``align_vector`` - reorders an indexed Series/DataFrame to an output's cell
   ids (AnnData ``obs_names`` / DataFrame index), so a label Series is matched
   by barcode rather than by position whenever both sides carry ids.
+  ``by_id_column`` does the same for a label CSV whose first column holds
+  the cell ids.
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import h5py
@@ -129,6 +132,23 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     numpy.ndarray
         1-D array of the raw label values (strings or numbers, as written);
         not integer codes. Every consumer in the package casts to ``str``.
+
+    Notes
+    -----
+    The first column that rules 2 and 4 leave out may hold cell ids.
+    Callers that know the cells' ids align the file by it
+    (:func:`read_labels_ids`, :func:`by_id_column`).
+    """
+    return read_labels_ids(path, column)[0]
+
+
+def read_labels_ids(path: Path | str, column: str | None = None):
+    """:func:`read_labels`, plus the first column it left out.
+
+    Returns ``(values, first)``. ``first`` is the file's first column (a
+    ``pandas.Series``) when rule 2 picked ``x`` from a file whose first
+    column is another one, or rule 4 dropped a unique first column; it may
+    hold cell ids. Otherwise ``first`` is ``None``.
     """
     path = _require_file(path, "labels file")
     d = pd.read_csv(path, sep=_sep_for(path))
@@ -137,20 +157,88 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
         if column not in d.columns:
             raise ValueError(
                 f"{path}: no column named {column!r}; columns are {cols}")
-        return d[column].to_numpy()
+        return d[column].to_numpy(), None
     if "x" in d.columns:
-        return d["x"].to_numpy()
+        extra = d.shape[1] > 1 and str(d.columns[0]) != "x"
+        return d["x"].to_numpy(), (d.iloc[:, 0] if extra else None)
     if d.shape[1] == 1:
-        return d.iloc[:, 0].to_numpy()
+        return d.iloc[:, 0].to_numpy(), None
     first_unique = d.shape[1] > 1 and d.iloc[:, 0].is_unique
     if d.shape[1] == 2 and first_unique:
         # index/barcode column + one label column: the obs-style export
-        return d.iloc[:, -1].to_numpy()
+        return d.iloc[:, -1].to_numpy(), d.iloc[:, 0]
     hint = (" The first column looks like cell barcodes (all unique); write the "
             "CSV with index=False to drop it." if first_unique else "")
     raise ValueError(
         f"{path}: {d.shape[1]} columns {cols}; cannot tell which holds the "
         f"labels - pass column=<name>.{hint}")
+
+
+def _looks_like_ids(col: pd.Series) -> bool:
+    """Text that is not a number: R's row numbers ``1..n`` and pandas'
+    ``0..n-1`` do not look like cell ids."""
+    if pd.api.types.is_numeric_dtype(col) or pd.api.types.is_bool_dtype(col):
+        return False
+    return bool(pd.to_numeric(col, errors="coerce").isna().any())
+
+
+def by_id_column(values, first, ids, *, what: str, name: str, target: str,
+                 order: str, no_ids: str, stacklevel: int = 3):
+    """Put a per-cell file in the order of ``ids`` by its first column.
+
+    ``values`` and ``first`` come from :func:`read_labels_ids`; ``ids`` are
+    the target's cell ids (``None`` when it has none, ``no_ids`` says why).
+    Returns ``(vector, aligned)``:
+
+    - every value of ``first`` is a cell of the target: the file is aligned
+      by it, and a repeated id or a cell without a row raises ``ValueError``;
+    - some values are cells and others are not: ``ValueError`` naming a few
+      of the others;
+    - no value is a cell, or the target has no ids: the file is matched by
+      position (``aligned`` False), with a ``UserWarning`` when ``first``
+      holds text that is not a number. ``order`` names the order the rows
+      must then follow.
+    """
+    vals = np.asarray(values)
+    if first is None:
+        return vals, False
+    text = _looks_like_ids(first)
+    by_position = (f"The file is matched by position. Check that its rows follow "
+                   f"{order}")
+    if ids is None:
+        if text:
+            warnings.warn(f"The first column of {name} looks like cell ids, but "
+                          f"{no_ids}. {by_position}.", UserWarning,
+                          stacklevel=stacklevel)
+        return vals, False
+    keys = pd.Index([str(v) for v in first])
+    ids = pd.Index([str(i) for i in ids])
+    known = keys.isin(ids)
+    if not known.any():
+        if text:
+            warnings.warn(f"The first column of {name} looks like cell ids, but none "
+                          f"is a cell of {target}. {by_position}, or use the barcodes "
+                          f"of {target} in that column.", UserWarning,
+                          stacklevel=stacklevel)
+        return vals, False
+    if not known.all():
+        other = keys[~known]
+        raise ValueError(
+            f"{what}: {len(other):,} of the {len(keys):,} ids in the first column of "
+            f"{name} are not cells of {target} (first: {_first(other, 3)}). Use the "
+            f"barcodes of {target}, or drop that column when the rows follow {order}.")
+    if not keys.is_unique:
+        dup = keys[keys.duplicated()]
+        raise ValueError(
+            f"{what}: the first column of {name} repeats {len(dup):,} id(s) (first: "
+            f"{_first(dup, 3)}). Give each cell one row.")
+    missing = ids.difference(keys, sort=False)
+    if len(missing):
+        raise ValueError(
+            f"{what}: {name} has no row for {len(missing):,} of the {len(ids):,} "
+            f"cells of {target} (first: {_first(missing, 3)}). Give a row for every "
+            f"cell.")
+    return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
 
 
 def read_clustering(path: Path | str) -> np.ndarray:

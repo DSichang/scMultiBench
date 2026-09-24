@@ -1745,7 +1745,7 @@ class BatchResult:
         Notes
         -----
         **Column reference.** When nothing ran the frame is empty, with the
-        first ten columns below:
+        columns below except the metrics:
 
         ```text
         method                  method id
@@ -1761,6 +1761,7 @@ class BatchResult:
         ARI, NMI, ASW, ...      one column per metric
         label_order_note        why label_order_confidence is blank
         caveat                  scan's caveat for the method, or ""
+        reason                  why a SKIPPED method did not run, or ""
         ```
 
         A ``caveat`` of NaN: the record was saved before this column existed;
@@ -1780,8 +1781,9 @@ class BatchResult:
         - ``RUN_OK`` - ran with ``evaluate=False``.
         - ``TIMEOUT`` - exceeded ``run_all(timeout=...)``.
         - ``FAIL`` - the method itself errored; see ``error`` in ``failures``.
-        - ``SKIPPED`` - blocked before the run, with the reason in ``error``;
-          in ``failures`` only when ``methods=`` named the method.
+        - ``SKIPPED`` - blocked before the run, with the reason in the
+          ``reason`` column; in ``failures`` only when ``methods=`` named the
+          method.
 
         ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and
         ``RUN_OK_NO_LABEL_MATCH`` also appear in ``failures``.
@@ -1844,15 +1846,20 @@ class BatchResult:
                         | {m: v for m, v in (r.get("metrics") or {}).items()}
                         # NaN, not None, for a record saved before the field
                         | {"caveat": np.nan if r.get("caveat") is None
-                           else r.get("caveat")})
+                           else r.get("caveat"),
+                           # a SKIPPED record keeps its reason in error
+                           "reason": (r.get("error") or "")
+                           if r.get("status") == "SKIPPED" else ""})
         if not rows:      # nothing ran (e.g. no method was runnable on this dataset)
             return pd.DataFrame(columns=["method", "status", "run_sec", "output_kind",
                                          "emb_shape", "n_tunable", "label_order",
                                          "label_order_confidence", "batch_source",
-                                         "n_batches", "label_order_note", "caveat"])
+                                         "n_batches", "label_order_note", "caveat",
+                                         "reason"])
         sm = _with_label_order_note(
             pd.DataFrame(rows).sort_values("method").reset_index(drop=True))
-        sm["caveat"] = sm.pop("caveat")          # new columns go last
+        for col in ("caveat", "reason"):         # new columns go last
+            sm[col] = sm.pop(col)
         # whole numbers stay whole next to the blanks of SKIPPED and FAIL rows
         for col in ("n_batches", "n_tunable"):
             try:
@@ -2087,12 +2094,13 @@ class BatchResult:
         Parameters
         ----------
         batch : array-like | Series | path | None
-            One batch id per cell, in the order of ``mtb.labels_for(dataset)``;
-            a Series is aligned by its index. ``None`` = each cell's label
-            file (Notes).
+            Batch ids, cells in the order of ``mtb.labels_for(dataset)``; a
+            Series or a barcode-indexed CSV is aligned by barcode. ``None`` =
+            each cell's label file.
         labels : array-like | Series | path | None
-            One cell-type label per cell, in embedding row order (same forms);
-            ``None`` = search the dataset's label files again.
+            One cell-type label per cell; a Series or a barcode-indexed CSV is
+            aligned by barcode. ``None`` = search the dataset's label files
+            again.
         metrics : str | list[str] | None
             Metric family (``"clustering"``, ``"batch"``, ``"all"``) or metric
             codes; ``None`` = every metric the batch structure allows.
@@ -2108,7 +2116,12 @@ class BatchResult:
         Raises
         ------
         ValueError
-            A ``batch`` Series holds ids that are not cells of the dataset.
+            ``labels`` or ``batch`` holds ids that are not cells of the dataset.
+
+        Warns
+        -----
+        UserWarning
+            A Series or barcode-indexed CSV cannot be aligned and is matched by position.
 
         Examples
         --------
@@ -2124,16 +2137,22 @@ class BatchResult:
         has instead of the file-of-origin rule, with your own labels, or with
         a different metric selection.
 
-        **Arguments.** A ``batch`` CSV path is read like a label file, and the
-        vector is recorded as ``batch_source='user'``. Its cell order is that
-        of ``run_all(batch=)``, and a Series is aligned as there. With
-        ``labels=``, it follows the labels' order, the embedding rows, and a
-        Series is matched by position.
+        **Arguments.** A ``labels`` array, list or CSV follows the embedding
+        rows. A ``batch`` array follows the cell order of ``run_all(batch=)``,
+        or the embedding rows when ``labels`` is matched by position. A CSV
+        path is read like a label file. The batch is recorded as
+        ``batch_source='user'``.
+
+        **Aligned by barcode.** A Series or one-column DataFrame with a
+        non-default index, or a CSV whose first column holds barcodes, is
+        aligned to the dataset's cells as in ``run_all(batch=)``, with the
+        same errors and warnings. Aligned labels go into each record's
+        label-order search, so ``label_order`` names the file order chosen.
+        Labels matched by position read ``(user labels)``.
 
         With ``labels=None`` the label-order search runs again
-        (``label_order`` / ``label_order_confidence`` are refilled); given
-        labels read ``(user labels)`` in ``label_order``. ``metrics`` is
-        handed to ``evaluate(metrics=)``.
+        (``label_order`` / ``label_order_confidence`` are refilled).
+        ``metrics`` is handed to ``evaluate(metrics=)``.
 
         **Labels without batch.** Given ``labels`` and no ``batch``, every
         cell is in one batch (``batch_source`` ``None``, ``n_batches`` 1), so
@@ -2165,21 +2184,21 @@ class BatchResult:
         BatchResult.save : persist the re-scored result.
         """
         import copy
-        from .eval.pipeline import _carries_ids
         new_records = []
-        lab_vec = None if labels is None else _eio.as_vector(labels, what="labels")
-        # the batch per data folder, before any record: a Series with ids
-        # that are not cells of the dataset raises here
+        # labels and batch per data folder, before any record is scored: ids
+        # that are not cells of the dataset raise here
+        lab_vec: dict = {}
         bat_vec: dict = {}
-        if batch is not None and labels is not None:
-            if _carries_ids(batch):
-                _positional_batch_warning(batch, "labels= gives the embedding rows, "
-                                                 "which carry no cell ids", stacklevel=3)
-            bat_vec = {None: _eio.as_vector(batch, what="batch")}
-        elif batch is not None:
-            for dp in dict.fromkeys(r.get("data_path") for r in self.records
-                                    if r.get("status") != "SKIPPED"):
-                bat_vec[dp] = _batch_vector(batch, self.dataset, dp)
+        for dp in dict.fromkeys(r.get("data_path") for r in self.records
+                                if r.get("status") != "SKIPPED"):
+            if labels is not None:
+                lab_vec[dp] = _cell_vector(labels, self.dataset, dp, what="labels",
+                                           order=_ROWS, stacklevel=4)
+            # a batch vector follows labels given in embedding row order
+            rows = labels is not None and not lab_vec[dp][1]
+            if batch is not None:
+                bat_vec[dp] = _cell_vector(batch, self.dataset, dp, what="batch",
+                                           order=_ROWS if rows else None, stacklevel=4)
         for r in self.records:
             rec = copy.deepcopy({k: v for k, v in r.items() if k != "_long"})
             rec["_long"] = None
@@ -2198,11 +2217,12 @@ class BatchResult:
                     rec["note"] = (f"output kind={v.output.kind}; this method does not "
                                    "produce an embedding, so embedding-based metrics do not apply")
                 else:
+                    lab, lab_by_cell = lab_vec.get(rec.get("data_path"), (None, False))
+                    bat, bat_by_cell = bat_vec.get(rec.get("data_path"), (None, False))
                     _score_record(rec, emb, self.dataset, self.category,
-                                  rec.get("data_path"), v,
-                                  batch=bat_vec.get(None if labels is not None
-                                                    else rec.get("data_path")),
-                                  labels=lab_vec, metrics=metrics)
+                                  rec.get("data_path"), v, batch=bat, labels=lab,
+                                  metrics=metrics, labels_by_cell=lab_by_cell,
+                                  batch_by_cell=bat_by_cell)
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
                 rec["status"] = "RUN_OK_EVAL_FAILED"
                 em = f"{type(e).__name__}: {e}"
@@ -2527,64 +2547,86 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     return ids if ids and len(set(ids)) == len(ids) else None
 
 
-def _positional_batch_warning(batch, why: str, *, stacklevel: int = 4) -> None:
-    warnings.warn(f"batch {type(batch).__name__} has a non-default index, but {why}. "
-                  "The batch is matched by position; pass batch.to_numpy() to silence "
-                  "this warning.", UserWarning, stacklevel=stacklevel)
-
-
 def _n_ids(n: int) -> str:
     """``'1 id'`` or ``'2,864 ids'``."""
     return "1 id" if n == 1 else f"{n:,} ids"
 
 
-def _batch_vector(batch, dataset, data_path) -> np.ndarray:
-    """``batch`` as one id per cell, in the order of ``labels_for(dataset)``.
+#: the order an argument of run_all / rescore follows when it is matched by position
+_ROWS = "the embedding rows"
 
-    As ``evaluate`` treats it: a Series or one-column DataFrame whose index
-    is not a ``RangeIndex`` is aligned by cell id to the barcodes of the
-    dataset's files. An index equal to them is used as is; a unique index
-    that covers them is reindexed; ids that are not cells of the dataset
-    raise ``ValueError``. Without usable barcodes (missing or repeated) the
-    match is by position, with a ``UserWarning``. Arrays, lists and CSV paths
-    are positional.
+
+def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
+                 stacklevel: int = 5) -> tuple[np.ndarray, bool]:
+    """``x`` as one value per cell, and whether it was aligned by cell id.
+
+    Aligned (``True``): a Series or one-column DataFrame whose index is not
+    a ``RangeIndex``, or a CSV whose first column holds cell ids, is put in
+    the order of ``labels_for(dataset)`` by the barcodes of the dataset's
+    files, as ``evaluate`` aligns to an AnnData. Ids that are not cells of
+    the dataset, repeated ids and cells without a value raise
+    ``ValueError``. Without usable barcodes (missing or repeated) the match
+    is by position, with a ``UserWarning``. Arrays, lists and other CSVs are
+    returned as given (``False``): positional, in ``order`` (default: the
+    order of ``labels_for(dataset)``). ``stacklevel`` is that of the CSV
+    warning, which is raised one call deeper than the Series warning.
     """
     from .eval.pipeline import _carries_ids
-    vals = _eio.as_vector(batch, what="batch")
-    if not _carries_ids(batch):
-        return vals
+    order = order or f"the order of mtb.labels_for({dataset!r})"
+    if isinstance(x, (str, Path)):
+        vals, first = _eio.read_labels_ids(x)
+        if first is None:
+            return np.asarray(vals), False
+        return _eio.by_id_column(
+            vals, first, _dataset_cell_ids(dataset, data_path), what=what,
+            name=Path(x).name, target=dataset, order=order,
+            no_ids=f"the files of {dataset} have no usable cell ids (missing or "
+                   f"repeated barcodes)", stacklevel=stacklevel)
+    vals = _eio.as_vector(x, what=what)
+    if not _carries_ids(x):
+        return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
     if ids is None:
-        _positional_batch_warning(batch, f"the files of {dataset} have no usable cell "
-                                         "ids (missing or repeated barcodes)")
-        return vals
-    index = pd.Index([str(i) for i in batch.index])
+        warnings.warn(f"The {what} {type(x).__name__} is matched by position, because "
+                      f"the files of {dataset} have no usable cell ids (missing or "
+                      f"repeated barcodes). Check that it follows {order}.",
+                      UserWarning, stacklevel=stacklevel - 1)
+        return vals, False
+    index = pd.Index([str(i) for i in x.index])
     if list(index) == ids:
-        return vals
-    # to_numpy() is right only for a vector already in the dataset's cell order
-    by_position = (f"pass batch.to_numpy() only when batch is already in the order "
-                   f"of mtb.labels_for({dataset!r})")
+        return vals, True
+    # to_numpy() is right only for a vector already in that order
+    by_position = (f"pass {what}.to_numpy() only when {what} "
+                   + (f"already follows {order}" if order == _ROWS
+                      else f"is already in {order}"))
     if not index.is_unique:
         dup = index[index.duplicated()]
-        raise ValueError(f"batch: the index repeats {_n_ids(len(dup))} (first: "
+        raise ValueError(f"{what}: the index repeats {_n_ids(len(dup))} (first: "
                          f"{list(dup[:3])}), so it cannot be aligned to the cells of "
                          f"{dataset}. Give each cell one id, or {by_position}.")
     foreign = index.difference(pd.Index(ids), sort=False)
     if len(foreign):
-        if pd.api.types.is_integer_dtype(batch.index):
-            raise ValueError(f"batch: the index holds row numbers (first: "
-                             f"{list(batch.index[:3])}), not cell barcodes. Set the "
+        if pd.api.types.is_integer_dtype(x.index):
+            raise ValueError(f"{what}: the index holds row numbers (first: "
+                             f"{list(x.index[:3])}), not cell barcodes. Set the "
                              f"index to the dataset's barcodes, or {by_position}.")
-        raise ValueError(f"batch: {_n_ids(len(foreign))} "
+        raise ValueError(f"{what}: {_n_ids(len(foreign))} "
                          f"{'is not a cell' if len(foreign) == 1 else 'are not cells'} "
                          f"of {dataset} (first: {list(foreign[:3])}). Rename the index "
                          f"to the dataset's barcodes, or {by_position}.")
     missing = pd.Index(ids).difference(index, sort=False)
     if len(missing):
-        raise ValueError(f"batch: {len(missing):,} of the {len(ids):,} cells of {dataset} "
-                         f"have no id in batch (first: {list(missing[:3])}). Give a "
-                         f"batch id for every cell.")
-    return np.asarray(pd.Series(vals, index=index).reindex(ids).to_numpy())
+        unit = "a batch id" if what == "batch" else "a label"
+        raise ValueError(f"{what}: {len(missing):,} of the {len(ids):,} cells of {dataset} "
+                         f"have no id in {what} (first: {list(missing[:3])}). Give "
+                         f"{unit} for every cell.")
+    return np.asarray(pd.Series(vals, index=index).reindex(ids).to_numpy()), True
+
+
+def _batch_vector(batch, dataset, data_path) -> np.ndarray:
+    """``batch`` as one id per cell, in the order of ``labels_for(dataset)``
+    when it carries cell ids (:func:`_cell_vector`); arrays as given."""
+    return _cell_vector(batch, dataset, data_path, what="batch", stacklevel=5)[0]
 
 
 def _inputs_on_disk(row, dataset, data_path) -> bool:
@@ -2674,41 +2716,74 @@ def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
 
 
 def _score_record(rec, emb, dataset, category, data_path, variant, *,
-                  batch=None, labels=None, metrics=None):
+                  batch=None, labels=None, metrics=None, labels_by_cell=False,
+                  batch_by_cell=False):
     """Fill ``rec`` with metrics for ``emb`` (shared by run_all and rescore).
 
     Sets ``status`` (``CHAIN_OK`` / ``CHAIN_OK_GRAPH_METHOD`` /
     ``RUN_OK_NO_LABEL_MATCH`` / ``RUN_OK_EVAL_FAILED``), ``metrics``,
     ``labels_used``, ``label_order_candidates``, ``batch_source``,
-    ``n_batches``, ``emb_shape`` and the tidy ``_long`` frame. ``labels``
-    (one per cell) bypasses the label-order search; ``batch`` (one per cell)
-    replaces the file-of-origin batch; ``metrics`` restricts the metric set
-    (``evaluate(metrics=)``).
+    ``n_batches``, ``emb_shape`` and the tidy ``_long`` frame. ``metrics``
+    restricts the metric set (``evaluate(metrics=)``).
+
+    ``labels`` (one per cell) replaces the label files. In embedding row
+    order it bypasses the label-order search; with ``labels_by_cell`` it is
+    in the order of ``labels_for(dataset)`` and is put into each candidate
+    order of the search, as the file labels are. Either way the cells form
+    one batch unless ``batch`` is given.
+
+    ``batch`` (one per cell) replaces the file-of-origin batch. It is in the
+    order of ``labels_for(dataset)`` and goes into each candidate order,
+    except that a vector without ``batch_by_cell`` follows labels given in
+    embedding row order. A batch in the dataset's order that meets such
+    labels is put in the variant's own label-file order. A vector as long as
+    the embedding is used as given when no order fits.
     """
     rec["emb_shape"] = list(emb.shape)
     n = emb.shape[0]
+    rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
     if batch is not None:
         batch = np.asarray(batch)
         # in the dataset's cell order: each label order gets the ids of its files
-        segments = None if labels is not None else _batch_segments(dataset, data_path,
-                                                                   batch)
+        if batch_by_cell or not rows:
+            segments = _batch_segments(dataset, data_path, batch)
         if len(batch) != n and segments is None:
             raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
-    if labels is not None:
+    if rows:
         labels = np.asarray(labels)
         if len(labels) != n:
             raise ValueError(f"labels has {len(labels)} entries, embedding has {n} cells")
         cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
     else:
         cands = _label_candidates(dataset, n, data_path)
+    if labels is not None and not rows:
+        # the user's labels, in the dataset's cell order, replace each
+        # candidate's file labels; the cells form one batch
+        labels = np.asarray(labels)
+        segs = _batch_segments(dataset, data_path, labels)
+        cands = [(names, np.concatenate([segs[k] for k in names]), np.ones(n, dtype=int))
+                 for names, _, _ in cands
+                 if segs is not None and all(k in segs for k in names)]
+        if not cands:
+            if len(labels) != n:
+                raise ValueError(f"labels has {len(labels)} entries, embedding has "
+                                 f"{n} cells")
+            cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
     if batch is not None:
         # the user's ids replace each candidate's file-of-origin batch, put in
-        # that candidate's order; a vector as long as the embedding is kept
+        # that candidate's order (the variant's own order for labels given in
+        # embedding rows); a vector as long as the embedding is kept
+        own = ([k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
+                                                modalities=rec.get("modalities") or None,
+                                                data_path=data_path)]
+               if rows and segments is not None else None)
         placed = []
         for names, lab, bat in cands:
-            if segments is not None and all(k in segments for k in names):
-                placed.append((names, lab, np.concatenate([segments[k] for k in names])))
+            keys = own if rows else names
+            if segments is not None and keys and all(k in segments for k in keys) \
+                    and sum(len(segments[k]) for k in keys) == n:
+                placed.append((names, lab, np.concatenate([segments[k] for k in keys])))
             elif len(batch) == n:
                 placed.append((names, lab, batch))
         if cands and not placed:
@@ -2790,8 +2865,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         Reuse an output file already in ``out_dir`` instead of re-running the
         method, to resume an interrupted sweep.
     batch : array-like | Series | path | None
-        One batch id per cell, cells in the order of ``mtb.labels_for(dataset)``;
-        a Series is aligned by its index. ``None`` = each cell's label file.
+        Batch ids, cells in the order of ``mtb.labels_for(dataset)``; a Series
+        or a barcode-indexed CSV is aligned by barcode. ``None`` = each cell's
+        label file.
     assume_gpu : bool
         Dry run only: skip this host's GPU test, as ``mtb.scan(assume_gpu=True)``
         does.
@@ -2813,7 +2889,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         Unknown ``category``, no matching variant, nothing runnable, a
         mismatched ``out_dir``, or conflicting arguments (Notes).
     ValueError
-        A ``batch`` Series holds ids that are not cells of the dataset.
+        A ``batch`` Series or CSV holds ids that are not cells of the dataset.
     KeyError
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
@@ -2826,7 +2902,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         ``dataset`` matches a folder only up to letter case, or ``modalities``
         drops directory-input methods.
     UserWarning
-        A ``batch`` Series is matched by position: the files have no usable barcodes.
+        A ``batch`` Series or barcode-indexed CSV cannot be aligned and is matched by position.
 
     Examples
     --------
@@ -2910,9 +2986,13 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     as one method's output is used as given.
 
     A Series or one-column DataFrame indexed by cell id is aligned to the
-    barcodes of the dataset's files. Ids that are not cells of the dataset
-    raise ``ValueError`` before any method runs. Files without usable
-    barcodes give a match by position, with a ``UserWarning``.
+    barcodes of the dataset's files. So is a CSV whose first column holds
+    them, as ``obs[["sample"]].to_csv(path)`` writes it. Ids that are not
+    cells of the dataset raise ``ValueError`` before any method runs.
+
+    Files without usable barcodes give a match by position, with a
+    ``UserWarning``. So does a CSV whose first column holds text but none of
+    the barcodes. R's row numbers in that column give no warning.
 
     Any other length marks that method ``RUN_OK_EVAL_FAILED`` (``batch has N
     entries, embedding has M cells``); the dry run says so first. Re-score a
