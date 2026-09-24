@@ -445,7 +445,8 @@ def test_coverage_cell_derives_from_the_registry(cat):
     code = "\n".join(_code(f"tutorial_{cat}"))
     assert "IMPUTATION_ONLY" not in code
     assert "method_info(m)['categories']" in code and "['tasks']" not in code
-    assert "not in the registry" in code
+    # the live method list, and a missing method named in plain words
+    assert "set(mtb.list_methods())" in code and "not in this package" in code
 
 
 @pytest.mark.parametrize("cat", CATS)

@@ -1,9 +1,10 @@
 """The tutorials after fix round 3 of the student study.
 
 R3-02 changed what ``runnable`` means. In a category with ATAC methods,
-``scan`` without ``methods=`` marks a variant whose ATAC file holds the other
-form not runnable, even when ``files_ok`` and ``env_ok`` pass, and ``run_all``
-skips it. Section 3 of each generated tutorial states the rule ``runnable``
+``scan`` marks a variant whose ATAC file holds the other form not runnable,
+even when ``files_ok`` and ``env_ok`` pass, and ``run_all`` skips it. Since
+R4-01 this holds also when ``methods=`` names the method
+(tests/test_tutorial_round4.py checks the named-method calls). Section 3 of each generated tutorial states the rule ``runnable``
 follows: these tests pin that sentence on the committed notebooks and check it
 against the live package on folders that hold the other ATAC form.
 """

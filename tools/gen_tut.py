@@ -215,9 +215,11 @@ def diagonal_atac_sentence():
 
 def runnable_sentence(cat):
     """The section-3 sentence on what ``runnable`` needs. In a category with
-    ATAC methods, ``scan`` (without ``methods=``) also marks a variant whose
-    ATAC file holds the other form not runnable, and ``run_all`` skips it;
-    read from ``find_methods`` at generation time."""
+    ATAC methods, ``scan`` also marks a variant whose ATAC file holds the
+    other form (or peak names the method cannot read) not runnable, also when
+    ``methods=`` names it, and ``run_all`` skips it; only
+    ``allow_atac_mismatch=True`` keeps it. Read from ``find_methods`` at
+    generation time."""
     import multibench as mtb
     if mtb.find_methods(cat, modalities=["atac"]):
         return ("A variant is `runnable` only when both pass and its ATAC file holds "
@@ -390,8 +392,8 @@ EXPORT_DETAIL = {
      "A cellranger-arc AnnData read with `gex_only=False` holds genes and peaks in "
      "one `X`. A feature filter splits them: `rna=\"X[feature_types=Gene Expression]\"` "
      "and `atac=\"X[feature_types=Peaks]\"`.",
-     "Keep several samples in one folder, without `batch=`. Score the batch mixing "
-     "later with `mtb.evaluate(..., batch=...)`.",
+     "Keep several samples in one folder, without `batch=`. To score the batch "
+     "mixing, pass the batch column to `run_all(batch=...)` or `evaluate(batch=...)`.",
      OVERWRITE_NOTE,
  ],
  "diagonal": [
@@ -400,7 +402,7 @@ EXPORT_DETAIL = {
      "multibench convert rna.h5ad data/MYDIAG --rna X --atac-from atac.h5ad \\\n"
      "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
      "```",
-     # {peak_only}: filled in from the registry by build_tutorial
+     # {peak_only}: filled in from find_methods by build_tutorial
      "For ATAC as a peak matrix only, pass `atac_kind=\"peak\"`. {peak_only} read "
      "peaks. Seurat_v5 also needs RNA and ATAC from the same cells, because it uses "
      "them as its paired bridge. `scan` shows a method's setup note in its `caveat` "
@@ -595,8 +597,7 @@ def build_tutorial(cat, s):
            "With `INSTALL_ENVS = True`, the cells download prebuilt environments and "
            "run the methods, with no conda needed.",
            "On Colab, choose a GPU runtime first: Runtime -> Change runtime type -> T4 "
-           "GPU. On a CPU runtime the smaller CPU builds are installed, and training "
-           "methods are much slower."))
+           "GPU. On a CPU runtime, training methods are much slower."))
     for cell in INSTALL_CELLS:
         code(cell)
     size = env_size_text(methods=trio)
@@ -916,16 +917,16 @@ There are two families, and higher is better for every metric.
 The cell compares the methods the scMultiBench study benchmarked for {cat} integration with the methods this package has a {cat} variant for. It prints each missing method with the categories it has variants for.""" + ("\n\n" + details(*coverage_notes) if coverage_notes else ""))
     code(f"""# benchmarked for {cat} on {PAPER_TASKS[cat]}
 paper = {PAPER_METHODS[cat]!r}
-registry = set(mtb.list_methods())
-wired = sorted(m for m in registry
-               if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
-missing = [m for m in paper if m not in wired]
-print(f"the study benchmarks {{len(paper)}} {{CATEGORY}} methods on {PAPER_TASKS[cat]}; this package has a {{CATEGORY}} variant for {{len(wired)}}")
+in_package = set(mtb.list_methods())
+has_variant = sorted(m for m in in_package
+                     if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
+missing = [m for m in paper if m not in has_variant]
+print(f"the study benchmarks {{len(paper)}} {{CATEGORY}} methods on {PAPER_TASKS[cat]}; this package has a {{CATEGORY}} variant for {{len(has_variant)}}")
 for m in missing:
-    if m in registry:
+    if m in in_package:
         print(f"  {{m}}: variants for {{', '.join(mtb.method_info(m)['categories'])}} only")
     else:
-        print(f"  {{m}}: not in the registry")
+        print(f"  {{m}}: not in this package")
 if not missing:
     print("every benchmarked method has a variant for this category")""")
 
@@ -933,14 +934,14 @@ if not missing:
     siblings = ", ".join(c for c in SCEN if c != cat)
     md("""## Troubleshooting
 
-When a method is not runnable, the `reason` column of `scan` says why. When a run fails, `res.failures` holds the error.
+`scan`'s `reason` column says why a method is not runnable. `res.failures` says why a run failed or a method you named was skipped.
 
 """ + details(
         """| symptom | fix |
 |---|---|
 | `files_ok` False: input files not found | `reason` names the missing file |
 | `env_ok` False on Linux | run the `multibench env install ...` command in `env_reason` |
-| `env_ok` False on macOS or Windows | methods run only on Linux; `mtb.run(..., dry_run=True)` prints the command to run there |
+| `env_ok` False on macOS or Windows | methods run only on Linux: run the same calls there |
 | `env_ok` False: the method needs an NVIDIA GPU | run it on a GPU machine; `mtb.scan(..., assume_gpu=True)` checks everything else on a computer without one |
 | `FileExistsError` from `export_dataset` | the folder already holds the file: pass `overwrite=True` to replace it |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
