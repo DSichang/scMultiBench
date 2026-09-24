@@ -1109,11 +1109,11 @@ def scan(dataset: str, category: str | None = None, *,
       (``multibench env install --methods X --packed --run``). On macOS
       and Windows it says the environment is Linux-only.
     - ``env_ok`` on a GPU-only method - when the upstream script calls CUDA
-      unconditionally (``method_info(m)['requires_gpu']``), ``env_ok`` also
-      needs an NVIDIA GPU (``mtb.env.host_has_gpu()``); without one,
-      ``env_reason`` carries the sentence ``run`` would raise (``"<method>
-      needs an NVIDIA GPU; this computer has none. See ..."``); the
-      ``file:line`` evidence is in ``method_info(m)['gpu_evidence']``.
+      unconditionally, ``env_ok`` also checks for an NVIDIA GPU
+      (``mtb.env.host_has_gpu()``). Without one, ``env_reason`` gives the
+      sentence ``run`` would raise: ``"<method> needs an NVIDIA GPU; this
+      computer has none. See ..."``. ``method_info(m)`` shows
+      ``requires_gpu`` and the code line in ``gpu_evidence``.
     - ``assume_gpu=True`` (``multibench scan --assume-gpu``) skips that GPU
       test, for a check on a login node before a GPU-node job. The row's
       ``caveat`` then says ``assumes the job runs on a GPU node``, and
@@ -1167,8 +1167,8 @@ def scan(dataset: str, category: str | None = None, *,
     - ``params`` are merged in the way ``run_all(params=)`` merges them.
     - On a GPU-less host it already carries each method's ``cpu_params``
       (the flags that turn CUDA off where a switch exists).
-    - A row blocked only by ``env_ok`` still shows its command - the line to
-      put in a job script once the env is built.
+    - A row blocked only by ``env_ok`` still shows its command. Put it in a
+      job script once the environment is built.
     - Some commands read a file that ``mtb.run`` writes first under
       ``inputs/`` (Seurat_v3's renamed peak file, a converted input). The
       ``caveat`` names the file; start such a method with ``mtb.run`` or
@@ -2842,8 +2842,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     **Dry run.** ``dry_run=True`` runs nothing and returns the
     ``mtb.scan`` frame for the same selection: blocked rows are kept with
     their ``reason``, and ``command`` is rendered for ``out_dir`` (or the
-    literal ``'<out_dir>'`` placeholder). Filter ``plan[plan.runnable]`` for
-    what will be attempted - ``len(plan)`` is not the sweep size.
+    literal ``'<out_dir>'`` placeholder). ``plan[plan.runnable]`` lists what
+    will run. ``len(plan)`` also counts blocked rows.
     ``multibench run-all --dry-run --format csv`` writes the same frame.
 
     **Before the sweep.** Every attempted row passed both ``mtb.scan`` checks
@@ -2951,8 +2951,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
       given), never the reasons of methods you did not ask for. On macOS or
       Windows, when an environment blocks a row, its second line says that
       methods run only on Linux.
-    - An ``out_dir`` holding a saved result of another dataset or category
-      - ``ValueError``, before any method runs.
+    - An ``out_dir`` that holds a saved result of another dataset or
+      category - ``ValueError``, before any method runs.
     - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
       real run - ``ValueError``; a real run checks this host's GPU.
 

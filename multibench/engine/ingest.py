@@ -1274,8 +1274,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
       positionally with a ``UserWarning`` (a different cell count still
       raises).
 
-    A bare array carries no barcodes, so nothing can be checked - pass a
-    DataFrame or AnnData when the order is not known to be right.
+    A bare array has no barcodes, so the order cannot be checked. Pass a
+    DataFrame or AnnData when you are not sure of the order.
 
     **Labels.** ``cty.csv`` is the single-column CSV the benchmark reads
     (header ``x``, one label per line); ``mtb.labels_for`` finds these files
