@@ -495,15 +495,6 @@ def _installed_envs() -> frozenset:
         return frozenset()
 
 
-#: Known method x dataset incompatibilities that file/env checks cannot see:
-#: the files exist and the env is installed, but the content stops the method.
-#: Surfaced by scan() so a sweep does not discover them hours in.
-_CAVEATS = {
-    ("GLUE", "D28"): ("fails on D28's peak names: GLUE needs chr:start-end; rename "
-                      "them with mtb.io.normalize_peak_names"),
-}
-
-
 def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script is unreachable here, or "" when it is fine.
 
@@ -517,7 +508,9 @@ def _missing_script(variant, *, method: str | None = None) -> str:
       first fetch would be wrong;
     * a local helper module the entrypoint imports from its own directory
       (``variant.helpers``, e.g. MIRA's ``logger.py``) that the public
-      repository does not ship - the script would ``ImportError`` at start.
+      repository does not ship - the script would ``ImportError`` at start;
+    * a checkout at another commit than ``$MULTIBENCH_SCRIPTS_REF``: the run
+      refuses at start (``config.scripts_ref_problem``).
 
     Parameters
     ----------
@@ -532,6 +525,9 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     repo = _P(config.DEFAULT.repo_path)
     for root in (repo, _P(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
+            wrong_ref = config.scripts_ref_problem(root)
+            if wrong_ref:
+                return wrong_ref
             if not (root / ep).exists():
                 return (f"method script {ep} is missing from the reference checkout at "
                         f"{root}: " + _runner.missing_script_fix(root))
@@ -556,10 +552,6 @@ def _join_clauses(parts) -> str:
     leave before the separator (``"... names.; setup: ..."``)."""
     parts = [p for p in parts if p]
     return "; ".join([p.rstrip().rstrip(".") for p in parts[:-1]] + parts[-1:])
-
-
-def _caveat(method: str, dataset: str) -> str:
-    return _CAVEATS.get((method, dataset), "")
 
 
 def _variant_rows(category=None):
@@ -1002,7 +994,7 @@ def scan(dataset: str, category: str | None = None, *,
     still needs, or what may go wrong without an error:
 
     - an ATAC file that holds the other representation (a peak matrix where
-      the method needs gene activity);
+      the method needs gene activity), or peak names the method cannot read;
     - an RNA, ADT or peak file whose values are not whole numbers: the
       methods expect raw counts;
     - diagonal: a folder whose only label file is ``cty.csv``; diagonal
@@ -1145,7 +1137,7 @@ def scan(dataset: str, category: str | None = None, *,
                "n_tunable": len(v.tunable),
                "runtime_tier": rt.get("tier", "unknown"),
                "observed_worst_sec": rt.get("worst_sec"),
-               "caveat": _caveat(spec.id, dataset), "runnable": False, "reason": "",
+               "caveat": "", "runnable": False, "reason": "",
                "files_ok": True, "files_reason": "", "env_ok": True, "env_reason": "",
                "needs_labels": bool(v.needs_labels),
                "atac": spec.atac if _variant_consumes_atac(v) else None,
@@ -2548,6 +2540,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             + config.hint(f"mtb.method_info(m)['supports'] and mtb.scan({dataset!r})",
                           f"`multibench info METHOD` and `multibench scan {dataset}`"))
     if dry_run:
+        wrong_ref = config.scripts_ref_problem()
+        if wrong_ref:                      # every row carries it as its reason
+            import sys
+            print(f"# {wrong_ref}", file=sys.stderr, flush=True)
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
             msg = (f"[run_all] dry run: {k} of {n} requested variant(s) runnable on "

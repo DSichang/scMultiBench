@@ -450,7 +450,8 @@ def test_present_scripts_must_be_at_the_requested_ref(tmp_path, monkeypatch):
     subprocess.run(["git", "tag", "v1"], cwd=repo, check=True, env=env)
     assert config.ensure_repo(repo, ref="v1") == repo               # a local tag
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, "v2")
-    with pytest.raises(RuntimeError, match=r"are at commit .* not 'v2'"):
+    with pytest.raises(RuntimeError,
+                       match=rf"^method scripts are at {head[:7]}, not v2 \(MULTIBENCH_SCRIPTS_REF\)"):
         config.ensure_repo(repo)                                     # silently other code: no
-    with pytest.raises(RuntimeError, match="not 'a'"):
+    with pytest.raises(RuntimeError, match=r"not a \(--ref\)"):
         config.ensure_repo(repo, ref="a")                            # too short to be a prefix

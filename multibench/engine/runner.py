@@ -780,8 +780,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     The dry run prints to stderr what the real run would need first: the
     method's ``setup_hint`` (``method_info(m)['setup_hint']``), a note when
-    the method scripts are not on this machine yet, and a note when the
-    command reads a file under ``inputs/`` that the run writes first.
+    the method scripts are not on this machine yet or not at
+    ``MULTIBENCH_SCRIPTS_REF``, and a note when the command reads a file
+    under ``inputs/`` that the run writes first.
 
     **Variant selection.** Only ``category`` and the modality roles of
     ``inputs`` select the variant. The modality roles are every key except the
@@ -872,9 +873,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     A Slurm job step:
 
     ```python
-    mtb.run("StabMap", "mosaic", inputs=inp, out_dir="runs/StabMap",
-            cmd_template="srun --gres=gpu:1 {env_cmd}")
+    mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
+            out_dir="runs/scMoMaT", cmd_template="srun --gres=gpu:1 {env_cmd}")
     ```
+
+    Request a GPU only for a method that uses one;
+    ``mtb.method_info(m)['gpu']`` says which.
 
     **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
     before the argv is built, and ``data_dir`` (like any existing directory)
@@ -1072,7 +1076,9 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     Returns
     -------
     tuple[list[str], list[str]]
-        ``(argv, notes)``; see :func:`script_notes` for the notes.
+        ``(argv, notes)``: the scripts-ref mismatch
+        (``config.scripts_ref_problem``) first when there is one, then
+        :func:`script_notes`, then the prepared-files note.
     """
     spec = registry.get(method)
     variant = spec.select(category, _modality_roles(inputs))
@@ -1085,7 +1091,10 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     values = {role: step["value"] for role, step in plan.items()}
     repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
     argv = _argv(variant, method, values, out_str, repo, params, cmd_template)
-    notes = script_notes(spec, variant, repo)
+    # the scripts at another commit than $MULTIBENCH_SCRIPTS_REF: the real run
+    # refuses (config.ensure_repo); mtb.scan reports it as the row's reason
+    ref = config.scripts_ref_problem(repo)
+    notes = ([ref] if ref else []) + script_notes(spec, variant, repo)
     prepared = _prepared_note(plan, out_str)
     return argv, notes + ([prepared] if prepared else [])
 

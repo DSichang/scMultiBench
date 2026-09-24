@@ -369,7 +369,7 @@ def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
     assert header == ["method", "modalities", "atac", "runnable", "files_ok", "env_ok",
                       "runtime_tier", "reason", "caveat"]
     glue = next(l for l in out.splitlines() if l.strip().startswith("GLUE"))
-    assert "fails on D28's peak names" in glue
+    assert "setup: GLUE needs" in glue and "peak names" not in glue
     rc = cli.main(["scan", "D11", "--category", "vertical", "--modalities", "rna,adt"])
     header = capsys.readouterr().out.splitlines()[0].split()
     assert rc == 0 and header == cli._COMPACT_PLAN_COLUMNS    # no ATAC row, no caveat

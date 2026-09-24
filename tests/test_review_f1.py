@@ -166,20 +166,22 @@ def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
     assert "/inputs/atac_peak_normpeaks.h5" in row["command"]
     assert ("the command reads inputs/atac_peak_normpeaks.h5, which mtb.run writes "
             "first: start the method with mtb.run or mtb.run_all") in row["caveat"]
-    # a command that reads only the dataset's own files has no such note
-    assert "writes first" not in sc.set_index("method").loc["GLUE", "caveat"]
+    # GLUE reads a renamed peak copy as well (R3-04); a command that reads
+    # only the dataset's own files has no such note
+    assert "inputs/atac_peak_normpeaks.h5" in sc.set_index("method").loc["GLUE", "caveat"]
+    assert "writes first" not in sc.set_index("method").loc["MultiMAP", "caveat"]
     # the dry run prints the same note
     inp = mtb.inputs_for("D28", "diagonal", "Seurat_v3", data_path=data)
     mtb.run("Seurat_v3", "diagonal", inputs=inp, out_dir=tmp_path / "o", dry_run=True)
     assert "# the command reads inputs/atac_peak_normpeaks.h5" in capsys.readouterr().err
     # the CLI marks the line in its '# commands' block
     rc = cli.main(["run-all", "D28", "--category", "diagonal", "--data-path", str(data),
-                   "--methods", "Seurat_v3,GLUE", "--dry-run", "--out-dir", str(tmp_path)])
+                   "--methods", "Seurat_v3,MultiMAP", "--dry-run", "--out-dir", str(tmp_path)])
     out = capsys.readouterr().out
     assert rc == 0
     lines = {ln.split(" (")[0]: ln for ln in out.splitlines() if ": conda run" in ln}
     assert "[use multibench run]" in lines["Seurat_v3"]
-    assert "[use multibench run]" not in lines["GLUE"]
+    assert "[use multibench run]" not in lines["MultiMAP"]
 
 
 # ------------------------------------------------------------------ L39/L41 CLI help

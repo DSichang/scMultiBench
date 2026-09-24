@@ -296,8 +296,10 @@ class Config:
     **Method scripts.** The first run fetches them from GitHub into
     ``repo_path`` (``multibench fetch --scripts`` does it ahead). Set
     ``MULTIBENCH_SCRIPTS_REF`` to a commit or tag to fetch that version
-    instead of the default branch. ``multibench config`` and every run record
-    show the commit in use (``scripts_commit``).
+    instead of the default branch; scripts already present must be at that
+    ref, or runs refuse and ``mtb.scan`` blocks every row.
+    ``multibench config`` and every run record show the commit in use
+    (``scripts_commit``).
 
     See Also
     --------
@@ -388,36 +390,66 @@ def scripts_commit(repo=None) -> str | None:
 _REF_RECORD = "multibench-scripts-ref"
 
 
-def _check_ref(repo: Path, ref: str) -> None:
-    """``RuntimeError`` when the scripts in ``repo`` are not at ``ref`` (internal).
+def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> str | None:
+    """The sentence saying the scripts in ``repo`` are not at ``ref``, or ``None`` (internal).
 
     Accepted: ``ref`` is the checkout's commit or a prefix of it (7+ hex
     digits), the ref this package fetched there, or what ``git rev-parse``
     resolves it to. A folder that is not a git checkout cannot be checked and
-    is accepted.
+    is accepted. ``source`` is where ``ref`` came from: the environment
+    variable, or ``"--ref"`` (``multibench fetch --scripts --ref``).
     """
     import subprocess
     head = scripts_commit(repo)
     if head is None or (_re.fullmatch(r"[0-9a-fA-F]{7,40}", ref)
                         and head.startswith(ref.lower())):
-        return
+        return None
     git = _git_dir(repo)
     try:
         if (git / _REF_RECORD).read_text().strip() == ref:
-            return
+            return None
     except OSError:
         pass
     try:
         out = subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "--quiet",
                               f"{ref}^{{commit}}"], capture_output=True, text=True)
         if out.returncode == 0 and out.stdout.strip().lower() == head:
-            return
+            return None
     except (OSError, subprocess.SubprocessError):
         pass
-    raise RuntimeError(
-        f"the method scripts in {repo} are at commit {head[:12]}, not {ref!r} "
-        f"({SCRIPTS_REF_VAR} or --ref). Remove that folder to fetch {ref!r}, or "
-        f"set {REPO_PATH_VAR} to a checkout of it.")
+    # no final period: scan joins this into its reason column with "; "
+    if source == SCRIPTS_REF_VAR:
+        fix = hint("Fetch that ref into a new repo_path, or unset the variable",
+                   f"Fetch that ref into a new folder (set {REPO_PATH_VAR}, then "
+                   f"`multibench fetch --scripts`), or unset the variable")
+    else:
+        fix = (f"Fetch that ref into a new folder: set {REPO_PATH_VAR}, then run "
+               f"`multibench fetch --scripts --ref {ref}`")
+    return f"method scripts are at {head[:7]}, not {ref} ({source}). {fix}"
+
+
+def _check_ref(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> None:
+    """``RuntimeError`` with :func:`_ref_mismatch`'s sentence when the scripts
+    in ``repo`` are not at ``ref`` (internal)."""
+    problem = _ref_mismatch(repo, ref, source=source)
+    if problem:
+        raise RuntimeError(problem)
+
+
+def scripts_ref_problem(repo=None) -> str | None:
+    """Why the method scripts do not match ``$MULTIBENCH_SCRIPTS_REF``, or ``None`` (internal).
+
+    ``repo`` = the folder holding ``tools_scripts/``; ``None`` = the one
+    :func:`ensure_repo` would use, without fetching. ``None`` also when the
+    variable is unset or no scripts are on this machine yet: the first fetch
+    then checks out that ref. ``mtb.scan``, the dry runs and ``multibench
+    config`` report this sentence; a real run raises it (:func:`ensure_repo`).
+    """
+    ref = _os.environ.get(SCRIPTS_REF_VAR) or None
+    repo = _scripts_checkout() if repo is None else Path(repo)
+    if ref is None or repo is None or not (repo / "tools_scripts").is_dir():
+        return None
+    return _ref_mismatch(repo, ref)
 
 
 def run_provenance(env: str | None, repo=None) -> dict:
@@ -443,8 +475,10 @@ def _sources(cfg: Config | None = None) -> list[dict]:
 
     Backs ``multibench config``. Returns one dict per setting, in the order
     ``data_path``, ``envs_dir``, ``repo_path``, ``scripts_commit`` (the
-    commit of the method scripts in ``repo_path``), ``result_path``,
-    ``leiden_flavor``, with the keys ``name``, ``value`` and ``source``.
+    commit of the method scripts in ``repo_path``), ``scripts_ref`` (only
+    when ``$MULTIBENCH_SCRIPTS_REF`` is set: the ref and whether the scripts
+    match it), ``result_path``, ``leiden_flavor``, with the keys ``name``,
+    ``value`` and ``source``.
     """
     cfg = DEFAULT if cfg is None else cfg
     rows = []
@@ -483,6 +517,18 @@ def _sources(cfg: Config | None = None) -> list[dict]:
         commit_src = (f"the method scripts in {where}" if sha else
                       f"{where} is not a git checkout")
     rows.append({"name": "scripts_commit", "value": commit, "source": commit_src})
+    ref = _os.environ.get(SCRIPTS_REF_VAR) or None
+    if ref:
+        if checkout is None:
+            state = "the first fetch checks it out"
+        elif not sha:
+            state = "cannot be checked: the scripts folder is not a git checkout"
+        elif _ref_mismatch(checkout, ref):
+            state = f"does not match scripts_commit {sha[:7]}"
+        else:
+            state = "matches scripts_commit"
+        rows.append({"name": "scripts_ref", "value": ref,
+                     "source": f"environment variable {SCRIPTS_REF_VAR}; {state}"})
     rows.append({"name": "result_path", "value": cfg.result_path,
                  "source": ("default: the tables shipped with the package"
                             if cfg.result_path == _ROOT / "multibench" / "result"
@@ -522,12 +568,13 @@ def ensure_repo(path=None, ref=None):
     import subprocess
     import shutil as _sh
 
+    source = "--ref" if ref else SCRIPTS_REF_VAR
     ref = ref or _os.environ.get(SCRIPTS_REF_VAR) or None
     p = Path(path) if path else DEFAULT.repo_path
     for have in (p, _ROOT):
         if (have / "tools_scripts").is_dir():
             if ref:
-                _check_ref(have, ref)
+                _check_ref(have, ref, source=source)
             return have
     if p.exists():
         # a directory without tools_scripts is most likely an interrupted
