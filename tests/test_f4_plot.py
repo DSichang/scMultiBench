@@ -43,12 +43,12 @@ def _mine(method, dataset, base=0.5, metrics=("ARI", "NMI", "ASW", "cLISI")):
 
 def test_chip_key_names_no_registry_and_spells_out_dr():
     assert "registry" not in B.CHIP_KEY
-    assert "? = not a package method, such as your own" in B.CHIP_KEY
+    assert "? = a name the package does not know" in B.CHIP_KEY
     assert "DR = dimension reduction" in B.CHIP_KEY
     # the family name stays: build_table's columns carry it
     assert B.FAMILIES[0][0] == "DR and clustering"
-    notes = inspect.getdoc(mtb.plot.bubble)
-    assert "registry" not in notes and "not a package" in notes
+    notes = " ".join(inspect.getdoc(mtb.plot.bubble).split())
+    assert "registry" not in notes and "a name the package does not know" in notes
 
 
 # --- R4-12 (b): two folders of the same cells --------------------------------
