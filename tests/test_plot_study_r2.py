@@ -148,7 +148,7 @@ def test_one_method_figure_warns_and_is_grey():
 
 def test_constant_column_warns_and_uses_the_neutral_fill():
     tbl, msgs = _messages(mtb.plot.build_table, _ilisi_tie())
-    assert msgs == ["All methods have the same iLISI (0.000), so that column is grey."]
+    assert msgs == ["iLISI is 0.000 for every method. That column is grey."]
     assert tbl.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]    # R parity kept
     assert tbl.ranks["iLISI"].tolist() == [3.0, 3.0, 3.0]
     fig = B.render(tbl)

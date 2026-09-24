@@ -166,12 +166,12 @@ def test_one_method_warning_is_plain():
 def test_equal_column_warning_is_plain():
     df = pd.DataFrame(_rows("A", (0.3, 0.4, 1.0)) + _rows("B", (0.5, 0.2, 1.0)))
     _, msgs = _messages(mtb.plot.build_table, df)
-    assert msgs == ["All methods have the same cLISI (1.000), so that column is grey."]
+    assert msgs == ["cLISI is 1.000 for every method. That column is grey."]
     df = pd.DataFrame(_rows("A", (0.3, 0.4, 1.0)) + _rows("B", (0.3, 0.2, 1.0)))
     _, msgs = _messages(mtb.plot.build_table, df)
     # columns in figure order: cLISI leads its family
-    assert msgs == ["All methods have the same cLISI (1.000) and ARI (0.300), so "
-                    "those columns are grey."]
+    assert msgs == ["cLISI is 1.000 and ARI is 0.300 for every method. Those "
+                    "columns are grey."]
 
 
 def test_equal_mean_rank_warning_is_plain():
@@ -181,9 +181,9 @@ def test_equal_mean_rank_warning_is_plain():
             rows += [{"method": m, "dataset": ds, "metric": k, "value": v}
                      for k in ("ARI", "NMI")]
     _, msgs = _messages(mtb.plot.build_table, pd.DataFrame(rows), aggregate="summary")
-    grey = [m for m in msgs if m.startswith("All methods have the same mean rank")]
-    assert grey == ["All methods have the same mean rank in ARI (1.5) and NMI (1.5), "
-                    "so those columns are grey."], msgs
+    grey = [m for m in msgs if m.startswith("Every method has mean rank")]
+    assert grey == ["Every method has mean rank 1.5 in ARI and NMI. Those columns "
+                    "are grey."], msgs
 
 
 # --- R5-11 (c): the CLI overlay line -----------------------------------------
@@ -240,7 +240,7 @@ def test_reordered_plain_dict_error_names_only_the_default_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict({"cty2": p2, "cty1": p1}, None)
     assert str(e.value) == (
-        "labels: the keys ['cty2', 'cty1'] are not in the default order. Pass the "
+        "The label keys cty2 and cty1 are not in the default order. Pass the "
         "dict from mtb.labels_for(dataset, category, method) unchanged, a list of "
         "paths in cell order, or label_order=[...]. The default order is cty1, "
         "cty2, ... by number, with rna before adt before atac. It is not "
@@ -260,7 +260,7 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict(three, None)
     assert str(e.value).startswith(
-        "labels: the keys ['cty1', 'cty3', 'cty2'] are in neither the method's cell "
+        "The label keys cty1, cty3 and cty2 are in neither the method's cell "
         "order nor the default order. Pass the dict from mtb.labels_for(")
     # labels_for without a method returns the default order: no method to name
     plain = LabelFiles({"cty1": p1, "cty2": p2})

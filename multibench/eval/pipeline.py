@@ -427,27 +427,32 @@ def _labels_from_dict(d: dict, label_order) -> list:
         else:
             where = "are not in the default order"
         raise ValueError(
-            f"labels: the keys {keys} {where}. Pass the dict from "
+            f"The label keys {_and_list(keys)} {where}. Pass the dict from "
             f"mtb.labels_for(dataset, category, method) unchanged, a list of "
             f"paths in cell order, or label_order=[...]. The default order is "
             f"cty1, cty2, ... by number, with rna before adt before atac. It is "
             f"not alphabetical.")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
         raise TypeError(
-            f"label_order= must be a list of keys of the labels dict, e.g. "
-            f"label_order={list(map(str, d))!r}; got {type(label_order).__name__}")
+            f"label_order= takes a list of keys of the labels dict, such as "
+            f"label_order={list(map(str, d))!r}. It got a "
+            f"{type(label_order).__name__}.")
     order = list(label_order)
     if not order:
         raise ValueError(
-            f"label_order= is empty; list the keys of the labels dict in the "
-            f"method's cell order, e.g. {list(map(str, d))!r}")
-    unknown = [k for k in order if k not in d]
+            f"label_order= is empty. List the keys of the labels dict in the "
+            f"method's cell order, such as {list(map(str, d))!r}.")
+    unknown = list(dict.fromkeys(k for k in order if k not in d))
     if unknown:
+        what = ("which is not a key" if len(unknown) == 1
+                else "which are not keys")
         raise ValueError(
-            f"label_order names key(s) {unknown!r} that are not in the labels "
-            f"dict; its keys are {list(map(str, d))!r}")
+            f"label_order names {_and_list(unknown)}, {what} of the labels dict. "
+            f"Its keys are {_and_list(d)}.")
     if len(set(order)) != len(order):
-        raise ValueError(f"label_order repeats a key: {order!r}")
+        times = {k: order.count(k) for k in dict.fromkeys(order) if order.count(k) > 1}
+        raise ValueError("label_order names " + _and_list(
+            f"{k} {'twice' if n == 2 else f'{n} times'}" for k, n in times.items()) + ".")
     return [d[k] for k in order]
 
 

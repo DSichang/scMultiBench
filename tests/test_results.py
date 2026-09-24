@@ -399,7 +399,8 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
     """The instructor got a silent 1-method cross/D52 table under the default
     source='published' (the CLI warns, the API did not)."""
     with pytest.warns(UserWarning, match=r"The published table for cross/D52 has one "
-                                         r"method, scMoMaT, so every rank is the same\. ") as rec:
+                                         r"method, scMoMaT\. Every rank in it is the "
+                                         r"same\. ") as rec:
         df = results.load_results("cross", dataset="D52", result_path=result_dir)
     assert set(df.method) == {"scMoMaT"}          # a warning, never an error
     msgs = [str(w.message) for w in rec if "has one method" in str(w.message)]

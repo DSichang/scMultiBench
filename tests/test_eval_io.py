@@ -270,7 +270,7 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels={"cty2": str(p), "cty1": str(p)}, metrics=["ARI"])
     msg = str(exc.value)
-    assert "labels: the keys ['cty2', 'cty1']" in msg
+    assert "The label keys cty2 and cty1 " in msg
     assert "list of paths in cell order" in msg
     # 0.3.x: the hint must no longer recommend the alphabetical order; it names
     # the cell-order rule and the label_order= escape hatch instead

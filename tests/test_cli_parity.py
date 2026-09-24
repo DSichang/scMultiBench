@@ -342,7 +342,7 @@ def test_cli_plot_single_method_warning_and_default_title(tmp_path, capsys, monk
     monkeypatch.setattr(plot_ns, "bar", fake_bubble)
     rc = cli.main(["plot", "bar", "--input", str(csv), "--dataset", "D1",
                    "--out", str(tmp_path / "x.png")])
-    assert rc == 0 and "this table has one method" in capsys.readouterr().err
+    assert rc == 0 and "The table has one method." in capsys.readouterr().err
     # default title for stored results is '<category> <dataset>'
     monkeypatch.setattr(multibench, "load_results", lambda **k: _long_df())
     rc = cli.main(["plot", "bubble", "--category", "vertical", "--dataset", "D1",

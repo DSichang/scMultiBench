@@ -1094,7 +1094,7 @@ def _cmd_plot(args) -> int:
         # (and names the source that holds more methods); --input-only
         # frames never pass through it. plot.bubble warns about one method
         # itself, so only bar needs this line
-        print("warning: this table has one method, so every rank is the same",
+        print("warning: The table has one method. Every rank is the same.",
               file=sys.stderr)
     title = args.title
     if title is None:
@@ -2212,15 +2212,11 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- scan
     ps = sub.add_parser(
         "scan", help="which methods can run on a dataset, and why not the rest (mtb.scan)",
-        description="Print the preflight table of mtb.scan: one row per method variant "
-                    "of the category with its two checks (files_ok, env_ok), the "
-                    "runnable verdict and the reason. The table shows a compact column "
-                    "set (" + ", ".join(_COMPACT_PLAN_COLUMNS) + "; plus atac when a "
-                    "variant reads ATAC and caveat when a row has one; long text "
-                    f"clipped to {_TRUNCATE_WIDTH} chars); --columns all (or any of "
-                    "--format csv/tsv/json) gives every column mtb.scan returns: "
-                    "category, env, output_kind, n_tunable, observed_worst_sec, caveat, "
-                    "files_reason, env_reason, needs_labels, atac ...")
+        description="Print the check table of mtb.scan. It has one row per method "
+                    "variant, with files_ok, env_ok, runnable and reason. The table "
+                    "shows the main columns and clips long text to "
+                    f"{_TRUNCATE_WIDTH} characters. --columns all, or --format csv, "
+                    "tsv or json, prints every column that mtb.scan returns.")
     ps.add_argument("dataset", help="dataset id = the folder name under --data-path "
                                    "(e.g. D11, or MYCITE for your own data)")
     ps.add_argument("--category", help=_CATEGORY_HELP + " Default: every category, "
@@ -2267,23 +2263,22 @@ def build_parser() -> argparse.ArgumentParser:
     pc = sub.add_parser(
         "convert", help="convert .h5ad/.h5mu/.csv to the canonical .h5 files "
                         "(mtb.io.to_canonical / mtb.io.export_dataset)",
-        description="Two modes. (1) One file: convert SRC OUT [--modality M] writes "
-                    "one canonical .h5 (features x cells, matrix/data + features + "
-                    "barcodes); OUT may be a directory when --modality is given "
-                    "(the canonical filename rna.h5 / adt.h5 / atac_peak.h5 / "
-                    "atac_gas.h5 is appended). (2) Whole dataset: any of --rna/--adt/"
-                    "--atac/--labels/--batch/--batch-index switches to export_dataset, which "
-                    "reads SRC (.h5ad or .h5mu) and writes OUT/ as a dataset folder "
-                    "ready for multibench scan OUT_NAME --data-path <parent>. "
-                    "Give raw counts: the methods normalise the data themselves.",
+        description="Mode 1 converts one file: convert SRC OUT writes one canonical "
+                    ".h5 file. With --modality, OUT may be a folder, and the file is "
+                    "named after the modality. Mode 2 writes a whole dataset folder, "
+                    "as mtb.io.export_dataset does. Any of --rna, --adt, --atac, "
+                    "--labels, --batch or --batch-index selects mode 2. SRC is then "
+                    "an .h5ad or .h5mu file. Check the folder with multibench scan "
+                    "NAME --data-path <parent>. Give raw counts. The methods normalise "
+                    "the data themselves.",
         epilog=_CONVERT_EPILOG, formatter_class=_HelpFormatter)
-    pc.add_argument("src", help="input: .h5ad, .h5mu (then --mod or mod: selectors), "
-                               ".csv/.tsv (cells x features), .loom, or an already "
-                               "canonical .h5 (copied to OUT, --dtype honoured; "
-                               "'already canonical - nothing written' when OUT is SRC)")
-    pc.add_argument("out", help="output .h5 file (mode 1; or an existing directory - or a "
-                               "path ending in / - with --modality) or the dataset "
-                               "folder to create (mode 2)")
+    pc.add_argument("src", help="input file: .h5ad, .h5mu, .csv, .tsv, .loom or .h5. "
+                               "A .h5mu file needs --mod or a mod: selector. A .csv "
+                               "or .tsv file has one row per cell. A canonical .h5 "
+                               "is copied to OUT with --dtype applied.")
+    pc.add_argument("out", help="mode 1: the output .h5 file. With --modality it may "
+                               "be a folder that exists or a path ending in /. "
+                               "Mode 2: the dataset folder to create.")
     pc.add_argument("--category", help=_CATEGORY_HELP + " Sets the file names. "
                     "vertical writes atac.h5. diagonal writes atac_peak.h5 or "
                     "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "

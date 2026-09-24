@@ -240,7 +240,7 @@ def test_reordered_label_dict_error_is_short_sentences(tmp_path):
                      labels={"cty2": str(p2), "cty1": str(p1)}, metrics=["ASW"],
                      verbose=False)
     assert str(e.value) == (
-        "labels: the keys ['cty2', 'cty1'] are not in the default order. Pass the dict "
+        "The label keys cty2 and cty1 are not in the default order. Pass the dict "
         "from mtb.labels_for(dataset, category, method) "
         "unchanged, a list of paths in cell order, or label_order=[...]. The default "
         "order is cty1, cty2, ... by number, with rna before adt before atac. It is not "

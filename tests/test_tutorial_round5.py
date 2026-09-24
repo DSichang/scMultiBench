@@ -168,7 +168,7 @@ def test_evaluate_refuses_a_dict_out_of_the_default_order(tmp_path):
     assert "ASW" in _quiet(mtb.evaluate, emb, labels=built, metrics=["ASW"], verbose=False).index
     reordered = {"cty2": paths["cty2"], "cty1": paths["cty1"]}
     with pytest.raises(ValueError, match=re.escape(
-            "labels: the keys ['cty2', 'cty1'] are not in the default order.")):
+            "The label keys cty2 and cty1 are not in the default order.")):
         _quiet(mtb.evaluate, emb, labels=reordered, metrics=["ASW"], verbose=False)
     got = _quiet(mtb.evaluate, emb, labels=reordered, label_order=["cty2", "cty1"],
                  metrics=["ASW"], verbose=False)
