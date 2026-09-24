@@ -178,19 +178,21 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path):
     df = mtb.scan("MU_TC", "vertical", data_path=tmp_path, verbose=False)
     df = df.set_index(["method", "modalities"])
     peak = df.loc[("scMVP", "rna+atac"), "reason"]
-    assert ('vertical reads atac.h5: rename atac_peak.h5 to atac.h5, or write it with '
-            'category="vertical"') in peak
+    assert ('scMVP reads atac.h5 for vertical. Rename atac_peak.h5 to atac.h5, or write it '
+            'with category="vertical".') in peak
     assert "needs peak ATAC" not in peak
     gas = df.loc[("Matilda", "rna+atac"), "reason"]
-    assert "needs gene-activity ATAC (atac.h5); folder has peaks (atac_peak.h5)" in gas
-    assert "rename" not in gas
+    assert ("Matilda needs gene-activity ATAC (atac.h5), and the folder has peaks "
+            "(atac_peak.h5).") in gas
+    assert "ename" not in gas
     # peak methods whose role is atac_gas: the reason and files_reason give one
     # rule, 'vertical reads atac.h5', and never atac_gas.h5 as the rename target
     for m in ("moETM", "scMM", "iPOLNG"):
         row = df.loc[(m, "rna+atac_gas")]
         for col in ("reason", "files_reason"):
-            assert "rename atac_peak.h5 to atac.h5" in row[col], (m, col, row[col])
+            assert "ename atac_peak.h5 to atac.h5" in row[col], (m, col, row[col])
             assert "vertical reads atac_gas.h5" not in row[col], (m, col)
+            assert "reads atac_gas.h5 for vertical" not in row[col], (m, col)
             assert "to atac_gas.h5" not in row[col], (m, col)
 
 
@@ -198,7 +200,7 @@ def test_vertical_peak_fix_names_the_cli_flag(tmp_path, monkeypatch):
     _mu_tc(tmp_path)
     monkeypatch.setattr(config, "_CLI", True)
     df = mtb.scan("MU_TC", "vertical", data_path=tmp_path, methods=["scMVP"], verbose=False)
-    assert ("rename atac_peak.h5 to atac.h5, or write it with --category vertical"
+    assert ("Rename atac_peak.h5 to atac.h5, or write it with --category vertical."
             in df["reason"].iloc[0])
 
 
@@ -245,7 +247,7 @@ def test_strict_counts_the_gpu_test_on_its_own(login_node, capsys):
                    "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "This host has no GPU for 1." in err
+    assert "Rows that need a GPU this host lacks: 1." in err
     assert "environment is not ready" not in err
     assert "--assume-gpu" in err
 
@@ -257,7 +259,8 @@ def test_strict_counts_a_missing_env_and_a_missing_gpu_apart(monkeypatch, capsys
                    "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "The environment is not ready in 2." in err and "This host has no GPU for 1." in err
+    assert "Rows whose environment is not ready: 2." in err \
+        and "Rows that need a GPU this host lacks: 1." in err
     # the flag would not make SMILE runnable here: no pointer to it
     assert "--assume-gpu" not in err
 
@@ -301,7 +304,7 @@ def test_cli_run_all_dry_run_takes_assume_gpu(login_node, capsys):
     rc = cli.main(["run-all", "D45", "--category", "mosaic", "--out-dir", "out/",
                    "--methods", "SMILE", "--dry-run", "--assume-gpu"])
     cap = capsys.readouterr()
-    assert rc == 0 and "1 of 1 variant(s) runnable" in cap.err
+    assert rc == 0 and "1 of 1 row can run" in cap.err
     with pytest.raises(SystemExit) as ei:
         cli.main(["run-all", "D45", "--category", "mosaic", "--out-dir", "out/",
                   "--methods", "SMILE", "--assume-gpu"])

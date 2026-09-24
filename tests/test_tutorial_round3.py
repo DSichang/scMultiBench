@@ -117,7 +117,8 @@ def test_the_sentence_holds_for_a_mosaic_folder_with_gene_activity(tmp_path, eve
     for m in ("StabMap", "scMoMaT"):
         r = df.loc[m]
         assert r.files_ok and r.env_ok and not r.runnable, m
-        assert r.reason.startswith("needs peak ATAC; atac2.h5 holds gene activity"), r.reason
+        assert r.reason.startswith(f"{m} needs peak ATAC, and atac2.h5 holds gene "
+                                   "activity"), r.reason
 
 
 def test_the_sentence_holds_for_a_diagonal_folder_with_peaks_as_gene_activity(
@@ -138,4 +139,5 @@ def test_the_sentence_holds_for_a_diagonal_folder_with_peaks_as_gene_activity(
     for m in GEN.SCEN["diagonal"]["own_trio"]:
         r = df.loc[m]
         assert r.files_ok and r.env_ok and not r.runnable, m
-        assert r.reason.startswith("needs gene-activity ATAC; atac_gas.h5 holds peaks"), r.reason
+        assert r.reason.startswith(f"{m} needs gene-activity ATAC, and atac_gas.h5 holds "
+                                   "peaks"), r.reason

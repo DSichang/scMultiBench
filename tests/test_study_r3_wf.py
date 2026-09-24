@@ -114,8 +114,8 @@ def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
         for m in GAS_METHODS:
             r = df.loc[m]
             assert not r.runnable and r.files_ok and r.env_ok, m
-            assert r.reason == (f"needs gene-activity ATAC; atac.h5 holds peaks. Export "
-                                f"the ATAC as gene activity, or pass "
+            assert r.reason == (f"{m} needs gene-activity ATAC, and atac.h5 holds peaks. "
+                                f"Export the ATAC as gene activity, or pass "
                                 f"allow_atac_mismatch=True to run {m} anyway."), r.reason
             assert r.caveat.startswith("expects gene activity; atac.h5 holds peaks")
         assert df.loc[["moETM", "scMM", "iPOLNG", "scMVP"], "runnable"].all()
@@ -136,7 +136,8 @@ def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
                 verbose=False).set_index("method")
     for m in ("moETM", "scMM", "iPOLNG", "scMVP"):
         assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
-        assert df.loc[m, "reason"].startswith("needs peak ATAC; atac.h5 holds gene activity")
+        assert df.loc[m, "reason"].startswith(f"{m} needs peak ATAC, and atac.h5 holds gene "
+                                              "activity")
     assert df.loc[sorted(GAS_METHODS), "runnable"].all()
 
 
@@ -168,7 +169,8 @@ def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatc
            data_path=root, evaluate=False)
     log = capsys.readouterr().out
     assert not GAS_METHODS & set(calls)
-    assert "[run_all] skipping Matilda: needs gene-activity ATAC; atac.h5 holds peaks." in log
+    assert ("[run_all] skipping Matilda: Matilda needs gene-activity ATAC, and atac.h5 "
+            "holds peaks.") in log
     # allowed: it runs, and the caveat reaches the log, the summary and the files
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "named",
                  methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
@@ -202,11 +204,11 @@ def test_scan_strict_counts_the_wrong_atac_kind_apart(tmp_path, capsys):
             "--modalities", "rna,atac_gas", "--strict"]
     rc = _quiet(cli.main, base)
     err = capsys.readouterr().err
-    assert rc == 1 and "The ATAC kind is wrong in 3." in err, err
+    assert rc == 1 and "Rows with the wrong ATAC kind: 3." in err, err
     # R4-01: --methods naming them still fails; --allow-atac-mismatch passes
     rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC"])
     cap = capsys.readouterr()
-    assert rc == 1 and "The ATAC kind is wrong in 2." in cap.err, cap.err
+    assert rc == 1 and "Rows with the wrong ATAC kind: 2." in cap.err, cap.err
     rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC", "--allow-atac-mismatch"])
     cap = capsys.readouterr()
     assert rc == 0, cap.err
@@ -291,4 +293,6 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
     assert cav == ("expects gene activity; atac.h5 holds peaks (features look like "
                    "chr:start-end)"), cav
     assert "method scripts not found" not in log
-    assert W._run_caveat("the command reads inputs/a.h5, which mtb.run writes first") == ""
+    assert W._run_caveat("Matilda reads inputs/a.h5. mtb.run writes that file first") == ""
+    assert W._run_caveat("expects raw counts; Matilda reads inputs/a.h5. mtb.run writes "
+                         "that file first") == "expects raw counts"

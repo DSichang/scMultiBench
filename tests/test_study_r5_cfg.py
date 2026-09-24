@@ -54,7 +54,7 @@ def _table(out: str) -> pd.DataFrame:
 def test_strict_table_agrees_with_its_error(no_scripts, capsys):
     assert cli.main(MATILDA + ["--strict"]) == 1
     cap = capsys.readouterr()
-    assert "Method scripts are not fetched in 1." in cap.err
+    assert "Rows whose method scripts are not fetched: 1." in cap.err
     df = _table(cap.out)
     assert list(df["runnable"]) == [False]
     assert list(df["reason"]) == [REASON]

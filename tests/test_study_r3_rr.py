@@ -71,8 +71,9 @@ def test_peak_ids_without_coordinates_get_the_peak_names_caveat(tmp_path):
     _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(1, 61)])
     cav = _scan_row(tmp_path, "LUNG_ids", "GLUE")["caveat"]
     # no subject, like the other caveats: logs print it after the method name
-    assert cav.startswith("reads peak names such as chr1:100-200; atac_peak.h5 "
-                          "holds other names (e.g. peak_1)")
+    assert cav.startswith("reads peak names such as chr1:100-200. atac_peak.h5 "
+                          "holds other names, for example peak_1. Rename them to "
+                          "chr:start-end")
     # one caveat for the file, not also the representation guess
     assert "holds gene activity" not in cav
     # the same content check for the other method whose peaks mtb.run renames
@@ -181,7 +182,7 @@ def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_pat
     err = capsys.readouterr().err
     assert rc == 0
     assert err.count(f"# method scripts are at {head[:7]}, not deadbeef") == 1
-    assert "`multibench fetch --scripts`" in err
+    assert "then multibench fetch --scripts)" in err and "`" not in err
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
                    "--dry-run"])
     assert rc == 0

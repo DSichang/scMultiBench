@@ -358,7 +358,7 @@ def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
                    "--input", f"rna={inp['rna']}", "--input", f"atac_gas={inp['atac_gas']}",
                    "--out-dir", str(tmp_path / "o"), "--dry-run"])
     err = capsys.readouterr().err
-    assert rc == 0 and "# dry run - nothing was executed; multibench run would execute:" in err
+    assert rc == 0 and "# Dry run. Nothing was executed. multibench run would execute:" in err
     assert "run()" not in err
     rc = cli.main(["params", "Matilda"])
     out = capsys.readouterr().out
@@ -368,8 +368,8 @@ def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
                    "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0
-    assert ("commands below are what multibench run would execute (rows with files_ok "
-            "False have none)") in err
+    assert ("The commands below are what multibench run would execute. Rows with "
+            "files_ok False have none.") in err
     assert "run()" not in err
     assert "method_info(" not in mtb.env.DIFFICULTY["blocked-script"]
 

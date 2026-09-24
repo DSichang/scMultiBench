@@ -152,7 +152,7 @@ def test_scan_and_config_name_a_folder_with_other_files(host, monkeypatch, capsy
     cli_sentence = f"{target} {OTHER} {CLI_FIX}"
     row = _scan_row()
     assert not row["runnable"]
-    assert row["reason"] == sentence
+    assert row["reason"] == sentence + "."
     assert row["files_ok"] and row["env_ok"]          # its own blocker, like the ref
     assert "first real run" not in row["caveat"]
     # the dry run notes the same sentence once, not a clone on the first run
@@ -169,7 +169,7 @@ def test_scan_and_config_name_a_folder_with_other_files(host, monkeypatch, capsy
     # that would refuse
     assert cli.main(MATILDA + ["--strict"]) == 1
     err = capsys.readouterr().err
-    assert "Method scripts are not fetched in 1." in err
+    assert "Rows whose method scripts are not fetched: 1." in err
     assert err.rstrip().endswith(cli_sentence + ".")
     assert "Run multibench fetch --scripts first." not in err
 
@@ -199,8 +199,8 @@ def test_scan_strict_fails_while_the_scripts_are_not_fetched(host, monkeypatch, 
     capsys.readouterr()
     assert cli.main(MATILDA + ["--strict"]) == 1
     err = capsys.readouterr().err
-    assert err.startswith("error: --strict: 0 of 1 row is runnable. Method scripts "
-                          "are not fetched in 1.")
+    assert err.startswith("error: --strict: 0 of 1 row is runnable. Rows whose method "
+                          "scripts are not fetched: 1.")
     assert "  Matilda: method scripts not fetched\n" in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
     assert "no row" not in err
@@ -213,8 +213,8 @@ def test_scan_strict_names_fetch_without_methods(host, monkeypatch, capsys):
     err = capsys.readouterr().err
     # the rows blocked only by the scripts have no reason: the head does not
     # send the reader to that column
-    assert re.search(r"^error: --strict: 0 of (\d+) rows are runnable\. Method scripts "
-                     r"are not fetched in \1\.\n", err), err
+    assert re.search(r"^error: --strict: 0 of (\d+) rows are runnable\. Rows whose method "
+                     r"scripts are not fetched: \1\.\n", err), err
     assert "reason column" not in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
 
@@ -229,7 +229,7 @@ def test_the_student_gate_on_a_mosaic_dataset(host, monkeypatch, capsys):
             "--strict", "--assume-gpu"]
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
-    assert "Method scripts are not fetched in 2." in err
+    assert "Rows whose method scripts are not fetched: 2." in err
     assert "Run multibench fetch --scripts first." in err
 
 

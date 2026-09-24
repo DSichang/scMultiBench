@@ -30,7 +30,7 @@ the methods.
 
 Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
 lines); diagnostics go to stderr (``error: ...``, ``warning: ...``, progress
-such as ``[run_all] ...`` and ``# dry run ...`` notes), so
+such as ``[run_all] ...`` and ``# Dry run. ...`` notes), so
 ``multibench scan ... --format tsv > plan.tsv`` captures a clean table and
 ``2>/dev/null`` silences the rest. Tables default to a compact column set
 (``--columns all`` for everything, ``--format csv|tsv|json`` for scripts).
@@ -301,8 +301,8 @@ def _platform_note() -> str | None:
     from .engine import envs
     problem = envs.host_platform_problem()
     if problem:
-        print(f"warning: {envs.linux_only_text(problem)} `multibench env install "
-              f"--run` refuses here; --force tries anyway. The method list, stored "
+        print(f"warning: {envs.linux_only_text(problem)} multibench env install "
+              f"--run refuses here, and --force tries anyway. The method list, stored "
               f"results, scan's file check, evaluate and plot work on this computer.",
               file=sys.stderr)
     return problem
@@ -409,7 +409,7 @@ def _strict_problem(df, methods) -> str | None:
 
     It fails when no row is runnable, or when a method named in
     ``--methods`` has no runnable row. The text counts the rows each check
-    blocks, one sentence per check, and, for named methods, gives the
+    blocks, one labelled count per check, and, for named methods, gives the
     reason of each one's first row with its files on disk. A GPU-only
     method on a host without a GPU is counted apart from a missing env,
     with a pointer to ``--assume-gpu``; so are a row given the wrong ATAC
@@ -433,7 +433,7 @@ def _strict_problem(df, methods) -> str | None:
     rest = df[~ok]
     counts = []
     if "files_ok" in rest and (~rest["files_ok"].astype(bool)).any():
-        counts.append(f"input files are missing in "
+        counts.append(f"Rows with missing input files: "
                       f"{int((~rest['files_ok'].astype(bool)).sum())}")
     from .workflow import PEAK_NAMES_REASON, _is_wrong_atac, _is_wrong_ref
     if "reason" in rest:
@@ -441,25 +441,26 @@ def _strict_problem(df, methods) -> str | None:
         names = wrong & rest["reason"].astype(str).str.contains(PEAK_NAMES_REASON,
                                                                 regex=False)
         if (wrong & ~names).any():
-            counts.append(f"the ATAC kind is wrong in {int((wrong & ~names).sum())}")
+            counts.append(f"Rows with the wrong ATAC kind: {int((wrong & ~names).sum())}")
         if names.any():
-            counts.append(f"peak names are unreadable in {int(names.sum())}")
+            counts.append(f"Rows whose peak names the method cannot read: "
+                          f"{int(names.sum())}")
         if _is_wrong_ref(rest["reason"]).any():
-            counts.append(f"the scripts are not at MULTIBENCH_SCRIPTS_REF in "
+            counts.append(f"Rows whose scripts are not at MULTIBENCH_SCRIPTS_REF: "
                           f"{int(_is_wrong_ref(rest['reason']).sum())}")
     if not fetched:
-        counts.append(f"method scripts are not fetched in {len(df)}")
+        counts.append(f"Rows whose method scripts are not fetched: {len(df)}")
     n_env, n_gpu, gpu_only = _env_and_gpu_counts(rest)
     if n_env:
-        counts.append(f"the environment is not ready in {n_env}")
+        counts.append(f"Rows whose environment is not ready: {n_env}")
     if n_gpu:
-        counts.append(f"this host has no GPU for {n_gpu}")
+        counts.append(f"Rows that need a GPU this host lacks: {n_gpu}")
     gpu_note = ("\nFor a job that runs on a GPU node, add --assume-gpu."
                 if gpu_only else "")
     if not fetched:                     # the fix for the scripts, before the GPU note
         fix = config.scripts_folder_problem() or "Run multibench fetch --scripts first"
         gpu_note = f"\n{fix}.{gpu_note}"
-    head += "".join(f" {c[0].upper()}{c[1:]}." for c in counts)
+    head += "".join(f" {c}." for c in counts)
     if not methods:
         # rows blocked only by the scripts have an empty reason
         why = ("" if not fetched and df["runnable"].astype(bool).any()
@@ -486,7 +487,7 @@ def _env_and_gpu_counts(rest) -> tuple[int, int, int]:
     """Count the rows of ``rest`` blocked by a missing env and by this host's GPU test.
 
     ``env_reason`` joins the env sentence and the GPU sentence
-    (``spec.requires_gpu_reason``) with ``"; "``; a row counts under each
+    (``spec.requires_gpu_reason``) with a space; a row counts under each
     part it carries. The third count is the rows the GPU test alone blocks
     (files and env ready): the ones ``--assume-gpu`` makes runnable.
     """
@@ -924,7 +925,7 @@ def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported la
     if not need <= set(df.columns):
         raise ValueError(
             f"--input {p}: expected a long results table with columns "
-            f"{sorted(need)} (what `multibench evaluate --method/--dataset` "
+            f"{sorted(need)} (what multibench evaluate --method/--dataset "
             f"and run_all's long.csv write); got {list(df.columns)}")
     return df
 
@@ -948,6 +949,16 @@ def _cli_spelling(message: str) -> str:
     for pattern, flag in _API_TO_FLAGS:
         message = re.sub(pattern, flag, message)
     return message
+
+
+def _unpublished_plot_msg(category: str, inputs) -> str:
+    """``plot``'s error for a category without published tables (mosaic)."""
+    if inputs:
+        return (f"{category} has no published tables. Pass --source rerun to plot your "
+                f"rows with the package's re-run tables, or drop --category to plot "
+                f"your rows alone.")
+    return (f"{category} has no published tables. Pass --source rerun to plot the "
+            f"package's re-run tables.")
 
 
 def _names(values) -> str:
@@ -1036,6 +1047,10 @@ def _cmd_plot(args) -> int:
         try:
             frames.append(load_results(**kw))
         except FileNotFoundError as e:
+            from .data.results import _unpublished_msg
+            if str(e) == _unpublished_msg(args.category):
+                # no published tables by design: the flag that plots anyway
+                raise FileNotFoundError(_unpublished_plot_msg(args.category, inputs)) from e
             # respell the API keywords as this command's flags
             raise FileNotFoundError(_cli_spelling(str(e))) from e
     own_rows = 0
@@ -1132,7 +1147,7 @@ def _cmd_run(args) -> int:
         argv = multibench.run(args.method, args.category, inputs=inputs,
                               out_dir=args.out, params=params.get(args.method),
                               cmd_template=args.runner, dry_run=True)
-        print("# dry run - nothing was executed; multibench run would execute:",
+        print("# Dry run. Nothing was executed. multibench run would execute:",
               file=sys.stderr)
         print(shlex.join(argv))
         return _EXIT_OK
@@ -1194,9 +1209,10 @@ def _cmd_run_all(args) -> int:
                                     allow_atac_mismatch=getattr(
                                         args, "allow_atac_mismatch", False))
         k, n = int(df["runnable"].sum()), len(df)
-        print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
-              f"{args.dataset} ({args.category}); commands below are what multibench "
-              f"run would execute (rows with files_ok False have none)", file=sys.stderr)
+        print(f"# Dry run. Nothing was executed. {k} of {n} {'row' if n == 1 else 'rows'} "
+              f"can run on {args.dataset} ({args.category}). The commands below are what "
+              f"multibench run would execute. Rows with files_ok False have none.",
+              file=sys.stderr)
         # the caveats of the rows the sweep would run: the compact table clips them
         scripts, lines = _dry_run_notes(df)
         if scripts:
@@ -1212,13 +1228,14 @@ def _cmd_run_all(args) -> int:
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
             print()
-            from .engine.runner import _PREPARED_PREFIX
-            print(f"# commands ({len(have)} variant(s) with resolvable inputs; "
-                  f"'[env missing]' = blocked by env_ok only; '[use multibench run]' = "
-                  f"reads a file under inputs/ that `multibench run` writes first)")
+            from .engine.runner import _prepared_at
+            print(f"# Commands of the {len(have)} {'row' if len(have) == 1 else 'rows'} "
+                  f"with resolvable inputs. [env missing]: blocked by env_ok only. "
+                  f"[use multibench run]: reads a file under inputs/ that multibench run "
+                  f"writes first.")
             for _, r in have.iterrows():
                 tag = "" if r["env_ok"] else " [env missing]"
-                if _PREPARED_PREFIX in str(r.get("caveat", "")):
+                if _prepared_at(r.get("caveat", "")) >= 0:
                     tag += " [use multibench run]"
                 print(f"{r['method']} ({r['modalities']}){tag}: {r['command']}")
         return _EXIT_OK
@@ -1405,7 +1422,8 @@ def _evaluate_labels(args, stack):
 def _label_order_problem(files, method, dataset, category) -> str | None:
     """Why ``--labels`` ``files`` contradict ``--method``'s cell order, or ``None``.
 
-    Checked only when ``method`` is a registry method, ``dataset`` and
+    Checked only when ``method`` is a registry method (always so with
+    ``--name``), ``dataset`` and
     ``category`` are given, and the files are two or more of the dataset's
     label files: those :func:`multibench.labels_for` returns for the folder
     under the data path, or, when there is no such folder, any ``*cty*.csv``
@@ -1423,7 +1441,8 @@ def _label_order_problem(files, method, dataset, category) -> str | None:
         registry.check_method(method)
         registry.check_category(category)
     except (KeyError, ValueError):
-        return None                   # SCALEX_rerun, a typo: evaluate reports it or not
+        # a row name such as SCALEX_rerun without --name: nothing to check against
+        return None
     here = True
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -1469,9 +1488,17 @@ def _cmd_evaluate(args) -> int:
     ``plot --input`` reads and ``load_results`` returns. Without
     ``--metrics`` the metric set is Python's default: clustering, plus the
     batch family when ``--batch`` or several ``--labels`` are given.
+
+    ``--name`` is the row name (``to_long(method=)``) and defaults to
+    ``--method``. Given ``--name``, ``--method`` must be a package method: it
+    sets the label order (``labels_for``) and the ``--labels`` order check,
+    as ``labels_for(..., 'SCALEX')`` and ``to_long(method='SCALEX_rerun')``
+    do in Python. Without ``--name`` an unknown ``--method`` with
+    ``--labels`` is only a row name, as before.
     """
     import multibench
-    long_mode = args.method is not None or args.dataset is not None
+    name = getattr(args, "name", None)
+    long_mode = args.method is not None or args.dataset is not None or name is not None
     if long_mode:
         missing = [f for f, v in (("--method", args.method), ("--dataset", args.dataset),
                                   ("--category", args.category)) if v is None]
@@ -1479,6 +1506,14 @@ def _cmd_evaluate(args) -> int:
             _usage_error(args, f"--method/--dataset write a long table and need "
                          f"all of --method, --dataset, --category; missing "
                          f"{', '.join(missing)}")
+    if name is not None:
+        from .engine import registry
+        try:
+            registry.check_method(args.method)
+        except KeyError as e:
+            # with --name, --method only sets the label order: it must be known
+            raise KeyError(f"{e.args[0]}. With --name, --method must be a package "
+                           f"method, because it sets the label order") from None
     # one metric-selection knob: --metrics (a family token or a comma list of
     # codes); --only and --task are older spellings of it
     metrics = _csv_list(args.metrics)
@@ -1510,7 +1545,7 @@ def _cmd_evaluate(args) -> int:
         finally:
             pipeline._CLI_LABELS_FROM.reset(token)
     if long_mode:
-        df = multibench.to_long(df, method=args.method, dataset=args.dataset,
+        df = multibench.to_long(df, method=name or args.method, dataset=args.dataset,
                                 category=args.category)
         if args.out:
             df.to_csv(args.out, index=False)
@@ -1532,14 +1567,15 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
 
     Every size known: ``# total for N envs: X GB download, Y GB on disk``. A
     column with an unknown size is not summed as if complete: the disk
-    figure is left out, a download figure reads ``at least X GB``, and a
-    last line counts the unknowns per column (a row printing ``? disk`` is
-    one disk unknown even when its download size is known), with the disk
-    sum of the others as a lower bound and the advice to check with ``du``
-    after the first install. With ``flavor``, a line between them names the
-    builds summed, e.g. ``# CPU builds, because this host has no NVIDIA GPU.
-    4 envs have a single build (the same archive for CPU and GPU hosts).``
-    No parenthesis holds a semicolon.
+    figure is left out, a download figure reads ``at least X GB``, and the
+    lines after it name the envs without a size (a row printing ``? disk``
+    has no disk size even when its download size is known), with the disk
+    sum of the others as a lower bound (``# 2.6 GB on disk for scmb_torch.
+    scmb_r is not measured.``) and the advice to check with ``du`` after the
+    first install. With ``flavor``, a line between them names the builds
+    summed, e.g. ``# 2 of 6 envs have the CPU build, because this host has
+    no NVIDIA GPU. 4 envs have a single build (the same archive for CPU and
+    GPU hosts).`` No parenthesis holds a semicolon.
 
     Parameters
     ----------
@@ -1562,12 +1598,13 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     Returns
     -------
     str
-        One to three ``#`` lines joined by newlines (stderr on the CLI).
+        One to five ``#`` lines joined by newlines (stderr on the CLI).
     """
     from .engine import envs
     dl = disk = 0
     n = n_dl = n_disk = 0
     n_cpu = n_gpu = n_single = 0
+    no_dl, no_disk, disk_known = [], [], []
     manifest = envs.packed_manifest() if manifest is None else manifest
     for r in rows:
         n += 1
@@ -1577,9 +1614,14 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
         if a is not None:
             n_dl += 1
             dl += a
+        else:
+            no_dl.append(r["env"])
         if u is not None:
             n_disk += 1
             disk += u
+            disk_known.append(r["env"])
+        else:
+            no_disk.append(r["env"])
         if r.get("flavor") == "cpu":
             n_cpu += 1
         elif envs._single_build(r["env"], manifest=manifest):
@@ -1609,21 +1651,24 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     if flavor is not None and n:
         lines.append(_builds_line(envs.resolve_flavor(flavor), flavor, n_cpu, n_gpu,
                                   n_single, _envs, _which))
-    unknown = []
     if 0 < n_dl < n:            # none known: the first line already says so
-        unknown.append(f"download size not recorded for {_which(n - n_dl)}")
+        lines.append(f"# The download size of {_named(no_dl)} is not recorded.")
     if n_disk < n:
         # the known part is a lower bound, e.g. for a storage-quota request
-        known = f" ({envs._gb(disk)} for the other {n_disk})" if n_disk else ""
-        unknown.append(("size on disk for " if unknown else "size on disk not recorded for ")
-                       + _which(n - n_disk) + known)
-    if unknown:
-        last = "# " + ", ".join(unknown)
-        if n_disk < n:
-            last += ("; unpacked envs are larger than the download, so check with du "
-                     "after the first install")
-        lines.append(last)
+        not_measured = f"{_named(no_disk)} {'is' if len(no_disk) == 1 else 'are'} not measured."
+        lines.append(f"# {envs._gb(disk)} on disk for {_named(disk_known)}. {not_measured}"
+                     if n_disk else f"# The size on disk of {_named(no_disk)} is not measured.")
+        lines.append("# Unpacked envs are larger than the download. Check with du after "
+                     "the first install.")
     return "\n".join(lines)
+
+
+def _named(env_names) -> str:
+    """``scmb_r``, ``scmb_r and scmb_x``, ``a, b and c``; ``N envs`` for more than three."""
+    names = list(dict.fromkeys(env_names))
+    if len(names) > 3:
+        return f"{len(names)} envs"
+    return " and ".join([", ".join(names[:-1]), names[-1]]) if len(names) > 1 else names[0]
 
 
 _SINGLE_BUILD = "a single build (the same archive for CPU and GPU hosts)"
@@ -1651,14 +1696,16 @@ def _builds_line(eff: str, flavor: str, n_cpu: int, n_gpu: int, n_single: int,
     parts = []
     if eff == "cpu":
         if n_cpu:
-            parts.append(f"CPU build{'s' if n_cpu != 1 else ''}{because}.")
+            parts.append(f"{_which(n_cpu).capitalize()} {_has(n_cpu)} the CPU build"
+                         f"{because}.")
         if n_gpu:
             whose = "its CPU build is" if n_gpu == 1 else "their CPU builds are"
             parts.append(f"{_envs(n_gpu)} {'gets' if n_gpu == 1 else 'get'} the GPU "
                          f"build, because {whose} not published yet.")
     else:
         if n_gpu:
-            parts.append(f"GPU build{'s' if n_gpu != 1 else ''}{because}.")
+            parts.append(f"{_which(n_gpu).capitalize()} {_has(n_gpu)} the GPU build"
+                         f"{because}.")
         if n_cpu:                     # an installed CPU build listed with the rest
             parts.append(f"{_envs(n_cpu)} {_has(n_cpu)} the CPU build.")
     if n_single:
@@ -1831,8 +1878,8 @@ def _cmd_env(args) -> int:
     name = getattr(args, "name", None) or expected
     if name == expected:
         banner = (f"# env {name!r} is the name scan/run/env doctor expect for {method} "
-                  f"(`multibench info {method}` shows it); `multibench env create "
-                  f"{method}` builds the same env from its lockfile")
+                  f"(multibench info {method} shows it). multibench env create "
+                  f"{method} builds the same env from its lockfile.")
     else:
         banner = (f"# env {name!r} is a custom --name: scan/run/env doctor expect "
                   f"{expected!r} for {method} and will not find this one")
@@ -2419,10 +2466,11 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")
-    pe.add_argument("--method", help="method name for the rows of the long format "
-                                     "(needs --dataset and --category); without "
-                                     "--labels it must be a method of this package, which "
-                                     "sets the label order")
+    pe.add_argument("--method", help="package method whose label order is used; also "
+                                     "the row name unless --name is given (needs "
+                                     "--dataset and --category)")
+    pe.add_argument("--name", help="row name in the long table, e.g. SCALEX_rerun "
+                                   "(needs --method)")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
                                       "--method and --category); without --labels its "
                                       "label files are read")

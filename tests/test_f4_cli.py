@@ -334,9 +334,12 @@ def test_mosaic_auto_plan_has_short_lines_without_semicolons_in_parentheses(linu
     assert not _parens_with_semicolon(err), err
     lines = err.splitlines()
     assert lines[0] == "# total for 6 envs: 15.6 GB download"
-    assert lines[1] == ("# CPU builds, because this host has no NVIDIA GPU. 4 envs have a "
-                        "single build (the same archive for CPU and GPU hosts).")
-    assert lines[2].startswith("# size on disk not recorded for 4 of 6 envs")
+    assert lines[1] == ("# 2 of 6 envs have the CPU build, because this host has no NVIDIA "
+                        "GPU. 4 envs have a single build (the same archive for CPU and GPU "
+                        "hosts).")
+    assert lines[2].startswith("# ") and lines[2].endswith(". 4 envs are not measured.")
+    assert lines[3] == ("# Unpacked envs are larger than the download. Check with du after "
+                        "the first install.")
     assert "GPU build" not in err and "only a GPU" not in err
 
 
@@ -345,7 +348,8 @@ def test_gpu_plan_says_gpu_build_only_for_envs_that_have_both(linux_cpu, capsys)
     err = capsys.readouterr().err
     assert err.splitlines()[:2] == [
         "# total for 2 envs: 5.5 GB download",
-        "# GPU build. 1 env has a single build (the same archive for CPU and GPU hosts)."]
+        "# 1 of 2 envs has the GPU build. 1 env has a single build (the same archive for "
+        "CPU and GPU hosts)."]
 
 
 def test_install_warning_and_unpack_line_for_a_single_build(tmp_path, monkeypatch):

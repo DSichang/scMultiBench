@@ -478,7 +478,7 @@ class MethodSpec:
         ``method_info(m)["gpu_evidence"]``. For example:
 
         ```text
-        scBridge needs an NVIDIA GPU; this computer has none.
+        scBridge needs an NVIDIA GPU, and this computer has none.
         See method_info("scBridge")["requires_gpu"].
         ```
         """
@@ -487,7 +487,7 @@ class MethodSpec:
         from .. import config
         see = config.hint(f'method_info("{self.id}")["requires_gpu"]',
                           f"multibench info {self.id}")
-        return f"{self.id} needs an NVIDIA GPU; this computer has none. See {see}."
+        return f"{self.id} needs an NVIDIA GPU, and this computer has none. See {see}."
 
     @property
     def wired_categories(self) -> list[str]:

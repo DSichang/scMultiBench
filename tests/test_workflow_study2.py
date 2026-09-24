@@ -55,11 +55,12 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         parts = r["files_reason"].split("; ")
         assert any(p.startswith("FileNotFoundError: ") for p in parts) and root in r["files_reason"]
         assert "FileNotFoundError" not in r["reason"] and root not in r["reason"]
-        assert r["reason"].endswith("; " + r["env_reason"])      # env half verbatim
+        assert r["reason"].endswith(". " + r["env_reason"])      # env half verbatim
         assert "--packed --run" in r["reason"]                    # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
     # the meaning first for ATAC (L31); D11's cty.csv is UnitedNet's label file (M21)
-    assert row["reason"].startswith("needs gene-activity ATAC (atac.h5); not in the folder; ")
+    assert row["reason"].startswith("UnitedNet needs gene-activity ATAC (atac.h5), which is "
+                                    "not in the folder. ")
     assert "cty" not in row["reason"]
 
 
@@ -156,7 +157,8 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
         # the platform sentence is the first line after the head (L18)
         assert msg.splitlines()[1].startswith(
             "Methods run only on Linux (this computer is darwin/arm64).")
-        assert "run the methods on a Linux machine" in msg
+        assert ("On this computer you can check files, score embeddings and plot. Run "
+                "the methods on a Linux machine.") in msg
         assert not re.search(r"\n  Methods", msg)       # never looks like a variant line
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     with pytest.raises(ValueError) as e:

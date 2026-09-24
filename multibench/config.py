@@ -423,10 +423,10 @@ def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR,
     if source == SCRIPTS_REF_VAR:
         fix = hint("Fetch that ref into a new repo_path, or unset the variable",
                    f"Fetch that ref into a new folder (set {REPO_PATH_VAR}, then "
-                   f"`multibench fetch --scripts`), or unset the variable")
+                   f"multibench fetch --scripts), or unset the variable")
     else:
         fix = (f"Fetch that ref into a new folder: set {REPO_PATH_VAR}, then run "
-               f"`multibench fetch --scripts --ref {ref}`")
+               f"multibench fetch --scripts --ref {ref}")
     what = f"the method scripts in {repo}" if folder else "method scripts"
     return f"{what} are at {head[:7]}, not {ref} ({source}). {fix}"
 
@@ -628,8 +628,8 @@ def ensure_repo(path=None, ref=None):
     if problem:
         raise RuntimeError(problem + ".")
     at = f" at {ref}" if ref else ""
-    print(f"method scripts not found - fetching PYangLab/scMultiBench{at} (once) into "
-          f"{p} ...", flush=True)
+    print(f"Fetching the method scripts from PYangLab/scMultiBench{at} into {p} ...",
+          flush=True)
     # an existing empty folder is cloned into from the inside, then its
     # contents are moved up: the folder stays, and its parent need not be
     # writable (a folder made for the user on shared storage)
@@ -660,7 +660,7 @@ def ensure_repo(path=None, ref=None):
             first = "could not reach github.com to fetch the method scripts."
         raise RuntimeError(
             f"{first} On a host without network, copy a scripts checkout "
-            f"(`multibench fetch --scripts` on a connected machine makes one) and "
+            f"(multibench fetch --scripts on a connected machine makes one) and "
             f"set {REPO_PATH_VAR}.") from e
     if inside:
         for entry in part.iterdir():

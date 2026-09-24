@@ -91,7 +91,7 @@ def test_pyproject_reads_the_version_from_the_package():
 # ====================================================================== M20
 def test_gpu_refusal_is_one_plain_sentence_and_a_hint():
     reason = registry.get("moETM").requires_gpu_reason
-    assert reason.startswith("moETM needs an NVIDIA GPU; this computer has none.")
+    assert reason.startswith("moETM needs an NVIDIA GPU, and this computer has none.")
     assert "tools_scripts" not in reason and not re.search(r"\.py:\d+", reason)
     assert 'method_info("moETM")["requires_gpu"]' in reason
 
@@ -109,11 +109,12 @@ def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypa
 
 
 def test_scan_notes_quote_the_gpu_refusal_run_raises():
-    """scan's Notes quote the env_reason of a GPU-only row; after M20 that is
-    the one plain sentence, not the old CUDA/file:line text."""
+    """scan's Notes quote the env_reason of a GPU-only row only in its current
+    form (the one plain sentence), never the old CUDA/file:line text."""
     notes = " ".join(inspect.getdoc(W.scan).split())
-    lead = registry.get("moETM").requires_gpu_reason.split(";")[0].replace("moETM", "<method>")
-    assert f'{lead}; this computer has none.' in notes
+    lead = registry.get("moETM").requires_gpu_reason.split(". ")[0].replace("moETM", "<method>")
+    assert "<method> needs an NVIDIA GPU" not in notes or f"{lead}." in notes
+    assert "needs an NVIDIA GPU; this computer has none" not in notes
     assert "calls CUDA unconditionally (<file>:<line>)" not in notes
 
 
@@ -234,10 +235,10 @@ def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
     assert two.splitlines()[1] == f"# Both envs have {single}"
     some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"},
                                  {"env": "c", "flavor": "gpu"}], sizes, **kw)
-    assert some.splitlines()[1] == f"# CPU build. 2 envs have {single}"
+    assert some.splitlines()[1] == f"# 1 of 3 envs has the CPU build. 2 envs have {single}"
     some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"}],
                                 sizes, **kw)
-    assert some.splitlines()[1] == f"# CPU build. 1 env has {single}"
+    assert some.splitlines()[1] == f"# 1 of 2 envs has the CPU build. 1 env has {single}"
     # a CPU build listed but not published yet: that env gets its GPU build
     late = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="cpu",
                                 manifest={"a-cpu": "u"})
@@ -262,7 +263,8 @@ def test_evaluate_and_run_help_texts():
     assert "they replace the sweep for ARI and NMI" in clus
     assert "iF1 still sweeps unless --metrics leaves it out" in clus
     meth = _opt_help(ev, "--method")
-    assert "must be a method of this package, which sets the label order" in meth
+    assert meth.startswith("package method whose label order is used; also the row name "
+                           "unless --name is given")
     assert "registry" not in meth
     dry = _opt_help(_sub("run"), "--dry-run")
     assert "environment activation included" in dry and "conda run -n" not in dry

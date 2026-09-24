@@ -101,9 +101,10 @@ def test_peak_ids_leave_multimap_runnable_and_block_glue_and_seurat_v3(tmp_path,
     assert "gene activity" not in sc.loc["MultiMAP", "caveat"]
     for m in ("GLUE", "Seurat_v3"):
         assert not sc.loc[m, "runnable"], m
-        assert sc.loc[m, "reason"].startswith("reads peak names such as chr1:100-200; "
-                                              "atac_peak.h5 holds other names (e.g. "
-                                              "peak_0)"), sc.loc[m, "reason"]
+        assert sc.loc[m, "reason"].startswith(f"{m} reads peak names such as "
+                                              "chr1:100-200. atac_peak.h5 holds other "
+                                              "names, for example peak_0. Rename them "
+                                              "to chr:start-end"), sc.loc[m, "reason"]
 
 
 def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned):
@@ -126,7 +127,8 @@ def test_gene_names_in_the_peak_file_still_block_multimap(tmp_path, pinned):
     row = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=["MultiMAP"], data_path=root,
                  verbose=False).iloc[0]
     assert not row["runnable"]
-    assert row["reason"].startswith("needs peak ATAC; atac_peak.h5 holds gene activity. ")
+    assert row["reason"].startswith("MultiMAP needs peak ATAC, and atac_peak.h5 holds gene "
+                                    "activity. ")
 
 
 def test_names_are_genes_needs_a_file_to_compare_with(tmp_path):
@@ -284,11 +286,11 @@ def test_strict_line_of_a_named_method_reads_the_row_with_its_files(tmp_path, pi
                            str(root), "--methods", "Matilda", "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert err.startswith("error: --strict: 0 of 2 rows are runnable. Input files are "
-                          "missing in 1. The ATAC kind is wrong in 1."), err
-    assert re.search(r"^  Matilda: needs gene-activity ATAC; atac\.h5 holds peaks\. "
-                     r"Export the ATAC as gene activity, or pass --allow-atac-mismatch "
-                     r"to run Matilda anyway\.$", err, re.M), err
+    assert err.startswith("error: --strict: 0 of 2 rows are runnable. Rows with missing "
+                          "input files: 1. Rows with the wrong ATAC kind: 1."), err
+    assert re.search(r"^  Matilda: Matilda needs gene-activity ATAC, and atac\.h5 holds "
+                     r"peaks\. Export the ATAC as gene activity, or pass "
+                     r"--allow-atac-mismatch to run Matilda anyway\.$", err, re.M), err
     assert "row(s)" not in err and ";" not in err.splitlines()[0]
 
 

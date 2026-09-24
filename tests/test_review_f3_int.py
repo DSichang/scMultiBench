@@ -97,8 +97,8 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
         assert sc.loc[m, "reason"].endswith(
             f"pass allow_atac_mismatch=True to run {m} anyway."), m
     assert sc.loc["GLUE", "reason"].startswith(
-        "reads peak names such as chr1:100-200; atac_peak.h5 holds other names (e.g. "
-        "GENE0). Rename them to chr:start-end, or pass ")
+        "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
+        "example GENE0. Rename them to chr:start-end, or pass ")
     # R4-01: naming the method keeps it blocked; allow_atac_mismatch runs it
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
@@ -116,8 +116,8 @@ def test_strict_counts_unreadable_peak_names_apart(tmp_path, pinned, capsys):
     err = capsys.readouterr().err
     # GLUE and Seurat_v3. MultiMAP never reads the names: peak_0 names that
     # are not the folder's genes are not gene activity (review of wp/f4_int)
-    assert rc == 1 and "Peak names are unreadable in 2." in err, err
-    assert "ATAC kind is wrong" not in err
+    assert rc == 1 and "Rows whose peak names the method cannot read: 2." in err, err
+    assert "wrong ATAC kind" not in err
 
 
 def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
@@ -126,8 +126,8 @@ def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
     _quiet(mtb.run_all, "LUNG_ids", "diagonal", methods=["GLUE", "Seurat_v3"],
            data_path=root, dry_run=True, allow_atac_mismatch=True)
     lines = [l for l in capsys.readouterr().out.splitlines() if l.startswith("[run_all] ")]
-    assert "[run_all] GLUE reads peak names such as chr1:100-200; atac_peak.h5 holds " \
-           "other names (e.g. peak_0)" in "\n".join(lines)
+    assert "[run_all] GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds " \
+           "other names, for example peak_0. Rename them to chr:start-end" in "\n".join(lines)
     for line in lines:
         for m in ("GLUE", "Seurat_v3"):
             assert not re.search(rf"\b{m} {m}\b", line), line
@@ -264,12 +264,13 @@ def test_a_scripts_ref_mismatch_is_its_own_blocker(scripts_at_head, capsys):
                    "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "The scripts are not at MULTIBENCH_SCRIPTS_REF in 1." in err and "input files" not in err
+    assert "Rows whose scripts are not at MULTIBENCH_SCRIPTS_REF: 1." in err \
+        and "input files" not in err
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "totalVI",
                    "--dry-run"])
     cap = capsys.readouterr()
     assert rc == 0
-    assert "# commands (1 variant(s) with resolvable inputs" in cap.out
+    assert "# Commands of the 1 row with resolvable inputs." in cap.out
     assert "totalVI (rna+adt): " in cap.out
 
 

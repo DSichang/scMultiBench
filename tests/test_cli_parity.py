@@ -384,13 +384,13 @@ def test_cli_plot_result_path_reads_another_results_root(tmp_path, layout_tree, 
     assert rc == 1
     assert "pass --result-path for another results root" in err
     assert "result_path=" not in err
-    # a category without published tables: the same hatches, in flag spelling
+    # a category without published tables: the fact and the flag, in flag spelling
     rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "use --source rerun" in err and "--result-path <file>" in err
-    assert "check --result-path (currently " in err
+    assert ("error: mosaic has no published tables. Pass --source rerun to plot the "
+            "package's re-run tables.") in err
     for api_spelling in ("result_path=", "source='", "category='", "mtb.config"):
         assert api_spelling not in err, err
     # ... and the flag it names works
@@ -604,7 +604,7 @@ def test_cli_run_all_dry_run_and_summary(monkeypatch, tmp_path, capsys):
                    "--dry-run", "--methods", "SCALEX,scBridge", "--timeout", "60",
                    "--skip-existing", "--no-evaluate", "--data-path", "d"])
     cap = capsys.readouterr()
-    assert rc == 0 and "no env" in cap.out and "dry run" in cap.err
+    assert rc == 0 and "no env" in cap.out and "# Dry run." in cap.err
     assert "conda run -n scmb_torch x" in cap.out       # the command preview
     assert captured["methods"] == ["SCALEX", "scBridge"] and captured["dry_run"] is True
     assert captured["data_path"] == "d" and captured["out_dir"] == str(tmp_path)

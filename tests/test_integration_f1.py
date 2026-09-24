@@ -16,6 +16,7 @@ Each work package fixed its own half; these pin the joins:
   commands on the Linux machine, as the docs do (L18 with L19): the commands
   hold this computer's absolute paths, so a copied command does not run there.
 """
+import re
 import h5py
 import numpy as np
 import pandas as pd
@@ -45,8 +46,8 @@ def test_scan_reason_names_a_per_batch_folder(tmp_path):
                   verbose=False)
     assert len(sc) and not sc["files_ok"].any()
     for reason in sc["reason"]:
-        assert reason.startswith("missing rna.h5, adt.h5")
-        assert "this folder holds per-batch files (rna1.h5, rna2.h5, ...)" in reason
+        assert re.match(r"rna\.h5, adt\.h5(, cty\.csv)? are missing\. ", reason), reason
+        assert "This folder holds per-batch files (rna1.h5, rna2.h5, ...)" in reason
         assert "or use category='cross' (RNA+ADT)" in reason
 
 

@@ -69,7 +69,8 @@ def test_info_unknown_method_names_the_cli_listing(capsys):
     rc = cli.main(["info", "Matlida"])
     err = capsys.readouterr().err
     assert rc == 1 and "did you mean 'Matilda'" in err
-    assert "see `multibench list`" in err and "mtb.list_methods()" not in err
+    assert "see multibench list" in err and "mtb.list_methods()" not in err
+    assert "`" not in err
 
 
 def test_config_prints_each_path_with_its_source(monkeypatch, tmp_path, capsys):
@@ -154,7 +155,8 @@ def test_fetch_scripts_reports_present_or_clones(monkeypatch, tmp_path, capsys):
     assert rc == 0 and ran and ran[0][:2] == ["git", "clone"]
     assert cap.out == (f"method scripts fetched: {fresh / 'tools_scripts'} "
                        f"(not a git checkout, commit unknown)\n")
-    assert "fetching PYangLab/scMultiBench" in cap.err
+    assert f"Fetching the method scripts from PYangLab/scMultiBench into {fresh} ..." \
+        in cap.err
 
 
 def test_new_commands_name_their_python_function():
@@ -201,7 +203,7 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
     # to get the GPU builds once
     assert cli.main(["env", "plan", "--methods", "scMoMaT"]) == 0
     err = capsys.readouterr().err
-    assert "# CPU build, because this host has no NVIDIA GPU." in err
+    assert "# This env has the CPU build, because this host has no NVIDIA GPU." in err
     assert "# for jobs on GPU nodes, pass --flavor gpu" in err
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert cli.main(["env", "install", "--packed", "--methods", "scMoMaT"]) == 0
@@ -305,10 +307,11 @@ def test_total_line_does_not_sum_an_incomplete_column_as_a_total():
     line = cli._size_total_line(rows, sizes)
     assert line.splitlines() == [
         "# total for 6 envs: 12.0 GB download",
-        "# size on disk not recorded for 4 of 6 envs (4.1 GB for the other 2); unpacked "
-        "envs are larger than the download, so check with du after the first install"]
+        "# 4.1 GB on disk for a and b. 4 envs are not measured.",
+        "# Unpacked envs are larger than the download. Check with du after the first "
+        "install."]
     assert "packed_sizes.json" not in line and "on disk," not in line
-    assert "size on disk not recorded for all 6 envs" in cli._size_total_line(
+    assert "# The size on disk of 6 envs is not measured." in cli._size_total_line(
         rows, {e: {"archive_bytes": 1} for e in "abcdef"})
 
 
@@ -321,7 +324,7 @@ def test_scan_strict_exits_1_when_nothing_is_runnable(no_envs, capsys):
     cap = capsys.readouterr()
     assert rc == 1 and "Matilda" in cap.out                  # the table is still printed
     assert cap.err.startswith("error: --strict: 0 of ")
-    assert "The environment is not ready in" in cap.err
+    assert "Rows whose environment is not ready: " in cap.err
 
 
 def test_scan_strict_names_a_requested_method_without_a_runnable_row(monkeypatch, capsys):
@@ -345,8 +348,9 @@ def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, cap
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path)])
     err = capsys.readouterr().err
     assert rc == 1 and "nothing is runnable" in err
-    assert "`multibench scan D11 --category vertical`" in err
-    assert "`multibench env doctor`" in err
+    assert "multibench scan D11 --category vertical shows every row" in err
+    assert "multibench env doctor checks the environments" in err
+    assert "`" not in err
     assert "mtb.scan(" not in err and "mtb.env.doctor()" not in err
     assert config._CLI is False                              # reset after the command
     with pytest.raises(ValueError) as e:                     # Python keeps Python spellings
@@ -357,7 +361,7 @@ def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, cap
 def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir=str(tmp_path), verbose=False)
-    body = str(e.value).split("blocked variants:\n", 1)[1]
+    body = str(e.value).split("blocked rows:\n", 1)[1]
     lines = [l for l in body.splitlines() if l.startswith("  ")]
     # D11 is CITE-seq: the rna+adt rows have their files; MIRA (rna+atac) does not
     assert len(lines) == 3 and all("(rna+adt)" in l for l in lines), lines
@@ -368,7 +372,8 @@ def test_scan_reason_names_the_cli_install_check(no_envs, capsys):
     rc = cli.main(["scan", "D11", "--category", "vertical", "--methods", "Matilda",
                    "--format", "csv", "--columns", "reason"])
     out = capsys.readouterr().out
-    assert rc == 0 and "see `multibench env doctor`" in out and "mtb.env.doctor()" not in out
+    assert rc == 0 and "See multibench env doctor." in out and "mtb.env.doctor()" not in out
+    assert "`" not in out
 
 
 def test_evaluate_hints_use_flag_names(tmp_path, capsys):
@@ -584,7 +589,7 @@ def test_help_text_has_no_internal_names_or_capital_emphasis():
                "FORMAT", "TASK", "LABELS", "BATCH", "METRICS", "OUTPUT", "CATEGORY",
                "MODALITY", "LAYER", "OBSM", "DTYPE", "MODALITIES", "INPUT", "TITLE",
                "RUNNER", "SOURCE", "OVERALL", "AGGREGATE", "TIMEOUT", "PARAM", "METHODS",
-               "COMMAND", "DEFAULT", "CITE", "SCRIPTS", "SKIPPED"}
+               "COMMAND", "DEFAULT", "CITE", "SCRIPTS", "SKIPPED", "SCALEX"}
     for parser in _all_parsers():
         text = parser.format_help()
         for word in internal:
