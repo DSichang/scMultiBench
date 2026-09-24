@@ -873,9 +873,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     A Slurm job step:
 
     ```python
-    mtb.run("StabMap", "mosaic", inputs=inp, out_dir="runs/StabMap",
-            cmd_template="srun --gres=gpu:1 {env_cmd}")
+    mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
+            out_dir="runs/scMoMaT", cmd_template="srun --gres=gpu:1 {env_cmd}")
     ```
+
+    Request a GPU only for a method that uses one;
+    ``mtb.method_info(m)['gpu']`` says which.
 
     **Paths.** Relative paths in ``inputs`` and ``out_dir`` are made absolute
     before the argv is built, and ``data_dir`` (like any existing directory)

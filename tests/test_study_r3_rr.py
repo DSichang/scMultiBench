@@ -1,4 +1,4 @@
-"""Round-3 student study, package work 'rr': R3-04, R3-10."""
+"""Round-3 student study, package work 'rr': R3-04, R3-10, R3-12."""
 import inspect
 import re
 import shutil
@@ -216,3 +216,21 @@ def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monke
     assert config.scripts_ref_problem() is None          # the first fetch checks it out
     monkeypatch.delenv(config.SCRIPTS_REF_VAR)
     assert config.scripts_ref_problem(tmp_path) is None
+
+
+# ============================================================ R3-12 Slurm example
+def test_slurm_example_requests_a_gpu_for_a_method_that_uses_one():
+    doc = inspect.getdoc(runner.run)
+    block = doc.split("A Slurm job step:", 1)[1].split("```", 2)[1]
+    method = re.search(r'mtb\.run\("(\w+)"', block).group(1)
+    assert "--gres=gpu:1" in block
+    assert mtb.method_info(method)["gpu"] in ("used when present", "required")
+    assert "StabMap" not in block
+    assert "Request a GPU only for a method that uses one" in doc
+
+
+def test_slurm_example_dry_run_works(tmp_path):
+    argv = mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
+                   out_dir=str(tmp_path / "scMoMaT"),
+                   cmd_template="srun --gres=gpu:1 {env_cmd}", dry_run=True)
+    assert argv[:2] == ["srun", "--gres=gpu:1"]
