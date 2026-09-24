@@ -600,10 +600,14 @@ methods:
     status: verified
     setup_hint: "GLUE needs the GENCODE v43 human annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in <repo_path>/tools_scripts/GLUE/. The wrapper runs the human script only, so mouse data is not supported through multibench."
     variants:
+      # GLUE_human.py l.103-106 splits the peak names on ':' or '-' and casts
+      # parts 2 and 3 to int, so chr_start_end names (D28's) fail at start ->
+      # normalize_peaks rewrites the atac_peak names to chr:start-end.
       - when: {category: diagonal, modalities: [rna, atac_peak]}
         entrypoint: tools_scripts/GLUE/GLUE_human.py
         language: python
         cwd_at_script: true
+        normalize_peaks: [atac_peak]
         args:
           - {role: rna, flag: "--path1"}
           - {role: atac_peak, flag: "--path2"}
