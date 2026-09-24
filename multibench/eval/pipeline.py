@@ -25,7 +25,7 @@ UNKNOWN_SCORING = "unknown"
 
 #: to_long's warning for such a frame (a hand-made frame, a wide CSV read back)
 NO_SCORING_RECORD = (
-    "these scores carry no record of how they were scored, so scored_with is "
+    "These scores carry no record of how they were scored. Their scored_with is "
     "\"unknown\". A wide CSV read back loses that record. To keep it, save the "
     "mtb.to_long(...) table instead of the wide one.")
 
@@ -96,7 +96,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     Warns
     -----
     UserWarning
-        ``value_df`` has no record of how it was scored; ``scored_with`` is
+        ``value_df`` has no record of how it was scored. Its ``scored_with`` is
         ``"unknown"``.
 
     Examples

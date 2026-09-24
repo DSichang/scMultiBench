@@ -174,8 +174,11 @@ def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_pat
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
     mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"), dry_run=True)
     assert capsys.readouterr().err.count(f"# {_mismatch(head)}\n") == 1
+    # R7-07: run_all prints the note only with verbose=True, after its count line
     mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
-    assert capsys.readouterr().err.count(f"# {_mismatch(head)}\n") == 1
+    assert "MULTIBENCH_SCRIPTS_REF" not in capsys.readouterr().err
+    mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=True)
+    assert capsys.readouterr().out.count(f"[run_all] {_mismatch(head)}\n") == 1
     # the CLI: one note, exit code unchanged
     pairs = [a for role, path in inp.items() for a in ("--input", f"{role}={path}")]
     rc = cli.main(["run", "--method", "Matilda", "--category", "vertical", *pairs,

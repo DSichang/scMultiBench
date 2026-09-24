@@ -312,19 +312,18 @@ FETCH_SCRIPTS_CMD = "multibench fetch --scripts"
 
 
 def linux_only_sentence() -> str | None:
-    """``"Methods run only on Linux (this computer is darwin/arm64)."``, or
+    """``"Methods run only on Linux, and this computer runs macOS."``, or
     ``None`` on Linux (where ``envs.host_platform_problem()`` is ``None``).
 
-    The platform part comes from ``host_platform_problem()``'s own sentence
-    ("... this host is <os>/<arch>"), so a patched value in a test and the
-    real one read alike.
+    The system comes from ``host_platform_problem()``'s own sentence
+    ("... this host is <os>/<arch>", see ``envs._host_system_name``), so a
+    patched value in a test and the real one read alike.
     """
     problem = envs.host_platform_problem()
     if not problem:
         return None
-    marker = "this host is "
-    host = problem.rsplit(marker, 1)[1].strip() if marker in problem else sys.platform
-    return f"Methods run only on Linux (this computer is {host})."
+    return (f"Methods run only on Linux, and this computer runs "
+            f"{envs._host_system_name(problem)}.")
 
 
 def missing_script_fix(repo) -> str:
@@ -1002,13 +1001,13 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
                 this = config.hint("this call", "this command")
                 preview_with = config.hint("dry_run=True", "--dry-run")
                 raise EnvironmentError(
-                    f"{linux_only} Run {this} on a Linux machine; {preview_with} "
+                    f"{linux_only} Run {this} on a Linux machine. {preview_with} "
                     f"previews the method's command here.")
-            py = f" (or mtb.env.install([{method!r}], dry_run=False)). See mtb.env.doctor()."
+            py = f" In Python, call mtb.env.install([{method!r}], dry_run=False)."
             raise EnvironmentError(
-                f"conda env {env_name!r} ({method}) is not installed. Run "
-                f"multibench env install --methods {method} --packed --run"
-                + config.hint(py, ". See multibench env doctor."))
+                f"Environment {env_name} of {method} is not installed. Run "
+                f"multibench env install --methods {method} --packed --run."
+                + config.hint(py, ""))
 
     # Absolute paths + trailing separator on directory roles before conversion,
     # so canonical passthrough files are absolute too; converted copies live

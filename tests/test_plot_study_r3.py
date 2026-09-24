@@ -20,7 +20,7 @@ B = importlib.import_module("multibench.plot.bubble")
 
 matplotlib.use("Agg")
 
-NO_OVERLAP = ("rows come from 2 datasets (D11, MYCITE) that share no method, so the "
+NO_OVERLAP = ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
               "figure ranks unrelated rows against each other. Plot each dataset on "
               "its own, or score your method on D11 and add it to that table.")
 

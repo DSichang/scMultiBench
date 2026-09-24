@@ -627,7 +627,8 @@ OUT_DIR_PLACEHOLDER = "<out_dir>"
 
 def _env_hint(env: str, method: str, category: str | None) -> str:
     """The env_reason text: names the env, the method-specific install command
-    and the category-wide alternative, and where to look.
+    and then the category-wide alternative. The command comes first, so a
+    clipped reason still holds it.
 
     Off Linux the install command refuses, so the reason only names the
     environment and says it cannot be installed here; the scan summary line
@@ -635,10 +636,10 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
     """
     if _runner.linux_only_sentence():
         return f"Environment {env} runs only on Linux, not on this computer."
-    alt = f" (or --category {category})" if category else ""
-    return (f"conda env {env!r} is not installed. Run "
-            f"multibench env install --methods {method} --packed --run{alt}. "
-            f"See {config.hint('mtb.env.doctor()', 'multibench env doctor')}.")
+    alt = (f" --category {category} installs the environments of every {category} "
+           f"method." if category else "")
+    return (f"Environment {env} is not installed. Run "
+            f"multibench env install --methods {method} --packed --run.{alt}")
 
 
 #: ``.format(method=)`` caveat of a GPU-only row that ``scan(assume_gpu=True)``
@@ -866,6 +867,14 @@ def _would_run(row) -> bool:
     """Whether the sweep would run this scan row: runnable, or blocked only by its env."""
     return bool(row["files_ok"]) and (not row["reason"]
                                       or row["reason"] == row.get("env_reason"))
+
+
+def _scripts_ref_note() -> str | None:
+    """The sentence a dry run prints under its count line when the method
+    scripts are not at ``$MULTIBENCH_SCRIPTS_REF``, or their folder cannot be
+    filled; ``None`` otherwise."""
+    note = config.scripts_ref_problem() or config.scripts_folder_problem()
+    return _join_sentences([note]) if note else None
 
 
 def _dry_run_notes(plan: "pd.DataFrame") -> tuple:
@@ -3464,10 +3473,6 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         # runnable" with other methods' reasons attached
         raise _no_variant_error(category, dataset, methods, modalities)
     if dry_run:
-        wrong_ref = config.scripts_ref_problem() or config.scripts_folder_problem()
-        if wrong_ref:                      # every row carries it as its reason
-            import sys
-            print(f"# {wrong_ref}", file=sys.stderr, flush=True)
         # a Series with ids that are not cells of the dataset raises here too
         batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
         if verbose:
@@ -3481,6 +3486,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                         f"and its files_ok and env_ok columns say which check "
                         f"failed. {doctor} checks the environments.")
             print(msg, flush=True)
+            # every row also carries it as its reason
+            wrong_ref = _scripts_ref_note()
+            if wrong_ref:
+                print(f"[run_all] {wrong_ref}", flush=True)
             # the caveats of the rows the sweep would run: the compact views clip them
             scripts, lines = _dry_run_notes(plan_df)
             if scripts:

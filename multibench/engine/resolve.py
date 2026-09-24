@@ -532,7 +532,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
     variant = select_variant(spec, category, modalities, ds_dir=ds_dir)
     out = _resolve_variant_inputs(variant, ds_dir, method)
     missing = {r: p for r, p in out.items() if not Path(p).exists()}
-    near = _near_miss_hints(ds_dir, missing, category, atac=spec.atac, method=method)
+    near = _near_miss_hints(ds_dir, missing, category, atac=spec.atac, method=method,
+                            roles=out)
     batch_hint = _per_batch_hint(
         ds_dir, category, {st for r in missing for st in _role_stems(r)[0]})
     if batch_hint:
@@ -588,7 +589,8 @@ _KIND_BY_BASE = {"atac_peak": "peak", "peak": "peak", "atac_gas": "gene_activity
 
 
 def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
-                     atac: str | None = None, method: str | None = None) -> list[str]:
+                     atac: str | None = None, method: str | None = None,
+                     roles=()) -> list[str]:
     """For each missing ATAC-family role with a sibling file, the rule it breaks.
 
     The ``atac`` role reads ``atac.h5``; ``atac_gas`` reads ``atac_gas.h5``
@@ -601,9 +603,13 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
     folder). ``atac`` is the method's representation (``spec.atac``): when
     a vertical sibling holds it (by name: ``atac_peak`` / ``peak`` are
     peaks, ``atac_gas`` gene activity), the hint names the rename instead,
-    as scan's short reason does.
+    as scan's short reason does. ``roles`` are the variant's input roles:
+    when they hold both ``atac_peak`` and ``atac_gas`` (MultiMAP, Seurat_v3),
+    the hint says the method reads both files instead of pointing to
+    ``method_info``, whose ``atac`` names one representation.
     """
     hints: list[str] = []
+    reads_both = {"atac_peak", "atac_gas"} <= set(roles)
     if not ds_dir.is_dir():
         return hints
     for role in missing:
@@ -629,9 +635,15 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
                 + ".")
             continue
         who = method or "the method"
-        why = ("Every mosaic method reads peak ATAC." if m else config.hint(
-            (f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]'),
-            f"multibench info {method or 'METHOD'}") + f" says which ATAC {who} needs.")
+        if m:
+            why = "Every mosaic method reads peak ATAC."
+        elif reads_both:
+            # method_info(m)["atac"] names one representation for these
+            why = f"{who[:1].upper()}{who[1:]} reads both atac_peak.h5 and atac_gas.h5."
+        else:
+            why = config.hint(
+                (f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]'),
+                f"multibench info {method or 'METHOD'}") + f" says which ATAC {who} needs."
         rule = f"{category.capitalize()} methods read {' or '.join(accepted)}."
         if category == "vertical" and not m:
             # the rule of the peak rows above, also for an atac_gas role
@@ -690,12 +702,11 @@ def _check_orientation(method, dataset, category, resolved):
             continue                  # ambiguous, or already correct
         if shape == (n_cell, n_feat):
             raise ValueError(
-                f"{method}/{dataset}/{category}: {p.name} stores matrix/data as "
-                f"{shape}, which is cells x features. This layout expects "
-                f"features x cells - here ({n_feat}, {n_cell}), matching "
-                f"matrix/features ({n_feat}) and matrix/barcodes ({n_cell}). "
-                f"Re-export with mtb.io.to_canonical(src, dst), or transpose "
-                f"matrix/data."
+                f"{method} reads {p.name} of {dataset}, which stores matrix/data as "
+                f"cells x features, shape {shape}. The file lists {n_feat} features "
+                f"and {n_cell} cells. Its matrix/data needs features x cells, shape "
+                f"({n_feat}, {n_cell}). Re-export it with "
+                f"mtb.io.to_canonical(src, dst), or transpose matrix/data."
             )
 
 
@@ -1084,18 +1095,22 @@ def _renamed_peak_roles(method: str | None, category: str | None, resolved) -> l
 #: Seurat_v5 builds its bridge from rna + atac_peak (main_Seurat_v5.Rmd:39-44;
 #: ``obj.multi[["ATAC"]] <- ...`` accepts only the cells the object holds)
 _SAME_CELL_ROLES = {"Seurat_v5": ("rna", "atac_peak")}
-#: ``.format(method=, n_a=, n_b=, shared=)`` template of the file-check failure
-#: when those two files hold different barcode sets
-SAME_CELLS_REASON = ("{method} needs RNA and ATAC from the same cells as its bridge. These "
-                     "files share {shared:,} of {n_a:,} and {n_b:,} cells")
-#: ``.format(gas=, peak=, n_gas=, n_peak=, shared=)``: a diagonal gene-activity
-#: file whose cells are not the cells of the peak file next to it
-GAS_OTHER_CELLS_REASON = ("{gas} and {peak} hold different cells ({n_gas:,} and "
-                          "{n_peak:,}, {shared:,} shared). Both files need the same "
-                          "ATAC cells")
-#: ``.format(gas=, peak=, write=)``: the same cells in another order
-GAS_OTHER_ORDER_REASON = ("{gas} lists the ATAC cells in another order than {peak}; "
-                          "atac_cty.csv follows {peak}. Write it again with {write}")
+#: ``.format(method=, dataset=, a=, b=, n_a=, n_b=, shared=)`` template of the
+#: file-check failure when those two files (``a``, ``b``) hold different
+#: barcode sets
+SAME_CELLS_REASON = ("{method} needs RNA and ATAC from the same cells as its bridge. In "
+                     "{dataset}, {a} and {b} share {shared:,} of {n_a:,} and {n_b:,} cells.")
+#: ``.format(method=, dataset=, gas=, peak=, n_gas=, n_peak=, shared=)``: a
+#: diagonal gene-activity file whose cells are not the cells of the peak file
+#: next to it
+GAS_OTHER_CELLS_REASON = ("{method} reads {gas} of {dataset}, which holds other cells than "
+                          "{peak}. The files hold {n_gas:,} and {n_peak:,} cells and share "
+                          "{shared:,}. Both files need the same ATAC cells.")
+#: ``.format(method=, dataset=, gas=, peak=, write=)``: the same cells in
+#: another order
+GAS_OTHER_ORDER_REASON = ("{method} reads {gas} of {dataset}, which lists the ATAC cells in "
+                          "another order than {peak}. atac_cty.csv follows {peak}. Write "
+                          "{gas} again with {write}.")
 
 
 @functools.lru_cache(maxsize=64)
@@ -1136,8 +1151,9 @@ def _check_same_cells(method, dataset, category, resolved) -> None:
     a, b = (set(x) for x in bars)
     if a == b:
         return
-    raise ValueError(f"{method}/{dataset}/{category}: " + SAME_CELLS_REASON.format(
-        method=method, n_a=len(a), n_b=len(b), shared=len(a & b)))
+    raise ValueError(SAME_CELLS_REASON.format(
+        method=method, dataset=dataset, a=Path(resolved[roles[0]]).name,
+        b=Path(resolved[roles[1]]).name, n_a=len(a), n_b=len(b), shared=len(a & b)))
 
 
 def _check_atac_gas_cells(method, dataset, resolved) -> None:
@@ -1171,16 +1187,14 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
         return
     kind, _ = _cell_order(a, b)
     if kind == "other":
-        why = GAS_OTHER_CELLS_REASON.format(gas=gas.name, peak=peak.name, n_gas=len(a),
-                                            n_peak=len(b), shared=len(set(a) & set(b)))
-    elif kind == "order":
-        why = GAS_OTHER_ORDER_REASON.format(
-            gas=gas.name, peak=peak.name,
+        raise ValueError(GAS_OTHER_CELLS_REASON.format(
+            method=method, dataset=dataset, gas=gas.name, peak=peak.name, n_gas=len(a),
+            n_peak=len(b), shared=len(set(a) & set(b))))
+    if kind == "order":
+        raise ValueError(GAS_OTHER_ORDER_REASON.format(
+            method=method, dataset=dataset, gas=gas.name, peak=peak.name,
             write=config.hint("mtb.io.to_canonical(..., modality='gas')",
-                              "multibench convert SRC DIR --modality gas"))
-    else:
-        return
-    raise ValueError(f"{method}/{dataset}/diagonal: {why}")
+                              "multibench convert SRC DIR --modality gas")))
 
 
 #: file names that carry a batch number: ``rna2.h5``, ``atac_peak3.h5``, ``cty1.csv``

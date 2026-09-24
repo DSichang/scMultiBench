@@ -65,7 +65,7 @@ def _two_own_folders():
                                    (mtb.plot.bar, {})])
 def test_two_own_datasets_sharing_no_method_mention_the_same_cells(fn, kw):
     _, msgs = _messages(fn, _two_own_folders(), **kw)
-    (msg,) = [m for m in msgs if m.startswith("rows come from")]
+    (msg,) = [m for m in msgs if m.startswith("The rows come from")]
     assert msg.endswith("Plot each dataset on its own, or score the same methods on "
                         "every dataset. If these datasets hold the same cells, give "
                         "their rows one dataset name first."), msg
@@ -77,7 +77,7 @@ def test_stored_rows_keep_the_no_overlap_text():
         stored = mtb.load_results("vertical", dataset="D11", source="rerun")
     _, msgs = _messages(mtb.plot.build_table,
                         pd.concat([stored, _mine("RNA PCA", "MYCITE")], ignore_index=True))
-    (msg,) = [m for m in msgs if m.startswith("rows come from")]
+    (msg,) = [m for m in msgs if m.startswith("The rows come from")]
     assert "same cells" not in msg
     assert msg.endswith("score your method on D11 and add it to that table.")
 

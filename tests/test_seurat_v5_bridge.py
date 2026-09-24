@@ -51,8 +51,8 @@ def test_scan_flags_unpaired_bridge_files(tmp_path):
     _folder(tmp_path, "UNPAIRED", cells, [f"a{i}" for i in range(45)])
     row = _row(tmp_path, "UNPAIRED")
     assert not row["files_ok"]
-    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. These files "
-            "share 0 of 50 and 45 cells") in row["reason"]
+    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In UNPAIRED, "
+            "rna.h5 and atac_peak.h5 share 0 of 50 and 45 cells.") in row["reason"]
     _folder(tmp_path, "PAIRED", cells, list(reversed(cells)))     # same cells, any order
     row = _row(tmp_path, "PAIRED")
     assert row["files_ok"], row["files_reason"]

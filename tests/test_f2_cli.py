@@ -199,8 +199,8 @@ def test_run_all_out_dir_help_says_when_it_is_needed():
 
 
 # ====================================================================== M26
-PLAIN_REFUSAL = ("Method environments run only on Linux (this computer is darwin/arm64). "
-                 "Run the install on a Linux machine; {force} tries anyway.")
+PLAIN_REFUSAL = ("Method environments run only on Linux, and this computer runs macOS. "
+                 "Run the install on a Linux machine. {force} tries anyway.")
 
 
 def test_install_refusal_is_plain_in_python(off_linux, monkeypatch):

@@ -392,7 +392,7 @@ def test_scan_joins_missing_env_and_missing_gpu(tmp_path, no_gpu, monkeypatch):
     df = mtb.scan("CITE", "vertical", methods=["moETM"], data_path=tmp_path, verbose=False)
     r = df[df["modalities"] == "rna+adt"].iloc[0]
     assert not bool(r["env_ok"])
-    assert r["env_reason"].startswith("conda env ") and "not installed" in r["env_reason"]
+    assert r["env_reason"].startswith("Environment ") and "not installed" in r["env_reason"]
     assert r["env_reason"].endswith(". " + MOETM_REASON)
     assert r["reason"] == r["env_reason"]
 

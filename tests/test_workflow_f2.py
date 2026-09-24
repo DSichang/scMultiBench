@@ -89,7 +89,7 @@ def test_cli_overwrite_refusal_names_the_flag(tmp_path, capsys):
     capsys.readouterr()
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
-    assert "pass --overwrite to replace them" in err and "overwrite=True" not in err
+    assert "Pass --overwrite to replace them." in err and "overwrite=True" not in err
 
 
 def test_python_overwrite_refusal_names_the_keyword(tmp_path):
@@ -97,7 +97,7 @@ def test_python_overwrite_refusal_names_the_keyword(tmp_path):
     ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
     with pytest.raises(FileExistsError) as ei:
         ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
-    assert "pass overwrite=True to replace them" in str(ei.value)
+    assert "Pass overwrite=True to replace them." in str(ei.value)
     assert "--overwrite" not in str(ei.value)
 
 

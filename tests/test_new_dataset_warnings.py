@@ -40,8 +40,8 @@ def _stored_plus_lone_baseline():
 
 def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
     fig, msgs = _messages(mtb.plot.bar, _stored_plus_lone_baseline())
-    lone = [m for m in msgs if m.startswith("dataset LABMOS has only one method")]
-    assert lone == ["dataset LABMOS has only one method (PCA_standin), so its Overall "
+    lone = [m for m in msgs if m.startswith("Dataset LABMOS has only one method")]
+    assert lone == ["Dataset LABMOS has only one method, PCA_standin. Its Overall "
                     "there is always 1.0. Plot it with methods scored on the same "
                     "dataset."]
     inc = [m for m in msgs if m.startswith("The summary ranks ")]
@@ -53,12 +53,12 @@ def test_build_table_summary_warns_about_the_lone_method_too():
     tbl, msgs = _messages(mtb.plot.build_table, _stored_plus_lone_baseline(),
                           aggregate="summary", overall="mean_overall")
     assert tbl.methods[0] == "PCA_standin"            # the reason for the warning
-    assert any(m.startswith("dataset LABMOS has only one method (PCA_standin), so "
-                            "its Overall there is always 1.0") for m in msgs)
+    assert any(m.startswith("Dataset LABMOS has only one method, PCA_standin. "
+                            "Its Overall there is always 1.0") for m in msgs)
     _, msgs = _messages(mtb.plot.build_table, _stored_plus_lone_baseline(),
                         aggregate="summary")          # overall="rank"
-    assert any(m.startswith("dataset LABMOS has only one method (PCA_standin), so "
-                            "its rank there is always the lowest")
+    assert any(m.startswith("Dataset LABMOS has only one method, PCA_standin. "
+                            "Its rank there is always the lowest")
                for m in msgs)
 
 
@@ -69,9 +69,9 @@ def test_datasets_sharing_no_method_get_the_stronger_warning():
                    (mtb.plot.build_table, {"aggregate": "summary"}),
                    (mtb.plot.bubble, {"aggregate": "summary"})):
         _, msgs = _messages(fn, df, **kw)
-        strong = [m for m in msgs if m.startswith("rows come from")]
-        assert strong == ["rows come from 2 datasets (D1, MINE) that share no method, "
-                          "so the figure ranks unrelated rows against each other. Plot "
+        strong = [m for m in msgs if m.startswith("The rows come from")]
+        assert strong == ["The rows come from 2 datasets, D1 and MINE, that share no "
+                          "method. The figure ranks unrelated rows against each other. Plot "
                           "each dataset on its own, or score the same methods on every "
                           "dataset. If these datasets hold the same cells, give their "
                           "rows one dataset name first."], fn

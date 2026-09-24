@@ -66,8 +66,8 @@ def envs_installed(monkeypatch):
 
 
 # --- M15: Seurat_v5 needs its bridge files from the same cells ---------------
-SEURAT_D28 = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. These "
-              "files share 0 of 6,408 and 4,606 cells")
+SEURAT_D28 = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, "
+              "rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
 
 
 def test_seurat_v5_is_not_file_ready_on_d28(root, envs_installed):
@@ -81,8 +81,8 @@ def test_seurat_v5_unpaired_folder_fails_the_file_check(tmp_path, envs_installed
     _diagonal(tmp_path, "UNPAIRED", [f"c{i}" for i in range(50)], [f"a{i}" for i in range(45)])
     row = _row("UNPAIRED", "diagonal", "Seurat_v5", tmp_path)
     assert not row["files_ok"] and not row["runnable"]
-    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. These files "
-            "share 0 of 50 and 45 cells") in row["reason"]
+    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In UNPAIRED, "
+            "rna.h5 and atac_peak.h5 share 0 of 50 and 45 cells.") in row["reason"]
     with pytest.raises(ValueError, match="Seurat_v5 needs RNA and ATAC from the same cells"):
         mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
     # check=False keeps returning the paths
@@ -116,12 +116,12 @@ def test_shuffled_gene_activity_fails_the_file_check(tmp_path, envs_installed):
     atac = [f"a{i}" for i in range(40)]
     shuffled = list(np.random.default_rng(1).permutation(atac))
     _diagonal(tmp_path, "SHUF", [f"c{i}" for i in range(50)], atac, shuffled)
-    order = ("atac_gas.h5 lists the ATAC cells in another order than atac_peak.h5; "
-             "atac_cty.csv follows atac_peak.h5. Write it again with")
+    order = ("reads atac_gas.h5 of SHUF, which lists the ATAC cells in another order than "
+             "atac_peak.h5. atac_cty.csv follows atac_peak.h5. Write atac_gas.h5 again with")
     for m in ("SCALEX", "MultiMAP", "Seurat_v3"):
         row = _row("SHUF", "diagonal", m, tmp_path)
         assert not row["files_ok"], m
-        assert order in row["reason"], (m, row["reason"])
+        assert f"{m} {order}" in row["reason"], (m, row["reason"])
     with pytest.raises(ValueError, match="another order than atac_peak.h5"):
         mtb.inputs_for("SHUF", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     # a method that reads only the peaks is not affected by atac_gas.h5
@@ -132,10 +132,14 @@ def test_gene_activity_of_other_cells_fails_the_file_check(tmp_path):
     atac = [f"a{i}" for i in range(40)]
     _diagonal(tmp_path, "OTHER", [f"c{i}" for i in range(50)], atac,
               [f"b{i}" for i in range(40)])
-    with pytest.raises(ValueError, match="atac_gas.h5 and atac_peak.h5 hold different cells"):
+    other = ("SCALEX reads atac_gas.h5 of OTHER, which holds other cells than "
+             "atac_peak.h5. The files hold 40 and 40 cells and share 0. Both files need "
+             "the same ATAC cells.")
+    with pytest.raises(ValueError) as e:
         mtb.inputs_for("OTHER", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+    assert str(e.value) == other
     row = _row("OTHER", "diagonal", "SCALEX", tmp_path)
-    assert "atac_gas.h5 and atac_peak.h5 hold different cells" in row["reason"]
+    assert other in row["reason"]
 
 
 def test_a_gem_well_suffix_alone_is_the_same_cells(tmp_path):
@@ -241,7 +245,7 @@ def test_partial_overlap_says_which_cells_in_short_sentences(tmp_path):
 def test_adt_hint_follows_the_obsm_selector(tmp_path):
     clr = np.random.default_rng(0).normal(size=(30, 5))
     rna = _rna_adata([f"c{i}" for i in range(30)], obsm=clr)
-    with pytest.warns(UserWarning, match=r"e\.g\. adt='obsm:protein_counts'"):
+    with pytest.warns(UserWarning, match=r"for example with adt='obsm:protein_counts'\."):
         mtb.io.export_dataset(rna, tmp_path / "O", adt="obsm:protein",
                               adt_names=[f"p{i}" for i in range(5)])
 
@@ -251,7 +255,7 @@ def test_adt_hint_for_a_layer_stays_layer_counts(tmp_path):
     prot = ad.AnnData(np.random.default_rng(0).normal(size=(30, 5)))
     prot.obs_names = list(rna.obs_names)
     prot.var_names = [f"p{i}" for i in range(5)]
-    with pytest.warns(UserWarning, match=r"e\.g\. adt='layer:counts'"):
+    with pytest.warns(UserWarning, match=r"for example with adt='layer:counts'\."):
         mtb.io.export_dataset(rna, tmp_path / "L", adt=prot)
 
 

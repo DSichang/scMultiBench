@@ -102,8 +102,8 @@ def test_scan_has_no_setup_note_for_the_checked_bridge_requirement(root):
     assert "setup:" not in row["caveat"]
     # the requirement is a file check now (study round 2, M15), not a caveat
     assert not row["files_ok"]
-    assert "needs RNA and ATAC from the same cells as its bridge. These files share " \
-        in row["reason"]
+    assert ("needs RNA and ATAC from the same cells as its bridge. In D28, rna.h5 and "
+            "atac_peak.h5 share ") in row["reason"]
     assert mtb.method_info("Seurat_v5")["setup_hint"]           # still in method_info
 
 
@@ -119,7 +119,7 @@ def test_run_off_linux_names_the_cli_flag_under_the_cli(tmp_path, monkeypatch):
     with pytest.raises(OSError) as e:
         mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
-    assert ("Run this command on a Linux machine; --dry-run previews the method's "
+    assert ("Run this command on a Linux machine. --dry-run previews the method's "
             "command here.") in str(e.value)
     # R3-16: off Linux the refusal is the platform sentence alone
     assert "env doctor" not in str(e.value) and "env install" not in str(e.value)
@@ -153,7 +153,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
         mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
-    assert ("Run this call on a Linux machine; dry_run=True previews the method's "
+    assert ("Run this call on a Linux machine. dry_run=True previews the method's "
             "command here.") in msg
     assert "run it on a Linux machine" not in msg
 

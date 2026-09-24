@@ -59,10 +59,10 @@ def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/sweep/0.3.1",
 def test_dataset_mode_own_dataset_gets_the_no_overlap_warning():
     df = pd.concat([_stored("D11"), _mine()], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
-    assert ("rows come from 2 datasets (D11, MYCITE) that share no method, so the "
+    assert ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
             "figure ranks unrelated rows against each other. Plot each dataset on "
             "its own, or score your method on D11 and add it to that table.") in msgs
-    assert ("dataset MYCITE has only one method (PCA), so its row is ranked against "
+    assert ("Dataset MYCITE has only one method, PCA. Its row is ranked against "
             "rows from other datasets. Plot it with methods scored on the same "
             "dataset.") in msgs
     assert not any("aggregate='summary'" in m for m in msgs), msgs
@@ -76,7 +76,7 @@ def test_dataset_mode_lone_dataset_next_to_shared_ones_gets_no_summary_advice():
     assert not any("aggregate='summary'" in m for m in msgs), msgs
     assert any(m.startswith("This figure averages each method over 4 datasets")
                and m.endswith("Plot each dataset on its own.") for m in msgs), msgs
-    assert any(m.startswith("dataset LUNG has only one method (PCA_standin)")
+    assert any(m.startswith("Dataset LUNG has only one method, PCA_standin.")
                for m in msgs), msgs
 
 
@@ -109,9 +109,9 @@ def test_no_plot_warning_says_by_construction():
         _, msgs = _messages(fn, lone, **kw)
         seen += msgs
         assert not any("by construction" in m for m in msgs), (fn, kw, msgs)
-    assert "dataset MYCITE has only one method (PCA), so its rank there is always " \
+    assert "Dataset MYCITE has only one method, PCA. Its rank there is always " \
            "the lowest. Plot it with methods scored on the same dataset." in seen
-    assert "dataset MYCITE has only one method (PCA), so its Overall there is " \
+    assert "Dataset MYCITE has only one method, PCA. Its Overall there is " \
            "always 1.0. Plot it with methods scored on the same dataset." in seen
 
 

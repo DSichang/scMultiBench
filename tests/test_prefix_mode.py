@@ -397,7 +397,7 @@ def test_install_packed_platform_guard_precedes_download(envs_dir, monkeypatch):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: "this host is darwin/arm64")
     monkeypatch.setattr(urllib.request, "urlretrieve",
                         lambda url: pytest.fail("downloaded on a non-linux host"))
-    with pytest.raises(RuntimeError, match="darwin/arm64"):
+    with pytest.raises(RuntimeError, match="this computer runs macOS"):
         envs.install_packed("matilda")
 
 

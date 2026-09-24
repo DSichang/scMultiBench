@@ -1216,7 +1216,7 @@ def _run_all_command(args, stack) -> int:
             # a file it cannot read, or ids that are not cells of the dataset, fail
             batch_vec = _batch_vector(batch, args.dataset, args.data_path)
     if args.dry_run:
-        from .workflow import _batch_length_problem, _dry_run_notes
+        from .workflow import _batch_length_problem, _dry_run_notes, _scripts_ref_note
         with _quiet_stdout():
             df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
                                     methods=_csv_list(args.methods),
@@ -1232,6 +1232,9 @@ def _run_all_command(args, stack) -> int:
               f"can run on {args.dataset} ({args.category}). The commands below are what "
               f"multibench run would execute. {_rows_word(df, 2).capitalize()} with "
               f"files_ok False have none.", file=sys.stderr)
+        wrong_ref = _scripts_ref_note()     # every row also carries it as its reason
+        if wrong_ref:
+            print(f"# {wrong_ref}", file=sys.stderr)
         # the caveats of the rows the sweep would run: the compact table clips them
         scripts, lines = _dry_run_notes(df)
         if scripts:
