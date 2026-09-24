@@ -141,7 +141,10 @@ def test_na_raise_does_not_offer_to_hide_the_error():
     _, msgs = _messages(mtb.plot.build_table, _with_gap())
     (warn,) = [m for m in msgs if "has no" in m]
     assert warn.endswith("Pass na='skip' to hide this message.")
-    assert warn.rsplit(". ", 1)[0] == msg.rsplit(". ", 1)[0]
+    # R5-11: the error leaves out the Overall sentence (no figure is drawn)
+    assert "Overall uses the metrics" in warn and "Overall uses the metrics" not in msg
+    body = warn.replace(" Its Overall uses the metrics it has.", "")
+    assert body.rsplit(". ", 1)[0] == msg.rsplit(". ", 1)[0]
 
 
 def test_na_raise_cli_spelling(tmp_path, capsys):
@@ -237,8 +240,8 @@ def test_reordered_label_dict_error_is_short_sentences(tmp_path):
                      labels={"cty2": str(p2), "cty1": str(p1)}, metrics=["ASW"],
                      verbose=False)
     assert str(e.value) == (
-        "labels: the keys ['cty2', 'cty1'] are in neither the method's cell order nor "
-        "the default order. Pass the dict from mtb.labels_for(dataset, category, method) "
+        "labels: the keys ['cty2', 'cty1'] are not in the default order. Pass the dict "
+        "from mtb.labels_for(dataset, category, method) "
         "unchanged, a list of paths in cell order, or label_order=[...]. The default "
         "order is cty1, cty2, ... by number, with rna before adt before atac. It is not "
         "alphabetical.")

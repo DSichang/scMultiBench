@@ -234,8 +234,8 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=d, metrics=["ARI"])
     msg = str(exc.value)
-    assert msg.startswith("labels: the keys ['atac_cty', 'rna_cty'] are in neither "
-                          "the method's cell order nor the default order. ")
+    assert msg.startswith("labels: the keys ['atac_cty', 'rna_cty'] are not in "
+                          "the default order. ")
     assert "label_order=" in msg
     assert "The default order is cty1, cty2, ... by number" in msg
     assert "rna before adt before atac" in msg
@@ -247,7 +247,7 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     with pytest.raises(ValueError, match="batch: got a dict with 2 label files"):
         io.as_vector(d, what="batch")
     # metrics='all' does not trip over the batch check BEFORE explaining the dict
-    with pytest.raises(ValueError, match="nor the default order"):
+    with pytest.raises(ValueError, match="are not in the default order"):
         evaluate(emb, metrics="all", labels=d)
 
 

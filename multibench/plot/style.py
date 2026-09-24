@@ -253,15 +253,13 @@ def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
     if none_shared:
         return [none_shared] + lone
     names = ", ".join(map(str, parts))
-    msg = (config.hint("aggregate='dataset' but the frame",
-                       "--aggregate dataset but the table")
-           + f" holds {n} datasets ({names}): values are averaged per method "
-           "across them and rows mix datasets. ")
+    msg = (f"This figure averages each method over {n} datasets ({names}), so "
+           "its rows mix datasets. ")
     if (coverage(parts) >= 2).all() and not lone:
         msg += config.hint(
-            "Pass aggregate='summary' for the paper's rank-averaged panel, or "
+            "Pass aggregate='summary' for the rank-averaged summary panel, or "
             "filter to one dataset.",
-            "Pass --aggregate summary for the paper's rank-averaged panel, or "
+            "Pass --aggregate summary for the rank-averaged summary panel, or "
             "filter with --dataset.")
     else:
         msg += config.hint("Plot each dataset on its own.",

@@ -990,7 +990,7 @@ def _cmd_plot(args) -> int:
     concatenated onto the stored table - the shell equivalent of
     ``pd.concat`` - so a method evaluated with ``multibench evaluate
     --method/--dataset`` is drawn next to the stored table; a
-    ``# overlay: ...`` note on stderr says how many rows came from where. ``--methods`` restricts the rows in every
+    ``# Added your ...`` note on stderr says how many rows came from where. ``--methods`` restricts the rows in every
     case; ``--dataset`` selects the stored table(s) and filters the inputs.
     ``--result-path`` is ``load_results(result_path=...)``: another results
     root, named in that spelling when a stored table is missing.
@@ -1024,9 +1024,9 @@ def _cmd_plot(args) -> int:
         df = pd.concat(frames, ignore_index=True, sort=False)
         if args.category is not None and inputs:
             own_methods = sorted(set().union(*[set(f["method"].astype(str)) for f in frames[1:]]))
-            print(f"# overlay: {own_rows} row(s) from --input (methods: "
-                  f"{', '.join(own_methods)}) concatenated onto the stored "
-                  f"{args.category} table ({len(frames[0])} rows, source={args.source})",
+            print(f"# Added your {own_rows} row{'' if own_rows == 1 else 's'} "
+                  f"({', '.join(own_methods)}) to the stored {args.category} table, "
+                  f"which has {len(frames[0])} rows (source {args.source}).",
                   file=sys.stderr)
     methods = _csv_list(args.methods)
     if methods and args.kind == "bar":
@@ -2148,7 +2148,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "
                          "plot. With --category: concatenated onto the stored table "
-                         "(a '# overlay: ...' note on stderr says how many rows came "
+                         "(a '# Added your ...' note on stderr says how many rows came "
                          "from where); --dataset then filters these rows too")
     pp.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown name "
                                                       "-> error)")

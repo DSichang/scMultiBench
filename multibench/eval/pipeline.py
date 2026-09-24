@@ -341,9 +341,15 @@ def _labels_from_dict(d: dict, label_order) -> list:
             return [d[k] for k in keys]
         if keys == sorted(keys, key=_label_sort_key):
             return [d[k] for k in keys]
+        # name the method's cell order only for a labels_for dict that had one
+        # (a method order other than the default) and was then reordered
+        own = list(getattr(d, "stacking_order", ()))
+        if isinstance(d, LabelFiles) and own != sorted(own, key=_label_sort_key):
+            where = "are in neither the method's cell order nor the default order"
+        else:
+            where = "are not in the default order"
         raise ValueError(
-            f"labels: the keys {keys} are in neither the method's cell order "
-            f"nor the default order. Pass the dict from "
+            f"labels: the keys {keys} {where}. Pass the dict from "
             f"mtb.labels_for(dataset, category, method) unchanged, a list of "
             f"paths in cell order, or label_order=[...]. The default order is "
             f"cty1, cty2, ... by number, with rna before adt before atac. It is "

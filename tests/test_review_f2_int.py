@@ -139,11 +139,10 @@ def _figure_texts(fig):
 def test_summary_mode_names_the_tied_mean_rank_not_a_metric_value():
     import matplotlib.pyplot as plt
     tbl, msgs = _messages(mtb.plot.build_table, _trade_places(), aggregate="summary")
-    grey = [m for m in msgs if "fill and rank show no comparison" in m]
+    grey = [m for m in msgs if m.endswith("are grey.")]
     assert len(grey) == 1, msgs
-    assert grey[0].startswith("every method has the same mean rank in ")
-    assert grey[0].endswith(": fill and rank show no comparison there, so those "
-                            "columns are grey.")
+    assert grey[0].startswith("All methods have the same mean rank in ")
+    assert grey[0].endswith(", so those columns are grey.")
     for metric in ("ARI", "NMI", "ASW", "cLISI"):
         assert f"{metric} (1.5)" in grey[0]
     assert not any("same value" in m or "1.500" in m for m in msgs)
@@ -162,8 +161,7 @@ def test_dataset_mode_keeps_the_metric_value():
     df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6))
     df.loc[df["metric"] == "cLISI", "value"] = 0.0
     _, msgs = _messages(mtb.plot.build_table, df)
-    assert ("all rows have the same value in cLISI (0.000): fill and rank show no "
-            "comparison there, so that column is grey.") in msgs
+    assert "All methods have the same cLISI (0.000), so that column is grey." in msgs
     fig, _ = _messages(mtb.plot.bubble, df)
     assert "Grey fill: all rows equal in cLISI (0.000)." in _figure_texts(fig)
     plt.close(fig)
@@ -175,8 +173,8 @@ def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
     rc = cli.main(["plot", "bubble", "--input", str(path), "--out", str(tmp_path / "b.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert err.count("only one method") == 1, err
-    assert "only one method (MyMethod) in this figure" in err
+    assert err.count("Only one method") == 1, err
+    assert "Only one method, MyMethod, is in this figure" in err
     rc = cli.main(["plot", "bar", "--input", str(path), "--out", str(tmp_path / "r.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
@@ -526,7 +524,7 @@ def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch,
     assert [row.split()[:2] for row in table[2:4]] == [["ADT", "PCA"], ["RNA", "PCA"]]
     msgs = [str(w.message) for w in rec if issubclass(w.category, UserWarning)
             and "multibench" in str(w.filename)]
-    assert not any("only one method" in m for m in msgs), msgs
+    assert not any("only one method" in m.lower() for m in msgs), msgs
     plt.close("all")
 
 

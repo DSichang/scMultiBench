@@ -655,17 +655,23 @@ def _no_comparison_message(methods, constant: dict,
     """The warning for a figure whose fill and rank compare nothing somewhere.
 
     One method: every column. Several: the columns in ``constant`` (from
-    :func:`multibench.plot.style.constant_columns`). ``render`` draws those
-    fills in :data:`CONSTANT_FILL`.
+    :func:`multibench.plot.style.constant_columns`), as ``'All methods have
+    the same cLISI (1.000), so that column is grey.'``; under
+    ``aggregate="summary"`` the value is the mean rank. ``render`` draws
+    those fills in :data:`CONSTANT_FILL`.
     """
     if len(methods) == 1:
-        return (f"only one method ({methods[0]}) in this figure: fill and rank "
-                f"show no comparison, so the fills are grey. Plot {methods[0]} "
-                f"with methods scored on the same dataset.")
+        return (f"Only one method, {methods[0]}, is in this figure. With nothing "
+                f"to rank it against, the fills are grey. Plot it with methods "
+                f"scored on the same dataset.")
     if constant:
         which = "that column is" if len(constant) == 1 else "those columns are"
-        return (f"{_equal_columns(constant, aggregate)}: fill and rank show no "
-                f"comparison there, so {which} grey.")
+        if aggregate == "summary":
+            same = "mean rank in " + _both([f"{c} ({round(v, 2):g})"
+                                            for c, v in constant.items()])
+        else:
+            same = _both([f"{c} ({v:.3f})" for c, v in constant.items()])
+        return f"All methods have the same {same}, so {which} grey."
     return None
 
 
@@ -771,6 +777,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
     ``Your row`` when none do, else ``Row``; the dataset(s) and the stored
     source follow in parentheses. The rank rule is stated once in the
     Notes of ``build_table``; the message says only what the reader acts on.
+    Under ``"dataset"`` a sentence says the Overall uses the metrics a row
+    has, left out under ``"raise"``, which draws no figure.
     The last sentence names the other policy: ``na="skip"`` under
     ``"warn"``, ``na="warn"`` under ``"raise"`` (an error cannot be hidden).
     """
@@ -809,7 +817,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
     if aggregate == "summary":
         sentences.append("In the summary, a missing value counts as the lowest rank on "
                          "that dataset.")
-    else:
+    elif na != "raise":
+        # the Overall rule describes the figure, which na="raise" does not draw
         sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
                          else "Each row's Overall uses the metrics it has.")
     if na == "raise":
