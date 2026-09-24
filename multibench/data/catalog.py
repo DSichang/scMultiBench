@@ -103,8 +103,8 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
        ``_``, unchanged in case.
 
     **Strict mode.** The error is the message ``mtb.method_info`` and
-    ``mtb.scan`` give, with a did-you-mean hint, e.g. ``"unknown method
-    'Matlida'; did you mean 'Matilda'?; see mtb.list_methods()"``. An
+    ``mtb.scan`` give, e.g. ``"Unknown method Matlida. Did you mean Matilda?
+    mtb.list_methods() shows all methods."``. An
     alias-table hit is returned without the method-id check, even with
     ``strict=True``: ``"Seurat v4"`` -> ``"Seurat_v4"``, which is not a
     method id. The default is lenient: result directories and user
@@ -127,11 +127,9 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
         return by_lower[folded.lower()]
     if strict:
         import difflib
+        from ..engine import registry
         hint = difflib.get_close_matches(folded, ids, n=1, cutoff=0.6)
-        raise KeyError(
-            f"unknown method {name!r}"
-            + (f"; did you mean {hint[0]!r}?" if hint else "")
-            + "; see mtb.list_methods()")
+        raise KeyError(registry.unknown_method_message(name, hint[0] if hint else ""))
     # default: collapse separators to underscore, keep original casing token
     return folded
 

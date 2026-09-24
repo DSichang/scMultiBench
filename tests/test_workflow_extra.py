@@ -219,7 +219,7 @@ def test_describe_layout_export_route():
 
 
 def test_method_info_runtime_validates_method_id():
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+    with pytest.raises(KeyError, match="Did you mean StabMap"):
         mtb.method_info("Stabmap")
     h = mtb.method_info("StabMap")["runtime"]
     assert set(h) == {"tier", "worst_sec", "observed", "host", "note"}
@@ -230,7 +230,7 @@ def test_method_info_runtime_validates_method_id():
 
 
 def test_sweep_validates_method_id():
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+    with pytest.raises(KeyError, match="Did you mean StabMap"):
         mtb.sweep("D11", "cross", "Stabmap", "k", [1, 2], out_dir="/tmp/unused")
 
 

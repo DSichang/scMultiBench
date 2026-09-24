@@ -235,10 +235,10 @@ def test_order_reorders_without_filtering():
 
 def test_duplicate_rows_raise():
     long = _three()
-    with pytest.raises(ValueError, match="duplicate"):
+    with pytest.raises(ValueError, match="rows repeat the same method, metric and dataset"):
         bubble.build_table(pd.concat([long, long]))
     nods = long.drop(columns=["dataset"])
-    with pytest.raises(ValueError, match="duplicate"):
+    with pytest.raises(ValueError, match="rows repeat the same method and metric"):
         bubble.build_table(pd.concat([nods, nods]))
     # a plain frame without dataset still works
     assert bubble.build_table(nods).methods == ["C", "B", "A"]
@@ -282,13 +282,12 @@ def test_summary_require_complete_restricts_and_raises():
     # the drop is kept, but never silent: ONE warning names the dropped
     # method(s) and the dataset(s) each lacks (re-test round 3: a student's
     # own method on one dataset vanished from the notebook's summary figure)
-    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method\(s\) not "
-                                         r"present on all 2 datasets \(DS1, DS2\): "
-                                         r"C \(missing DS2\)") as rec:
+    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method that "
+                                         r"lacks a dataset: C lacks DS2\.") as rec:
         tbl = bubble.build_table(long, aggregate="summary", require_complete=True)
     assert set(tbl.methods) == {"A", "B"}
     assert len([w for w in rec if "require_complete=True dropped" in str(w.message)]) == 1
-    assert "pass require_complete=False to keep them" in str(rec[0].message)
+    assert "Pass require_complete=False to keep them." in str(rec[0].message)
     # a complete frame stays silent under require_complete=True
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -297,7 +296,7 @@ def test_summary_require_complete_restricts_and_raises():
     assert set(full.methods) == {"A", "B", "C"}
     only_partial = long[((long.method == "A") & (long.dataset == "DS1"))
                         | ((long.method == "B") & (long.dataset == "DS2"))]
-    with pytest.raises(ValueError, match="no method has results on all 2 datasets"):
+    with pytest.raises(ValueError, match="No method has results on all 2 datasets"):
         bubble.build_table(only_partial, aggregate="summary", require_complete=True)
 
 

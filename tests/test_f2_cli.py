@@ -277,9 +277,9 @@ def test_evaluate_unknown_method_on_the_dataset_route_names_labels(tmp_path, cap
                    "vertical", "--method", "PriyaNet"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "unknown method 'PriyaNet'" in err
-    assert ("for your own method, pass the label files with --labels, once per file, "
-            "in your embedding's cell order") in err
+    assert "PriyaNet is not a package method." in err
+    assert ("For your own method, pass --name and the label files with --labels, once "
+            "per file, in your embedding's cell order.") in err
 
 
 def test_evaluate_names_the_mudata_type():

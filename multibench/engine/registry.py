@@ -198,17 +198,27 @@ def load() -> list[MethodSpec]:
 def check_method(method_id: str) -> str:
     """Return ``method_id`` if it is a registry id; else raise ``KeyError``.
 
-    The message names the closest known id ("did you mean 'StabMap'?") and
-    points at ``mtb.list_methods()``.
+    The message names the closest known id and the call that lists them all:
+    ``"Unknown method stabmap. Did you mean StabMap? mtb.list_methods() shows
+    all methods."``
     """
     ids = [s.id for s in load()]
     if method_id in ids:
         return method_id
-    hint = closest_method(method_id)
-    raise KeyError(
-        f"unknown method {method_id!r}"
-        + (f"; did you mean {hint!r}?" if hint else "")
-        + "; see " + config.hint("mtb.list_methods()", "multibench list"))
+    raise KeyError(unknown_method_message(method_id))
+
+
+def unknown_method_message(method_id, hint: str | None = None) -> str:
+    """``"Unknown method X. Did you mean Y? ... shows all methods."`` (internal).
+
+    ``hint`` defaults to :func:`closest_method`; the last sentence names
+    ``multibench list`` on the command line.
+    """
+    hint = closest_method(method_id) if hint is None else hint
+    return (f"Unknown method {method_id}."
+            + (f" Did you mean {hint}?" if hint else "")
+            + " " + config.hint("mtb.list_methods()", "multibench list")
+            + " shows all methods.")
 
 
 def closest_method(method_id: str) -> str | None:
@@ -225,7 +235,7 @@ def check_id_list(value, name: str):
     """Return ``value``; raise ``TypeError`` if it is a bare string.
 
     ``methods='StabMap'`` would be iterated character by character and fail
-    with ``KeyError: unknown method 'S'``; the ``TypeError`` says what was meant.
+    with ``KeyError: Unknown method S.``; the ``TypeError`` says what was meant.
     """
     if isinstance(value, str):
         raise TypeError(
@@ -251,9 +261,9 @@ def resolve_method_id(name: str) -> str:
     Raises
     ------
     KeyError
-        Nothing matches, with the same did-you-mean message as
-        :func:`check_method` (``"unknown method 'Matlida'; did you mean
-        'Matilda'?; see mtb.list_methods()"``).
+        Nothing matches, with the same message as :func:`check_method`
+        (``"Unknown method Matlida. Did you mean Matilda? mtb.list_methods()
+        shows all methods."``).
 
     Notes
     -----
@@ -358,7 +368,7 @@ def get(method_id: str) -> MethodSpec:
     for s in load():
         if s.id == method_id:
             return s
-    raise KeyError(f"unknown method {method_id!r}; see mtb.list_methods()")  # unreachable
+    raise KeyError(unknown_method_message(method_id))  # unreachable
 
 
 def list_tasks() -> list[str]:

@@ -138,9 +138,9 @@ def test_scan_new_columns_present_and_old_order_kept(all_envs):
 def test_scan_methods_filter_and_unknown_raises():
     df = mtb.scan("D11", "vertical", methods=["Matilda"])
     assert set(df["method"]) == {"Matilda"} and len(df) >= 1
-    with pytest.raises(KeyError, match="unknown method 'Nope'"):
+    with pytest.raises(KeyError, match="Unknown method Nope"):
         mtb.scan("D11", "vertical", methods=["Nope"])
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+    with pytest.raises(KeyError, match="Did you mean StabMap"):
         mtb.scan("D11", "cross", methods=["Stabmap"])
 
 
@@ -240,10 +240,10 @@ def test_run_all_dry_run_equals_scan_with_methods():
 
 
 def test_run_all_dry_run_unknown_method_still_keyerror():
-    with pytest.raises(KeyError, match="unknown method"):
+    with pytest.raises(KeyError, match="Unknown method"):
         mtb.run_all("D28", "diagonal", out_dir="/tmp/unused", methods=["NotAMethod"],
                     dry_run=True, verbose=False)
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+    with pytest.raises(KeyError, match="Did you mean StabMap"):
         mtb.run_all("D11", "cross", out_dir="/tmp/unused", methods=["Stabmap"],
                     dry_run=True, verbose=False)
 

@@ -334,7 +334,7 @@ def test_recommend_methods_keyword(layout_tree):
     r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], result_path=result_dir)
     assert r2.method.tolist() == ["sciPENN", "scMDC", "totalVI"]
     assert "totalVI has no published scores and is listed last." in msg2
-    with pytest.raises(KeyError, match=r"unknown method 'Matlida'; did you mean 'Matilda'\?"):
+    with pytest.raises(KeyError, match=r"Unknown method Matlida. Did you mean Matilda\?"):
         recommend("cross", methods=["Matlida"], result_path=result_dir)
     with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in source='published' for cross"):
         recommend("cross", methods=["totalVI"], result_path=result_dir)

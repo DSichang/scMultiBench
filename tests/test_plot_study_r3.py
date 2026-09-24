@@ -70,14 +70,14 @@ def test_same_dataset_igraph_row_still_warns(fn):
     _, msgs = _messages(fn, df)
     hit = [m for m in msgs if "igraph Leiden backend" in m]
     # only the D11 row is named: the MYCITE rows have no stored row to meet
-    assert len(hit) == 1 and hit[0].startswith("rows for PriyaNet were clustered"), msgs
+    assert len(hit) == 1 and hit[0].startswith("The rows for PriyaNet were clustered"), msgs
 
 
 def test_backend_rule_without_a_dataset_column_is_unchanged():
     stored = _stored("D11").drop(columns="dataset")
     own = _mine("PriyaNet", "D11").drop(columns="dataset")
     msg = mtb.plot.style.backend_warning(pd.concat([stored, own], ignore_index=True))
-    assert msg and msg.startswith("rows for PriyaNet were clustered")
+    assert msg and msg.startswith("The rows for PriyaNet were clustered")
 
 
 def _plot_cli(tmp_path, capsys, *frames):
@@ -94,7 +94,7 @@ def test_cli_plot_follows_the_dataset_rule(tmp_path, capsys):
     err = _plot_cli(tmp_path, capsys, _stored("D11"), _mycite())
     assert "share no method" in err and "igraph Leiden backend" not in err
     err = _plot_cli(tmp_path, capsys, _stored("D11"), _mine("PriyaNet", "D11"))
-    assert "warning: rows for PriyaNet were clustered with the igraph Leiden backend" in err
+    assert "warning: The rows for PriyaNet were clustered with the igraph Leiden backend" in err
     assert "multibench evaluate --leiden-flavor leidenalg" in err
 
 
@@ -107,8 +107,8 @@ def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
     r, msgs = _messages(mtb.recommend, "vertical", long_df=long_df)
     assert "PriyaNet_ig" in set(r["method"])
     (msg,) = [m for m in msgs if m.startswith("recommend('vertical'):")]
-    assert ("\n  - rows for PriyaNet_ig were clustered with the igraph Leiden backend; "
-            "the stored tables used leidenalg") in msg
+    assert ("\n  - The rows for PriyaNet_ig were clustered with the igraph Leiden backend. "
+            "The stored tables used leidenalg") in msg
     assert "mtb.config.DEFAULT.leiden_flavor = 'leidenalg'" in msg
 
 

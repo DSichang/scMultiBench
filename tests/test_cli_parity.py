@@ -125,7 +125,7 @@ def test_cli_scan_unknown_column_and_method_errors(capsys):
     assert rc == 1 and "unknown column(s) ['nope']" in err and "available:" in err
     rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "NotAMethod"])
     err = capsys.readouterr().err
-    assert rc == 1 and "unknown method 'NotAMethod'" in err
+    assert rc == 1 and "Unknown method NotAMethod" in err
     # a KNOWN id with no variant in this category is still reported as absent
     rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "Matilda"])
     err = capsys.readouterr().err
@@ -488,8 +488,8 @@ def test_cli_evaluate_long_mode_requires_all_three(monkeypatch, capsys):
         cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", "--method", "M"])
     assert ei.value.code == 2
     err = capsys.readouterr().err
-    assert "need all of --method, --dataset, --category" in err
-    assert "--dataset, --category" in err
+    assert ("A long table needs --dataset, --category, and --method or --name. "
+            "Missing: --dataset, --category.") in err
 
 
 def test_cli_evaluate_clustering_alias(monkeypatch):

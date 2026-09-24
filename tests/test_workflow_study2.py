@@ -85,7 +85,7 @@ def test_methods_as_a_string_raises_pass_a_list(call):
         call()
     msg = str(e.value)
     assert "must be a list of ids" in msg and "methods=['StabMap']" in msg
-    assert "unknown method 'S'" not in msg
+    assert "Unknown method S" not in msg
 
 
 def test_modalities_as_a_string_raises_pass_a_list():

@@ -29,7 +29,7 @@ def test_a_bare_string_raises_the_type_error_scan_raises(name):
         CALLS[name]("Matilda")
     msg = str(e.value)
     assert "must be a list of ids" in msg and "methods=['Matilda']" in msg
-    assert "unknown method 'M'" not in msg
+    assert "Unknown method M" not in msg
     assert msg == _scan_message("Matilda")
 
 

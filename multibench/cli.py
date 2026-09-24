@@ -816,6 +816,9 @@ def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
               if (category is None or v.when.get("category") == category)
               and (want is None or set(v.when.get("modalities", [])) == set(want))]
     if not picked:
+        if category is not None and category not in spec.wired_categories:
+            from .engine.schema import no_category_message
+            raise ValueError(no_category_message(method, spec.wired_categories, category))
         avail = [f"{v.when.get('category')}:{'+'.join(v.when.get('modalities', [])) or '(data_dir)'}"
                  for v in spec.variants]
         raise ValueError(f"{method}: no variant for category={category!r} "
@@ -987,19 +990,19 @@ def _filter_own_rows(frames: list, args) -> list:
     if datasets and "dataset" in whole.columns:
         keep &= whole["dataset"].astype(str).isin(datasets)
         if n and not keep.any():
-            fix = ("plot them without --category, or score your method on "
-                   f"{', '.join(datasets)}" if args.category is not None else
-                   f"drop --dataset, or pass --dataset {_names(whole['dataset'])}")
+            fix = ("Plot them without --category, or score your method on "
+                   f"{', '.join(datasets)}." if args.category is not None else
+                   f"Drop --dataset, or pass --dataset {_names(whole['dataset'])}.")
             raise ValueError(
-                f"your {n} rows are for dataset {_names(whole['dataset'])}; "
-                f"--dataset {args.dataset} removed all of them ({fix})")
+                f"Your {n} rows are for dataset {_names(whole['dataset'])}, and "
+                f"--dataset {args.dataset} removed all of them. {fix}")
     if methods:
         by_method = whole["method"].astype(str).isin(methods)
         if (keep & ~by_method).any() and not (keep & by_method).any():
             raise ValueError(
-                f"your rows are for method {_names(whole.loc[keep, 'method'])}; "
-                f"--methods {args.methods} removed all of them (add "
-                f"{_names(whole.loc[keep, 'method'])} to --methods)")
+                f"Your rows are for method {_names(whole.loc[keep, 'method'])}, and "
+                f"--methods {args.methods} removed all of them. Add "
+                f"{_names(whole.loc[keep, 'method'])} to --methods.")
         keep &= by_method
     dropped = whole[~keep]
     if len(dropped):
@@ -1009,7 +1012,7 @@ def _filter_own_rows(frames: list, args) -> list:
         flags = " and ".join(f for f, on in (("--dataset", datasets), ("--methods", methods))
                              if on)
         print(f"warning: {flags} dropped {len(dropped)} of your {n} rows "
-              f"({'; '.join(what)})", file=sys.stderr)
+              f"({', '.join(what)})", file=sys.stderr)
     out, start = [], 0
     for f in frames:
         stop = start + len(f)
@@ -1145,11 +1148,12 @@ def _cmd_run(args) -> int:
     params = _parse_params(args.param, args, default_method=args.method) or {}
     inputs = _parse_inputs(args.input, args)
     if args.dry_run:
+        # the header first, then run's notes, then the command
+        print("# Dry run. Nothing was executed.", file=sys.stderr, flush=True)
         argv = multibench.run(args.method, args.category, inputs=inputs,
                               out_dir=args.out, params=params.get(args.method),
                               cmd_template=args.runner, dry_run=True)
-        print("# Dry run. Nothing was executed. multibench run would execute:",
-              file=sys.stderr)
+        print("# multibench run would execute:", file=sys.stderr, flush=True)
         print(shlex.join(argv))
         return _EXIT_OK
     with _quiet_stdout():                     # library progress -> stderr
@@ -1391,14 +1395,17 @@ def _evaluate_labels(args, stack):
             _usage_error(args, "need --labels CSV (repeatable), or --dataset, --method "
                          "and --category to read the dataset's label files")
         from .engine import registry
+        from .engine.schema import no_category_message
         try:
-            registry.check_method(args.method)
-        except KeyError as e:
+            spec = registry.get(args.method)
+        except KeyError:
             # the label order comes from a registry method; the user's own
             # method passes its label files instead
-            raise KeyError(f"{e.args[0]}; for your own method, pass the label files "
-                           f"with --labels, once per file, in your embedding's cell "
-                           f"order") from None
+            raise KeyError(_unknown_method_message(args.method)) from None
+        if args.category not in spec.wired_categories:
+            raise KeyError(no_category_message(args.method, spec.wired_categories,
+                                               args.category)
+                           + " For your own embedding, pass the label files with --labels.")
         labels = multibench.labels_for(args.dataset, args.category, args.method,
                                        data_path=args.data_path)
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
@@ -1450,8 +1457,8 @@ def _batch_arg(args, stack):
 def _label_order_problem(files, method, dataset, category) -> str | None:
     """Why ``--labels`` ``files`` contradict ``--method``'s cell order, or ``None``.
 
-    Checked only when ``method`` is a registry method (always so with
-    ``--name``), ``dataset`` and
+    Checked only when ``method`` is a registry method (always so when
+    ``--name`` is given with ``--method``), ``dataset`` and
     ``category`` are given, and the files are two or more of the dataset's
     label files: those :func:`multibench.labels_for` returns for the folder
     under the data path, or, when there is no such folder, any ``*cty*.csv``
@@ -1506,6 +1513,50 @@ def _label_order_problem(files, method, dataset, category) -> str | None:
             + (", or drop --labels to read them in that order." if here else "."))
 
 
+def _own_method_flags(name, files) -> str:
+    """``--name "RNA+ADT PCA" --labels cty.csv``: the flags of a call for your own method."""
+    def q(v):
+        v = str(v)
+        return v if shlex.quote(v) == v else '"' + v.replace('"', '\\"') + '"'
+    labels = " ".join(f"--labels {q(f)}" for f in files) or "--labels CSV"
+    return f"--name {q(name)} {labels}"
+
+
+def _unknown_method_message(method, name=None, files=()) -> str:
+    """The error of ``multibench evaluate`` for a ``--method`` the package does not know.
+
+    With ``--name``: leave out ``--method``, e.g. ``--name "RNA+ADT PCA"
+    --labels cty.csv``. Without it: a name that starts with a method id
+    (``uniPort_rerun``) gets ``--method uniPort --name uniPort_rerun``, a
+    close spelling ``Did you mean ...?``, then the flags for your own method.
+    """
+    from .engine import registry
+    msg = f"{method} is not a package method."
+    ids = [s.id for s in registry.load()]
+    base = max((i for i in ids if len(str(method)) > len(i)
+                and str(method).lower().startswith(i.lower())), key=len, default=None)
+    near = registry.closest_method(method)
+    if name is not None:
+        if near:
+            msg += f" Did you mean {near}?"
+        return (msg + " For your own embedding, leave out --method: "
+                + _own_method_flags(name, files) + ".")
+    if base:
+        msg += f" To name your rows {method}, pass --method {base} --name {method}."
+    elif near:
+        msg += f" Did you mean {near}?"
+    return (msg + " For your own method, pass --name and the label files with "
+            "--labels, once per file, in your embedding's cell order.")
+
+
+def _labels_needed_by(method, category) -> bool:
+    """Whether ``method`` reads cell-type labels in ``category``: the ``L`` badge of bubble."""
+    from .engine import registry
+    spec = registry.get(method)
+    vs = [v for v in spec.variants if v.when.get("category") == category]
+    return any(v.needs_labels for v in vs) if vs else bool(spec.needs_labels)
+
+
 def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file.
 
@@ -1518,33 +1569,35 @@ def _cmd_evaluate(args) -> int:
     batch family when ``--batch`` or several ``--labels`` are given.
 
     ``--name`` is the row name (``to_long(method=)``) and defaults to
-    ``--method``. Given ``--name``, ``--method`` must be a package method: it
-    sets the label order (``labels_for``) and the ``--labels`` order check,
-    as ``labels_for(..., 'SCALEX')`` and ``to_long(method='SCALEX_rerun')``
-    do in Python. Without ``--name`` an unknown ``--method`` with
-    ``--labels`` is only a row name, as before.
+    ``--method``. With ``--labels``, ``--name`` alone names the rows of your
+    own embedding and no order check runs. Given both, ``--method`` must be
+    a package method: it sets the label order (``labels_for``), the
+    ``--labels`` order check and a ``needs_labels`` column (the ``L`` badge
+    of ``plot bubble``), as ``labels_for(..., 'SCALEX')`` and
+    ``to_long(method='SCALEX_rerun')`` do in Python. Without ``--name`` an
+    unknown ``--method`` with ``--labels`` is only a row name, as before.
     """
     import multibench
     name = getattr(args, "name", None)
     long_mode = args.method is not None or args.dataset is not None or name is not None
     if long_mode:
-        missing = [f for f, v in (("--method", args.method), ("--dataset", args.dataset),
+        missing = [f for f, v in (("--method (or --name)", args.method or name),
+                                  ("--dataset", args.dataset),
                                   ("--category", args.category)) if v is None]
         if missing:
-            _usage_error(args, f"--method/--dataset write a long table and need "
-                         f"all of --method, --dataset, --category; missing "
-                         f"{', '.join(missing)}")
-    if name is not None:
+            _usage_error(args, "A long table needs --dataset, --category, and --method "
+                         f"or --name. Missing: {', '.join(missing)}.")
+        if args.method is None and not args.labels:
+            _usage_error(args, "Without --method, pass the label files with --labels, "
+                         "once per file, in your embedding's cell order.")
+    if name is not None and args.method is not None:
         from .engine import registry
         try:
             registry.check_method(args.method)
         except KeyError:
             # with --name, --method only sets the label order: it must be known
-            near = registry.closest_method(args.method)
-            raise KeyError(f"With --name, --method must be a package method. "
-                           f"{args.method} is not one."
-                           + (f" Did you mean {near}?" if near else "")
-                           + " multibench list shows the methods.") from None
+            raise KeyError(_unknown_method_message(args.method, name,
+                                                   args.labels or ())) from None
     # one metric-selection knob: --metrics (a family token or a comma list of
     # codes); --only and --task are older spellings of it
     metrics = _csv_list(args.metrics)
@@ -1579,6 +1632,9 @@ def _cmd_evaluate(args) -> int:
     if long_mode:
         df = multibench.to_long(df, method=name or args.method, dataset=args.dataset,
                                 category=args.category)
+        if name is not None and args.method is not None:
+            # the L badge of plot bubble follows the method, not the row name
+            df["needs_labels"] = _labels_needed_by(args.method, args.category)
         if args.out:
             df.to_csv(args.out, index=False)
             print(f"wrote {args.out}")
@@ -2453,7 +2509,7 @@ def build_parser() -> argparse.ArgumentParser:
     pe = sub.add_parser(
         "evaluate", help="scIB metrics for an embedding against labels (mtb.evaluate)",
         description="Compute the benchmark's metrics for one embedding file. Prints "
-                    "the metric table (or writes it with --out). With --method, "
+                    "the metric table (or writes it with --out). With --method or --name, "
                     "--dataset and --category the table is written in the long "
                     "format (metric,value,method,dataset,category,clustering,source,"
                     "scored_with) that multibench plot --input reads.")
@@ -2509,11 +2565,11 @@ def build_parser() -> argparse.ArgumentParser:
                                      "with --labels any row name. It is also the row "
                                      "name unless --name is given. Needs --dataset and "
                                      "--category")
-    pe.add_argument("--name", help="row name in the long table, e.g. SCALEX_rerun "
-                                   "(needs --method)")
+    pe.add_argument("--name", help="row name in the long table, e.g. SCALEX_rerun; "
+                                   "with --labels, --method can be left out")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
-                                      "--method and --category); without --labels its "
-                                      "label files are read")
+                                      "--category, and --method or --name); without "
+                                      "--labels its label files are read")
     pe.add_argument("--out", help="CSV to write (default: print the table)")
     pe.set_defaults(func=_cmd_evaluate, _parser=pe)
 

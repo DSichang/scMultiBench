@@ -435,6 +435,19 @@ def _check_input(role: str, val, *, real: bool) -> str:
     raise ValueError(f"unsupported input format: {p.name}")
 
 
+def _missing_input_notes(method: str, inputs: dict) -> list[str]:
+    """One note per input path that does not exist, for ``run(dry_run=True)``.
+
+    The path is shown as given. A real run stops at once on such a file; a
+    preview only says so, because it may name the files of another host.
+    """
+    scan = config.hint("mtb.scan", "multibench scan")
+    return [f"{method} reads {val}, which does not exist. {scan} shows what the "
+            f"folder holds."
+            for val in inputs.values()
+            if isinstance(val, (str, os.PathLike)) and not Path(val).exists()]
+
+
 def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, convert: bool,
                  real: bool) -> dict:
     """The file each role hands the script, and how it gets there.
@@ -940,6 +953,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
                               params=params, convert=convert,
                               cmd_template=cmd_template, repo_path=repo_path)
+        notes = _missing_input_notes(method, inputs) + notes
         for note in notes + mismatch:
             print(f"# {note}", file=sys.stderr, flush=True)
         return argv

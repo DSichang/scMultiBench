@@ -100,4 +100,4 @@ def test_params_for_ambiguous_category_lists_the_options():
 def test_params_for_unknown_category_is_explicit():
     with pytest.raises(KeyError) as e:
         mtb.params_for("totalVI", "mosaic")        # declared, but no such variant
-    assert "no 'mosaic' variant" in str(e.value)
+    assert "totalVI does not run on mosaic data. Its categories: vertical, cross." in str(e.value)

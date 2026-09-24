@@ -77,10 +77,10 @@ def test_cli_params_formats(capsys):
 
 def test_cli_params_errors(capsys):
     rc = cli.main(["params", "Matlda"])
-    assert rc == 1 and "did you mean 'Matilda'" in capsys.readouterr().err
+    assert rc == 1 and "Did you mean Matilda" in capsys.readouterr().err
     rc = cli.main(["params", "Matilda", "--category", "cross"])
     err = capsys.readouterr().err
-    assert rc == 1 and "no variant for category='cross'" in err and "vertical:rna+adt" in err
+    assert rc == 1 and "Matilda does not run on cross data. Its categories: vertical." in err
     rc = cli.main(["params", "Matilda", "--category", "vertcal"])
     assert rc == 1 and "vertical" in capsys.readouterr().err
 

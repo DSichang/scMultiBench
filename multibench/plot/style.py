@@ -315,8 +315,8 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     if not hit.any():
         return None
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
-    return (f"rows for {names} were clustered with the igraph Leiden backend; "
-            f"the stored tables used leidenalg, which can move ARI by up to "
+    return (f"The rows for {names} were clustered with the igraph Leiden backend. "
+            f"The stored tables used leidenalg, which can move ARI by up to "
             f"about 0.1. " + config.hint(
                 "Set mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before "
                 "evaluate to compare them.",
