@@ -283,8 +283,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     methods : list of str | None
         Methods (rows) to keep; ``None`` = every method in the frame.
     order : list of str | None
-        Methods to put first, in this order; the rest follow best first.
-        Reorders only - filter with ``methods``.
+        Methods to put first, in this order. The rest follow, best first. To
+        drop methods, use ``methods``.
     aggregate : {"dataset", "summary"}
         ``"dataset"``: raw metric values of one dataset (several are averaged
         per method). ``"summary"``: within-dataset max-ranks averaged across
@@ -1269,8 +1269,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     methods : list of str | None
         Methods (rows) to show; ``None`` = every method in the frame.
     order : list of str | None
-        Methods to put first, in this order; the rest follow best first.
-        Reorders only - filter with ``methods``.
+        Methods to put first, in this order. The rest follow, best first. To
+        drop methods, use ``methods``.
     aggregate : {"dataset", "summary"}
         ``"dataset"``: one dataset's values, drawn as circles. ``"summary"``:
         within-dataset ranks averaged across datasets, drawn as bars (the
