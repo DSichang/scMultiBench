@@ -5,6 +5,13 @@ from dataclasses import dataclass, field
 from pathlib import PurePath
 
 
+def no_category_message(method: str, categories, category) -> str:
+    """``"SCALEX does not run on vertical data. Its categories: diagonal."`` (internal)."""
+    cats = ", ".join(str(c) for c in categories)
+    return (f"{method} does not run on {category} data."
+            + (f" Its categories: {cats}." if cats else ""))
+
+
 class AmbiguousVariantError(ValueError, KeyError):
     """Raised when several variants of a method fit and the call must pick one.
 
@@ -569,6 +576,8 @@ class MethodSpec:
                     f"{self.id}: modalities={sorted(modalities)} match {len(hits)} "
                     f"{category!r} variants: {[v.when.get('modalities') for v in hits]}; "
                     f"pass the exact role tokens (method_info({self.id!r})['supports'])")
+        if category not in self.wired_categories:
+            raise KeyError(no_category_message(self.id, self.wired_categories, category))
         raise KeyError(
             f"{self.id}: no variant for category={category!r} modalities={sorted(modalities)}; "
             f"available: {[(v.when.get('category'), v.when.get('modalities')) for v in self.variants]}"

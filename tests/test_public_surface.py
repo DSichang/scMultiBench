@@ -113,7 +113,7 @@ def test_runtime_hint_is_a_deprecated_alias_of_method_info_runtime():
     assert "runtime_hint is deprecated since 0.3.0" in msg
     assert "use method_info(m)['runtime']" in msg
     assert "runtime_hint" not in dir(mtb)
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"), warnings.catch_warnings():
+    with pytest.raises(KeyError, match="Did you mean StabMap"), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         mtb.runtime_hint("Stabmap")
 
@@ -247,7 +247,7 @@ def test_env_install_is_the_cli_code_path(monkeypatch):
     assert out[0]["packed_url"] == "https://x/t.tar.gz"
     out = mtb.env.install(["SCALEX"], packed=False)
     assert [r["state"] for r in out] == ["build(dry-run)", "have"]
-    with pytest.raises(KeyError, match="did you mean"):
+    with pytest.raises(KeyError, match="Did you mean"):
         mtb.env.install(["Stabmap"])
     sig = inspect.signature(mtb.env.install)
     assert list(sig.parameters) == ["methods", "category", "packed", "dry_run", "conda",

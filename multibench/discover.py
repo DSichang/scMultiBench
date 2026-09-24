@@ -736,9 +736,8 @@ def params_for(method: str, category: str | None = None,
         # which has no modalities to pass.
         cands = [x for x in s.variants if x.when.get("category") == category]
         if not cands:
-            raise KeyError(
-                f"{method}: no {category!r} variant; available: "
-                f"{[_variant_key(x) for x in s.variants]}")
+            from .engine.schema import no_category_message
+            raise KeyError(no_category_message(method, s.wired_categories, category))
         if len(cands) > 1:
             v = _by_folder(cands)
             if v is None:

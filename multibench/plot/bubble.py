@@ -236,7 +236,7 @@ def _resolve(requested, available, kind: str, canon) -> list:
         import difflib
         hints = {u: difflib.get_close_matches(str(u), [str(a) for a in available],
                                              n=1, cutoff=0.6) for u in unknown}
-        did = "; ".join(f"{u!r}: did you mean {h[0]!r}?" for u, h in hints.items() if h)
+        did = " ".join(f"{u!r}: did you mean {h[0]!r}?" for u, h in hints.items() if h)
         raise ValueError(
             f"unknown {kind}(s) {unknown}" + (f" ({did})" if did else "")
             + f"; available in this frame: {sorted(map(str, available))}")
@@ -379,8 +379,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     together.
 
     **require_complete.** One ``UserWarning`` names each dropped method and
-    the datasets it lacks (``"require_complete=True dropped 1 method(s) ...:
-    MyRandom (missing D52s)"``). It has no effect under
+    the datasets it lacks (``"require_complete=True dropped 1 method ...:
+    MyRandom lacks D52s."``). It has no effect under
     ``aggregate="dataset"``.
 
     **A new dataset.** A figure compares methods only where they share a
@@ -433,8 +433,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     **Errors.** A frame that looks like ``mtb.evaluate``'s wide output gets a
     hint to convert it with ``mtb.to_long`` first; an unknown name gets a
     did-you-mean hint and the values present. Duplicate rows raise
-    ``ValueError``: deduplicate, or name the variants distinctly (as
-    ``mtb.sweep`` does). A method with both ``True`` and ``False``
+    ``ValueError``. Remove them, or rename each version (as ``mtb.sweep``
+    does). A method with both ``True`` and ``False``
     ``needs_labels`` rows, or an empty frame, also raises ``ValueError``.
 
     See Also
@@ -485,11 +485,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
     dmask = df.duplicated(keys, keep=False)
     if dmask.any():
-        raise ValueError(
-            f"{int(dmask.sum())} duplicate rows for the same {tuple(keys)} "
-            f"(e.g. {df[dmask][keys].drop_duplicates().head(3).to_dict('records')}); "
-            "bubble() does not average them - deduplicate, or name the "
-            "variants distinctly (as sweep() does).")
+        raise ValueError(_duplicate_rows_message(df[dmask], keys))
 
     datasets = (tuple(sorted(map(str, df["dataset"].dropna().unique())))
                 if "dataset" in df.columns else ())
@@ -509,25 +505,30 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
             keep = cov[cov == n].index
             if len(keep) == 0:
                 raise ValueError(
-                    f"no method has results on all {n} datasets "
-                    f"({', '.join(map(str, parts))}); coverage: "
-                    f"{cov.to_dict()}")
+                    f"No method has results on all {n} datasets "
+                    f"({', '.join(map(str, parts))}). "
+                    + _config.hint("Pass require_complete=False.",
+                                   "Leave out --require-complete."))
             if len(keep) < len(cov):
                 # name what was dropped: a newly added method is the one
                 # most likely to cover a single dataset
                 dropped = cov[cov < n].sort_values()
-                lacks = {m: [ds for ds, mat in parts.items() if m not in mat.index]
+                lacks = {m: tuple(ds for ds, mat in parts.items() if m not in mat.index)
                          for m in dropped.index}
+                groups = {}
+                for m in dropped.index:
+                    groups.setdefault(lacks[m], []).append(str(m))
+                k = len(dropped)
                 warnings.warn(
                     _config.hint("require_complete=True", "--require-complete")
-                    + f" dropped {len(dropped)} method(s) "
-                    f"not present on all {n} datasets ({', '.join(map(str, parts))}): "
-                    + ", ".join(f"{m} (missing {', '.join(map(str, lacks[m]))})"
-                                for m in dropped.index)
-                    + "; " + _config.hint("pass require_complete=False",
-                                          "leave out --require-complete")
-                    + " to keep them (a missing dataset then scores rank 0 under "
-                    + _config.hint("overall='rank'", "--overall rank") + ").",
+                    + f" dropped {k} method{'' if k == 1 else 's'} that "
+                    f"lack{'s' if k == 1 else ''} a dataset: "
+                    + " ".join(f"{_and(ms)} lack{'s' if len(ms) == 1 else ''} "
+                               f"{_and(ds)}." for ds, ms in groups.items())
+                    + " " + _config.hint("Pass require_complete=False",
+                                         "Leave out --require-complete")
+                    + " to keep them. A missing dataset then scores rank 0 under "
+                    + _config.hint("overall='rank'", "--overall rank") + ".",
                     UserWarning, stacklevel=2)
                 df = df[df["method"].isin(keep)]
                 parts = style.per_dataset_ranks(df)
@@ -828,6 +829,36 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         sentences.append(_config.hint("Pass na='skip' to hide this message.",
                                       "Pass --na skip to hide this message."))
     return " ".join(sentences)
+
+
+def _and(values) -> str:
+    """``'A'``, ``'A and B'``, ``'A, B and C'``: the distinct values, in first-seen order."""
+    v = list(dict.fromkeys(map(str, values)))
+    return v[0] if len(v) == 1 else ", ".join(v[:-1]) + " and " + v[-1]
+
+
+def _duplicate_rows_message(dup, keys) -> str:
+    """The error for rows that repeat the same ``keys`` (method, metric, dataset).
+
+    When your rows (not ``published`` / ``rerun``) collide with stored rows,
+    the message says so and names the fix; otherwise it names one repeat.
+    """
+    stored = (dup["source"].astype("string").str.match(r"^(published|rerun)").fillna(False)
+              if "source" in dup.columns else pd.Series(False, index=dup.index))
+    mixed = dup.assign(_st=stored.to_numpy()).groupby(keys)["_st"].agg(
+        lambda s: s.any() and not s.all())
+    mixed = mixed[mixed].index.to_frame(index=False)
+    if len(mixed):
+        where = f" on {_and(mixed['dataset'])}" if "dataset" in keys else ""
+        first = str(mixed["method"].iloc[0])
+        return (f"Your rows and the stored table both have {_and(mixed['method'])}{where}. "
+                f"Give your rows another name, such as {first}_rerun, "
+                + _config.hint("with to_long(method=...).", "with evaluate --name."))
+    what = ", ".join(keys[:-1]) + " and " + keys[-1]
+    example = ", ".join(str(dup[k].iloc[0]) for k in keys)
+    return (f"{len(dup)} rows repeat the same {what}, for example {example}. The figure "
+            "does not average them. Remove the repeats, or give each version its own "
+            "method name.")
 
 
 def _frame_needs_labels(df) -> dict:

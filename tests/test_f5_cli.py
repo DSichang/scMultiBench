@@ -140,17 +140,17 @@ def test_name_needs_a_package_method(diag, capsys):
                    name="mine")
     err = capsys.readouterr().err
     assert rc == 1
-    assert ("error: With --name, --method must be a package method. uniPort_rerun is "
-            "not one. Did you mean uniPort? multibench list shows the methods.") in err
+    assert ("error: uniPort_rerun is not a package method. Did you mean uniPort? For "
+            "your own embedding, leave out --method: --name mine --labels ") in err
 
 
-def test_name_needs_method(diag, capsys):
+def test_name_without_method_needs_labels(diag, capsys):
     d, emb = diag
     with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--output", str(emb), "--labels", str(d / "rna_cty.csv"),
-                  "--name", "x", "--dataset", "D28", "--category", "diagonal"])
+        cli.main(["evaluate", "--output", str(emb), "--name", "x", "--dataset", "D28",
+                  "--category", "diagonal"])
     assert e.value.code == 2
-    assert "missing --method" in capsys.readouterr().err
+    assert "Without --method, pass the label files with --labels" in capsys.readouterr().err
 
 
 def test_unknown_method_with_labels_is_still_only_a_row_name(diag, tmp_path, capsys):

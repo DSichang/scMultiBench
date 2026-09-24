@@ -205,7 +205,8 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         return v
     candidates = [v for v in spec.variants if v.when.get("category") == category]
     if not candidates:
-        raise KeyError(f"{spec.id} has no variant for category={category!r}")
+        from .schema import no_category_message
+        raise KeyError(no_category_message(spec.id, spec.wired_categories, category))
     if len(candidates) == 1:
         return candidates[0]
     available = [v.when.get("modalities", []) for v in candidates]

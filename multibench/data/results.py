@@ -464,12 +464,10 @@ def _check_methods(wanted: list, present) -> None:
             import difflib
             pool = sorted(set(present) | set(catalog._registry_ids()))
             hint = difflib.get_close_matches(str(m), pool, n=1, cutoff=0.6)
-            raise KeyError(
-                f"unknown method {m!r}"
-                + (f"; did you mean {hint[0]!r}?" if hint else "")
-                + "; see mtb.list_methods() (a method absent from the loaded "
-                "tables but known to the package gives an empty frame plus a "
-                "UserWarning instead)") from None
+            from ..engine import registry
+            raise KeyError(registry.unknown_method_message(m, hint[0] if hint else "")
+                           + " A package method absent from the loaded tables "
+                           "gives an empty frame and a UserWarning.") from None
 
 
 def _degenerate_rerun_rows(out: pd.DataFrame, base: Path) -> pd.DataFrame:
@@ -690,8 +688,8 @@ def load_results(
 
     **Method and metric names.** A ``methods`` entry that is neither a
     method id nor a method in the loaded frame raises ``KeyError`` with a
-    did-you-mean hint (``"unknown method 'Matlida'; did you mean
-    'Matilda'?"``). Method folders of the published tables are reported by
+    did-you-mean hint (``"Unknown method Matlida. Did you mean
+    Matilda?"``). Method folders of the published tables are reported by
     method id (``MOFA+`` -> ``MOFA2``, ``Seurat(WNN)`` -> ``Seurat_WNN``);
     metric names read from the published tables or a file are canonical
     (``iFI`` -> ``iF1``).

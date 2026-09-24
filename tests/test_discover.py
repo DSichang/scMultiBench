@@ -200,14 +200,14 @@ def test_method_info_unknown_method_points_at_mtb_list_methods():
     import pytest
     with pytest.raises(KeyError) as e:
         discover.method_info("Stabmap")
-    assert "did you mean 'StabMap'" in str(e.value) and "mtb.list_methods()" in str(e.value)
+    assert "Did you mean StabMap" in str(e.value) and "mtb.list_methods()" in str(e.value)
 
 
 def test_params_for_validates_and_aliases():
     import pytest
     p = discover.params_for("totalVI", "vertical", ["rna", "protein"])
     assert p["variant"] == "vertical:rna+adt"
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+    with pytest.raises(KeyError, match="Did you mean StabMap"):
         discover.params_for("Stabmap")
     with pytest.raises(ValueError, match="unknown category 'verticall'"):
         discover.params_for("totalVI", "verticall")

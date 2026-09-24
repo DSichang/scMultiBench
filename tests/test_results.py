@@ -283,9 +283,9 @@ def test_dataset_list_validates_every_element(result_dir):
 
 
 def test_method_list_validates_every_element(result_dir):
-    with pytest.raises(KeyError, match=r"unknown method 'Matlida'; did you mean 'Matilda'\?"):
+    with pytest.raises(KeyError, match=r"Unknown method Matlida. Did you mean Matilda\?"):
         results.load_results("vertical", methods="Matlida", result_path=result_dir)
-    with pytest.raises(KeyError, match="unknown method 'Nope'"):
+    with pytest.raises(KeyError, match="Unknown method Nope"):
         results.load_results("vertical", methods=["Matilda", "Nope"], result_path=result_dir)
     # case-folded names resolve (registry id 'totalVI')
     df = _quiet_rerun("vertical", methods="totalvi", source="rerun", result_path=result_dir)
@@ -299,7 +299,7 @@ def test_user_method_name_accepted_in_file(tmp_path):
     f = tmp_path / "mine.csv"
     long.to_csv(f, index=False)
     assert set(results.load_results(result_path=f, methods="mymethod").method) == {"MyMethod"}
-    with pytest.raises(KeyError, match="unknown method 'MyMethd'; did you mean 'MyMethod'"):
+    with pytest.raises(KeyError, match="Unknown method MyMethd. Did you mean MyMethod"):
         results.load_results(result_path=f, methods="MyMethd")
 
 

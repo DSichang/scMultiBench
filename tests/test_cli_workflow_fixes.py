@@ -81,14 +81,14 @@ def test_unknown_method_raises_did_you_mean_before_filesystem(call):
     (the folder here does not exist either): KeyError comes first."""
     with pytest.raises(KeyError) as e:
         call()
-    assert "did you mean 'StabMap'" in str(e.value)
+    assert "Did you mean StabMap" in str(e.value)
 
 
 def test_cli_scan_unknown_method_did_you_mean_exit_1(capsys):
     rc = cli.main(["scan", "NOPE", "--category", "vertical", "--data-path", "/nonexistent",
                    "--methods", "Matlda"])
     cap = capsys.readouterr()
-    assert rc == 1 and "did you mean 'Matilda'" in cap.err and cap.out == ""
+    assert rc == 1 and "Did you mean Matilda" in cap.err and cap.out == ""
 
 
 # ------------------------------------------------------------------ J2: compact tables
@@ -225,7 +225,7 @@ def test_run_dry_run_mirrors_run_builder():
     argv2 = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
                     cmd_template="srun {cmd}", dry_run=True)
     assert argv2[0] == "srun" and "conda" not in argv2
-    with pytest.raises(KeyError, match="did you mean"):
+    with pytest.raises(KeyError, match="Did you mean"):
         mtb.run("Matlda", "vertical", inputs=inp, out_dir="o", dry_run=True)
 
 
@@ -257,7 +257,7 @@ def test_parse_params_shape_and_errors():
         {"Matilda": {"epochs": 5, "lr": 0.001}, "totalVI": {"x": "a"}}
     assert cli._parse_params(["epochs=5"], default_method="Matilda") == \
         {"Matilda": {"epochs": 5}}
-    with pytest.raises(KeyError, match="did you mean 'Matilda'"):
+    with pytest.raises(KeyError, match="Did you mean Matilda"):
         cli._parse_params(["Matlda:epochs=5"])
     with pytest.raises(SystemExit):
         cli._parse_params(["Matilda:epochs"])
@@ -277,7 +277,7 @@ def test_cli_run_all_param_reaches_dry_run_command(capsys, tmp_path):
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path),
                    "--dry-run", "-p", "Matlda:epochs=5"])
     cap = capsys.readouterr()
-    assert rc == 1 and "did you mean 'Matilda'" in cap.err and cap.out == ""
+    assert rc == 1 and "Did you mean Matilda" in cap.err and cap.out == ""
     # unknown key: rejected in the dry run, naming the accepted keys
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path),
                    "--dry-run", "--methods", "Matilda", "-p", "Matilda:bogus=1"])
@@ -323,7 +323,7 @@ def test_param_help_has_an_example():
 
 
 def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
-    with pytest.raises(KeyError, match="did you mean 'Matilda'"):
+    with pytest.raises(KeyError, match="Did you mean Matilda"):
         mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent",
                     params={"Matlda": {"epochs": 5}}, verbose=False)
     with pytest.raises(KeyError) as e:
@@ -348,7 +348,7 @@ def test_default_env_name_is_the_env_every_entry_point_uses():
             assert envs.default_env_name(m) == scan_env[m]
     assert envs.default_env_name("Matilda") == "matilda"
     assert envs.own_env_name("Matilda") == "scmb_matilda"       # the old answer, renamed
-    with pytest.raises(KeyError, match="did you mean"):
+    with pytest.raises(KeyError, match="Did you mean"):
         envs.default_env_name("Matlda")
 
 
@@ -447,7 +447,7 @@ def test_read_only_commands_put_data_on_stdout_and_notes_on_stderr(argv, capsys,
     (["scan", "NOPE", "--category", "vertical", "--data-path", "/nonexistent"], 1,
      "does not exist"),
     (["cite", "BOGUS"], 1, "BOGUS"),
-    (["env", "recipe", "Matlda"], 1, "did you mean 'Matilda'"),
+    (["env", "recipe", "Matlda"], 1, "Did you mean Matilda"),
     (["run-all", "D52", "--category", "cross", "--out-dir", "/tmp/unused", "--methods",
       "Matilda"], 1, "no 'cross' variant matches"),
 ])

@@ -184,7 +184,7 @@ def test_bubble_table_notes_document_the_grey_rule():
 
 # --- M03: igraph rows next to the stored tables -----------------------------
 
-BACKEND = ("rows for {m} were clustered with the igraph Leiden backend; the stored "
+BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The stored "
            "tables used leidenalg, which can move ARI by up to about 0.1. Set "
            "mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before evaluate to compare "
            "them.")

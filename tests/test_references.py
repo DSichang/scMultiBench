@@ -90,7 +90,7 @@ def test_cite_bibtex_and_text():
     assert t.count("\n") == 0 and "https://doi.org/10.1038/s41592-025-02856-3" in t
     with pytest.raises(ValueError, match="unknown fmt 'ris'"):
         cite(fmt="ris")
-    with pytest.raises(KeyError, match="unknown method 'NoSuchMethod'"):
+    with pytest.raises(KeyError, match="Unknown method NoSuchMethod"):
         cite(["NoSuchMethod"])
     # an unverified method is flagged, not silently dropped
     u = cite(["VIMCCA"], fmt="bibtex")

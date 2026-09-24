@@ -68,8 +68,8 @@ def test_info_prints_what_to_check_before_a_run(capsys):
 def test_info_unknown_method_names_the_cli_listing(capsys):
     rc = cli.main(["info", "Matlida"])
     err = capsys.readouterr().err
-    assert rc == 1 and "did you mean 'Matilda'" in err
-    assert "see multibench list" in err and "mtb.list_methods()" not in err
+    assert rc == 1 and "Did you mean Matilda" in err
+    assert "multibench list shows all methods" in err and "mtb.list_methods()" not in err
     assert "`" not in err
 
 
@@ -517,8 +517,8 @@ def test_plot_input_rows_all_removed_by_dataset_is_an_error(tmp_path, monkeypatc
                    "--dataset", "D11", "--source", "rerun", "--out", str(tmp_path / "f.pdf")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert ("error: your 6 rows are for dataset MYCITE; --dataset D11 removed all of them "
-            "(plot them without --category, or score your method on D11)") in err
+    assert ("error: Your 6 rows are for dataset MYCITE, and --dataset D11 removed all of "
+            "them. Plot them without --category, or score your method on D11.") in err
 
 
 def test_plot_input_rows_partly_removed_warns(tmp_path, monkeypatch, capsys):
@@ -532,12 +532,13 @@ def test_plot_input_rows_partly_removed_warns(tmp_path, monkeypatch, capsys):
                    "--dataset", "D11", "--out", str(tmp_path / "f.pdf")])
     err = capsys.readouterr().err
     assert rc == 0 and sorted(seen["df"]["method"].unique()) == ["A", "Mine"]
-    assert "warning: --dataset dropped 3 of your 6 rows (dataset MYCITE; method Other)" in err
+    assert "warning: --dataset dropped 3 of your 6 rows (dataset MYCITE, method Other)" in err
     # --methods naming none of your methods removes all of them: an error too
     rc = cli.main(["plot", "bubble", "--input", str(mine), "--category", "vertical",
                    "--dataset", "D11", "--methods", "A", "--out", str(tmp_path / "f.pdf")])
     err = capsys.readouterr().err
-    assert rc == 1 and "--methods A removed all of them (add Mine to --methods)" in err
+    assert rc == 1 and ("error: Your rows are for method Mine, and --methods A removed all "
+                        "of them. Add Mine to --methods.") in err
 
 
 # ================================================================ L07 convert --batch-index

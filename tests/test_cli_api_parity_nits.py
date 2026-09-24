@@ -39,7 +39,7 @@ def test_labels_for_old_order_is_a_typeerror():
 
 
 def test_inputs_for_plain_typos_keep_their_messages():
-    with pytest.raises(KeyError, match="did you mean 'StabMap'"):
+    with pytest.raises(KeyError, match="Did you mean StabMap"):
         mtb.inputs_for("D52", "cross", "Stabmap")
     with pytest.raises(ValueError, match="unknown category 'cros'; valid"):
         mtb.inputs_for("D52", "cros", "StabMap")
@@ -146,7 +146,7 @@ def test_cli_cite_accepts_commas_and_spaces(capsys):
     assert cli.main(["cite", "Matilda,", "MOFA2", "--format", "text"]) == 0   # stray comma
     assert capsys.readouterr().out == spaces
     assert cli.main(["cite", "Matilda,Matlida"]) == 1
-    assert "did you mean 'Matilda'" in capsys.readouterr().err
+    assert "Did you mean Matilda" in capsys.readouterr().err
 
 
 def test_cli_scan_unknown_method_message_without_category(capsys):

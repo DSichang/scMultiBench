@@ -173,8 +173,8 @@ def test_get_unknown_method_has_did_you_mean():
     with pytest.raises(KeyError) as e:
         registry.get("Stabmap")
     msg = str(e.value)
-    assert "did you mean 'StabMap'" in msg and "mtb.list_methods()" in msg
-    with pytest.raises(KeyError, match="unknown method 'zzz'"):
+    assert "Did you mean StabMap" in msg and "mtb.list_methods()" in msg
+    with pytest.raises(KeyError, match="Unknown method zzz"):
         registry.check_method("zzz")
     assert registry.check_method("StabMap") == "StabMap"
 

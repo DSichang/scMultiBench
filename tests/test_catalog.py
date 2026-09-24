@@ -107,9 +107,9 @@ def test_canonical_id_case_folds_against_the_registry():
     # a name the registry does not know is kept (result-dir tokens, user methods)
     assert catalog.canonical_id("Concerto_louvain") == "Concerto_louvain"
     assert catalog.canonical_id("MyMethod") == "MyMethod"
-    with pytest.raises(KeyError, match="unknown method 'Matlida'; did you mean 'Matilda'"):
+    with pytest.raises(KeyError, match="Unknown method Matlida. Did you mean Matilda"):
         catalog.canonical_id("Matlida", strict=True)
-    with pytest.raises(KeyError, match="see mtb.list_methods"):
+    with pytest.raises(KeyError, match=r"mtb.list_methods\(\) shows all methods"):
         catalog.canonical_id("zzz", strict=True)
     assert catalog.canonical_id("matilda", strict=True) == "Matilda"
 

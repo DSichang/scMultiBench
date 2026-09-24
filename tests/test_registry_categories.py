@@ -65,7 +65,7 @@ def test_resolve_method_id_case_folds_with_did_you_mean():
     assert registry.resolve_method_id(" Matilda ") == "Matilda"
     with pytest.raises(KeyError) as e:
         registry.resolve_method_id("Matlida")
-    assert "did you mean 'Matilda'" in str(e.value) and "mtb.list_methods()" in str(e.value)
+    assert "Did you mean Matilda" in str(e.value) and "mtb.list_methods()" in str(e.value)
     # strict validator is unchanged
     with pytest.raises(KeyError):
         registry.check_method("scipenn")

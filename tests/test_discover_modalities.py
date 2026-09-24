@@ -59,7 +59,7 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
     # 'atac' selects the atac_gas variant; unknown category stays KeyError
     assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
     assert mtb.params_for("scMM", modalities=["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
-    with pytest.raises(KeyError, match="no 'mosaic' variant"):
+    with pytest.raises(KeyError, match="totalVI does not run on mosaic data"):
         mtb.params_for("totalVI", "mosaic")
 
 
@@ -92,7 +92,7 @@ def test_cite_is_variadic_and_keeps_the_list_form():
     assert mtb.cite("all") == mtb.cite(["all"][0]) and mtb.cite("all", fmt="bibtex").count("@") > 30
     with pytest.raises(ValueError, match="unknown fmt 'nope'"):
         mtb.cite("Matilda", fmt="nope")
-    with pytest.raises(KeyError, match="did you mean 'Matilda'"):
+    with pytest.raises(KeyError, match="Did you mean Matilda"):
         mtb.cite("Matlida")
     with pytest.raises(TypeError, match="pass one list"):
         mtb.cite(["Matilda"], ["MOFA2"])
