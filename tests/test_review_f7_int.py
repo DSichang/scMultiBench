@@ -370,12 +370,12 @@ def test_changes_page_quotes_the_live_several_datasets_warning():
 def test_changes_page_lists_the_review_changes():
     text = _flat("changes.md")
     for phrase in (
-            "- A `bubble` figure of one to three metrics is widened so that its row labels "
-            "and key fit. The height is unchanged.",
+            "- A `bubble` figure of one to three metrics is widened so that its row labels, "
+            "family headers and key fit. The height is unchanged.",
             "On Linux, it names `mtb.env.doctor()` when an environment is missing.",
-            "- the error of `mtb.env.install` when conda is not installed",
-            "- the several-variants errors of `inputs_for` and `params_for`",
-            "- the missing-file errors of `evaluate`"):
+            # R8-10 folded the reworded items into one sentence
+            "`inputs_for`, `params_for` and `evaluate`, the environment messages and "
+            "file checks,"):
         assert phrase in text, phrase
     assert "`verbose=True` prints a line before each ranking." not in text
     # the height of a narrow figure is that of the full one

@@ -29,14 +29,11 @@ def test_changes_page_lists_round_7_changes():
             "The last line of the `No method can run` error repeats the data path, "
             "modalities and other scan options of the call.",
             "So does the list header of the `run_all` error.",
-            # R7-08 to R7-11, one item each
-            "- Reworded: - the barcode errors, full-folder error and raw-counts warning of "
-            "`export_dataset` - ",
-            "- the Linux-only refusals of `mtb.run` and `mtb.env.install` - ",
-            "- the missing-environment messages - the Seurat_v5, gene-activity and "
-            "orientation checks - ",
-            "- the dataset-mixing warnings of `bubble`, `build_table` and `bar` - the "
-            "no-record warning of `to_long` "):
+            # R7-08 to R7-11, folded into one sentence by R8-10
+            "- Reworded: the messages of `export_dataset`, `to_canonical`, `inputs_for`, "
+            "`params_for` and `evaluate`, the environment messages and file checks, the "
+            "warnings of `scan`, `load_results`, `to_long` and the plots, and the help of "
+            "`multibench scan` and `convert`."):
         assert phrase in text, phrase
 
 

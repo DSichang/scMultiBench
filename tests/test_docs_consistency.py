@@ -260,11 +260,14 @@ def test_clustering_variants_ship_per_category_as_documented(tmp_path):
         if path.name == "plot.md" and path.parent.name == "tutorials":
             marker = "### Clustering variants"
             section = re.split(r"\n#{2,3} ", path.read_text().split(marker, 1)[1], maxsplit=1)[0]
-            sentence = next((s for s in " ".join(section.split()).split(". ")
-                             if "all three variants" in s), None)
-            assert sentence, f"plot.md {marker!r}: no sentence says which variants ship"
+            # the sentences that name a category in bold, each clause on its own
+            clauses = [c for s in " ".join(section.split()).split(". ")
+                       if re.search(r"\*\*\w+\*\*", s) for c in s.split(";")]
+            sentence = ". ".join(clauses)
+            assert any("all three variants" in c for c in clauses), \
+                f"plot.md {marker!r}: no sentence says which variants ship"
             named = []
-            for clause in sentence.split(";"):
+            for clause in clauses:
                 cats = re.findall(r"\*\*(\w+)\*\*", clause)
                 ids = set(re.findall(r"`(D\d+s?)`", clause))
                 assert cats, clause
