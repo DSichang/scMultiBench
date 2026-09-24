@@ -773,12 +773,14 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
     code(SUBSAMPLE_FN)
     md("""`scan` checks each method variant. A variant is one set of input files that a method accepts. `files_ok` checks the folder and works on any computer. `env_ok` checks the environment. """
        + runnable_sentence(cat))
+    # scan prints the file and environment counts in its own line, naming its
+    # rows "methods" or "rows"; the scan cells add only the runnable count
     code(f'''DATA_ROOT = "/tmp/mydata"
 src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
 subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
 
 sc = mtb.scan(f"MYDATA_{cat}", category=CATEGORY, data_path=DATA_ROOT)
-print(f"files_ok {{int(sc.files_ok.sum())}}, env_ok {{int(sc.env_ok.sum())}}, runnable {{int(sc.runnable.sum())}} of {{len(sc)}} method variants")
+print(f"runnable: {{int(sc.runnable.sum())}} of {{len(sc)}}")
 sc[["method", "modalities", "files_ok", "env_ok", "runnable", "reason"]].head(6)''')
     own_ds, own_methods = fallback_sweep(cat, ds2, trio)
     own_args = f'"{own_ds}"' + (f", {own_methods!r}" if own_methods else "")
@@ -855,7 +857,7 @@ cov[cov.dataset == DATASET].groupby("source").method.nunique()''')
         "scan. `--columns all` adds every column, including `command`: the exact "
         "command `run` would execute."))
     code("""avail = mtb.scan(DATASET, category=CATEGORY)
-print(f"files_ok {int(avail.files_ok.sum())}, env_ok {int(avail.env_ok.sum())}, runnable {int(avail.runnable.sum())} of {len(avail)} method variants")
+print(f"runnable: {int(avail.runnable.sum())} of {len(avail)}")
 avail[avail.files_ok][["method", "modalities", "env", "env_ok", "env_reason",
                        "output_kind", "needs_labels", "runtime_tier", "caveat"]]""")
     code("""not_ok = avail[~avail.files_ok][["method", "modalities", "files_reason"]]
