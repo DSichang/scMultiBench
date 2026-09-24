@@ -474,25 +474,24 @@ def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monke
     assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"] \
         and "https://x/matilda-cpu.tar.gz" in lines["matilda"]
     assert "4.5 GB dl" in lines["scmb_torch"] and "https://x/scmb_torch.tar.gz" in lines["scmb_torch"]
-    total = [l for l in cap.err.splitlines() if l.startswith("# total")][0]
-    assert total.startswith("# total (3 envs): 6.2 GB to download; disk: unknown for 2 of 3 "
-                            "envs (at least 2.5 GB for the other 1)")
-    assert "; summed the cpu archives; 2 of 3 envs have no CPU archive yet; their GPU " \
-           "archives are counted; sizes are those recorded for this release" in total
-    assert "(auto:" not in total
-    # auto on a CPU host says so; gpu sums the CUDA archives and never falls back
+    du = ("# size on disk not recorded for 2 of 3 envs; unpacked envs are larger than the "
+          "download, so check with du after the first install")
+    assert ("# total for 3 envs (CPU builds; 2 envs have only a GPU build): 6.2 GB to "
+            "download\n" + du) in cap.err
+    assert "NVIDIA GPU" not in cap.err
+    # auto on a CPU host says so once (the install note); gpu sums the CUDA
+    # archives and never falls back
     assert cli.main(["env", "install", "--packed"]) == 0
-    total = [l for l in capsys.readouterr().err.splitlines() if l.startswith("# total")][0]
-    assert "summed the cpu archives (auto: no NVIDIA GPU visible on this host); 2 of 3" in total
+    err = capsys.readouterr().err
+    assert "# total for 3 envs (CPU builds; 2 envs have only a GPU build): 6.2 GB" in err
+    assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert cli.main(["env", "install", "--packed", "--flavor", "gpu"]) == 0
-    total = [l for l in capsys.readouterr().err.splitlines() if l.startswith("# total")][0]
-    assert total.startswith("# total (3 envs): 8.4 GB to download; disk: unknown for 2 of 3 "
-                            "envs (at least 9.0 GB for the other 1)")
-    assert "; summed the gpu archives; sizes are those recorded" in total
+    assert ("# total for 3 envs (GPU builds): 8.4 GB to download\n" + du) \
+        in capsys.readouterr().err
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     assert cli.main(["env", "install", "--packed"]) == 0
-    total = [l for l in capsys.readouterr().err.splitlines() if l.startswith("# total")][0]
-    assert "summed the gpu archives (auto: NVIDIA GPU visible on this host); sizes" in total
+    assert ("# total for 3 envs (GPU builds, as this host has an NVIDIA GPU): 8.4 GB "
+            "to download") in capsys.readouterr().err
 
 
 def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
@@ -502,20 +501,21 @@ def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
     lines = {l.split()[0]: l for l in cap.out.splitlines()}
     assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"]
     assert "4.5 GB dl" in lines["scmb_torch"] and "0.9 GB dl" in lines["scmb_r"]
-    assert cap.err.startswith("# total (3 envs): 6.2 GB download; disk: unknown for 2 of 3 "
-                              "envs (at least 2.5 GB for the other 1); summed the "
-                              "cpu archives; 2 of 3 envs have no CPU archive yet; their GPU "
-                              "archives are counted; sizes are")
+    assert cap.err.startswith(
+        "# total for 3 envs (CPU builds; 2 envs have only a GPU build): 6.2 GB download\n"
+        "# size on disk not recorded for 2 of 3 envs; unpacked envs are larger than the "
+        "download, so check with du after the first install")
     assert cli.main(["env", "plan", "--methods", "Matilda", "--flavor", "gpu"]) == 0
     cap = capsys.readouterr()
     assert "3.0 GB dl" in cap.out and "9.0 GB disk" in cap.out
-    assert cap.err.startswith("# total (1 env): 3.0 GB download, 9.0 GB on disk; summed the "
-                              "gpu archives; ")
+    assert cap.err.startswith("# total for 1 env (GPU build): 3.0 GB download, 9.0 GB "
+                              "on disk\n")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     assert cli.main(["env", "plan", "--methods", "Matilda"]) == 0        # auto
     cap = capsys.readouterr()
     assert "0.8 GB dl" in cap.out
-    assert "summed the cpu archives (auto: no NVIDIA GPU visible on this host); sizes" in cap.err
+    assert ("# total for 1 env (CPU build, as this host has no NVIDIA GPU): 0.8 GB "
+            "download, 2.5 GB on disk\n# for jobs on GPU nodes, pass --flavor gpu") in cap.err
 
 
 def test_cli_status_doctor_plan_print_the_record(cli_linux, envs_dir, capsys):
@@ -549,8 +549,9 @@ def test_size_total_line_without_flavor_is_unchanged():
              "b": {"archive_bytes": 5_000_000_000, "unpacked_bytes": None},
              "b-cpu": {"archive_bytes": 1_000_000_000, "unpacked_bytes": None}}
     line = cli._size_total_line(rows, sizes)
-    assert line == ("# total (2 envs): 2.0 GB download; disk: unknown for 1 of 2 envs (at "
-                    "least 2.0 GB for the other 1); sizes are those recorded for this release")
+    assert line == ("# total for 2 envs: 2.0 GB download\n# size on disk not recorded for "
+                    "1 of 2 envs; unpacked envs are larger than the download, so check "
+                    "with du after the first install")
     assert cli._flavor_token("cpu") == " flavor=cpu" and cli._flavor_token(None) == ""
     assert cli._flavor_token("tpu") == ""
 

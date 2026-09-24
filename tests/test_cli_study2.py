@@ -280,9 +280,10 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
     assert "? dl" in lines["mystery"] and "? disk" in lines["mystery"]
     assert "dl" not in lines["have_it"]
     # unknowns are counted per column: the row printing '? disk' is a disk unknown
-    assert ("# total (2 envs): download: unknown for 1 of 2 envs (at least 0.9 GB for "
-            "the other 1); disk: unknown for 1 of 2 envs (at least 3.1 GB for the other "
-            "1)") in cap.err
+    assert "# total for 2 envs (" in cap.err
+    assert ("): at least 0.9 GB to download\n# download size not recorded for 1 of 2 "
+            "envs, size on disk for 1 of 2 envs; unpacked envs are larger than the "
+            "download, so check with du after the first install") in cap.err
     assert not any(l.startswith("#") for l in cap.out.splitlines())
 
 
@@ -296,12 +297,12 @@ def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     lines = {l.split()[0]: l for l in cap.out.splitlines()}
     assert "0.9 GB dl" in lines["scmb_r"] and "2.1 GB dl" in lines["env_sciPENN"]
     assert re.search(r"(\d+(\.\d+)? [KMG]B|\?) dl", lines["matilda"])   # size when known, ? otherwise
-    # "X GB download" when every size is known, "download: unknown for K of N
-    # envs (at least ...)" when some are still unmeasured
+    # "X GB download" when every size is known, "at least X GB download" and a
+    # line counting the unmeasured envs when some are still unmeasured
     assert cap.err.startswith("# total") and "download" in cap.err
     # counts depend on the recorded sizes; the disk count must equal the '? disk' rows
     from tests.test_env_cli_consistency import total_unknowns
-    n, dl, disk = total_unknowns(cap.err.splitlines()[0])
+    n, dl, disk = total_unknowns(cap.err)
     assert disk == sum("? disk" in l for l in cap.out.splitlines())
     assert dl == sum("? dl" in l for l in cap.out.splitlines())
     assert lines["scmb_r"].endswith("<- UINMF")

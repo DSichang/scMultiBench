@@ -23,18 +23,22 @@ def _linux_no_envs(monkeypatch):
 
 
 # ----------------------------------------------------------------- plan summary
-def total_unknowns(line: str) -> tuple[int, int, int]:
-    """``(n envs, unknown downloads, unknown disks)`` parsed from a ``# total`` line."""
-    n = int(re.search(r"# total \((\d+) envs?\)", line).group(1))
+def total_unknowns(text: str) -> tuple[int, int, int]:
+    """``(n envs, unknown downloads, unknown disks)`` parsed from the ``# total``
+    line and the line after it that counts the unknown sizes."""
+    n = int(re.search(r"# total for (\d+) envs?", text).group(1))
 
-    def unknown(word):
-        m = re.search(word + r": unknown(?: for (?:(\d+) of \d+ envs|(both) envs|all (\d+) envs))?",
-                      line)
+    def unknown(what):
+        m = re.search(what + r" (?:not recorded )?for (?:(\d+) of \d+ envs|(both) envs|"
+                      r"all (\d+) envs|(this) env)", text)
         if m is None:
             return 0
-        k, both, every = m.groups()
-        return int(k) if k else 2 if both else int(every) if every else n
-    return n, unknown("download"), unknown("disk")
+        k, both, every, this = m.groups()
+        return int(k) if k else 2 if both else int(every) if every else 1
+    # none known: the first line says so, and the second does not repeat it
+    dl = n if re.search(r"# total for [^\n]*: download size not recorded", text) \
+        else unknown("download size")
+    return n, dl, unknown("size on disk")
 
 
 def test_size_total_counts_unknowns_per_column():
@@ -44,20 +48,22 @@ def test_size_total_counts_unknowns_per_column():
              "c": {"archive_bytes": 1_000_000_000}}
     line = cli._size_total_line(rows, sizes)
     assert total_unknowns(line) == (3, 0, 2)
-    # a partly known column is a floor over the known envs, never a plain total
-    assert "3.0 GB download; disk: unknown for 2 of 3 envs (at least 2.0 GB for the other 1)" in line
-    assert "on disk" not in line
+    # a partly known column is never printed as a plain total
+    assert line.splitlines() == [
+        "# total for 3 envs: 3.0 GB download",
+        "# size on disk not recorded for 2 of 3 envs; unpacked envs are larger than "
+        "the download, so check with du after the first install"]
+    assert "on disk," not in line and "GB on disk" not in line
     full = cli._size_total_line(rows[:1], sizes)
     assert total_unknowns(full) == (1, 0, 0)
-    assert full.startswith("# total (1 env): 1.0 GB download, 2.0 GB on disk; ")
+    assert full == "# total for 1 env: 1.0 GB download, 2.0 GB on disk"
 
 
 def test_env_plan_summary_matches_the_question_marks_in_the_rows(capsys):
     rc = cli.main(["env", "plan", "--category", "cross"])
     cap = capsys.readouterr()
     assert rc == 0
-    total = [l for l in cap.err.splitlines() if l.startswith("# total")][0]
-    n, dl, disk = total_unknowns(total)
+    n, dl, disk = total_unknowns(cap.err)
     rows = [l for l in cap.out.splitlines() if l.strip()]
     assert n == len(rows)
     assert dl == sum("? dl" in l for l in rows)

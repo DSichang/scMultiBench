@@ -197,37 +197,55 @@ def test_config_docstring_lists_the_variables():
 def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     note = "(no NVIDIA GPU on this host); if the jobs run on GPU nodes, pass --flavor gpu"
-    assert cli.main(["env", "plan", "--methods", "StabMap"]) == 0
+    # scMoMaT's env has a CPU archive: the plan sums it, says why once and how
+    # to get the GPU builds once
+    assert cli.main(["env", "plan", "--methods", "scMoMaT"]) == 0
     err = capsys.readouterr().err
-    assert f"# sizes are for the CPU builds {note}" in err
-    assert cli.main(["env", "install", "--packed", "--methods", "StabMap"]) == 0
+    assert "(CPU build, as this host has no NVIDIA GPU)" in err
+    assert "# for jobs on GPU nodes, pass --flavor gpu" in err
+    assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
+    assert cli.main(["env", "install", "--packed", "--methods", "scMoMaT"]) == 0
     err = capsys.readouterr().err
     assert err.count(f"# installing CPU builds {note}") == 1
+    assert err.count("NVIDIA GPU") == 1
+    # StabMap's env has no CPU build: the GPU build is taken either way, so
+    # neither command gives the --flavor advice
+    for argv in (["env", "plan", "--methods", "StabMap"],
+                 ["env", "install", "--packed", "--methods", "StabMap"]):
+        assert cli.main(argv) == 0
+        err = capsys.readouterr().err
+        assert "(GPU build; no CPU build is published for it)" in err, argv
+        assert "--flavor gpu" not in err and "CPU builds" not in err, argv
     for argv in (["env", "plan", "--methods", "StabMap", "--flavor", "cpu"],
                  ["env", "install", "--packed", "--methods", "StabMap", "--flavor", "gpu"]):
         assert cli.main(argv) == 0
-        assert "if the jobs run on GPU nodes" not in capsys.readouterr().err, argv
+        assert "pass --flavor gpu" not in capsys.readouterr().err, argv
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     assert cli.main(["env", "plan", "--methods", "StabMap"]) == 0
-    assert "if the jobs run on GPU nodes" not in capsys.readouterr().err
+    assert "pass --flavor gpu" not in capsys.readouterr().err
 
 
 def test_auto_flavour_note_on_the_real_install_path(linux, monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    monkeypatch.setattr(envs, "doctor", lambda **kw: [{"env": "scmb_r", "exists": False,
-                                                       "has_lock": True, "methods": ["StabMap"]}])
+    torch = envs.group_for("scMoMaT")          # an env with a published CPU archive
+    missing = [{"env": torch, "exists": False, "has_lock": True, "methods": ["scMoMaT"]}]
+    monkeypatch.setattr(envs, "doctor", lambda **kw: [dict(r) for r in missing])
     monkeypatch.setattr(envs, "_find_conda", lambda: "/usr/bin/conda")
     monkeypatch.setattr(envs, "install_packed", lambda env, **kw: True)
     monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: "cpu")
     monkeypatch.setattr(envs, "create_all", lambda **kw: [
-        {"env": "scmb_r", "methods": ["StabMap"], "exists": True, "has_lock": True}])
-    envs.install(["StabMap"], dry_run=False)          # Python: names the keyword
+        {"env": torch, "methods": ["scMoMaT"], "exists": True, "has_lock": True}])
+    envs.install(["scMoMaT"], dry_run=False)          # Python: names the keyword
     err = capsys.readouterr().err
     assert err.count("# installing CPU builds (no NVIDIA GPU on this host)") == 1
     assert "pass flavor='gpu'" in err
-    assert cli.main(["env", "install", "--packed", "--run", "--methods", "StabMap"]) == 0
+    assert cli.main(["env", "install", "--packed", "--run", "--methods", "scMoMaT"]) == 0
     err = capsys.readouterr().err
     assert err.count("pass --flavor gpu") == 1
+    # an env without a CPU archive gets the GPU build: no CPU-builds note
+    missing[0].update(env="scmb_r", methods=["StabMap"])
+    envs.install(["StabMap"], dry_run=False)
+    assert "installing CPU builds" not in capsys.readouterr().err
 
 
 # ================================================================ L26 {env_cmd}
@@ -283,11 +301,12 @@ def test_total_line_does_not_sum_an_incomplete_column_as_a_total():
     sizes = {e: {"archive_bytes": 2_000_000_000, "unpacked_bytes": None} for e in "abcdef"}
     sizes["a"]["unpacked_bytes"] = sizes["b"]["unpacked_bytes"] = 2_050_000_000
     line = cli._size_total_line(rows, sizes)
-    assert line.startswith("# total (6 envs): 12.0 GB download; disk: unknown for 4 of 6 envs "
-                           "(at least 4.1 GB for the other 2)")
-    assert line.endswith("sizes are those recorded for this release")
-    assert "packed_sizes.json" not in line and "at least:" not in line
-    assert "disk: unknown for all 6 envs" in cli._size_total_line(
+    assert line.splitlines() == [
+        "# total for 6 envs: 12.0 GB download",
+        "# size on disk not recorded for 4 of 6 envs; unpacked envs are larger than the "
+        "download, so check with du after the first install"]
+    assert "packed_sizes.json" not in line and "on disk," not in line
+    assert "size on disk not recorded for all 6 envs" in cli._size_total_line(
         rows, {e: {"archive_bytes": 1} for e in "abcdef"})
 
 
