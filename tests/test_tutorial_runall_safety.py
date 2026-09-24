@@ -277,7 +277,8 @@ def test_stand_in_falls_back_to_the_stored_table_when_fetch_outputs_raises(exc, 
     assert res == ("STORED", "D45")
     assert mtb.load_batch_calls == []
     out = capsys.readouterr().out
-    assert f"replacement: the package's stored metric table ({type(exc).__name__} from fetch_outputs" in out
+    assert (f"replacement: the package's stored metric table. {type(exc).__name__} from "
+            f"fetch_outputs: {exc}\n") in out
     assert "the benchmark's Linux machine" not in out
 
 
@@ -565,7 +566,8 @@ def test_end_to_end_stand_in_reads_the_host_embedding_or_returns_none(tmp_path, 
     ns = {"mtb": _StubMtb(_StubData(OSError("offline"))), "Path": Path, "h5py": h5py}
     exec(_e2e_function("replacement"), ns)
     assert ns["replacement"]("D11", "Matilda") is None
-    assert "(OSError from fetch_outputs: offline)" in capsys.readouterr().out
+    assert ("replacement: the package's stored scores for Matilda. OSError from "
+            "fetch_outputs: offline\n") in capsys.readouterr().out
 
 
 def test_end_to_end_evaluate_cell_without_an_embedding_shows_the_stored_scores(capsys, monkeypatch):

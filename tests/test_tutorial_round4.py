@@ -73,8 +73,9 @@ SKIP_SENTENCE = ("`res.failures` says why a run failed or a method you named was
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_troubleshooting_says_where_the_reason_of_a_skipped_method_is(name):
     """Visible under the Troubleshooting heading: a method the run cell names
-    and ``run_all`` skips shows ``SKIPPED`` in ``res.summary`` with no reason
-    column there; ``res.failures`` holds the reason."""
+    and ``run_all`` skips shows ``SKIPPED`` in ``res.summary``, and
+    ``res.failures`` holds the reason (since round 5 the summary's ``reason``
+    column holds it too, tests/test_tutorial_round5.py)."""
     md = next(src for kind, src in _cells(name)
               if kind == "markdown" and src.startswith("## Troubleshooting"))
     assert SKIP_SENTENCE in _visible(md), md
