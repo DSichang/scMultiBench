@@ -804,8 +804,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str) -> str:
     if more > 0:
         sentences.append(f"... and {more} more row{'s' if more > 1 else ''}.")
     if aggregate == "summary":
-        sentences.append("In the summary, a missing value counts as rank 0 on that "
-                         "dataset.")
+        sentences.append("In the summary, a missing value counts as the lowest rank on "
+                         "that dataset.")
     else:
         sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
                          else "Each row's Overall uses the metrics it has.")

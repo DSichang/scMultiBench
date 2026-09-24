@@ -93,7 +93,8 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch):
         sc = mtb.scan("MU_PEAK", "vertical", methods=None, modalities=["rna", "atac"],
                       data_path=tmp_path, verbose=False).set_index("method")
         r = sc.loc["Matilda"]
-        assert not r["runnable"] and not r["files_ok"]
+        # the ref is its own blocker, like the wrong ATAC kind: the files are fine
+        assert not r["runnable"] and r["files_ok"]
         assert r["reason"].startswith(wrong[:-1])
         assert "needs gene-activity ATAC; atac.h5 holds peaks. To run Matilda anyway" \
             in r["reason"]

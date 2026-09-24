@@ -345,22 +345,25 @@ def _cmd_scan(args) -> int:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
     kw = dict(data_path=args.data_path, modalities=_csv_list(args.modalities),
               verbose=False, assume_gpu=getattr(args, "assume_gpu", False))
+    df = None
     try:
         # named methods keep a wrong-ATAC-kind row runnable, as in mtb.scan
         df = multibench.scan(args.dataset, args.category, methods=methods, **kw)
-    except ValueError:
-        if not methods:
+    except ValueError as e:
+        # a representation token that dropped a named method: the message says why
+        if not methods or getattr(e, "representation", False):
             raise
-        df = multibench.scan(args.dataset, args.category, **kw)   # names what is present
     if methods:
-        unknown = sorted(set(methods) - set(df["method"]))
+        unknown = sorted(set(methods) - set([] if df is None else df["method"]))
         if unknown:
             where = f"{args.dataset}/{args.category}" if args.category else (
                 f"{args.dataset} (all categories)")
+            # what the category holds, not only the named methods it holds
+            present = multibench.scan(args.dataset, args.category, **kw)["method"]
             raise ValueError(
                 f"method(s) {unknown} are not in the scan table for "
                 f"{where}; methods present: "
-                f"{sorted(set(df['method']))}")
+                f"{sorted(set(present))}")
         df = df[df["method"].isin(methods)]
     _print_frame(df, columns=_csv_list(args.columns), fmt=args.format,
                  compact=_compact_plan_columns(df))
@@ -379,8 +382,9 @@ def _strict_problem(df, methods) -> str | None:
     ``--methods`` has no runnable row. The text counts the rows each check
     blocks and, for named methods, gives the reason of each one's first row.
     A GPU-only method on a host without a GPU is counted apart from a
-    missing env, with a pointer to ``--assume-gpu``; so is a row given the
-    wrong ATAC kind.
+    missing env, with a pointer to ``--assume-gpu``; so are a row given the
+    wrong ATAC kind, a row whose peak names the method cannot read, and
+    scripts at another commit than ``MULTIBENCH_SCRIPTS_REF``.
     """
     ok = df["runnable"].astype(bool)
     runnable = df[ok]
@@ -395,9 +399,18 @@ def _strict_problem(df, methods) -> str | None:
     counts = []
     if "files_ok" in rest and (~rest["files_ok"].astype(bool)).any():
         counts.append(f"input files missing in {int((~rest['files_ok'].astype(bool)).sum())}")
-    from .workflow import _is_wrong_atac
-    if "reason" in rest and _is_wrong_atac(rest["reason"]).any():
-        counts.append(f"wrong ATAC kind in {int(_is_wrong_atac(rest['reason']).sum())}")
+    from .workflow import PEAK_NAMES_REASON, _is_wrong_atac, _is_wrong_ref
+    if "reason" in rest:
+        wrong = _is_wrong_atac(rest["reason"])
+        names = wrong & rest["reason"].astype(str).str.contains(PEAK_NAMES_REASON,
+                                                                regex=False)
+        if (wrong & ~names).any():
+            counts.append(f"wrong ATAC kind in {int((wrong & ~names).sum())}")
+        if names.any():
+            counts.append(f"unreadable peak names in {int(names.sum())}")
+        if _is_wrong_ref(rest["reason"]).any():
+            counts.append(f"scripts not at MULTIBENCH_SCRIPTS_REF in "
+                          f"{int(_is_wrong_ref(rest['reason']).sum())}")
     n_env, n_gpu, gpu_only = _env_and_gpu_counts(rest)
     if n_env:
         counts.append(f"env not ready in {n_env}")
@@ -1108,12 +1121,14 @@ def _cmd_run_all(args) -> int:
         _usage_error(args, "--assume-gpu applies to --dry-run only; a real run checks "
                            "this host's GPU")
     batch = getattr(args, "batch", None)
+    batch_vec = None
     if batch is not None:
         from .eval import io as eio
         eio._require_file(batch, "--batch file")   # exit 1 before any method runs
         if args.dry_run:
-            eio.as_vector(batch, what="batch")      # a file it cannot read fails the check
+            batch_vec = eio.as_vector(batch, what="batch")   # a file it cannot read fails
     if args.dry_run:
+        from .workflow import _batch_length_problem, _dry_run_notes
         with _quiet_stdout():
             df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
                                     methods=_csv_list(args.methods),
@@ -1125,9 +1140,17 @@ def _cmd_run_all(args) -> int:
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
               f"{args.dataset} ({args.category}); commands below are what multibench "
               f"run would execute (rows with files_ok False have none)", file=sys.stderr)
-        for _, r in df[df["files_ok"]].iterrows():
-            if r.get("caveat"):     # the compact table clips the caveat column
-                print(f"# {r['method']} {r['caveat']}", file=sys.stderr)
+        # the caveats of the rows the sweep would run: the compact table clips them
+        scripts, lines = _dry_run_notes(df)
+        if scripts:
+            print(f"# {scripts}", file=sys.stderr)
+        for m, cav in lines:
+            print(f"# {m} {cav}", file=sys.stderr)
+        if batch_vec is not None:
+            bad = _batch_length_problem(df, batch_vec, args.dataset, args.category,
+                                        args.data_path)
+            if bad:          # the scoring of the real run would fail: exit 1 now
+                raise ValueError(bad)
         _print_frame(df, columns=columns, fmt=args.format, compact=_compact_plan_columns(df))
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
@@ -1259,14 +1282,20 @@ def _cmd_evaluate(args) -> int:
                           DeprecationWarning, stacklevel=2)
         if metrics is None:
             metrics = args.task
+    from .eval import pipeline
     with contextlib.ExitStack() as stack:
         labels = _evaluate_labels(args, stack)
         kw = dict(category=args.category, labels=labels, clustering=args.cluster,
                   batch=getattr(args, "batch", None))
         if args.obsm is not None:
             kw["obsm"] = args.obsm
-        with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):   # progress -> stderr
-            df = multibench.evaluate(output=args.output, metrics=metrics, **kw)
+        # labels read from --dataset: a count error names that dataset's files
+        token = pipeline._CLI_LABELS_FROM.set(None if args.labels else args.dataset)
+        try:
+            with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):   # progress -> stderr
+                df = multibench.evaluate(output=args.output, metrics=metrics, **kw)
+        finally:
+            pipeline._CLI_LABELS_FROM.reset(token)
     if long_mode:
         df = multibench.to_long(df, method=args.method, dataset=args.dataset,
                                 category=args.category)
@@ -1293,8 +1322,9 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     if complete: the disk figure is left out, a download figure reads ``at
     least X GB``, and a second line counts the unknowns per column (a row
     printing ``? disk`` is one disk unknown even when its download size is
-    known). An unknown disk size adds the advice to check with ``du`` after
-    the first install. No line holds more than two semicolons.
+    known), with the disk sum of the others as a lower bound. An unknown
+    disk size adds the advice to check with ``du`` after the first install.
+    No line holds more than two semicolons.
 
     Parameters
     ----------
@@ -1375,8 +1405,10 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     if 0 < n_dl < n:            # none known: the first line already says so
         unknown.append(f"download size not recorded for {_which(n - n_dl)}")
     if n_disk < n:
+        # the known part is a lower bound, e.g. for a storage-quota request
+        known = f" ({envs._gb(disk)} for the other {n_disk})" if n_disk else ""
         unknown.append(("size on disk for " if unknown else "size on disk not recorded for ")
-                       + _which(n - n_disk))
+                       + _which(n - n_disk) + known)
     if not unknown:
         return line
     second = "# " + ", ".join(unknown)
@@ -1789,7 +1821,8 @@ def build_parser() -> argparse.ArgumentParser:
                                                       "id -> did-you-mean error)")
     ps.add_argument("--modalities", help="comma-separated modality roles to restrict the "
                                          "variants to, e.g. rna,adt ('protein' is "
-                                         "accepted for adt)")
+                                         "accepted for adt); atac_peak and atac_gas "
+                                         "select by what the method reads")
     ps.add_argument("--columns", help="comma-separated columns to print, in this order, "
                                       "or 'all' for every column (default: the compact "
                                       "set in table mode, all columns for csv/tsv/json; "
@@ -2012,7 +2045,8 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--methods", help=_METHODS_HELP + "; only those (default: every "
                                                        "runnable method)")
     pra.add_argument("--modalities", help="comma-separated modalities to restrict the "
-                                          "method variants to, e.g. rna,adt")
+                                          "method variants to, e.g. rna,adt; atac_peak "
+                                          "and atac_gas select by what the method reads")
     pra.add_argument("--data-path", dest="data_path",
                      help="folder that contains the dataset folder (default: the "
                           "package data path)")
@@ -2052,8 +2086,8 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--no-evaluate", dest="no_evaluate", action="store_true",
                      help="run only; do not compute metrics on the outputs")
     pra.add_argument("--batch", metavar="CSV",
-                     help="one batch id per cell, in the dataset's cell order, as for "
-                          "evaluate --batch (default: each cell's label file)")
+                     help="CSV as for evaluate --batch, cells in the order of the label "
+                          "files (default: one batch per label file)")
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                      help="Leiden backend of the clustering sweep when scoring (default: "
                           "see `multibench config`); leidenalg matches both stored "

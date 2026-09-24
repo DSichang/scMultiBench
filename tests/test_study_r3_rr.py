@@ -70,13 +70,14 @@ def test_dash_peaks_need_no_caveat(tmp_path):
 def test_peak_ids_without_coordinates_get_the_peak_names_caveat(tmp_path):
     _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(1, 61)])
     cav = _scan_row(tmp_path, "LUNG_ids", "GLUE")["caveat"]
-    assert cav.startswith("GLUE reads peak names such as chr1:100-200; atac_peak.h5 "
+    # no subject, like the other caveats: logs print it after the method name
+    assert cav.startswith("reads peak names such as chr1:100-200; atac_peak.h5 "
                           "holds other names (e.g. peak_1)")
     # one caveat for the file, not also the representation guess
     assert "holds gene activity" not in cav
     # the same content check for the other method whose peaks mtb.run renames
     cav = _scan_row(tmp_path, "LUNG_ids", "Seurat_v3")["caveat"]
-    assert "Seurat_v3 reads peak names such as chr1:100-200" in cav
+    assert cav.startswith("reads peak names such as chr1:100-200")
 
 
 def test_d28_glue_caveat_does_not_name_the_dataset():
@@ -185,8 +186,10 @@ def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_pat
                    "--dry-run"])
     assert rc == 0
     assert capsys.readouterr().err.count("# method scripts are at ") == 1
-    # the real run refuses with the same sentence
-    with pytest.raises(RuntimeError, match=re.escape(_mismatch(head))):
+    # the real run refuses with the same sentence, naming the scripts folder
+    with pytest.raises(RuntimeError, match=re.escape(
+            f"the method scripts in {repo} are at "
+            + _mismatch(head).split("method scripts are at ", 1)[1])):
         config.ensure_repo()
 
 

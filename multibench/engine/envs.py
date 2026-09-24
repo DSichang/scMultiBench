@@ -162,7 +162,8 @@ def packed_sizes() -> dict:
     dict
         ``{env: {"archive_bytes": int | None, "unpacked_bytes": int | None}}``;
         ``None`` means "not measured yet". ``{}`` when the file is absent or
-        unreadable.
+        unreadable. An unpacked size below the archive size cannot be right
+        (an unpacked env is larger than its archive) and reads ``None``.
     """
     if not _SIZES_JSON.is_file():
         return {}
@@ -172,8 +173,15 @@ def packed_sizes() -> dict:
         return {}
     if not isinstance(data, dict):
         return {}
-    return {k: v for k, v in data.items()
-            if not str(k).startswith("_") and isinstance(v, dict)}
+    out = {}
+    for k, v in data.items():
+        if str(k).startswith("_") or not isinstance(v, dict):
+            continue
+        a, u = v.get("archive_bytes"), v.get("unpacked_bytes")
+        if isinstance(a, (int, float)) and isinstance(u, (int, float)) and u < a:
+            v = {**v, "unpacked_bytes": None}      # a mis-measured size shows as '?'
+        out[k] = v
+    return out
 
 
 def _gb(n) -> str:

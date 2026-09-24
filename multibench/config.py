@@ -390,7 +390,8 @@ def scripts_commit(repo=None) -> str | None:
 _REF_RECORD = "multibench-scripts-ref"
 
 
-def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> str | None:
+def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR,
+                  folder: bool = False) -> str | None:
     """The sentence saying the scripts in ``repo`` are not at ``ref``, or ``None`` (internal).
 
     Accepted: ``ref`` is the checkout's commit or a prefix of it (7+ hex
@@ -398,6 +399,7 @@ def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> str
     resolves it to. A folder that is not a git checkout cannot be checked and
     is accepted. ``source`` is where ``ref`` came from: the environment
     variable, or ``"--ref"`` (``multibench fetch --scripts --ref``).
+    ``folder=True`` names ``repo`` in the sentence (the error of a real run).
     """
     import subprocess
     head = scripts_commit(repo)
@@ -425,13 +427,14 @@ def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> str
     else:
         fix = (f"Fetch that ref into a new folder: set {REPO_PATH_VAR}, then run "
                f"`multibench fetch --scripts --ref {ref}`")
-    return f"method scripts are at {head[:7]}, not {ref} ({source}). {fix}"
+    what = f"the method scripts in {repo}" if folder else "method scripts"
+    return f"{what} are at {head[:7]}, not {ref} ({source}). {fix}"
 
 
 def _check_ref(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> None:
     """``RuntimeError`` with :func:`_ref_mismatch`'s sentence when the scripts
     in ``repo`` are not at ``ref`` (internal)."""
-    problem = _ref_mismatch(repo, ref, source=source)
+    problem = _ref_mismatch(repo, ref, source=source, folder=True)
     if problem:
         raise RuntimeError(problem)
 

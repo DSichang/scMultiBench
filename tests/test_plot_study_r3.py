@@ -193,7 +193,7 @@ def test_na_warning_in_summary_mode():
     _, msgs = _messages(mtb.plot.build_table, df, aggregate="summary")
     (msg,) = [m for m in msgs if "has no" in m]
     assert msg.startswith("Your row B has no NMI on Y. In the summary, a missing "
-                          "value counts as rank 0 on that dataset.")
+                          "value counts as the lowest rank on that dataset.")
 
 
 def test_na_warning_cli_spelling(tmp_path, capsys):

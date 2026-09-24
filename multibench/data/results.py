@@ -608,7 +608,7 @@ def load_results(
     Raises
     ------
     FileNotFoundError
-        No table for a requested category, dataset or source.
+        No table for a requested category, dataset or source, or no ``result_path``.
     KeyError
         Unknown method name in ``methods``; the message suggests a close match,
         if any.
@@ -749,6 +749,12 @@ def load_results(
     wanted_methods = _as_list(methods)
 
     base = _base_path(result_path)
+    if result_path is not None and not base.exists() and (
+            base.suffix.lower() in (".csv", ".tsv") or source not in SOURCES):
+        # a file that is not there, not a source= the stored tables lack
+        raise FileNotFoundError(
+            f"result_path {str(result_path)!r} does not exist (working directory: "
+            f"{Path.cwd()})")
     if datasets and category is not None and not base.is_file():
         datasets = _canonical_dataset_ids(category, datasets, base, source)
     rerun_versions: set[str] = set()

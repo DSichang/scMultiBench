@@ -143,7 +143,9 @@ def test_run_all_parser_accepts_batch_and_its_help_is_two_lines():
     lines = _rendered_help(_sub("run-all"), "--batch")
     assert len(lines) <= 2, lines
     text = " ".join(" ".join(lines).split())
-    assert "evaluate --batch" in text and "cell order" in text
+    # the order the ids follow: the label files', as run_all puts them per method
+    assert "evaluate --batch" in text and "cells in the order of the label files" in text
+    assert "(default: one batch per label file)" in text
 
 
 def test_run_all_batch_reaches_the_summary(standin, tmp_path, capsys):
@@ -261,7 +263,7 @@ def test_plan_auto_on_a_cpu_host_states_the_reason_and_the_advice_once(tables, m
     assert _total_lines(err) == [
         "# total for 2 envs (CPU builds, as this host has no NVIDIA GPU; 1 env has only "
         "a GPU build): 1.8 GB download",
-        f"# size on disk not recorded for 1 of 2 envs; {DU}"]
+        f"# size on disk not recorded for 1 of 2 envs (2.6 GB for the other 1); {DU}"]
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert "# for jobs on GPU nodes, pass --flavor gpu" in err
     assert all(l.count(";") <= 2 for l in err.splitlines())
@@ -276,7 +278,7 @@ def test_install_dry_run_states_the_no_gpu_fact_once(tables, monkeypatch, capsys
     err = capsys.readouterr().err
     assert _total_lines(err) == [
         "# total for 2 envs (CPU builds; 1 env has only a GPU build): 1.8 GB to download",
-        f"# size on disk not recorded for 1 of 2 envs; {DU}"]
+        f"# size on disk not recorded for 1 of 2 envs (2.6 GB for the other 1); {DU}"]
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert all(l.count(";") <= 2 for l in err.splitlines())
 

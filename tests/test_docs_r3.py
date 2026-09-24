@@ -105,7 +105,8 @@ def test_cluster_recipe_pins_scripts_and_reads_strict():
     """R3-26: both blocks can pin the scripts; the scan line says what exit 1 means."""
     install = _read("installation.md")
     cluster = install.split("## On a cluster with offline compute nodes", 1)[1].split("\n## ", 1)[0]
-    line = "export MULTIBENCH_SCRIPTS_REF=<commit>   # optional: same scripts for every job"
+    # commented out: a bare <commit> is a bash redirection (review of f3_int)
+    line = "# export MULTIBENCH_SCRIPTS_REF=<commit>  # optional: pin the scripts"
     assert cluster.count(line) == 2 and len(line) <= 80
     login = cluster.split('```bash title="login node"', 1)[1].split("```", 1)[0]
     assert login.index(line) < login.index("multibench fetch --scripts")

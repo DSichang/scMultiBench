@@ -48,11 +48,13 @@ def test_size_total_counts_unknowns_per_column():
              "c": {"archive_bytes": 1_000_000_000}}
     line = cli._size_total_line(rows, sizes)
     assert total_unknowns(line) == (3, 0, 2)
-    # a partly known column is never printed as a plain total
+    # a partly known column is never printed as a plain total; the known part
+    # stays as a lower bound (the figure a storage-quota request needs)
     assert line.splitlines() == [
         "# total for 3 envs: 3.0 GB download",
-        "# size on disk not recorded for 2 of 3 envs; unpacked envs are larger than "
-        "the download, so check with du after the first install"]
+        "# size on disk not recorded for 2 of 3 envs (2.0 GB for the other 1); unpacked "
+        "envs are larger than the download, so check with du after the first install"]
+    assert all(l.count(";") <= 2 for l in line.splitlines())
     assert "on disk," not in line and "GB on disk" not in line
     full = cli._size_total_line(rows[:1], sizes)
     assert total_unknowns(full) == (1, 0, 0)

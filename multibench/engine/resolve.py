@@ -886,11 +886,12 @@ PEAK_FED_TO_GAS_CAVEAT = ("expects gene activity; {file} holds peaks (features l
                           "chr:start-end)")
 GAS_FED_TO_PEAK_CAVEAT = ("expects peaks; {file} holds gene activity (features do not "
                           "look like chr:start-end)")
-#: ``.format(method=, file=, example=)`` caveat for a peak file of a variant whose
+#: ``.format(file=, example=)`` caveat for a peak file of a variant whose
 #: peak names ``mtb.run`` rewrites to chr:start-end (``normalize_peaks``) when
 #: more than 10% of the first 50 names are not chr<sep>start<sep>end, so the
-#: rewrite cannot help; ``example`` is the first such name.
-PEAK_NAMES_CAVEAT = ("{method} reads peak names such as chr1:100-200; {file} holds other "
+#: rewrite cannot help; ``example`` is the first such name. No subject, like
+#: the other caveats: logs print it after the method name.
+PEAK_NAMES_CAVEAT = ("reads peak names such as chr1:100-200; {file} holds other "
                      "names (e.g. {example})")
 #: ``.format(file=...)`` caveat for a modality file whose sampled values are not
 #: whole numbers (log-normalised data).
@@ -1200,8 +1201,7 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     for role in renamed:
         bad = _unrewritable_peak_name(Path(resolved[role]))
         if bad is not None:
-            out.append(PEAK_NAMES_CAVEAT.format(method=method, file=Path(resolved[role]).name,
-                                                example=bad))
+            out.append(PEAK_NAMES_CAVEAT.format(file=Path(resolved[role]).name, example=bad))
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":

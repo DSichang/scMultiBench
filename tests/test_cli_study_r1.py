@@ -303,8 +303,8 @@ def test_total_line_does_not_sum_an_incomplete_column_as_a_total():
     line = cli._size_total_line(rows, sizes)
     assert line.splitlines() == [
         "# total for 6 envs: 12.0 GB download",
-        "# size on disk not recorded for 4 of 6 envs; unpacked envs are larger than the "
-        "download, so check with du after the first install"]
+        "# size on disk not recorded for 4 of 6 envs (4.1 GB for the other 2); unpacked "
+        "envs are larger than the download, so check with du after the first install"]
     assert "packed_sizes.json" not in line and "on disk," not in line
     assert "size on disk not recorded for all 6 envs" in cli._size_total_line(
         rows, {e: {"archive_bytes": 1} for e in "abcdef"})

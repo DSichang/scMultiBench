@@ -463,8 +463,9 @@ def test_na_skip_and_raise():
 def test_na_rule_in_summary_mode_is_rank_zero():
     long = _three(datasets=("D1", "D2"))
     long = long[~((long.method == "B") & (long.metric == "NMI") & (long.dataset == "D2"))]
+    # the message says 'lowest rank': the legend reads 1 = best
     with pytest.warns(UserWarning, match=r"Row B has no NMI on D2\. In the summary, "
-                                         r"a missing value counts as rank 0"):
+                                         r"a missing value counts as the lowest rank"):
         tbl = bubble.build_table(long, aggregate="summary")
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 

@@ -1,6 +1,7 @@
 """evaluate(): turn a run output into a metric.csv-shaped DataFrame."""
 from __future__ import annotations
 
+import contextvars
 import warnings
 from pathlib import Path
 
@@ -370,6 +371,11 @@ def _labels_from_dict(d: dict, label_order) -> list:
 
 #: the ``multibench evaluate`` flag that fills each argument of evaluate()
 _FLAGS = {"labels": "--labels", "clustering": "--clustering", "batch": "--batch"}
+#: what one value of each argument is called in the command-line messages
+_UNITS = {"labels": "labels", "clustering": "cluster ids", "batch": "batch ids"}
+#: the dataset whose label files ``multibench evaluate --dataset`` read
+#: (``labels_for``), so a count error names them, not a --labels never typed
+_CLI_LABELS_FROM = contextvars.ContextVar("cli_labels_from", default=None)
 
 
 def _label_files(given) -> list:
@@ -411,9 +417,16 @@ def _count_error(what: str, n: int, n_cells: int, given) -> str:
     from . import scib as escib
     files = _label_files(given)
     names = f" ({', '.join(f.name for f in files)})" if files else ""
+    dataset = _CLI_LABELS_FROM.get() if what == "labels" else None
+    if dataset:
+        cli = (f"the label files of {dataset}{names} hold {n:,} labels for "
+               f"{n_cells:,} cells in --output. Check that --output holds the "
+               f"embedding of --method on {dataset}.")
+        return config.hint(escib.count_error(what, n, n_cells), cli)
     msg = config.hint(
         escib.count_error(what, n, n_cells),
-        f"{_FLAGS[what]} gave {n:,} labels{names} for {n_cells:,} cells in --output.")
+        f"{_FLAGS[what]} gave {n:,} {_UNITS[what]}{names} for {n_cells:,} cells "
+        f"in --output.")
     if what != "labels" or n >= n_cells:
         return msg
     batches = _batch_files(files[0], n_cells) if len(files) == 1 else []

@@ -79,7 +79,8 @@ def test_batch_and_clustering_counts_follow_the_same_pattern(tmp_path, capsys):
                      "--metrics", "all"])
     err = capsys.readouterr().err
     assert code == 1
-    assert "error: --batch gave 30 labels (batch.csv) for 90 cells in --output." in err
+    # each flag counts its own unit: batch ids for --batch
+    assert "error: --batch gave 30 batch ids (batch.csv) for 90 cells in --output." in err
 
 
 def test_more_labels_than_cells_gives_no_per_batch_advice():
