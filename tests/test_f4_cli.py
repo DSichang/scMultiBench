@@ -123,8 +123,9 @@ def test_run_all_exits_0_when_every_method_is_chain_ok(working, tmp_path, capsys
     assert rc == 0, err
     assert mtb.load_batch(tmp_path / "out").summary.loc[0, "status"] == "CHAIN_OK"
     assert "failed" not in err
-    # a CHAIN_OK line still ends with the ARI
-    assert re.fullmatch(r"\[run_all\]   -> CHAIN_OK \([0-9.]+s\) [0-9.]+", _status_line(err))
+    # a CHAIN_OK line still ends with the ARI, named, to 3 decimals
+    assert re.fullmatch(r"\[run_all\]   -> CHAIN_OK \([0-9.]+s\) ARI -?[0-9]\.[0-9]{3}",
+                        _status_line(err))
 
 
 def test_run_all_timeout_exits_3_and_the_line_names_the_limit(slow, tmp_path, capsys):

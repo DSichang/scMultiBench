@@ -1685,7 +1685,8 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
             return names, None, [{"order": names,
                                   "error": f"{type(e).__name__}: {str(e)[:300]}"}]
         # metrics= may leave ARI out: the one order needs no ranking
-        ari = round(float(val["Value"]["ARI"]), 4) if "ARI" in val.index else None
+        # + 0.0: a tiny negative ARI rounds to 0.0, not -0.0
+        ari = round(float(val["Value"]["ARI"]), 4) + 0.0 if "ARI" in val.index else None
         return names, val, [{"order": names, "ARI": ari}]
 
     # Ranking orderings needs only ARI, and the Leiden sweep behind ARI depends
@@ -1741,7 +1742,7 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
         raise RuntimeError(
             f"evaluation failed for the winning label order {names}: "
             f"{type(e).__name__}: {e}") from e
-    spread = [{"order": n, "ARI": round(a, 4)} for a, n, _, _, _ in scored]
+    spread = [{"order": n, "ARI": round(a, 4) + 0.0} for a, n, _, _, _ in scored]
     return names, val, spread
 
 
@@ -2451,8 +2452,8 @@ class BatchResult:
                 em = f"{type(e).__name__}: {e}"
                 rec["error"] = em if len(em) <= 600 else "... " + em[-596:]
             if verbose:
-                print(f"[rescore] {m} -> {rec['status']} "
-                      f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
+                print(f"[rescore] {m} -> {rec['status']} {_ari_tail(rec)}".rstrip(),
+                      flush=True)
             new.records.append(rec)
         # a saved batch that fits no label order: the batch metrics are gone
         unused = next((r["note"] for r in new.records
@@ -2591,6 +2592,20 @@ _ERROR_TRAILERS = ("Execution halted",)
 #: R prints the call trace and then any warnings after the error message
 _R_CALLS = re.compile(r"^Calls: ")
 _R_WARNINGS = re.compile(r"^In addition: Warning messages?:")
+
+
+def _ari_tail(rec) -> str:
+    """The end of a ``run_all`` / ``rescore`` result line: ``ARI 0.629``,
+    rounded to 3 decimals and never ``-0.000``; ``""`` when the record has
+    no ARI (missing, ``None`` or NaN)."""
+    ari = (rec.get("metrics") or {}).get("ARI")
+    try:
+        ari = float(ari)
+    except (TypeError, ValueError):
+        return ""
+    if ari != ari:          # NaN
+        return ""
+    return f"ARI {round(ari, 3) + 0.0:.3f}"
 
 
 def _error_tail(error, width: int = 200) -> str:
@@ -3234,7 +3249,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         if errs:
             rec["error"] = errs[0]
         return rec
-    rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4))
+    # + 0.0: a tiny negative score rounds to 0.0, not -0.0
+    rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4) + 0.0)
                       for k, x in val["Value"].items()}
     rec["labels_used"] = names
     if kept and stored:
@@ -3701,8 +3717,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         finally:
             _disarm_deadline(_deadline_prev)
         if verbose:
-            tail = (_error_tail(rec["error"]) if rec.get("error")
-                    else (rec.get("metrics") or {}).get("ARI", ""))
+            tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
             print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) {tail}".rstrip(),
                   flush=True)
         if rec.get("reused"):
