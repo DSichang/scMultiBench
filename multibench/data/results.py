@@ -1355,10 +1355,10 @@ def recommend(
 
     **Warning.** One ``UserWarning`` with one line per finding summarises
     a requested modality the datasets did not measure, dropped methods and
-    datasets, partial coverage and the unscored methods. A line also names
-    the ``long_df`` methods clustered with the igraph Leiden backend when
-    ARI, NMI or iF1 ranks them against stored rows of the same dataset,
-    which used leidenalg.
+    datasets, partial coverage and the unscored methods. The stored tables
+    were clustered with leidenalg. A line also names the ``long_df`` methods
+    clustered with igraph when ARI, NMI or iF1 ranks them against stored
+    rows of their dataset.
 
     **Errors.** ``ValueError`` is raised when:
 
