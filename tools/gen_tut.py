@@ -355,7 +355,7 @@ SCEN = {
    ds="D52",
    blurb=("Cross integration combines batches that all measure the same "
           "modalities. The task is to remove batch effects and keep the biological "
-          "structure. Every cross method here reads RNA and ADT; for several 10x "
+          "structure. Every cross method here reads RNA and ADT. For several 10x "
           "Multiome samples, use the vertical tutorial. This tutorial uses `D52`, "
           "with 23,478 cells in three batches."),
    live=("StabMap", "None"), live_modalities=None,
@@ -383,8 +383,8 @@ EXPORT_INTRO = {
               "from different cells, each with its own label file. Here on synthetic "
               "data, with ATAC as gene-activity scores:"),
  "mosaic": ("A mosaic project often arrives as one file per batch. "
-            "`mtb.io.export_dataset` with `batch_index=` writes one batch per call; "
-            "number the batches to match a pattern that `describe_layout` lists. The "
+            "`mtb.io.export_dataset` with `batch_index=` writes one batch per call. "
+            "Number the batches to match a pattern that `describe_layout` lists. The "
             "ATAC matrix must hold peaks. Here on synthetic data with `D46`'s pattern:"),
  "cross": ("`mtb.io.export_dataset` with `batch=` splits one AnnData into numbered "
            "files, one set per batch. Here on a synthetic AnnData:"),
@@ -392,7 +392,7 @@ EXPORT_INTRO = {
 EXPORT_DETAIL = {
  "vertical": [
      "A 10x Multiome MuData goes in with one call. Here the labels are in "
-     "`mdata.obs`; for labels in `mdata[\"rna\"].obs`, write `labels=\"rna:celltype\"`.\n\n"
+     "`mdata.obs`. For labels in `mdata[\"rna\"].obs`, write `labels=\"rna:celltype\"`.\n\n"
      "```python\n"
      "mtb.io.export_dataset(mdata, \"data/MYMULTIOME\", rna=\"rna\", atac=\"atac\",\n"
      "                      atac_kind=\"peak\", labels=\"obs:celltype\",\n"
@@ -646,7 +646,7 @@ The next cell installs the environments for {trio_text}: {env_size_text(methods=
         "downloaded again.",
         f"To install every {cat} environment from a terminal, run `multibench env "
         f"install --category {cat} --packed --run`. That is "
-        f"{env_size_text(category=cat)}; `multibench env plan --category {cat}` lists "
+        f"{env_size_text(category=cat)}. `multibench env plan --category {cat}` lists "
         f"the size of each."))
     code(f"""import sys
 if not INSTALL_ENVS:
@@ -718,7 +718,7 @@ res.summary''')
     code(EVALUATE_CELL_TEMPLATE.format(method=fastm))
     md("""### Plot
 
-`res.plot()` draws a bubble table. Circle size shows the rank within a column; bigger is better. The fill compares the value with the other rows in the same column: the lightest fill is the lowest value in this figure, not zero.
+`res.plot()` draws a bubble table. Circle size shows the rank within a column. Bigger is better. The fill compares the value with the other rows in the same column: the lightest fill is the lowest value in this figure, not zero.
 
 """ + details(
         "Metrics are grouped by family: blue for dimension reduction and clustering, "
@@ -731,7 +731,7 @@ res.summary''')
     # ------------------------------------------------------------- own data
     md(f"""## 3. Your own data
 
-The same calls work on a folder of your own data. Give raw counts for every modality, as in the demo data; the methods normalise the data themselves. `describe_layout` prints the files a {cat} dataset needs:""")
+The same calls work on a folder of your own data. Give raw counts for every modality, as in the demo data. The methods normalise the data themselves. `describe_layout` prints the files a {cat} dataset needs:""")
     code("""print(mtb.describe_layout(CATEGORY))""")
     labels_code = """labels = mtb.labels_for(DATASET)            # {file stem: path}
 print({k: Path(v).name for k, v in labels.items()})
@@ -889,7 +889,7 @@ The table counts the parameters each variant exposes. `mtb.params_for(method, CA
 pd.DataFrame(rows).sort_values(["n_tunable", "method"], ascending=[False, True]).reset_index(drop=True)""")
     md(f"""### A method's record and citation
 
-`method_info` returns what the package knows about a method, including its reference and repository. `mtb.cite` returns the citations for the benchmark and for the methods you pass. The cell cites {fastm}; for your own work, pass every method you ran.
+`method_info` returns what the package knows about a method, including its reference and repository. `mtb.cite` returns the citations for the benchmark and for the methods you pass. The cell cites {fastm}. For your own work, pass every method you ran.
 
 """ + details(
         "`needs_labels` is True when any variant of the method needs cell-type labels. "
@@ -911,7 +911,7 @@ There are two families, and higher is better for every metric.
 | batch correction | `ASW_batch`, `GC`, `iLISI` (+ opt-in `kBET`) | whether the batches mix within each cell type |
 
 """ + details(
-        "ARI can fall slightly below 0; about 0 means a random clustering. Every "
+        "ARI can fall slightly below 0. About 0 means a random clustering. Every "
         "other metric lies between 0 and 1. `mtb.catalog.metrics()` describes each one.",
         "Batch metrics appear only when the dataset has more than one batch.",
         "kBET is computed only when named, as in `metrics=[\"ASW_batch\", \"GC\", "
@@ -932,7 +932,8 @@ in_package = set(mtb.list_methods())
 has_variant = sorted(m for m in in_package
                      if any(v["category"] == CATEGORY for v in mtb.method_info(m)["supports"]))
 missing = [m for m in paper if m not in has_variant]
-print(f"the study benchmarks {{len(paper)}} {{CATEGORY}} methods on {PAPER_TASKS[cat]}; this package has a {{CATEGORY}} variant for {{len(has_variant)}}")
+print(f"the study benchmarks {{len(paper)}} {{CATEGORY}} methods on {PAPER_TASKS[cat]}")
+print(f"this package has a {{CATEGORY}} variant for {{len(has_variant)}}")
 for m in missing:
     if m in in_package:
         print(f"  {{m}}: variants for {{', '.join(mtb.method_info(m)['categories'])}} only")
@@ -953,7 +954,7 @@ if not missing:
 | `files_ok` False: input files not found | `reason` names the missing file |
 | `env_ok` False on Linux | run the `multibench env install ...` command in `env_reason` |
 | `env_ok` False on macOS or Windows | methods run only on Linux: run the same calls there |
-| `env_ok` False: the method needs an NVIDIA GPU | run it on a GPU machine; `mtb.scan(..., assume_gpu=True)` checks everything else on a computer without one |
+| `env_ok` False: the method needs an NVIDIA GPU | run it on a GPU machine. On a computer without one, `mtb.scan(..., assume_gpu=True)` checks everything else |
 | `FileExistsError` from `export_dataset` | the folder already holds the file: pass `overwrite=True` to replace it |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` or `mtb.io.to_canonical` |
