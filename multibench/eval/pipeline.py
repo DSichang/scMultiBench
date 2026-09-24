@@ -758,6 +758,10 @@ def evaluate(
     kBET       kBET                  computed only when named in metrics=[...]
     ```
 
+    cLISI and iLISI take the median m of the per-cell scores and scale it:
+    cLISI = (L - m)/(L - 1), iLISI = (m - 1)/(B - 1), with L cell types and
+    B batches.
+
     The re-run tables were scored by multibench 0.2.1's ``evaluate`` with
     these definitions and the leidenalg backend. The published tables were
     computed by the benchmark; see the paper's Methods.
