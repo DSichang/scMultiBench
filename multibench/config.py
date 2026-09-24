@@ -228,8 +228,8 @@ class Config:
         ``metric_full.csv``). Default ``<package root>/multibench/files``.
     repo_path : pathlib.Path
         Checkout holding the upstream ``tools_scripts/`` (the method scripts),
-        cloned on first use when absent. Default ``$MULTIBENCH_REPO_PATH``,
-        else ``<base>/scMultiBench_ref``.
+        cloned on first use when absent or empty. Default
+        ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref``.
     data_path : pathlib.Path
         Data root that holds the dataset folders; ``mtb.data.fetch``,
         ``mtb.scan`` and ``mtb.run_all`` use it. Default
@@ -512,7 +512,9 @@ def _sources(cfg: Config | None = None) -> list[dict]:
     rows.append({"name": "repo_path", "value": cfg.repo_path, "source": repo_src})
     checkout = _scripts_checkout(cfg)
     if checkout is None:
-        commit, commit_src = "not fetched", "multibench fetch --scripts fetches the method scripts"
+        commit, commit_src = "not fetched", (
+            scripts_folder_problem(cfg.repo_path)
+            or "multibench fetch --scripts fetches the method scripts")
     else:
         sha = scripts_commit(checkout)
         commit = sha or "unknown"
@@ -553,6 +555,40 @@ def scripts_line(repo) -> str:
             f"method scripts: {where} (not a git checkout, commit unknown)")
 
 
+#: Where a fetch into an existing empty ``repo_path`` clones, inside that folder.
+_PARTIAL = ".multibench-fetch.partial"
+
+
+def _fillable(p: Path) -> bool:
+    """Whether a fetch may put the method scripts at ``p`` (internal).
+
+    ``True`` when ``p`` does not exist or is an empty folder. A folder that
+    holds only the leftover of an interrupted fetch counts as empty.
+    """
+    if not p.exists():
+        return True
+    try:
+        return p.is_dir() and all(e.name == _PARTIAL for e in p.iterdir())
+    except OSError:
+        return False
+
+
+def scripts_folder_problem(repo=None) -> str | None:
+    """Why a fetch refuses the scripts folder ``repo``, or ``None`` (internal).
+
+    ``repo`` = the configured ``repo_path`` when ``None``. The sentence is
+    for a folder that holds other files and no ``tools_scripts/``, while the
+    package root holds no scripts either. It has no final period: ``mtb.scan``
+    joins it into its reason column with ``"; "`` and blocks every row with it.
+    The dry runs and ``multibench config`` show it; a real run raises it
+    (:func:`ensure_repo`).
+    """
+    p = Path(DEFAULT.repo_path if repo is None else repo)
+    if any((q / "tools_scripts").is_dir() for q in (p, _ROOT)) or _fillable(p):
+        return None
+    return f"{p} holds no method scripts. Remove it, then run multibench fetch --scripts"
+
+
 def ensure_repo(path=None, ref=None):
     """Return a directory that contains ``tools_scripts/``, provisioning it if needed.
 
@@ -562,6 +598,10 @@ def ensure_repo(path=None, ref=None):
     scMultiBench repository into the configured location, so methods run on a
     fresh machine or Colab, where the package does not carry the upstream
     method scripts.
+
+    The location may be an existing empty folder: it is filled in place and
+    keeps its owner and permissions. A folder that holds other files is
+    refused (:func:`scripts_folder_problem`); nothing in it is deleted.
 
     ``ref`` (default ``$MULTIBENCH_SCRIPTS_REF``) is a commit or tag: a fetch
     checks it out instead of the default branch, and scripts already present
@@ -579,17 +619,17 @@ def ensure_repo(path=None, ref=None):
             if ref:
                 _check_ref(have, ref, source=source)
             return have
-    if p.exists():
-        # a directory without tools_scripts is most likely an interrupted
-        # clone; refuse to guess and never delete a directory not created here
-        raise RuntimeError(
-            f"{p} exists but has no tools_scripts/ - remove it (or point "
-            f"repo_path or {REPO_PATH_VAR} elsewhere) and the method scripts "
-            f"will be fetched fresh")
+    problem = scripts_folder_problem(p)
+    if problem:
+        raise RuntimeError(problem + ".")
     at = f" at {ref}" if ref else ""
     print(f"method scripts not found - fetching PYangLab/scMultiBench{at} (once) into "
           f"{p} ...", flush=True)
-    part = p.with_name(p.name + ".partial")
+    # an existing empty folder is cloned into from the inside, then its
+    # contents are moved up: the folder stays, and its parent need not be
+    # writable (a folder made for the user on shared storage)
+    inside = p.is_dir()
+    part = p / _PARTIAL if inside else p.with_name(p.name + ".partial")
     _sh.rmtree(part, ignore_errors=True)
     try:
         if ref is None:
@@ -617,5 +657,10 @@ def ensure_repo(path=None, ref=None):
             f"{first} On a host without network, copy a scripts checkout "
             f"(`multibench fetch --scripts` on a connected machine makes one) and "
             f"set {REPO_PATH_VAR}.") from e
-    part.rename(p)
+    if inside:
+        for entry in part.iterdir():
+            entry.rename(p / entry.name)
+        part.rmdir()
+    else:
+        part.rename(p)
     return p

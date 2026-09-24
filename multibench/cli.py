@@ -384,9 +384,13 @@ def _strict_problem(df, methods) -> str | None:
     A GPU-only method on a host without a GPU is counted apart from a
     missing env, with a pointer to ``--assume-gpu``; so are a row given the
     wrong ATAC kind, a row whose peak names the method cannot read, and
-    scripts at another commit than ``MULTIBENCH_SCRIPTS_REF``.
+    scripts at another commit than ``MULTIBENCH_SCRIPTS_REF``. Method
+    scripts not fetched block every row, although ``runnable`` stays true:
+    a job on a node without network cannot fetch them.
     """
-    ok = df["runnable"].astype(bool)
+    from . import config
+    fetched = config.scripts_present()
+    ok = df["runnable"].astype(bool) & fetched
     runnable = df[ok]
     if methods:
         blocked = [m for m in methods if m not in set(runnable["method"])]
@@ -411,6 +415,8 @@ def _strict_problem(df, methods) -> str | None:
         if _is_wrong_ref(rest["reason"]).any():
             counts.append(f"scripts not at MULTIBENCH_SCRIPTS_REF in "
                           f"{int(_is_wrong_ref(rest['reason']).sum())}")
+    if not fetched:
+        counts.append(f"method scripts not fetched in {len(df)}")
     n_env, n_gpu, gpu_only = _env_and_gpu_counts(rest)
     if n_env:
         counts.append(f"env not ready in {n_env}")
@@ -418,6 +424,9 @@ def _strict_problem(df, methods) -> str | None:
         counts.append(f"needs a GPU on this host in {n_gpu}")
     gpu_note = ("\nFor a job that runs on a GPU node, add --assume-gpu."
                 if gpu_only else "")
+    if not fetched:                     # the fix for the scripts, before the GPU note
+        fix = config.scripts_folder_problem() or "Run multibench fetch --scripts first"
+        gpu_note = f"\n{fix}.{gpu_note}"
     if counts:
         head += f" ({'; '.join(counts)})"
     if not methods:
@@ -426,6 +435,8 @@ def _strict_problem(df, methods) -> str | None:
     for m in blocked:
         rows = df[df["method"] == m]
         reason = rows["reason"].iloc[0] if len(rows) else ""
+        if len(rows) and _blank(reason):            # runnable but for the scripts
+            reason = "method scripts not fetched"
         # an ATAC reason ends with its override: never clipped
         text = ("no row" if _blank(reason) else str(reason) if _is_wrong_atac(reason)
                 else _truncate(reason, 120))
@@ -1844,7 +1855,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "scripts; json = a list of row objects)")
     ps.add_argument("--strict", action="store_true",
                     help="exit 1 when no requested row is runnable; with --methods, "
-                         "when any named method has none (for scripts: multibench "
+                         "when any named method has none; also when the method "
+                         "scripts are not fetched (for scripts: multibench "
                          "scan DS --category C --strict && sbatch ...)")
     ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                     help="skip this host's GPU test. Use it on a login node without a "

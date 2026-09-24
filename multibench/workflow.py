@@ -1154,6 +1154,7 @@ def scan(dataset: str, category: str | None = None, *,
     Seurat_v3 row whose peak names are not chr:start-end.
     ``allow_atac_mismatch=True`` keeps such a row runnable, with its caveat.
     With ``MULTIBENCH_SCRIPTS_REF`` set to another commit than the method
+    scripts, or a ``repo_path`` that holds other files and no method
     scripts, no row is runnable.
 
     **The command column.**
@@ -1268,9 +1269,10 @@ def scan(dataset: str, category: str | None = None, *,
                           "contains it (see `multibench layout`)"))
     installed = _installed_envs()
     repo = _runner._repo_root_no_fetch()
-    # scripts at another commit than $MULTIBENCH_SCRIPTS_REF: the real run
-    # refuses, so every row is blocked; the files and the command stay checked
-    wrong_ref = config.scripts_ref_problem(repo) or ""
+    # scripts at another commit than $MULTIBENCH_SCRIPTS_REF, or a scripts
+    # folder that holds other files: the real run refuses, so every row is
+    # blocked; the files and the command stay checked
+    wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
     for spec, v, cat, mods in _variant_rows(category):

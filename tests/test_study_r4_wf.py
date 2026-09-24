@@ -128,7 +128,10 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
     assert ok["caveat"].str.startswith("expects peaks; atac2.h5 holds gene activity").all()
 
 
-def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned, capsys):
+def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned, capsys,
+                                                              monkeypatch):
+    # scripts fetched: scan --strict also fails while they are not (R4-06)
+    monkeypatch.setattr(config, "scripts_present", lambda cfg=None: True)
     root = _gasmos(tmp_path)
     base = ["scan", "GASMOS", "--category", "mosaic", "--data-path", str(root),
             "--methods", "StabMap,scMoMaT", "--strict", "--assume-gpu"]
