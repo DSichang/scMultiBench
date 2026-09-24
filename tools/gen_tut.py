@@ -213,6 +213,18 @@ def diagonal_atac_sentence():
             f"method reads.")
 
 
+def runnable_sentence(cat):
+    """The section-3 sentence on what ``runnable`` needs. In a category with
+    ATAC methods, ``scan`` (without ``methods=``) also marks a variant whose
+    ATAC file holds the other form not runnable, and ``run_all`` skips it;
+    read from ``find_methods`` at generation time."""
+    import multibench as mtb
+    if mtb.find_methods(cat, modalities=["atac"]):
+        return ("A variant is `runnable` only when both pass and its ATAC file holds "
+                "the form the method reads. `reason` says what failed.")
+    return "A variant is `runnable` only when both pass, and `reason` says what failed."
+
+
 CAT_DATA = {"vertical": ["D11"], "diagonal": ["D28"],
             "mosaic": ["D45", "D46"], "cross": ["D52"]}
 
@@ -758,7 +770,8 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
         "Each modality file then stays aligned with its label file. An export of your "
         "own data must keep this alignment too.", label="Details: cell alignment"))
     code(SUBSAMPLE_FN)
-    md("""`scan` checks each method variant. A variant is one set of input files that a method accepts. `files_ok` checks the folder and works on any computer. `env_ok` checks the environment. A variant is `runnable` only when both pass, and `reason` says what failed.""")
+    md("""`scan` checks each method variant. A variant is one set of input files that a method accepts. `files_ok` checks the folder and works on any computer. `env_ok` checks the environment. """
+       + runnable_sentence(cat))
     code(f'''DATA_ROOT = "/tmp/mydata"
 src = mtb.config.DEFAULT.data_path / "{s['own_src']}"
 subsample_dataset(src, f"{{DATA_ROOT}}/MYDATA_{cat}", frac=0.6)
