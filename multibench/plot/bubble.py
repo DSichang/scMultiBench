@@ -32,9 +32,13 @@ NA_MARK = "\u2013"
 #: second line of the Score legend title: the fill is scaled within each column
 SCORE_SCALE_NOTE = "(scaled per column)"
 
-#: legend line explaining the chips left of each row (drawn when show_language)
+#: legend line explaining the chips left of each row (drawn when show_language).
+#: '?' is looked up by the row name, so it also marks a renamed re-run of a
+#: package method; the key must stay true for that row. The longer wording
+#: "..., such as your own or a renamed re-run" is in the Notes of bubble and
+#: to_long: on the figure it made a one-metric footer about 6.5 inches wide.
 CHIP_KEY = ("Py / R = language \u00b7 L = uses cell-type labels "
-            "\u00b7 ? = not a package method, such as your own "
+            "\u00b7 ? = a name the package does not know "
             "\u00b7 DR = dimension reduction")
 
 #: fill of a column whose rows all hold the same value (and of every marker in
@@ -283,8 +287,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     methods : list of str | None
         Methods (rows) to keep; ``None`` = every method in the frame.
     order : list of str | None
-        Methods to put first, in this order; the rest follow best first.
-        Reorders only - filter with ``methods``.
+        Methods to put first, in this order. The rest follow, best first. To
+        drop methods, use ``methods``.
     aggregate : {"dataset", "summary"}
         ``"dataset"``: raw metric values of one dataset (several are averaged
         per method). ``"summary"``: within-dataset max-ranks averaged across
@@ -1033,8 +1037,9 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         for i, m in enumerate(methods):
             lang = _method_language(m)
             if not lang:
-                # not a registry method (user's own method, a sweep variant,
-                # a result-dir token): say so with '?' rather than a blank
+                # a name the registry does not know (the user's own method, a
+                # renamed re-run or sweep variant, a result-dir token): say so
+                # with '?' rather than a blank
                 label, colr = "?", "#aaaaaa"
             elif lang.startswith("py"):
                 label, colr = "Py", "#3572A5"
@@ -1244,7 +1249,35 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     if title:
         ax.set_title(title, fontsize=10, pad=10)
     fig.tight_layout()
+    _fit_width(fig, ax)
     return fig
+
+
+def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
+    """Widen ``fig`` until the texts of ``ax`` lie inside it; the height stays.
+
+    ``tight_layout`` alone cannot do it: the axes keeps an equal aspect, so in
+    a figure of one to three metrics the footnote lines and the row labels are
+    wider than the table and ran past the figure edges, cut off by a plain
+    ``fig.savefig``. A figure whose texts already fit keeps its size.
+    """
+    pad = pad_pt * fig.dpi / 72.0
+    for _ in range(rounds):
+        fig.draw_without_rendering()
+        arts = [t for t in ax.texts if t.get_visible() and t.get_text()]
+        arts += [t for t in ax.get_yticklabels() if t.get_text()]
+        if ax.title.get_text():
+            arts.append(ax.title)
+        if not arts:
+            return
+        boxes = [a.get_window_extent() for a in arts]
+        over = (max(0.0, fig.bbox.x0 + pad - min(b.x0 for b in boxes))
+                + max(0.0, max(b.x1 for b in boxes) - (fig.bbox.x1 - pad)))
+        if over < 1.0:
+            return
+        w, h = fig.get_size_inches()
+        fig.set_size_inches(w + over / fig.dpi, h)
+        fig.tight_layout()
 
 
 def bubble(long_df, *, metrics=None, methods=None, order=None,
@@ -1269,8 +1302,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     methods : list of str | None
         Methods (rows) to show; ``None`` = every method in the frame.
     order : list of str | None
-        Methods to put first, in this order; the rest follow best first.
-        Reorders only - filter with ``methods``.
+        Methods to put first, in this order. The rest follow, best first. To
+        drop methods, use ``methods``.
     aggregate : {"dataset", "summary"}
         ``"dataset"``: one dataset's values, drawn as circles. ``"summary"``:
         within-dataset ranks averaged across datasets, drawn as bars (the
@@ -1371,12 +1404,12 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     **Chips and badge** (``show_language``).
 
-    - Chip: ``Py`` / ``R`` = the method's language; ``?`` = not a package
-      method, such as your own or a sweep variant.
+    - Chip: ``Py`` / ``R`` = language; ``?`` = a name the package does not
+      know, such as your own or a renamed re-run.
     - ``L`` badge: the method uses cell-type labels (supervised), so its
       clustering scores are not comparable with unsupervised rows. It
-      follows the variants of the frame's single ``category`` (scMoMaT is
-      supervised in mosaic only); without one, the method-level flag.
+      follows the frame's single ``category`` (scMoMaT is supervised in
+      mosaic only); without one, the method-level flag.
 
     See Also
     --------

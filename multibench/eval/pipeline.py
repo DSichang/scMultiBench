@@ -143,9 +143,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     rows after ``pd.concat``. ``load_results(result_path=...)`` keeps the
     column when it reads the CSV back.
 
-    **Plot badges.** The bubble figure shows ``?`` for a method the package
-    does not know, such as your own. To badge a method of your own as supervised, add
-    a boolean ``needs_labels`` column to the frame.
+    **Plot badges.** The bubble figure shows ``?`` for a name the package
+    does not know, such as your own or a renamed re-run. To badge such a row
+    as supervised, add a boolean ``needs_labels`` column.
 
     **Errors.** All are ``ValueError``:
 
@@ -787,8 +787,8 @@ def evaluate(
     - any other dict goes in as is only in the default order
       (``cty1, cty2, ...`` numerically; ``rna`` before ``adt`` before
       ``atac``) and otherwise needs ``label_order=`` naming its keys;
-    - ``label_order=list(d)`` trusts the dict's own order; a one-entry dict
-      has no order to get wrong.
+    - ``label_order=list(d)`` trusts the dict's own order. A one-entry dict
+      needs no ``label_order``.
 
     **Metric selection.** ``None`` computes the clustering family (``ARI,
     NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, GC, iLISI`` when a batch

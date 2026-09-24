@@ -419,7 +419,7 @@ def test_chip_key_drawn_with_language_chips():
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert B.CHIP_KEY in texts
     assert B.CHIP_KEY.startswith("Py / R = language") and "L = uses cell-type labels" in B.CHIP_KEY
-    assert "? = not a package method, such as your own" in B.CHIP_KEY
+    assert "? = a name the package does not know" in B.CHIP_KEY
     fig2 = bubble.render(bubble.build_table(_three()), show_language=False)
     assert B.CHIP_KEY not in [t.get_text() for t in fig2.axes[0].texts]
 
