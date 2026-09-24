@@ -352,25 +352,8 @@ def _cmd_scan(args) -> int:
     kw = dict(data_path=args.data_path, modalities=_csv_list(args.modalities),
               verbose=False, assume_gpu=getattr(args, "assume_gpu", False),
               allow_atac_mismatch=getattr(args, "allow_atac_mismatch", False))
-    df = None
-    try:
-        df = multibench.scan(args.dataset, args.category, methods=methods, **kw)
-    except ValueError as e:
-        # a representation token that dropped a named method: the message says why
-        if not methods or getattr(e, "representation", False):
-            raise
-    if methods:
-        unknown = sorted(set(methods) - set([] if df is None else df["method"]))
-        if unknown:
-            where = f"{args.dataset}/{args.category}" if args.category else (
-                f"{args.dataset} (all categories)")
-            # what the category holds, not only the named methods it holds
-            present = multibench.scan(args.dataset, args.category, **kw)["method"]
-            raise ValueError(
-                f"method(s) {unknown} are not in the scan table for "
-                f"{where}; methods present: "
-                f"{sorted(set(present))}")
-        df = df[df["method"].isin(methods)]
+    # a named method with no variant here raises ValueError with its reason
+    df = multibench.scan(args.dataset, args.category, methods=methods, **kw)
     shown = _strict_table(df) if getattr(args, "strict", False) else df
     _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
                  compact=_compact_plan_columns(df))

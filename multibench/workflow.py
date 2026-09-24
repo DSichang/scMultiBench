@@ -1050,31 +1050,37 @@ def _representation_note(category, methods, modalities) -> str:
 
 
 def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
-    """The ``ValueError`` of a selection that matches no variant: what does
-    not run, then why (a representation token) or where to look."""
+    """The ``ValueError`` of named methods that have no row, or of a selection
+    that matches no variant: what does not run, then why.
+
+    A named method with no variant under ``category`` gets its own sentence
+    (``totalVI does not run on mosaic data. Its categories: vertical,
+    cross.``). The named methods that ``modalities`` dropped share one
+    sentence, then the representation note or where to look.
+    """
     from .engine.schema import no_category_message
     from .plot.bubble import _and
     where = f"{category} data" if category else "any category"
-    if modalities is None:
-        # the named methods have no variant under this category
-        head = " ".join(no_category_message(
-            m, dict.fromkeys(c for _s, _v, c, _m in _variant_rows()
-                             if _s.id == m and c), category) for m in methods or ()
-        ) or f"No method runs on {where}."
-    else:
+    methods = list(methods or ())
+    cats = {m: dict.fromkeys(c for s, _v, c, _m in _variant_rows() if s.id == m and c)
+            for m in methods}
+    # no variant under this category at all, whatever the modalities
+    off = [m for m in methods
+           if modalities is None or (category and category not in cats[m])]
+    dropped = [m for m in methods if m not in off]
+    parts = [no_category_message(m, cats[m], category) for m in off]
+    if modalities is not None and (dropped or not methods):
         mods = "+".join(map(str, modalities or ())) or "a data folder"
-        head = (f"{_and(methods)} {'does' if len(methods) == 1 else 'do'} not read "
-                f"{mods} in {where}." if methods else f"No method reads {mods} in {where}.")
-    why = _representation_note(category, methods, modalities)
-    one = methods[0] if methods and len(methods) == 1 else None
-    fix = "" if modalities is None else config.hint(
-        f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
-        "mtb.method_info(m)['supports'] lists what each method reads.",
-        f"multibench info {one} lists what {one} reads." if one else
-        "multibench info METHOD lists what each method reads.")
-    err = ValueError(" ".join(t for t in (head, why or fix) if t))
-    err.representation = bool(why)      # the CLI keeps this message as it is
-    return err
+        parts.append(f"{_and(dropped)} {'does' if len(dropped) == 1 else 'do'} not read "
+                     f"{mods} in {where}." if dropped else
+                     f"No method reads {mods} in {where}.")
+        one = dropped[0] if len(dropped) == 1 else None
+        parts.append(_representation_note(category, dropped, modalities) or config.hint(
+            f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
+            "mtb.method_info(m)['supports'] lists what each method reads.",
+            f"multibench info {one} lists what {one} reads." if one else
+            "multibench info METHOD lists what each method reads."))
+    return ValueError(" ".join(parts) or f"No method runs on {where}.")
 
 
 def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset: str,
@@ -1155,8 +1161,9 @@ def scan(dataset: str, category: str | None = None, *,
     FileNotFoundError
         ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
     ValueError
-        Unknown ``category`` or modality token, or no variant of ``methods``
-        exists under ``category``.
+        Unknown ``category`` or modality token.
+    ValueError
+        A method in ``methods`` has no variant in ``category`` or ``modalities``.
     KeyError
         Unknown id in ``methods`` or ``params``, or a ``params`` key no variant accepts.
     TypeError
@@ -1303,9 +1310,8 @@ def scan(dataset: str, category: str | None = None, *,
       values.
     - ``methods`` - an unknown id raises ``KeyError`` with a did-you-mean
       hint; blocked rows of the selected methods are kept, with their reason.
-      A selection with no variant under ``category`` (a known id with no
-      diagonal variant, say) raises ``ValueError`` instead of returning an
-      empty frame.
+      A named method with no variant under ``category`` or ``modalities``
+      raises ``ValueError``, even when other named methods have one.
     - ``params`` - a key no variant of that method accepts raises
       ``KeyError`` naming the accepted keys.
     - ``dataset`` - a spelling that differs from the folder only in case
@@ -1485,11 +1491,13 @@ def scan(dataset: str, category: str | None = None, *,
     df = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     df = df.sort_values(["runnable", "category", "method"],
                         ascending=[False, True, True]).reset_index(drop=True)
-    if df.empty and methods is not None:
-        # no variant of the requested methods exists under this category: a
-        # request problem (Matilda is not a cross method), reported as such
-        # rather than as a silently empty frame
-        raise _no_variant_error(category, dataset, methods, modalities)
+    if methods is not None:
+        # a named method with no row (Matilda is not a cross method, or
+        # modalities= dropped it) is a request problem, also when the other
+        # named methods have rows: raised, not dropped
+        missing = [m for m in dict.fromkeys(methods) if m not in set(df["method"])]
+        if missing or df.empty:
+            raise _no_variant_error(category, dataset, missing or methods, modalities)
     if params:
         _check_param_keys(df, params)       # a typo'd key must not start a sweep
     if dropped_dirs and modalities:
@@ -3491,8 +3499,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     - An unknown ``category``: ``ValueError`` listing the four.
     - An unknown id in ``methods`` or ``params``: ``KeyError`` with a
       did-you-mean hint, before anything runs.
-    - A selection that matches no variant: ``ValueError``, such as
-      "Matilda does not run on cross data."; a dry run is never empty.
+    - A named method or a selection with no variant: ``ValueError`` before
+      anything runs, dry run included, such as "Matilda does not run on
+      cross data."
     - A dry run with a ``params`` key no planned variant of that method
       accepts: ``KeyError`` naming the accepted keys.
     - Nothing runnable: ``ValueError``. Its first line is

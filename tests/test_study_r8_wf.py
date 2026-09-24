@@ -207,3 +207,100 @@ def test_the_docstrings_say_which_folder_fed_method_is_named():
                 "allows.") in _doc(fn)
     assert ("Other lists drop them with a ``UserWarning``, unless the tokens exclude "
             "their ATAC representation.") in _doc(W.scan)
+
+
+# ============================================================ R8-04
+@pytest.fixture
+def no_envs(monkeypatch):
+    """No method environment is installed (the laptop situation)."""
+    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+
+
+@pytest.fixture
+def labmos(tmp_path, monkeypatch):
+    """``<tmp>/data/LABMOS``: the D46 mosaic files (StabMap / scMoMaT layout)."""
+    folder = tmp_path / "data" / "LABMOS"
+    folder.mkdir(parents=True)
+    for f in (ROOT / "data" / "D46").iterdir():
+        (folder / f.name).symlink_to(f)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+_TOTALVI = "totalVI does not run on mosaic data. Its categories: vertical, cross."
+
+
+def test_scan_raises_for_a_named_method_of_another_category(no_envs, labmos):
+    with pytest.raises(ValueError) as e:
+        mtb.scan("LABMOS", "mosaic", data_path="data", methods=["StabMap", "totalVI"],
+                 verbose=False)
+    assert str(e.value) == _TOTALVI
+    # one sentence per method
+    with pytest.raises(ValueError) as e:
+        mtb.scan("LABMOS", "mosaic", data_path="data",
+                 methods=["totalVI", "StabMap", "SCALEX"], verbose=False)
+    assert str(e.value) == (f"{_TOTALVI} SCALEX does not run on mosaic data. Its "
+                            "categories: diagonal.")
+
+
+def test_run_all_raises_before_anything_runs(no_envs, labmos, capsys):
+    for kw in ({"dry_run": True}, {"out_dir": "out"}):
+        with pytest.raises(ValueError) as e:
+            mtb.run_all("LABMOS", "mosaic", data_path="data",
+                        methods=["StabMap", "scMoMaT", "totalVI"], **kw)
+        assert str(e.value) == _TOTALVI
+    assert not (labmos / "out").exists()
+    assert capsys.readouterr().out == ""
+
+
+def test_a_selection_with_every_method_present_is_unchanged(no_envs, labmos):
+    one = mtb.scan("LABMOS", "mosaic", data_path="data", methods=["StabMap"],
+                   verbose=False)
+    assert list(one["method"]) == ["StabMap"]
+    every = mtb.scan("LABMOS", "mosaic", data_path="data", verbose=False)
+    assert {"StabMap", "scMoMaT"} <= set(every["method"])
+
+
+def test_a_method_the_modalities_drop_raises_with_the_representation_note(lung):
+    with pytest.raises(ValueError) as e:
+        mtb.scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "SCALEX"],
+                 modalities=["rna", "atac_peak"], verbose=False)
+    assert str(e.value) == ("SCALEX does not read rna+atac_peak in diagonal data. SCALEX "
+                            "reads gene activity. Pass modalities=['rna', 'atac_gas'] or "
+                            "['rna', 'atac'].")
+    # another category and the modalities, in one message
+    with pytest.raises(ValueError) as e:
+        mtb.scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "Matilda", "SCALEX"],
+                 modalities=["rna", "atac_peak"], verbose=False)
+    assert str(e.value).startswith("Matilda does not run on diagonal data. Its categories: "
+                                   "vertical. SCALEX does not read rna+atac_peak in "
+                                   "diagonal data. SCALEX reads gene activity."), e.value
+
+
+def test_the_cli_run_all_dry_run_exits_1_with_the_sentence(no_envs, labmos, capsys):
+    rc = cli.main(["run-all", "LABMOS", "--category", "mosaic", "--data-path", "data",
+                   "--methods", "StabMap,scMoMaT,totalVI", "--dry-run"])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert f"error: {_TOTALVI}\n" in captured.err, captured.err
+    assert captured.out == ""
+
+
+def test_the_cli_scan_gives_the_same_sentence(no_envs, labmos, capsys):
+    for methods in ("StabMap,SCALEX", "SCALEX"):
+        rc = cli.main(["scan", "LABMOS", "--category", "mosaic", "--data-path", "data",
+                       "--methods", methods])
+        err = capsys.readouterr().err
+        assert rc == 1
+        (line,) = [l for l in err.splitlines() if l.startswith("error: ")]
+        assert line == "error: SCALEX does not run on mosaic data. Its categories: diagonal."
+        assert "[" not in err and ";" not in err, err
+
+
+def test_the_docstrings_say_a_method_without_a_variant_raises():
+    assert "A method in ``methods`` has no variant in ``category`` or ``modalities``." \
+        in _doc(W.scan)
+    assert ("A named method with no variant under ``category`` or ``modalities`` raises "
+            "``ValueError``, even when other named methods have one.") in _doc(W.scan)
+    assert ("A named method or a selection with no variant: ``ValueError`` before "
+            "anything runs, dry run included") in _doc(W.run_all)
