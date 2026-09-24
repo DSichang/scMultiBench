@@ -1,0 +1,3598 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+      
+      
+        <meta name="author" content="PYangLab">
+      
+      
+        <link rel="canonical" href="https://dsichang.github.io/scMultiBench/reference/plot/">
+      
+      
+        <link rel="prev" href="../io/">
+      
+      
+        <link rel="next" href="../data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/m3-logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Plot (mtb.plot) - scMultiBench</title>
+      
+    
+    
+  
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+  <style>
+    /* Colab-button styling shipped INLINE with the page HTML (not via the
+       separately-cached extra.css), so a stale cached stylesheet can't revert
+       it. Absolute (not float) so it doesn't squeeze mkdocs-jupyter's
+       .jp-Notebook narrower, and above the .jupyter-wrapper so it stays
+       clickable. Same pattern as the M3 / Matilda sites. */
+    .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
+    .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+  </style>
+
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plot-mtbplot" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-header__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../../assets/m3-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            scMultiBench
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plot (mtb.plot)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../installation/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/vertical/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  How scMultiBench works
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../faq/" class="md-tabs__link">
+          
+  
+  
+  Resources
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-nav__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../../assets/m3-logo.png" alt="logo">
+
+    </a>
+    scMultiBench
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/end_to_end/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    End-to-end walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluate a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load and plot results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discover methods
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../shiny/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive explorer (Shiny)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/vertical/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/diagonal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagonal integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/mosaic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mosaic integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/cross/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scMultiBench works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prepare inputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../score/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data I/O (mtb.io)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plot (mtb.plot)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plot (mtb.plot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.bubble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.plot.bubble
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bar.bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.plot.bar
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.build_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.plot.build_table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.BubbleTable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;mtb.plot.BubbleTable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" mtb.plot.BubbleTable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.BubbleTable.norm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;norm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.BubbleTable.ranks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ranks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets (mtb.data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration (mtb.config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.bubble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.plot.bubble
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bar.bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.plot.bar
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.build_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.plot.build_table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.BubbleTable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;mtb.plot.BubbleTable
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" mtb.plot.BubbleTable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.BubbleTable.norm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;norm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multibench.plot.bubble.BubbleTable.ranks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ranks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../../api/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    API reference
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+  
+  
+  
+  
+                  
+
+
+  
+  
+
+
+<h1 id="plot-mtbplot">Plot (<code>mtb.plot</code>)<a class="headerlink" href="#plot-mtbplot" title="Anchor link to this section">&para;</a></h1>
+<p>Figures from a long results frame: what <code>mtb.load_results</code> returns for the
+stored tables, or <code>mtb.to_long</code> / <code>BatchResult.long</code> for your own runs.</p>
+<!-- api-summary: generated by tools/gen_reference_tables.py from the docstrings; do not edit by hand -->
+<div class="api-summary">
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#multibench.plot.bubble.bubble"><code>mtb.plot.bubble</code></a></td>
+<td>Draw the paper-style bubble table: methods as rows, metrics as columns.</td>
+</tr>
+<tr>
+<td><a href="#multibench.plot.bar.bar"><code>mtb.plot.bar</code></a></td>
+<td>Draw each method's overall score across datasets as a horizontal bar.</td>
+</tr>
+<tr>
+<td><a href="#multibench.plot.bubble.build_table"><code>mtb.plot.build_table</code></a></td>
+<td>Compute the ranks, scores and row order behind a bubble figure.</td>
+</tr>
+<tr>
+<td><a href="#multibench.plot.bubble.BubbleTable"><code>mtb.plot.BubbleTable</code></a></td>
+<td>The numbers behind a bubble figure, as <code>mtb.plot.build_table</code> returns.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- /api-summary -->
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="multibench.plot.bubble.bubble" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.plot.bubble
+
+
+<a href="#multibench.plot.bubble.bubble" class="headerlink" title="Anchor link to this section">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">bubble</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">long_df</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">aggregate</span><span class="o">=</span><span class="s2">"dataset"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">cmap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">save</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">show_language</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">require_complete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">overall</span><span class="o">=</span><span class="s2">"rank"</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">na</span><span class="o">=</span><span class="s2">"warn"</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Draw the paper-style bubble table: methods as rows, metrics as columns.</p>
+<p>Metrics are grouped into task families, each led by an <em>Overall</em> bar;
+rows run best first unless <code>order</code> is given. <code>mtb.plot.build_table</code>
+returns the same numbers without drawing.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETERS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>long_df</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Tidy frame with <code>method</code>, <code>metric</code>, <code>value</code> and optional
+<code>dataset</code> columns, as from <code>mtb.load_results</code>, <code>mtb.to_long</code> or
+the <code>BatchResult.long</code> property (more in Notes).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.DataFrame">DataFrame</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metrics</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Metric codes to show, in this order within each family; <code>None</code> =
+every metric in the frame.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>methods</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Methods (rows) to show; <code>None</code> = every method in the frame.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>order</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Methods to put first, in this order; the rest follow best first.
+Reorders only - filter with <code>methods</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p><code>"dataset"</code>: one dataset's values, drawn as circles. <code>"summary"</code>:
+within-dataset ranks averaged across datasets, drawn as bars (the
+paper's panel c).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;dataset&#39;, &#39;summary&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;dataset&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cmap</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Matplotlib colormap for the first family; <code>None</code> = blues, greens
+and purples per family.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>title</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Figure title; <code>None</code> = no title.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>save</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>File to write the figure to (tight bounding box); the suffix picks
+the format, e.g. <code>.pdf</code>, <code>.png</code>, <code>.svg</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span> or <span title="path">path</span> - <span title="like">like</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>show_language</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Draw the <code>Py</code> / <code>R</code> chip and the <code>L</code> (supervised) badge left of
+each row, plus a key line (Notes).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>require_complete</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>With <code>aggregate="summary"</code>: keep only the methods present in every
+dataset.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>False</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>overall</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Across-dataset <em>Overall</em>: <code>"rank"</code> re-ranks mean ranks (missing
+dataset = rank 0); <code>"mean_overall"</code> averages per-dataset Overalls
+(missing dataset skipped). Applies under <code>aggregate="summary"</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;rank&#39;, &#39;mean_overall&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;rank&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>na</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>How to report <code>n/a</code> cells (a method lacking a metric): warn once,
+stay silent, or raise.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;warn&#39;, &#39;skip&#39;, &#39;raise&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;warn&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="matplotlib.figure.Figure">Figure</span></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>The figure (one axes), already saved when <code>save</code> is given.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RAISES</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>long_df</code> lacks <code>method</code> / <code>metric</code> / <code>value</code>, or <code>metrics</code> /
+<code>methods</code> / <code>order</code> names an absent value.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>Duplicate <code>(method[, dataset], metric)</code> rows, or an invalid
+<code>aggregate</code> / <code>overall</code> / <code>na</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>No method is complete under <code>require_complete=True</code>, or <code>n/a</code>
+cells under <code>na="raise"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">WARNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-warns-annotation">
+                  <code><span title="UserWarning">UserWarning</span></code>
+              </span>
+            </td>
+            <td class="doc-warns-details">
+              <div class="doc-md-description">
+                <p><code>n/a</code> cells under <code>na="warn"</code>, or several datasets under
+<code>aggregate="dataset"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-warns-annotation">
+                  <code><span title="UserWarning">UserWarning</span></code>
+              </span>
+            </td>
+            <td class="doc-warns-details">
+              <div class="doc-md-description">
+                <p><code>aggregate="summary"</code> on an incomplete method x dataset matrix.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-warns-annotation">
+                  <code><span title="UserWarning">UserWarning</span></code>
+              </span>
+            </td>
+            <td class="doc-warns-details">
+              <div class="doc-md-description">
+                <p><code>require_complete=True</code> dropped methods; each is named with the
+datasets it lacks.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples</span></p>
+    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">,</span> <span class="s2">"ASW"</span><span class="p">],</span> <span class="n">title</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">"d11.pdf"</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">multi</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="p">[</span><span class="s2">"D24"</span><span class="p">,</span> <span class="s2">"D25"</span><span class="p">,</span> <span class="s2">"D28"</span><span class="p">])</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">multi</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="s2">"summary"</span><span class="p">,</span> <span class="n">require_complete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+
+
+<details class="note">
+  <summary>Notes</summary>
+  <p><strong>Reading the figure.</strong> What each mark encodes:</p>
+<ul>
+<li>Metric circle (<code>aggregate="dataset"</code>): radius = within-column rank,
+  <code>0.85 * sqrt(rank / n)</code> with <code>n</code> = the methods SCORED in that column
+  (n/a cells excluded), so the largest is the best; fill = the min-max
+  scaled value on the family's colour ramp.</li>
+<li>Metric bar (<code>aggregate="summary"</code>): length and fill = the min-max
+  scaled mean rank.</li>
+<li>Family <em>Overall</em> bar: length = the family score min-max scaled across
+  the rows; fill = the score itself (the two differ only under
+  <code>overall="mean_overall"</code>).</li>
+<li>Rows: ordered by the mean of the family Overall scores, best first.
+  <code>order</code> moves rows but never changes a rank or a score.</li>
+<li><em>Rank</em> legend: 1 = best, whereas <code>BubbleTable.ranks</code> /
+  <code>FamilyBlock.ranks</code> store max-ranks (<code>n</code> = best).</li>
+<li>Footnote: the Overall formula in use, the <code>n/a</code> rule when a dash is
+  drawn, and the chip key.</li>
+</ul>
+<p><strong>Overall formulas.</strong> <code>overall=</code> sets the family <em>Overall</em> under
+<code>aggregate="summary"</code>; under <code>"dataset"</code> it is always <code>minmax(mean
+over metrics of max-rank)</code>. The two can order methods differently on
+the same frame.</p>
+<ul>
+<li><code>"rank"</code> (bubble's default): <code>minmax(mean over metrics of
+  max-rank(mean over datasets of within-dataset max-rank))</code> - the
+  per-dataset ranks are averaged per metric, re-ranked across methods,
+  averaged over metrics and min-max scaled. A method absent from a
+  dataset scores rank 0 there (the paper's summary rule), which pulls it
+  down.</li>
+<li><code>"mean_overall"</code> (bar's default): <code>mean over datasets of
+  minmax(mean over metrics of within-dataset max-rank)</code> - each dataset
+  gets its own min-max-scaled overall, averaged over the datasets the
+  method was run on (absence is skipped, not penalised).</li>
+</ul>
+<p><strong>Bubble and bar.</strong> <code>mtb.plot.bar</code> uses the same formulas and the same
+tie-break (alphabetical within a tie). With <code>aggregate="summary"</code>, the
+same <code>overall=</code> and the metrics of one family (e.g. against
+<code>bar(group="clustering")</code>), both figures order methods identically.
+Across both families they can differ: bubble averages the family
+Overalls, bar scores all metrics together.</p>
+<p><strong>Missing cells.</strong> A metric not computed for a method shows a dash
+(<code>n/a</code>) instead of a marker.</p>
+<ul>
+<li><code>aggregate="dataset"</code>: the family Overall averages the metrics the
+  method has; a column's ranks count only the scored methods.</li>
+<li><code>aggregate="summary"</code>: the cell is rank 0 in that dataset for the
+  metric bar (the paper's rule); the family Overall counts it as rank 0
+  under <code>overall="rank"</code> and skips it under <code>"mean_overall"</code>.</li>
+</ul>
+<p><code>na="warn"</code> names each method in one warning per figure, e.g.
+<code>"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"</code>.</p>
+<p><strong>Input columns.</strong> Only <code>method</code>, <code>metric</code> and <code>value</code> are
+required.</p>
+<ul>
+<li><code>dataset</code> - groups rows for <code>aggregate="summary"</code> (absent = one
+  dataset) and is part of the duplicate-row key. A <code>"dataset"</code> figure
+  that mixes datasets averages them per method and adds a dataset cue to
+  each row label (<code>Name · D11</code> or <code>Name · 3 ds</code>).</li>
+<li><code>category</code> - a single value makes the <code>L</code> badge follow that
+  category's variants.</li>
+<li><code>needs_labels</code> (bool) - overrides the registry's <code>L</code> badge per
+  method; the only way to badge a method the registry does not know.
+  NaN = no override.</li>
+<li>Rows whose <code>metric</code> is NaN are dropped.</li>
+</ul>
+<p>To draw your own runs next to the stored table, concatenate the frames:
+<code>pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])</code>,
+with <code>res</code> from <code>mtb.run_all</code>.</p>
+<p><strong>Name matching.</strong> <code>metrics</code>, <code>methods</code> and <code>order</code> match the
+frame exactly, by canonical form (<code>"ari"</code> -&gt; <code>"ARI"</code>) or
+case-insensitively; the frame's own spelling is kept. The family blocks
+always stay in paper order.</p>
+<p><strong>Chips and badge</strong> (<code>show_language</code>).</p>
+<ul>
+<li>Chip: <code>Py</code> / <code>R</code> = the registry method's language; <code>?</code> = not a
+  registry method (your own, a sweep variant).</li>
+<li><code>L</code> badge: the method consumes cell-type labels (supervised), so its
+  clustering scores are not comparable with unsupervised rows. It
+  follows the variants of the frame's single <code>category</code> (scMoMaT is
+  supervised in mosaic only); without one, the registry's method-level
+  flag.</li>
+</ul>
+<p><strong>Errors.</strong> A frame that looks like <code>mtb.evaluate</code>'s wide output gets a
+hint to convert it with <code>mtb.to_long</code> first; an unknown name gets a
+did-you-mean hint and the values present. Duplicate rows raise rather
+than being silently averaged: deduplicate, or name the variants
+distinctly (as <code>mtb.sweep</code> does). A method with both <code>True</code> and
+<code>False</code> <code>needs_labels</code> rows, or an empty frame, also raises
+<code>ValueError</code>.</p>
+</details>
+
+<details class="see-also">
+  <summary>See Also</summary>
+  <p>mtb.plot.build_table : the numbers behind the figure, to audit first.
+mtb.plot.render : draw a <code>BubbleTable</code>; <code>bubble</code> is <code>build_table</code> then <code>render</code>.
+mtb.plot.bar : one bar per method across datasets; same <code>overall=</code> formulas.
+mtb.to_long : reshape <code>mtb.evaluate</code>'s wide frame into the long frame.
+mtb.load_results : stored metric tables as a long frame.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="multibench.plot.bar.bar" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.plot.bar
+
+
+<a href="#multibench.plot.bar.bar" class="headerlink" title="Anchor link to this section">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">bar</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">long_df</span><span class="p">:</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">group</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">top</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">title</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">cmap</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"Blues"</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">show_datasets</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">save</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">overall</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"mean_overall"</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Draw each method's overall score across datasets as a horizontal bar.</p>
+<p>The benchmark's summary view: how each method does overall, where
+<code>mtb.plot.bubble</code> shows each metric.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETERS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>long_df</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Tidy frame with <code>method</code>, <code>metric</code>, <code>value</code> columns and an
+optional <code>dataset</code> (absent = one dataset), e.g. from
+<code>mtb.load_results</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.DataFrame">DataFrame</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metrics</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Metric codes to score; <code>None</code> = every metric. Ignored when
+<code>group</code> is given.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>group</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Score one metric family only (the benchmark's two summary panels);
+<code>None</code> = the <code>metrics</code> selection.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;clustering&#39;, &#39;batch&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;clustering&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>top</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Keep the <code>top</code> best methods, scored against all of them; <code>None</code>
+= every method.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="int">int</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>title</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Figure title; <code>None</code> = the number of datasets. With <code>group</code>,
+<code>(&lt;group&gt; metrics)</code> is appended.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cmap</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Matplotlib colormap for the bars; <code>group="batch"</code> always uses
+<code>"Greens"</code> (the paper's family colour).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#39;Blues&#39;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>show_datasets</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Overlay one dot per dataset's score on each bar; drawn only under
+<code>overall="mean_overall"</code> with several datasets.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>save</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>File to write the figure to (140 dpi, tight bounding box).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span> | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>overall</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Across-dataset <em>Overall</em>: <code>"rank"</code> re-ranks mean ranks (missing
+dataset = rank 0); <code>"mean_overall"</code> averages per-dataset Overalls
+(missing dataset skipped).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;rank&#39;, &#39;mean_overall&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;rank&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="matplotlib.figure.Figure">Figure</span></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>One horizontal bar per method, best on top.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RAISES</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>long_df</code> is empty or lacks <code>method</code> / <code>metric</code> / <code>value</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>Unknown <code>metrics</code> code, or an invalid <code>group</code> / <code>overall</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>group</code> names a family with no metric in the frame.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples</span></p>
+    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">)</span>            <span class="c1"># every dataset with a table in the category</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"clustering"</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">"clustering.png"</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"batch"</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">overall</span><span class="o">=</span><span class="s2">"rank"</span><span class="p">)</span>       <span class="c1"># bubble's default formula</span>
+</span></code></pre></div>
+
+
+<details class="note">
+  <summary>Notes</summary>
+  <p><strong>Whiskers, dots and x label.</strong></p>
+<ul>
+<li>Whiskers (<code>overall="mean_overall"</code>): the SD of the per-dataset
+  scores; a method present in one dataset gets none - there is no spread
+  to show.</li>
+<li>Dots (<code>overall="mean_overall"</code>, <code>show_datasets</code>): the per-dataset
+  scores, so a uniformly good method is distinguishable from one that
+  averages well by winning on a single dataset.</li>
+<li>Under <code>overall="rank"</code> the bar is not a mean of per-dataset scores,
+  so neither whiskers nor dots are drawn.</li>
+<li>X label: the single dataset, or the formula and the number of
+  datasets.</li>
+</ul>
+<p><strong>Overall formulas.</strong> The two can order methods differently on the same
+frame.</p>
+<ul>
+<li><code>"rank"</code> (bubble's default): <code>minmax(mean over metrics of
+  max-rank(mean over datasets of within-dataset max-rank))</code> - the
+  per-dataset ranks are averaged per metric, re-ranked across methods,
+  averaged over metrics and min-max scaled. A method absent from a
+  dataset scores rank 0 there (the paper's summary rule), which pulls it
+  down.</li>
+<li><code>"mean_overall"</code> (bar's default): <code>mean over datasets of
+  minmax(mean over metrics of within-dataset max-rank)</code> - each dataset
+  gets its own min-max-scaled overall, averaged over the datasets the
+  method was run on (absence is skipped, not penalised).</li>
+</ul>
+<p><strong>Reading the score.</strong> It is rank-based, so it is only meaningful
+relative to the other methods in the same figure. A method lacking a
+metric is compared on the metrics it has under <code>"mean_overall"</code> (the
+within-dataset mean skips NaN cells); under <code>"rank"</code> the missing cell
+is rank 0 in that dataset.</p>
+<p><strong>Bubble and bar.</strong> Ties are broken the way <code>mtb.plot.bubble</code> breaks
+them (a stable sort, alphabetical within a tie). With the same
+<code>overall=</code> and the metrics of one family (e.g. <code>group="clustering"</code>
+against a bubble of those metrics with <code>aggregate="summary"</code>), both
+figures order methods identically. Across both families they can
+differ: bubble averages the family Overalls, bar scores all metrics
+together.</p>
+<p><strong>Input.</strong> Concatenate several datasets' frames to summarise across
+them; <code>mtb.to_long</code> and the <code>BatchResult.long</code> property give the same
+frame for your own runs. <code>metrics</code> is case- and alias-tolerant
+(<code>"ari"</code> -&gt; <code>"ARI"</code>).</p>
+<p><strong>Errors.</strong> An unknown <code>metrics</code> code gets a did-you-mean hint and the
+list of metrics present. Batch metrics need a multi-batch dataset: a
+single-batch design has none to compute, which is what the
+<code>group="batch"</code> error says. An empty frame's error points at
+<code>mtb.load_results</code>, which may have returned nothing (see its
+<code>UserWarning</code>).</p>
+</details>
+
+<details class="see-also">
+  <summary>See Also</summary>
+  <p>mtb.plot.bubble : per-dataset (or rank-averaged) bubble table, same <code>overall=</code> formulas.
+mtb.load_results : stored metric tables as a long frame.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="multibench.plot.bubble.build_table" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.plot.build_table
+
+
+<a href="#multibench.plot.bubble.build_table" class="headerlink" title="Anchor link to this section">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build_table</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">long_df</span><span class="p">:</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">methods</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">aggregate</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"dataset"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">require_complete</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">overall</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"rank"</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">na</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"warn"</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="            mtb.plot.BubbleTable
+
+
+  
+      dataclass
+   (multibench.plot.bubble.BubbleTable)" href="#multibench.plot.bubble.BubbleTable">BubbleTable</a></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Compute the ranks, scores and row order behind a bubble figure.</p>
+<p>The numeric half of <code>mtb.plot.bubble</code>: audit the ranks and the row
+order before (or instead of) drawing.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">PARAMETERS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>long_df</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Tidy frame with <code>method</code>, <code>metric</code>, <code>value</code> columns; optional
+<code>dataset</code>, <code>category</code> and <code>needs_labels</code> columns (Notes).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.DataFrame">DataFrame</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metrics</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Metric codes to keep, in this order within each family; <code>None</code> =
+every metric in the frame.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>methods</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Methods (rows) to keep; <code>None</code> = every method in the frame.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>order</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Methods to put first, in this order; the rest follow best first.
+Reorders only - filter with <code>methods</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>list of str | None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>aggregate</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p><code>"dataset"</code>: raw metric values of one dataset (several are averaged
+per method). <code>"summary"</code>: within-dataset max-ranks averaged across
+datasets (the paper's panel c).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;dataset&#39;, &#39;summary&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;dataset&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>require_complete</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>With <code>aggregate="summary"</code>: keep only the methods present in every
+dataset.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>False</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>overall</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>Formula for each family's Overall under <code>aggregate="summary"</code>:
+<code>"rank"</code> (the paper's panel rule) or <code>"mean_overall"</code> (bar's
+default); see <code>mtb.plot.bubble</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;rank&#39;, &#39;mean_overall&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;rank&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>na</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>How to report <code>n/a</code> cells (a method lacking a metric): <code>"warn"</code>,
+<code>"skip"</code> (silent, nothing is dropped) or <code>"raise"</code>; also stored
+as <code>na_cells</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;warn&#39;, &#39;skip&#39;, &#39;raise&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;warn&#34;</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><a class="autorefs autorefs-internal" title="            mtb.plot.BubbleTable
+
+
+  
+      dataclass
+   (multibench.plot.bubble.BubbleTable)" href="#multibench.plot.bubble.BubbleTable">BubbleTable</a></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>Read <code>methods</code> (row order: best first unless <code>order</code> is given),
+<code>ranks</code> (max-ranks, <code>n</code> = best) and <code>overall</code>; all fields are
+under <code>mtb.plot.BubbleTable</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RAISES</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>long_df</code> lacks <code>method</code> / <code>metric</code> / <code>value</code>, or <code>metrics</code> /
+<code>methods</code> / <code>order</code> names an absent value.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>Duplicate <code>(method[, dataset], metric)</code> rows, or an invalid
+<code>aggregate</code> / <code>overall</code> / <code>na</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>No method is complete under <code>require_complete=True</code>, or <code>n/a</code>
+cells under <code>na="raise"</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">WARNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-warns-annotation">
+                  <code><span title="UserWarning">UserWarning</span></code>
+              </span>
+            </td>
+            <td class="doc-warns-details">
+              <div class="doc-md-description">
+                <p><code>n/a</code> cells under <code>na="warn"</code>, or several datasets under
+<code>aggregate="dataset"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-warns-annotation">
+                  <code><span title="UserWarning">UserWarning</span></code>
+              </span>
+            </td>
+            <td class="doc-warns-details">
+              <div class="doc-md-description">
+                <p><code>aggregate="summary"</code> on an incomplete method x dataset matrix.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-warns-annotation">
+                  <code><span title="UserWarning">UserWarning</span></code>
+              </span>
+            </td>
+            <td class="doc-warns-details">
+              <div class="doc-md-description">
+                <p><code>require_complete=True</code> dropped methods; each is named with the
+datasets it lacks.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples</span></p>
+    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">))</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span><span class="o">.</span><span class="n">methods</span>                      <span class="c1"># rows, best first</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span><span class="o">.</span><span class="n">ranks</span>                        <span class="c1"># max-ranks per metric (n = best)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">multi</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="p">[</span><span class="s2">"D24"</span><span class="p">,</span> <span class="s2">"D25"</span><span class="p">,</span> <span class="s2">"D28"</span><span class="p">])</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">multi</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="s2">"summary"</span><span class="p">,</span> <span class="n">require_complete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">coverage</span>
+</span></code></pre></div>
+
+
+<details class="note">
+  <summary>Notes</summary>
+  <p><strong>Missing-metric rule.</strong> A method may lack a value for some metric (an
+<code>n/a</code> cell, drawn as a dash):</p>
+<ul>
+<li><code>aggregate="dataset"</code>: the cell is simply absent. The family
+  <em>Overall</em> averages the ranks of the metrics the method has (a method
+  scored on 3 of 4 metrics is compared on those 3), and a column's ranks
+  count only the methods scored in it.</li>
+<li><code>aggregate="summary"</code>: the cell is rank 0 in that dataset (the
+  paper's rule), in the metric columns and in the <code>overall="rank"</code>
+  Overall; <code>overall="mean_overall"</code> skips it.</li>
+</ul>
+<p>Neither rule is visible in the numbers, so <code>na</code> sets how it is
+reported; the warning reads like <code>"YukiNet: DR and clustering Overall
+over 3 of 4 metrics (cLISI n/a)"</code>.</p>
+<p><strong>Row order.</strong> The combined Overall is the mean of the family Overalls,
+sorted best first with a stable sort, so tied methods keep alphabetical
+order - the tie-break <code>mtb.plot.bar</code> uses. Ranks and scores always
+come from the whole filtered frame; <code>order</code> only moves rows.</p>
+<p><strong>require_complete.</strong> It never drops silently: one <code>UserWarning</code> names
+each dropped method and the datasets it lacks (<code>"require_complete=True
+dropped 1 method(s) ...: MyRandom (missing D52s)"</code>). It has no effect
+under <code>aggregate="dataset"</code>.</p>
+<p><strong>Input columns.</strong> <code>dataset</code> groups rows for <code>aggregate="summary"</code>
+(absent = one dataset) and is part of the duplicate-row key. A boolean
+<code>needs_labels</code> column overrides the registry's supervised badge per
+method (NaN = no override); a single <code>category</code> value makes the badge
+follow that category's variants. Rows whose <code>metric</code> is NaN are
+dropped.</p>
+<p><strong>Name matching.</strong> <code>metrics</code>, <code>methods</code> and <code>order</code> match the
+frame exactly, by canonical form (<code>"ari"</code> -&gt; <code>"ARI"</code>) or
+case-insensitively; the frame's own spelling is kept. The family blocks
+always stay in paper order; metrics outside the two paper families form
+a neutral purple "Other" block.</p>
+<p><strong>Errors.</strong> A frame that looks like <code>mtb.evaluate</code>'s wide output gets a
+hint to convert it with <code>mtb.to_long</code> first; an unknown name gets a
+did-you-mean hint and the values present. Duplicate rows raise rather
+than being silently averaged: deduplicate, or name the variants
+distinctly (as <code>mtb.sweep</code> does). A method with both <code>True</code> and
+<code>False</code> <code>needs_labels</code> rows, or an empty frame, also raises
+<code>ValueError</code>.</p>
+</details>
+
+<details class="see-also">
+  <summary>See Also</summary>
+  <p>mtb.plot.bubble : build and render in one call.
+mtb.plot.render : draw a table returned by this function.
+mtb.plot.BubbleTable : what is returned, field by field.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="multibench.plot.bubble.BubbleTable" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            mtb.plot.BubbleTable
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#multibench.plot.bubble.BubbleTable" class="headerlink" title="Anchor link to this section">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">BubbleTable</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">methods</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">blocks</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">matrix</span><span class="p">:</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">raw</span><span class="p">:</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">overall</span><span class="p">:</span> <span class="n"><span title="pandas.Series">Series</span></span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">aggregate</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"dataset"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">overall_basis</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"rank"</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">datasets</span><span class="p">:</span> <span class="n"><span title="tuple">tuple</span></span> <span class="o">=</span> <span class="p">(),</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">coverage</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">method_datasets</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">needs_labels</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">na_cells</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>The numbers behind a bubble figure, as <code>mtb.plot.build_table</code> returns.</p>
+<p>Rows are <code>methods</code>; the per-family matrices live in <code>blocks</code>. Pass
+the table to <code>mtb.plot.render</code> to draw it.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">ATTRIBUTES</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.methods">methods</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Row order: best first, or the <code>order</code> methods first;
+<code>methods.index(name) + 1</code> is the row's position (1 = top).</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code>list of str</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.blocks">blocks</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>One block per metric family present, in paper order, each with its
+own <code>raw</code>, <code>norm</code>, <code>ranks</code> and <code>overall</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code>list of FamilyBlock</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.matrix">matrix</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Per-column min-max values (method x metric) of all families, in
+figure order; the same object as <code>norm</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.DataFrame">DataFrame</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.raw">raw</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Unscaled matrix (method x metric) in figure order: metric means, or
+mean within-dataset max-ranks under <code>"summary"</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.DataFrame">DataFrame</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.overall">overall</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Combined Overall per method (mean of the family Overalls); it sets
+the row order unless <code>order</code> is given.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.Series">Series</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.aggregate">aggregate</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p><code>"dataset"</code> (metric markers are circles) or <code>"summary"</code> (bars,
+the paper's panel c).</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.overall_basis">overall_basis</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Formula behind the family Overall under <code>"summary"</code>: <code>"rank"</code> or
+<code>"mean_overall"</code> (the <code>overall=</code> of <code>mtb.plot.bubble</code>).</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span></code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.datasets">datasets</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Dataset ids in the frame, sorted; <code>()</code> without a <code>dataset</code> column.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code>tuple of str</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.coverage">coverage</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>Number of datasets each method has rows in; <code>"summary"</code> only,
+else <code>None</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="pandas.Series">Series</span> or None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.method_datasets">method_datasets</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p><code>{method: [dataset, ...]}</code> from the frame; <code>None</code> without a
+<code>dataset</code> column.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="dict">dict</span> or None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.category">category</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>The frame's single <code>category</code> value, else <code>None</code> (mixed or
+absent); drives the supervised <code>L</code> badge.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="str">str</span> or None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.needs_labels">needs_labels</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p><code>{method: bool}</code> from an optional <code>needs_labels</code> column, empty
+without it; overrides the registry for the <code>L</code> badge.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code><span title="dict">dict</span> or None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="multibench.plot.bubble.BubbleTable.na_cells">na_cells</span></code></td>
+            <td class="doc-attribute-details">
+              <div class="doc-md-description">
+                <p>One line per method with <code>n/a</code> cells, in row order: the text of
+the <code>na="warn"</code> warning.</p>
+              </div>
+              <p>
+                  <span class="doc-attribute-annotation">
+                    <b>type</b>
+                      <code>list of str or None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Examples</span></p>
+    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">))</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span><span class="o">.</span><span class="n">methods</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>                       <span class="c1"># the best three methods</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span><span class="o">.</span><span class="n">ranks</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">tbl</span><span class="o">.</span><span class="n">methods</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>         <span class="c1"># the best method's max-rank per metric</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">tbl</span><span class="o">.</span><span class="n">blocks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">overall</span>                 <span class="c1"># first family's Overall per method</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">tbl</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">)</span>
+</span></code></pre></div>
+
+
+<details class="note">
+  <summary>Notes</summary>
+  <p><strong>Ranks.</strong> <code>ranks</code> and <code>FamilyBlock.ranks</code> hold per-column
+max-ranks: <code>n</code> = best, ties share the higher number (R's
+<code>ties.method="max"</code>). A method with no value in a column is NaN there,
+and the column's <code>n</code> counts only the scored methods. The figure's
+<em>Rank</em> legend counts 1 = best instead.</p>
+<p><strong>Scaled values.</strong> <code>matrix</code> and <code>norm</code> are per-column min-max values
+in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.</p>
+<p><strong>Blocks.</strong> Paper order: DR and clustering (blues), batch correction
+(greens), then "Other" (purples) for any metric outside the two.</p>
+<p><strong>Drawing.</strong> <code>mtb.plot.render(tbl, cmap=None, title=None,
+show_language=True)</code> draws the table; <code>mtb.plot.bubble</code> is
+<code>build_table</code> followed by <code>render</code>.</p>
+</details>
+
+<details class="see-also">
+  <summary>See Also</summary>
+  <p>mtb.plot.build_table : builds a table from a tidy long frame.
+mtb.plot.render : draws a table as the paper-style figure.
+mtb.plot.bubble : build and render in one call.</p>
+</details>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="multibench.plot.bubble.BubbleTable.norm" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">norm</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#multibench.plot.bubble.BubbleTable.norm" class="headerlink" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">norm</span><span class="p">:</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>All families' per-column min-max values, in figure order.</p>
+<p>An alias of <code>matrix</code>: rows are <code>methods</code>, columns the metrics in
+the order the figure draws them.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="pandas.DataFrame">DataFrame</span></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>Method x metric values scaled to [0, 1] per column.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="multibench.plot.bubble.BubbleTable.ranks" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">ranks</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#multibench.plot.bubble.BubbleTable.ranks" class="headerlink" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">ranks</span><span class="p">:</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>All families' per-column max-ranks, in figure order.</p>
+<p>Rows are <code>methods</code>, columns the metrics in the order the figure
+draws them; the class Notes give the max-rank convention.</p>
+
+
+<table>
+      <thead>
+        <tr>
+          <th><span class="doc-section-title">RETURNS</span></th>
+          <th><span>DESCRIPTION</span></th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <span class="doc-returns-annotation">
+                    <code><span title="pandas.DataFrame">DataFrame</span></code>
+                </span>
+            </td>
+            <td class="doc-returns-details">
+              <div class="doc-md-description">
+                <p>Method x metric max-ranks: <code>n</code> = best, NaN where the method has
+no value for that metric.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../io/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Data I/O (mtb.io)">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Data I/O (mtb.io)
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../data/" class="md-footer__link md-footer__link--next" aria-label="Next: Datasets (mtb.data)">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Datasets (mtb.data)
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/PYangLab" target="_blank" rel="noopener" title="PYangLab on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "navigation.path", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "toc.follow", "search.highlight", "content.code.copy", "content.code.annotate", "content.code.select", "content.tabs.link", "announce.dismiss", "header.autohide", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+      
+        <script src="../../javascripts/animations.js"></script>
+      
+        <script src="../../javascripts/ui-tweaks.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
