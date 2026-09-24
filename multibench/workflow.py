@@ -47,7 +47,7 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
 
 
 
-def load_batch(out_dir, *, methods=None) -> "BatchResult":
+def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     """Reload a saved ``run_all`` result.
 
     Use it to inspect, re-plot or re-score a finished sweep.
@@ -59,6 +59,8 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
         ``mtb.data.fetch_outputs`` tree.
     methods : list[str] | None
         Methods whose records to keep; ``None`` = every record.
+    data_path : path-like | None
+        Data root for re-scoring; ``None`` = each record's own.
 
     Returns
     -------
@@ -92,8 +94,10 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     order the tree ran them, not the order of ``methods``.
 
     **Moved folders.** A record whose ``out_dir`` does not exist is pointed
-    at the folder of the same name next to ``batch_result.json``. So a
-    ``fetch_outputs`` tree or a copied ``run_all`` folder can be re-scored.
+    at the folder of the same name next to ``batch_result.json``. The
+    dataset folder is looked up under ``data_path=``, the recorded
+    ``data_path`` and then ``data_root``. So a ``fetch_outputs`` tree or a
+    copied ``run_all`` folder can be re-scored.
 
     See Also
     --------
@@ -120,6 +124,11 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
         od = r.get("out_dir")
         if od and not Path(od).exists() and (d / Path(od).name).is_dir():
             r["out_dir"] = str(d / Path(od).name)
+        # the first data root that holds the dataset; left as recorded when
+        # none does, and rescore then names the missing folder
+        root, found = _dataset_root(r, blob["dataset"], data_path)
+        if found:
+            r["data_path"] = root
     lp = d / "long.csv"
     if lp.exists():
         lng = pd.read_csv(lp)
@@ -129,7 +138,10 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     else:
         for r in recs:
             r["_long"] = None
-    return BatchResult(recs, blob["dataset"], blob["category"], out_dir=d)
+    res = BatchResult(recs, blob["dataset"], blob["category"], out_dir=d)
+    for r in recs:
+        res._batch_text(r.get("batch_file"))       # the saved batch, when present
+    return res
 
 #: The four integration scenarios, and what each one's data looks like.
 CATEGORIES = {
@@ -1527,11 +1539,12 @@ _CHANCE_ARI = 0.05
 def _order_confidence(cands) -> float | None:
     """How clearly the winning label order beat the alternatives, on a 0-1 scale.
 
-    ``(best - runner_up) / best``. A ratio, not a difference: the runner-up
-    sits near chance (ARI ~ 0), so a difference is bounded above by the ARI itself
-    and a method scoring 0.3 could never look clearly separated. Dividing by the
-    winner makes an unambiguous order read ~1.0 whether the method scored 0.9 or
-    0.2.
+    ``(best - max(runner_up, 0)) / best``. A ratio, not a difference: the
+    runner-up sits near chance (ARI ~ 0), so a difference is bounded above by the
+    ARI itself and a method scoring 0.3 could never look clearly separated.
+    Dividing by the winner makes an unambiguous order read ~1.0 whether the
+    method scored 0.9 or 0.2. ARI can fall slightly below 0, so the runner-up
+    is clipped at 0 to keep the value within 0-1.
     """
     if not cands or len(cands) < 2:
         return None
@@ -1540,25 +1553,61 @@ def _order_confidence(cands) -> float | None:
     # 0.5): report None so the column is not misread when no ordering worked.
     if best < _CHANCE_ARI:
         return None
-    return round(max(0.0, (best - second) / best), 4)
+    return round(max(0.0, (best - max(second, 0.0)) / best), 4)
 
 
-def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
+def _metric_codes(metrics):
+    """The metric codes ``metrics=`` selects; ``None`` = every metric, also
+    for a value ``evaluate`` will reject (it raises there, with its message)."""
+    from .data import catalog
+    try:
+        return catalog.metric_selection(metrics).codes
+    except (TypeError, ValueError):
+        return None
+
+
+#: the metrics that need the Leiden clustering, and so a sweep
+_SWEEP_METRICS = ("ARI", "NMI", "iF1")
+
+
+def _needs_sweep(metrics) -> bool:
+    """Whether ``metrics=`` names a metric computed on the Leiden clustering."""
+    codes = _metric_codes(metrics)
+    return codes is None or any(c in _SWEEP_METRICS for c in codes)
+
+
+def _names_batch_metric(metrics) -> bool:
+    """Whether ``metrics=`` is ``None`` or names a metric of the batch family."""
+    from .plot.bar import BATCH_METRICS
+    codes = _metric_codes(metrics)
+    return codes is None or any(c in BATCH_METRICS for c in codes)
+
+
+def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
+                         user_batch=False, on_rank=None):
     """Score each candidate label order, keep the best, return the full spread.
 
     ``batch`` (optional, one entry per cell in embedding order) replaces the
     file-of-origin batch vector carried by each candidate - ``run_all(batch=)``
-    / ``BatchResult.rescore(batch=)``. ``metrics`` (a family token or a list
-    of metric codes, ``evaluate(metrics=)``) restricts the set the winner is
-    scored on; ``None`` = the family the batch structure implies (screening
-    still needs ARI only).
+    / ``BatchResult.rescore(batch=)``. ``user_batch`` says that the
+    candidates already carry such a vector. ``metrics`` (a family token or a
+    list of metric codes, ``evaluate(metrics=)``) restricts the set the
+    winner is scored on; ``None`` = the family the batch structure implies
+    (screening still needs ARI only). A file-of-origin batch goes to
+    ``evaluate`` only when ``metrics`` can use it, so that ``evaluate`` does
+    not warn about a batch the caller never gave. ``on_rank(orders, cells)``
+    is called before several orders are ranked.
     """
+    user_batch = user_batch or batch is not None
+    use_batch = user_batch or _names_batch_metric(metrics)
+
     def _full(lab, bat, clustering=None):
         # several distinct source files (or a user batch with >1 level) => a
         # real batch structure, so ask for both metric families; else clustering.
         if batch is not None:
             bat = np.asarray(batch)
-        grp = "all" if len(set(np.asarray(bat).tolist())) > 1 else "clustering"
+        grp = ("all" if use_batch and len(set(np.asarray(bat).tolist())) > 1
+               else "clustering")
         return _evaluate(emb, category=category, labels=lab,
                                 verbose=False, batch=(bat if grp == "all" else None),
                                 clustering=clustering,
@@ -1584,6 +1633,8 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
     # doing either per candidate multiplies the cost by the number of orderings.
     import scib.metrics as _me
 
+    if on_rank is not None:
+        on_rank(len(cands), emb.shape[0])
     try:
         sweep_adata, sweep_keys = _escib.leiden_sweep(emb)
     except Exception:
@@ -1688,6 +1739,36 @@ def _check_save_target(d: Path, dataset: str, category: str) -> None:
             f"category={category!r}. Save it to another folder.")
 
 
+def _scorable(rec: dict) -> bool:
+    """Whether ``rescore`` scores ``rec``: not SKIPPED, FAIL or TIMEOUT."""
+    status = str(rec.get("status", ""))
+    return status != "SKIPPED" and not status.startswith(("FAIL", "TIMEOUT"))
+
+
+def _rank_line(method):
+    """``rescore(verbose=True)``'s line before the label orders are ranked."""
+    def say(orders, cells):
+        print(f"[rescore] {method}: ranking {orders} label orders on {cells:,} cells "
+              f"with one Leiden sweep ...", flush=True)
+    return say
+
+
+def _warn_unsaved_batch(records, result) -> None:
+    """Warn once when a record was scored with a user batch that is not saved."""
+    old = [r for r in records if r.get("batch_source") == "user" and "batch_file" not in r]
+    lost = [r for r in records if "batch_file" in r
+            and result._batch_text(r.get("batch_file")) is None
+            and (r.get("batch_file") or r.get("batch_source") == "user")]
+    if old:
+        warnings.warn("This result was scored with your batch vector, which older "
+                      "versions did not save. Pass batch= again to keep the batch "
+                      "metrics.", UserWarning, stacklevel=3)
+    elif lost:
+        warnings.warn("This result was scored with your batch vector, which is not "
+                      "saved with it. Pass batch= again to keep the batch metrics.",
+                      UserWarning, stacklevel=3)
+
+
 class BatchResult:
     """Outcome of ``mtb.run_all`` - a summary table, a long table and a figure.
 
@@ -1755,6 +1836,16 @@ class BatchResult:
         self.dataset = dataset
         self.category = category
         self.out_dir = out_dir
+        # the batch files the records name ({file name: CSV text}), until saved
+        self._batches: dict = {}
+
+    def _batch_text(self, name) -> str | None:
+        """The text of the batch file ``name``: in memory, else in ``out_dir``."""
+        if name and name not in self._batches and self.out_dir is not None:
+            p = Path(self.out_dir) / name
+            if p.is_file():
+                self._batches[name] = p.read_text()
+        return self._batches.get(name)
 
     @property
     def summary(self) -> pd.DataFrame:
@@ -1841,8 +1932,8 @@ class BatchResult:
         two disjoint cell sets in a method-specific order.
 
         **Label-order confidence.** ``label_order_confidence`` is
-        ``(best - runner_up) / best`` over the ARI of the candidate label
-        orders, from 0 to 1. Near 1, one order clearly fits. Below about 0.5,
+        ``(best - max(runner_up, 0)) / best`` over the ARI of the candidate
+        label orders, from 0 to 1. Near 1, one order clearly fits. Below about 0.5,
         two orders scored alike; check that row's label order.
 
         **Optimistic bias.** When more than one ordering is possible the
@@ -1987,12 +2078,14 @@ class BatchResult:
         labels_used                 the label file(s) behind the metrics
         label_order_candidates      every label ordering tried, with its ARI
         batch_source, n_batches     the batch vector the batch metrics used
+        batch_file                  the file in out_dir that holds a user batch
         error, traceback, note      why a method failed, was skipped or was not scored
         requested                   SKIPPED records: True when methods= named it
         reused                      True when skip_existing reused the output
         env, output_kind, n_tunable the scan row the method ran from
         caveat                      that row's caveat, or ""
         data_path, multibench_version, started_at   provenance of the run
+        data_root                   data_path as an absolute path
         scripts_commit, env_flavor, hostname        the scripts, env build and computer
         _long                       internal; read BatchResult.long instead
         ```
@@ -2126,9 +2219,9 @@ class BatchResult:
         Parameters
         ----------
         batch : array-like | Series | path | None
-            Batch ids, cells in the order of ``mtb.labels_for(dataset)``; a
-            Series or a barcode-indexed CSV is aligned by barcode. ``None`` =
-            each cell's label file.
+            Batch ids in the order of ``mtb.labels_for(dataset)``, or a
+            barcode-indexed Series or CSV. ``None`` = the batch ``run_all`` was
+            given, else each cell's label file.
         labels : array-like | Series | path | None
             One cell-type label per cell; a Series or a barcode-indexed CSV is
             aligned by barcode. ``None`` = search the dataset's label files
@@ -2182,14 +2275,15 @@ class BatchResult:
         label-order search, so ``label_order`` names the file order chosen.
         Labels matched by position read ``(user labels)``.
 
-        With ``labels=None`` the label-order search runs again
-        (``label_order`` / ``label_order_confidence`` are refilled).
-        ``metrics`` is handed to ``evaluate(metrics=)``.
+        With ``labels=None`` and several label files, ``rescore`` ranks the
+        file orders by ARI, which needs one Leiden sweep. It keeps the stored
+        order and skips the sweep when ``metrics=`` has no ARI, NMI or iF1.
 
-        **Labels without batch.** Given ``labels`` and no ``batch``, every
+        **Labels without batch.** Given ``labels`` and no ``batch``, the batch
+        that ``run_all(batch=)`` saved is reused. Without a saved batch, every
         cell is in one batch (``batch_source`` ``None``, ``n_batches`` 1), so
-        only clustering metrics are computed; pass ``batch`` as well to get
-        the batch metrics.
+        only clustering metrics are computed. Pass ``batch`` as well to get the
+        batch metrics.
 
         **Record status.** A method that emits no embedding (graph-only) is
         marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. ``SKIPPED``, ``FAIL``
@@ -2200,11 +2294,11 @@ class BatchResult:
         cells``).
 
         **Other hosts.** Records keep ``out_dir`` and ``data_path`` as
-        ``run_all`` received them, relative when you passed a relative path.
-        ``mtb.load_batch`` points a missing ``out_dir`` at the folder of the
-        same name next to ``batch_result.json``. A ``data_path`` that does
-        not exist here gives ``RUN_OK_NO_LABEL_MATCH`` unless ``labels=`` is
-        given.
+        ``run_all`` received them, and ``data_root`` as an absolute path.
+        ``mtb.load_batch`` finds moved folders; see its Notes. When the
+        dataset folder is not found, ``labels=None`` gives
+        ``RUN_OK_NO_LABEL_MATCH`` with a ``note``. A Series or CSV is then
+        matched by position, with a warning.
 
         **Persisting.** ``mtb.load_batch`` keeps returning the original result
         until the new one is saved.
@@ -2216,30 +2310,38 @@ class BatchResult:
         BatchResult.save : persist the re-scored result.
         """
         import copy
-        new_records = []
+        new = BatchResult([], self.dataset, self.category, out_dir=self.out_dir)
+        # the data folder of each record: the recorded data_path, else data_root
+        roots = [_dataset_root(r, self.dataset)[0] for r in self.records]
         # labels and batch per data folder, before any record is scored: ids
         # that are not cells of the dataset raise here
         lab_vec: dict = {}
         bat_vec: dict = {}
-        for dp in dict.fromkeys(r.get("data_path") for r in self.records
+        for dp in dict.fromkeys(dp for dp, r in zip(roots, self.records)
                                 if r.get("status") != "SKIPPED"):
             if labels is not None:
                 lab_vec[dp] = _cell_vector(labels, self.dataset, dp, what="labels",
-                                           order=_ROWS, stacklevel=4)
+                                           order=_ROWS, stacklevel=4, moved=True)
             # a batch vector follows labels given in embedding row order
             rows = labels is not None and not lab_vec[dp][1]
             if batch is not None:
-                bat_vec[dp] = _cell_vector(batch, self.dataset, dp, what="batch",
-                                           order=_ROWS if rows else None, stacklevel=4)
-        for r in self.records:
+                vec, by_cell = _cell_vector(batch, self.dataset, dp, what="batch",
+                                            order=_ROWS if rows else None,
+                                            stacklevel=4, moved=True)
+                # saved with the result, unless it follows the embedding rows
+                file = None if rows and not by_cell else _batch_csv(vec, self.dataset, dp)
+                bat_vec[dp] = (vec, by_cell, file)
+        if batch is None:
+            _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
+        for r, dp in zip(self.records, roots):
             rec = copy.deepcopy({k: v for k, v in r.items() if k != "_long"})
             rec["_long"] = None
             m = rec.get("method")
             # nothing was run, or the run failed: there is no output to score
-            if rec.get("status") == "SKIPPED" or str(rec.get("status", "")).startswith(
-                    ("FAIL", "TIMEOUT")):
-                new_records.append(rec)
+            if not _scorable(rec):
+                new.records.append(rec)
                 continue
+            rec["data_path"] = dp
             try:
                 mods = rec.get("modalities") or []
                 v = registry.get(m).select(self.category, set(mods))
@@ -2249,21 +2351,36 @@ class BatchResult:
                     rec["note"] = (f"output kind={v.output.kind}; this method does not "
                                    "produce an embedding, so embedding-based metrics do not apply")
                 else:
-                    lab, lab_by_cell = lab_vec.get(rec.get("data_path"), (None, False))
-                    bat, bat_by_cell = bat_vec.get(rec.get("data_path"), (None, False))
-                    _score_record(rec, emb, self.dataset, self.category,
-                                  rec.get("data_path"), v, batch=bat, labels=lab,
-                                  metrics=metrics, labels_by_cell=lab_by_cell,
-                                  batch_by_cell=bat_by_cell)
+                    lab, lab_by_cell = lab_vec.get(dp, (None, False))
+                    if batch is not None:
+                        bat, bat_by_cell, file = bat_vec[dp]
+                        rec["batch_file"] = file and file[0]
+                    else:
+                        # the batch run_all was given, when it is saved
+                        text = self._batch_text(rec.get("batch_file"))
+                        file = text and (rec["batch_file"], text)
+                        bat, bat_by_cell = ((_read_batch_text(text), True) if text
+                                            else (None, False))
+                    if file:
+                        new._batches[file[0]] = file[1]
+                    # metrics without clustering: the stored label order is kept
+                    keep = (rec.get("labels_used")
+                            if labels is None and not _needs_sweep(metrics) else None)
+                    _score_record(rec, emb, self.dataset, self.category, dp, v,
+                                  batch=bat, labels=lab, metrics=metrics,
+                                  labels_by_cell=lab_by_cell, batch_by_cell=bat_by_cell,
+                                  keep_order=keep,
+                                  on_rank=_rank_line(m) if verbose else None)
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
+                _drop_scores(rec)
                 rec["status"] = "RUN_OK_EVAL_FAILED"
                 em = f"{type(e).__name__}: {e}"
                 rec["error"] = em if len(em) <= 600 else "... " + em[-596:]
             if verbose:
                 print(f"[rescore] {m} -> {rec['status']} "
                       f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
-            new_records.append(rec)
-        return BatchResult(new_records, self.dataset, self.category, out_dir=self.out_dir)
+            new.records.append(rec)
+        return new
 
     def save(self, out_dir=None) -> "Path":
         """Write this result to disk so it outlives the process.
@@ -2299,6 +2416,7 @@ class BatchResult:
           metrics.
         - ``failures.csv`` - the ``failures`` frame.
         - ``batch_result.json`` - dataset, category and the per-method records.
+        - ``batch_<hash>.csv`` - a batch vector the records were scored with.
 
         Reload it with ``mtb.load_batch``.
 
@@ -2350,6 +2468,12 @@ class BatchResult:
             # an earlier long.csv would attach stale metrics on load_batch
             (d / "long.csv").unlink()
         merged.failures.to_csv(d / "failures.csv", index=False)
+        # the batch vectors the records were scored with, for a later rescore
+        for name in dict.fromkeys(r["batch_file"] for r in merged.records
+                                  if r.get("batch_file")):
+            text = None if (d / name).exists() else self._batch_text(name)
+            if text is not None:
+                (d / name).write_text(text)
         slim = [{k: v for k, v in r.items() if k != "_long"} for r in merged.records]
         with open(d / "batch_result.json", "w") as fh:
             json.dump({"dataset": self.dataset, "category": self.category,
@@ -2569,6 +2693,62 @@ def _label_data_files(label: Path) -> list[Path]:
     return [label.parent / f"{s}.h5" for s in stems]
 
 
+def _dataset_folder(dataset, data_path) -> Path:
+    """``<data_path>/<dataset>``, with ``None`` = config's data root."""
+    base = config.DEFAULT.data_path if data_path is None else data_path
+    return Path(base) / dataset
+
+
+def _dataset_root(rec: dict, dataset: str, override=None) -> tuple:
+    """``(root, found)``: the data root a saved record is scored from.
+
+    The first of ``override``, the recorded ``data_path`` (read from the
+    current directory; ``None`` = config's) and ``data_root`` whose
+    ``<root>/<dataset>`` is a folder. When none is, the recorded
+    ``data_path`` and ``False``.
+    """
+    recorded = rec.get("data_path")
+    tries = [override] if override is not None else []
+    tries.append(recorded)
+    if rec.get("data_root"):
+        tries.append(rec["data_root"])
+    for root in tries:
+        if _dataset_folder(dataset, root).is_dir():
+            return (None if root is None else str(root)), True
+    return recorded, False
+
+
+#: what to do when a saved result's dataset folder is not found
+_MOVED_FIX = ("Pass data_path= to mtb.load_batch, or run rescore from the folder "
+              "where run_all ran.")
+
+
+def _folder_missing(folder) -> str:
+    """The reason a saved result's cell ids cannot be read, as a clause."""
+    return f"the dataset folder {folder} is not found from this directory"
+
+
+def _batch_csv(vec, dataset, data_path) -> tuple[str, str]:
+    """``(file name, CSV text)`` of a batch vector that ``run_all`` or
+    ``rescore`` scored with: one row per cell, the dataset's cell ids first
+    when it has as many. The name holds the text's sha1."""
+    import hashlib
+    frame = pd.DataFrame({"batch": np.asarray(vec)})
+    if _dataset_folder(dataset, data_path).is_dir():
+        ids = _dataset_cell_ids(dataset, data_path)
+        if ids is not None and len(ids) == len(frame):
+            frame.insert(0, "cell", ids)
+    text = frame.to_csv(index=False)
+    return f"batch_{hashlib.sha1(text.encode()).hexdigest()[:8]}.csv", text
+
+
+def _read_batch_text(text: str) -> np.ndarray:
+    """The batch ids of a file :func:`_batch_csv` wrote, as text."""
+    import io
+    return pd.read_csv(io.StringIO(text), dtype=str,
+                       keep_default_na=False)["batch"].to_numpy()
+
+
 def _dataset_cell_ids(dataset, data_path) -> list | None:
     """The dataset's cell ids in the order of ``labels_for(dataset)``: for
     each label file, the barcodes of a data file with as many cells. ``None``
@@ -2596,7 +2776,7 @@ _ROWS = "the embedding rows"
 
 
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
-                 stacklevel: int = 5) -> tuple[np.ndarray, bool]:
+                 stacklevel: int = 5, moved: bool = False) -> tuple[np.ndarray, bool]:
     """``x`` as one value per cell, and whether it was aligned by cell id.
 
     Aligned (``True``): a Series or one-column DataFrame whose index is not
@@ -2609,10 +2789,21 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     returned as given (``False``): positional, in ``order`` (default: the
     order of ``labels_for(dataset)``). ``stacklevel`` is that of the CSV
     warning, which is raised one call deeper than the Series warning.
+    A dataset folder that is not found is named; ``moved`` (rescore) adds
+    the fix for a saved result read from another directory.
     """
     from .eval.pipeline import _carries_ids
     order = order or config.hint(f"the order of mtb.labels_for({dataset!r})",
                                  f"the order of the label files of {dataset}")
+    folder = _dataset_folder(dataset, data_path)
+    if not folder.is_dir():
+        why = _folder_missing(folder)
+        fix = _MOVED_FIX if moved else f"Check that it follows {order}."
+        no_ids = f"{why}. {fix[:-1]}" if moved else why
+    else:
+        why = (f"the files of {dataset} have no usable cell ids (missing or "
+               f"repeated barcodes)")
+        fix, no_ids = f"Check that it follows {order}.", why
     if isinstance(x, (str, Path)):
         vals, first = _eio.read_labels_ids(
             x, what=what, pick="Keep one column in the file, or the cell ids and one "
@@ -2621,18 +2812,15 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
             return np.asarray(vals), False
         return _eio.by_id_column(
             vals, first, _dataset_cell_ids(dataset, data_path), what=what,
-            name=Path(x).name, target=dataset, order=order,
-            no_ids=f"the files of {dataset} have no usable cell ids (missing or "
-                   f"repeated barcodes)", stacklevel=stacklevel)
+            name=Path(x).name, target=dataset, order=order, no_ids=no_ids,
+            stacklevel=stacklevel)
     vals = _eio.as_vector(x, what=what)
     if not _carries_ids(x):
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
     if ids is None:
         warnings.warn(f"The {what} {type(x).__name__} is matched by position, because "
-                      f"the files of {dataset} have no usable cell ids (missing or "
-                      f"repeated barcodes). Check that it follows {order}.",
-                      UserWarning, stacklevel=stacklevel - 1)
+                      f"{why}. {fix}", UserWarning, stacklevel=stacklevel - 1)
         return vals, False
     index = pd.Index([str(i) for i in x.index])
     if list(index) == ids:
@@ -2712,7 +2900,7 @@ def _skipped_rows(blocked, attempted, methods, dataset, data_path) -> tuple[list
 
 
 def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
-                     version) -> list[dict]:
+                     version, data_root=None) -> list[dict]:
     """One ``SKIPPED`` record per method with no attempted row: its first
     reported row, a row with its files on disk first."""
     named = set(methods or ())
@@ -2728,6 +2916,7 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
              "error": r["reason"], "requested": m in named, "_long": None,
              "caveat": _run_caveat(r["caveat"]),
              "data_path": str(data_path) if data_path else None,
+             "data_root": data_root,
              "multibench_version": version,
              "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
             for m, r in first.items()]
@@ -2757,16 +2946,35 @@ def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
             f"The batch metrics of {who} would fail.")
 
 
+#: what scoring writes into a record; a record that is not scored keeps none of it
+_SCORE_KEYS = ("metrics", "labels_used", "label_order_candidates", "batch_source",
+               "n_batches", "_long", "note", "error")
+
+
+def _drop_scores(rec: dict) -> dict:
+    """Remove the fields of an earlier scoring from ``rec``."""
+    for k in _SCORE_KEYS:
+        rec.pop(k, None)
+    return rec
+
+
 def _score_record(rec, emb, dataset, category, data_path, variant, *,
                   batch=None, labels=None, metrics=None, labels_by_cell=False,
-                  batch_by_cell=False):
+                  batch_by_cell=False, keep_order=None, on_rank=None):
     """Fill ``rec`` with metrics for ``emb`` (shared by run_all and rescore).
 
     Sets ``status`` (``CHAIN_OK`` / ``CHAIN_OK_GRAPH_METHOD`` /
     ``RUN_OK_NO_LABEL_MATCH`` / ``RUN_OK_EVAL_FAILED``), ``metrics``,
     ``labels_used``, ``label_order_candidates``, ``batch_source``,
     ``n_batches``, ``emb_shape`` and the tidy ``_long`` frame. ``metrics``
-    restricts the metric set (``evaluate(metrics=)``).
+    restricts the metric set (``evaluate(metrics=)``). The fields of an
+    earlier scoring are removed first, so a record that is not scored has
+    none of them.
+
+    ``keep_order`` (a stored ``labels_used``) is scored directly, with no
+    ranking, when it is one of the candidate orders; the stored
+    ``label_order_candidates`` are then kept. ``on_rank`` is handed to
+    :func:`_evaluate_best_order`.
 
     ``labels`` (one per cell) replaces the label files. In embedding row
     order it bypasses the label-order search; with ``labels_by_cell`` it is
@@ -2781,6 +2989,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     labels is put in the variant's own label-file order. A vector as long as
     the embedding is used as given when no order fits.
     """
+    stored = rec.get("label_order_candidates")
+    _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
@@ -2812,6 +3022,10 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
                 raise ValueError(f"labels has {len(labels)} entries, embedding has "
                                  f"{n} cells")
             cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
+    kept = [c for c in cands if keep_order and c[0] == list(keep_order)]
+    if kept:
+        # the stored order is still a candidate: no ranking, no sweep
+        cands = kept
     if batch is not None:
         # the user's ids replace each candidate's file-of-origin batch, put in
         # that candidate's order (the variant's own order for labels given in
@@ -2831,12 +3045,16 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         if cands and not placed:
             raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
         cands = placed
-    for k in ("metrics", "labels_used", "label_order_candidates", "_long"):
-        rec.pop(k, None)
     if not cands:
         rec["status"] = "RUN_OK_NO_LABEL_MATCH"
+        folder = _dataset_folder(dataset, data_path)
+        if not folder.is_dir():
+            why = _folder_missing(folder)
+            rec["note"] = f"{why[:1].upper()}{why[1:]}. {_MOVED_FIX}"
         return rec
-    names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics)
+    names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
+                                              user_batch=batch is not None,
+                                              on_rank=on_rank)
     if val is None:
         rec["status"] = "RUN_OK_EVAL_FAILED"
         errs = [s["error"] for s in spread if isinstance(s, dict) and s.get("error")]
@@ -2846,7 +3064,9 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4))
                       for k, x in val["Value"].items()}
     rec["labels_used"] = names
-    if len(spread) > 1:
+    if kept and stored:
+        rec["label_order_candidates"] = stored
+    elif len(spread) > 1:
         rec["label_order_candidates"] = spread
     # which batch vector the batch metrics saw (summary columns batch_source/n_batches)
     bat = next(b for nm, _, b in cands if nm == names)
@@ -2986,9 +3206,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     unavailable, with a warning.
 
     **Saved files.** The result is saved automatically under ``out_dir``
-    (``summary.csv``, ``failures.csv``, ``batch_result.json``, and
-    ``long.csv`` when some method produced metrics); reload it with
-    ``mtb.load_batch``.
+    (``summary.csv``, ``failures.csv``, ``batch_result.json``, ``long.csv``
+    when some method produced metrics, and the ``batch`` vector); reload it
+    with ``mtb.load_batch``.
 
     **Several jobs, one folder.** A later run into the same ``out_dir`` is
     merged with the records already there: methods it re-ran are replaced,
@@ -3176,6 +3396,13 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         raise ValueError(_nothing_runnable_message(dataset, category, blocked, methods))
 
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
+    # saved in out_dir so that rescore can reuse it
+    batch_file = (_batch_csv(batch_vec, dataset, data_path)
+                  if batch_vec is not None and evaluate else None)
+    # the data root as an absolute path: a saved result read from another
+    # directory still finds the dataset folder
+    data_root = os.path.abspath(config.DEFAULT.data_path if data_path is None
+                                else data_path)
     out_dir = Path(out_dir)
     # a folder holding another dataset's saved result would refuse the save
     # after the sweep; refuse now, before any method runs
@@ -3210,6 +3437,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                "params_used": dict(params.get(m) or {}),
                "out_dir": str(out_dir / f"{m}_{dataset}"),
                "data_path": str(data_path) if data_path else None,
+               "data_root": data_root,
                "multibench_version": _pkg_version,
                "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
         t0 = time.time()
@@ -3270,6 +3498,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                 if not evaluate:
                     rec["status"] = "RUN_OK"
                 else:
+                    if batch_file:
+                        rec["batch_file"] = batch_file[0]
                     try:
                         _score_record(rec, emb, dataset, category, data_path, v,
                                       batch=batch_vec)
@@ -3304,9 +3534,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         records.append(rec)
     records += _skipped_records(shown, attempted, methods, category=category,
                                 dataset=dataset, data_path=data_path,
-                                version=_pkg_version)
+                                version=_pkg_version, data_root=data_root)
 
     result = BatchResult(records, dataset, category, out_dir)
+    if batch_file and any(r.get("batch_file") for r in records):
+        result._batches[batch_file[0]] = batch_file[1]
     result.save()          # survive process exit; reload with load_batch()
     return result
 

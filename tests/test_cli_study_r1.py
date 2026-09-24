@@ -382,7 +382,7 @@ def test_evaluate_hints_use_flag_names(tmp_path, capsys):
     rc = cli.main(["evaluate", "--output", str(tmp_path / "e.npy"),
                    "--labels", str(tmp_path / "l.csv"), "--metrics", "batch"])
     err = capsys.readouterr().err
-    assert rc == 1 and "pass --batch CSV (or two or more --labels files)" in err
+    assert rc == 1 and "Pass --batch CSV, or two or more --labels files." in err
     assert "batch=<vector>" not in err
 
 

@@ -558,7 +558,7 @@ def test_reference_entries_lose_their_justification_tails():
     assert ("so with few methods a small gap fills the whole colour scale. Check the "
             "values in ``summary``.") in flat["plot"]
     assert "not a difference, because" not in flat["summary"]
-    assert "``(best - runner_up) / best``" in flat["summary"]
+    assert "``(best - max(runner_up, 0)) / best``" in flat["summary"]
     assert "not predictions" not in flat["method_info"]
     assert "Use them to set ``run_all(timeout=...)``." in flat["method_info"]
     assert "meaningless ranks" not in flat["load_results"]

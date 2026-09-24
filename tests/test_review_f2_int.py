@@ -428,7 +428,7 @@ def test_docstrings_drop_the_justification_tails():
     assert "bounded above by the ARI itself" not in flat["summary"]
     # R4-14 deleted the ratio sentence; the formula stays
     assert "not a difference, because" not in flat["summary"]
-    assert "``(best - runner_up) / best``" in flat["summary"]
+    assert "``(best - max(runner_up, 0)) / best``" in flat["summary"]
     assert "so a whole category needs only a few envs" not in flat["plan"]
     assert "go straight to" not in flat["load_results"]
 

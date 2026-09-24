@@ -306,7 +306,7 @@ def test_a_dataset_order_batch_follows_each_methods_cell_order(tmp_path, monkeyp
     batch = np.array(["rna_s"] * 10 + ["atac_s"] * 8)          # labels_for order
     seen = {}
 
-    def fake(emb, category, cands, batch=None, metrics=None):
+    def fake(emb, category, cands, batch=None, metrics=None, **kw):
         names, lab, bat = next(c for c in cands if c[0][0] == "atac_cty.csv")
         seen["bat"] = np.asarray(batch if batch is not None else bat)
         val = pd.DataFrame({"Value": {"ARI": 0.5}})
@@ -328,7 +328,7 @@ def test_a_dataset_order_batch_is_cut_to_the_batches_a_method_reads(tmp_path, mo
     batch = np.array(["d1"] * 4 + ["d2"] * 6 + ["d3"] * 5)
     seen = {}
 
-    def fake(emb, category, cands, batch=None, metrics=None):
+    def fake(emb, category, cands, batch=None, metrics=None, **kw):
         names, lab, bat = next(c for c in cands if c[0] == ["cty1.csv", "cty2.csv"])
         seen["bat"] = np.asarray(batch if batch is not None else bat)
         return names, pd.DataFrame({"Value": {"ARI": 0.5}}), [{"order": names, "ARI": 0.5}]
