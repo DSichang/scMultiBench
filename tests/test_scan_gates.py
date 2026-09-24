@@ -92,11 +92,12 @@ def test_scan_empty_folder_flags_data_dir_methods(tmp_path, all_envs, monkeypatc
     assert len(rows) == 1
     r = rows.iloc[0]
     assert not r["files_ok"] and not r["runnable"]
-    assert "'rna.h5'" in r["files_reason"] and "'atac_cty.csv'" in r["files_reason"]
+    assert "rna.h5" in r["files_reason"] and "atac_cty.csv" in r["files_reason"]
     # env gate passed (mocked), so the ONLY reason is the file problem - in
     # its short form: the exception class and the absolute dir are gone
     assert r["env_ok"]
-    assert r["reason"].startswith("missing files in EMPTY: ")
+    assert r["reason"] == ("scBridge needs rna.h5, atac_gas.h5, rna_cty.csv and "
+                           "atac_cty.csv, and EMPTY has none of them.")
     assert r["files_reason"].startswith("FileNotFoundError: ")
     assert "FileNotFoundError" not in r["reason"]
 
@@ -196,7 +197,7 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
     df = mtb.scan("PEAKY", "diagonal", data_path=tmp_path)
     portal = df[df["method"] == "Portal"].iloc[0]          # wants gene activity
     assert portal["files_ok"]
-    assert "expects gene activity; atac.h5 holds peaks" in portal["caveat"]
+    assert "Portal needs gene-activity ATAC. atac.h5 holds peaks" in portal["caveat"]
     assert "chr:start-end" in portal["caveat"]
     # a method that WANTS peaks behind the atac_gas role gets no caveat
     peak_wanters = df[(df["atac"] == "peak") & df["modalities"].str.contains("atac_gas")]

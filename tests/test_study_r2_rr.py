@@ -300,18 +300,18 @@ def test_unitednet_reason_names_atac_first_then_cty(tmp_path):
                                     "not in the folder. cty.csv is missing.")
 
 
-# --- M22: caveats lead with the problem ---------------------------------------
+# --- M22 / R6-10: caveats start with the method, then the problem --------------
 def test_every_caveat_leads_with_its_warning():
     heads = {
-        resolve.PEAK_IN_GAS_CAVEAT: "expects gene activity",
-        resolve.PEAK_FED_TO_GAS_CAVEAT: "expects gene activity",
-        resolve.GAS_FED_TO_PEAK_CAVEAT: "expects peaks",
-        resolve.NOT_COUNTS_CAVEAT: "expects raw counts",
+        resolve.PEAK_IN_GAS_CAVEAT: "needs gene-activity ATAC.",
+        resolve.PEAK_FED_TO_GAS_CAVEAT: "needs gene-activity ATAC.",
+        resolve.GAS_FED_TO_PEAK_CAVEAT: "needs peak ATAC.",
+        resolve.NOT_COUNTS_CAVEAT: "needs raw counts.",
         resolve.DIAGONAL_CTY_CAVEAT: "needs rna_cty.csv",
         resolve.UNUSED_BATCHES_CAVEAT: "reads batches",
     }
     for text, head in heads.items():
-        assert head in text[:30], text
+        assert text.startswith("{method} " + head), text
 
 
 def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeypatch):
@@ -327,7 +327,7 @@ def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeyp
     out = capsys.readouterr().out
     assert rc == 0
     line = next(ln for ln in out.splitlines() if ln.strip().startswith("Matilda"))
-    assert "expects gene activity" in line
+    assert "Matilda needs gene-activity ATAC" in line
     assert "resolved to a peak matrix" not in out
 
 
@@ -343,7 +343,7 @@ def test_labels_for_uinmf_returns_the_batches_it_reads(root):
 def test_scan_caveat_names_the_unused_batch(root):
     df = mtb.scan("D52", "cross", data_path=root / "data", verbose=False)
     by = df.set_index("method")["caveat"]
-    assert "reads batches 1-2 of 3; batch 3 is not used" in by["UINMF"]
+    assert by["UINMF"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used.")
     others = [m for m in by.index if m != "UINMF"]
     assert not any("reads batches" in by[m] for m in others)
 
@@ -352,7 +352,7 @@ def test_dry_run_prints_the_unused_batch(root, capsys):
     mtb.run_all("D52", "cross", methods=["UINMF", "StabMap"], data_path=root / "data",
                 dry_run=True)
     out = capsys.readouterr().out
-    assert "UINMF reads batches 1-2 of 3; batch 3 is not used" in out
+    assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
     assert "StabMap reads batches" not in out
 
 
@@ -379,7 +379,7 @@ def test_cli_dry_run_prints_the_unused_batch(root, capsys, tmp_path):
                    "--dry-run", "--out-dir", str(tmp_path / "out")])
     assert rc == 0
     err = capsys.readouterr().err
-    assert "# UINMF reads batches 1-2 of 3; batch 3 is not used" in err
+    assert "# UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in err
     assert "StabMap reads batches" not in err
 
 
@@ -393,7 +393,8 @@ def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(workflow, "_run", fake_run)
     mtb.run_all("D52", "cross", tmp_path / "out", methods=["UINMF"],
                 data_path=root / "data", evaluate=False)
-    assert "[run_all]   UINMF reads batches 1-2 of 3; batch 3 is not used" in capsys.readouterr().out
+    assert ("[run_all]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n"
+            in capsys.readouterr().out)
 
 
 def test_to_canonical_gas_for_vertical_keeps_its_order(tmp_path, capsys):

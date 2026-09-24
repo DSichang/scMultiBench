@@ -69,11 +69,12 @@ def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, m
                           data_path=tmp_path, evaluate=False)
     assert row["runnable"] and "GLUE reads inputs/atac_peak_normpeaks.h5" in row["caveat"]
     kept = res.summary["caveat"].iloc[0]
-    assert kept.startswith("setup: GLUE needs the GENCODE v43 human annotation")
+    assert kept.startswith("GLUE needs the GENCODE v43 human annotation")
     assert "reads inputs/" not in kept and "normpeaks" not in kept
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())
     assert blob["records"][0]["caveat"] == kept
-    assert f"[run_all]   GLUE {kept}\n" in capsys.readouterr().out
+    # the caveat starts with the method name: the log line names it once
+    assert f"[run_all]   {kept}\n" in capsys.readouterr().out
 
 
 def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch):
@@ -85,7 +86,7 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch):
     _h5(d / "atac.h5", [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)],
         [f"c{i}" for i in range(60)])
     pd.DataFrame({"x": ["A", "B"] * 30}).to_csv(d / "cty.csv", index=False)
-    wrong = "method scripts are at 0000000, not deadbeef (MULTIBENCH_SCRIPTS_REF)."
+    wrong = "The method scripts are at 0000000, not deadbeef (MULTIBENCH_SCRIPTS_REF)."
     monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: wrong)
     monkeypatch.setattr(W, "_run", lambda *a, **k: pytest.fail("no method may start"))
     with warnings.catch_warnings():
@@ -99,6 +100,6 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch):
         assert ("Matilda needs gene-activity ATAC, and atac.h5 holds peaks. Export the "
                 "ATAC as gene activity, or pass allow_atac_mismatch=True to run Matilda "
                 "anyway.") in r["reason"]
-        with pytest.raises(ValueError, match="nothing is runnable"):
+        with pytest.raises(ValueError, match=r"^No method can run on MU_PEAK \(vertical\)"):
             mtb.run_all("MU_PEAK", "vertical", tmp_path / "out",
                         modalities=["rna", "atac"], data_path=tmp_path, verbose=False)

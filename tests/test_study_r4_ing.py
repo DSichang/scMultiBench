@@ -194,14 +194,14 @@ def test_scan_strict_fails_while_the_scripts_are_not_fetched(host, monkeypatch, 
     # the Python scan: runnable, with the caveat (a host with network clones)
     row = _scan_row()
     assert row["runnable"] and row["reason"] == ""
-    assert f"method scripts not found under {target}: the first real run" in row["caveat"]
+    assert f"The method scripts are not in {target}. The first real run" in row["caveat"]
     assert cli.main(MATILDA) == 0                       # without --strict: unchanged
     capsys.readouterr()
     assert cli.main(MATILDA + ["--strict"]) == 1
     err = capsys.readouterr().err
     assert err.startswith("error: --strict: 0 of 1 row is runnable. Rows whose method "
                           "scripts are not fetched: 1.")
-    assert "  Matilda: method scripts not fetched\n" in err
+    assert "  Matilda: The method scripts are not fetched.\n" in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
     assert "no row" not in err
 

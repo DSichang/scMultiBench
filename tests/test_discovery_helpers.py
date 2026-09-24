@@ -53,7 +53,9 @@ def test_inputs_for_check_none_warns_on_missing(tmp_path):
                                  check=None)
     assert got["atac_peak"].endswith("/D27/atac_peak.h5")     # fallback path still returned
     msg = str(rec[0].message)
-    assert "1 resolved input path(s) do not exist" in msg and "check=True to raise" in msg
+    assert msg.startswith(f"Seurat_v5 (diagonal) needs atac_peak.h5 in {d}. The folder "
+                          f"holds rna.h5.")
+    assert "Pass check=True to raise this as an error" in msg
 
 
 def test_inputs_for_check_false_is_silent_and_is_the_default(tmp_path):

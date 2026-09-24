@@ -78,18 +78,19 @@ def test_near_miss_hint_names_the_rename_when_the_kind_matches(tmp_path, monkeyp
     with pytest.raises(FileNotFoundError) as ei:
         resolve.inputs_for("MU", "vertical", "scMVP", data_path=tmp_path, check=True)
     msg = str(ei.value)
-    assert ("atac.h5 not found; found atac_peak.h5 - vertical reads atac.h5: rename "
-            "atac_peak.h5 to atac.h5, or write it with category=\"vertical\"") in msg
-    assert "pass the representation" not in msg
+    assert ("The folder holds atac_peak.h5 and rna.h5. Vertical methods read atac.h5. "
+            "Rename atac_peak.h5 to atac.h5, or write it with category=\"vertical\".") in msg
+    assert "says which ATAC" not in msg
     # the CLI spelling of the same fix
     monkeypatch.setattr(config, "_CLI", True)
     hints = resolve._near_miss_hints(d, {"atac": str(d / "atac.h5")}, "vertical",
                                      atac="peak")
-    assert hints and hints[0].endswith("--category vertical"), hints
+    assert hints and hints[0].endswith("--category vertical."), hints
     # a method that reads gene activity keeps the representation pointer
     hints = resolve._near_miss_hints(d, {"atac": str(d / "atac.h5")}, "vertical",
                                      atac="gene_activity")
-    assert "pass the representation this method wants" in hints[0]
+    assert hints[0] == ("Vertical methods read atac.h5. multibench info METHOD says which "
+                        "ATAC the method needs.")
 
 
 def test_incomplete_matrix_warning_names_the_overall_flag_on_the_cli(monkeypatch):

@@ -209,7 +209,7 @@ def _looks_like_ids(col: pd.Series) -> bool:
 
 
 def by_id_column(values, first, ids, *, what: str, name: str, target: str,
-                 order: str, no_ids: str, stacklevel: int = 3):
+                 order: str, no_ids: str, stacklevel: int = 3, n_files: int = 1):
     """Put a per-cell file in the order of ``ids`` by its first column.
 
     ``values`` and ``first`` come from :func:`read_labels_ids`; ``ids`` are
@@ -229,12 +229,17 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
       the file only when they are exactly the target's ids in some order
       (an AnnData with the default ``obs_names``); otherwise the file is
       matched by position, silently, as before.
+
+    ``n_files`` > 1 when ``name`` names several stacked files: the warnings
+    then speak of them in the plural.
     """
     vals = np.asarray(values)
     if first is None:
         return vals, False
     text = _looks_like_ids(first)
-    by_position = (f"The file is matched by position. Check that its rows follow "
+    by_position = (f"The file is matched by position. Check that its rows follow {order}"
+                   if n_files == 1 else
+                   f"These files are matched by position. Check that their rows follow "
                    f"{order}")
     if ids is None:
         if text and first.is_unique:

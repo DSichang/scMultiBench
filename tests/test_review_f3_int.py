@@ -202,16 +202,16 @@ def test_scan_error_lists_the_categorys_methods_for_a_mixed_list(capsys):
 def test_dry_run_prints_the_scripts_note_once_and_no_start_notes(pinned, capsys):
     _quiet(mtb.run_all, "D11", "vertical", dry_run=True)
     out = capsys.readouterr().out
-    assert out.count("method scripts not found under") == 1, out
-    assert "[run_all] method scripts not found under" in out
+    assert out.count("The method scripts are not in") == 1, out
+    assert "[run_all] The method scripts are not in" in out
     _quiet(mtb.run_all, "D28", "diagonal", dry_run=True)
     out = capsys.readouterr().out
     assert "the command reads" not in out and "start the method with" not in out
-    assert out.count("method scripts not found under") == 1
+    assert out.count("The method scripts are not in") == 1
     rc = _quiet(cli.main, ["run-all", "D11", "--category", "vertical", "--dry-run"])
     err = capsys.readouterr().err
-    assert rc == 0 and err.count("# method scripts not found under") == 1, err
-    assert not re.search(r"^# \w+ method scripts not found", err, re.M)
+    assert rc == 0 and err.count("# The method scripts are not in") == 1, err
+    assert not re.search(r"^# \w+ The method scripts are not in", err, re.M)
 
 
 def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, capsys):
@@ -220,14 +220,14 @@ def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, caps
            data_path=root, dry_run=True)
     out = capsys.readouterr().out
     assert "[run_all] Matilda" not in out           # blocked: the wrong ATAC kind
-    assert "[run_all] moETM" not in out or "expects" not in out
+    assert "[run_all] moETM" not in out or "moETM needs" not in out
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
            modalities=["rna", "atac"], data_path=root, dry_run=True)
     assert "[run_all] Matilda" not in capsys.readouterr().out    # named: still skipped
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
            modalities=["rna", "atac"], data_path=root, dry_run=True,
            allow_atac_mismatch=True)
-    assert "[run_all] Matilda expects gene activity; atac.h5 holds peaks" in \
+    assert "[run_all] Matilda needs gene-activity ATAC. atac.h5 holds peaks, because" in \
         capsys.readouterr().out
 
 
@@ -270,7 +270,7 @@ def test_a_scripts_ref_mismatch_is_its_own_blocker(scripts_at_head, capsys):
                    "--dry-run"])
     cap = capsys.readouterr()
     assert rc == 0
-    assert "# Commands of the 1 row with resolvable inputs." in cap.out
+    assert "# Commands of the 1 row whose input files are in place." in cap.out
     assert "totalVI (rna+adt): " in cap.out
 
 

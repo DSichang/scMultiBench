@@ -364,7 +364,7 @@ def _stack_label_files(files, ids):
         pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
             [first for _, first in read], ignore_index=True), ids if unique else None,
             what="labels", name=name, target="the output", order=order,
-            no_ids=_no_ids(ids), stacklevel=5)
+            no_ids=_no_ids(ids), stacklevel=5, n_files=len(names))
         return vals[pos], origin[pos]
     for (v, first), name in zip(read, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the output",

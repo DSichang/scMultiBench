@@ -335,9 +335,9 @@ def test_glue_d28_caveat_names_the_rename_call(tmp_path):
     # R3-04: mtb.run rewrites D28's chr_start_end names for GLUE, so the
     # caveat has no peak-name clause and does not name the dataset
     r = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
-    assert r["caveat"].startswith("setup: ")
+    assert r["caveat"].startswith("GLUE needs the GENCODE v43 human annotation")
     assert "peak names" not in r["caveat"] and "D28" not in r["caveat"]
-    assert ".;" not in r["caveat"] and "D27" not in r["caveat"]
+    assert ";" not in r["caveat"] and "D27" not in r["caveat"]
     # the named call writes the spelling GLUE needs
     src = Path(mtb.inputs_for("D28", "diagonal", "GLUE")["atac_peak"])
     out = mtb.io.normalize_peak_names(src, tmp_path / "atac_peak.h5")
@@ -346,9 +346,10 @@ def test_glue_d28_caveat_names_the_rename_call(tmp_path):
     assert re.fullmatch(r"chr\w+:\d+-\d+", first), first
 
 
-def test_caveat_clauses_join_without_a_stray_period():
-    assert W._join_clauses(["a sentence.", "", "setup: b."]) == "a sentence; setup: b."
-    assert W._join_clauses(["only one."]) == "only one."
+def test_caveat_clauses_join_as_sentences():
+    # R6-10: the caveat parts are sentences, joined with a space
+    assert W._join_clauses(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
+    assert W._join_clauses(["Only one."]) == "Only one."
 
 
 # ====================================================================== M13

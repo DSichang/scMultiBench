@@ -94,9 +94,9 @@ def test_gas_fed_to_peak_method_is_flagged(tmp_path):
     got = resolve.inputs_for("GAS", "vertical", "moETM", modalities=["rna", "atac_gas"],
                              data_path=tmp_path, check=True)
     assert got["atac_gas"].endswith("atac_gas.h5")
-    cav = resolve._preflight_caveats(got, atac="peak")
-    assert cav == ["expects peaks; atac_gas.h5 holds gene activity (features do not look "
-                   "like chr:start-end)"]
+    cav = resolve._preflight_caveats(got, atac="peak", method="moETM")
+    assert cav == ["moETM needs peak ATAC. atac_gas.h5 holds gene activity, because its "
+                   "features do not look like chr:start-end."]
     # legacy call (no atac=): today's single check, nothing for this case
     assert resolve._preflight_caveats(got) == []
     # a peak file satisfies a peak method
@@ -112,15 +112,16 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     # Matilda rna+atac wants gene activity but reads the plain atac role
     got = resolve.inputs_for("PK", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
-    cav = resolve._preflight_caveats(got, atac="gene_activity")
-    assert cav == ["expects gene activity; atac.h5 holds peaks (features look like "
-                   "chr:start-end)"]
+    cav = resolve._preflight_caveats(got, atac="gene_activity", method="Matilda")
+    assert cav == ["Matilda needs gene-activity ATAC. atac.h5 holds peaks, because its "
+                   "features look like chr:start-end."]
     # the legacy atac_gas-role check is unchanged
     _h5(d / "atac.h5", 40, 50, feats=PEAKS)
     got2 = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path)
-    assert resolve._preflight_caveats(got2) == [resolve.PEAK_IN_GAS_CAVEAT]
-    assert resolve._preflight_caveats(got2, atac="gene_activity") == [
-        resolve.PEAK_FED_TO_GAS_CAVEAT.format(file="atac.h5")]
+    assert resolve._preflight_caveats(got2) == [
+        resolve.PEAK_IN_GAS_CAVEAT.format(method="The method")]
+    assert resolve._preflight_caveats(got2, atac="gene_activity", method="Portal") == [
+        resolve.PEAK_FED_TO_GAS_CAVEAT.format(method="Portal", file="atac.h5")]
     # mixed names (10-90 %) -> no verdict either way
     _h5(d / "atac.h5", 40, 50, feats=PEAKS[:20] + [f"g{i}" for i in range(20)])
     got3 = resolve.inputs_for("PK", "vertical", "Matilda", modalities=["rna", "atac"],
@@ -138,10 +139,11 @@ def test_near_miss_vertical_atac_names_the_peak_file(tmp_path):
         resolve.inputs_for("MM", "vertical", "Matilda", modalities=["rna", "atac"],
                            data_path=tmp_path, check=True)
     msg = str(ei.value)
-    assert ("atac.h5 not found; found atac_peak.h5 - vertical reads atac.h5 "
-            "(pass the representation this method wants: see method_info(m)['atac'])") in msg
+    assert msg == (f"Matilda (vertical) needs atac.h5 in {d}. The folder holds "
+                   f"atac_peak.h5, cty.csv and rna.h5. Vertical methods read atac.h5. "
+                   f'method_info("Matilda")["atac"] says which ATAC Matilda needs.')
     # the warn-only form (check=None) carries the same hint
-    with pytest.warns(UserWarning, match="found atac_peak.h5"):
+    with pytest.warns(UserWarning, match=r"Vertical methods read atac\.h5\. method_info"):
         resolve.inputs_for("MM", "vertical", "Matilda", modalities=["rna", "atac"],
                            data_path=tmp_path, check=None)
 
@@ -153,16 +155,17 @@ def test_near_miss_diagonal_gas_names_the_peak_file_and_vice_versa(tmp_path):
     (d / "rna_cty.csv").write_text("x\n" + "\n".join(["a"] * 50) + "\n")
     with pytest.raises(FileNotFoundError) as ei:
         resolve.inputs_for("DG", "diagonal", "Portal", data_path=tmp_path, check=True)
-    assert ("atac_gas.h5 not found; found atac_peak.h5 - diagonal methods read "
-            "atac_gas.h5 or atac.h5") in str(ei.value)
+    assert (f"Portal (diagonal) needs atac_gas.h5 in {d}. The folder holds atac_peak.h5, "
+            f"rna.h5 and rna_cty.csv. Diagonal methods read atac_gas.h5 or atac.h5. "
+            f'method_info("Portal")["atac"] says which ATAC Portal needs.') == str(ei.value)
     (d / "atac_peak.h5").unlink()
     _h5(d / "atac_gas.h5", 40, 45)
     with pytest.raises(FileNotFoundError) as ei:
         resolve.inputs_for("DG", "diagonal", "Seurat_v3", data_path=tmp_path, check=True)
-    assert ("atac_peak.h5 not found; found atac_gas.h5 - diagonal methods read "
-            "atac_peak.h5 or peak.h5") in str(ei.value)
+    assert ("The folder holds atac_gas.h5, rna.h5 and rna_cty.csv. Diagonal methods read "
+            "atac_peak.h5 or peak.h5.") in str(ei.value)
     # no sibling at all -> no near-miss clause, the plain message stands
     (d / "atac_gas.h5").unlink()
     with pytest.raises(FileNotFoundError) as ei:
         resolve.inputs_for("DG", "diagonal", "Portal", data_path=tmp_path, check=True)
-    assert "not found; found" not in str(ei.value)
+    assert "methods read" not in str(ei.value)

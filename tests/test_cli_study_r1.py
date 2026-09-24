@@ -347,7 +347,7 @@ def test_scan_strict_names_a_requested_method_without_a_runnable_row(monkeypatch
 def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, capsys):
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path)])
     err = capsys.readouterr().err
-    assert rc == 1 and "nothing is runnable" in err
+    assert rc == 1 and "No method can run on D11 (vertical)." in err
     assert "multibench scan D11 --category vertical shows every row" in err
     assert "multibench env doctor checks the environments" in err
     assert "`" not in err
@@ -395,7 +395,7 @@ def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
     assert header == ["method", "modalities", "atac", "runnable", "files_ok", "env_ok",
                       "runtime_tier", "reason", "caveat"]
     glue = next(l for l in out.splitlines() if l.strip().startswith("GLUE"))
-    assert "setup: GLUE needs" in glue and "peak names" not in glue
+    assert "GLUE needs the GENCODE" in glue and "peak names" not in glue
     rc = cli.main(["scan", "D11", "--category", "vertical", "--modalities", "rna,adt"])
     header = capsys.readouterr().out.splitlines()[0].split()
     assert rc == 0 and header == cli._COMPACT_PLAN_COLUMNS    # no ATAC row, no caveat

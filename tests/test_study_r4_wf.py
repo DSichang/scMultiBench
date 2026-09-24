@@ -126,7 +126,9 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
     ok = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False, allow_atac_mismatch=True)
     assert ok["runnable"].all() and ok["reason"].eq("").all()
-    assert ok["caveat"].str.startswith("expects peaks; atac2.h5 holds gene activity").all()
+    assert all(c.startswith(f"{m} needs peak ATAC. atac2.h5 holds gene activity, because its "
+                            f"features do not look like chr:start-end.")
+               for m, c in zip(ok["method"], ok["caveat"])), ok["caveat"].tolist()
 
 
 def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned, capsys,
@@ -147,7 +149,8 @@ def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned,
     cap = capsys.readouterr()
     assert rc == 0, cap.err
     df = pd.read_csv(__import__("io").StringIO(cap.out))
-    assert df["caveat"].str.startswith("expects peaks; atac2.h5 holds gene activity").all()
+    assert all(c.startswith(f"{m} needs peak ATAC. atac2.h5 holds gene activity")
+               for m, c in zip(df["method"], df["caveat"])), df["caveat"].tolist()
 
 
 def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinned, capsys):
@@ -162,8 +165,9 @@ def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinn
                   modalities=["rna", "atac"], data_path=root, dry_run=True,
                   allow_atac_mismatch=True)
     assert plan["runnable"].all() and plan["reason"].eq("").all()
-    assert plan["caveat"].iloc[0].startswith("expects gene activity; atac.h5 holds peaks")
-    assert "[run_all] Matilda expects gene activity; atac.h5 holds peaks" in \
+    assert plan["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC. atac.h5 "
+                                             "holds peaks")
+    assert "[run_all] Matilda needs gene-activity ATAC. atac.h5 holds peaks" in \
         capsys.readouterr().out
 
 
@@ -176,7 +180,8 @@ def test_real_run_all_with_the_override_runs_and_keeps_the_caveat(tmp_path, pinn
         calls.append(method)
         return _Res(np.zeros((60, 5)))
     monkeypatch.setattr(W, "_run", fake_run)
-    with pytest.raises(ValueError, match="nothing is runnable"):
+    with pytest.raises(ValueError, match=r"^None of the requested methods \(Matilda\) can "
+                                         r"run on MU_PEAK \(vertical\)\."):
         _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "blocked",
                methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
                evaluate=False)
@@ -185,9 +190,9 @@ def test_real_run_all_with_the_override_runs_and_keeps_the_caveat(tmp_path, pinn
                  methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
                  evaluate=False, allow_atac_mismatch=True)
     assert calls == ["Matilda"]
-    assert "[run_all]   Matilda expects gene activity; atac.h5 holds peaks" in \
+    assert "[run_all]   Matilda needs gene-activity ATAC. atac.h5 holds peaks" in \
         capsys.readouterr().out
-    assert res.summary["caveat"].iloc[0].startswith("expects gene activity")
+    assert res.summary["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC")
 
 
 def test_named_glue_with_peak_0_names_is_blocked(tmp_path, pinned):
@@ -218,7 +223,8 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
     _quiet(mtb.run, "Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"),
            dry_run=True)
     err = capsys.readouterr().err
-    assert re.search(r"^# Matilda expects gene activity; atac\.h5 holds peaks", err, re.M), err
+    assert re.search(r"^# Matilda needs gene-activity ATAC\. atac\.h5 holds peaks", err,
+                     re.M), err
 
     class Stop(Exception):
         pass
@@ -226,8 +232,8 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
     def stop(spec):
         raise Stop
     monkeypatch.setattr(R, "check_gpu_requirement", stop)
-    with pytest.warns(UserWarning, match=r"^Matilda expects gene activity; atac\.h5 holds "
-                                         r"peaks"):
+    with pytest.warns(UserWarning, match=r"^Matilda needs gene-activity ATAC\. atac\.h5 "
+                                         r"holds peaks"):
         with pytest.raises(Stop):
             mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
     # the right representation: no note
@@ -236,7 +242,7 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
                           data_path=root2)
     _quiet(mtb.run, "Matilda", "vertical", inputs=inp2, out_dir=str(tmp_path / "o2"),
            dry_run=True)
-    assert "expects" not in capsys.readouterr().err
+    assert "needs gene-activity ATAC" not in capsys.readouterr().err
 
 
 def test_cli_run_dry_run_prints_the_note(tmp_path, pinned, capsys):
