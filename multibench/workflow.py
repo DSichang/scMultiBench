@@ -1239,9 +1239,10 @@ def scan(dataset: str, category: str | None = None, *,
                           "contains it (see `multibench layout`)"))
     installed = _installed_envs()
     repo = _runner._repo_root_no_fetch()
-    # scripts at another commit than $MULTIBENCH_SCRIPTS_REF: the real run
-    # refuses, so every row is blocked; the files and the command stay checked
-    wrong_ref = config.scripts_ref_problem(repo) or ""
+    # scripts at another commit than $MULTIBENCH_SCRIPTS_REF, or a scripts
+    # folder that holds other files: the real run refuses, so every row is
+    # blocked; the files and the command stay checked
+    wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
     for spec, v, cat, mods in _variant_rows(category):
