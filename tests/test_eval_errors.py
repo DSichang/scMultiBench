@@ -40,7 +40,7 @@ def test_metrics_family_token_and_code_list_agree():
     b = evaluate(emb, labels=lab, metrics="clustering")
     assert a.loc["ASW", "Value"] == pytest.approx(b.loc["ASW", "Value"])
     # the batch family needs batch labels
-    with pytest.raises(ValueError, match="batch labels required"):
+    with pytest.raises(ValueError, match="metrics='batch' needs batch labels"):
         evaluate(emb, labels=lab, metrics="batch")
 
 

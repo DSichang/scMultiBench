@@ -52,15 +52,15 @@ def test_batch_metric_without_batch_labels_raises_not_empty():
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics=["GC"])
     msg = str(exc.value)
-    assert "batch labels required for batch metric(s) ['GC']: pass batch=<vector>" in msg
+    assert "metrics=['GC'] needs batch labels for GC. Pass batch=<vector>" in msg
     # several offenders are all named
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics=["GC", "iLISI"])
     assert "['GC', 'iLISI']" in str(exc.value)
     # the family tokens need them too
-    with pytest.raises(ValueError, match="batch labels required for metrics='batch'"):
+    with pytest.raises(ValueError, match="metrics='batch' needs batch labels"):
         evaluate(emb, labels=ct, metrics="batch")
-    with pytest.raises(ValueError, match="batch labels required for metrics='all'"):
+    with pytest.raises(ValueError, match="metrics='all' needs batch labels"):
         evaluate(emb, labels=ct, metrics="all")
 
 
@@ -92,14 +92,15 @@ def test_only_valid_requests_still_work_and_unknown_lists_valid_names():
 
 def test_batch_under_clustering_task_warns_instead_of_silently_ignoring():
     emb, ct, bat, _ = _toy()
-    with pytest.warns(UserWarning, match=r"batch= was given but metrics=\['ASW'\] computes no batch metric"):
+    with pytest.warns(UserWarning, match=r"batch= changes nothing here, because "
+                                         r"metrics=\['ASW'\] has no batch metric"):
         df = evaluate(emb, labels=ct, batch=bat, metrics=["ASW"])
     assert list(df.index) == ["ASW"]
     # no such warning when batch is used
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         evaluate(emb, labels=ct, batch=bat, metrics=["ASW", "GC"])
-    assert not [w for w in rec if "batch= was given" in str(w.message)]
+    assert not [w for w in rec if "batch= changes nothing" in str(w.message)]
 
 
 def test_evaluate_never_returns_an_empty_frame():

@@ -534,11 +534,12 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         want_clu = [c for c in sel.codes if c in clu]
         if want_bat and not has_batch:
             raise ValueError(
-                f"batch labels required for batch metric(s) {want_bat}: pass "
-                + config.hint("batch=<vector> (or labels as a list of two or more "
-                              "files, whose file of origin then serves as the batch)",
-                              "--batch CSV (or two or more --labels files; each file "
-                              "then counts as one batch)"))
+                f"{_metrics_spelling(metrics)} needs batch labels for "
+                f"{_and_list(want_bat)}. "
+                + config.hint("Pass batch=<vector>, or labels as a list of two or more "
+                              "files. Each file then counts as one batch.",
+                              "Pass --batch CSV, or two or more --labels files. Each "
+                              "file then counts as one batch."))
         group = "all" if (want_bat and want_clu) else ("batch" if want_bat else "clustering")
         only, slow = set(sel.codes), "kBET" in sel.codes
     elif sel.family == "all":
@@ -549,31 +550,47 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         else:
             if not has_batch:
                 raise ValueError(
-                    "batch labels required for metrics='all' (batch family "
-                    f"{bat}): pass "
-                    + config.hint("batch=<vector>, or metrics='clustering'",
-                                  "--batch CSV, or --metrics clustering"))
+                    f"{_metrics_spelling(metrics)} needs batch labels for "
+                    f"{_and_list(bat)}. "
+                    + config.hint("Pass batch=<vector>, or metrics='clustering'.",
+                                  "Pass --batch CSV, or --metrics clustering."))
             group = "all"
         only, slow = None, False
     elif sel.family == "batch":
         if not has_batch:
             raise ValueError(
-                f"batch labels required for metrics='batch' ({bat}): pass "
-                + config.hint("batch=<vector> (or labels as a list of two or more files)",
-                              "--batch CSV (or two or more --labels files)"))
+                f"{_metrics_spelling(metrics)} needs batch labels for "
+                f"{_and_list(bat)}. "
+                + config.hint("Pass batch=<vector>, or labels as a list of two or "
+                              "more files.",
+                              "Pass --batch CSV, or two or more --labels files."))
         group, only, slow = "batch", None, False
     else:
         group, only, slow = "clustering", None, False
     if group == "clustering" and batch_given:
         warnings.warn(
-            config.hint(f"batch= was given but metrics={metrics!r}",
-                        f"--batch was given but --metrics {metrics}")
-            + f" computes no batch metric ({bat}); pass "
-            + config.hint("metrics='all' (or 'batch', or name a batch metric in the list)",
-                          "--metrics all (or batch, or name a batch metric)")
-            + " to compute them - batch changes nothing here",
+            config.hint("batch= changes nothing here, because ",
+                        "--batch changes nothing here, because ")
+            + f"{_metrics_spelling(metrics)} has no batch metric. Add "
+            + _and_list([c for c in bat if c != "kBET"], "or")
+            + config.hint(", or pass metrics='all'.",
+                          " to --metrics, or pass --metrics all."),
             UserWarning, stacklevel=4)
     return group, only, slow
+
+
+def _metrics_spelling(metrics) -> str:
+    """``metrics=['ARI', 'NMI']`` in Python, ``--metrics ARI,NMI`` on the command line."""
+    if metrics is not None and not isinstance(metrics, str):
+        codes = [str(m) for m in metrics]
+        return config.hint(f"metrics={codes!r}", f"--metrics {','.join(codes)}")
+    return config.hint(f"metrics={metrics!r}", f"--metrics {metrics}")
+
+
+def _and_list(items, last: str = "and") -> str:
+    """``['a', 'b', 'c']`` -> ``'a, b and c'``."""
+    items = [str(i) for i in items]
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {last} {items[-1]}"
 
 
 def _legacy_evaluate_kwargs(kw: dict) -> dict:

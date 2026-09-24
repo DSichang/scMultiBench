@@ -74,7 +74,7 @@ def test_evaluate_requires_batch_for_batch_task():
     with pytest.raises(ValueError) as exc:
         pipeline.evaluate(output=emb, category="vertical", metrics="batch",
                           labels=ct, clustering=cl, batch=None)
-    assert "batch labels required" in str(exc.value)
+    assert "metrics='batch' needs batch labels" in str(exc.value)
 
 
 def test_compute_rejects_length_mismatch():
@@ -251,7 +251,7 @@ def test_evaluate_list_of_label_paths_concatenates_in_order_and_builds_batch(tmp
     # a single file in a list still needs an explicit batch for metrics='all'
     with pytest.raises(ValueError) as exc:
         evaluate(emb, metrics="all", labels=[tmp_path / "all.csv"])
-    assert "batch labels required" in str(exc.value)
+    assert "metrics='all' needs batch labels" in str(exc.value)
 
 
 def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
