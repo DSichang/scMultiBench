@@ -163,3 +163,160 @@ def test_plot_extended_summaries_are_plain():
     assert "summary view" not in inspect.getdoc(mtb.plot.bar)
     bt = inspect.getdoc(mtb.plot.build_table).split("\n\n")
     assert bt[1] == "Returns the numbers ``mtb.plot.bubble`` draws, without drawing."
+
+
+# --- R4-13 (a): recommend's warning lines -------------------------------------
+
+def _recommend(*a, **kw):
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        r = mtb.recommend(*a, **kw)
+    msgs = [str(w.message) for w in rec if str(w.message).startswith("recommend(")]
+    return r, (msgs[0] if msgs else "")
+
+
+def _no_log_joins(msg):
+    """No clause joined with ' - ', no ';' inside parentheses (a line's own
+    bullet marker, as in recommend's list, is not a join)."""
+    import re
+    for line in msg.splitlines():
+        body = re.sub(r"^\s*- ", "", line)
+        assert " - " not in body, line
+        assert not re.search(r"\([^)]*;[^)]*\)", body), line
+
+
+def test_recommend_unscored_methods_line_is_plain(result_dir):
+    r, msg = _recommend("vertical", result_path=result_dir)
+    unscored = r[r.grand_score.isna()].method.tolist()
+    assert (f"These {len(unscored)} methods have no published scores and are listed "
+            f"last: {', '.join(unscored)}. Try source=\"rerun\".") in msg
+    _no_log_joins(msg)
+    _, msg = _recommend("vertical", modalities=["rna", "adt"], source="rerun",
+                        result_path=result_dir)
+    assert "Seurat_WNN has no re-run scores and is listed last." in msg
+    assert "Try source" not in msg
+
+
+def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree):
+    _, msg = _recommend("diagonal", source="both", result_path=result_dir)
+    assert ("Some methods have scores on only part of the datasets: Seurat_v5 3 of 4, "
+            "GLUE 3 of 4. Check the coverage column before reading the order.") in msg
+    _no_log_joins(msg)
+    _, msg = _recommend("cross", result_path=layout_tree)
+    assert ("scMoMaT and UINMF have scores only on datasets left out of the ranking, "
+            "so they are listed last.") in msg
+    assert ("MOFA2 and Multigrate have scores in the published table, but this package "
+            "does not run them for cross, so they are left out of the ranking. "
+            "mtb.list_methods(category='cross') does not list them.") in msg
+    assert "A min-max score over one method is always 1.0." in msg
+    _no_log_joins(msg)
+
+
+# --- R4-13 (c): DegenerateRerunWarning ----------------------------------------
+
+def test_degenerate_rerun_warning_head_is_a_sentence(result_dir):
+    with pytest.warns(mtb.DegenerateRerunWarning) as rec:
+        mtb.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
+    msg = str(rec[0].message)
+    assert msg.startswith(
+        "This re-run row has ARI below 0.01, while the published table has above 0.2 "
+        "for the same method and dataset: Conos/D28 (re-run 0.2.1, ARI 0.0004). Such a "
+        "row most likely comes from a failed re-run")
+    _no_log_joins(msg)
+
+
+# --- R4-13 (d): evaluate's reordered-dict error -------------------------------
+
+def test_reordered_label_dict_error_is_short_sentences(tmp_path):
+    import numpy as np
+    p1, p2 = tmp_path / "cty1.csv", tmp_path / "cty2.csv"
+    pd.DataFrame({"x": ["a", "b"] * 5}).to_csv(p1, index=False)
+    pd.DataFrame({"x": ["a", "b"] * 5}).to_csv(p2, index=False)
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(np.random.default_rng(0).normal(size=(20, 3)),
+                     labels={"cty2": str(p2), "cty1": str(p1)}, metrics=["ASW"],
+                     verbose=False)
+    assert str(e.value) == (
+        "labels: the keys ['cty2', 'cty1'] are in neither the method's cell order nor "
+        "the default order. Pass the dict from mtb.labels_for(dataset, category, method) "
+        "unchanged, a list of paths in cell order, or label_order=[...]. The default "
+        "order is cty1, cty2, ... by number, with rna before adt before atac. It is not "
+        "alphabetical.")
+
+
+# --- R4-13 (b): run_all's nothing-runnable error and dry-run count line --------
+
+@pytest.fixture
+def no_envs(monkeypatch):
+    W = importlib.import_module("multibench.workflow")
+    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+
+
+def test_nothing_runnable_tail_is_plain(no_envs, root):
+    for kw, where in (({}, "mtb.scan('D11', 'vertical') shows every row."),
+                      ({"methods": ["Matilda"]},
+                       "mtb.scan('D11', 'vertical', methods=['Matilda']) shows these rows.")):
+        with pytest.raises(ValueError) as e:
+            mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False,
+                        data_path=root / "data", **kw)
+        tail = str(e.value).splitlines()[-1]
+        assert tail == (f"{where} Its files_ok and env_ok columns say which check "
+                        f"failed. mtb.env.doctor() checks the environments.")
+
+
+def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
+    mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, verbose=True,
+                data_path=root / "data")
+    (line,) = [ln for ln in capsys.readouterr().out.splitlines()
+               if ln.startswith("[run_all] dry run:")]
+    assert " blocked. The table's reason column says why, and its files_ok and env_ok " \
+           "columns say which check failed. mtb.env.doctor() checks the environments." in line
+    _no_log_joins(line)
+
+
+# --- R4-13 (e): the prepared-file note ----------------------------------------
+
+def test_prepared_file_note_names_the_method(root):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sc = mtb.scan("D28", "diagonal", data_path=root / "data", verbose=False)
+    cav = sc.set_index("method").loc["GLUE", "caveat"]
+    assert ("the command reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
+            "first, so start GLUE with mtb.run or mtb.run_all. The printed command alone "
+            "fails in a job script.") in cav
+    assert "shell line" not in cav
+
+
+def test_prepared_file_note_cli_spelling(monkeypatch):
+    from multibench.engine import runner
+    monkeypatch.setattr(config, "_CLI", True)
+    plan = {"atac": {"value": "/o/inputs/a.h5", "convert": True, "normpeaks_from": None},
+            "rna": {"value": "/o/inputs/b.h5", "convert": True, "normpeaks_from": None}}
+    assert runner._prepared_note(plan, "/o", "GLUE") == (
+        "the command reads inputs/a.h5, inputs/b.h5. `multibench run` writes those "
+        "files first, so start GLUE with `multibench run` or `multibench run-all`. The "
+        "printed command alone fails in a job script.")
+
+
+# --- R4-13 (f): the batch advice names run_all too ----------------------------
+
+def test_batch_advice_names_run_all_and_evaluate(monkeypatch):
+    from multibench.engine import resolve
+    py = resolve._one_file_advice("vertical", has_adt=True)
+    assert py == ("vertical methods read one rna.h5: export without batch= and pass the "
+                  "batch column to run_all(batch=...) or evaluate(batch=...), or use "
+                  "category='cross' (RNA+ADT)")
+    monkeypatch.setattr(config, "_CLI", True)
+    assert resolve._one_file_advice("diagonal") == (
+        "diagonal methods read one rna.h5 and one ATAC file: convert without --batch "
+        "and pass the batch column to run-all --batch or evaluate --batch")
+
+
+def test_batch_with_atac_warning_names_run_all():
+    from multibench.engine import ingest
+    with pytest.warns(UserWarning, match=r"pass the batch column to run_all\(batch=\.\.\.\) "
+                                         r"or evaluate\(batch=\.\.\.\)"):
+        ingest._check_batch_args("obs:batch", None, None, adt=None, atac="X")
+    for fn in (mtb.io.export_dataset, mtb.labels_for):
+        flat = " ".join(inspect.getdoc(fn).split())
+        assert "``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``" in flat, fn

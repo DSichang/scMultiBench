@@ -302,13 +302,15 @@ def test_user_method_name_accepted_in_file(tmp_path):
 
 
 def test_degenerate_rerun_rows_are_flagged(result_dir):
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(rerun-0.2.1 ARI 0.0004\)") as rec:
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.2.1, ARI 0.0004\)") as rec:
         rr = results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
     assert "Conos" in set(rr.method)          # flagged, never dropped silently
     msg = str(rec[0].message)
-    assert "df[df.method != 'Conos']" in msg and "ARI < 0.01" in msg
+    assert "df[df.method != 'Conos']" in msg
     # the message names the trigger and the re-run value, never a score pair
-    assert "published table scored > 0.2" in msg and " vs " not in msg
+    assert msg.startswith("This re-run row has ARI below 0.01, while the published "
+                          "table has above 0.2 for the same method and dataset: ")
+    assert " vs " not in msg and " - " not in msg
     # the detection still reads both sides of the trigger
     bad = results._degenerate_rerun_rows(rr, result_dir)
     assert bad[["category", "dataset", "method"]].values.tolist() == [["diagonal", "D28", "Conos"]]
@@ -387,7 +389,7 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     back = results.load_results(result_path=f, source="rerun")
     assert set(back.source) == {"rerun"} and back.attrs["rerun_version"] is None
     # the DegenerateRerunWarning keeps naming the full stamp
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(rerun-0.2.1 ARI"):
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.2.1, ARI"):
         results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
 
 

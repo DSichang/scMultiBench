@@ -2276,15 +2276,15 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                             f"--methods {','.join(methods)}`")
         return (f"{head} (methods={list(methods)}).\n{platform}Blocked, one line per "
                 f"requested variant:\n" + "\n".join(lines) +
-                f"\nfiles_ok / env_ok in {where} say which check failed; {doctor} "
-                f"for envs.")
+                f"\n{where} shows these rows. Its files_ok and env_ok columns say "
+                f"which check failed. {doctor} checks the environments.")
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
     where = config.hint(f"mtb.scan({dataset!r}, {category!r})",
                         f"`multibench scan {dataset} --category {category}`")
     return (f"{head}.\n{platform}First {k} of {n} blocked variants:\n" + "\n".join(lines) +
-            f"\nInspect {where} for the full table "
-            f"(files_ok / env_ok say which check failed; {doctor} for envs).")
+            f"\n{where} shows every row. Its files_ok and env_ok columns say "
+            f"which check failed. {doctor} checks the environments.")
 
 
 def _platform_line(blocked: pd.DataFrame) -> str:
@@ -2737,8 +2737,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                    f"{dataset} ({category})")
             if n > k:
                 doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
-                msg += (f"; {n - k} blocked - see the reason column "
-                        f"(files_ok / env_ok say which check; {doctor} for envs)")
+                msg += (f". {n - k} blocked. The table's reason column says why, "
+                        f"and its files_ok and env_ok columns say which check "
+                        f"failed. {doctor} checks the environments.")
             print(msg, flush=True)
             # the caveats of the rows the sweep would run: the compact views clip them
             scripts, lines = _dry_run_notes(plan_df)

@@ -495,13 +495,18 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
         return
 
     def _stamp(src) -> str:
-        return _rerun_tag(rerun_version) if src == _rerun_source() else str(src)
+        if src != _rerun_source():
+            return str(src)
+        m = _RERUN_TAG_RE.match(_rerun_tag(rerun_version))
+        return f"re-run {m.group(1)}" if m else "re-run"
 
-    items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)} ARI {r.rerun_ARI:.4f})"
+    items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)}, ARI {r.rerun_ARI:.4f})"
                       for r in bad.itertuples())
+    head = ("These re-run rows have" if len(bad) > 1 else "This re-run row has")
     warnings.warn(
-        f"degenerate re-run row(s) - ARI < {_DEGENERATE_RERUN_ARI} where the "
-        f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. Such a "
+        f"{head} ARI below {_DEGENERATE_RERUN_ARI}, while the published table has "
+        f"above {_DEGENERATE_PUBLISHED_ARI} for the same method and dataset: "
+        f"{items}. Such a "
         f"row most likely comes from a failed re-run, for example a collapsed "
         f"embedding or a wrong label order, not from the method itself. Drop it "
         f"before ranking: df[df.method != {bad.method.iloc[0]!r}].",
@@ -1180,9 +1185,15 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
         groups.setdefault(_STORED_DATASET_MODALITIES[d], []).append(d)
     where = "; ".join(f"{', '.join(ds)} ({'+'.join(mods)})" for mods, ds in groups.items())
     data = "+".join(m.upper() for m in _MODALITY_ORDER if m in wanted)
-    head = f"stored {category} scores" if stored else f"{category} scores in long_df"
-    return (f"{head} come from {where}; none measured {' or '.join(missing)}, "
-            f"so this ranking does not describe {data} data")
+    head = f"Stored {category} scores" if stored else f"The {category} scores in long_df"
+    return (f"{head} come from {where}. None of these datasets measured "
+            f"{' or '.join(missing)}, so this ranking does not describe {data} data.")
+
+
+def _and(names) -> str:
+    """``'A'``, ``'A and B'``, ``'A, B and C'``."""
+    names = [str(n) for n in names]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _runtime(method_id: str, method_info) -> dict:
@@ -1569,34 +1580,46 @@ def recommend(
         if unmeasured:
             notes.append(unmeasured)
     if degenerate:
+        one = len(degenerate) == 1
         notes.append(
-            f"dropped {len(degenerate)} dataset(s) with fewer than {min_methods} "
-            f"methods ({', '.join(map(str, degenerate))}) - a min-max score over "
-            f"one method is always 1.0")
+            f"{'Dataset' if one else 'Datasets'} {_and(degenerate)} "
+            f"{'has' if one else 'have'} fewer than {min_methods} methods and "
+            f"{'is' if one else 'are'} left out of the ranking. A min-max score "
+            f"over one method is always 1.0.")
     if foreign:
+        one = len(foreign) == 1
+        it, they = ("it", "it is") if one else ("them", "they are")
         notes.append(
-            f"also scored in the {table_noun} but not run by this package for "
-            f"{category}: {', '.join(foreign)} - dropped before ranking "
-            f"(mtb.list_methods(category={category!r}) does not list them)")
+            f"{_and(foreign)} {'has' if one else 'have'} scores in the "
+            f"{table_noun}, but this package does not run {it} for {category}, "
+            f"so {they} left out of the ranking. "
+            f"mtb.list_methods(category={category!r}) does not list {it}.")
     partial = out[(out["coverage"] < 1.0) & out["grand_score"].notna()]
     if not partial.empty:
         notes.append(
-            "grand_score averages over an incomplete method x dataset matrix "
-            "(partial coverage: "
-            + ", ".join(f"{r.method} {r.n_datasets}/{r.n_datasets_total}"
+            "Some methods have scores on only part of the datasets: "
+            + ", ".join(f"{r.method} {r.n_datasets} of {r.n_datasets_total}"
                         for r in partial.itertuples())
-            + "); compare coverage before trusting the order")
+            + ". Check the coverage column before reading the order.")
     if backend:
         notes.append(backend)
     if only_dropped:
+        one = len(only_dropped) == 1
         notes.append(
-            f"rows only in dropped dataset(s) for: {', '.join(only_dropped)} - "
-            f"listed with grand_score NaN / coverage 0.0")
+            f"{_and(only_dropped)} {'has' if one else 'have'} scores only on "
+            f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
+            f"listed last.")
     if no_rows:
+        scores = ({"published": "published scores", "rerun": "re-run scores"}
+                  .get(source, "stored scores") if long_df_was_none
+                  else "scores in long_df")
+        head = (f"{no_rows[0]} has no {scores} and is listed last"
+                if len(no_rows) == 1 else
+                f"These {len(no_rows)} methods have no {scores} and are listed "
+                f"last: {', '.join(no_rows)}")
         notes.append(
-            f"no rows in {label} for: {', '.join(no_rows)} - listed with "
-            f"grand_score NaN / coverage 0.0"
-            + (' (try source="rerun")' if source == "published" and long_df_was_none
+            head + "."
+            + (' Try source="rerun".' if source == "published" and long_df_was_none
                else ""))
     if notes:
         warnings.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),

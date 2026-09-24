@@ -342,14 +342,12 @@ def _labels_from_dict(d: dict, label_order) -> list:
         if keys == sorted(keys, key=_label_sort_key):
             return [d[k] for k in keys]
         raise ValueError(
-            f"labels: got a dict with {len(d)} label files {keys} that is not "
-            f"an unchanged mtb.labels_for dict and is not in the default "
-            f"cell order (cty1, cty2, ... numerically; rna before adt before "
-            f"atac; this is not alphabetical order); pass the dict "
-            f"mtb.labels_for(dataset, method=<method>, category=<category>) "
-            f"returns, unchanged (it is in that method's cell order), a list "
-            f"of paths in cell order, or label_order=[...] naming the keys in "
-            f"that order")
+            f"labels: the keys {keys} are in neither the method's cell order "
+            f"nor the default order. Pass the dict from "
+            f"mtb.labels_for(dataset, category, method) unchanged, a list of "
+            f"paths in cell order, or label_order=[...]. The default order is "
+            f"cty1, cty2, ... by number, with rna before adt before atac. It is "
+            f"not alphabetical.")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
         raise TypeError(
             f"label_order= must be a list of keys of the labels dict, e.g. "
