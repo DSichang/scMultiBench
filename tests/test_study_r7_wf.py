@@ -14,8 +14,10 @@ R7-06  ``rescore(verbose=True)`` also prints a line before each label-order
 R7-12  template-like passages in workflow.py docstrings, reworded.
 """
 import inspect
+import io
 import os
 import re
+import shlex
 import warnings
 from pathlib import Path
 
@@ -23,8 +25,12 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import cli, config
 from multibench import workflow as W
 from tests.test_docs_consistency import REFERENCE, _resolve
+
+ROOT = Path(__file__).resolve().parent.parent
+D11 = ROOT / "data" / "D11"
 
 
 def _flat(obj) -> str:
@@ -35,6 +41,18 @@ def _flat(obj) -> str:
 def no_envs(monkeypatch):
     """No method environment is installed (the laptop situation)."""
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+
+
+@pytest.fixture
+def mydata(tmp_path, monkeypatch):
+    """``<tmp>/data/MYDATA``: the D11 files (CITE-seq) under a relative data root,
+    with the working directory at ``<tmp>``."""
+    folder = tmp_path / "data" / "MYDATA"
+    folder.mkdir(parents=True)
+    for name in ("rna.h5", "adt.h5", "cty.csv"):
+        (folder / name).symlink_to(D11 / name)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
 
 
 # ============================================================ R7-01
@@ -160,6 +178,95 @@ def test_run_all_notes_quote_the_live_first_lines(no_envs, tmp_path):
     assert "Without ``methods``, it gives the first 3 of N." in doc
     assert "never lists the reasons of methods you did not ask for" in doc
     assert "its second line says that methods run only on Linux" in doc
+
+
+# ============================================================ R7-02
+def _nothing_runnable(**kw):
+    with pytest.raises(ValueError) as e:
+        mtb.run_all("MYDATA", "vertical", out_dir="out", verbose=False, **kw)
+    return str(e.value)
+
+
+def test_the_scan_hint_carries_the_callers_arguments(no_envs, mydata):
+    msg = _nothing_runnable(data_path="data", modalities=["rna", "adt"])
+    last = msg.splitlines()[-1]
+    call = "mtb.scan('MYDATA', 'vertical', data_path='data', modalities=['rna', 'adt'])"
+    assert last.startswith(f"{call} shows every row. "), last
+    # run as printed, from the same directory, it shows the rows the call selected
+    shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
+    plan = mtb.run_all("MYDATA", "vertical", data_path="data", modalities=["rna", "adt"],
+                       dry_run=True, verbose=False)
+    assert list(shown["method"]) == list(plan["method"])
+    assert set(shown["modalities"]) == {"rna+adt"}
+    n = int(re.search(r"^The first 3 of (\d+) blocked ", msg, re.M).group(1))
+    assert n == len(shown)
+
+
+def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
+    msg = _nothing_runnable(data_path="data", modalities=["rna", "adt"])
+    plan = mtb.scan("MYDATA", "vertical", data_path="data", modalities=["rna", "adt"],
+                    verbose=False)
+    assert plan["method"].is_unique and len(plan) > 3
+    assert f"\nThe first 3 of {len(plan)} blocked methods:\n" in msg
+    # several rows per method: still rows
+    msg = _nothing_runnable(data_path="data")
+    assert re.search(r"\nThe first 3 of \d+ blocked rows:\n", msg), msg
+    # with methods=, one line per requested method or row
+    msg = _nothing_runnable(data_path="data", methods=["Matilda", "totalVI"],
+                            modalities=["rna", "adt"])
+    assert "\nBlocked, one line per requested method:\n" in msg
+    assert msg.splitlines()[-1].startswith(
+        "mtb.scan('MYDATA', 'vertical', data_path='data', methods=['Matilda', "
+        "'totalVI'], modalities=['rna', 'adt']) shows these rows.")
+
+
+def test_the_hint_names_every_scan_argument_the_call_set():
+    blocked = pd.DataFrame({"method": ["A", "B"], "modalities": ["rna+adt"] * 2,
+                            "reason": ["r", "r"], "files_ok": [True, True],
+                            "env_ok": [False, False]})
+    msg = W._nothing_runnable_message(
+        "MYDATA", "vertical", blocked, None, data_path=Path("my data"),
+        modalities=["rna", "adt"], allow_atac_mismatch=True, assume_gpu=True)
+    assert msg.splitlines()[-1].startswith(
+        "mtb.scan('MYDATA', 'vertical', data_path='my data', modalities=['rna', 'adt'], "
+        "allow_atac_mismatch=True, assume_gpu=True) shows every row.")
+    assert "\nThe 2 blocked methods:\n" in msg
+    try:
+        config._CLI = True
+        msg = W._nothing_runnable_message(
+            "MYDATA", "vertical", blocked.head(1), ["A"], data_path="my data",
+            allow_atac_mismatch=True, assume_gpu=True)
+    finally:
+        config._CLI = False
+    assert msg.splitlines()[-1].startswith(
+        "multibench scan MYDATA --category vertical --data-path 'my data' --methods A "
+        "--allow-atac-mismatch --assume-gpu shows these rows.")
+    assert "\nBlocked, one line per requested method:\n" in msg
+
+
+def test_the_cli_hint_carries_the_callers_flags(no_envs, mydata, capsys):
+    rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
+                   "--modalities", "rna,adt", "--out-dir", "out"])
+    err = capsys.readouterr().err
+    assert rc == 1 and "No method can run on MYDATA (vertical)." in err
+    hint = ("multibench scan MYDATA --category vertical --data-path data "
+            "--modalities rna,adt")
+    assert f"\n{hint} shows every row." in err, err
+    n = int(re.search(r"The first 3 of (\d+) blocked methods:", err).group(1))
+    # run as printed, from the same directory
+    rc = cli.main(shlex.split(hint)[1:] + ["--format", "csv"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    shown = pd.read_csv(io.StringIO(out))
+    assert len(shown) == n and set(shown["modalities"]) == {"rna+adt"}
+
+
+def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
+    for kw in ({}, {"data_path": root / "data"}):     # the default data root, spelled out
+        with pytest.raises(ValueError) as e:
+            mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False, **kw)
+        assert e.value.args[0].splitlines()[-1].startswith(
+            "mtb.scan('D11', 'vertical') shows every row. ")
 
 
 # ============================================================ R7-05
