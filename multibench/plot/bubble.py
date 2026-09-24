@@ -109,7 +109,8 @@ class BubbleTable:
         ``{method: bool}`` from an optional ``needs_labels`` column, empty
         without it; overrides the registry for the ``L`` badge.
     na_cells : list of str or None
-        One line per method and family with ``n/a`` cells, in row order.
+        The ``n/a`` cells: one line per family and method (per dataset and
+        method under ``"summary"``).
 
     Examples
     --------
@@ -320,7 +321,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     UserWarning
         A column has the same value in every row, or there is one method.
     UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows.
+        Rows scored with the igraph Leiden backend are shown with stored rows
+        of their dataset.
 
     Examples
     --------
@@ -345,9 +347,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
       paper's rule), in the metric columns and in the ``overall="rank"``
       Overall; ``overall="mean_overall"`` skips it.
 
-    ``na`` sets how this is reported. ``na_cells`` holds one line per
-    method and family, e.g. ``"YukiNet: DR and clustering Overall over 3 of
-    4 metrics (cLISI n/a)"``.
+    ``na`` sets how this is reported. ``na_cells`` lists the cells, e.g.
+    ``"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
 
     **Overall formulas.** ``overall=`` sets the family *Overall* under
     ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
@@ -400,10 +401,10 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     **Leiden backend.** The stored tables were clustered with leidenalg; the
     igraph default can move ARI by up to about 0.1. When rows whose
-    ``scored_with`` starts with ``igraph/`` meet stored rows, and ARI, NMI
-    or iF1 is shown, one ``UserWarning`` names those methods and the fix:
-    set ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` before
-    ``mtb.evaluate``.
+    ``scored_with`` starts with ``igraph/`` meet stored rows of the same
+    dataset, and ARI, NMI or iF1 is shown, one ``UserWarning`` names those
+    methods and the fix: set ``mtb.config.DEFAULT.leiden_flavor =
+    "leidenalg"`` before ``mtb.evaluate``.
 
     **Input columns.** Only ``method``, ``metric`` and ``value`` are
     required.
@@ -612,17 +613,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     na_cells = _na_report(blocks, parts, aggregate)
     if na_cells and na != "skip":
-        if aggregate == "summary":
-            rule = ("an n/a cell within a dataset is rank 0 there (the paper's "
-                    "summary rule)")
-        else:
-            rule = ("the family Overall averages the ranks of the metrics a "
-                    "method has and a column's ranks count only the methods "
-                    "scored in it")
-        from .. import config
-        msg = ("n/a cells: " + "; ".join(na_cells) + f" - {rule}. " + config.hint(
-            "Pass na='skip' to silence this, na='raise' to refuse an incomplete frame.",
-            "Pass --na skip to silence this, --na raise to refuse an incomplete table."))
+        msg = _na_message(_na_missing(blocks, parts, aggregate), df, aggregate)
         if na == "raise":
             raise ValueError(msg)
         warnings.warn(msg, UserWarning, stacklevel=2)
@@ -691,7 +682,7 @@ def _constant_note(methods, constant: dict, aggregate: str = "dataset") -> str |
 
 
 def _na_report(blocks, parts, aggregate: str) -> list:
-    """One line per method with n/a cells, in row order.
+    """The ``na_cells`` lines: one per family and method with n/a cells.
 
     ``aggregate="dataset"``: ``"<method>: <family> Overall over k of n metrics
     (<codes> n/a)"`` per family block. ``"summary"``: ``"<method>: <codes> n/a
@@ -721,6 +712,106 @@ def _na_report(blocks, parts, aggregate: str) -> list:
             lines.append(f"no {b.label} metric (no {b.label} Overall) for: "
                          f"{', '.join(whole)}")
     return lines
+
+
+def _na_missing(blocks, parts, aggregate: str) -> list:
+    """The ``n/a`` cells per figure row, in row order.
+
+    ``[(method, [(dataset, [codes])], [families])]``: under ``"dataset"`` one
+    ``(None, codes)`` pair per method, and the families the method has no
+    value in at all; under ``"summary"`` one pair per dataset with ``n/a``
+    cells. Codes follow the figure's column order.
+    """
+    columns = [c for b in blocks for c in b.raw.columns]
+    pos = {c: i for i, c in enumerate(columns)}
+
+    def _sorted(codes):
+        return sorted(codes, key=lambda c: pos.get(c, len(pos)))
+
+    out = []
+    for m in blocks[0].raw.index:
+        if aggregate == "summary":
+            per_ds = [(ds, _sorted(c for c in mat.columns if pd.isna(mat.loc[m, c])))
+                      for ds, mat in (parts or {}).items() if m in mat.index]
+            per_ds = [(ds, codes) for ds, codes in per_ds if codes]
+            if per_ds:
+                out.append((m, per_ds, []))
+            continue
+        codes, whole = [], []
+        for b in blocks:
+            na = [c for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
+            codes += na
+            if na and len(na) == b.raw.shape[1]:
+                whole.append(b.label)
+        if codes:
+            out.append((m, [(None, codes)], whole))
+    return out
+
+
+def _either(codes) -> str:
+    """``'ASW, iASW or ASW_batch'``."""
+    codes = [str(c) for c in codes]
+    return codes[0] if len(codes) == 1 else ", ".join(codes[:-1]) + " or " + codes[-1]
+
+
+def _both(names) -> str:
+    """``'D24, D25 and D28'``."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+#: most rows the ``n/a`` warning names before it counts the rest
+NA_ROWS_SHOWN = 3
+
+
+def _na_message(missing: list, df: pd.DataFrame, aggregate: str) -> str:
+    """The ``na="warn"`` / ``na="raise"`` text: one short sentence per row.
+
+    A row is ``The stored row`` when all its rows come from a stored table,
+    ``Your row`` when none do, else ``Row``; the dataset(s) and the stored
+    source follow in parentheses. The rank rule is stated once in the
+    Notes of ``build_table``; the message says only what the reader acts on.
+    """
+    stored_sources = set(style.STORED_SOURCES)
+    has_ds = "dataset" in df.columns
+    sentences = []
+    for m, per_ds, whole in missing[:NA_ROWS_SHOWN]:
+        rows = df[df["method"] == m]
+        src = (set(rows["source"].dropna().astype(str)) if "source" in rows.columns
+               else set())
+        stored = bool(src) and src <= stored_sources
+        who = ("The stored row" if stored else
+               "Your row" if src and not src & stored_sources else "Row")
+        where = []
+        if aggregate != "summary" and has_ds:
+            where += sorted(map(str, rows["dataset"].dropna().unique()))
+        if stored:
+            where += sorted(src)
+        name = f"{who} {m}" + (f" ({', '.join(where)})" if where else "")
+        if aggregate == "summary" and has_ds:
+            # datasets that lack the same metrics are named together
+            by_codes: dict = {}
+            for ds, codes in per_ds:
+                by_codes.setdefault(tuple(codes), []).append(str(ds))
+            what = ", and no ".join(f"{_either(codes)} on {_both(dss)}"
+                                    for codes, dss in by_codes.items())
+        else:
+            what = _either(dict.fromkeys(c for _, codes in per_ds for c in codes))
+        text = f"{name} has no {what}."
+        if whole:
+            text += f" It has no {' or '.join(whole)} Overall."
+        sentences.append(text)
+    more = len(missing) - NA_ROWS_SHOWN
+    if more > 0:
+        sentences.append(f"... and {more} more row{'s' if more > 1 else ''}.")
+    if aggregate == "summary":
+        sentences.append("In the summary, a missing value counts as rank 0 on that "
+                         "dataset.")
+    else:
+        sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
+                         else "Each row's Overall uses the metrics it has.")
+    sentences.append(_config.hint("Pass na='skip' to hide this message.",
+                                  "Pass --na skip to hide this message."))
+    return " ".join(sentences)
 
 
 def _frame_needs_labels(df) -> dict:
@@ -1158,7 +1249,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     UserWarning
         A column has the same value in every row, or there is one method.
     UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows.
+        Rows scored with the igraph Leiden backend are shown with stored rows
+        of their dataset.
 
     Examples
     --------

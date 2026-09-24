@@ -81,7 +81,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     UserWarning
         A dataset holds one method, or no method spans two datasets.
     UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows.
+        Rows scored with the igraph Leiden backend are shown with stored rows
+        of their dataset.
 
     Examples
     --------

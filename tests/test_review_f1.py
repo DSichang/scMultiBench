@@ -238,10 +238,10 @@ def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
             "--metrics", "ARI,NMI,ASW", "--out", str(tmp_path / "f.png")]
     assert cli.main(args) == 0
     err = capsys.readouterr().err
-    assert "Pass --na skip to silence this" in err and "na='skip'" not in err
+    assert "Pass --na skip to hide this message." in err and "na='skip'" not in err
     assert cli.main(args + ["--na", "skip"]) == 0
-    assert "n/a cells" not in capsys.readouterr().err
-    with pytest.warns(UserWarning, match="Pass na='skip' to silence this"):
+    assert "to hide this message" not in capsys.readouterr().err
+    with pytest.warns(UserWarning, match="Pass na='skip' to hide this message."):
         mtb.plot.bubble(mtb.load_results("diagonal", dataset="D28"),
                         metrics=["ARI", "NMI", "ASW"])
 

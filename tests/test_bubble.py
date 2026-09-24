@@ -432,11 +432,12 @@ def _with_gap():
 
 
 def test_na_warn_default_names_method_and_rule():
-    with pytest.warns(UserWarning, match=r"B: DR and clustering Overall over 2 of 3 metrics \(NMI n/a\)") as rec:
+    # R3-08: short sentences that name the row (no source column: plain "Row")
+    with pytest.warns(UserWarning, match=r"Row B \(D1\) has no NMI\.") as rec:
         tbl = bubble.build_table(_with_gap())
-    msg = str([w for w in rec if "n/a cells" in str(w.message)][0].message)
-    assert "averages the ranks of the metrics a method has" in msg
-    assert "na='skip'" in msg and "na='raise'" in msg
+    msg = str([w for w in rec if "has no NMI" in str(w.message)][0].message)
+    assert "Its Overall uses the metrics it has." in msg
+    assert "na='skip'" in msg
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
     # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
     b = tbl.blocks[0]
@@ -449,7 +450,7 @@ def test_na_skip_and_raise():
         warnings.simplefilter("error")
         tbl = bubble.build_table(_with_gap(), na="skip")
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
-    with pytest.raises(ValueError, match=r"n/a cells: B: DR and clustering Overall over 2 of 3"):
+    with pytest.raises(ValueError, match=r"Row B \(D1\) has no NMI\."):
         bubble.build_table(_with_gap(), na="raise")
     with pytest.raises(ValueError, match="na must be one of"):
         bubble.build_table(_with_gap(), na="worst")
@@ -462,7 +463,8 @@ def test_na_skip_and_raise():
 def test_na_rule_in_summary_mode_is_rank_zero():
     long = _three(datasets=("D1", "D2"))
     long = long[~((long.method == "B") & (long.metric == "NMI") & (long.dataset == "D2"))]
-    with pytest.warns(UserWarning, match=r"B: NMI n/a in D2 -> rank 0 there"):
+    with pytest.warns(UserWarning, match=r"Row B has no NMI on D2\. In the summary, "
+                                         r"a missing value counts as rank 0"):
         tbl = bubble.build_table(long, aggregate="summary")
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 
@@ -474,7 +476,7 @@ def test_bubble_passes_na_through_and_legend_states_the_rule():
         fig = bubble(_with_gap(), na="skip")
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert any("Overall averages the metrics the method has" in t for t in texts)
-    with pytest.raises(ValueError, match="n/a cells"):
+    with pytest.raises(ValueError, match="has no NMI"):
         bubble(_with_gap(), na="raise")
 
 
