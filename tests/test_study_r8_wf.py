@@ -55,3 +55,26 @@ def test_a_mixed_confidence_column_stays_float():
 def test_the_empty_summary_has_a_float_confidence_column():
     res = W.BatchResult([], "D11", "vertical")
     assert res.summary["label_order_confidence"].dtype == "float64"
+
+
+@pytest.mark.parametrize("obj,gone", [
+    (W.BatchResult.rescore, ("Re-evaluate", "Typical uses", " / batch / ")),
+    (W.load_batch, ("inspect, re-plot or re-score",)),
+    (W.BatchResult, ("not by hand",)),
+    (W.BatchResult.summary, ("behave", "stays numeric")),
+])
+def test_the_template_passages_are_gone(obj, gone):
+    doc = _doc(obj.fget if isinstance(obj, property) else obj)
+    assert not [g for g in gone if g in doc]
+
+
+def test_the_rewritten_passages_keep_their_facts():
+    assert inspect.getdoc(W.BatchResult.rescore).splitlines()[0] == (
+        "Score the saved outputs again with new labels, batch or metrics.")
+    assert "No method is re-run. Each record's embedding is read back from its " \
+           "``out_dir``." in _doc(W.BatchResult.rescore)
+    assert "``mtb.run_all`` and ``mtb.load_batch`` build it. It keeps one record per " \
+           "method, which ``rescore`` and ``plot`` read." in _doc(W.BatchResult)
+    assert ("The column is numeric, and a blank is ``NaN``. So ``> 0.5`` is ``False`` "
+            "for it and ``.isna()`` finds it. It is blank in three cases, named by "
+            "``label_order_note``:") in _doc(W.BatchResult.summary.fget)
