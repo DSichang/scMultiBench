@@ -365,11 +365,14 @@ def test_printed_examples_match_the_live_package(capsys):
         if path.name in ("quickstart.md", "installation.md"):
             text = path.read_text()
             assert "mtb.describe_layout(" in text, f"{path.name} must name describe_layout"
-            assert "multibench run --method SCALEX --category diagonal" in text \
-                and "--dry-run" in text, f"{path.name} must show one `multibench run ... --dry-run` line"
         if path.name == "quickstart.md":
-            assert "'source': 'manual'" in path.read_text()
-            assert "'scBridge'" in path.read_text()
+            # Installation dropped its copy of the dry-run line (R3-25); the
+            # guarantee that a get-started page shows the CLI spelling stays here.
+            text = path.read_text()
+            assert "multibench run --method SCALEX --category diagonal" in text \
+                and "--dry-run" in text, "quickstart.md must show one `multibench run ... --dry-run` line"
+            assert "'source': 'manual'" in text
+            assert "'scBridge'" in text
 
 
 @pytest.mark.parametrize("path", _docs_md_files(), ids=lambda p: p.name)

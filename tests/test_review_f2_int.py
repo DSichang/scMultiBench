@@ -503,18 +503,26 @@ def _cite_adata(n_cells=400, n_genes=2500, n_adt=14, seed=0):
 
 
 @needs_docs
-def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch):
+def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch, capsys):
+    """Pasted alone into a fresh file, the laptop tab imports multibench, reads
+    my_citeseq.h5ad itself (R3-20/R3-21), prints the 2 x 6 score table and
+    draws the figure."""
     import matplotlib.pyplot as plt
     code = _laptop_tab()
     assert "sc.pp.pca(adt, n_comps=min(20, adt.n_vars - 1))" in code
     assert max(len(line) for line in code.splitlines()) <= 80
     monkeypatch.chdir(tmp_path)
-    scope = {"mtb": mtb, "adata": _cite_adata()}
+    _cite_adata().write_h5ad(tmp_path / "my_citeseq.h5ad")
+    scope = {}                        # nothing pre-defined: no mtb, no adata
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         exec(compile(code, "quickstart-laptop-tab", "exec"), scope)
     assert set(scope["mine"]["method"]) == {"RNA PCA", "ADT PCA"}
     assert scope["adata"].obsm["X_adt"].shape == (400, 13)
+    out = capsys.readouterr().out
+    table = out[out.index("metric"):].splitlines()
+    assert table[0].split() == ["metric", "ARI", "ASW", "NMI", "cLISI", "iASW", "iF1"]
+    assert [row.split()[:2] for row in table[2:4]] == [["ADT", "PCA"], ["RNA", "PCA"]]
     msgs = [str(w.message) for w in rec if issubclass(w.category, UserWarning)
             and "multibench" in str(w.filename)]
     assert not any("only one method" in m for m in msgs), msgs
