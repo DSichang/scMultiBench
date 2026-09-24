@@ -256,9 +256,9 @@ def test_peak_name_warning_for_atac_roles(tmp_path):
     peaks.var_names = ["chr1_100_200", "chr1-300-400", "chr2:10-20", "chrX_5_9"]
     genes = ad.AnnData(np.ones((3, 2)))
     genes.var_names = ["GAPDH", "ACTB"]
-    with pytest.warns(UserWarning, match="look like peaks .* not gene activity"):
+    with pytest.warns(UserWarning, match="look like peaks such as chr1:100-200, not genes"):
         ingest.to_canonical(peaks, tmp_path / "a.h5", modality="atac_gas")
-    with pytest.warns(UserWarning, match="only 0% of the features look like peaks"):
+    with pytest.warns(UserWarning, match="Only 0% of the ATAC feature names look like peaks"):
         ingest.to_canonical(genes, tmp_path / "b.h5", modality="atac_peak")
     with warnings.catch_warnings():
         warnings.simplefilter("error")

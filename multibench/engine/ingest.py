@@ -395,21 +395,46 @@ def _peak_fraction(feats) -> float:
     return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
 
 
-def _check_peak_names(modality, feats):
-    """Warn when the feature names contradict the declared ATAC role."""
+def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
+    """Warn when the feature names contradict the declared ATAC role.
+
+    Names declared as peaks that do not look like peaks get the rename advice.
+    Gene activity is suggested only when the names support it: when
+    ``rna_feats`` (the RNA feature names of the same export) is given, only
+    if most ATAC names are among them; without it, as the second option.
+    ``kind_arg`` spells the fix as ``export_dataset``'s ``atac_kind=``
+    instead of ``to_canonical``'s ``modality=``.
+    """
     if modality not in ("atac_gas", "atac_peak"):
         return
     frac = _peak_fraction(feats)
+    if kind_arg:
+        as_peak = config.hint("atac_kind='peak'", "--atac-kind peak")
+        as_gas = config.hint("atac_kind='gene_activity'", "--atac-kind gene_activity")
+    else:
+        as_peak = config.hint("modality='atac_peak'", "--modality atac_peak")
+        as_gas = config.hint("modality='atac_gas'", "--modality atac_gas")
     if modality == "atac_gas" and frac > 0.5:
         warnings.warn(
-            f"modality='atac_gas' but {frac:.0%} of the features look like peaks "
-            "(chr:start-end), not gene activity; did you mean modality='atac_peak' / "
-            "atac_kind='peak'?", UserWarning, stacklevel=3)
+            f"{frac:.0%} of the ATAC feature names look like peaks such as "
+            f"chr1:100-200, not genes. If the matrix holds peaks, pass {as_peak}.",
+            UserWarning, stacklevel=3)
     elif modality == "atac_peak" and frac < 0.5:
-        warnings.warn(
-            f"modality='atac_peak' but only {frac:.0%} of the features look like "
-            "peaks (chr:start-end); did you mean modality='atac_gas' / "
-            "atac_kind='gene_activity'?", UserWarning, stacklevel=3)
+        head = (f"Only {frac:.0%} of the ATAC feature names look like peaks such as "
+                "chr1:100-200")
+        rename = (". If they are peaks, rename them to chr:start-end. Some methods read "
+                  "the peak positions from the names, and "
+                  f"{config.hint('mtb.scan', 'multibench scan')} names these methods.")
+        gas = f" If the matrix holds gene activity, pass {as_gas}."
+        genes = set(rna_feats or ())
+        share = sum(1 for x in feats if x in genes) / len(feats) if len(feats) else 0.0
+        if rna_feats is None:                   # nothing to compare with: both options
+            text = head + rename + gas
+        elif share > 0.5:
+            text = head + f", and {share:.0%} are RNA gene names." + gas
+        else:
+            text = head + rename
+        warnings.warn(text, UserWarning, stacklevel=3)
 
 
 def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
@@ -1493,7 +1518,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"),
                                     feature_names=adt_names if role == "adt" else None,
                                     what=role)
-            _check_peak_names(role, feats)
+            if role in ("atac_peak", "atac_gas"):
+                # the RNA is prepared first (side 'rna', then the ATAC)
+                rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
+                _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
             if role in _COUNT_ROLES:
                 # the hint follows the selector: raw ADT counts of a CITE-seq
                 # object usually sit in another obsm key, not in a layer

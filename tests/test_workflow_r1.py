@@ -443,7 +443,8 @@ _ALLOWED_CAPS = {"RNA", "ADT", "ATAC", "CSV", "TSV", "JSON", "GPU", "CPU", "CUDA
                  "GENCODE", "HDF5", "CITE", "API", "CLI", "OS", "NB", "MB", "GB",
                  "ID", "UMI", "PCA", "SVD", "HVG", "FDR", "MPLBACKEND", "CONDA_PREFIX",
                  "CONDA_DEFAULT_ENV", "PYTHONNOUSERSITE", "LD_PRELOAD", "MULTIBENCH_RUN_MODE",
-                 "MULTIBENCH_ENVS_DIR", "TIMEOUT", "FAIL", "WNN", "MOFA", "NULL", "README"}
+                 "MULTIBENCH_ENVS_DIR", "TIMEOUT", "FAIL", "WNN", "MOFA", "NULL", "README",
+                 "URL"}
 
 
 def _caps(text):

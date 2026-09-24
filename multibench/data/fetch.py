@@ -1,7 +1,9 @@
 """Download reference datasets from the repository's release assets."""
 from __future__ import annotations
 
+import http.client
 import tarfile
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -56,6 +58,27 @@ def _download(url: str) -> Path:
     return Path(tgz)
 
 
+def _download_or_explain(url: str, what: str, dest: Path) -> Path:
+    """:func:`_download`, with a failure raised as ``OSError`` naming ``url``.
+
+    ``what`` names the download in the message ("D46", "the stored outputs
+    of D11"); ``dest`` is the folder the archive is unpacked into by hand.
+    """
+    try:
+        return _download(url)
+    except urllib.error.HTTPError as e:
+        why = f"HTTP {e.code}"
+        err = e
+    except (OSError, http.client.HTTPException) as e:
+        # URLError keeps the cause in .reason (a refused connection, a dead proxy)
+        why = str(getattr(e, "reason", None) or e) or type(e).__name__
+        err = e
+    raise OSError(
+        f"Could not download {what} from {url} ({why}). Check the network or "
+        f"proxy, or download the file by hand and unpack it into {dest}, as shown "
+        "under 'Get the data' in the installation guide.") from err
+
+
 def _output_urls() -> dict:
     """The ``{dataset: url}`` manifest, read from :data:`OUTPUT_MANIFEST`."""
     import json
@@ -87,6 +110,8 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
         A dataset id is not a release asset (the message lists the ids).
     RuntimeError
         The downloaded archive lacks the ``<dataset>/`` folder.
+    OSError
+        The download failed; the message names the URL.
 
     Examples
     --------
@@ -131,10 +156,11 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
             raise ValueError(
                 f"{ds!r} is not in the release assets ({', '.join(sorted(AVAILABLE))}); "
                 "see 'Get the data' in the installation guide for the full collection")
-        root.mkdir(parents=True, exist_ok=True)
+        url = f"{RELEASE_URL}/{ds}.tar.gz"
         if not quiet:
-            print(f"downloading {ds} ({AVAILABLE[ds]}) ...", flush=True)
-        tgz = _download(f"{RELEASE_URL}/{ds}.tar.gz")
+            print(f"downloading {ds} ({AVAILABLE[ds]}) from {url} ...", flush=True)
+        tgz = _download_or_explain(url, ds, root)
+        root.mkdir(parents=True, exist_ok=True)
         # extract to a scratch dir first and move into place atomically, so an
         # interrupted download/extract can never masquerade as a complete
         # dataset on the next run
@@ -191,6 +217,8 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
         A name in ``methods`` is not in the tree (the message lists its methods).
     RuntimeError
         The archive lacks ``batch_result.json``, or a non-empty ``outputs/<dataset>/`` lacks one.
+    OSError
+        The download failed; the message names the URL.
 
     Examples
     --------
@@ -243,11 +271,11 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
                     f"{dest} exists without batch_result.json - remove it and "
                     f"the outputs will be fetched fresh")
             dest.rmdir()                     # empty leftover
-        outputs.mkdir(parents=True, exist_ok=True)
         if not quiet:
             print(f"downloading run_all outputs for {dataset} from {urls[dataset]} ...",
                   flush=True)
-        tgz = _download(urls[dataset])
+        tgz = _download_or_explain(urls[dataset], f"the stored outputs of {dataset}", dest)
+        outputs.mkdir(parents=True, exist_ok=True)
         tmp = Path(_tempfile.mkdtemp(dir=outputs, prefix=f".{dataset}-"))
         try:
             with tarfile.open(tgz) as t:
