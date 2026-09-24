@@ -87,7 +87,8 @@ def test_compute_rejects_length_mismatch():
     ba = np.array([0, 1, 0, 1, 0, 1])
     with pytest.raises(ValueError) as exc:
         escib.compute(emb, ct, cl, ba, group="clustering")
-    assert "length mismatch" in str(exc.value)
+    # R3-14: named after evaluate's argument, with the two counts
+    assert str(exc.value) == "labels has 5 entries for 6 cells in the embedding."
 
 
 def test_compute_rejects_unknown_group():
@@ -263,7 +264,7 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     # a dict whose insertion order IS the stacking order (what labels_for
     # returns) is accepted as-is: the two files are concatenated in that order
     # (here both hold the same 90 cells, so the only complaint is the length)
-    with pytest.raises(ValueError, match="length mismatch"):
+    with pytest.raises(ValueError, match="labels has 180 entries for 90 cells"):
         evaluate(emb, labels={"cty1": str(p), "cty2": str(p)}, metrics=["ARI"])
     # any other order must be explicit
     with pytest.raises(ValueError) as exc:
