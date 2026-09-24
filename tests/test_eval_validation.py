@@ -236,7 +236,7 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=d, metrics=["ARI"])
     msg = str(exc.value)
-    assert msg.startswith("labels: the keys ['atac_cty', 'rna_cty'] are not in "
+    assert msg.startswith("The label keys atac_cty and rna_cty are not in "
                           "the default order. ")
     assert "label_order=" in msg
     assert "The default order is cty1, cty2, ... by number" in msg
@@ -282,13 +282,13 @@ def test_label_order_validation_messages(tmp_path):
     d = {"cty1": str(p1), "cty2": str(p2)}
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=d, label_order=["cty1", "cty3"], metrics=["ARI"])
-    assert "label_order names key(s) ['cty3'] that are not in the labels dict" in str(exc.value)
-    assert "['cty1', 'cty2']" in str(exc.value)
-    with pytest.raises(ValueError, match="label_order repeats a key"):
+    assert str(exc.value) == ("label_order names cty3, which is not a key of the "
+                              "labels dict. Its keys are cty1 and cty2.")
+    with pytest.raises(ValueError, match="^label_order names cty1 twice\\.$"):
         evaluate(emb, labels=d, label_order=["cty1", "cty1"], metrics=["ARI"])
     with pytest.raises(ValueError, match="label_order= is empty"):
         evaluate(emb, labels=d, label_order=[], metrics=["ARI"])
-    with pytest.raises(TypeError, match="label_order= must be a list of keys"):
+    with pytest.raises(TypeError, match="^label_order= takes a list of keys"):
         evaluate(emb, labels=d, label_order="cty1", metrics=["ARI"])
     with pytest.raises(TypeError, match="label_order= applies only when labels is a dict"):
         evaluate(emb, labels=[p1, p2], label_order=["cty1", "cty2"], metrics=["ARI"])

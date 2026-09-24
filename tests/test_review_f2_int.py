@@ -140,11 +140,8 @@ def test_summary_mode_names_the_tied_mean_rank_not_a_metric_value():
     import matplotlib.pyplot as plt
     tbl, msgs = _messages(mtb.plot.build_table, _trade_places(), aggregate="summary")
     grey = [m for m in msgs if m.endswith("are grey.")]
-    assert len(grey) == 1, msgs
-    assert grey[0].startswith("All methods have the same mean rank in ")
-    assert grey[0].endswith(", so those columns are grey.")
-    for metric in ("ARI", "NMI", "ASW", "cLISI"):
-        assert f"{metric} (1.5)" in grey[0]
+    assert grey == ["Every method has mean rank 1.5 in cLISI, ARI, ASW and NMI. "
+                    "Those columns are grey."], msgs
     assert not any("same value" in m or "1.500" in m for m in msgs)
     for overall in ("rank", "mean_overall"):
         fig, msgs = _messages(mtb.plot.bubble, _trade_places(), aggregate="summary",
@@ -161,7 +158,7 @@ def test_dataset_mode_keeps_the_metric_value():
     df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6))
     df.loc[df["metric"] == "cLISI", "value"] = 0.0
     _, msgs = _messages(mtb.plot.build_table, df)
-    assert "All methods have the same cLISI (0.000), so that column is grey." in msgs
+    assert "cLISI is 0.000 for every method. That column is grey." in msgs
     fig, _ = _messages(mtb.plot.bubble, df)
     assert "Grey fill: all rows equal in cLISI (0.000)." in _figure_texts(fig)
     plt.close(fig)
@@ -178,7 +175,7 @@ def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
     rc = cli.main(["plot", "bar", "--input", str(path), "--out", str(tmp_path / "r.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert "warning: this table has one method, so every rank is the same" in err
+    assert "warning: The table has one method. Every rank is the same.\n" in err
 
 
 # ====================================================== cell checks in run()

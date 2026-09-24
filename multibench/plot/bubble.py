@@ -674,24 +674,29 @@ def _no_comparison_message(methods, constant: dict,
     """The warning for a figure whose fill and rank compare nothing somewhere.
 
     One method: every column. Several: the columns in ``constant`` (from
-    :func:`multibench.plot.style.constant_columns`), as ``'All methods have
-    the same cLISI (1.000), so that column is grey.'``; under
-    ``aggregate="summary"`` the value is the mean rank. ``render`` draws
-    those fills in :data:`CONSTANT_FILL`.
+    :func:`multibench.plot.style.constant_columns`), as ``'cLISI is 1.000 for
+    every method. That column is grey.'``; under ``aggregate="summary"`` the
+    value is the mean rank, as ``'Every method has mean rank 1.5 in ARI and
+    NMI. Those columns are grey.'``. ``render`` draws those fills in
+    :data:`CONSTANT_FILL`.
     """
     if len(methods) == 1:
         return (f"Only one method, {methods[0]}, is in this figure. With nothing "
                 f"to rank it against, the fills are grey. Plot it with methods "
                 f"scored on the same dataset.")
-    if constant:
-        which = "that column is" if len(constant) == 1 else "those columns are"
-        if aggregate == "summary":
-            same = "mean rank in " + _both([f"{c} ({round(v, 2):g})"
-                                            for c, v in constant.items()])
-        else:
-            same = _both([f"{c} ({v:.3f})" for c, v in constant.items()])
-        return f"All methods have the same {same}, so {which} grey."
-    return None
+    if not constant:
+        return None
+    which = "That column is" if len(constant) == 1 else "Those columns are"
+    if aggregate == "summary":
+        # columns that share a mean rank are named together
+        groups = {}
+        for c, v in constant.items():
+            groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
+        parts = [f"{v} in {_both(cs)}" for v, cs in groups.items()]
+        same = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + ", and " + parts[-1]
+        return f"Every method has mean rank {same}. {which} grey."
+    same = _both([f"{c} is {v:.3f}" for c, v in constant.items()])
+    return f"{same} for every method. {which} grey."
 
 
 def _constant_note(methods, constant: dict, aggregate: str = "dataset") -> str | None:
@@ -980,6 +985,20 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     summary panels (no error bars).
     No rank numbers are drawn - marker size carries the rank.
     """
+    gaps = [0.0] * max(len(tbl.blocks) - 1, 0)
+    for _ in range(4):
+        fig = _draw(tbl, cmap, title, show_language, gaps)
+        short = _fit_pills(fig, fig.axes[0])
+        if not any(s > 1e-6 for s in short):
+            break
+        # two widened pills would touch: more room between those families
+        gaps = [g + s for g, s in zip(gaps, short)]
+    return fig
+
+
+def _draw(tbl, cmap, title, show_language, gaps):
+    """The body of :func:`render`; ``gaps`` widens the space between families
+    (one data-unit amount per pair of neighbouring families)."""
     from matplotlib.figure import Figure
     from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
     from matplotlib import cm, colors
@@ -991,13 +1010,14 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     # ---- x layout: per family [overall][metrics...] with a family gap -----
     xs, col_meta = 0.0, []
     for fi, b in enumerate(tbl.blocks):
+        if fi:
+            xs += 0.5 + gaps[fi - 1]
         col_meta.append((xs, fi, "overall", "Overall"))
         xs += 1.5                                     # bar column is wider
         for mname in b.raw.columns:
             col_meta.append((xs, fi, "metric", mname))
             xs += 1.1
-        xs += 0.5
-    total_w = xs - 0.5
+    total_w = xs
 
     # ---- legend geometry: the legends under a table of few metrics are wider
     # than the table, so the axes end at the right edge of the widest one ----
@@ -1154,12 +1174,15 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     for fi, b in enumerate(tbl.blocks):
         xs_f = [x for x, f, k, _ in col_meta if f == fi]
         x0, x1 = xs_f[0], xs_f[-1] + 1.1
+        # gid="family" marks the pill and its header; render widens a pill
+        # that is narrower than its header (_fit_pills)
         ax.add_patch(FancyBboxPatch((x0 + 0.05, band_y), x1 - x0 - 0.35, 0.6,
-                                    boxstyle="round,pad=0.02,rounding_size=0.18",
+                                    boxstyle=f"round,pad={PILL_BOX_PAD},rounding_size=0.18",
                                     facecolor=mappers[fi].to_rgba(0.30),
-                                    edgecolor="none", zorder=2))
+                                    edgecolor="none", zorder=2, gid="family",
+                                    clip_on=False))
         ax.text((x0 + x1 - 0.3) / 2, band_y + 0.3, b.label, ha="center",
-                va="center", fontsize=8.6, color="#1a1a1a", zorder=3)
+                va="center", fontsize=8.6, color="#1a1a1a", zorder=3, gid="family")
 
     # ---- legends: Score ramps + Rank size, under the table (scIB layout) ---
     # gid="legend" marks every artist of the Score and Rank legends
@@ -1251,6 +1274,44 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     fig.tight_layout()
     _fit_width(fig, ax)
     return fig
+
+
+#: data units the rounded box of a family pill reaches past its bounds
+PILL_BOX_PAD = 0.02
+#: least room, in points, between a family header and each end of its pill,
+#: and between two neighbouring pills
+PILL_PAD_PT, PILL_GAP_PT = 3.0, 2.0
+
+
+def _fit_pills(fig, ax, pad_pt=PILL_PAD_PT, gap_pt=PILL_GAP_PT) -> list:
+    """Widen each family pill of ``ax`` that is narrower than its header.
+
+    Such a pill (a family of one metric) is widened about its own centre until
+    the header plus ``pad_pt`` on each side fits; the other pills keep their
+    size. Returns, per pair of neighbouring families, the data units the gap
+    between them lacks for the two pills to stay ``gap_pt`` apart (zeros when
+    they do). Call it on a finished layout: it measures the drawn header.
+    """
+    fig.draw_without_rendering()
+    pills = [p for p in ax.patches if p.get_gid() == "family"]
+    heads = [t for t in ax.texts if t.get_gid() == "family"]
+    inv = ax.transData.inverted()
+    per_px = abs(inv.transform((1.0, 0.0))[0] - inv.transform((0.0, 0.0))[0])
+    pad = pad_pt * fig.dpi / 72.0 * per_px
+    for pill, head in zip(pills, heads):
+        ext = head.get_window_extent()
+        tx0 = inv.transform((ext.x0, ext.y0))[0]
+        tx1 = inv.transform((ext.x1, ext.y1))[0]
+        x, w = pill.get_x(), pill.get_width()
+        c = x + w / 2
+        half = max(c - (tx0 - pad), (tx1 + pad) - c) - PILL_BOX_PAD
+        if 2 * half > w:
+            pill.set_x(c - half)
+            pill.set_width(2 * half)
+    gap = gap_pt * fig.dpi / 72.0 * per_px
+    return [max(0.0, float((a.get_x() + a.get_width() + PILL_BOX_PAD) + gap
+                - (b.get_x() - PILL_BOX_PAD)))
+            for a, b in zip(pills, pills[1:])]
 
 
 def _fit_width(fig, ax, pad_pt=3.0, rounds=4):

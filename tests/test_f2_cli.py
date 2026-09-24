@@ -358,8 +358,8 @@ def test_clone_failure_names_the_offline_route(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError) as e:
         config.ensure_repo(target)
     msg = str(e.value)
-    assert msg.startswith("could not reach github.com to fetch the method scripts.")
-    assert "copy a scripts checkout" in msg and "set MULTIBENCH_REPO_PATH" in msg
+    assert msg.startswith("Could not reach github.com to fetch the method scripts.")
+    assert "copy the folder" in msg and "set MULTIBENCH_REPO_PATH" in msg
     assert "returned non-zero exit status" not in msg
     assert not target.exists() and not target.with_name("fresh.partial").exists()
 

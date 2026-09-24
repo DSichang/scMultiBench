@@ -920,12 +920,12 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
     other = "rerun" if source == "published" else "published"
     where = category or "/".join(cats)
     if datasets:          # no dataset filter: the selection is the category
-        where += f"/{datasets[0] if len(datasets) == 1 else list(datasets)}"
+        where += f"/{_and(datasets)}"
     names = {"published": "published", "rerun": "re-run"}
     fix = config.hint(f'Pass source="{other}" or "both".', f"Pass --source {other}.")
     warnings.warn(
         f"The {names[source]} table for {where} has one method, "
-        f"{out['method'].iloc[0]}, so every rank is the same. The {names[other]} "
+        f"{out['method'].iloc[0]}. Every rank in it is the same. The {names[other]} "
         f"tables have {len(have)} methods for {where}: "
         f"{', '.join(sorted(have, key=str.lower))}. {fix}",
         UserWarning, stacklevel=stacklevel)

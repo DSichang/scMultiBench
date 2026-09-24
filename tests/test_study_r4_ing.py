@@ -121,7 +121,7 @@ def test_a_failed_fetch_leaves_the_empty_folder_as_it_was(host, monkeypatch):
     def dead_proxy(argv, **kw):
         raise subprocess.CalledProcessError(128, argv)
     monkeypatch.setattr(subprocess, "run", dead_proxy)
-    with pytest.raises(RuntimeError, match="^could not reach github.com"):
+    with pytest.raises(RuntimeError, match="^Could not reach github.com"):
         config.ensure_repo(target)
     assert target.is_dir() and not os.listdir(target)
 
