@@ -159,7 +159,9 @@ def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
     assert "/inputs/atac_peak_normpeaks.h5" in row["command"]
     assert ("the command reads inputs/atac_peak_normpeaks.h5, which mtb.run writes "
             "first: start the method with mtb.run or mtb.run_all") in row["caveat"]
-    # a command that reads only the dataset's own files has no such note
+    # GLUE reads a renamed peak copy as well (R3-04); a command that reads
+    # only the dataset's own files has no such note
+    assert "inputs/atac_peak_normpeaks.h5" in sc.set_index("method").loc["GLUE", "caveat"]
     assert "writes first" not in sc.set_index("method").loc["MultiMAP", "caveat"]
     # the dry run prints the same note
     inp = mtb.inputs_for("D28", "diagonal", "Seurat_v3", data_path=data)

@@ -791,8 +791,8 @@ def normalize_peak_names(src, dst):
     ``matrix/barcodes`` are copied as they are; only ``matrix/features`` is
     replaced.
 
-    **Inside ``mtb.run``.** ``mtb.run`` applies this itself for the methods
-    that need it, writing a per-run ``<role>_normpeaks.h5`` copy next to the
+    **Inside ``mtb.run``.** ``mtb.run`` applies this itself for GLUE and
+    Seurat_v3, writing a per-run ``<role>_normpeaks.h5`` copy next to the
     converted inputs. Call it by hand only to prepare a file for a script
     you run outside the wrapper.
 
