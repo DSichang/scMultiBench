@@ -137,7 +137,8 @@ def test_scan_keeps_one_combination_and_find_methods_at_least(data):
     assert set(sc["method"]) < fm
     scan_doc, fm_doc = mtb.scan.__doc__, mtb.find_methods.__doc__
     assert "the rule is the one ``mtb.find_methods`` uses" not in scan_doc
-    assert "A row is kept when its modalities are exactly that combination." in scan_doc
+    assert ("Base tokens keep a row whose modalities are exactly that combination."
+            in " ".join(scan_doc.split()))
     assert "A method matches when one variant reads at least" in fm_doc
     assert "a row's modalities must be exactly the named combination" in fm_doc
 

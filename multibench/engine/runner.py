@@ -744,6 +744,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     -----
     UserWarning
         The input barcodes do not match the output's cells; ``obs_names`` is ``None``.
+    UserWarning
+        An ATAC input holds the other representation or peak names the method cannot read.
     DeprecationWarning
         UnitedNet's labels passed under the old key ``rna_cty``; the key is ``cty``.
 
@@ -783,6 +785,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     the method scripts are not on this machine yet or not at
     ``MULTIBENCH_SCRIPTS_REF``, and a note when the command reads a file
     under ``inputs/`` that the run writes first.
+
+    An ATAC file that ``mtb.scan`` would block gets a note too: it holds the
+    other representation, or peak names the method cannot read. The real
+    run warns and still runs.
 
     **Variant selection.** Only ``category`` and the modality roles of
     ``inputs`` select the variant. The modality roles are every key except the
@@ -918,13 +924,19 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     inputs = _rename_old_roles(method, inputs)
     # the cell checks scan and inputs_for(check=True) apply, before anything runs
     _check_input_cells(method, category, inputs)
+    # the ATAC checks of mtb.scan: the other representation, or peak names
+    # the script cannot read (workflow imports this module, hence here)
+    from ..workflow import _atac_mismatch_caveats
+    mismatch = [f"{method} {c}" for c in _atac_mismatch_caveats(method, category, inputs)]
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
                               params=params, convert=convert,
                               cmd_template=cmd_template, repo_path=repo_path)
-        for note in notes:
+        for note in notes + mismatch:
             print(f"# {note}", file=sys.stderr, flush=True)
         return argv
+    if mismatch:
+        warnings.warn("; ".join(mismatch), UserWarning, stacklevel=2)
 
     spec = registry.get(method)
     variant = spec.select(category, _modality_roles(inputs))

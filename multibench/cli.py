@@ -344,10 +344,10 @@ def _cmd_scan(args) -> int:
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
     kw = dict(data_path=args.data_path, modalities=_csv_list(args.modalities),
-              verbose=False, assume_gpu=getattr(args, "assume_gpu", False))
+              verbose=False, assume_gpu=getattr(args, "assume_gpu", False),
+              allow_atac_mismatch=getattr(args, "allow_atac_mismatch", False))
     df = None
     try:
-        # named methods keep a wrong-ATAC-kind row runnable, as in mtb.scan
         df = multibench.scan(args.dataset, args.category, methods=methods, **kw)
     except ValueError as e:
         # a representation token that dropped a named method: the message says why
@@ -426,7 +426,10 @@ def _strict_problem(df, methods) -> str | None:
     for m in blocked:
         rows = df[df["method"] == m]
         reason = rows["reason"].iloc[0] if len(rows) else ""
-        lines.append(f"  {m}: {'no row' if _blank(reason) else _truncate(reason, 120)}")
+        # an ATAC reason ends with its override: never clipped
+        text = ("no row" if _blank(reason) else str(reason) if _is_wrong_atac(reason)
+                else _truncate(reason, 120))
+        lines.append(f"  {m}: {text}")
     return (head + f"; no runnable row for {', '.join(blocked)}:\n"
             + "\n".join(lines) + gpu_note)
 
@@ -1135,7 +1138,9 @@ def _cmd_run_all(args) -> int:
                                     modalities=_csv_list(args.modalities),
                                     data_path=args.data_path, params=params,
                                     dry_run=True, verbose=False,
-                                    assume_gpu=getattr(args, "assume_gpu", False))
+                                    assume_gpu=getattr(args, "assume_gpu", False),
+                                    allow_atac_mismatch=getattr(
+                                        args, "allow_atac_mismatch", False))
         k, n = int(df["runnable"].sum()), len(df)
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
               f"{args.dataset} ({args.category}); commands below are what multibench "
@@ -1172,7 +1177,9 @@ def _cmd_run_all(args) -> int:
                                data_path=args.data_path, params=params,
                                evaluate=not args.no_evaluate, dry_run=False,
                                timeout=args.timeout, skip_existing=args.skip_existing,
-                               batch=batch)
+                               batch=batch,
+                               allow_atac_mismatch=getattr(args, "allow_atac_mismatch",
+                                                           False))
     _print_frame(res.summary, columns=columns, fmt=args.format)
     print(f"saved under {args.out}", file=sys.stderr)
     return _EXIT_OK
@@ -1655,6 +1662,10 @@ _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' a
                 "name is the same whatever the flavour; env status/doctor show which "
                 "flavour is installed. Installing on a login node for jobs on GPU "
                 "nodes: pass gpu")
+#: ``--allow-atac-mismatch`` of scan and run-all
+_ATAC_MISMATCH_HELP = ("count a method as runnable when its ATAC file holds the other "
+                       "representation or peak names the method cannot read. The "
+                       "caveat stays (allow_atac_mismatch=True)")
 _FORCE_HELP = ("try anyway on a computer that is not Linux (method environments run "
                "only on Linux; without --force the command refuses there before any "
                "download)")
@@ -1838,6 +1849,8 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                     help="skip this host's GPU test. Use it on a login node without a "
                          "GPU to check a job for a GPU node (mtb.scan(assume_gpu=True))")
+    ps.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
+                    action="store_true", help=_ATAC_MISMATCH_HELP)
     ps.set_defaults(func=_cmd_scan, _parser=ps)
 
     # ---- layout
@@ -2061,6 +2074,8 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                      help="with --dry-run: skip this host's GPU test, as scan "
                           "--assume-gpu does")
+    pra.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
+                     action="store_true", help=_ATAC_MISMATCH_HELP)
     pra.add_argument("--param", "-p", action="append", metavar="METHOD:KEY=VALUE",
                      help="one hyperparameter override, repeatable: --param "
                           "Matilda:epochs=5 --param Matilda:lr=0.001 -> params="

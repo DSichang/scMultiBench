@@ -94,13 +94,19 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
                 verbose=False).set_index("method")
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         assert not sc.loc[m, "runnable"] and sc.loc[m, "files_ok"], m
-        assert sc.loc[m, "reason"].endswith(f"To run {m} anyway, name it in methods="), m
+        assert sc.loc[m, "reason"].endswith(
+            f"pass allow_atac_mismatch=True to run {m} anyway."), m
     assert sc.loc["GLUE", "reason"].startswith(
-        "needs peak names such as chr1:100-200; atac_peak.h5 holds other names. ")
+        "reads peak names such as chr1:100-200; atac_peak.h5 holds other names (e.g. "
+        "GENE0). Rename them to chr:start-end, or pass ")
+    # R4-01: naming the method keeps it blocked; allow_atac_mismatch runs it
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
                        verbose=False).iloc[0]
-        assert named["runnable"] and named["reason"] == "", m
+        assert not named["runnable"], m
+        allowed = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
+                         verbose=False, allow_atac_mismatch=True).iloc[0]
+        assert allowed["runnable"] and allowed["reason"] == "", m
 
 
 def test_strict_counts_unreadable_peak_names_apart(tmp_path, pinned, capsys):
@@ -117,7 +123,7 @@ def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
         tmp_path, pinned, capsys):
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
     _quiet(mtb.run_all, "LUNG_ids", "diagonal", methods=["GLUE", "Seurat_v3"],
-           data_path=root, dry_run=True)
+           data_path=root, dry_run=True, allow_atac_mismatch=True)
     lines = [l for l in capsys.readouterr().out.splitlines() if l.startswith("[run_all] ")]
     assert "[run_all] GLUE reads peak names such as chr1:100-200; atac_peak.h5 holds " \
            "other names (e.g. peak_0)" in "\n".join(lines)
@@ -216,6 +222,10 @@ def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, caps
     assert "[run_all] moETM" not in out or "expects" not in out
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
            modalities=["rna", "atac"], data_path=root, dry_run=True)
+    assert "[run_all] Matilda" not in capsys.readouterr().out    # named: still skipped
+    _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
+           modalities=["rna", "atac"], data_path=root, dry_run=True,
+           allow_atac_mismatch=True)
     assert "[run_all] Matilda expects gene activity; atac.h5 holds peaks" in \
         capsys.readouterr().out
 
@@ -432,9 +442,9 @@ def test_an_unpacked_size_below_the_archive_reads_unknown(tmp_path, monkeypatch)
 def test_layout_and_export_notes_say_scan_skips_the_other_representation():
     txt = mtb.describe_layout("vertical")
     assert "still runs" not in txt
-    assert "scan and run_all skip a method whose file holds the other representation." \
-        in txt
-    assert "Named in methods=, or given to mtb.run, it runs and gives a wrong embedding" \
+    assert "A method whose ATAC file holds the other representation gives a wrong " \
+           "embedding." in txt
+    assert "mtb.scan and mtb.run_all skip such a method unless allow_atac_mismatch=True." \
         in txt
     notes = " ".join(inspect.getdoc(ingest.export_dataset).split())
     assert "``mtb.scan`` and ``run_all`` skip a method whose file holds the other " \

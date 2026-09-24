@@ -105,7 +105,7 @@ def test_modality_token_notes_state_the_exception():
 
 
 # ----------------------------------------------------------------- R3-02
-def test_scan_blocks_the_other_atac_kind_unless_named(tmp_path):
+def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
     for call in (mtb.scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
         df = _quiet(call, "MU_PEAK", "vertical", modalities=["rna", "atac"],
@@ -113,14 +113,20 @@ def test_scan_blocks_the_other_atac_kind_unless_named(tmp_path):
         for m in GAS_METHODS:
             r = df.loc[m]
             assert not r.runnable and r.files_ok and r.env_ok, m
-            assert r.reason == (f"needs gene-activity ATAC; atac.h5 holds peaks. To run "
-                                f"{m} anyway, name it in methods="), r.reason
+            assert r.reason == (f"needs gene-activity ATAC; atac.h5 holds peaks. Export "
+                                f"the ATAC as gene activity, or pass "
+                                f"allow_atac_mismatch=True to run {m} anyway."), r.reason
             assert r.caveat.startswith("expects gene activity; atac.h5 holds peaks")
         assert df.loc[["moETM", "scMM", "iPOLNG", "scMVP"], "runnable"].all()
+    # R4-01: naming the method no longer runs it; allow_atac_mismatch does
     named = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
                    modalities=["rna", "atac"], data_path=root, dry_run=True, verbose=False)
-    assert named["runnable"].all() and named["reason"].eq("").all()
-    assert named["caveat"].str.startswith("expects gene activity").all()
+    assert not named["runnable"].any()
+    allowed = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
+                     modalities=["rna", "atac"], data_path=root, dry_run=True,
+                     verbose=False, allow_atac_mismatch=True)
+    assert allowed["runnable"].all() and allowed["reason"].eq("").all()
+    assert allowed["caveat"].str.startswith("expects gene activity").all()
 
 
 def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
@@ -140,7 +146,7 @@ def test_the_cli_spelling_of_the_reason(tmp_path, monkeypatch):
     df = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=None, data_path=root,
                 verbose=False)
     r = df[(df.method == "Matilda") & (df.modalities == "rna+atac")].iloc[0]
-    assert r.reason.endswith("To run Matilda anyway, name it in --methods")
+    assert r.reason.endswith("or pass --allow-atac-mismatch to run Matilda anyway.")
 
 
 class _Res:
@@ -162,10 +168,10 @@ def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatc
     log = capsys.readouterr().out
     assert not GAS_METHODS & set(calls)
     assert "[run_all] skipping Matilda: needs gene-activity ATAC; atac.h5 holds peaks." in log
-    # named: it runs, and the caveat reaches the log, the summary and the files
+    # allowed: it runs, and the caveat reaches the log, the summary and the files
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "named",
                  methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
-                 evaluate=False)
+                 evaluate=False, allow_atac_mismatch=True)
     log = capsys.readouterr().out
     assert calls[-1] == "Matilda"
     assert "[run_all]   Matilda expects gene activity; atac.h5 holds peaks" in log
@@ -183,7 +189,7 @@ def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatc
 def test_dry_run_prints_the_whole_caveat(tmp_path, capsys):
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"], data_path=root,
-           dry_run=True)
+           dry_run=True, allow_atac_mismatch=True)
     assert ("[run_all] Matilda expects gene activity; atac.h5 holds peaks"
             in capsys.readouterr().out)
 
@@ -195,8 +201,11 @@ def test_scan_strict_counts_the_wrong_atac_kind_apart(tmp_path, capsys):
     rc = _quiet(cli.main, base)
     err = capsys.readouterr().err
     assert rc == 1 and "wrong ATAC kind in 3" in err, err
-    # --methods names it: runnable, --strict passes
+    # R4-01: --methods naming them still fails; --allow-atac-mismatch passes
     rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC"])
+    cap = capsys.readouterr()
+    assert rc == 1 and "wrong ATAC kind in 2" in cap.err, cap.err
+    rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC", "--allow-atac-mismatch"])
     cap = capsys.readouterr()
     assert rc == 0, cap.err
 
@@ -218,11 +227,12 @@ def test_demo_datasets_have_no_row_blocked_by_the_atac_kind(dataset, category):
 
 def test_run_all_notes_say_it_skips_the_other_representation():
     flat = " ".join(inspect.getdoc(mtb.run_all).split())
-    assert "``run_all`` skips a method given the other representation unless " \
-           "``methods=`` names it" in flat
+    assert "``run_all`` skips a method given the other representation, also when " \
+           "``methods=`` names it. With ``allow_atac_mismatch=True`` the method runs" in flat
     assert "runs without an error and gives a wrong embedding; ``mtb.scan``" not in flat
     flat = " ".join(inspect.getdoc(mtb.scan).split())
-    assert "Name the method in ``methods=`` to run it anyway." in flat
+    assert "``allow_atac_mismatch=True`` keeps such a row runnable, with its caveat." \
+        in flat
 
 
 # ----------------------------------------------------------------- R3-17
@@ -272,7 +282,8 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
     monkeypatch.setattr(W, "_run", lambda method, category, inputs, out_dir, params=None:
                         _Res(np.zeros((60, 5))))
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out", methods=["Matilda"],
-                 modalities=["rna", "atac"], data_path=root, evaluate=False)
+                 modalities=["rna", "atac"], data_path=root, evaluate=False,
+                 allow_atac_mismatch=True)
     log = capsys.readouterr().out
     cav = res.results[0]["caveat"]
     assert cav == ("expects gene activity; atac.h5 holds peaks (features look like "

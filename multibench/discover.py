@@ -433,8 +433,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
       from the GPU benchmark host; for a method that uses a GPU it adds that
       a CPU-only host takes longer.
 
-    These are measurements, not predictions: use them to choose a sensible
-    ``run_all(timeout=...)``, not to promise a finish time.
+    Use them to set ``run_all(timeout=...)``.
 
     **Labels.** ``needs_labels`` is the method-level flag: ``True`` when
     any variant takes a cell-type-label (``cty``) role as a required input.
