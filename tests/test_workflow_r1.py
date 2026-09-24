@@ -130,7 +130,7 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
     assert r["files_ok"]
     assert ("setup: GLUE needs the GENCODE v43 human annotation "
             "(gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in "
-            "<repo_path>/tools_scripts/GLUE/.") in r["caveat"]
+            "<repo_path>/tools_scripts/GLUE/") in r["caveat"]
     assert "mouse" not in r["caveat"]                   # first sentence only
     # a method without a hint gets no setup note
     tv = mtb.scan("D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]

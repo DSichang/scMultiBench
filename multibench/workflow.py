@@ -495,15 +495,6 @@ def _installed_envs() -> frozenset:
         return frozenset()
 
 
-#: Known method x dataset incompatibilities that file/env checks cannot see:
-#: the files exist and the env is installed, but the content stops the method.
-#: Surfaced by scan() so a sweep does not discover them hours in.
-_CAVEATS = {
-    ("GLUE", "D28"): ("fails on D28's peak names: GLUE needs chr:start-end; rename "
-                      "them with mtb.io.normalize_peak_names"),
-}
-
-
 def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script is unreachable here, or "" when it is fine.
 
@@ -556,10 +547,6 @@ def _join_clauses(parts) -> str:
     leave before the separator (``"... names.; setup: ..."``)."""
     parts = [p for p in parts if p]
     return "; ".join([p.rstrip().rstrip(".") for p in parts[:-1]] + parts[-1:])
-
-
-def _caveat(method: str, dataset: str) -> str:
-    return _CAVEATS.get((method, dataset), "")
 
 
 def _variant_rows(category=None):
@@ -952,7 +939,7 @@ def scan(dataset: str, category: str | None = None, *,
     still needs, or what may go wrong without an error:
 
     - an ATAC file that holds the other representation (a peak matrix where
-      the method needs gene activity);
+      the method needs gene activity), or peak names the method cannot read;
     - an RNA, ADT or peak file whose values are not whole numbers: the
       methods expect raw counts;
     - diagonal: a folder whose only label file is ``cty.csv``; diagonal
@@ -1092,7 +1079,7 @@ def scan(dataset: str, category: str | None = None, *,
                "n_tunable": len(v.tunable),
                "runtime_tier": rt.get("tier", "unknown"),
                "observed_worst_sec": rt.get("worst_sec"),
-               "caveat": _caveat(spec.id, dataset), "runnable": False, "reason": "",
+               "caveat": "", "runnable": False, "reason": "",
                "files_ok": True, "files_reason": "", "env_ok": True, "env_reason": "",
                "needs_labels": bool(v.needs_labels),
                "atac": spec.atac if _variant_consumes_atac(v) else None,

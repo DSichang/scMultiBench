@@ -9,7 +9,8 @@ from pathlib import Path
 
 from .. import config
 from . import registry
-from .schema import AmbiguousVariantError, base_modality, is_label_role
+from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, base_modality,
+                     is_label_role)
 
 # A few variant roles name a modality *representation* whose on-disk filename
 # differs from the role token (e.g. the diagonal ATAC roles). Candidate bases
@@ -882,6 +883,12 @@ PEAK_FED_TO_GAS_CAVEAT = ("expects gene activity; {file} holds peaks (features l
                           "chr:start-end)")
 GAS_FED_TO_PEAK_CAVEAT = ("expects peaks; {file} holds gene activity (features do not "
                           "look like chr:start-end)")
+#: ``.format(method=, file=, example=)`` caveat for a peak file of a variant whose
+#: peak names ``mtb.run`` rewrites to chr:start-end (``normalize_peaks``) when
+#: more than 10% of the first 50 names are not chr<sep>start<sep>end, so the
+#: rewrite cannot help; ``example`` is the first such name.
+PEAK_NAMES_CAVEAT = ("{method} reads peak names such as chr1:100-200; {file} holds other "
+                     "names (e.g. {example})")
 #: ``.format(file=...)`` caveat for a modality file whose sampled values are not
 #: whole numbers (log-normalised data).
 NOT_COUNTS_CAVEAT = "expects raw counts; {file} holds non-integer values"
@@ -944,6 +951,34 @@ def _peak_fraction_of(path: Path) -> float | None:
     if not feats:
         return None
     return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
+
+
+def _unrewritable_peak_name(path: Path) -> str | None:
+    """The first of the first 50 feature names that ``normalize_peak_names``
+    cannot rewrite to ``chr:start-end``, when more than 10% of them are such
+    names; ``None`` otherwise, or when the file is not a readable canonical
+    ``.h5``."""
+    from .ingest import _PEAK_RE
+
+    if path.suffix != ".h5" or not path.is_file():
+        return None
+    feats = _sniff_features(str(path), path.stat().st_mtime_ns)
+    bad = [x for x in feats or [] if not _PEAK_RE.match(x)]
+    return bad[0] if feats and len(bad) > 0.1 * len(feats) else None
+
+
+def _renamed_peak_roles(method: str | None, category: str | None, resolved) -> list[str]:
+    """The roles of ``resolved`` whose peak names ``mtb.run`` rewrites for this
+    method's variant (``Variant.normalize_peaks``); ``[]`` when the variant is
+    not known."""
+    if not method or not category:
+        return []
+    try:
+        mods = {r for r in resolved if not is_label_role(r) and r not in _NON_MODALITY_ROLES}
+        variant = registry.get(method).select(category, mods)
+    except Exception:  # noqa: BLE001 - a caveat check never raises
+        return []
+    return [r for r in (getattr(variant, "normalize_peaks", None) or []) if r in resolved]
 
 
 #: methods whose script needs the same cells in two of its input roles:
@@ -1146,13 +1181,24 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     First of all: numbered roles that name fewer batches than the folder
     holds -> :data:`UNUSED_BATCHES_CAVEAT`.
 
-    ``method`` is accepted and not used: the same-cells rule
-    (``_SAME_CELL_ROLES``) is a file check of :func:`inputs_for`.
+    With ``method`` and ``category``: a role the method's variant renames
+    (``normalize_peaks``; ``mtb.run`` passes a chr:start-end copy) is judged
+    by its names instead of the representation check above. Underscore or
+    dash peak names are rewritten and need no caveat; when more than 10% of
+    the first 50 names have no chr<sep>start<sep>end form ->
+    :data:`PEAK_NAMES_CAVEAT`. The same-cells rule (``_SAME_CELL_ROLES``) is
+    a file check of :func:`inputs_for`, not a caveat.
     """
     out: list[str] = []
     note = _unused_batches_note(resolved)
     if note:
         out.append(note)
+    renamed = _renamed_peak_roles(method, category, resolved)
+    for role in renamed:
+        bad = _unrewritable_peak_name(Path(resolved[role]))
+        if bad is not None:
+            out.append(PEAK_NAMES_CAVEAT.format(method=method, file=Path(resolved[role]).name,
+                                                example=bad))
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":
@@ -1165,7 +1211,7 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
         stems = {r.rstrip("0123456789") for r in resolved}
         both = {"atac_peak", "atac_gas"} <= stems
         for role, path in resolved.items():
-            if is_label_role(role) or base_modality(role) != "atac":
+            if is_label_role(role) or base_modality(role) != "atac" or role in renamed:
                 continue
             frac = _peak_fraction_of(Path(path))
             if frac is None:

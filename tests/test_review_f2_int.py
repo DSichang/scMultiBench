@@ -334,9 +334,11 @@ def test_config_says_when_the_scripts_are_not_fetched(tmp_path, monkeypatch):
 
 # ====================================================================== M22
 def test_glue_d28_caveat_names_the_rename_call(tmp_path):
+    # R3-04: mtb.run rewrites D28's chr_start_end names for GLUE, so the
+    # caveat has no peak-name clause and does not name the dataset
     r = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
-    assert r["caveat"].startswith("fails on D28's peak names: GLUE needs chr:start-end; "
-                                  "rename them with mtb.io.normalize_peak_names; setup: ")
+    assert r["caveat"].startswith("setup: ")
+    assert "peak names" not in r["caveat"] and "D28" not in r["caveat"]
     assert ".;" not in r["caveat"] and "D27" not in r["caveat"]
     # the named call writes the spelling GLUE needs
     src = Path(mtb.inputs_for("D28", "diagonal", "GLUE")["atac_peak"])

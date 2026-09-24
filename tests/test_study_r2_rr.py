@@ -403,6 +403,6 @@ def test_to_canonical_gas_for_vertical_keeps_its_order(tmp_path, capsys):
     assert capsys.readouterr().err == ""
 
 
-def test_dataset_caveats_lead_with_the_problem():
-    for text in workflow._CAVEATS.values():
-        assert "fails" in text[:30], text
+def test_no_dataset_keyed_caveats_remain():
+    # R3-04: GLUE's D28 peak-name caveat became a content check
+    assert not hasattr(workflow, "_CAVEATS")
