@@ -22,7 +22,8 @@ Exit codes and streams
 ``0`` success; ``1`` a runtime error raised by the API (the message is printed
 as ``error: ...`` on stderr; set ``MULTIBENCH_DEBUG=1`` to get the traceback);
 ``2`` a usage error (argparse: unknown flag, missing required flag, bad
-choice, or a flag combination the subcommand rejects).
+choice, or a flag combination the subcommand rejects); ``3`` ``run-all``
+finished and saved its files, but a method is listed in ``failures.csv``.
 
 Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
 lines); diagnostics go to stderr (``error: ...``, ``warning: ...``, progress
@@ -47,6 +48,8 @@ from pathlib import Path
 _EXIT_OK = 0
 _EXIT_ERROR = 1
 _EXIT_USAGE = 2
+#: ``run-all`` finished and saved, but ``failures`` is not empty
+_EXIT_METHOD_FAILED = 3
 
 
 # ----------------------------------------------------------------- helpers
@@ -1124,6 +1127,8 @@ def _cmd_run_all(args) -> int:
     the ``<out_dir>`` placeholder, as ``run_all(dry_run=True)`` does.
     ``--batch CSV`` becomes ``run_all(batch=CSV)``; a missing file exits 1
     before any method runs, and ``--dry-run`` reads the file as a check.
+    A finished run with a non-empty ``failures`` exits 3 (``_EXIT_METHOD_FAILED``)
+    after saving; the Python ``run_all`` does not raise.
     """
     import multibench
     if args.out is None and not args.dry_run:
@@ -1193,7 +1198,28 @@ def _cmd_run_all(args) -> int:
                                                            False))
     _print_frame(res.summary, columns=columns, fmt=args.format)
     print(f"saved under {args.out}", file=sys.stderr)
+    failed = _failed_line(res, Path(args.out) / "failures.csv")
+    if failed:
+        print(failed, file=sys.stderr)
+        return _EXIT_METHOD_FAILED
     return _EXIT_OK
+
+
+def _failed_line(res, where) -> str | None:
+    """The stderr line of a finished ``run-all`` whose ``failures`` is not empty.
+
+    ``# 1 of 2 methods failed: StabMap (FAIL). See runs/failures.csv.``;
+    ``None`` when nothing failed. Counts are methods of this run, not of
+    records merged from an earlier run in the same folder.
+    """
+    bad = res.failures
+    if bad.empty:
+        return None
+    named = list(dict.fromkeys(f"{m} ({s})" for m, s in zip(bad["method"], bad["status"])))
+    n_bad = len(set(bad["method"]))
+    n_all = len({r.get("method") for r in res.records} | set(bad["method"]))
+    return (f"# {n_bad} of {n_all} method{'s' if n_all != 1 else ''} failed: "
+            f"{', '.join(named)}. See {where}.")
 
 
 @contextlib.contextmanager
@@ -1245,6 +1271,10 @@ def _evaluate_labels(args, stack):
     elif args.data_path is not None:
         _usage_error(args, "--data-path reads the labels from the dataset folder; "
                      "drop it when --labels names the files")
+    else:
+        bad = _label_order_problem(files, args.method, args.dataset, args.category)
+        if bad:
+            raise ValueError(bad)
     if args.column is not None:
         # one column out of each file, written as the one-column files the
         # stacking reader expects, so several files still count as batches
@@ -1262,6 +1292,63 @@ def _evaluate_labels(args, stack):
             picked.append(str(out))
         files = picked
     return files[0] if len(files) == 1 else files
+
+
+def _label_order_problem(files, method, dataset, category) -> str | None:
+    """Why ``--labels`` ``files`` contradict ``--method``'s cell order, or ``None``.
+
+    Checked only when ``method`` is a registry method, ``dataset`` and
+    ``category`` are given, and the files are two or more of the dataset's
+    label files: those :func:`multibench.labels_for` returns for the folder
+    under the data path, or, when there is no such folder, any ``*cty*.csv``
+    names (ordered as that folder would be). Any other case is not checked.
+    """
+    import tempfile
+
+    import multibench
+    from .engine import registry
+    names = [Path(f).name for f in files]
+    if (None in (method, dataset, category) or len(names) < 2
+            or len(set(names)) != len(names)):
+        return None
+    try:
+        registry.check_method(method)
+        registry.check_category(category)
+    except (KeyError, ValueError):
+        return None                   # SCALEX_rerun, a typo: evaluate reports it or not
+    here = True
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            labels = multibench.labels_for(dataset, category, method)
+        except FileNotFoundError:
+            labels = None
+        except Exception:  # noqa: BLE001 - no variant for category etc.: not checked
+            return None
+        if labels is None:
+            # no such folder here: order the typed names as that folder would
+            if not all("cty" in n and n.endswith(".csv") for n in names):
+                return None
+            here = False
+            with tempfile.TemporaryDirectory() as tmp:
+                (Path(tmp) / dataset).mkdir()
+                for n in names:
+                    (Path(tmp) / dataset / n).touch()
+                try:
+                    labels = multibench.labels_for(dataset, category, method, data_path=tmp)
+                except Exception:  # noqa: BLE001 - not checked
+                    return None
+    expected = [Path(p).name for p in labels.values()]
+    if not set(names) <= set(expected):
+        return None
+    want = [n for n in expected if n in names]
+    if names == want:
+        return None
+    stems = [Path(n).stem for n in want]
+    order = (f"{stems[0]} before {stems[1]}" if len(stems) == 2
+             else ", then ".join(stems))
+    return (f"{method} puts the cells of {order}. Repeat --labels in that order"
+            + (", or drop --labels to read them in that order." if here else "."))
 
 
 def _cmd_evaluate(args) -> int:
@@ -1332,17 +1419,19 @@ def _cmd_evaluate(args) -> int:
 
 
 def _size_total_line(rows, sizes: dict, what: str = "download", *,
-                     flavor: str | None = None) -> str:
-    """The ``# total`` lines for ``rows``: download and on-disk sums.
+                     flavor: str | None = None, manifest: dict | None = None) -> str:
+    """The ``# total`` lines for ``rows``: download and on-disk sums, then the builds.
 
-    Every size known: one line, ``# total for N envs (GPU builds): X GB
-    download, Y GB on disk``. A column with an unknown size is not summed as
-    if complete: the disk figure is left out, a download figure reads ``at
-    least X GB``, and a second line counts the unknowns per column (a row
-    printing ``? disk`` is one disk unknown even when its download size is
-    known), with the disk sum of the others as a lower bound. An unknown
-    disk size adds the advice to check with ``du`` after the first install.
-    No line holds more than two semicolons.
+    Every size known: ``# total for N envs: X GB download, Y GB on disk``. A
+    column with an unknown size is not summed as if complete: the disk
+    figure is left out, a download figure reads ``at least X GB``, and a
+    last line counts the unknowns per column (a row printing ``? disk`` is
+    one disk unknown even when its download size is known), with the disk
+    sum of the others as a lower bound and the advice to check with ``du``
+    after the first install. With ``flavor``, a line between them names the
+    builds summed, e.g. ``# CPU builds, because this host has no NVIDIA GPU.
+    4 envs have a single build (the same archive for CPU and GPU hosts).``
+    No parenthesis holds a semicolon.
 
     Parameters
     ----------
@@ -1356,19 +1445,22 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
         The word after the download figure (``'download'`` / ``'to download'``).
     flavor : str, keyword-only, optional
         The flavour the caller asked for (``'auto'``, ``'cpu'``, ``'gpu'``):
-        when given, the first line names the builds it summed and how many
-        envs fell back to the GPU build; ``'auto'`` adds why this host got
-        that flavour. ``None`` omits the parenthesis.
+        when given, the builds line follows the total; ``'auto'`` adds why
+        this host got that flavour. ``None`` = no builds line.
+    manifest : dict, keyword-only, optional
+        :func:`multibench.env.packed_manifest` (or a replacement in tests):
+        an env without a ``'<env>-cpu'`` key there has a single build.
 
     Returns
     -------
     str
-        One ``#`` line, or two joined by a newline (stderr on the CLI).
+        One to three ``#`` lines joined by newlines (stderr on the CLI).
     """
     from .engine import envs
     dl = disk = 0
     n = n_dl = n_disk = 0
-    gpu_rows = 0
+    n_cpu = n_gpu = n_single = 0
+    manifest = envs.packed_manifest() if manifest is None else manifest
     for r in rows:
         n += 1
         key = envs.archive_key(r["env"], r.get("flavor"))
@@ -1380,7 +1472,12 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
         if u is not None:
             n_disk += 1
             disk += u
-        gpu_rows += r.get("flavor") == "gpu"
+        if r.get("flavor") == "cpu":
+            n_cpu += 1
+        elif envs._single_build(r["env"], manifest=manifest):
+            n_single += 1
+        else:
+            n_gpu += 1
 
     def _envs(k: int) -> str:
         return f"{k} env{'s' if k != 1 else ''}"
@@ -1392,33 +1489,18 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
             return "both envs" if n == 2 else f"all {n} envs"
         return f"{k} of {n} envs"
 
-    line = f"# total for {_envs(n)}"
-    if flavor is not None:
-        eff = envs.resolve_flavor(flavor)
-        s = "s" if n != 1 else ""
-        if eff == "cpu" and n and gpu_rows == n:
-            builds = (f"GPU build{s}; no CPU build is published for "
-                      + ("it" if n == 1 else "these envs"))
-        elif eff == "cpu":
-            builds = f"CPU build{s}"
-            if flavor == "auto":
-                builds += ", as this host has no NVIDIA GPU"
-            if gpu_rows:
-                builds += (f"; {_envs(gpu_rows)} "
-                           f"{'has' if gpu_rows == 1 else 'have'} only a GPU build")
-        else:
-            builds = f"GPU build{s}"
-            if flavor == "auto":
-                builds += ", as this host has an NVIDIA GPU"
-        line += f" ({builds})"
+    lines = [f"# total for {_envs(n)}"]
     if n_dl == n:
-        line += f": {envs._gb(dl)} {what}"
+        lines[0] += f": {envs._gb(dl)} {what}"
     elif n_dl:
-        line += f": at least {envs._gb(dl)} {what}"
+        lines[0] += f": at least {envs._gb(dl)} {what}"
     else:
-        line += ": download size not recorded"
+        lines[0] += ": download size not recorded"
     if n_disk == n:
-        line += f", {envs._gb(disk)} on disk"
+        lines[0] += f", {envs._gb(disk)} on disk"
+    if flavor is not None and n:
+        lines.append(_builds_line(envs.resolve_flavor(flavor), flavor, n_cpu, n_gpu,
+                                  n_single, _envs, _which))
     unknown = []
     if 0 < n_dl < n:            # none known: the first line already says so
         unknown.append(f"download size not recorded for {_which(n - n_dl)}")
@@ -1427,18 +1509,67 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
         known = f" ({envs._gb(disk)} for the other {n_disk})" if n_disk else ""
         unknown.append(("size on disk for " if unknown else "size on disk not recorded for ")
                        + _which(n - n_disk) + known)
-    if not unknown:
-        return line
-    second = "# " + ", ".join(unknown)
-    if n_disk < n:
-        second += ("; unpacked envs are larger than the download, so check with du "
-                   "after the first install")
-    return line + "\n" + second
+    if unknown:
+        last = "# " + ", ".join(unknown)
+        if n_disk < n:
+            last += ("; unpacked envs are larger than the download, so check with du "
+                     "after the first install")
+        lines.append(last)
+    return "\n".join(lines)
 
 
-def _flavor_token(flavor) -> str:
-    """`` flavor=cpu`` for a row whose installed flavour is recorded, else ``''``."""
-    return f" flavor={flavor}" if flavor in ("cpu", "gpu") else ""
+_SINGLE_BUILD = "a single build (the same archive for CPU and GPU hosts)"
+
+
+def _builds_line(eff: str, flavor: str, n_cpu: int, n_gpu: int, n_single: int,
+                 _envs, _which) -> str:
+    """The ``# ...`` line naming the builds :func:`_size_total_line` summed.
+
+    ``eff`` is the flavour ``flavor`` resolved to on this host. "GPU build"
+    and "CPU build" name only envs that have both; an env with one archive
+    has "a single build".
+    """
+    n = n_cpu + n_gpu + n_single
+
+    def _has(k: int) -> str:
+        return "has" if k == 1 else "have"
+
+    if n_single == n:
+        return f"# {_which(n).capitalize()} {_has(n)} {_SINGLE_BUILD}."
+    because = ""
+    if flavor == "auto":
+        because = (", because this host has no NVIDIA GPU" if eff == "cpu"
+                   else ", because this host has an NVIDIA GPU")
+    parts = []
+    if eff == "cpu":
+        if n_cpu:
+            parts.append(f"CPU build{'s' if n_cpu != 1 else ''}{because}.")
+        if n_gpu:
+            whose = "its CPU build is" if n_gpu == 1 else "their CPU builds are"
+            parts.append(f"{_envs(n_gpu)} {'gets' if n_gpu == 1 else 'get'} the GPU "
+                         f"build, because {whose} not published yet.")
+    else:
+        if n_gpu:
+            parts.append(f"GPU build{'s' if n_gpu != 1 else ''}{because}.")
+        if n_cpu:                     # an installed CPU build listed with the rest
+            parts.append(f"{_envs(n_cpu)} {_has(n_cpu)} the CPU build.")
+    if n_single:
+        parts.append(f"{_envs(n_single)} {_has(n_single)} {_SINGLE_BUILD}.")
+    return "# " + " ".join(parts)
+
+
+def _flavor_token(flavor, env: str | None = None) -> str:
+    """`` flavor=cpu`` for a row whose installed flavour is recorded, else ``''``.
+
+    An ``env`` with a single build has no flavour to show.
+    """
+    if flavor not in ("cpu", "gpu"):
+        return ""
+    if env is not None:
+        from .engine import envs
+        if envs._single_build(env):
+            return ""
+    return f" flavor={flavor}"
 
 
 def _cmd_env(args) -> int:
@@ -1472,7 +1603,7 @@ def _cmd_env(args) -> int:
             if r["difficulty"] not in seen_tags:
                 seen_tags.append(r["difficulty"])
             print(f"[{mark}] {r['method']:16} {r['env']:18} {tag}"
-                  f"{_flavor_token(r.get('flavor'))}")
+                  f"{_flavor_token(r.get('flavor'), r['env'])}")
         # the legend is a note, so stderr: stdout stays one line per method
         print(f"# legend: {envs.MARK_LEGEND};  tag = difficulty of building "
               "the env: " + "; ".join(f"{t} = {envs.DIFFICULTY.get(t, '?')}"
@@ -1500,8 +1631,9 @@ def _cmd_env(args) -> int:
             sz = sizes.get(key) or {}
             print(f"{p['env']:18} [{tag:6}] {envs._gb(sz.get('archive_bytes')):>8} dl "
                   f"{envs._gb(sz.get('unpacked_bytes')):>8} disk <- {', '.join(p['methods'])}"
-                  f"{_flavor_token(p.get('flavor'))}")
-        print(_size_total_line(summed, sizes, flavor=flavor), file=sys.stderr)
+                  f"{_flavor_token(p.get('flavor'), p['env'])}")
+        print(_size_total_line(summed, sizes, flavor=flavor, manifest=manifest),
+              file=sys.stderr)
         note = envs.auto_flavor_note(flavor, planning=True)
         if note and any(p["flavor"] == "cpu" for p in summed):
             print(note, file=sys.stderr)
@@ -1512,7 +1644,7 @@ def _cmd_env(args) -> int:
         for r in rows:
             mark = envs.env_mark(r["exists"], r["has_lock"])
             print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}"
-                  f"{_flavor_token(r.get('flavor'))}")
+                  f"{_flavor_token(r.get('flavor'), r['env'])}")
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"
@@ -1545,7 +1677,7 @@ def _cmd_env(args) -> int:
                 extra = (f" {envs._gb(r.get('archive_bytes')):>8} dl "
                          f"{envs._gb(r.get('unpacked_bytes')):>8} disk  {r['packed_url']}")
             elif r["state"] in ("have", "PACKED"):
-                extra = _flavor_token(r.get("flavor"))
+                extra = _flavor_token(r.get("flavor"), r["env"])
             print(f"{r['env']:18} [{r['state']:{width}}] <- {', '.join(r['methods'])}{extra}")
         if not do_run:
             print("# dry-run - add --run to create the missing envs"
@@ -1558,7 +1690,8 @@ def _cmd_env(args) -> int:
                 said = envs.auto_flavor_note(flavor) is not None
                 print(_size_total_line(todo, envs.packed_sizes(), what="to download",
                                        flavor=envs.resolve_flavor(flavor) if said
-                                       else flavor), file=sys.stderr)
+                                       else flavor, manifest=envs.packed_manifest()),
+                      file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if getattr(args, "all", False):
@@ -1666,9 +1799,9 @@ _TASK_HELP = ("task within the category: clustering, batch or dimension_reductio
 _METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
 _FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
-                "(the same env without the CUDA libraries, 3-4x smaller; the GPU build "
-                "with a warning where no CPU archive is published yet), 'gpu' = the "
-                "full CUDA build, 'auto' (default) = 'cpu' when no NVIDIA GPU is "
+                "(the same env without the CUDA libraries, 3-4x smaller) where "
+                "published, else the '<env>' archive with a warning, 'gpu' = the "
+                "'<env>' archive, 'auto' (default) = 'cpu' when no NVIDIA GPU is "
                 "visible on this host (mtb.env.host_has_gpu), 'gpu' otherwise. The env "
                 "name is the same whatever the flavour; env status/doctor show which "
                 "flavour is installed. Installing on a login node for jobs on GPU "
@@ -1692,7 +1825,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "methods from the scMultiBench benchmark. Each command wraps "
                     "one function of the Python API (import multibench as mtb).",
         epilog="Exit codes: 0 ok, 1 runtime error (error: ... on stderr; "
-               "MULTIBENCH_DEBUG=1 shows the traceback), 2 usage error. "
+               "MULTIBENCH_DEBUG=1 shows the traceback), 2 usage error, 3 run-all "
+               "finished but a method is listed in failures.csv. "
                "Run `multibench <command> --help` for the flags of a command.")
     p.add_argument("--version", action="version",
                    version=f"%(prog)s {_version()}",
@@ -2059,8 +2193,10 @@ def build_parser() -> argparse.ArgumentParser:
         "run-all", help="run every runnable method of a category on a dataset folder "
                         "(mtb.run_all)",
         description="Run (or with --dry-run, only plan) every method of the category "
-                    "on <data-path>/<DATASET>/, evaluate each output and save the "
-                    "summary, long.csv and figure under --out-dir.")
+                    "on <data-path>/<DATASET>/, evaluate each output and save "
+                    "summary.csv, long.csv, failures.csv and batch_result.json under "
+                    "--out-dir. multibench plot bubble --input OUT draws the figure.",
+        epilog="Exit code 3: the run finished, but a method is listed in failures.csv.")
     pra.add_argument("dataset", help="dataset id = the folder name under --data-path")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pra.add_argument("--out-dir", "--out", dest="out",
@@ -2073,16 +2209,11 @@ def build_parser() -> argparse.ArgumentParser:
                                           "method variants to, e.g. rna,adt; atac_peak "
                                           "and atac_gas select by what the method reads")
     pra.add_argument("--data-path", dest="data_path",
-                     help="folder that contains the dataset folder (default: the "
-                          "package data path)")
+                     help="folder that contains the dataset folder (default: see "
+                          "`multibench config`)")
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
-                     help="print the plan - the mtb.scan frame run_all(dry_run=True) "
-                          "returns (one row per method variant: runnable, files_ok, "
-                          "env_ok, reason; --columns all for every column) and, per "
-                          "variant whose inputs resolve, the exact command line "
-                          "multibench run would execute (the 'command' column in "
-                          "csv/tsv/json); "
-                          "execute and create nothing")
+                     help="print the plan (one row per method variant, as in "
+                          "multibench scan) and the commands; nothing runs")
     pra.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                      help="with --dry-run: skip this host's GPU test, as scan "
                           "--assume-gpu does")

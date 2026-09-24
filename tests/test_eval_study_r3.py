@@ -49,8 +49,8 @@ def test_cli_one_label_file_of_three_names_the_flags_and_the_fix(tmp_path, capsy
     err = capsys.readouterr().err
     assert code == 1
     assert ("error: --labels gave 30 labels (cty1.csv) for 90 cells in --output. "
-            "For one label file per batch, repeat --labels in batch order (cty1.csv, "
-            "cty2.csv, cty3.csv), or pass --dataset, --category and --method.") in err
+            "For several label files (cty1.csv, cty2.csv, cty3.csv), repeat --labels in "
+            "the row order of --output, or pass --dataset, --category and --method.") in err
     assert "celltype" not in err and "emb has" not in err
 
 
@@ -97,8 +97,8 @@ def test_cli_one_label_file_without_siblings_gives_the_general_fix(tmp_path, cap
     assert cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"),
                      "--labels", str(tmp_path / "cells.csv"), "--metrics", "ASW"]) == 1
     err = capsys.readouterr().err
-    assert ("--labels gave 30 labels (cells.csv) for 90 cells in --output. For one "
-            "label file per batch, repeat --labels in batch order, or pass --dataset, "
+    assert ("--labels gave 30 labels (cells.csv) for 90 cells in --output. For several "
+            "label files, repeat --labels in the row order of --output, or pass --dataset, "
             "--category and --method.") in err
 
 

@@ -432,8 +432,8 @@ def _count_error(what: str, n: int, n_cells: int, given) -> str:
     return msg + " " + config.hint(
         "For a folder with one label file per batch, pass "
         "mtb.labels_for(dataset, category, method).",
-        f"For one label file per batch, repeat --labels in batch order{order}, "
-        f"or pass --dataset, --category and --method.")
+        f"For several label files{order}, repeat --labels in the row order of "
+        f"--output, or pass --dataset, --category and --method.")
 
 
 def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):

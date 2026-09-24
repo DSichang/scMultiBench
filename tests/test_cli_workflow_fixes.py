@@ -197,7 +197,7 @@ def test_run_all_dry_run_help_matches_behaviour():
     p = cli.build_parser()
     sub = next(a for a in p._actions if a.dest == "command").choices["run-all"]
     help_txt = next(a for a in sub._actions if a.dest == "dry_run").help
-    assert "command line" in help_txt and "execute" in help_txt
+    assert "the commands" in help_txt and "nothing runs" in help_txt
 
 
 def test_scan_command_column_renders_for_out_dir():
@@ -504,6 +504,7 @@ def test_warnings_are_formatted_on_stderr(monkeypatch, capsys):
 def test_run_all_progress_goes_to_stderr(monkeypatch, tmp_path, capsys):
     class FakeRes:
         summary = pd.DataFrame({"method": ["M"], "status": ["CHAIN_OK"]})
+        failures = pd.DataFrame(columns=["method", "status", "error"])
 
     def fake_run_all(*a, **k):
         print("[run_all] M (vertical/D11) ...")          # library progress on stdout

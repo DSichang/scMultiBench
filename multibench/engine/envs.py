@@ -333,7 +333,7 @@ def archive_for(env: str, flavor: str = "auto", *, manifest: dict | None = None,
         measured ``archive_bytes`` for it. A ``null`` size marks an archive
         that is not uploaded yet (the size is recorded after the upload);
         picking it would send a CPU host to a 404 and on to a lockfile build.
-        Otherwise ``('<env>', 'gpu')`` - the CUDA build every env has.
+        Otherwise ``('<env>', 'gpu')`` - the archive every env has.
     """
     wanted = resolve_flavor(flavor)
     if wanted == "cpu":
@@ -345,14 +345,24 @@ def archive_for(env: str, flavor: str = "auto", *, manifest: dict | None = None,
     return env, "gpu"
 
 
+def _single_build(env: str, *, manifest: dict | None = None) -> bool:
+    """``True`` when ``env`` has one archive for CPU and GPU hosts (no ``'<env>-cpu'`` twin).
+
+    Only an env with both archives has a "GPU build" and a "CPU build"; the
+    one archive of any other env says nothing about CUDA.
+    """
+    manifest = packed_manifest() if manifest is None else manifest
+    return archive_key(env, "cpu") not in manifest
+
+
 def _cpu_fallback_warning(env: str, manifest: dict, sizes: dict) -> str:
-    """The one ``UserWarning`` a CPU request that lands on the GPU build emits."""
+    """The one ``UserWarning`` a CPU request that lands on the ``'<env>'`` archive emits."""
     size = _gb((sizes.get(env) or {}).get("archive_bytes"))
-    msg = f"no CPU archive for {env}; installing the GPU build ({size})"
-    key = archive_key(env, "cpu")
-    if key in manifest:
-        msg += f" - the CPU archive {key} is not published yet"
-    return msg
+    if _single_build(env, manifest=manifest):
+        return (f"{env} has a single build (the same archive for CPU and GPU hosts); "
+                f"installing it ({size})")
+    return (f"no CPU archive for {env}; installing the GPU build ({size}) - the CPU "
+            f"archive {archive_key(env, 'cpu')} is not published yet")
 
 
 def auto_flavor_note(flavor: str, *, planning: bool = False) -> str | None:
@@ -918,11 +928,11 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         The archives are linux-64; on any other host ``RuntimeError`` is
         raised before the download unless ``force=True``.
     flavor : str
-        Which archive: ``'gpu'`` - the ``'<env>'`` archive (the CUDA build
-        every env has); ``'cpu'`` - the ``'<env>-cpu'`` archive (the same
-        env without the CUDA libraries, 3-4x smaller) when it is published
-        (:func:`archive_for`), else the GPU build with one ``UserWarning``
-        ``"no CPU archive for <env>; installing the GPU build (<size>)"``;
+        Which archive: ``'gpu'`` - the ``'<env>'`` archive, which every env
+        has; ``'cpu'`` - the ``'<env>-cpu'`` archive (the same env without
+        the CUDA libraries, 3-4x smaller) when it is published
+        (:func:`archive_for`), else the ``'<env>'`` archive with one
+        ``UserWarning``;
         ``'auto'`` (default) - ``'cpu'`` when :func:`host_has_gpu` is
         ``False``, else ``'gpu'``. Whatever the flavour, the prefix is
         ``<envs_dir>/<env>`` - the env name never changes, so the runner
@@ -967,7 +977,8 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         tgz, _ = urllib.request.urlretrieve(url)
     except urllib.error.HTTPError:
         return False
-    print(f"[env] unpacking prebuilt {env} ({installed} build) -> {dest} ...", flush=True)
+    build = "single" if _single_build(env, manifest=manifest) else installed
+    print(f"[env] unpacking prebuilt {env} ({build} build) -> {dest} ...", flush=True)
     from ..data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
@@ -1426,7 +1437,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         ``True`` = attempt a real install on a non-Linux host, which is
         refused otherwise.
     flavor : str
-        Packed-archive build per env: ``'cpu'``, ``'gpu'`` (the CUDA build)
+        Packed-archive build per env: ``'cpu'``, ``'gpu'``
         or ``'auto'`` (``'cpu'`` unless an NVIDIA GPU is visible); unused
         when ``packed=False``.
 
@@ -1454,7 +1465,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     Warns
     -----
     UserWarning
-        A CPU install finds no CPU archive for an env; the GPU build is
+        A CPU install finds no CPU archive for an env; its one archive is
         installed.
 
     Examples
@@ -1505,10 +1516,10 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
 
     **Flavours.** The env name and prefix are the same whatever the flavour.
 
-    - ``'gpu'`` - the ``'<env>'`` archive, the CUDA build every env has.
+    - ``'gpu'`` - the ``'<env>'`` archive, which every env has.
     - ``'cpu'`` - the ``'<env>-cpu'`` archive (the same env without the CUDA
-      libraries, several times smaller) where published; otherwise the GPU
-      build and one ``UserWarning``.
+      libraries, several times smaller) where published; otherwise the
+      ``'<env>'`` archive and one ``UserWarning``.
     - ``'auto'`` - ``'cpu'`` when ``mtb.env.host_has_gpu()`` is ``False``
       (no ``nvidia-smi -L`` output and no ``/proc/driver/nvidia/version``),
       else ``'gpu'``.
@@ -1582,8 +1593,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     f"no conda/mamba on this host; {r['env']} has no packed "
                     f"archive - install conda first")
         if packed:
-            # said only when a CPU build is taken; an env without one gets the
-            # GPU build whatever the flavour
+            # said only when a CPU build is taken; an env without one gets its
+            # '<env>' archive whatever the flavour
             note = auto_flavor_note(flavor) if any(
                 archive_for(r["env"], flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
                 for r in missing) else None

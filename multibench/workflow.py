@@ -2316,6 +2316,24 @@ class BatchResult:
 
 
 # ---------------------------------------------------------------------- run_all
+#: closing lines that name no cause (R's after any error); the line before them does
+_ERROR_TRAILERS = ("Execution halted",)
+
+
+def _error_tail(error, width: int = 200) -> str:
+    """The last line of ``error`` that names a cause, clipped from the left to ``width``.
+
+    ``run_all``'s ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with it, so
+    a job log shows why without opening ``failures.csv``.
+    """
+    lines = [l.strip() for l in str(error or "").splitlines()]
+    lines = [l for l in lines if l and l not in _ERROR_TRAILERS]
+    if not lines:
+        return ""
+    last = lines[-1]
+    return last if len(last) <= width else "..." + last[-(width - 3):]
+
+
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
                               methods) -> str:
     """The ``ValueError`` text for "not one requested variant can start".
@@ -3106,8 +3124,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         finally:
             _disarm_deadline(_deadline_prev)
         if verbose:
-            print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) "
-                  f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
+            tail = (_error_tail(rec["error"]) if rec.get("error")
+                    else (rec.get("metrics") or {}).get("ARI", ""))
+            print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) {tail}".rstrip(),
+                  flush=True)
         if rec.get("reused"):
             rec.update(earlier.get(m, _UNKNOWN_PROVENANCE))
         else:

@@ -225,18 +225,24 @@ def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     sizes = {"a": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9},
              "b": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9}}
-    one = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="cpu")
-    assert one.startswith("# total for 1 env (GPU build; no CPU build is published for it)")
-    two = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "gpu"}],
-                               sizes, flavor="cpu")
-    assert two.startswith("# total for 2 envs (GPU builds; no CPU build is published for "
-                          "these envs)")
+    single = "a single build (the same archive for CPU and GPU hosts)."
+    kw = dict(flavor="cpu", manifest={"b-cpu": "u"})       # only b has a CPU build
+    one = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, **kw)
+    assert one.splitlines()[1] == f"# This env has {single}"
+    two = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "c", "flavor": "gpu"}],
+                               sizes, **kw)
+    assert two.splitlines()[1] == f"# Both envs have {single}"
     some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"},
-                                 {"env": "c", "flavor": "gpu"}], sizes, flavor="cpu")
-    assert some.startswith("# total for 3 envs (CPU builds; 2 envs have only a GPU build)")
+                                 {"env": "c", "flavor": "gpu"}], sizes, **kw)
+    assert some.splitlines()[1] == f"# CPU build. 2 envs have {single}"
     some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"}],
-                                sizes, flavor="cpu")
-    assert some.startswith("# total for 2 envs (CPU builds; 1 env has only a GPU build)")
+                                sizes, **kw)
+    assert some.splitlines()[1] == f"# CPU build. 1 env has {single}"
+    # a CPU build listed but not published yet: that env gets its GPU build
+    late = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="cpu",
+                                manifest={"a-cpu": "u"})
+    assert late.splitlines()[1] == ("# 1 env gets the GPU build, because its CPU build is "
+                                    "not published yet.")
 
 
 def test_env_status_help_is_one_sentence_and_one_tag_per_line():
