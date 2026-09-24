@@ -216,7 +216,7 @@ def test_recommend_unknown_result_id_and_modalities(result_dir):
     sub = long[long.method.isin(["sciPENN", "scMSI"])]
     with pytest.raises(ValueError, match="consumes modalities"):
         recommend("vertical", long_df=sub, modalities=["rna", "atac"])
-    with pytest.raises(ValueError, match=r"unknown metrics= token 'bogus'"):
+    with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\."):
         recommend("vertical", long_df=long, metrics="bogus")
 
 

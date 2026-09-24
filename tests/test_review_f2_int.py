@@ -393,8 +393,8 @@ def _help(path, flag):
 
 def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
     assert _help(["scan"], "--assume-gpu") == (
-        "skip this host's GPU test. Use it on a login node without a GPU to check a "
-        "job for a GPU node (mtb.scan(assume_gpu=True))")
+        "skip this host's GPU test. On a login node without a GPU, it checks a job for "
+        "a GPU node. Python: assume_gpu=True")
     assert _help(["fetch"], "--ref").endswith(
         "Scripts already present must be at that commit or tag.")
     doc = " ".join(mtb.scan.__doc__.split())

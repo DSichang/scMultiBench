@@ -692,9 +692,10 @@ def _no_comparison_message(methods, constant: dict,
         groups = {}
         for c, v in constant.items():
             groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
-        parts = [f"{v} in {_both(cs)}" for v, cs in groups.items()]
-        same = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + ", and " + parts[-1]
-        return f"Every method has mean rank {same}. {which} grey."
+        # one sentence per mean rank
+        same = " ".join(f"Every method has mean rank {v} in {_both(cs)}."
+                        for v, cs in groups.items())
+        return f"{same} {which} grey."
     same = _both([f"{c} is {v:.3f}" for c, v in constant.items()])
     return f"{same} for every method. {which} grey."
 

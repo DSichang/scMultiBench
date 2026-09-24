@@ -115,7 +115,7 @@ def test_inputs_for_protein_alias_and_bad_category(tmp_path):
     assert a == b and set(a) == {"rna", "adt"}
     with pytest.raises(ValueError, match="unknown category 'crosss'"):
         resolve.inputs_for("D11", "crosss", "totalVI", data_path=tmp_path)
-    with pytest.raises(ValueError, match="unknown modality 'proteinx'"):
+    with pytest.raises(ValueError, match=r"^Unknown modality proteinx\."):
         resolve.inputs_for("D11", "vertical", "totalVI", modalities=["rna", "proteinx"],
                            data_path=tmp_path)
     with pytest.raises(KeyError, match="Did you mean StabMap"):

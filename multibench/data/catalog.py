@@ -296,10 +296,10 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     Raises
     ------
     ValueError
-        A string that is not a family token (``"unknown metrics= token
-        'ARI'; valid: 'all', 'clustering', 'batch' - or a list of codes"``;
-        a :func:`multibench.list_tasks` token gets an extra sentence saying
-        the slot selects a metric family), an unknown code in a list
+        A string that is not a family token (``"Unknown metrics= token
+        ARI. Pass 'all', 'clustering' or 'batch', or a list of metric codes
+        ..."``; a :func:`multibench.list_tasks` token gets an extra sentence
+        saying the slot selects a metric family), an unknown code in a list
         (listing the valid codes), an empty list, or a list that names the
         same metric twice after canonicalisation.
     TypeError
@@ -319,23 +319,24 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         except Exception:
             tasks = []
         if metrics in tasks:
-            hint = (f" - {kw}= selects a metric family, not a mtb.list_tasks() token; "
-                    f"'dimension_reduction' and 'clustering' share the 'clustering' "
-                    f"family, and the scIB families are the only metrics computed")
+            hint = (f" {kw}= selects a metric family, not a task of mtb.list_tasks(). "
+                    f"The tasks dimension_reduction and clustering both use the "
+                    f"clustering family. Only the scIB families are computed.")
         elif canonical_metric(metrics) in known_metrics():
-            hint = f" - a single code goes in a list: {kw}=[{canonical_metric(metrics)!r}]"
+            hint = f" A single code goes in a list: {kw}=[{canonical_metric(metrics)!r}]."
         raise ValueError(
-            f"unknown {kw}= token {metrics!r}; valid: 'all', 'clustering', 'batch' "
-            f"(or a list of metric codes, e.g. {kw}=['ARI', 'NMI']){hint}")
+            f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering' or 'batch', "
+            f"or a list of metric codes such as {kw}=['ARI', 'NMI'].{hint}")
     if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
+        got = type(metrics).__name__
         raise TypeError(
-            f"{kw}= must be None, a family token ('all', 'clustering', 'batch') or "
-            f"a list of metric codes; got {type(metrics).__name__}")
+            f"{kw}= takes None, 'all', 'clustering', 'batch' or a list of metric "
+            f"codes. It got {'an' if got[:1] in 'aeiou' else 'a'} {got}.")
     wanted = list(metrics)
     if not wanted:
         raise ValueError(
-            f"{kw}=[] selects nothing; pass None for every metric, a family token, "
-            f"or a non-empty list of codes")
+            f"{kw}=[] selects nothing. Pass None for every metric, a family token, "
+            f"or a non-empty list of codes.")
     valid = list(known_metrics())
     present = sorted(set(map(str, extra)))
     codes, unknown = [], []

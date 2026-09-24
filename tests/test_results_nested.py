@@ -2,6 +2,7 @@
 are loadable and listed (Elena: D56 was in the wheel but invisible to
 available_datasets, and the FileNotFoundError named it as available). The
 ``layout_tree`` fixture reproduces that layout."""
+import re
 import warnings
 
 import pytest
@@ -44,7 +45,8 @@ def _available_list_and_error_agree(root):
     with pytest.raises(FileNotFoundError) as ei:
         results.load_results("cross", dataset="D99", result_path=root)
     msg = str(ei.value)
-    have = eval(msg.split("datasets with published tables: ")[1])
+    held = re.match(r"The published tables of cross hold (.*), not D99\.", msg).group(1)
+    have = re.split(r", | and ", held)
     assert have == avail
     return have
 

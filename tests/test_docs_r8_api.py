@@ -28,11 +28,12 @@ def test_changes_page_lists_round_8_changes():
             # R8-04
             "- `scan` and `run_all`, dry run included, raise `ValueError` before anything "
             "runs when `methods=` names a method with no variant in the category or "
-            "modalities. 0.3.1 dropped that method. The commands exit with `1`.",
+            "modalities. 0.3.1 dropped that method. `multibench run-all` exits with `1`.",
             # R8-06
             "The column is numeric, also when every row is blank.",
             # R8-03
-            "widened so that its row labels, family headers and key fit.",
+            "`bubble` widens a family pill to fit its header, and a figure of one to "
+            "three metrics to fit its row labels and key.",
             # R8-05
             "On macOS and Windows, the error lists only the rows that something else "
             "also blocks.",

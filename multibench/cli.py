@@ -201,7 +201,8 @@ def _print_frame(df, columns=None, fmt: str = "table", file=None, *,
             if "atac" in df.columns:
                 df["atac"] = df["atac"].map(lambda v: "" if _blank(v) else v)
         if len(df) == 0:
-            print(f"(empty table; columns: {list(df.columns)})", file=file)
+            print(f"The table has no rows. Its columns are {', '.join(map(str, df.columns))}.",
+                  file=file)
         else:
             print(df.to_string(index=False), file=file)
 
@@ -1596,13 +1597,13 @@ def _cmd_evaluate(args) -> int:
     if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
         metrics = metrics[0]
     if getattr(args, "only", None) is not None:
-        print("warning: --only is deprecated; use --metrics", file=sys.stderr)
+        print("warning: --only is deprecated. Use --metrics.", file=sys.stderr)
         if metrics is None:
             metrics = _csv_list(args.only)
     if args.task is not None:
         with warnings.catch_warnings():
             warnings.simplefilter("always", DeprecationWarning)
-            warnings.warn(f"--task is deprecated; use --metrics {args.task}",
+            warnings.warn(f"--task is deprecated. Use --metrics {args.task}.",
                           DeprecationWarning, stacklevel=2)
         if metrics is None:
             metrics = args.task
@@ -2210,25 +2211,25 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--methods", help=_METHODS_HELP + ". Only those rows. An unknown "
                                                       "id gets a did-you-mean error")
     ps.add_argument("--modalities", help="comma-separated modality roles to restrict the "
-                                         "variants to, e.g. rna,adt ('protein' is "
-                                         "accepted for adt); atac_peak and atac_gas "
-                                         "select by what the method reads")
+                                         "variants to, e.g. rna,adt. protein is accepted "
+                                         "for adt. atac_peak and atac_gas select by what "
+                                         "the method reads")
     ps.add_argument("--columns", help="comma-separated columns to print, in this order, "
-                                      "or 'all' for every column (default: the compact "
-                                      "set in table mode, all columns for csv/tsv/json; "
-                                      "an unknown name lists the available ones)")
+                                      "or 'all'. Default: the main columns for table "
+                                      "output, all for csv, tsv and json. An unknown "
+                                      "name lists the valid ones")
     ps.add_argument("--format", choices=["table", "csv", "tsv", "json"], default="table",
-                    help="output format (default table = aligned text, compact and "
-                         "clipped; csv/tsv/json = every column, never clipped, for "
-                         "scripts; json = a list of row objects)")
+                    help="table (default) prints the main columns, clipped. csv, tsv "
+                         "and json print every column in full. json is a list of row "
+                         "objects")
     ps.add_argument("--strict", action="store_true",
-                    help="exit 1 when no requested row is runnable; with --methods, "
-                         "when any named method has none; also when the method "
-                         "scripts are not fetched (for scripts: multibench "
-                         "scan DS --category C --strict && sbatch ...)")
+                    help="exit 1 when no requested row is runnable, when a method "
+                         "named in --methods has none, or when the method scripts are "
+                         "not fetched. Example: multibench scan DS --category C "
+                         "--strict && sbatch ...")
     ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
-                    help="skip this host's GPU test. Use it on a login node without a "
-                         "GPU to check a job for a GPU node (mtb.scan(assume_gpu=True))")
+                    help="skip this host's GPU test. On a login node without a GPU, "
+                         "it checks a job for a GPU node. Python: assume_gpu=True")
     ps.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
                     action="store_true", help=_ATAC_MISMATCH_HELP)
     ps.set_defaults(func=_cmd_scan, _parser=ps)
@@ -2266,47 +2267,46 @@ def build_parser() -> argparse.ArgumentParser:
                     "vertical writes atac.h5. diagonal writes atac_peak.h5 or "
                     "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "
                     "mosaic writes atac<i>.h5.")
-    pc.add_argument("--modality", help="mode 1: rna | adt | atac | atac_peak | atac_gas "
-                                       "(aliases protein, peak, gas/gene_activity); "
-                                       "validated, picks the filename when OUT is a "
-                                       "directory and checks ATAC feature names")
+    pc.add_argument("--modality", help="mode 1: rna, adt, atac, atac_peak or atac_gas. "
+                                       "Aliases: protein, peak, gas, gene_activity. "
+                                       "Names the file when OUT is a folder, and "
+                                       "checks ATAC feature names")
     pc.add_argument("--layer", help="mode 1: take the matrix from adata.layers[LAYER] "
                                     "instead of .X")
     pc.add_argument("--obsm", help="mode 1: take the matrix from adata.obsm[OBSM] "
                                    "(e.g. protein for CITE-seq ADT)")
     pc.add_argument("--mod", help="mode 1: for .h5mu input, the modality to export")
     pc.add_argument("--rna", help="mode 2: where the raw-count RNA matrix lives: X, "
-                                  "obsm:<key>, layer:<key>, mod:<name> (no default - omit "
-                                  "to skip RNA); append [<var column>=<value>] to keep "
+                                  "obsm:<key>, layer:<key> or mod:<name>. Without it, no "
+                                  "RNA is written. Append [<var column>=<value>] to keep "
                                   "some features, e.g. \"X[feature_types=Gene Expression]\"")
-    pc.add_argument("--adt", help="mode 2: where the ADT/protein matrix lives "
-                                  "(same grammar, e.g. obsm:protein)")
-    pc.add_argument("--atac", help="mode 2: where the ATAC matrix lives (same grammar, "
-                                   "e.g. \"X[feature_types=Peaks]\"); requires --atac-kind")
+    pc.add_argument("--adt", help="mode 2: the ADT matrix, as for --rna, e.g. "
+                                  "obsm:protein")
+    pc.add_argument("--atac", help="mode 2: the ATAC matrix, as for --rna, e.g. "
+                                   "\"X[feature_types=Peaks]\". Needs --atac-kind")
     pc.add_argument("--atac-from", dest="atac_from", metavar="PATH",
-                    help="mode 2, --category diagonal: a second .h5ad/.h5mu with the "
-                         "ATAC cells; --atac then selects from it (default X)")
+                    help="mode 2, --category diagonal: another .h5ad or .h5mu with the "
+                         "ATAC cells. --atac selects from it, default X")
     pc.add_argument("--atac-kind", dest="atac_kind", choices=["peak", "gene_activity"],
-                    help="mode 2: peak -> atac_peak.h5 (+ atac.h5 without --category); "
-                         "gene_activity -> atac_gas.h5; --category vertical writes atac.h5 "
-                         "and mosaic atac<i>.h5 for both")
-    pc.add_argument("--labels", help="mode 2: cell-type column, obs:<col> (the MuData's "
-                                     "global obs) or <mod>:<col> -> cty.csv (diagonal: "
-                                     "rna_cty.csv / atac_cty.csv)")
-    pc.add_argument("--batch", help="mode 2: batch column (same grammar); cells are "
+                    help="mode 2: peak writes atac_peak.h5, and atac.h5 without "
+                         "--category. gene_activity writes atac_gas.h5. --category "
+                         "vertical writes atac.h5 and mosaic atac<i>.h5 for both")
+    pc.add_argument("--labels", help="mode 2: cell-type column, obs:<col> for the global "
+                                     "obs or <mod>:<col>. Written to cty.csv, for "
+                                     "diagonal to rna_cty.csv and atac_cty.csv")
+    pc.add_argument("--batch", help="mode 2: batch column, as for --labels. Cells are "
                                     "split per batch into numbered files rna1.h5, "
                                     "rna2.h5, cty1.csv ..., read by mosaic and cross methods")
     pc.add_argument("--batch-index", dest="batch_index", type=int, metavar="N",
                     help="mode 2, --category mosaic or cross: write the whole file "
-                         "as batch N (rna<N>.h5, adt<N>.h5, atac<N>.h5, cty<N>.csv); "
-                         "one call per batch file, see the recipe below "
-                         "(mtb.io.export_dataset(batch_index=N))")
+                         "as batch N: rna<N>.h5, adt<N>.h5, atac<N>.h5 and cty<N>.csv. "
+                         "One call per batch file. Python: batch_index=N")
     pc.add_argument("--overwrite", action="store_true",
                     help="mode 2: replace files already in OUT (default: refuse and "
                          "list them)")
     pc.add_argument("--dtype", default="float64",
-                    help="stored dtype of matrix/data (default float64 like the "
-                         "shipped files; float32 halves the size)")
+                    help="stored dtype of matrix/data. Default float64, like the "
+                         "shipped files. float32 halves the size")
     pc.set_defaults(func=_cmd_convert, _parser=pc)
 
     # ---- cite
@@ -2615,11 +2615,11 @@ def build_parser() -> argparse.ArgumentParser:
     ec.add_argument("--force", action="store_true", help=_FORCE_HELP)
     ec.set_defaults(func=_cmd_env, _parser=ec)
     ep = ev.add_parser("plan", help="which envs a set of methods needs (collapsed per env)",
-                       description="Collapse methods into the conda envs they need, "
-                                   "marking shared vs own envs, with the packed-archive "
-                                   "download size ('dl') and unpacked size on disk "
-                                   "('disk') recorded for this release ('?' = not "
-                                   "measured); a '# total' line on stderr sums them.")
+                       description="Group methods by the conda environment they need, "
+                                   "and mark shared and own environments. 'dl' is the "
+                                   "packed-archive download size and 'disk' the unpacked "
+                                   "size, recorded for this release. '?' means not "
+                                   "measured. A '# total' line on stderr sums them.")
     ep.add_argument("--category", help=_CATEGORY_HELP)
     ep.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ep.add_argument("--flavor", choices=_FLAVORS, default="auto", help=_FLAVOR_HELP)
@@ -2633,7 +2633,7 @@ def build_parser() -> argparse.ArgumentParser:
     eg.add_argument("--force", action="store_true", help=_FORCE_HELP)
     eg.set_defaults(func=_cmd_env, _parser=eg)
     edoc = ev.add_parser(
-        "doctor", help="preflight: which envs are present / need building",
+        "doctor", help="check which environments are installed or need building",
         description="One line per env needed by the selected methods: [x] installed, "
                     "[L] missing but a lockfile is ready, [!] missing and no "
                     "lockfile; then the install command for the missing ones. Method "
@@ -2647,17 +2647,17 @@ def build_parser() -> argparse.ArgumentParser:
     ei = ev.add_parser(
         "install", help="build every needed env from its lockfile or packed archive "
                         "(mtb.env.install)",
-        description="Install the envs the selected methods need. Dry run by default: "
-                    "prints per env 'have' / 'build(dry-run)' / 'NO-LOCK', or with "
-                    "--packed 'packed archive published' plus the archive's download "
-                    "size, unpacked size and URL recorded for this release ('?' = not "
-                    "measured) / 'no archive - lockfile build', and a '# total' line "
-                    "on stderr. Add --run to do it. "
-                    "--flavor picks the CPU-only or the CUDA archive (auto = by "
-                    "whether this host has an NVIDIA GPU); the env name is the same "
-                    "either way. Method envs are linux-64 conda envs: on "
-                    "macOS/Windows a warning is printed first and --run refuses "
-                    "(--force overrides).")
+        description="Install the environments the selected methods need. Without "
+                    "--run, a dry run prints one line per environment: "
+                    "'have', 'build(dry-run)' or 'NO-LOCK'. With --packed, a line reads "
+                    "'packed archive published', with the archive's download size, "
+                    "unpacked size and URL for this release, or 'no archive - lockfile "
+                    "build'. '?' means not measured. A '# total' line goes to stderr. "
+                    "--flavor picks the CPU-only or the CUDA archive. auto picks by "
+                    "whether this computer has an NVIDIA GPU. The environment name is "
+                    "the same either way. They are linux-64 conda environments. On "
+                    "macOS and Windows a warning comes first, and "
+                    "--run refuses unless --force is given.")
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ei.add_argument("--packed", action="store_true",

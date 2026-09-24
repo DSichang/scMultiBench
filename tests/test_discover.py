@@ -180,7 +180,7 @@ def test_find_methods_rejects_bad_tokens():
         discover.find_methods(atac="binary")
     with pytest.raises(ValueError) as e:
         discover.find_methods(modalities=["proteinx"])
-    assert "unknown modality 'proteinx'" in str(e.value) and "protein" in str(e.value)
+    assert "Unknown modality proteinx." in str(e.value) and "protein" in str(e.value)
 
 
 def test_find_methods_modalities_aliases():

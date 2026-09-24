@@ -312,9 +312,11 @@ def _norm_modality(modality):
         return None
     m = _ALIASES.get(str(modality), str(modality))
     if m not in _MODALITIES:
-        raise ValueError(
-            f"unknown modality {modality!r}; valid: {list(_MODALITIES)} "
-            f"(aliases: {_ALIASES})")
+        alias = {m: [a for a, t in _ALIASES.items() if t == m] for m in _MODALITIES}
+        valid = [m + (f" (or {', '.join(alias[m])})" if alias[m] else "")
+                 for m in _MODALITIES]
+        raise ValueError(f"Unknown modality {modality}. The modalities are "
+                         f"{', '.join(valid[:-1])} and {valid[-1]}.")
     return m
 
 

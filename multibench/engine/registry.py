@@ -351,10 +351,10 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
         t = MODALITY_ALIASES.get(str(tok).lower(), str(tok))
         if t not in known and not is_label_role(t):
             raise ValueError(
-                f"unknown modality {tok!r}; known: rna, adt (alias: protein), atac; "
-                f"the representation tokens atac_peak (also peak, peaks) and atac_gas "
-                f"(also gas, gene_activity) name the ATAC form a method reads; rna1, "
-                f"adt1, atac2 ... name numbered batches")
+                f"Unknown modality {tok}. The tokens are rna, adt (or protein) and "
+                f"atac. atac_peak (or peak, peaks) and atac_gas (or gas, "
+                f"gene_activity) name the ATAC form a method reads. rna1, adt1, "
+                f"atac2 ... name numbered batches.")
         if base:
             t = base_modality(t)
         if t not in out:

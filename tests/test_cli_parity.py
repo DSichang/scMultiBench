@@ -382,7 +382,7 @@ def test_cli_plot_result_path_reads_another_results_root(tmp_path, layout_tree, 
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "pass --result-path for another results root" in err
+    assert "Pass --result-path to read another results folder." in err
     assert "result_path=" not in err
     # a category without published tables: the fact and the flag, in flag spelling
     rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",

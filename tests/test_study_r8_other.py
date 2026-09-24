@@ -229,9 +229,9 @@ def test_scripts_fetch_errors_are_plain_and_fit_the_fail_line(monkeypatch, tmp_p
     # run_all's FAIL line shows the whole text, not a clipped '...' tail
     assert W._error_tail(record) == record
     e = _fetch_error(monkeypatch, tmp_path, ref="abc123")
-    assert str(e) == ("Could not fetch the method scripts at 'abc123' from github.com. "
-                      "Either there is no network, or github.com has no such commit "
-                      "or tag." + tail)
+    assert str(e) == ("Could not fetch the method scripts at 'abc123'. There is no "
+                      "network, or no such commit or tag. Offline, copy a fetched "
+                      "scripts folder and set MULTIBENCH_REPO_PATH.")
     e2 = _fetch_error(monkeypatch, tmp_path, missing_git=True)
     assert str(e2) == "Git is not installed. It is needed to fetch the method scripts." + tail
     for err in (e, e2):
@@ -271,6 +271,15 @@ def test_scan_and_convert_help_are_short_sentences():
         assert _depth(text) <= 1, (name, text)
         # no slash lists such as .csv/.tsv or --rna/--adt
         assert not re.search(r"[\w.]/[-.\w]", text), (name, text)
+    # the option help printed under the descriptions follows the same rules;
+    # matrix/data is the path inside a .h5 file, not a slash list
+    for name in ("scan", "convert"):
+        for a in _subparser(name)._actions:
+            if a.help and a.dest != "help":
+                text = a.help.replace("matrix/data", "")
+                assert ";" not in text and _depth(text) <= 1, (name, a.dest, text)
+                assert not re.search(r"[\w.]/[-.\w]", text), (name, a.dest, text)
+                assert " | " not in text, (name, a.dest, text)
     assert "preflight" not in texts["scan"]
     assert f"{cli._TRUNCATE_WIDTH} characters" in texts["scan"]
     # the modes the other convert options refer to are still named

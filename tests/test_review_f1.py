@@ -117,8 +117,8 @@ def test_the_vocabulary_message_calls_peak_and_gas_representation_tokens():
         registry.normalize_modalities(["rna", "bogus"])
     msg = str(ei.value)
     assert "aliases: peak" not in msg
-    assert "the representation tokens atac_peak (also peak, peaks) and atac_gas " \
-           "(also gas, gene_activity)" in msg
+    assert "atac_peak (or peak, peaks) and atac_gas (or gas, gene_activity) name the " \
+           "ATAC form a method reads" in msg
     notes = mtb.inputs_for.__doc__
     assert "``peak`` / ``peaks`` for ``atac_peak``" not in notes
     assert "the representation tokens ``atac_peak`` (also ``peak``, ``peaks``)" in notes

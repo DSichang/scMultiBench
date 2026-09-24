@@ -650,16 +650,17 @@ def ensure_repo(path=None, ref=None):
                 (part / ".git" / _REF_RECORD).write_text(ref + "\n")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         _sh.rmtree(part, ignore_errors=True)
-        if isinstance(e, FileNotFoundError):
-            first = "Git is not installed. It is needed to fetch the method scripts."
-        elif ref:
-            first = (f"Could not fetch the method scripts at {ref!r} from github.com. "
-                     f"Either there is no network, or github.com has no such commit "
-                     f"or tag.")
-        else:
-            first = "Could not reach github.com to fetch the method scripts."
-        # run_all's FAIL line shows the last 200 characters of an error: the
-        # no-ref text with "RuntimeError: " in front stays within them
+        # run_all's FAIL line shows the last 200 characters of an error: each
+        # text keeps its subject within them ("RuntimeError: " in front, and
+        # with a ref of up to 40 characters, a full commit SHA)
+        if ref and not isinstance(e, FileNotFoundError):
+            raise RuntimeError(
+                f"Could not fetch the method scripts at {ref!r}. There is no network, "
+                f"or no such commit or tag. Offline, copy a fetched scripts folder and "
+                f"set {REPO_PATH_VAR}.") from e
+        first = ("Git is not installed. It is needed to fetch the method scripts."
+                 if isinstance(e, FileNotFoundError) else
+                 "Could not reach github.com to fetch the method scripts.")
         raise RuntimeError(
             f"{first} On a host without network, run multibench fetch --scripts "
             f"on a connected machine, copy the folder and set {REPO_PATH_VAR}.") from e

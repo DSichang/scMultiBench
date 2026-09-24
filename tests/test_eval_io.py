@@ -344,7 +344,7 @@ def test_evaluate_metrics_rejects_unknown_metric_and_bare_code_string():
     assert "ARI" in msg and "kBET" in msg
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics="ARI")      # a code is not a family token
-    assert "a single code goes in a list: metrics=['ARI']" in str(exc.value)
+    assert "A single code goes in a list: metrics=['ARI']." in str(exc.value)
 
 
 def test_evaluate_rejects_unknown_category_and_allows_none():

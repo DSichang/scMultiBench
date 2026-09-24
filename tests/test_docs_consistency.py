@@ -235,7 +235,7 @@ def test_clustering_variants_ship_per_category_as_documented(tmp_path):
                 assert _methods_per_dataset(df) == _methods_per_dataset(default)
                 hit.add("loaded")
             else:
-                with pytest.raises(FileNotFoundError, match=f"metric_{variant}.csv"):
+                with pytest.raises(FileNotFoundError, match=f"have no {variant} variant"):
                     mtb.load_results(cat, clustering=variant)
                 hit.add("raised")
     assert hit == {"loaded", "raised"}, f"the shipped tree exercises only {hit}: {shipped}"

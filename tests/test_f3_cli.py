@@ -197,8 +197,8 @@ def test_run_all_dry_run_accepts_batch(standin, tmp_path, capsys):
 # ====================================================================== R3-11
 def test_scan_strict_help_names_both_rules():
     text = " ".join(_opt_help(_sub("scan"), "--strict").split())
-    assert text.startswith("exit 1 when no requested row is runnable; with --methods, "
-                           "when any named method has none")
+    assert text.startswith("exit 1 when no requested row is runnable, when a method "
+                           "named in --methods has none")
     assert "nothing requested is runnable" not in text
 
 

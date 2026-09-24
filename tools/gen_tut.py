@@ -760,11 +760,18 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
             "order it kept.", label="Details: label order"))
         # the printed example is a method that fits the dataset (files_ok, no
         # scan caveat: Seurat_v5 reorders D28 too, but needs paired files D28
-        # does not have)
+        # does not have). The note that the method scripts are not on this
+        # machine is no such caveat: without a scripts checkout every row has it.
         import multibench as mtb
+        from multibench.engine.runner import SCRIPTS_NOT_HERE, _prepared_at
         fit = mtb.scan(ds, cat, methods=list(others), verbose=False)
-        fit = set(fit.loc[fit["files_ok"] & (fit["caveat"] == ""), "method"])
-        m0 = next((m for m in others if m in fit), next(iter(others)))
+        only_scripts = fit["caveat"].map(
+            lambda c: c == "" or (c.startswith(SCRIPTS_NOT_HERE) and _prepared_at(c) < 0))
+        fit = set(fit.loc[fit["files_ok"] & only_scripts, "method"])
+        m0 = next((m for m in others if m in fit), None)
+        if m0 is None:
+            raise SystemExit(f"no method that stacks {ds}'s cells in another order fits "
+                             f"{ds} without a caveat: pick the label-order example by hand")
         labels_code += f'\nprint("{m0}:", list(mtb.labels_for(DATASET, CATEGORY, "{m0}")))'
     code(labels_code)
     export_notes = EXPORT_DETAIL[cat]

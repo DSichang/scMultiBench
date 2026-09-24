@@ -152,10 +152,10 @@ CATEGORIES = {
                 "RNA+ADT, or 10x multiome RNA+ATAC). Cells are already matched.",
     "diagonal": "Modalities measured in different cells, with no pairing "
                 "(e.g. an RNA experiment and a separate ATAC experiment).",
-    "mosaic":   "Several batches where only some share a modality; a paired batch "
+    "mosaic":   "Several batches where only some share a modality. A paired batch "
                 "bridges the others.",
     "cross":    "Several batches, each measured with RNA and ADT, for example one "
-                "CITE-seq assay from several donors; the task is removing batch "
+                "CITE-seq assay from several donors. The task is removing batch "
                 "effects.",
 }
 
@@ -164,7 +164,7 @@ CATEGORIES = {
 ROLES = {
     "rna":       "rna.h5         - gene expression",
     "adt":       "adt.h5         - surface protein (CITE-seq antibody-derived tags)",
-    "atac":      "atac.h5        - ATAC; method_info(m)['atac'] says peaks or gene activity",
+    "atac":      "atac.h5        - ATAC. method_info(m)['atac'] says peaks or gene activity",
     "atac_peak": "atac_peak.h5   - ATAC as peaks (diagonal)",
     "atac_gas":  "atac_gas.h5    - ATAC as gene-activity scores (diagonal)",
     "rna1/adt1/atac2 ...": "rna1.h5, adt1.h5, atac2.h5 ... - one file per batch (mosaic, cross)",
@@ -273,7 +273,7 @@ def describe_layout(category: str | None = None) -> str:
     cats = [category] if category else list(CATEGORIES)
     lines = ["Put the files of one dataset in one folder: <data_path>/<DATASET>/, "
              "for example ./data/MYDATA/.",
-             "The dataset name is the folder name; data_path is the folder that "
+             "The dataset name is the folder name. data_path is the folder that "
              "contains it.", ""]
     for cat in cats:
         lines += _layout_block(cat, full=category is not None) + [""]
@@ -289,9 +289,9 @@ def describe_layout(category: str | None = None) -> str:
                           "writes the whole folder",
                           "matrix/features and matrix/barcodes. multibench convert "
                           "writes the whole folder"),
-              config.hint("from an AnnData or MuData; mtb.io.to_canonical writes one "
+              config.hint("from an AnnData or MuData. mtb.io.to_canonical writes one "
                           "file.",
-                          "from an .h5ad or .h5mu file, or one file; multibench convert "
+                          "from an .h5ad or .h5mu file, or one file. multibench convert "
                           "--help has examples."),
               "A label file is a single-column CSV: one header line, then one label "
               "per cell.",
@@ -303,7 +303,7 @@ def describe_layout(category: str | None = None) -> str:
               config.hint(
                   f"Next: mtb.scan('MYDATA', '{cat}'), then, on Linux, "
                   f"mtb.run_all('MYDATA', '{cat}', out_dir='out/')",
-                  f"Next: multibench scan MYDATA --category {cat}; on Linux, "
+                  f"Next: multibench scan MYDATA --category {cat}, then, on Linux, "
                   f"multibench run-all MYDATA --category {cat} --out-dir out/")]
     return "\n".join(lines)
 
@@ -363,7 +363,7 @@ def _atac_lines(category: str) -> list[str]:
         return []
     out = []
     if category == "vertical":
-        out.append("atac.h5 holds peaks or gene activity; each method needs one of them:")
+        out.append("atac.h5 holds peaks or gene activity. Each method needs one of them:")
     elif category == "diagonal":
         out.append("Give atac_peak.h5, atac_gas.h5 or both. Each method needs one of "
                    "them, or both:")
@@ -376,7 +376,7 @@ def _atac_lines(category: str) -> list[str]:
         peak = [m for m in peak if m not in both]
         gas = [m for m in gas if m not in both]
     elif gas:
-        out.append("atac<i>.h5 holds peaks or gene activity; each method needs one of them:")
+        out.append("atac<i>.h5 holds peaks or gene activity. Each method needs one of them:")
     else:
         out.append(f"atac<i>.h5 holds peaks: every {category} method that reads ATAC "
                    f"needs peaks.")
@@ -452,7 +452,7 @@ def _batch_recipe(category: str, patterns) -> list[str]:
                              f"{' and '.join(rest)})")
             break
     if any(_CONVERT_FLAGS[ms][0] == "h5mu" for ms in batches.values()):
-        lines.append("  In a .h5mu file, rna:cell_type reads the RNA modality's obs; "
+        lines.append("  In a .h5mu file, rna:cell_type reads the RNA modality's obs. "
                      "obs:<col> reads the global obs.")
     if not config._CLI:
         first = next(iter(batches.values()))
@@ -1174,7 +1174,7 @@ def scan(dataset: str, category: str | None = None, *,
     UserWarning
         ``dataset`` matches a folder only up to letter case.
     UserWarning
-        ``modalities`` drops a folder-fed method whose ATAC representation it allows.
+        ``modalities`` leaves out scBridge, which reads a folder, without excluding its ATAC form.
 
     Examples
     --------
@@ -1298,8 +1298,8 @@ def scan(dataset: str, category: str | None = None, *,
     **The modalities column.** ``modalities`` is a ``+``-joined string here
     (``"rna+adt"``); ``run_all`` / ``inputs_for`` take a list
     (``["rna", "adt"]``), so split on ``"+"``. The sentinel ``"(data_dir)"``
-    marks a method that consumes a whole directory rather than named modality
-    files (scBridge); for it, pass no ``modalities`` at all.
+    marks a method that reads a whole folder rather than named modality
+    files (scBridge). For it, pass no ``modalities`` at all.
 
     **Sizing a sweep.** ``runtime_tier`` / ``observed_worst_sec`` (see
     ``method_info(m)['runtime']``) let you size a sweep before launching it.
@@ -1340,9 +1340,10 @@ def scan(dataset: str, category: str | None = None, *,
     - a numbered token (``rna1``) matches that role only;
     - an unknown token raises ``ValueError`` listing the vocabulary.
 
-    A folder-fed variant (scBridge) has no modality roles. ``modalities=[]``
-    selects exactly those. Other lists drop them with a ``UserWarning``,
-    unless the tokens exclude their ATAC representation.
+    A variant that reads a whole folder (scBridge) has no modality roles.
+    ``modalities=[]`` selects exactly those. Other lists drop them, with a
+    ``UserWarning`` unless the tokens already exclude their ATAC
+    representation.
 
     **Choosing a category.** A CITE-seq folder (``rna.h5`` + ``adt.h5`` +
     ``cty.csv``) is ``vertical`` with modalities ``["rna", "adt"]``; RNA and
@@ -1399,17 +1400,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     dataset = _resolve.canonical_dataset(base, dataset, stacklevel=stacklevel + 1)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
-        from .plot.bubble import _and
-        dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
-        holds = (f"{base} holds {_and(dirs)}." if dirs else
-                 f"{base} holds no folders." if base.is_dir() else
-                 f"{base} does not exist either.")
-        raise FileNotFoundError(
-            f"The folder {ds_dir} does not exist. {holds} "
-            + config.hint("dataset= is the folder name, and data_path= the folder that "
-                          "holds it. mtb.describe_layout() shows the layout.",
-                          "DATASET is the folder name, and --data-path the folder that "
-                          "holds it. multibench layout shows the layout."))
+        raise FileNotFoundError(_resolve.missing_dataset_message(base, dataset))
     installed = _installed_envs()
     repo = _runner._repo_root_no_fetch()
     # scripts at another commit than $MULTIBENCH_SCRIPTS_REF, or a scripts
@@ -2082,7 +2073,9 @@ class BatchResult:
                            "label_order_confidence": _order_confidence(cands),
                            "batch_source": r.get("batch_source"),
                            "n_batches": r.get("n_batches")}
-                        | {m: v for m, v in (r.get("metrics") or {}).items()}
+                        # + 0.0: a record saved before 0.3.2 may hold -0.0
+                        | {m: (v + 0.0 if isinstance(v, float) else v)
+                           for m, v in (r.get("metrics") or {}).items()}
                         # NaN, not None, for a record saved before the field
                         | {"caveat": np.nan if r.get("caveat") is None
                            else r.get("caveat"),
@@ -2738,12 +2731,15 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     fix. Off Linux, when an environment blocks a row, the line after the
     head says where methods run, and the list keeps only the rows that
     something else also blocks, each with that reason from ``others``
-    (:func:`_other_blocks`). The last line names the ``scan`` call with the
-    caller's selection (:func:`_scan_hint`); the list counts methods when
-    each method has one row (:func:`_rows_word`).
+    (:func:`_other_blocks`). As for ``SKIPPED`` records
+    (:func:`_skipped_rows`), that list counts only the rows whose input
+    files are in the folder, and every row of a named method; one line
+    counts the rows that need files the folder lacks. The last line names
+    the ``scan`` call with the caller's selection (:func:`_scan_hint`); the
+    list counts methods when each method has one row (:func:`_rows_word`).
     """
     def _line(r):
-        return f"  {r['method']} ({r['modalities']}): {r['reason']}"
+        return f"  {_row_label(r)}: {r['reason']}"
     # rows whose files are in place first: they are the ones an env install fixes
     if "files_ok" in blocked.columns:
         blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
@@ -2753,10 +2749,19 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                        modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
                        assume_gpu=assume_gpu)
+    lacking = ""
+    if platform and others is not None:
+        # as for SKIPPED records: rows whose files the folder has, and every
+        # row of a named method; the rest are only counted
+        shown, n_lacking = _skipped_rows(blocked, set(), methods, dataset, data_path)
+        if shown and n_lacking:
+            blocked = blocked.loc[[r.name for r, _ in shown]]
+            lacking = (f"\n{n_lacking} {'row needs' if n_lacking == 1 else 'rows need'} "
+                       f"files that {dataset} does not have.")
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
-        listing = (_other_blocks(blocked, others, requested=True)
+        listing = (_other_blocks(blocked, others, requested=True) + lacking
                    if platform and others is not None else
                    f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
                    + "\n".join(_line(r) for _, r in blocked.iterrows()))
@@ -2765,7 +2770,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                 f"which check failed. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
     if platform and others is not None:
-        listing = _other_blocks(blocked, others, requested=False)
+        listing = _other_blocks(blocked, others, requested=False) + lacking
     else:
         n, k = len(blocked), min(3, len(blocked))
         rows = _rows_word(blocked, n)
@@ -2796,9 +2801,16 @@ def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) 
                 else f"Nothing else blocks these {n} {noun}.")
     count = f"{k} of {n} {noun} {'is' if k == 1 else 'are'} also blocked by something else"
     shown = listed if requested else listed[:3]
-    lines = "\n".join(f"  {r['method']} ({r['modalities']}): {text}" for r, text in shown)
+    lines = "\n".join(f"  {_row_label(r)}: {text}" for r, text in shown)
     return (f"{count}:" if len(shown) == k
             else f"{count}. The first {len(shown)}:") + "\n" + lines
+
+
+def _row_label(r) -> str:
+    """A scan row as the "No method can run" error lists it: ``Matilda
+    (rna+adt)``, or the method alone for a variant that reads a folder."""
+    mods = r["modalities"]
+    return r["method"] if mods == "(data_dir)" else f"{r['method']} ({mods})"
 
 
 def _platform_line(blocked: pd.DataFrame) -> str:
@@ -3437,7 +3449,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     UserWarning
         ``dataset`` matches a folder only up to letter case.
     UserWarning
-        ``modalities`` drops a folder-fed method whose ATAC representation it allows.
+        ``modalities`` leaves out scBridge, which reads a folder, without excluding its ATAC form.
     UserWarning
         A ``batch`` Series or barcode-indexed CSV cannot be aligned and is matched by position.
 
@@ -3581,7 +3593,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     See Also
     --------
-    mtb.scan : the preflight frame this function runs from.
+    mtb.scan : the check table this function runs from.
 
     mtb.BatchResult : what is returned - ``summary``, ``long``, ``failures``, ``plot``, ``rescore``.
 

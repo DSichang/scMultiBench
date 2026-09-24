@@ -170,9 +170,28 @@ def _base_path(result_path) -> Path:
     return Path(result_path) if result_path is not None else config.DEFAULT.result_path
 
 
-#: appended to every "no table for <dataset>" error, for a results tree of
-#: the user's own
-_RESULT_PATH_HINT = " (pass result_path= for another results root)"
+#: how the "no table for <dataset>" errors name each ``source=``
+_SOURCE_WORD = {"published": "published", "rerun": "re-run", "both": "published or re-run"}
+#: the last sentence of those errors, for a results tree of the user's own
+_RESULT_PATH_HINT = "Pass result_path= to read another results folder."
+
+
+def _no_dataset_msg(source: str, category, missing, have) -> str:
+    """The error for datasets without a stored table: the datasets the
+    tables hold, and ``result_path=`` for a results tree of the user's own."""
+    of = f" of {category}" if category else ""
+    held = (f"hold {_and(have)}" if have else "hold no dataset") + (
+        f", not {_and(missing)}." if missing else ".")
+    return f"The {_SOURCE_WORD.get(source, source)} tables{of} {held} {_RESULT_PATH_HINT}"
+
+
+def _joined_errors(errors) -> str:
+    """The lookup errors of both sources as one text, the ``result_path=``
+    sentence once at the end."""
+    parts = [e.replace(_RESULT_PATH_HINT, "").strip() for e in errors]
+    text = " ".join(dict.fromkeys(p for p in parts if p))
+    return text + (f" {_RESULT_PATH_HINT}" if any(_RESULT_PATH_HINT in e for e in errors)
+                   else "")
 
 
 #: the results the package ships (``multibench/result``)
@@ -300,15 +319,17 @@ def _load_published(category: str, datasets: list | None, clustering: str,
         rows.append(df)
     if not rows:
         have = sorted(p.name for p in root.iterdir() if p.is_dir())
-        if datasets:
-            raise FileNotFoundError(
-                f"no published {_CLUSTERING_FILES[clustering]} for "
-                f"{category}/{datasets if len(datasets) > 1 else datasets[0]} "
-                f"under {root}{_RESULT_PATH_HINT}; datasets with published "
-                f"tables: {have}")
+        missing = [d for d in datasets or () if d not in have]
+        if missing or not have:
+            raise FileNotFoundError(_no_dataset_msg("published", category, missing, have))
+        # the datasets are there, without a table of this clustering
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            other = [c for c in _CLUSTERING_FILES if c != clustering
+                     and next(_iter_published(root, datasets, c), None) is not None]
         raise FileNotFoundError(
-            f"no {_CLUSTERING_FILES[clustering]} found under {root} "
-            f"(clustering={clustering!r})")
+            f"The published tables of {category} have no {clustering} variant."
+            + (f" They have {_and(other)} only." if other else ""))
     return pd.concat(rows, ignore_index=True)[COLUMNS]
 
 
@@ -361,13 +382,10 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
         versions.update(v if isinstance(v, tuple) else ([v] if v else []))
     if not frames:
         allf = pd.concat([df for _, df in files], ignore_index=True)
-        avail = (allf[["category", "dataset"]].drop_duplicates()
-                 .sort_values(["category", "dataset"]))
-        pairs = [f"{c}/{d}" for c, d in avail.itertuples(index=False)]
-        raise FileNotFoundError(
-            f"no re-run sweep for {category or 'any category'}/"
-            f"{(datasets if len(datasets) > 1 else datasets[0]) if datasets else 'any dataset'}"
-            f"{_RESULT_PATH_HINT}; available: {pairs}")
+        if category is not None:
+            allf = allf[allf["category"] == category]
+        have = sorted(allf["dataset"].astype(str).unique(), key=catalog._dataset_sort_key)
+        raise FileNotFoundError(_no_dataset_msg("rerun", category, datasets or (), have))
     out = pd.concat(frames, ignore_index=True)
     out.attrs["rerun_version"] = _version_attr(versions)
     return out
@@ -829,11 +847,13 @@ def load_results(
                     errors.append(str(e))
             if not got_any and category is not None:
                 # a named category must resolve; say precisely what was tried
-                raise FileNotFoundError(" | ".join(errors))
+                raise FileNotFoundError(_joined_errors(errors))
         if not frames:
+            avail = _list_datasets(None, base, source, clustering) if datasets else []
             raise FileNotFoundError(
-                f"no results for any category under {base} (source={source!r}): "
-                + " | ".join(errors))
+                _no_dataset_msg(source, None, datasets, avail) if avail else
+                f"No {_SOURCE_WORD.get(source, source)} tables under {base}. "
+                + _joined_errors(errors))
         out = pd.concat(frames, ignore_index=True)
         if datasets:
             # every element of a list must resolve, like the scalar form does
@@ -841,10 +861,7 @@ def load_results(
             missing = [d for d in datasets if str(d) not in have]
             if missing:
                 avail = _list_datasets(category, base, source, clustering)
-                raise FileNotFoundError(
-                    f"no {source} results for {category or 'any category'}/"
-                    f"{missing if len(missing) > 1 else missing[0]}{_RESULT_PATH_HINT}; "
-                    f"datasets with {source} tables: {avail}")
+                raise FileNotFoundError(_no_dataset_msg(source, category, missing, avail))
         if source != "both":
             # a one-method table ranks nothing; say so when the other source
             # holds a real table for the same selection

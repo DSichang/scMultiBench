@@ -98,7 +98,7 @@ def test_scan_numbered_and_base_tokens_on_mosaic():
 
 
 def test_scan_unknown_modality_token_raises_with_the_vocabulary():
-    with pytest.raises(ValueError, match="unknown modality 'peaks2x'.*known"):
+    with pytest.raises(ValueError, match=r"Unknown modality peaks2x\. The tokens are"):
         mtb.scan("D11", "vertical", modalities=["rna", "peaks2x"], verbose=False)
 
 

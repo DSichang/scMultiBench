@@ -29,11 +29,10 @@ def test_changes_page_lists_round_7_changes():
             "The last line of the `No method can run` error repeats the data path, "
             "modalities and other scan options of the call.",
             "So does the list header of the `run_all` error.",
-            # R7-08 to R7-11, folded into one sentence by R8-10
+            # R7-08 to R7-11, folded into one bullet by R8-10 and its review
             "- Reworded: the messages of `export_dataset`, `to_canonical`, `inputs_for`, "
-            "`params_for` and `evaluate`, the environment messages and file checks, the "
-            "warnings of `scan`, `load_results`, `to_long` and the plots, and the help of "
-            "`multibench scan` and `convert`."):
+            "`params_for` and `evaluate`. Also the environment messages, file checks, "
+            "plot and scan warnings,"):
         assert phrase in text, phrase
 
 

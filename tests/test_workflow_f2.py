@@ -55,7 +55,7 @@ def test_cli_layout_names_commands_not_python_calls(cat, capsys):
     out = capsys.readouterr().out
     assert "multibench scan" in out and "mtb." not in out
     assert out.rstrip().splitlines()[-1] == (
-        f"Next: multibench scan MYDATA --category {cat}; on Linux, "
+        f"Next: multibench scan MYDATA --category {cat}, then, on Linux, "
         f"multibench run-all MYDATA --category {cat} --out-dir out/")
     py = mtb.describe_layout(cat)
     assert py.splitlines()[-1] == (f"Next: mtb.scan('MYDATA', '{cat}'), then, on Linux, "

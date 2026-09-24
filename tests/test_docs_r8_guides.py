@@ -1,7 +1,8 @@
 """Round 8 of the student study, guides (R8-09): the four guide tutorials.
 
 tutorials/run, evaluate, plot and discover join no two facts with ';' in
-their prose. Code blocks, code comments and inline code are not checked.
+their prose, and (review of round 8) neither does the API overview page.
+Code blocks, code comments and inline code are not checked.
 
 Needs the docs source (SCMULTIBENCH_DOCS=<docs dir>); skipped without it.
 """
@@ -29,3 +30,11 @@ def _prose_lines(page):
 def test_guide_prose_has_no_semicolon_joins(page):
     joined = [l.strip() for l in _prose_lines(f"tutorials/{page}.md") if ";" in l]
     assert not joined, f"tutorials/{page}.md joins facts with ';': {joined}"
+
+
+@needs_docs
+def test_api_overview_prose_has_no_semicolon_joins():
+    """The review of round 8: the API overview page follows the same rule,
+    in its visible text, its Details blocks and its table cells."""
+    joined = [l.strip() for l in _prose_lines("api.md") if ";" in l]
+    assert not joined, f"api.md joins facts with ';': {joined}"

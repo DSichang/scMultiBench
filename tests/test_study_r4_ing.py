@@ -250,6 +250,6 @@ def test_scan_strict_help_names_the_scripts():
     act = next(a for a in cli.build_parser()._subparsers._group_actions[0]
                .choices["scan"]._actions if a.dest == "strict")
     text = " ".join(act.help.split())
-    assert "; also when the method scripts are not fetched (for scripts: " in text
-    assert text.startswith("exit 1 when no requested row is runnable; with --methods, "
-                           "when any named method has none")
+    assert "or when the method scripts are not fetched. Example: " in text
+    assert text.startswith("exit 1 when no requested row is runnable, when a method "
+                           "named in --methods has none")

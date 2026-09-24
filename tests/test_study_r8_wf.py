@@ -204,10 +204,10 @@ def test_the_cli_scan_with_a_peak_token_does_not_name_scbridge(lung, capsys):
 
 def test_the_docstrings_say_which_folder_fed_method_is_named():
     for fn in (W.scan, W.run_all):
-        assert ("``modalities`` drops a folder-fed method whose ATAC representation it "
-                "allows.") in _doc(fn)
-    assert ("Other lists drop them with a ``UserWarning``, unless the tokens exclude "
-            "their ATAC representation.") in _doc(W.scan)
+        assert ("``modalities`` leaves out scBridge, which reads a folder, without "
+                "excluding its ATAC form.") in _doc(fn)
+    assert ("Other lists drop them, with a ``UserWarning`` unless the tokens already "
+            "exclude their ATAC representation.") in _doc(W.scan)
 
 
 # ============================================================ R8-04
@@ -370,17 +370,28 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
     assert "not on this computer" not in msg
 
 
-def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata):
+def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monkeypatch):
+    # the review of round 8: rows whose files MYDATA lacks are counted, not listed
     msg = _nothing_runnable()
     plan = _plan()
-    others = plan[~plan["files_ok"]]
+    lacking = int((~plan["files_ok"]).sum())
+    have = plan[plan["files_ok"]]
     lines = msg.splitlines()
-    assert lines[2] == (f"{len(others)} of {len(plan)} rows are also blocked by something "
-                        "else. The first 3:")
+    assert lines[2] == f"Nothing else blocks these {len(have)} methods."
+    assert lines[3] == f"{lacking} rows need files that MYDATA does not have."
+    # scripts at another commit block every row: the first 3 are listed
+    from multibench import config
+    monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: "Wrong scripts.")
+    msg = _nothing_runnable()
+    lines = msg.splitlines()
+    n = len(have)
+    assert lines[2] == (f"{n} of {n} methods are also blocked by something else. "
+                        "The first 3:")
     listed = lines[3:6]
-    assert [l.split(" (")[0].strip() for l in listed] == sorted(others["method"])[:3]
+    assert [l.split(" (")[0].strip() for l in listed] == sorted(have["method"])[:3]
     assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
-    assert lines[6].startswith("mtb.scan('MYDATA', 'vertical', data_path='data') shows "
+    assert lines[6] == f"{lacking} rows need files that MYDATA does not have."
+    assert lines[7].startswith("mtb.scan('MYDATA', 'vertical', data_path='data') shows "
                                "every row.")
 
 

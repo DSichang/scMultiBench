@@ -179,7 +179,7 @@ def test_modality_validated_and_aliases(tmp_path):
     assert ingest.to_canonical(a, d / "custom.h5", modality="rna") == d / "custom.h5"
     # directory not yet existing but spelled with a trailing slash
     assert ingest.to_canonical(a, str(tmp_path / "NEW") + "/", modality="rna") == tmp_path / "NEW" / "rna.h5"
-    with pytest.raises(ValueError, match="unknown modality 'bogus'"):
+    with pytest.raises(ValueError, match=r"^Unknown modality bogus\. The modalities are rna, adt \(or protein\)"):
         ingest.to_canonical(a, d, modality="bogus")
     with pytest.raises(ValueError, match="out path required"):
         ingest.to_canonical(a)

@@ -51,7 +51,7 @@ def test_two_representations_select_the_variants_that_read_both_files():
 
 
 def test_unknown_token_raises_with_the_vocabulary():
-    with pytest.raises(ValueError, match="unknown modality 'peaks2'") as e:
+    with pytest.raises(ValueError, match=r"Unknown modality peaks2\.") as e:
         discover.find_methods(modalities=["rna", "peaks2"])
     assert "atac_peak" in str(e.value) and "protein" in str(e.value)
 
@@ -73,6 +73,6 @@ def test_recommend_takes_atac_like_find_methods():
 def test_recommend_rejects_a_bad_atac_before_loading(tmp_path):
     with pytest.raises(ValueError, match="unknown atac representation 'binary'"):
         mtb.recommend("diagonal", atac="binary", result_path=tmp_path / "nowhere")
-    with pytest.raises(ValueError, match="unknown modality 'peaks2'"):
+    with pytest.raises(ValueError, match=r"Unknown modality peaks2\."):
         mtb.recommend("diagonal", modalities=["atac_peak", "peaks2"],
                       result_path=tmp_path / "nowhere")

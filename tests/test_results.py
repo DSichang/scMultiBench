@@ -142,10 +142,10 @@ def test_metrics_filters_by_family(result_dir):
     c = results.load_results("diagonal", dataset="D28", metrics="clustering", result_path=result_dir)
     assert set(c.metric) <= set(mtb.plot.CLUSTERING_METRICS) and len(c)
     assert len(b) + len(c) == len(full)      # the two families partition the frame
-    with pytest.raises(ValueError, match=r"unknown metrics= token 'bogus'; valid: 'all', 'clustering', 'batch'"):
+    with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\. Pass 'all', 'clustering' or 'batch'"):
         results.load_results("diagonal", dataset="D28", metrics="bogus", result_path=result_dir)
     # a list_tasks() token in the metrics slot is explained, not just rejected
-    with pytest.raises(ValueError, match="selects a metric family, not a mtb.list_tasks"):
+    with pytest.raises(ValueError, match="selects a metric family, not a task of mtb.list_tasks"):
         results.load_results("diagonal", metrics="dimension_reduction", result_path=result_dir)
     # everything after category is keyword-only: the positional slip is a TypeError
     with pytest.raises(TypeError):
@@ -212,11 +212,11 @@ def test_dataset_list_and_unknown_dataset(result_dir):
     # result_path= escape hatch, for either source
     with pytest.raises(FileNotFoundError, match="D999") as e:
         results.load_results("diagonal", dataset="D999", result_path=result_dir)
-    assert "datasets with published tables: ['D24', 'D25', 'D28']" in str(e.value)
-    assert "(pass result_path= for another results root)" in str(e.value)
-    with pytest.raises(FileNotFoundError, match="no re-run sweep") as e:
+    assert "The published tables of diagonal hold D24, D25 and D28, not D999." in str(e.value)
+    assert "Pass result_path= to read another results folder." in str(e.value)
+    with pytest.raises(FileNotFoundError, match="The re-run tables of diagonal") as e:
         results.load_results("diagonal", dataset="D999", source="rerun", result_path=result_dir)
-    assert "result_path=" in str(e.value) and "diagonal/D28" in str(e.value)
+    assert "result_path=" in str(e.value) and "hold D28 and D28s, not D999" in str(e.value)
 
 
 # ---------------------------------------------------------------------------
@@ -268,10 +268,9 @@ def test_load_long_csv_fills_nan_provenance(tmp_path):
 
 
 def test_dataset_list_validates_every_element(result_dir):
-    with pytest.raises(FileNotFoundError, match=r"no published results for diagonal/D99 \(pass result_path= for another results root\);") as e:
+    with pytest.raises(FileNotFoundError, match=r"^The published tables of diagonal hold D24, D25 and D28, not D99\. Pass result_path=") as e:
         results.load_results("diagonal", dataset=["D24", "D99"], result_path=result_dir)
-    assert "datasets with published tables: ['D24'" in str(e.value)
-    with pytest.raises(FileNotFoundError, match=r"no rerun results for diagonal/\['D98', 'D99'\]"):
+    with pytest.raises(FileNotFoundError, match=r"The re-run tables of diagonal hold D28 and D28s, not D98 and D99\."):
         _quiet_rerun("diagonal", dataset=["D28", "D98", "D99"], source="rerun",
                      result_path=result_dir)
     # source='both': an id present in ONE source is fine (D24 is published-only)
@@ -429,7 +428,7 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
     # a different FileNotFoundError inside the lookup, the same silence
     import shutil
     shutil.copytree(result_dir / "rerun", layout_tree / "rerun")
-    with pytest.raises(FileNotFoundError, match="no re-run sweep for cross/D54"):
+    with pytest.raises(FileNotFoundError, match="The re-run tables of cross hold D52 and D52s, not D54."):
         results._load_rerun("cross", ["D54"], layout_tree)
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
@@ -473,4 +472,4 @@ def test_shipped_tree_is_consistent_across_the_api(result_dir):
             continue
         with pytest.raises(FileNotFoundError, match="result_path=") as e:
             results.load_results(c, dataset="D999", result_path=result_dir)
-        assert f"datasets with published tables: {ds}" in str(e.value)
+        assert f"The published tables of {c} hold {results._and(ds)}, not D999." in str(e.value)

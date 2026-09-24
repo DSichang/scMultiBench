@@ -272,6 +272,22 @@ def _check_representation(spec, modalities) -> None:
         raise KeyError(f"{spec.id} reads {reads}; modalities name {_READS[rep]}")
 
 
+def missing_dataset_message(base, dataset: str) -> str:
+    """The error for a dataset folder that does not exist: the folders that
+    ``base`` holds (or that ``base`` is missing too) and what ``dataset``
+    and ``data_path`` name. ``scan`` and ``labels_for`` raise it."""
+    base = Path(base)
+    dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
+    holds = (f"{base} holds {_and_list(dirs)}." if dirs else
+             f"{base} holds no folders." if base.is_dir() else
+             f"{base} does not exist either.")
+    return (f"The folder {base / dataset} does not exist. {holds} "
+            + config.hint("dataset= is the folder name, and data_path= the folder that "
+                          "holds it. mtb.describe_layout() shows the layout.",
+                          "DATASET is the folder name, and --data-path the folder that "
+                          "holds it. multibench layout shows the layout."))
+
+
 def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
     """The on-disk spelling of a dataset folder name under ``base``.
 
@@ -490,13 +506,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
     - ``False`` (default): the best-effort paths, with no warning.
     - ``None``: the same paths, plus a ``UserWarning`` listing the missing ones.
     - ``True``: ``FileNotFoundError`` for a missing input, plus the content
-      preflight below.
+      checks below.
 
     The missing-file error or warning names an ATAC-family sibling that is
     present, e.g. ``atac_peak.h5`` when a vertical variant reads ``atac.h5``,
     and says when the folder holds per-batch files.
 
-    **Content preflight** (``check=True``). The same checks ``mtb.scan``
+    **Content checks** (``check=True``). The same checks ``mtb.scan``
     reports per row as ``files_ok`` / ``files_reason``:
 
     - orientation: ``ValueError`` when ``matrix/data`` is stored cells x
@@ -1613,7 +1629,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     dataset = canonical_dataset(base, dataset)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
-        raise FileNotFoundError(f"no dataset dir at {ds_dir}")
+        raise FileNotFoundError(missing_dataset_message(os.fspath(root), dataset))
     hint = _per_batch_hint(ds_dir, category) if check is not False else None
     if hint:
         msg = f"labels_for({dataset!r}, {category!r}): {hint}"

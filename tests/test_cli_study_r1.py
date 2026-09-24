@@ -472,7 +472,7 @@ def test_evaluate_leiden_flavor_and_task_deprecation(fake_eval, capsys):
     rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv", "--task", "batch"])
     err = capsys.readouterr().err
     assert rc == 0 and fake_eval["metrics"] == "batch"
-    assert "warning: --task is deprecated; use --metrics batch" in err
+    assert "warning: --task is deprecated. Use --metrics batch." in err
     with pytest.raises(SystemExit) as e:
         cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv",
                   "--task", "dimension_reduction"])

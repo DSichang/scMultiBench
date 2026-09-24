@@ -143,9 +143,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
             f"'value']; missing {sorted(need - have)}")
     if len(long_df) == 0:
         raise ValueError(
-            "long_df is empty (0 rows) - nothing to plot; load_results(...) may "
-            "have returned nothing, see its UserWarning (e.g. a method with no "
-            "rows under source='published' - try source='rerun')")
+            "long_df has no rows to plot. load_results may have returned none. "
+            "Its UserWarning says why, for example a method with no rows under "
+            "source='published'. Then try source='rerun'.")
     if metrics is not None and not group:
         metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
                            "metric", catalog.canonical_metric)

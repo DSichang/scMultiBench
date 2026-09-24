@@ -211,8 +211,8 @@ def test_normalize_modalities_aliases_base_and_errors():
     assert registry.normalize_modalities("protein") == ["adt"]
     with pytest.raises(ValueError) as e:
         registry.normalize_modalities(["rna", "proteinx"])
-    assert "unknown modality 'proteinx'" in str(e.value)
-    assert "alias: protein" in str(e.value)
+    assert str(e.value).startswith("Unknown modality proteinx. ")
+    assert "adt (or protein)" in str(e.value)
     assert {"rna", "adt", "atac", "atac_gas", "atac_peak", "rna1"} <= registry.known_modalities()
 
 
