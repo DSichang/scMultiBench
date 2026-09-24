@@ -288,7 +288,7 @@ REPLACEMENT_FN = '''def replacement(dataset, methods, stored):
         return res
     # offline, or the outputs are not published yet
     except Exception as e:
-        print(f"replacement: the package's stored metric table ({type(e).__name__} from fetch_outputs: {e})")
+        print(f"replacement: the package's stored metric table. {type(e).__name__} from fetch_outputs: {e}")
         return stored_sweep(*stored)'''
 
 # The scoring step on its own, on the embedding one method wrote - run_all's
@@ -744,7 +744,7 @@ print(*Path(next(iter(labels.values()))).read_text().splitlines()[:4], sep="\\n"
              + and_list(f"`{', '.join(o)}` for {m}" for m, o in partial.items()) + ".")
             if partial else None,
             "Pass the dict that `labels_for` returns to `evaluate` unchanged. A dict "
-            "you build or reorder yourself is read in the default order. For any other "
+            "you build or reorder yourself must be in the default order. For any other "
             "order, name the keys with `label_order=`.",
             "`run_all` scores every order that fits the cell count and keeps the one "
             "with the highest ARI. The `label_order` column of `res.summary` shows the "
