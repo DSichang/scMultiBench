@@ -226,10 +226,17 @@ def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
     sizes = {"a": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9},
              "b": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9}}
     one = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="cpu")
-    assert "1 of 1 env has no CPU archive yet; its GPU archive is counted" in one
+    assert one.startswith("# total for 1 env (GPU build; no CPU build is published for it)")
     two = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "gpu"}],
                                sizes, flavor="cpu")
-    assert "2 of 2 envs have no CPU archive yet; their GPU archives are counted" in two
+    assert two.startswith("# total for 2 envs (GPU builds; no CPU build is published for "
+                          "these envs)")
+    some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"},
+                                 {"env": "c", "flavor": "gpu"}], sizes, flavor="cpu")
+    assert some.startswith("# total for 3 envs (CPU builds; 2 envs have only a GPU build)")
+    some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"}],
+                                sizes, flavor="cpu")
+    assert some.startswith("# total for 2 envs (CPU builds; 1 env has only a GPU build)")
 
 
 def test_env_status_help_is_one_sentence_and_one_tag_per_line():

@@ -1085,6 +1085,8 @@ def _cmd_run_all(args) -> int:
     METHOD:KEY=VALUE`` (repeatable) becomes ``params={METHOD: {KEY: value}}``.
     ``--out-dir`` is optional with ``--dry-run`` only: the commands then show
     the ``<out_dir>`` placeholder, as ``run_all(dry_run=True)`` does.
+    ``--batch CSV`` becomes ``run_all(batch=CSV)``; a missing file exits 1
+    before any method runs, and ``--dry-run`` reads the file as a check.
     """
     import multibench
     if args.out is None and not args.dry_run:
@@ -1095,6 +1097,12 @@ def _cmd_run_all(args) -> int:
     if getattr(args, "assume_gpu", False) and not args.dry_run:
         _usage_error(args, "--assume-gpu applies to --dry-run only; a real run checks "
                            "this host's GPU")
+    batch = getattr(args, "batch", None)
+    if batch is not None:
+        from .eval import io as eio
+        eio._require_file(batch, "--batch file")   # exit 1 before any method runs
+        if args.dry_run:
+            eio.as_vector(batch, what="batch")      # a file it cannot read fails the check
     if args.dry_run:
         with _quiet_stdout():
             df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
@@ -1132,7 +1140,8 @@ def _cmd_run_all(args) -> int:
                                modalities=_csv_list(args.modalities),
                                data_path=args.data_path, params=params,
                                evaluate=not args.no_evaluate, dry_run=False,
-                               timeout=args.timeout, skip_existing=args.skip_existing)
+                               timeout=args.timeout, skip_existing=args.skip_existing,
+                               batch=batch)
     _print_frame(res.summary, columns=columns, fmt=args.format)
     print(f"saved under {args.out}", file=sys.stderr)
     return _EXIT_OK
@@ -1210,7 +1219,7 @@ def _cmd_evaluate(args) -> int:
     Default output is the wide ``metric.csv`` shape (index = metric, one
     ``Value`` column). With ``--method`` and ``--dataset`` (and ``--category``)
     the frame is reshaped with :func:`multibench.to_long` to the long
-    ``metric,value,method,dataset,category,clustering,source`` table that
+    ``metric,value,method,dataset,category,clustering,source,scored_with`` table that
     ``plot --input`` reads and ``load_results`` returns. Without
     ``--metrics`` the metric set is Python's default: clustering, plus the
     batch family when ``--batch`` or several ``--labels`` are given.
@@ -1267,13 +1276,15 @@ def _cmd_evaluate(args) -> int:
 
 def _size_total_line(rows, sizes: dict, what: str = "download", *,
                      flavor: str | None = None) -> str:
-    """The ``# total ...`` line for ``rows``: download and on-disk sums.
+    """The ``# total`` lines for ``rows``: download and on-disk sums.
 
-    Shape when every size is known: ``# total (N envs): X GB download, Y GB
-    on disk``. A column with unknown sizes is not summed as if complete:
-    it reads ``disk: unknown for 4 of 6 envs (at least 4.1 GB for the other
-    2)``. Unknowns are counted per column, never as zero: a row printing
-    ``? disk`` is one disk unknown even when its download size is known.
+    Every size known: one line, ``# total for N envs (GPU builds): X GB
+    download, Y GB on disk``. A column with an unknown size is not summed as
+    if complete: the disk figure is left out, a download figure reads ``at
+    least X GB``, and a second line counts the unknowns per column (a row
+    printing ``? disk`` is one disk unknown even when its download size is
+    known). An unknown disk size adds the advice to check with ``du`` after
+    the first install. No line holds more than two semicolons.
 
     Parameters
     ----------
@@ -1287,18 +1298,19 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
         The word after the download figure (``'download'`` / ``'to download'``).
     flavor : str, keyword-only, optional
         The flavour the caller asked for (``'auto'``, ``'cpu'``, ``'gpu'``):
-        when given, the line names which flavour it summed and how many
-        envs fell back to the GPU build; ``None`` omits that note.
+        when given, the first line names the builds it summed and how many
+        envs fell back to the GPU build; ``'auto'`` adds why this host got
+        that flavour. ``None`` omits the parenthesis.
 
     Returns
     -------
     str
-        The one ``# total`` line (stderr on the CLI).
+        One ``#`` line, or two joined by a newline (stderr on the CLI).
     """
     from .engine import envs
     dl = disk = 0
     n = n_dl = n_disk = 0
-    fell_back = 0
+    gpu_rows = 0
     for r in rows:
         n += 1
         key = envs.archive_key(r["env"], r.get("flavor"))
@@ -1310,38 +1322,58 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
         if u is not None:
             n_disk += 1
             disk += u
-        if r.get("flavor") == "gpu" and flavor is not None \
-                and envs.resolve_flavor(flavor) == "cpu":
-            fell_back += 1
-
-    def _part(total: int, known: int, figure: str, word: str) -> str:
-        if known == n:
-            return f"{envs._gb(total)} {figure}"
-        if known == 0:
-            return f"{word}: unknown" + ("" if n == 1 else
-                                         " for both envs" if n == 2 else f" for all {n} envs")
-        return (f"{word}: unknown for {n - known} of {_envs(n)} (at least "
-                f"{envs._gb(total)} for the other {known})")
+        gpu_rows += r.get("flavor") == "gpu"
 
     def _envs(k: int) -> str:
         return f"{k} env{'s' if k != 1 else ''}"
 
-    dl_part = _part(dl, n_dl, what, "download")
-    disk_part = _part(disk, n_disk, "on disk", "disk")
-    sep = ", " if (n_dl == n and n_disk == n) else "; "
-    note = ""
+    def _which(k: int) -> str:
+        if n == 1:
+            return "this env"
+        if k == n:
+            return "both envs" if n == 2 else f"all {n} envs"
+        return f"{k} of {n} envs"
+
+    line = f"# total for {_envs(n)}"
     if flavor is not None:
         eff = envs.resolve_flavor(flavor)
-        note = f"; summed the {eff} archives"
-        if flavor == "auto":
-            note += (" (auto: NVIDIA GPU visible on this host)" if eff == "gpu"
-                     else " (auto: no NVIDIA GPU visible on this host)")
-        if fell_back:
-            note += (f"; {fell_back} of {_envs(n)} " + (
-                "has no CPU archive yet; its GPU archive is counted" if fell_back == 1
-                else "have no CPU archive yet; their GPU archives are counted"))
-    return (f"# total ({_envs(n)}): {dl_part}{sep}{disk_part}{note}; "
-            f"sizes are those recorded for this release")
+        s = "s" if n != 1 else ""
+        if eff == "cpu" and n and gpu_rows == n:
+            builds = (f"GPU build{s}; no CPU build is published for "
+                      + ("it" if n == 1 else "these envs"))
+        elif eff == "cpu":
+            builds = f"CPU build{s}"
+            if flavor == "auto":
+                builds += ", as this host has no NVIDIA GPU"
+            if gpu_rows:
+                builds += (f"; {_envs(gpu_rows)} "
+                           f"{'has' if gpu_rows == 1 else 'have'} only a GPU build")
+        else:
+            builds = f"GPU build{s}"
+            if flavor == "auto":
+                builds += ", as this host has an NVIDIA GPU"
+        line += f" ({builds})"
+    if n_dl == n:
+        line += f": {envs._gb(dl)} {what}"
+    elif n_dl:
+        line += f": at least {envs._gb(dl)} {what}"
+    else:
+        line += ": download size not recorded"
+    if n_disk == n:
+        line += f", {envs._gb(disk)} on disk"
+    unknown = []
+    if 0 < n_dl < n:            # none known: the first line already says so
+        unknown.append(f"download size not recorded for {_which(n - n_dl)}")
+    if n_disk < n:
+        unknown.append(("size on disk for " if unknown else "size on disk not recorded for ")
+                       + _which(n - n_disk))
+    if not unknown:
+        return line
+    second = "# " + ", ".join(unknown)
+    if n_disk < n:
+        second += ("; unpacked envs are larger than the download, so check with du "
+                   "after the first install")
+    return line + "\n" + second
 
 
 def _flavor_token(flavor) -> str:
@@ -1411,7 +1443,7 @@ def _cmd_env(args) -> int:
                   f"{_flavor_token(p.get('flavor'))}")
         print(_size_total_line(summed, sizes, flavor=flavor), file=sys.stderr)
         note = envs.auto_flavor_note(flavor, planning=True)
-        if note:
+        if note and any(p["flavor"] == "cpu" for p in summed):
             print(note, file=sys.stderr)
         return _EXIT_OK
     if cmd == "doctor":
@@ -1461,8 +1493,12 @@ def _cmd_env(args) -> int:
                      if packed else " from their lockfiles"), file=sys.stderr)
             if packed:
                 todo = [r for r in rows if not r["exists"] and r.get("packed_url")]
+                # mtb.env.install printed why 'auto' took the CPU builds; the
+                # total then names the builds without repeating the reason
+                said = envs.auto_flavor_note(flavor) is not None
                 print(_size_total_line(todo, envs.packed_sizes(), what="to download",
-                                       flavor=flavor), file=sys.stderr)
+                                       flavor=envs.resolve_flavor(flavor) if said
+                                       else flavor), file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if getattr(args, "all", False):
@@ -1737,8 +1773,8 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--category", help=_CATEGORY_HELP + " Default: every category, "
                                                         "as mtb.scan(dataset) does.")
     ps.add_argument("--data-path", dest="data_path",
-                    help="folder that contains the dataset folder (default: the "
-                         "package data path, see mtb.config)")
+                    help="folder that contains the dataset folder (default: see "
+                         "`multibench config`)")
     ps.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown "
                                                       "id -> did-you-mean error)")
     ps.add_argument("--modalities", help="comma-separated modality roles to restrict the "
@@ -1753,8 +1789,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "clipped; csv/tsv/json = every column, never clipped, for "
                          "scripts; json = a list of row objects)")
     ps.add_argument("--strict", action="store_true",
-                    help="exit 1 when nothing requested is runnable (for scripts: "
-                         "multibench scan DS --category C --strict && sbatch ...)")
+                    help="exit 1 when no requested row is runnable; with --methods, "
+                         "when any named method has none (for scripts: multibench "
+                         "scan DS --category C --strict && sbatch ...)")
     ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                     help="skip this host's GPU test. Use it on a login node without a "
                          "GPU to check a job for a GPU node (mtb.scan(assume_gpu=True))")
@@ -2004,10 +2041,13 @@ def build_parser() -> argparse.ArgumentParser:
                           "of re-running it")
     pra.add_argument("--no-evaluate", dest="no_evaluate", action="store_true",
                      help="run only; do not compute metrics on the outputs")
+    pra.add_argument("--batch", metavar="CSV",
+                     help="one batch id per cell, in the dataset's cell order, as for "
+                          "evaluate --batch (default: each cell's label file)")
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                      help="Leiden backend of the clustering sweep when scoring (default: "
-                          "igraph, or mtb.config.DEFAULT.leiden_flavor); leidenalg "
-                          "matches both stored tables (published and re-run)")
+                          "see `multibench config`); leidenalg matches both stored "
+                          "tables (published and re-run)")
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
 
     # ---- evaluate
@@ -2016,8 +2056,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="Compute the benchmark's metrics for one embedding file. Prints "
                     "the metric table (or writes it with --out). With --method, "
                     "--dataset and --category the table is written in the long "
-                    "format (metric,value,method,dataset,category,clustering,source) that `multibench "
-                    "plot --input` reads.")
+                    "format (metric,value,method,dataset,category,clustering,source,"
+                    "scored_with) that `multibench plot --input` reads.")
     pe.add_argument("--output", required=True,
                     help="the embedding, cells x dims: .h5 (dataset 'data', the "
                          "benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
@@ -2052,9 +2092,9 @@ def build_parser() -> argparse.ArgumentParser:
                                       "clustering, plus batch when --batch or several "
                                       "--labels are given")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                    help="Leiden backend of the clustering sweep (default: igraph, "
-                         "or mtb.config.DEFAULT.leiden_flavor); leidenalg matches both "
-                         "stored tables (published and re-run)")
+                    help="Leiden backend of the clustering sweep (default: see "
+                         "`multibench config`); leidenalg matches both stored tables "
+                         "(published and re-run)")
     pe.add_argument("--only", help=argparse.SUPPRESS)     # deprecated spelling of --metrics
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
                                    "embedding (default X_emb; 'X' = .X)")

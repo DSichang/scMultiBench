@@ -359,13 +359,15 @@ def auto_flavor_note(flavor: str, *, planning: bool = False) -> str | None:
     flavor : str
         The ``flavor=`` value the caller was given.
     planning : bool, keyword-only
-        ``True`` for ``multibench env plan`` (sizes only, nothing installed).
+        ``True`` for ``multibench env plan``: its total line already names
+        the CPU builds and the reason, so only the advice is returned.
     """
     if flavor != "auto" or resolve_flavor(flavor) != "cpu":
         return None
-    what = "sizes are for the CPU builds" if planning else "installing CPU builds"
     gpu = config.hint("flavor='gpu'", "--flavor gpu")
-    return (f"# {what} (no NVIDIA GPU on this host); if the jobs run on GPU "
+    if planning:
+        return f"# for jobs on GPU nodes, pass {gpu}"
+    return (f"# installing CPU builds (no NVIDIA GPU on this host); if the jobs run on GPU "
             f"nodes, pass {gpu}")
 
 
@@ -1572,7 +1574,11 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     f"no conda/mamba on this host; {r['env']} has no packed "
                     f"archive - install conda first")
         if packed:
-            note = auto_flavor_note(flavor) if missing else None
+            # said only when a CPU build is taken; an env without one gets the
+            # GPU build whatever the flavour
+            note = auto_flavor_note(flavor) if any(
+                archive_for(r["env"], flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
+                for r in missing) else None
             if note:
                 print(note, file=sys.stderr, flush=True)
             for r in missing:
@@ -1612,7 +1618,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     "archive_bytes": sz.get("archive_bytes"),
                     "unpacked_bytes": sz.get("unpacked_bytes"),
                     "flavor": installed if (r["exists"] or env in unpacked) else eff})
-    if dry_run and packed and any(not r["exists"] for r in out):
+    if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu" for r in out):
         note = auto_flavor_note(flavor)
         if note:
             print(note, file=sys.stderr, flush=True)

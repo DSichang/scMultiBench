@@ -602,8 +602,8 @@ def load_results(
     -------
     pandas.DataFrame
         One row per score, columns ``metric, value, method, dataset,
-        category, clustering, source``. ``attrs["rerun_version"]`` holds the
-        re-run stamp (Notes).
+        category, clustering, source``, plus ``scored_with`` when a user CSV
+        has it. ``attrs["rerun_version"]`` holds the re-run stamp (Notes).
 
     Raises
     ------
