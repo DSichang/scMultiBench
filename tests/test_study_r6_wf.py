@@ -453,8 +453,9 @@ def test_docstrings_state_the_new_rules():
     assert ("``None`` = the batch ``run_all`` was given, else each cell's label "
             "file.") in flat["rescore"]
     assert "the batch that ``run_all(batch=)`` saved is reused" in flat["rescore"]
-    assert "data_path : path-like | None Data root for re-scoring; ``None`` = each " \
-        "record's own." in flat["load_batch"]
+    # R7-12 (b)
+    assert "data_path : path-like | None Folder that holds the dataset folder; " \
+        "``None`` = the path each record saved." in flat["load_batch"]
     assert "``(best - max(runner_up, 0)) / best``" in flat["summary"]
     assert "data_root" in flat["results"] and "batch_file" in flat["results"]
     assert "``batch_<hash>.csv``" in flat["save"]

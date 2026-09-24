@@ -357,8 +357,11 @@ def test_docstrings_quote_the_current_texts():
         "run_all": mtb.run_all, "save": W.BatchResult.save, "run": mtb.run,
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch}.items()}
     assert "nothing is runnable" not in flat["run_all"]
-    assert ('the "No method can run on <dataset> (<category>)." ``ValueError`` ("None of '
-            'the requested methods ..." with ``methods=``)') in flat["run_all"]
+    # R7-01: the messages are quoted with concrete values, in code spans
+    assert ("Nothing runnable: ``ValueError``. Its first line is ``No method can run "
+            "on D11 (vertical).`` With ``methods=``, it starts ``None of the "
+            "requested methods (Matilda, totalVI) can run on D11 (vertical).``") \
+        in flat["run_all"]
     assert "no 'cross' variant matches" not in flat["run_all"]
     assert "and the ``batch`` vector" not in flat["run_all"]
     assert "With ``batch=``, the vector is saved as ``batch_<hash>.csv``." in flat["run_all"]
@@ -367,7 +370,9 @@ def test_docstrings_quote_the_current_texts():
     assert "and a note for an input path that does not exist." in flat["run"]
     assert "**Label order.** With ``labels=None``" in flat["rescore"]
     assert "see its Notes" not in flat["rescore"]
-    assert "``mtb.load_batch(data_path=)`` finds moved folders." in flat["rescore"]
+    # R7-12 (c)
+    assert ("When the data folder has moved, give its new location to "
+            "``mtb.load_batch(data_path=)``.") in flat["rescore"]
     assert "the one found is recorded as an absolute path" in flat["load_batch"]
 
 
