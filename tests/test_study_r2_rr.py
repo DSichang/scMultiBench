@@ -231,7 +231,9 @@ def test_partial_overlap_says_which_cells_in_short_sentences(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.io.export_dataset(rna, tmp_path / "X", atac=atac, atac_kind="peak")
     msg = str(e.value)
-    assert msg.startswith("atac has 25 cells, and 5 of them are not in data")
+    # R3-14: the object is named in plain words, not by the parameter name
+    assert msg.startswith("atac has 25 cells, and 5 of them are not in the object "
+                          "passed as data")
     assert ("All modalities of one dataset must hold the same cells. Subset each modality "
             "to the shared barcodes first.") in msg
 

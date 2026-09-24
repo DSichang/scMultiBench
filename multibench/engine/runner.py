@@ -960,16 +960,18 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             envs._conda_prefixes.cache_clear()
             have = envs.installed_envs()
         if (have or linux_only) and env_name not in have:
-            py = f" (or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()"
-            install = (f"conda env {env_name!r} ({method}) is not installed - run "
-                       f"`multibench env install --methods {method} --packed --run`"
-                       + config.hint(py, "; see `multibench env doctor`"))
             if linux_only:
+                # an install refuses off Linux: the platform sentence alone
                 this = config.hint("this call", "this command")
                 preview_with = config.hint("dry_run=True", "--dry-run")
-                install = (f"{linux_only} Run {this} on a Linux machine; {preview_with} "
-                           f"previews the method's command here.\n{install}")
-            raise EnvironmentError(install)
+                raise EnvironmentError(
+                    f"{linux_only} Run {this} on a Linux machine; {preview_with} "
+                    f"previews the method's command here.")
+            py = f" (or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()"
+            raise EnvironmentError(
+                f"conda env {env_name!r} ({method}) is not installed - run "
+                f"`multibench env install --methods {method} --packed --run`"
+                + config.hint(py, "; see `multibench env doctor`"))
 
     # Absolute paths + trailing separator on directory roles before conversion,
     # so canonical passthrough files are absolute too; converted copies live

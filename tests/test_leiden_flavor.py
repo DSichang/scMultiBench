@@ -131,7 +131,8 @@ def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
         monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
         mtb.evaluate(emb, labels=lab, metrics=["ARI"])
         err = capsys.readouterr().err
-        assert re.search(rf"Leiden resolution sweep \(10 resolutions, flavor={_eff(flavor)}\)", err)
+        assert re.search(rf"at 10 resolutions for ARI, with the {_eff(flavor)} Leiden "
+                         rf"backend\.", err)
 
 
 def test_leidenalg_path_does_not_nag_about_igraph(recwarn):

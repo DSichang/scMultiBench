@@ -109,8 +109,8 @@ class BubbleTable:
         ``{method: bool}`` from an optional ``needs_labels`` column, empty
         without it; overrides the registry for the ``L`` badge.
     na_cells : list of str or None
-        One line per method with ``n/a`` cells, in row order: the text of
-        the ``na="warn"`` warning.
+        The ``n/a`` cells: one line per family and method (per dataset and
+        method under ``"summary"``).
 
     Examples
     --------
@@ -140,9 +140,6 @@ class BubbleTable:
 
     **Blocks.** Paper order: DR and clustering (blues), batch correction
     (greens), then "Other" (purples) for any metric outside the two.
-
-    **Drawing.** ``mtb.plot.bubble`` builds this table from the same long
-    table and draws it.
 
     See Also
     --------
@@ -284,7 +281,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     overall : {"rank", "mean_overall"}
         Formula for each family's Overall under ``aggregate="summary"``:
         ``"rank"`` (the paper's panel rule) or ``"mean_overall"`` (bar's
-        default); see ``mtb.plot.bubble``.
+        default); formulas in Notes.
     na : {"warn", "skip", "raise"}
         How to report ``n/a`` cells (a method lacking a metric): ``"warn"``,
         ``"skip"`` (silent, nothing is dropped) or ``"raise"``; also stored
@@ -324,7 +321,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     UserWarning
         A column has the same value in every row, or there is one method.
     UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows.
+        Rows scored with the igraph Leiden backend are shown with stored rows
+        of their dataset.
 
     Examples
     --------
@@ -339,25 +337,46 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     Notes
     -----
-    **Missing-metric rule.** A method may lack a value for some metric (an
-    ``n/a`` cell, drawn as a dash):
+    **Missing cells.** A metric not computed for a method is an ``n/a``
+    cell, drawn as a dash.
 
-    - ``aggregate="dataset"``: the cell is simply absent. The family
-      *Overall* averages the ranks of the metrics the method has (a method
-      scored on 3 of 4 metrics is compared on those 3), and a column's ranks
-      count only the methods scored in it.
+    - ``aggregate="dataset"``: the family *Overall* averages the ranks of
+      the metrics the method has, and a column's ranks count only the
+      methods scored in it.
     - ``aggregate="summary"``: the cell is rank 0 in that dataset (the
       paper's rule), in the metric columns and in the ``overall="rank"``
       Overall; ``overall="mean_overall"`` skips it.
 
-    Neither rule is visible in the numbers, so ``na`` sets how it is
-    reported; the warning reads like ``"YukiNet: DR and clustering Overall
-    over 3 of 4 metrics (cLISI n/a)"``.
+    ``na`` sets how this is reported. ``na_cells`` lists the cells, e.g.
+    ``"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
+
+    **Overall formulas.** ``overall=`` sets the family *Overall* under
+    ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
+    over metrics of max-rank)``. The two can order methods differently on
+    the same frame.
+
+    - ``"rank"`` (bubble's default): ``minmax(mean over metrics of
+      max-rank(mean over datasets of within-dataset max-rank))`` - the
+      per-dataset ranks are averaged per metric, re-ranked across methods,
+      averaged over metrics and min-max scaled. A method absent from a
+      dataset scores rank 0 there (the paper's summary rule), which pulls it
+      down.
+    - ``"mean_overall"`` (bar's default): ``mean over datasets of
+      minmax(mean over metrics of within-dataset max-rank)`` - each dataset
+      gets its own min-max-scaled overall, and these are averaged; a dataset
+      the method lacks is skipped.
 
     **Row order.** The combined Overall is the mean of the family Overalls,
     sorted best first with a stable sort, so tied methods keep alphabetical
-    order - the tie-break ``mtb.plot.bar`` uses. Ranks and scores always
-    come from the whole filtered frame; ``order`` only moves rows.
+    order. Ranks and scores always come from the whole filtered frame;
+    ``order`` only moves rows.
+
+    **Bubble and bar.** ``mtb.plot.bar`` uses the same formulas and
+    tie-break. With ``aggregate="summary"``, the same ``overall=`` and the
+    metrics of one family (e.g. against ``bar(group="clustering")``), both
+    figures order methods identically. Across both families they can
+    differ: bubble averages the family Overalls, bar scores all metrics
+    together.
 
     **require_complete.** One ``UserWarning`` names each dropped method and
     the datasets it lacks (``"require_complete=True dropped 1 method(s) ...:
@@ -365,31 +384,45 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     ``aggregate="dataset"``.
 
     **A new dataset.** A figure compares methods only where they share a
-    dataset. A ``UserWarning`` names a dataset that holds one method, and
-    says so when no method spans two of the datasets. Plot such a dataset on
-    its own, or score the same methods on it.
+    dataset, and the stored tables hold only the demo datasets. A
+    ``UserWarning`` names a dataset that holds one method, and says so when
+    no method spans two of the datasets. Plot such a dataset on its own, or
+    score your method on the demo dataset of its category and add that row.
 
-    Under ``"dataset"``, the several-datasets warning suggests
-    ``aggregate="summary"`` only when every method has rows in at least two
-    datasets and no dataset holds a single method.
+    A method alone on its dataset gets an Overall of 1.0 there under
+    ``"mean_overall"``. Under ``"dataset"``, the several-datasets warning
+    suggests ``aggregate="summary"`` only when every method has rows in at
+    least two datasets and no dataset holds a single method.
 
     **No comparison.** A column whose rows all hold the same value, and
     every column of a one-method figure, compares nothing: one
     ``UserWarning`` names the columns, and the figure draws them in grey.
     Ranks and scores stay as computed.
 
-    **Leiden backend.** The stored tables were clustered with leidenalg.
-    When rows whose ``scored_with`` starts with ``igraph/`` meet stored
-    rows, and ARI, NMI or iF1 is shown, one ``UserWarning`` names those
+    **Leiden backend.** The stored tables were clustered with leidenalg; the
+    igraph default can move ARI by up to about 0.1. When rows whose
+    ``scored_with`` starts with ``igraph/`` meet stored rows of the same
+    dataset, and ARI, NMI or iF1 is shown, one ``UserWarning`` names those
     methods and the fix: set ``mtb.config.DEFAULT.leiden_flavor =
     "leidenalg"`` before ``mtb.evaluate``.
 
-    **Input columns.** ``dataset`` groups rows for ``aggregate="summary"``
-    (absent = one dataset) and is part of the duplicate-row key. A boolean
-    ``needs_labels`` column overrides the registry's supervised badge per
-    method (NaN = no override); a single ``category`` value makes the badge
-    follow that category's variants. Rows whose ``metric`` is NaN are
-    dropped.
+    **Input columns.** Only ``method``, ``metric`` and ``value`` are
+    required.
+
+    - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
+      dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
+      that mixes datasets averages them per method and adds a dataset cue to
+      each row label (``Name · D11`` or ``Name · 3 ds``).
+    - ``category`` - a single value makes the ``L`` badge follow that
+      category's variants.
+    - ``needs_labels`` (bool) - overrides the registry's ``L`` badge per
+      method; the only way to badge a method the registry does not know.
+      NaN = no override.
+    - Rows whose ``metric`` is NaN are dropped.
+
+    To draw your own runs next to the stored table, concatenate the frames:
+    ``pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])``,
+    with ``res`` from ``mtb.run_all``.
 
     **Name matching.** ``metrics``, ``methods`` and ``order`` match the
     frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
@@ -580,17 +613,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     na_cells = _na_report(blocks, parts, aggregate)
     if na_cells and na != "skip":
-        if aggregate == "summary":
-            rule = ("an n/a cell within a dataset is rank 0 there (the paper's "
-                    "summary rule)")
-        else:
-            rule = ("the family Overall averages the ranks of the metrics a "
-                    "method has and a column's ranks count only the methods "
-                    "scored in it")
-        from .. import config
-        msg = ("n/a cells: " + "; ".join(na_cells) + f" - {rule}. " + config.hint(
-            "Pass na='skip' to silence this, na='raise' to refuse an incomplete frame.",
-            "Pass --na skip to silence this, --na raise to refuse an incomplete table."))
+        msg = _na_message(_na_missing(blocks, parts, aggregate), df, aggregate)
         if na == "raise":
             raise ValueError(msg)
         warnings.warn(msg, UserWarning, stacklevel=2)
@@ -659,7 +682,7 @@ def _constant_note(methods, constant: dict, aggregate: str = "dataset") -> str |
 
 
 def _na_report(blocks, parts, aggregate: str) -> list:
-    """One line per method with n/a cells, in row order.
+    """The ``na_cells`` lines: one per family and method with n/a cells.
 
     ``aggregate="dataset"``: ``"<method>: <family> Overall over k of n metrics
     (<codes> n/a)"`` per family block. ``"summary"``: ``"<method>: <codes> n/a
@@ -689,6 +712,106 @@ def _na_report(blocks, parts, aggregate: str) -> list:
             lines.append(f"no {b.label} metric (no {b.label} Overall) for: "
                          f"{', '.join(whole)}")
     return lines
+
+
+def _na_missing(blocks, parts, aggregate: str) -> list:
+    """The ``n/a`` cells per figure row, in row order.
+
+    ``[(method, [(dataset, [codes])], [families])]``: under ``"dataset"`` one
+    ``(None, codes)`` pair per method, and the families the method has no
+    value in at all; under ``"summary"`` one pair per dataset with ``n/a``
+    cells. Codes follow the figure's column order.
+    """
+    columns = [c for b in blocks for c in b.raw.columns]
+    pos = {c: i for i, c in enumerate(columns)}
+
+    def _sorted(codes):
+        return sorted(codes, key=lambda c: pos.get(c, len(pos)))
+
+    out = []
+    for m in blocks[0].raw.index:
+        if aggregate == "summary":
+            per_ds = [(ds, _sorted(c for c in mat.columns if pd.isna(mat.loc[m, c])))
+                      for ds, mat in (parts or {}).items() if m in mat.index]
+            per_ds = [(ds, codes) for ds, codes in per_ds if codes]
+            if per_ds:
+                out.append((m, per_ds, []))
+            continue
+        codes, whole = [], []
+        for b in blocks:
+            na = [c for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
+            codes += na
+            if na and len(na) == b.raw.shape[1]:
+                whole.append(b.label)
+        if codes:
+            out.append((m, [(None, codes)], whole))
+    return out
+
+
+def _either(codes) -> str:
+    """``'ASW, iASW or ASW_batch'``."""
+    codes = [str(c) for c in codes]
+    return codes[0] if len(codes) == 1 else ", ".join(codes[:-1]) + " or " + codes[-1]
+
+
+def _both(names) -> str:
+    """``'D24, D25 and D28'``."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+#: most rows the ``n/a`` warning names before it counts the rest
+NA_ROWS_SHOWN = 3
+
+
+def _na_message(missing: list, df: pd.DataFrame, aggregate: str) -> str:
+    """The ``na="warn"`` / ``na="raise"`` text: one short sentence per row.
+
+    A row is ``The stored row`` when all its rows come from a stored table,
+    ``Your row`` when none do, else ``Row``; the dataset(s) and the stored
+    source follow in parentheses. The rank rule is stated once in the
+    Notes of ``build_table``; the message says only what the reader acts on.
+    """
+    stored_sources = set(style.STORED_SOURCES)
+    has_ds = "dataset" in df.columns
+    sentences = []
+    for m, per_ds, whole in missing[:NA_ROWS_SHOWN]:
+        rows = df[df["method"] == m]
+        src = (set(rows["source"].dropna().astype(str)) if "source" in rows.columns
+               else set())
+        stored = bool(src) and src <= stored_sources
+        who = ("The stored row" if stored else
+               "Your row" if src and not src & stored_sources else "Row")
+        where = []
+        if aggregate != "summary" and has_ds:
+            where += sorted(map(str, rows["dataset"].dropna().unique()))
+        if stored:
+            where += sorted(src)
+        name = f"{who} {m}" + (f" ({', '.join(where)})" if where else "")
+        if aggregate == "summary" and has_ds:
+            # datasets that lack the same metrics are named together
+            by_codes: dict = {}
+            for ds, codes in per_ds:
+                by_codes.setdefault(tuple(codes), []).append(str(ds))
+            what = ", and no ".join(f"{_either(codes)} on {_both(dss)}"
+                                    for codes, dss in by_codes.items())
+        else:
+            what = _either(dict.fromkeys(c for _, codes in per_ds for c in codes))
+        text = f"{name} has no {what}."
+        if whole:
+            text += f" It has no {' or '.join(whole)} Overall."
+        sentences.append(text)
+    more = len(missing) - NA_ROWS_SHOWN
+    if more > 0:
+        sentences.append(f"... and {more} more row{'s' if more > 1 else ''}.")
+    if aggregate == "summary":
+        sentences.append("In the summary, a missing value counts as rank 0 on that "
+                         "dataset.")
+    else:
+        sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
+                         else "Each row's Overall uses the metrics it has.")
+    sentences.append(_config.hint("Pass na='skip' to hide this message.",
+                                  "Pass --na skip to hide this message."))
+    return " ".join(sentences)
 
 
 def _frame_needs_labels(df) -> dict:
@@ -1126,7 +1249,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     UserWarning
         A column has the same value in every row, or there is one method.
     UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows.
+        Rows scored with the igraph Leiden backend are shown with stored rows
+        of their dataset.
 
     Examples
     --------
@@ -1139,6 +1263,10 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     Notes
     -----
+    ``bubble`` draws the table that ``mtb.plot.build_table`` computes. The
+    Notes of ``build_table`` give the Overall formulas, missing cells, row
+    order, input columns, name matching, errors and warnings.
+
     **Reading the figure.** What each mark encodes:
 
     - Metric circle (``aggregate="dataset"``): radius = within-column rank,
@@ -1153,84 +1281,13 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     - Family *Overall* bar: length = the family score min-max scaled across
       the rows; fill = the score itself (the two differ only under
       ``overall="mean_overall"``).
-    - Rows: ordered by the mean of the family Overall scores, best first.
-      ``order`` moves rows but never changes a rank or a score.
+    - Rows: best mean Overall first; ``order`` moves rows only.
     - *Rank* legend: 1 = best, whereas ``BubbleTable.ranks`` /
       ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
     - Grey fill: every row of that column holds the same value, or the
       figure has one method, so there is nothing to compare.
     - Footnote: the Overall formula in use, the grey columns, the ``n/a``
       rule when a dash is drawn, and the chip key.
-
-    **Overall formulas.** ``overall=`` sets the family *Overall* under
-    ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
-    over metrics of max-rank)``. The two can order methods differently on
-    the same frame.
-
-    - ``"rank"`` (bubble's default): ``minmax(mean over metrics of
-      max-rank(mean over datasets of within-dataset max-rank))`` - the
-      per-dataset ranks are averaged per metric, re-ranked across methods,
-      averaged over metrics and min-max scaled. A method absent from a
-      dataset scores rank 0 there (the paper's summary rule), which pulls it
-      down.
-    - ``"mean_overall"`` (bar's default): ``mean over datasets of
-      minmax(mean over metrics of within-dataset max-rank)`` - each dataset
-      gets its own min-max-scaled overall, and these are averaged; a dataset
-      the method lacks is skipped.
-
-    **Bubble and bar.** ``mtb.plot.bar`` uses the same formulas and the same
-    tie-break (alphabetical within a tie). With ``aggregate="summary"``, the
-    same ``overall=`` and the metrics of one family (e.g. against
-    ``bar(group="clustering")``), both figures order methods identically.
-    Across both families they can differ: bubble averages the family
-    Overalls, bar scores all metrics together.
-
-    **Missing cells.** A metric not computed for a method shows a dash
-    (``n/a``) instead of a marker.
-
-    - ``aggregate="dataset"``: the family Overall averages the metrics the
-      method has; a column's ranks count only the scored methods.
-    - ``aggregate="summary"``: the cell is rank 0 in that dataset for the
-      metric bar (the paper's rule); the family Overall counts it as rank 0
-      under ``overall="rank"`` and skips it under ``"mean_overall"``.
-
-    ``na="warn"`` names each method in one warning per figure, e.g.
-    ``"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
-
-    **Input columns.** Only ``method``, ``metric`` and ``value`` are
-    required.
-
-    - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
-      dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
-      that mixes datasets averages them per method and adds a dataset cue to
-      each row label (``Name · D11`` or ``Name · 3 ds``).
-    - ``category`` - a single value makes the ``L`` badge follow that
-      category's variants.
-    - ``needs_labels`` (bool) - overrides the registry's ``L`` badge per
-      method; the only way to badge a method the registry does not know.
-      NaN = no override.
-    - Rows whose ``metric`` is NaN are dropped.
-
-    To draw your own runs next to the stored table, concatenate the frames:
-    ``pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])``,
-    with ``res`` from ``mtb.run_all``.
-
-    **A new dataset.** The stored tables hold only the demo datasets, so
-    rows from your own dataset have nothing stored to rank against. Plot
-    that dataset on its own, or score your method on the demo dataset of
-    its category and add that row. A ``UserWarning`` names a dataset that
-    holds one method, and says so when no method spans two datasets.
-
-    **Leiden backend.** The stored tables were clustered with leidenalg; the
-    igraph default can move ARI by up to about 0.1. When your rows say
-    ``igraph/...`` in ``scored_with`` and ARI, NMI or iF1 is shown, a
-    ``UserWarning`` names them. Set ``mtb.config.DEFAULT.leiden_flavor =
-    "leidenalg"`` before ``mtb.evaluate`` to compare them.
-
-    **Name matching.** ``metrics``, ``methods`` and ``order`` match the
-    frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
-    case-insensitively; the frame's own spelling is kept. The family blocks
-    always stay in paper order.
 
     **Chips and badge** (``show_language``).
 
@@ -1241,13 +1298,6 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
       follows the variants of the frame's single ``category`` (scMoMaT is
       supervised in mosaic only); without one, the registry's method-level
       flag.
-
-    **Errors.** A frame that looks like ``mtb.evaluate``'s wide output gets a
-    hint to convert it with ``mtb.to_long`` first; an unknown name gets a
-    did-you-mean hint and the values present. Duplicate rows raise
-    ``ValueError``: deduplicate, or name the variants distinctly (as
-    ``mtb.sweep`` does). A method with both ``True`` and ``False``
-    ``needs_labels`` rows, or an empty frame, also raises ``ValueError``.
 
     See Also
     --------
@@ -1268,7 +1318,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 # The `overall` parameter text is style.OVERALL_DOC, written out verbatim in
 # the docstrings of bubble and bar (a runtime splice is invisible to the
 # static docs build); tests/test_bubble.py and tests/test_bar.py pin parity.
-# The two formulas are in both Notes and in style.overall_by_basis.
+# The two formulas are in the Notes of build_table and in style.overall_by_basis.
 
 #: deprecated 0.2.x name of :func:`bubble` (DeprecationWarning; removed in 0.4)
 plot_bubble = _compat.deprecated_alias("mtb.plot.plot_bubble", "mtb.plot.bubble", bubble)

@@ -1267,6 +1267,12 @@ def recommend(
     FileNotFoundError
         No stored results for the category and source.
 
+    Warns
+    -----
+    UserWarning
+        Partial coverage, dropped or unscored methods, or igraph-scored rows;
+        one message (Notes).
+
     Examples
     --------
     >>> import multibench as mtb
@@ -1348,7 +1354,10 @@ def recommend(
 
     **Warning.** One ``UserWarning`` with one line per finding summarises
     a requested modality the datasets did not measure, dropped methods and
-    datasets, partial coverage and the unscored methods.
+    datasets, partial coverage and the unscored methods. The stored tables
+    were clustered with leidenalg. A line also names the ``long_df`` methods
+    clustered with igraph when ARI, NMI or iF1 ranks them against stored
+    rows of their dataset.
 
     **Errors.** ``ValueError`` is raised when:
 
@@ -1464,6 +1473,9 @@ def recommend(
             f"1.0).{hint} Otherwise pass long_df= with more methods, or lower "
             f"min_methods.")
     per_ds = pd.DataFrame({ds: style.compute_overall(mat) for ds, mat in kept.items()})
+    # igraph-scored rows ranked against the leidenalg-scored stored rows of
+    # their dataset: the plot functions' warning, on the ranked rows only
+    backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
     grand = per_ds.mean(axis=1)
     n_ds = per_ds.notna().sum(axis=1)
     n_total = per_ds.shape[1]
@@ -1568,6 +1580,8 @@ def recommend(
             + ", ".join(f"{r.method} {r.n_datasets}/{r.n_datasets_total}"
                         for r in partial.itertuples())
             + "); compare coverage before trusting the order")
+    if backend:
+        notes.append(backend)
     if only_dropped:
         notes.append(
             f"rows only in dropped dataset(s) for: {', '.join(only_dropped)} - "

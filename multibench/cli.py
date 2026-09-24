@@ -1205,7 +1205,9 @@ def _evaluate_labels(args, stack):
         tmp = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         picked = []
         for i, f in enumerate(files, 1):
-            out = tmp / f"labels{i}.csv"
+            # the file keeps its name: evaluate's errors name the files typed
+            out = tmp / str(i) / Path(f).name
+            out.parent.mkdir()
             pd.DataFrame({"x": eio.read_labels(f, args.column)}).to_csv(out, index=False)
             picked.append(str(out))
         files = picked

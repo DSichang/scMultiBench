@@ -424,6 +424,15 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
     return float(np.mean(scores))
 
 
+def count_error(what: str, n: int, n_cells: int) -> str:
+    """``'labels has 3,000 entries for 7,500 cells in the embedding.'``
+
+    ``what`` is the argument of ``mtb.evaluate`` that holds ``n`` values:
+    ``labels``, ``clustering`` or ``batch``.
+    """
+    return f"{what} has {n:,} entries for {n_cells:,} cells in the embedding."
+
+
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
             slow_metrics: bool = False, only=None, *,
             verbose: bool | None = None, flavor=None) -> pd.DataFrame:
@@ -489,23 +498,11 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         ) from e
 
     n = np.asarray(emb).shape[0]
-    n_ct = len(np.asarray(celltype))
-    if n_ct != n:
-        raise ValueError(
-            f"input length mismatch: emb has {n} cells, celltype has {n_ct}"
-        )
-    if cluster is not None:
-        n_cl = len(np.asarray(cluster))
-        if n_cl != n:
-            raise ValueError(
-                f"input length mismatch: emb has {n} cells, cluster has {n_cl}"
-            )
-    if batch is not None:
-        n_ba = len(np.asarray(batch))
-        if n_ba != n:
-            raise ValueError(
-                f"input length mismatch: emb has {n} cells, batch has {n_ba}"
-            )
+    # named after evaluate()'s arguments, which the user passed
+    for what, values in (("labels", celltype), ("clustering", cluster),
+                         ("batch", batch)):
+        if values is not None and len(np.asarray(values)) != n:
+            raise ValueError(count_error(what, len(np.asarray(values)), n))
 
     adata = _build_adata(emb, celltype, cluster, batch)
     sc.pp.neighbors(adata, use_rep="X_emb")
@@ -532,16 +529,18 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             needs = [m for m in ("ARI", "NMI")
                      if cluster is None and (only is None or m in only)] \
                 + (["iF1"] if _needs_isof1 else [])
+            names = (needs[0] if len(needs) == 1
+                     else ", ".join(needs[:-1]) + " and " + needs[-1])
             from .. import config as _config
-            skip = (_config.hint("clustering= or metrics=[...] without ARI/NMI/iF1",
-                                 "--clustering, or --metrics without ARI/NMI/iF1")
-                    if cluster is None else
-                    _config.hint("metrics=[...] without iF1", "--metrics without iF1"))
-            print(f"scIB clustering metrics: Leiden resolution sweep (10 "
-                  f"resolutions, flavor={flavor}) over {n:,} cells for "
-                  f"{', '.join(needs)} - typically 30-60 s per 3,000 cells with "
-                  f"leidenalg, several times faster with igraph; pass "
-                  f"{skip} to skip it",
+            # clustering= spares the sweep only when iF1 does not need it
+            skip = (_config.hint(f"metrics= without {names}",
+                                 f"--metrics without {names}")
+                    if "iF1" in needs else
+                    _config.hint(f"clustering=, or metrics= without {names}",
+                                 f"--clustering, or --metrics without {names}"))
+            print(f"Clustering {n:,} cells at 10 resolutions for {names}, with "
+                  f"the {flavor} Leiden backend. This takes from seconds to a few "
+                  f"minutes. To skip it, pass {skip}.",
                   file=sys.stderr, flush=True)
         with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
             warnings.simplefilter("ignore")

@@ -1043,6 +1043,10 @@ def _align_cells(a, *, master, master_name, role):
     master = [str(x) for x in master]
     if names == master:
         return a
+    pair = {role, master_name}
+    if master_name == "data":
+        # the parameter name alone reads as "the data"
+        master_name = "the object passed as data"
     unique = len(set(names)) == len(names) and len(set(master)) == len(master)
     if unique and set(names) == set(master):
         return a[master]
@@ -1052,7 +1056,6 @@ def _align_cells(a, *, master, master_name, role):
         lack = [x for x in master if x not in in_names]
         same = "All modalities of one dataset must hold the same cells."
         if len(stray) == len(names):            # no cell in common
-            pair = {role, master_name}
             if "atac" in pair and pair & {"rna", "data"}:
                 raise ValueError(
                     "RNA and ATAC have no cells in common. For RNA and ATAC from "

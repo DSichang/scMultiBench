@@ -5,7 +5,7 @@ math shared by :func:`multibench.plot.bubble` and :func:`multibench.plot.bar`:
 :func:`per_dataset_ranks`, :func:`mean_rank_matrix` and
 :func:`overall_by_basis`. Both figures call these, so with the same
 ``overall=`` and the metrics of one family they order methods identically
-(see the Notes of ``plot.bubble``).
+(see the Notes of ``plot.build_table``).
 """
 from __future__ import annotations
 
@@ -279,12 +279,16 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     The stored tables were clustered with leidenalg. A row is affected when
     its ``scored_with`` starts with ``igraph/`` and its metric came from the
     sweep: iF1 always, ARI and NMI when the clusters part is ``sweep``.
-    Rows without ``scored_with`` (NaN) never trigger it.
+    Rows without ``scored_with`` (NaN) never trigger it. With a ``dataset``
+    column, a row counts only when the frame holds a stored row of the same
+    dataset: rows from a dataset with no stored rows are compared with no
+    stored score, and the no-overlap warning covers them.
     """
     from .. import config
     if not {"source", "scored_with", "metric", "method"} <= set(df.columns):
         return None
-    if not df["source"].isin(STORED_SOURCES).any():
+    stored = df["source"].isin(STORED_SOURCES)
+    if not stored.any():
         return None
     parts = df["scored_with"].astype("string").str.split("/")
     flavor = parts.str[0].fillna("")
@@ -292,6 +296,8 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     hit = (flavor == "igraph") & (
         (df["metric"] == "iF1")
         | (df["metric"].isin(["ARI", "NMI"]) & (clusters == "sweep")))
+    if "dataset" in df.columns:
+        hit &= df["dataset"].isin(df.loc[stored, "dataset"].dropna().unique())
     if not hit.any():
         return None
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
@@ -308,7 +314,7 @@ def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
     """Across-dataset Overall per method under the given ``basis``.
 
     ``parts`` is the dict from :func:`per_dataset_ranks`. The two formulas
-    (spelled out again in the Notes of ``plot.bubble`` and ``plot.bar``):
+    (spelled out again in the Notes of ``plot.build_table``):
 
     - ``"rank"``: ``minmax(mean over metrics of max-rank(mean over datasets
       of within-dataset max-rank))``; a method absent from a dataset scores

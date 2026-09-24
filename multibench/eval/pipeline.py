@@ -368,6 +368,63 @@ def _labels_from_dict(d: dict, label_order) -> list:
     return [d[k] for k in order]
 
 
+#: the ``multibench evaluate`` flag that fills each argument of evaluate()
+_FLAGS = {"labels": "--labels", "clustering": "--clustering", "batch": "--batch"}
+
+
+def _label_files(given) -> list:
+    """The label file(s) behind an argument of evaluate(), as paths; ``[]``
+    for anything that is not a file path or a list of them."""
+    if isinstance(given, (str, Path)) and io._is_label_file(Path(given)) \
+            and Path(given).is_file():
+        return [Path(given)]
+    if _is_label_path_list(given):
+        return [Path(p) for p in given]
+    return []
+
+
+def _batch_files(path: Path, n_cells: int) -> list:
+    """``cty1.csv, cty2.csv, ...`` next to ``path`` (itself one of them), in
+    number order, when their labels add up to ``n_cells``; else ``[]``."""
+    import re
+    m = re.fullmatch(r"(.*?)\d+(\.\w+)", path.name)
+    if not m:
+        return []
+    head, suffix = m.groups()
+    pattern = re.compile(re.escape(head) + r"(\d+)" + re.escape(suffix))
+    found = sorted((int(pattern.fullmatch(q.name).group(1)), q)
+                   for q in path.parent.iterdir() if pattern.fullmatch(q.name))
+    try:
+        total = sum(len(io.read_labels(q)) for _, q in found)
+    except Exception:  # noqa: BLE001 - a file that does not read: no suggestion
+        return []
+    return [q for _, q in found] if len(found) > 1 and total == n_cells else []
+
+
+def _count_error(what: str, n: int, n_cells: int, given) -> str:
+    """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows.
+
+    On the command line it names the flag and the file(s) the user typed;
+    for too few labels it adds the per-batch fix (the sibling files when
+    they add up to the cell count).
+    """
+    from . import scib as escib
+    files = _label_files(given)
+    names = f" ({', '.join(f.name for f in files)})" if files else ""
+    msg = config.hint(
+        escib.count_error(what, n, n_cells),
+        f"{_FLAGS[what]} gave {n:,} labels{names} for {n_cells:,} cells in --output.")
+    if what != "labels" or n >= n_cells:
+        return msg
+    batches = _batch_files(files[0], n_cells) if len(files) == 1 else []
+    order = f" ({', '.join(f.name for f in batches)})" if batches else ""
+    return msg + " " + config.hint(
+        "For a folder with one label file per batch, pass "
+        "mtb.labels_for(dataset, category, method).",
+        f"For one label file per batch, repeat --labels in batch order{order}, "
+        f"or pass --dataset, --category and --method.")
+
+
 def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
     """Turn the ``metrics=`` argument into what :func:`multibench.eval.scib.compute` needs.
 
@@ -658,8 +715,10 @@ def evaluate(
 
     - the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default
       neighbour graph (15 neighbours);
-    - cLISI and iLISI use k0 = 90 neighbours (scib default; perplexity
-      k0/3);
+    - cLISI and iLISI: scib builds a 15-neighbour graph from the embedding
+      and takes the 90 cells nearest by path length on it (k0 = 90,
+      perplexity 30). A cell with fewer than 90 reachable cells counts as
+      one label;
     - ASW, iASW and ASW_batch use distances in the embedding;
     - kBET builds its own neighbour graph.
 
@@ -676,10 +735,12 @@ def evaluate(
     ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
     iASW       isolated_labels_asw   iso_threshold = number of batches + 1
     iF1        isolated_labels_f1    same threshold; best F1 over the sweep
-    cLISI      clisi_graph           type_="embed", k0 = 90; scaled to 0-1
+    cLISI      clisi_graph           type_="embed"; 90 nearest by path on the
+                                     15-neighbour graph; scaled to 0-1
     ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
     GC         graph_connectivity    on the 15-neighbour graph
-    iLISI      ilisi_graph           type_="embed", k0 = 90; scaled to 0-1
+    iLISI      ilisi_graph           type_="embed"; 90 nearest by path on the
+                                     15-neighbour graph; scaled to 0-1
     kBET       kBET                  computed only when named in metrics=[...]
     ```
 
@@ -729,8 +790,9 @@ def evaluate(
     - missing labels, or a batch metric / family requested without batch
       labels;
     - an unknown category, ``metrics`` token or code;
-    - length mismatches (``'input length mismatch: emb has N cells,
-      celltype has M'``) and cell-id mismatches when aligning;
+    - a count that differs from the embedding's cells (``'labels has M
+      entries for N cells in the embedding.'``), and cell-id mismatches when
+      aligning;
     - ambiguous label files, and a multi-entry labels dict (other than an
       unchanged ``labels_for`` one) out of the default order without
       ``label_order``;
@@ -814,6 +876,11 @@ def evaluate(
         ba = np.zeros(emb.shape[0], dtype=int)
 
     from . import scib as escib
+    n_cells = emb.shape[0]
+    for what, values, given in (("labels", ct, labels), ("clustering", cl, clustering),
+                                ("batch", ba, batch)):
+        if values is not None and len(values) != n_cells:
+            raise ValueError(_count_error(what, len(values), n_cells, given))
     out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
                         verbose=None if verbose else False)
     # compute() already emits canonical names; canonicalise anyway, so a frame

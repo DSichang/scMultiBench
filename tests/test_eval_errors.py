@@ -96,15 +96,15 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
     monkeypatch.setattr(mscib, "_SWEEP_NOTICE_CELLS", 0)  # every sweep now counts as long
     evaluate(emb, labels=lab, metrics=["ARI"])            # default verbose=True announces it
     err = capsys.readouterr().err
-    assert re.search(r"Leiden resolution sweep \(10 resolutions, flavor=(igraph|leidenalg)\) "
-                     r"over 120 cells for ARI", err)
-    assert "pass clustering= or metrics=" in err
+    assert re.search(r"Clustering 120 cells at 10 resolutions for ARI, with the "
+                     r"(igraph|leidenalg) Leiden backend\.", err)
+    assert "To skip it, pass clustering=, or metrics= without ARI." in err
     # with a clustering given the sweep serves iF1 alone: the notice names
     # only iF1 and does not suggest the clustering= that was already passed
     evaluate(emb, labels=lab, clustering=lab)
     err = capsys.readouterr().err
-    assert "over 120 cells for iF1 - " in err
-    assert err.rstrip().endswith("pass metrics=[...] without iF1 to skip it")
+    assert "Clustering 120 cells at 10 resolutions for iF1, with the " in err
+    assert err.rstrip().endswith("To skip it, pass metrics= without iF1.")
     assert "clustering=" not in err and "ARI" not in err and "NMI" not in err
     evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])   # nothing left to sweep for
     assert "Leiden" not in capsys.readouterr().err

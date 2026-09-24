@@ -120,7 +120,8 @@ def test_run_off_linux_names_the_cli_flag_under_the_cli(tmp_path, monkeypatch):
                 out_dir=str(tmp_path / "out"))
     assert ("Run this command on a Linux machine; --dry-run previews the method's "
             "command here.") in str(e.value)
-    assert "`multibench env doctor`" in str(e.value)
+    # R3-16: off Linux the refusal is the platform sentence alone
+    assert "env doctor" not in str(e.value) and "env install" not in str(e.value)
 
 
 def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
