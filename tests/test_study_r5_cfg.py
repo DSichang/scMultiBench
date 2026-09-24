@@ -30,7 +30,8 @@ F = importlib.import_module("multibench.data.fetch")
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
            "--modalities", "rna,adt", "--format", "csv"]
-REASON = "method scripts not fetched (multibench fetch --scripts)"
+# a sentence with its own subject, as every other reason of the column (R5-10)
+REASON = "The method scripts are not fetched. Run multibench fetch --scripts."
 
 
 # ================================================= R5-04: scan --strict table
@@ -84,7 +85,7 @@ def test_strict_table_text_format(no_scripts, capsys):
     head = lines[0].split()
     row = next(line for line in lines if line.lstrip().startswith("Matilda"))
     assert row.split()[head.index("runnable")] == "False"
-    assert "method scripts not fetched" in row
+    assert "method scripts are not fetched" in row
 
 
 def test_without_strict_the_table_and_python_scan_are_unchanged(no_scripts, capsys):

@@ -383,7 +383,7 @@ def _cmd_scan(args) -> int:
 
 
 #: The reason ``scan --strict`` prints for a row blocked only by the method scripts.
-_SCRIPTS_REASON = "method scripts not fetched (multibench fetch --scripts)"
+_SCRIPTS_REASON = "The method scripts are not fetched. Run multibench fetch --scripts."
 
 
 def _strict_table(df):
