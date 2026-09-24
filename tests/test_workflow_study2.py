@@ -29,15 +29,20 @@ def all_envs(monkeypatch):
 
 
 # ----------------------------------------------------------------- Noor: short reason
-def test_short_reason_strips_exception_prefix_row_prefix_and_absolute_paths():
-    raw = ("FileNotFoundError: UnitedNet/D11/vertical: input files not found on disk: "
-           "{'atac_gas': '/home/wen/data/D11/atac_gas.h5', 'rna_cty': "
-           "'/home/wen/data/D11/rna_cty.csv'}. Available files in /home/wen/data/D11: "
-           "['adt.h5', 'cty.csv', 'rna.h5']")
+def test_short_reason_strips_exception_prefix_cell_check_opening_and_absolute_paths():
+    # no message carries a 'method/dataset/category: ' prefix any more; the
+    # cell checks open with '<method> reads <file> of <dataset>, which'
+    raw = ("ValueError: SCALEX reads atac_gas.h5 of LUNG, which holds other cells than "
+           "atac_peak.h5. The files hold 20 and 20 cells and share 0. Both files need "
+           "the same ATAC cells.")
+    got = W._short_reason(raw, "SCALEX", "LUNG", "diagonal")
+    assert got == ("atac_gas.h5 holds other cells than atac_peak.h5. The files hold 20 "
+                   "and 20 cells and share 0. Both files need the same ATAC cells.")
+    raw = ("FileNotFoundError: UnitedNet (vertical) needs atac_gas.h5 in "
+           "/home/wen/data/D11. The folder holds adt.h5, cty.csv and rna.h5.")
     got = W._short_reason(raw, "UnitedNet", "D11", "vertical")
-    assert got == ("input files not found on disk: {'atac_gas': 'atac_gas.h5', "
-                   "'rna_cty': 'rna_cty.csv'}. Available files in D11: "
-                   "['adt.h5', 'cty.csv', 'rna.h5']")
+    assert got == ("UnitedNet (vertical) needs atac_gas.h5 in D11. The folder holds "
+                   "adt.h5, cty.csv and rna.h5.")
     assert "/home" not in got and "FileNotFoundError" not in got
     assert W._short_reason("", "M", "D", "c") == ""
 
@@ -112,10 +117,11 @@ def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypa
 def test_scan_modalities_warns_about_excluded_data_dir_methods(all_envs):
     with pytest.warns(UserWarning) as rec:
         df = mtb.scan("D28", "diagonal", modalities=["rna", "atac_gas"])
-    msgs = [str(w.message) for w in rec if "directory-input" in str(w.message)]
+    msgs = [str(w.message) for w in rec if "leave out scBridge" in str(w.message)]
     assert len(msgs) == 1, msgs
-    assert "scBridge" in msgs[0]
-    assert "modalities=[]" in msgs[0]
+    assert msgs[0] == ("The modalities rna and atac_gas leave out scBridge, which reads a "
+                       "folder instead of modality files. Pass modalities=[] to select it, "
+                       "or leave out modalities= to see every variant.")
     assert "(data_dir)" not in set(df["modalities"])      # rows unchanged: exact selector
     # modalities=[] selects exactly it, and no note is emitted
     with warnings.catch_warnings():

@@ -357,14 +357,13 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Returns
     -------
     dict
-        One flat record. Read ``supports`` (category/modality combinations it
-        runs), ``params`` (what ``run(params=...)`` can change), ``runtime``
-        (to size a sweep) and ``needs_labels``; all keys are in Notes.
+        One flat record. Start with ``supports``, ``params``, ``runtime`` and
+        ``needs_labels``. Notes describes every key.
 
     Raises
     ------
     KeyError
-        Unknown method id (the message suggests a close match), or a declared stub.
+        Unknown method id. The message suggests a close match.
 
     Examples
     --------
@@ -401,16 +400,18 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     - ``reference`` - ``{doi, title, authors, journal, year}`` or ``None``;
       ``mtb.cite`` formats it.
     - ``notes`` - a short summary of the method.
-    - ``supports`` - one entry per variant: ``category``, ``modalities``,
+    - ``supports`` - the category and modality combinations the method
+      runs, one entry per variant: ``category``, ``modalities``,
       ``output_kind``, ``n_tunable``, ``needs_labels``, ``labels`` (the
       label roles the variant reads, e.g. ``['cty']`` / ``['rna_cty']`` /
       ``[]``) and ``reference_batch`` (the batch a variant uses as its fixed
       reference, e.g. 3 for StabMap in cross; ``None`` elsewhere).
-    - ``params`` - keyed per variant as ``'category:mods'``, each with
-      ``defaults``, ``tunable`` and ``effective`` (see ``mtb.params_for``).
+    - ``params`` - what ``run(params=...)`` can change, keyed per variant
+      as ``'category:mods'``, each with ``defaults``, ``tunable`` and
+      ``effective`` (see ``mtb.params_for``).
     - ``fixed_in_script`` / ``upstream_knobs`` / ``upstream_url`` - what the
       script pins and what its library documents (see ``mtb.params_for``).
-    - ``runtime`` - observed cost; see **Runtime**.
+    - ``runtime`` - observed cost, to size a sweep; see **Runtime**.
     - ``gpu`` / ``cpu_params`` / ``requires_gpu`` / ``gpu_evidence`` - see
       **GPU and CPU**.
     - ``notes_long`` (``verbose=True`` only) - the raw upstream-knob audit
@@ -445,7 +446,8 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     **Status.** ``status`` says how the method was checked. ``'verified'``
     means the command template was cross-checked against the upstream entrypoint
     and the method was executed end to end on a reference dataset;
-    ``'declared'`` = available but not run end to end.
+    ``'declared'`` = available but not run end to end. A method listed but
+    not yet runnable raises ``KeyError``.
 
     **GPU and CPU.** ``gpu``, ``cpu_params``, ``requires_gpu`` and
     ``gpu_evidence`` are the GPU/CPU contract of the upstream script, read
@@ -724,10 +726,11 @@ def params_for(method: str, category: str | None = None,
         if len(s.variants) > 1:
             v = _by_folder(s.variants)
             if v is None:
+                keys = _resolve._and_list(_variant_key(x) for x in s.variants)
                 raise AmbiguousVariantError(
-                    f"{method} has {len(s.variants)} variants - pass category and "
-                    f"modalities, e.g. {_example(s.variants[0])}; available: "
-                    f"{[_variant_key(x) for x in s.variants]}")
+                    f"{method} has {len(s.variants)} variants, {keys}. Pass the "
+                    f"category and modalities of one, for example "
+                    f"{_example(s.variants[0])}.")
         else:
             v = s.variants[0]
     elif modalities is None:
@@ -741,10 +744,11 @@ def params_for(method: str, category: str | None = None,
         if len(cands) > 1:
             v = _by_folder(cands)
             if v is None:
+                mods = _resolve._and_list("+".join(x.when.get("modalities", []))
+                                          for x in cands)
                 raise AmbiguousVariantError(
-                    f"{method} has {len(cands)} {category!r} variants - also pass "
-                    f"modalities, e.g. {_example(cands[0])}; available: "
-                    f"{[_variant_key(x) for x in cands]}")
+                    f"{method} has {len(cands)} {category} variants, {mods}. Pass the "
+                    f"modalities too, for example {_example(cands[0])}.")
         else:
             v = cands[0]
     elif category is None:
@@ -756,16 +760,18 @@ def params_for(method: str, category: str | None = None,
             cands = [x for x in s.variants
                      if {modality_family(m) for m in x.when.get("modalities", [])} == want]
         if not cands:
+            keys = _resolve._and_list(_variant_key(x) for x in s.variants)
             raise KeyError(
-                f"{method}: no variant takes modalities {sorted(modalities)}; "
-                f"available: {[_variant_key(x) for x in s.variants]}")
+                f"No variant of {method} takes the modalities "
+                f"{_resolve._and_list(sorted(modalities))}. Its variants: {keys}.")
         if len(cands) > 1:
             v = _by_folder(cands)
             if v is None:
+                keys = _resolve._and_list(_variant_key(x) for x in cands)
                 raise AmbiguousVariantError(
-                    f"{method}: modalities {sorted(modalities)} match {len(cands)} "
-                    f"variants - also pass category, e.g. {_example(cands[0])}; "
-                    f"available: {[_variant_key(x) for x in cands]}")
+                    f"The modalities {_resolve._and_list(sorted(modalities))} match "
+                    f"{len(cands)} variants of {method}, {keys}. Pass the category "
+                    f"too, for example {_example(cands[0])}.")
         else:
             v = cands[0]
     else:

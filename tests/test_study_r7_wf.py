@@ -312,9 +312,9 @@ def test_workflow_passages_read_as_plain_sentences():
             "optimistic. ``label_order_confidence`` shows how far ahead the chosen order "
             "was.") in summary
     rescore = _flat(W.BatchResult.rescore)
-    assert ("**Other hosts.** When the data folder has moved, give its new location to "
-            "``mtb.load_batch(data_path=)``. When the dataset folder is not found, ") \
-        in rescore
+    assert ("**Other hosts.** When the dataset folder has moved, pass the folder that "
+            "now holds it as ``mtb.load_batch(data_path=)``. When the dataset folder is "
+            "not found, ") in rescore
     for old in ("Outcome of", "Data root for re-scoring", "finds moved folders",
                 "clear-cut", "small optimistic bias"):
         assert old not in " ".join([cls, load, summary, rescore]), old

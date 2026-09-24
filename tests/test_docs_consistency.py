@@ -404,7 +404,8 @@ def test_docs_pages_carry_the_colab_speed_round(path):
         assert "cross 3.0 GB" in text and "vertical 6.2 GB" in text, "measured archive totals per tutorial"
         assert "No conda binary is needed for the packed path" in text
         assert "MULTIBENCH_ENVS_DIR" in text and "~/.cache/multibench/envs" in text
-        assert "no conda/mamba on this host; <env> has a packed" in text
+        assert ("`RuntimeError: Conda is not installed on this computer. Environment "
+                "<env> has a packed archive.`") in text
     if path.name == "api.md":
         # the signatures live on the generated reference pages now; the
         # overview keeps the prose and links every entry point there

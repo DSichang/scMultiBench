@@ -34,16 +34,17 @@ _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 
 def _require_file(path: Path | str, what: str = "file") -> Path:
     """``Path(path)`` when it is an existing file; else ``FileNotFoundError``
-    naming the path and the working directory (a relative path that resolves
+    naming ``what``, the path and, for a relative path, the working directory
+    and where the path resolves from there (a relative path that resolves
     from the repository but not from a notebook's cwd is the usual cause)."""
     p = Path(path)
+    where = ("" if p.is_absolute() else
+             f" From the working directory {Path.cwd()}, the path resolves to "
+             f"{p.resolve()}.")
     if p.is_dir():
-        raise FileNotFoundError(
-            f"{what} {p} is a directory, not a file (cwd {Path.cwd()})")
+        raise FileNotFoundError(f"The {what} {p} is a folder, not a file.{where}")
     if not p.is_file():
-        raise FileNotFoundError(
-            f"{what} {p} does not exist (cwd {Path.cwd()}"
-            + (f"; resolved {p.resolve()}" if not p.is_absolute() else "") + ")")
+        raise FileNotFoundError(f"The {what} {p} does not exist.{where}")
     return p
 
 
@@ -163,7 +164,8 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     argument (default: pass ``column=``).
     """
     from .. import config
-    path = _require_file(path, "labels file")
+    path = _require_file(path, config.hint(f"{what} file", f"--{what} file")
+                         if what else "labels file")
     d = pd.read_csv(path, sep=_sep_for(path))
     head = (config.hint(f"The {what} file {path.name}", f"The --{what} file {path.name}")
             if what else str(path))

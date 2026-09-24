@@ -90,7 +90,8 @@ def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
     arr = np.ones((rna.n_obs, 4))
     with pytest.raises(ValueError, match="cell barcodes are unknown"):
         ingest.export_dataset(None, tmp_path / "A", adt=arr)
-    with pytest.warns(UserWarning, match="no feature names found .* feature_0..feature_3") as rec:
+    with pytest.warns(UserWarning, match="has no feature names. The file names them "
+                                         "feature_0 to feature_3.") as rec:
         ingest.export_dataset(rna, tmp_path / "A", adt=arr)
     assert "adt_names=" in str(rec[0].message)
     with warnings.catch_warnings():
@@ -99,7 +100,7 @@ def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
     assert _feats(d / "adt.h5") == ["CD3", "CD4", "CD8", "CD19"]
     # the obsm form Priya hit
     rna.obsm["protein"] = arr
-    with pytest.warns(UserWarning, match="adt: no feature names found"):
+    with pytest.warns(UserWarning, match=r"The adt matrix obsm\['protein'\] has no feature names"):
         ingest.export_dataset(rna, tmp_path / "C", adt="obsm:protein")
     with warnings.catch_warnings():
         warnings.simplefilter("error")

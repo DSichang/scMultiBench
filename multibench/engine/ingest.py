@@ -318,7 +318,14 @@ def _norm_modality(modality):
     return m
 
 
-def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None):
+def _no_names_message(what: str, source: str, n_feat: int, fix: str) -> str:
+    """The warning for a matrix written with the fallback names ``feature_<i>``."""
+    return (f"The {what} matrix {source} has no feature names. The file names them "
+            f"feature_0 to feature_{n_feat - 1}. {fix}")
+
+
+def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
+                 names_arg=None):
     """Return ``(X, feature_names)`` for the requested slot of ``adata``.
 
     ``obsm`` matrices carry no var axis in AnnData, so feature names come from
@@ -326,7 +333,9 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None)
     else ``adata.uns[f"{obsm}_names"]`` (when its length matches), else
     ``feature_0..`` - with a ``UserWarning`` naming the fallback, because a
     protein panel written as ``feature_0..feature_29`` loses its marker names
-    in every downstream readout. ``what`` labels the warning (``'adt'``).
+    in every downstream readout. ``what`` labels the warning (``'adt'``);
+    ``names_arg`` is the caller's keyword that takes the names
+    (``'adt_names'``, ``'feature_names'``), offered first in Python.
     """
     if layer is not None and obsm is not None:
         raise ValueError("pass at most one of layer= / obsm=")
@@ -351,12 +360,12 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None)
             names = [str(v) for v in uns_names]
         if names is None and n_feat is not None:
             names = [f"feature_{i}" for i in range(n_feat)]
-            warnings.warn(
-                f"{what or 'obsm:' + obsm}: no feature names found (obsm[{obsm!r}] is a "
-                f"bare array and adata.uns[{obsm + '_names'!r}] is absent); writing "
-                f"feature_0..feature_{n_feat - 1} - pass feature_names=[...] "
-                f"(export_dataset: adt_names=) or store a DataFrame in obsm",
-                UserWarning, stacklevel=3)
+            slot, uns = f"obsm[{obsm!r}]", f"adata.uns[{obsm + '_names'!r}]"
+            store = f"store {slot} as a DataFrame, or put the names in {uns}"
+            fix = (f"Pass {names_arg}=, {store}." if names_arg and not config._CLI
+                   else f"{store[:1].upper()}{store[1:]}.")
+            warnings.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
+                          UserWarning, stacklevel=3)
         return X, names
     if layer is not None:
         if layer not in adata.layers:
@@ -690,7 +699,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
             "adata.X (usually the RNA) would be written as adt.h5")
 
     X, feats = _pick_matrix(adata, layer=layer, obsm=obsm,
-                            feature_names=feature_names, what=modality)
+                            feature_names=feature_names, what=modality,
+                            names_arg="feature_names")
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
@@ -803,7 +813,7 @@ def normalize_peak_names(src, dst):
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.io.normalize_peak_names("data/MYMULTI/atac_peak.h5", "tmp/atac_peak.h5")
+    >>> mtb.io.normalize_peak_names("data/MYMULTI/atac.h5", "tmp/atac.h5")
 
     Notes
     -----
@@ -1043,11 +1053,11 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
         a.obs_names = list(master)
         if feature_names is None:
             n_feat = spec.shape[1]
-            warnings.warn(
-                f"{what}: no feature names found (bare array); writing "
-                f"feature_0..feature_{n_feat - 1} - pass {'adt_names' if what == 'adt' else 'a DataFrame'}"
-                f"=[...] or a DataFrame / AnnData with named features",
-                UserWarning, stacklevel=3)
+            named = f"give {what}= as a DataFrame or AnnData with named features"
+            fix = (f"Pass adt_names=, or {named}." if what == "adt"
+                   else f"{named[:1].upper()}{named[1:]}.")
+            warnings.warn(_no_names_message(what, "array", n_feat, fix),
+                          UserWarning, stacklevel=3)
             feature_names = [f"feature_{i}" for i in range(n_feat)]
         a.var_names = [str(x) for x in feature_names]
         return a, {}
@@ -1522,7 +1532,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     "adata.X (usually the RNA) would be written as adt.h5")
             X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"),
                                     feature_names=adt_names if role == "adt" else None,
-                                    what=role)
+                                    what=role,
+                                    names_arg="adt_names" if role == "adt" else None)
             if role in ("atac_peak", "atac_gas"):
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)

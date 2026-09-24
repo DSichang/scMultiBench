@@ -371,7 +371,7 @@ def test_docstrings_quote_the_current_texts():
     assert "**Label order.** With ``labels=None``" in flat["rescore"]
     assert "see its Notes" not in flat["rescore"]
     # R7-12 (c)
-    assert ("When the data folder has moved, give its new location to "
+    assert ("When the dataset folder has moved, pass the folder that now holds it as "
             "``mtb.load_batch(data_path=)``.") in flat["rescore"]
     assert "the one found is recorded as an absolute path" in flat["load_batch"]
 

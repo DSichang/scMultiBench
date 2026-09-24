@@ -118,10 +118,14 @@ def test_shuffled_gene_activity_fails_the_file_check(tmp_path, envs_installed):
     _diagonal(tmp_path, "SHUF", [f"c{i}" for i in range(50)], atac, shuffled)
     order = ("reads atac_gas.h5 of SHUF, which lists the ATAC cells in another order than "
              "atac_peak.h5. atac_cty.csv follows atac_peak.h5. Write atac_gas.h5 again with")
+    short = ("atac_gas.h5 lists the ATAC cells in another order than atac_peak.h5. "
+             "atac_cty.csv follows atac_peak.h5. Write atac_gas.h5 again with")
     for m in ("SCALEX", "MultiMAP", "Seurat_v3"):
         row = _row("SHUF", "diagonal", m, tmp_path)
         assert not row["files_ok"], m
-        assert f"{m} {order}" in row["reason"], (m, row["reason"])
+        # files_reason keeps the whole text; reason drops what every row repeats
+        assert f"{m} {order}" in row["files_reason"], (m, row["files_reason"])
+        assert row["reason"].startswith(short), (m, row["reason"])
     with pytest.raises(ValueError, match="another order than atac_peak.h5"):
         mtb.inputs_for("SHUF", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     # a method that reads only the peaks is not affected by atac_gas.h5
@@ -139,7 +143,9 @@ def test_gene_activity_of_other_cells_fails_the_file_check(tmp_path):
         mtb.inputs_for("OTHER", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     assert str(e.value) == other
     row = _row("OTHER", "diagonal", "SCALEX", tmp_path)
-    assert other in row["reason"]
+    assert other in row["files_reason"]
+    assert row["reason"].startswith(other.replace("SCALEX reads atac_gas.h5 of OTHER, which ",
+                                                  "atac_gas.h5 "))
 
 
 def test_a_gem_well_suffix_alone_is_the_same_cells(tmp_path):

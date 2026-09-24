@@ -72,12 +72,18 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
         mtb.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path)
     msg = str(e.value)
     assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
-    assert "multiple variants" in msg and "pass modalities= to disambiguate" in msg
-    assert "2 of them have every input file" in msg and "adt.h5" in msg
-    assert "e.g. modalities=" in msg
+    assert msg.startswith("Matilda has 2 vertical variants, rna+adt and rna+atac.")
+    assert f"The folder {tmp_path / 'D11'} has every input file of both." in msg
+    assert msg.endswith("Pass modalities=['rna', 'adt'] or modalities=['rna', 'atac'].")
     assert not msg.startswith('"')          # plain message, no KeyError quoting
+    # a folder with the files of neither: what it holds
+    _touch(tmp_path / "D12", ["rna.h5", "cty.csv"])
+    with pytest.raises(ValueError) as e:
+        mtb.inputs_for("D12", "vertical", "Matilda", data_path=tmp_path)
+    assert (f"None of them has every input file in {tmp_path / 'D12'}. It holds cty.csv "
+            f"and rna.h5.") in str(e.value)
     # nothing on disk -> same error, no folder note
-    with pytest.raises(ValueError, match="pass modalities= to disambiguate"):
+    with pytest.raises(ValueError, match=r"variants, rna\+adt and rna\+atac\. Pass modalities="):
         mtb.inputs_for("D99", "vertical", "Matilda", data_path=tmp_path)
 
 

@@ -389,12 +389,15 @@ def _atac_lines(category: str) -> list[str]:
             out.append(f"  need gene activity:    {', '.join(gas)}")
     out += ["A method whose ATAC file holds the other representation gives a wrong "
             "embedding."]
+    # method_info(m)['atac'] names one representation, so it cannot tell a
+    # method that reads both files: point to the list printed above instead
+    check = ("the list above" if category == "diagonal" else _check_atac_call())
     out += config.hint(
         ["mtb.scan and mtb.run_all skip such a method unless allow_atac_mismatch=True.",
-         f"mtb.run only warns, so check {_check_atac_call()} first."],
+         f"mtb.run only warns, so check {check} first."],
         ["multibench scan and run-all skip such a method unless --allow-atac-mismatch "
          "is given.",
-         f"multibench run only warns, so check {_check_atac_call()} first."])
+         f"multibench run only warns, so check {check} first."])
     if category == "diagonal":
         out.append(OLDER_NAMES)
     return out
@@ -637,8 +640,8 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
     """
     if _runner.linux_only_sentence():
         return f"Environment {env} runs only on Linux, not on this computer."
-    alt = (f" --category {category} installs the environments of every {category} "
-           f"method." if category else "")
+    alt = (f" Use --category {category} to install the environments of every "
+           f"{category} method." if category else "")
     return (f"Environment {env} is not installed. Run "
             f"multibench env install --methods {method} --packed --run.{alt}")
 
@@ -744,6 +747,20 @@ _ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}
 _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
 
 
+def _dropped_dirs_message(modalities, dropped: list) -> str:
+    """The warning of ``scan(modalities=...)`` for the methods that read a
+    folder (scBridge): no modality token selects them."""
+    one = len(dropped) == 1
+    mods = _resolve._and_list([str(m) for m in modalities])
+    fix = config.hint(
+        f"Pass modalities=[] to select {'it' if one else 'them'}, or leave out "
+        f"modalities= to see every variant.",
+        f'Pass --modalities "" to select {"it" if one else "them"}, or leave out '
+        f"--modalities to see every variant.")
+    return (f"The modalities {mods} leave out {_resolve._and_list(dropped)}, which "
+            f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
+
+
 def _short_reason(text: str, method: str, dataset: str, category: str | None) -> str:
     """The ``reason`` column form of a ``files_reason``: what is missing, no noise.
 
@@ -752,17 +769,19 @@ def _short_reason(text: str, method: str, dataset: str, category: str | None) ->
     needs atac_gas.h5 in /path/to/data/LUNG. ...``), which keeps the full
     path because that is what a user greps for. ``reason`` is what the scan
     frame, the CLI table and the "No method can run" error show, so it drops
-    what every row repeats: the exception class, a ``method/dataset/category:``
-    prefix and the absolute directory (each path becomes its basename). The
-    env half of ``reason`` is untouched - it carries the copy-pasteable
-    install command.
+    what every row repeats: the exception class, the absolute directory
+    (each path becomes its basename) and the ``<method> reads <file> of
+    <dataset>, which`` opening of a cell check, which leaves the file as the
+    subject (``atac_gas.h5 lists the ATAC cells in another order than
+    atac_peak.h5. ...``). The 80-character column then keeps the fact that
+    differs. The env half of ``reason`` is untouched - it carries the
+    copy-pasteable install command.
     """
     if not text:
         return text
     part = _EXC_PREFIX_RE.sub("", text)
-    prefix = f"{method}/{dataset}/{category}: "
-    if part.startswith(prefix):
-        part = part[len(prefix):]
+    part = re.sub(rf"^{re.escape(method)} reads (\S+) of {re.escape(str(dataset))}, which ",
+                  r"\1 ", part)
     return _ABS_PATH_RE.sub(lambda m: m.group(0).rstrip("/").rsplit("/", 1)[-1], part)
 
 
@@ -1460,12 +1479,8 @@ def scan(dataset: str, category: str | None = None, *,
     if dropped_dirs and modalities:
         # a variant fed a folder names no modality roles, so no token can
         # select it; say what was left out rather than dropping it unnoticed
-        warnings.warn(
-            f"scan: modalities={list(modalities)} excludes {len(dropped_dirs)} "
-            f"directory-input method(s) ({', '.join(dropped_dirs)}: they take a "
-            f"data_dir, shown as '(data_dir)', not modality files); pass "
-            f"modalities=[] to select them, or no modalities for every variant",
-            UserWarning, stacklevel=2)
+        warnings.warn(_dropped_dirs_message(modalities, dropped_dirs),
+                      UserWarning, stacklevel=2)
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
         rows = _rows_word(df, n)
@@ -1473,6 +1488,11 @@ def scan(dataset: str, category: str | None = None, *,
                 f"{k_env} of {n} {_have_their(k_env, n)} environment installed.")
         if _runner.linux_only_sentence():
             line += f" {LINUX_ONLY_SUMMARY}"
+        elif any(e and e not in installed for e in df["env"]):
+            # the env reasons lead with the install command; doctor is named
+            # once here (a row blocked only by the GPU test needs no doctor)
+            doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
+            line += f" {doctor} checks the environments."
         print(line, flush=True)
     return df
 
@@ -2044,9 +2064,9 @@ class BatchResult:
         -------
         pandas.DataFrame
             Columns ``metric``, ``value``, ``method``, ``dataset``,
-            ``category``, ``clustering``, ``source``, and ``scored_with`` for
-            rows ``run_all`` scored, as ``mtb.to_long`` writes them. Empty,
-            with the first seven columns, when no method produced metrics.
+            ``category``, ``clustering`` and ``source``. When the scores carry
+            ``scored_with``, so does the table. Empty, with the first seven
+            columns, when no method produced metrics.
 
         Examples
         --------
@@ -2059,6 +2079,8 @@ class BatchResult:
         **Source of the rows.** Each record contributes the unrounded frame
         ``run_all`` attached (or ``long.csv`` via ``mtb.load_batch``) when
         present. Otherwise the record contributes its ``metrics`` dict.
+        Neither that dict nor the folders that ``mtb.data.fetch_outputs``
+        downloads carry ``scored_with``.
 
         See Also
         --------
@@ -2339,10 +2361,10 @@ class BatchResult:
         ``batch`` of the wrong length (``batch has N entries, embedding has M
         cells``).
 
-        **Other hosts.** When the data folder has moved, give its new location
-        to ``mtb.load_batch(data_path=)``. When the dataset folder is not
-        found, ``labels=None`` gives ``RUN_OK_NO_LABEL_MATCH`` with a
-        ``note``. A Series or CSV is then matched by position, with a warning,
+        **Other hosts.** When the dataset folder has moved, pass the folder
+        that now holds it as ``mtb.load_batch(data_path=)``. When the dataset
+        folder is not found, ``labels=None`` gives ``RUN_OK_NO_LABEL_MATCH``
+        with a ``note``. A Series or CSV is then matched by position, with a warning,
         and the saved batch is not used.
 
         **Persisting.** ``mtb.load_batch`` keeps returning the original result

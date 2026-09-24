@@ -303,8 +303,8 @@ def test_scan_env_reason_on_linux_names_the_command_without_backticks(monkeypatc
     assert rc == 0
     assert row["reason"] == (
         "Environment matilda is not installed. Run multibench env install --methods "
-        "Matilda --packed --run. --category vertical installs the environments of every "
-        "vertical method.")
+        "Matilda --packed --run. Use --category vertical to install the environments of "
+        "every vertical method.")
 
 
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
@@ -314,7 +314,7 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
     out = capsys.readouterr().out
     n, k = len(df), int(df["files_ok"].sum())
     assert out == (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
-                   f"environment installed.\n")
+                   f"environment installed. mtb.env.doctor() checks the environments.\n")
     mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True)
     line = next(l for l in capsys.readouterr().out.splitlines() if "Dry run" in l)
     assert line.startswith(f"[run_all] Dry run: 0 of {n} requested rows can run on D11 "

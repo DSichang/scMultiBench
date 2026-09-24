@@ -121,7 +121,7 @@ def test_several_datasets_warning_is_plain():
                     _stored("D11s", "rerun", "vertical")], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets (D11, D11s), so its rows "
+        "This figure averages each method over 2 datasets, D11 and D11s. Its rows "
         "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
         "or filter to one dataset."]
 
@@ -132,8 +132,8 @@ def test_several_datasets_warning_with_a_lone_dataset():
                          "dataset": "LUNG", "category": "diagonal", "source": "user"}
                         for m, v in (("ARI", 0.3), ("NMI", 0.4), ("cLISI", 0.9))])
     _, msgs = _messages(mtb.plot.build_table, pd.concat([diag, own], ignore_index=True))
-    assert ("This figure averages each method over 4 datasets (D24, D25, D28, LUNG), "
-            "so its rows mix datasets. Plot each dataset on its own.") in msgs
+    assert ("This figure averages each method over 4 datasets, D24, D25, D28 and LUNG. "
+            "Its rows mix datasets. Plot each dataset on its own.") in msgs
     assert not any("paper's" in m for m in msgs), msgs
 
 
@@ -143,7 +143,7 @@ def test_several_datasets_warning_cli_spelling(monkeypatch):
                     _stored("D11s", "rerun", "vertical")], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets (D11, D11s), so its rows "
+        "This figure averages each method over 2 datasets, D11 and D11s. Its rows "
         "mix datasets. Pass --aggregate summary for the rank-averaged summary panel, "
         "or filter with --dataset."]
 

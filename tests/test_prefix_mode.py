@@ -425,8 +425,9 @@ def test_install_no_conda_lockfile_build_refused_with_archive(linux_no_conda):
     # SCALEX -> scmb_torch: archive published, but packed=False asked for a build
     with pytest.raises(RuntimeError) as e:
         mtb.env.install(["SCALEX"], packed=False, dry_run=False)
-    assert str(e.value) == ("no conda/mamba on this host; scmb_torch has a packed "
-                            "archive - pass packed=True")
+    assert str(e.value) == ("Conda is not installed on this computer. Environment "
+                            "scmb_torch has a packed archive. Pass packed=True to "
+                            "install it.")
 
 
 def test_install_no_conda_refused_without_archive(linux_no_conda):
@@ -436,9 +437,9 @@ def test_install_no_conda_refused_without_archive(linux_no_conda):
     assert env not in envs.packed_manifest()
     with pytest.raises(RuntimeError) as e:
         mtb.env.install(["Matilda", "SCALEX"], packed=True, dry_run=False)
-    assert str(e.value) == (f"no conda/mamba on this host; {env} has no packed "
-                            f"archive - install conda first")
-    with pytest.raises(RuntimeError, match="has no packed archive - install conda first"):
+    assert str(e.value) == (f"Conda is not installed on this computer. Environment "
+                            f"{env} has no packed archive. Install conda first.")
+    with pytest.raises(RuntimeError, match=r"has no packed archive\. Install conda first\."):
         mtb.env.install(["Matilda"], packed=False, dry_run=False)
 
 

@@ -203,8 +203,8 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         No variant for ``category`` (or for the given modalities).
     AmbiguousVariantError
         Several variants remain (a ``ValueError``): the message lists the
-        modality-sets, the folder contents when a folder was consulted, and
-        says to pass ``modalities=``.
+        variants, says which of them the folder has every file of (or what it
+        holds when it has none), and says to pass ``modalities=``.
     """
     if modalities is not None:
         v = spec.select(category, set(modalities), loose=True)
@@ -217,20 +217,33 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         raise KeyError(no_category_message(spec.id, spec.wired_categories, category))
     if len(candidates) == 1:
         return candidates[0]
-    available = [v.when.get("modalities", []) for v in candidates]
     folder_note = ""
     if ds_dir is not None and Path(ds_dir).is_dir():
         ok = [v for v in candidates if _variant_satisfiable(v, Path(ds_dir), spec.id)]
         if len(ok) == 1:
             return ok[0]
-        names = sorted(q.name for q in Path(ds_dir).glob("*"))
-        folder_note = (f" - {len(ok)} of them have every input file in {ds_dir} "
-                       f"(files: {names})")
-    raise AmbiguousVariantError(
-        f"{spec.id} has multiple variants for category={category!r}: "
-        f"modality-sets {available}{folder_note}; pass modalities= to disambiguate, "
-        f"e.g. modalities={available[0]}"
-    )
+        if ok:
+            which = ("both" if len(ok) == len(candidates) == 2 else
+                     _and_list("+".join(v.when.get("modalities", [])) for v in ok))
+            folder_note = f" The folder {ds_dir} has every input file of {which}."
+        else:
+            names = sorted(q.name for q in Path(ds_dir).glob("*"))
+            holds = f"It holds {_and_list(names)}." if names else "It is empty."
+            folder_note = (f" None of them has every input file in {ds_dir}. {holds}")
+    raise AmbiguousVariantError(_ambiguous_message(spec.id, category, candidates,
+                                                   folder_note))
+
+
+def _ambiguous_message(method: str, category: str, candidates, folder_note="") -> str:
+    """The error for a method with several ``category`` variants and no
+    ``modalities=``: the variants, what the folder says (``folder_note``,
+    one or two sentences with a leading space) and how to pick one."""
+    mods = [list(v.when.get("modalities", [])) for v in candidates]
+    names = _and_list("+".join(m) for m in mods)
+    spell = [config.hint(f"modalities={m}", f"--modalities {','.join(m)}") for m in mods]
+    pick = (f"Pass {spell[0]} or {spell[1]}." if len(spell) == 2 else
+            f"Pass the modalities of one, for example {spell[0]}.")
+    return f"{method} has {len(mods)} {category} variants, {names}.{folder_note} {pick}"
 
 
 _READS = {"peak": "peaks", "gene_activity": "gene activity"}

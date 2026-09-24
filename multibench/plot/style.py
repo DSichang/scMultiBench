@@ -253,9 +253,8 @@ def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
     none_shared = _no_overlap_message(parts, stored)
     if none_shared:
         return [none_shared] + lone
-    names = ", ".join(map(str, parts))
-    msg = (f"This figure averages each method over {n} datasets ({names}), so "
-           "its rows mix datasets. ")
+    msg = (f"This figure averages each method over {n} datasets, {_and(parts)}. "
+           "Its rows mix datasets. ")
     if (coverage(parts) >= 2).all() and not lone:
         msg += config.hint(
             "Pass aggregate='summary' for the rank-averaged summary panel, or "

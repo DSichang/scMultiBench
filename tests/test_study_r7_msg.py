@@ -365,8 +365,8 @@ def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("scmb_r", "StabMap", "mosaic")
     assert text == ("Environment scmb_r is not installed. Run multibench env install "
-                    "--methods StabMap --packed --run. --category mosaic installs the "
-                    "environments of every mosaic method.")
+                    "--methods StabMap --packed --run. Use --category mosaic to install "
+                    "the environments of every mosaic method.")
     assert "multibench env install --methods StabMap --packed --run." in text[:120]
     assert W._env_hint("scmb_r", "StabMap", None) == (
         "Environment scmb_r is not installed. Run multibench env install --methods "

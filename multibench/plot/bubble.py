@@ -1406,10 +1406,11 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     - Chip: ``Py`` / ``R`` = language; ``?`` = a name the package does not
       know, such as your own or a renamed re-run.
-    - ``L`` badge: the method uses cell-type labels (supervised), so its
-      clustering scores are not comparable with unsupervised rows. It
-      follows the frame's single ``category`` (scMoMaT is supervised in
-      mosaic only); without one, the method-level flag.
+    - ``L`` badge: the method uses cell-type labels, and its clustering
+      scores are not comparable with unsupervised rows. A ``needs_labels``
+      column decides first. Otherwise the badge follows the frame's
+      ``category``: scMoMaT has it in mosaic only. With several categories,
+      it shows when the method uses labels in any of them.
 
     See Also
     --------

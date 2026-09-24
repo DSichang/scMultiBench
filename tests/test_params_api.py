@@ -93,8 +93,8 @@ def test_params_for_modalities_only():
 def test_params_for_ambiguous_category_lists_the_options():
     with pytest.raises(KeyError) as e:
         mtb.params_for("Matilda", "vertical")      # 2 vertical variants
-    assert "also pass modalities" in str(e.value)
-    assert "vertical:rna+adt" in str(e.value)
+    assert "Pass the modalities too" in str(e.value)
+    assert "Matilda has 2 vertical variants, rna+adt and rna+atac." in str(e.value)
 
 
 def test_params_for_unknown_category_is_explicit():

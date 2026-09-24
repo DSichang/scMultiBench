@@ -175,7 +175,7 @@ def test_run_all_batch_missing_file_exits_1_before_any_method(standin, tmp_path,
         rc = _run_all(standin, tmp_path / "out", "--batch", str(missing), *extra)
         err = capsys.readouterr().err
         assert rc == 1, extra
-        assert f"error: --batch file {missing} does not exist" in err
+        assert f"error: The --batch file {missing} does not exist." in err
         assert "Traceback" not in err
     assert not (tmp_path / "out").exists()
 

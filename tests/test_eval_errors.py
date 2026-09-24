@@ -53,12 +53,14 @@ def test_metrics_folds_case_like_the_other_metric_arguments():
 
 
 def test_missing_output_file_names_path_and_cwd(tmp_path):
-    with pytest.raises(FileNotFoundError, match=r"output nothere\.h5 does not exist \(cwd ") as e:
+    with pytest.raises(FileNotFoundError, match=r"^The output nothere\.h5 does not exist\. "
+                       r"From the working directory ") as e:
         evaluate("nothere.h5", labels=["a", "b"])
-    assert "resolved" in str(e.value)
-    with pytest.raises(FileNotFoundError, match="is a directory, not a file"):
+    assert "the path resolves to " in str(e.value)
+    with pytest.raises(FileNotFoundError, match="is a folder, not a file"):
         evaluate(str(tmp_path), labels=["a", "b"])
-    with pytest.raises(FileNotFoundError, match=r"labels file .*nothere\.csv does not exist \(cwd"):
+    # an absolute path needs no working directory
+    with pytest.raises(FileNotFoundError, match=r"^The labels file .*nothere\.csv does not exist\.$"):
         eio.read_labels(tmp_path / "nothere.csv")
     with pytest.raises(FileNotFoundError, match="clustering file .* does not exist"):
         eio.read_clustering(tmp_path / "nothere.h5")

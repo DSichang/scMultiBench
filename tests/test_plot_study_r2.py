@@ -84,7 +84,7 @@ def test_dataset_mode_rerun_pair_still_suggests_the_summary():
     df = pd.concat([_stored("D11"), _stored("D11s")], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets (D11, D11s), so its rows "
+        "This figure averages each method over 2 datasets, D11 and D11s. Its rows "
         "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
         "or filter to one dataset."]
 

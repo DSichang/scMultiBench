@@ -51,11 +51,14 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
         mtb.params_for("Matilda")
     assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
     msg = str(e.value)
-    assert "pass category and modalities, e.g. params_for('Matilda', 'vertical', ['rna', 'adt'])" in msg
+    assert ("Pass the category and modalities of one, for example "
+            "params_for('Matilda', 'vertical', ['rna', 'adt']).") in msg
+    assert "vertical:rna+adt and vertical:rna+atac" in msg
     with pytest.raises(ValueError) as e:
         mtb.params_for("Matilda", "vertical")
-    assert "also pass modalities, e.g. params_for('Matilda', 'vertical', ['rna', 'adt'])" in str(e.value)
-    assert "vertical:rna+adt" in str(e.value)
+    assert ("Pass the modalities too, for example "
+            "params_for('Matilda', 'vertical', ['rna', 'adt']).") in str(e.value)
+    assert "Matilda has 2 vertical variants, rna+adt and rna+atac." in str(e.value)
     # 'atac' selects the atac_gas variant; unknown category stays KeyError
     assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
     assert mtb.params_for("scMM", modalities=["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
@@ -72,7 +75,7 @@ def test_params_for_dataset_disambiguates_by_folder(tmp_path):
     assert mtb.params_for("Matilda", "vertical", dataset="D11", data_path=tmp_path)["variant"] == "vertical:rna+adt"
     # both variants satisfiable -> still ambiguous
     (d / "atac.h5").write_text("")
-    with pytest.raises(ValueError, match="pass category and modalities"):
+    with pytest.raises(ValueError, match="Pass the category and modalities of one"):
         mtb.params_for("Matilda", dataset="D11", data_path=tmp_path)
     # missing folder settles nothing
     with pytest.raises(ValueError):

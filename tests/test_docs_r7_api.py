@@ -18,21 +18,25 @@ from tests.test_f6_cli import _DATA, _lung
 def test_changes_page_lists_round_7_changes():
     text = _flat("changes.md")
     for phrase in (
-            # R7-07: the Python dry run prints the scripts-ref note only with verbose
-            "`run_all(dry_run=True)` prints the note only with `verbose=True`, after its "
-            "count line.",
-            # R7-06
-            "0.3.1 ranked the label orders again. `verbose=True` prints a line before each "
+            # R7-07: the Python dry run prints the scripts-ref note only with verbose,
+            # as a [run_all] line on stdout
+            "`run_all(dry_run=True)` prints the note only with `verbose=True`, as a "
+            "`[run_all]` line on stdout after its count line.",
+            # R7-06, in its own bullet: it holds only when rescore ranks
+            "- `BatchResult.rescore(verbose=True)` prints a line before each label-order "
             "ranking.",
             # R7-02
             "The last line of the `No method can run` error repeats the data path, "
             "modalities and other scan options of the call.",
             "So does the list header of the `run_all` error.",
-            # R7-08 to R7-11
-            "the barcode errors, full-folder error and raw-counts warning of "
-            "`export_dataset`, the missing-environment messages, the Seurat_v5, "
-            "gene-activity and orientation checks, the dataset-mixing warnings of "
-            "`bubble`, `build_table` and `bar`, and the no-record warning of `to_long`."):
+            # R7-08 to R7-11, one item each
+            "- Reworded: - the barcode errors, full-folder error and raw-counts warning of "
+            "`export_dataset` - ",
+            "- the Linux-only refusals of `mtb.run` and `mtb.env.install` - ",
+            "- the missing-environment messages - the Seurat_v5, gene-activity and "
+            "orientation checks - ",
+            "- the dataset-mixing warnings of `bubble`, `build_table` and `bar` - the "
+            "no-record warning of `to_long` "):
         assert phrase in text, phrase
 
 

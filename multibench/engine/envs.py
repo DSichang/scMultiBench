@@ -108,6 +108,11 @@ def _require_linux(force: bool) -> None:
             f"{config.hint('force=True', '--force')} tries anyway.")
 
 
+#: The first sentence of the install error on a host with neither conda nor
+#: mamba (docs/installation.md Troubleshooting quotes it).
+NO_CONDA = "Conda is not installed on this computer."
+
+
 #: What the ``difficulty`` tag of ``env_specs.yaml`` (shown by ``env status``
 #: and :func:`status`) means. The tag describes how hard the env is to build
 #: from its recipe, not how well the method works.
@@ -1570,10 +1575,10 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     - Archives and lockfiles are linux-64, so a non-Linux host raises
       ``RuntimeError`` before any download unless ``force=True``.
     - Without conda/mamba, a missing env that needs a lockfile build raises
-      ``RuntimeError`` before any download: ``"no conda/mamba on this host;
-      <env> has a packed archive - pass packed=True"`` when ``packed=False``
-      skipped a published archive, ``"... has no packed archive - install
-      conda first"`` otherwise.
+      ``RuntimeError`` before any download. It starts ``"Conda is not
+      installed on this computer. Environment <env> has a packed archive."``
+      when ``packed=False`` skipped a published archive, and says ``"... has
+      no packed archive. Install conda first."`` otherwise.
     - A failed build command raises ``RuntimeError`` with its stderr tail.
 
     **Command line.** ``multibench env install --methods X --packed --run``
@@ -1607,11 +1612,11 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     continue
                 if r["env"] in packed_manifest():
                     raise RuntimeError(
-                        f"no conda/mamba on this host; {r['env']} has a packed "
-                        f"archive - pass packed=True")
+                        f"{NO_CONDA} Environment {r['env']} has a packed archive. Pass "
+                        f"{config.hint('packed=True', '--packed')} to install it.")
                 raise RuntimeError(
-                    f"no conda/mamba on this host; {r['env']} has no packed "
-                    f"archive - install conda first")
+                    f"{NO_CONDA} Environment {r['env']} has no packed archive. Install "
+                    f"conda first.")
         if packed:
             # said only when a CPU build is taken; an env without one gets its
             # '<env>' archive whatever the flavour
