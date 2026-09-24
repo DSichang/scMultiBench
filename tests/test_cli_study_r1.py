@@ -576,14 +576,15 @@ def test_help_text_has_no_internal_names_or_capital_emphasis():
     internal = ("packed_sizes.json", "packed_urls.json", ".multibench_flavor", "engine/",
                 "methods.yaml", " gate", "stand-in")
     # acronyms, placeholder names, environment variable names (MULTIBENCH_*),
-    # the NO-LOCK state value and mtb.config.DEFAULT are not emphasis
+    # the NO-LOCK state value, the SKIPPED status of summary.csv and
+    # mtb.config.DEFAULT are not emphasis
     allowed = {"NVIDIA", "CUDA", "ATAC", "JSON", "PATH", "LOCK", "MYCITE", "UINMF", "MOFA",
                "MULTIBENCH", "DEBUG", "DATA", "REPO", "ENVS", "TEMPLATE", "DATASET",
                "METHOD", "VALUE", "ROLE", "NAME", "GROUP", "LONG", "KIND", "COLUMNS",
                "FORMAT", "TASK", "LABELS", "BATCH", "METRICS", "OUTPUT", "CATEGORY",
                "MODALITY", "LAYER", "OBSM", "DTYPE", "MODALITIES", "INPUT", "TITLE",
                "RUNNER", "SOURCE", "OVERALL", "AGGREGATE", "TIMEOUT", "PARAM", "METHODS",
-               "COMMAND", "DEFAULT", "CITE", "SCRIPTS"}
+               "COMMAND", "DEFAULT", "CITE", "SCRIPTS", "SKIPPED"}
     for parser in _all_parsers():
         text = parser.format_help()
         for word in internal:

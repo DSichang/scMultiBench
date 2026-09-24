@@ -697,8 +697,7 @@ def load_results(
     **Empty results.** A known method or metric with no rows gives an empty
     frame and a ``UserWarning``, not an error. Under ``source="published"``
     the warning also says whether the re-run sweeps hold that method
-    (``"rerun has 1 dataset(s) ... pass source='rerun'"``): a published
-    table need not score every method the package runs for its category.
+    (``"rerun has 1 dataset(s) ... pass source='rerun'"``).
 
     **Clustering variants.** A result directory named ``<method>_louvain`` /
     ``<method>_kmeans`` is that variant: it is reported under the method's
@@ -720,8 +719,8 @@ def load_results(
     ``rerun-<version>``; the ``source`` column reads plain ``"rerun"`` and
     ``attrs["rerun_version"]`` keeps the version (``"0.2.1"``; a sorted
     tuple when files from several versions were loaded; ``None`` when no
-    stamped row is present). ``pd.concat`` keeps ``attrs`` only when every
-    input carries the same ones - read it before concatenating.
+    stamped row is present). Read ``attrs["rerun_version"]`` before
+    ``pd.concat``, which drops ``attrs`` that differ.
 
     **Retired keywords.** ``method=``, ``metric=``, ``task=`` and
     ``family=`` still work, with a ``DeprecationWarning``; ``metric_set=``

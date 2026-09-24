@@ -395,8 +395,9 @@ def test_the_empty_summary_ends_like_a_full_one():
     empty = W.BatchResult([], "D11", "vertical").summary
     full = W.BatchResult([{"method": "Matilda", "status": "RUN_OK"}], "D11",
                          "vertical").summary
-    assert list(empty.columns)[-2:] == ["label_order_note", "caveat"]
-    assert list(full.columns)[-2:] == ["label_order_note", "caveat"]
+    # R5-03: reason is the last column
+    assert list(empty.columns)[-3:] == ["label_order_note", "caveat", "reason"]
+    assert list(full.columns)[-3:] == ["label_order_note", "caveat", "reason"]
 
 
 def test_evaluate_count_errors_name_where_the_labels_came_from(tmp_path, capsys):

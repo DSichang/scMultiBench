@@ -378,8 +378,9 @@ def test_without_usable_barcodes_the_series_is_positional_with_a_warning(cite, t
             del h["matrix/barcodes"]
             h["matrix/barcodes"] = np.array(["same"] * N, dtype="S8")
     series = pd.Series(batch, index=[f"c{i}" for i in range(N)])
-    with pytest.warns(UserWarning, match=r"batch Series has a non-default index, but the "
-                                         r"files of MYCITE have no usable cell ids"):
+    with pytest.warns(UserWarning, match=r"The batch Series is matched by position, "
+                                         r"because the files of MYCITE have no usable "
+                                         r"cell ids"):
         vec = W._batch_vector(series, "MYCITE", data)
     assert list(vec) == list(batch)
 

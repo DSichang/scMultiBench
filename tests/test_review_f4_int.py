@@ -273,7 +273,7 @@ def test_missing_and_foreign_ids_get_their_own_fix(mycite):
 def test_run_all_raises_names_the_batch_series_error():
     doc = inspect.getdoc(mtb.run_all)
     raises = doc.split("Raises\n------\n")[1].split("\n\n")[0]
-    assert "A ``batch`` Series holds ids that are not cells of the dataset." in raises
+    assert "A ``batch`` Series or CSV holds ids that are not cells of the dataset." in raises
 
 
 # ------------------------------------------- --strict reads the row on the disk
@@ -302,11 +302,12 @@ def test_failed_line_says_when_the_folder_kept_an_earlier_record(tmp_path):
                           "MYMULTIOME", "vertical")
     again.save(out)
     line = cli._failed_line(again, out / "failures.csv")
-    assert line == "# 1 of 1 method failed: StabMap (SKIPPED, earlier record kept)."
+    # R5-03: a skip is counted as skipped, not failed
+    assert line == "# 1 skipped (StabMap). The folder keeps the earlier record of StabMap."
     fail = W.BatchResult([_rec("Matilda", "FAIL", error="boom")], "MYMULTIOME", "vertical")
     fail.save(out)
     assert cli._failed_line(fail, out / "failures.csv") == (
-        f"# 1 of 1 method failed: Matilda (FAIL). See {out / 'failures.csv'}.")
+        f"# 1 failed (Matilda). See {out / 'failures.csv'}.")
 
 
 # -------------------------------------------------------------- single builds

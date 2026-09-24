@@ -113,7 +113,7 @@ def test_run_all_exits_3_when_a_method_fails_and_says_why(failing, tmp_path, cap
     line = _status_line(err)
     assert re.fullmatch(r"\[run_all\]   -> FAIL \([0-9.]+s\) ValueError: stand-in method "
                         r"failed on purpose", line), line
-    assert f"# 1 of 1 method failed: Matilda (FAIL). See {out / 'failures.csv'}." in err
+    assert f"# 1 failed (Matilda). See {out / 'failures.csv'}." in err
     assert err.rstrip().endswith("See " + str(out / "failures.csv") + ".")
 
 
@@ -133,7 +133,7 @@ def test_run_all_timeout_exits_3_and_the_line_names_the_limit(slow, tmp_path, ca
     assert rc == 3, err
     line = _status_line(err)
     assert line.startswith("[run_all]   -> TIMEOUT (") and "1" in line.split(")", 1)[1]
-    assert "# 1 of 1 method failed: Matilda (TIMEOUT)." in err
+    assert "# 1 timed out (Matilda)." in err
 
 
 def test_python_run_all_status_line_ends_with_the_error(failing, tmp_path, capsys):
@@ -161,9 +161,10 @@ def test_exit_code_3_is_documented_in_both_helps(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--help"])
     top = " ".join(capsys.readouterr().out.split())
-    # worded by this run: failures.csv holds the merged folder (review of wp/f4_int)
-    assert ("3 run-all finished but a method of this run failed or was skipped (a line "
-            "on stderr names it)") in top
+    # R5-03: only a skip of a method named in --methods sets exit 3
+    assert ("3 run-all finished, but a method failed, or a method named in --methods "
+            "was skipped. Without --methods, a skipped method is only logged and "
+            "marked SKIPPED in summary.csv.") in top
     assert "``3`` ``run-all``" in cli.__doc__
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])
