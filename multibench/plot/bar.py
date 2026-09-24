@@ -26,9 +26,6 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         overall: str = "mean_overall"):
     """Draw each method's overall score across datasets as a horizontal bar.
 
-    The benchmark's summary view: how each method does overall, where
-    ``mtb.plot.bubble`` shows each metric.
-
     Parameters
     ----------
     long_df : pandas.DataFrame

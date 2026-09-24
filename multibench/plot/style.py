@@ -150,7 +150,10 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
     """The message for datasets that share no method, else ``None``.
 
     With stored rows in some datasets and a user's rows in others, the
-    remedy names the stored dataset(s) to score the user's method on.
+    remedy names the stored dataset(s) to score the user's method on. With
+    no stored rows at all, the datasets may be two folders of the same cells
+    (a peak run and a gene-activity run), so one sentence says how to merge
+    them.
     """
     n = len(parts)
     cov = coverage(parts)
@@ -164,9 +167,18 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
                   f"that table")
     else:
         remedy = "score the same methods on every dataset"
+    same_cells = ("" if stored else
+                  " If these datasets hold the same cells, give their rows one "
+                  "dataset name first.")
     return (f"rows come from {n} datasets ({', '.join(names)}) that share no "
             f"method, so the figure ranks unrelated rows against each other. "
-            f"Plot each dataset on its own, or {remedy}.")
+            f"Plot each dataset on its own, or {remedy}.{same_cells}")
+
+
+def _and(names) -> str:
+    """``'A'``, ``'A and B'``, ``'A, B and C'``."""
+    names = [str(n) for n in names]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _lone_method_messages(parts: dict, consequence: str) -> list:
@@ -204,14 +216,18 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
         out.append(none_shared)
     elif n > 1 and (cov < n).any():
         part = cov[cov < n].sort_values()
+        by_count: dict = {}
+        for m, c in part.items():
+            by_count.setdefault(int(c), []).append(str(m))
+        seen = " ".join(
+            f"{_and(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
+            for c, ms in by_count.items())
         out.append(
-            f"summary ranks an incomplete method x dataset matrix ({n} "
-            f"datasets): " + ", ".join(f"{m} seen in {c}/{n}" for m, c in part.items())
-            + "; a method absent from a dataset scores rank 0 there under "
+            f"The summary ranks {n} datasets. {seen} With "
             + config.hint("overall='rank'", "--overall rank")
-            + " and is skipped under "
+            + ", a missing dataset counts as rank 0, the lowest. With "
             + config.hint("overall='mean_overall'", "--overall mean_overall")
-            + ". " + incomplete_fix)
+            + ", the missing dataset is left out. " + incomplete_fix)
     out += _lone_method_messages(
         parts, "its Overall there is always 1.0" if basis == "mean_overall"
         else "its rank there is always the lowest")

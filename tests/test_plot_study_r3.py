@@ -162,7 +162,10 @@ def test_na_warning_names_the_stored_row_in_short_sentences():
     assert " - the family Overall" not in msg and "LiNet" not in msg
     with pytest.raises(ValueError) as e:
         mtb.plot.build_table(_d28_with_mine(), na="raise")
-    assert str(e.value) == msg
+    # R4-12: the error names na='warn' instead of offering to hide itself
+    assert str(e.value) == (msg.replace("Pass na='skip' to hide this message.",
+                                        "Pass na='warn' to draw the figure with "
+                                        "these gaps."))
 
 
 def test_na_warning_names_your_row():

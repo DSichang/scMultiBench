@@ -240,7 +240,8 @@ def test_backend_warning_cli_spelling(monkeypatch):
 
 def test_footnote_and_chip_key_are_plain_sentences():
     assert B.CHIP_KEY == "Py / R = language · L = uses cell-type labels · " \
-                         "? = not a registry method"
+                         "? = not a package method, such as your own · " \
+                         "DR = dimension reduction"
     fig = B.render(B.build_table(_ilisi_tie()))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert ("Overall: each method's mean rank over the metrics, scaled 0-1. "

@@ -267,7 +267,7 @@ def test_multi_dataset_under_aggregate_dataset_warns():
 def test_summary_warns_on_incomplete_matrix():
     long = _three(datasets=("DS1", "DS2"))
     long = long[~((long.method == "C") & (long.dataset == "DS2"))]
-    with pytest.warns(UserWarning, match="C seen in 1/2"):
+    with pytest.warns(UserWarning, match="C has scores on 1 of them"):
         tbl = bubble.build_table(long, aggregate="summary")
     assert set(tbl.methods) == {"A", "B", "C"}
     assert tbl.coverage.to_dict() == {"A": 2, "B": 2, "C": 1}
@@ -419,7 +419,7 @@ def test_chip_key_drawn_with_language_chips():
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert B.CHIP_KEY in texts
     assert B.CHIP_KEY.startswith("Py / R = language") and "L = uses cell-type labels" in B.CHIP_KEY
-    assert "? = not a registry method" in B.CHIP_KEY
+    assert "? = not a package method, such as your own" in B.CHIP_KEY
     fig2 = bubble.render(bubble.build_table(_three()), show_language=False)
     assert B.CHIP_KEY not in [t.get_text() for t in fig2.axes[0].texts]
 

@@ -34,7 +34,8 @@ SCORE_SCALE_NOTE = "(scaled per column)"
 
 #: legend line explaining the chips left of each row (drawn when show_language)
 CHIP_KEY = ("Py / R = language \u00b7 L = uses cell-type labels "
-            "\u00b7 ? = not a registry method")
+            "\u00b7 ? = not a package method, such as your own "
+            "\u00b7 DR = dimension reduction")
 
 #: fill of a column whose rows all hold the same value (and of every marker in
 #: a one-method figure): the colour ramp would draw it at its "High" end
@@ -107,7 +108,7 @@ class BubbleTable:
         absent); drives the supervised ``L`` badge.
     needs_labels : dict or None
         ``{method: bool}`` from an optional ``needs_labels`` column, empty
-        without it; overrides the registry for the ``L`` badge.
+        without it; overrides the package's own flag for the ``L`` badge.
     na_cells : list of str or None
         The ``n/a`` cells: one line per family and method (per dataset and
         method under ``"summary"``).
@@ -255,8 +256,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                 overall: str = "rank", na: str = "warn") -> BubbleTable:
     """Compute the ranks, scores and row order behind a bubble figure.
 
-    The numeric half of ``mtb.plot.bubble``: audit the ranks and the row
-    order before (or instead of) drawing.
+    Returns the numbers ``mtb.plot.bubble`` draws, without drawing.
 
     Parameters
     ----------
@@ -415,8 +415,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
       each row label (``Name · D11`` or ``Name · 3 ds``).
     - ``category`` - a single value makes the ``L`` badge follow that
       category's variants.
-    - ``needs_labels`` (bool) - overrides the registry's ``L`` badge per
-      method; the only way to badge a method the registry does not know.
+    - ``needs_labels`` (bool) - overrides the ``L`` badge per method; the
+      only way to badge a method the package does not know.
       NaN = no override.
     - Rows whose ``metric`` is NaN are dropped.
 
@@ -535,8 +535,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         for msg in style.coverage_warnings(
                 parts, basis=overall,
                 incomplete_fix=_config.hint(
-                    "Pass require_complete=True to restrict to the complete "
-                    "intersection.",
+                    "Pass require_complete=True to keep only the methods scored "
+                    "on every dataset.",
                     "Pass --require-complete to keep only the methods scored on "
                     "every dataset."),
                 stored=stored):
@@ -613,7 +613,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     na_cells = _na_report(blocks, parts, aggregate)
     if na_cells and na != "skip":
-        msg = _na_message(_na_missing(blocks, parts, aggregate), df, aggregate)
+        msg = _na_message(_na_missing(blocks, parts, aggregate), df, aggregate, na)
         if na == "raise":
             raise ValueError(msg)
         warnings.warn(msg, UserWarning, stacklevel=2)
@@ -763,13 +763,16 @@ def _both(names) -> str:
 NA_ROWS_SHOWN = 3
 
 
-def _na_message(missing: list, df: pd.DataFrame, aggregate: str) -> str:
+def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
+                na: str = "warn") -> str:
     """The ``na="warn"`` / ``na="raise"`` text: one short sentence per row.
 
     A row is ``The stored row`` when all its rows come from a stored table,
     ``Your row`` when none do, else ``Row``; the dataset(s) and the stored
     source follow in parentheses. The rank rule is stated once in the
     Notes of ``build_table``; the message says only what the reader acts on.
+    The last sentence names the other policy: ``na="skip"`` under
+    ``"warn"``, ``na="warn"`` under ``"raise"`` (an error cannot be hidden).
     """
     stored_sources = set(style.STORED_SOURCES)
     has_ds = "dataset" in df.columns
@@ -809,8 +812,12 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str) -> str:
     else:
         sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
                          else "Each row's Overall uses the metrics it has.")
-    sentences.append(_config.hint("Pass na='skip' to hide this message.",
-                                  "Pass --na skip to hide this message."))
+    if na == "raise":
+        sentences.append(_config.hint("Pass na='warn' to draw the figure with these gaps.",
+                                      "Pass --na warn to draw the figure with these gaps."))
+    else:
+        sentences.append(_config.hint("Pass na='skip' to hide this message.",
+                                      "Pass --na skip to hide this message."))
     return " ".join(sentences)
 
 
@@ -896,7 +903,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         Draw the Py / R / ? chips and the ``L`` badge left of each row plus
         the one-line key (:data:`CHIP_KEY`) under the legends; the badge
         honours ``tbl.needs_labels`` (an explicit override) before the
-        registry lookup for ``tbl.category``.
+        package's own flag for ``tbl.category``.
 
     Returns
     -------
@@ -1291,13 +1298,12 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     **Chips and badge** (``show_language``).
 
-    - Chip: ``Py`` / ``R`` = the registry method's language; ``?`` = not a
-      registry method (your own, a sweep variant).
+    - Chip: ``Py`` / ``R`` = the method's language; ``?`` = not a package
+      method, such as your own or a sweep variant.
     - ``L`` badge: the method uses cell-type labels (supervised), so its
       clustering scores are not comparable with unsupervised rows. It
       follows the variants of the frame's single ``category`` (scMoMaT is
-      supervised in mosaic only); without one, the registry's method-level
-      flag.
+      supervised in mosaic only); without one, the method-level flag.
 
     See Also
     --------
