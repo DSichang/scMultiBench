@@ -449,8 +449,23 @@ _ALLOWED_CAPS = {"RNA", "ADT", "ATAC", "CSV", "TSV", "JSON", "GPU", "CPU", "CUDA
                  "URL"}
 
 
+def _strip_code_and_quotes(text):
+    """``text`` without code spans and quoted names, stripped one kind at a time:
+    an apostrophe inside a word (``method's``) does not open a quote."""
+    text = re.sub(r"``.*?``", "", text, flags=re.S)
+    text = re.sub(r"`[^`]*`", "", text)
+    text = re.sub(r"\"[^\"]*\"", "", text)
+    return re.sub(r"(?<!\w)'[^']*'(?!\w)", "", text)
+
+
+def test_caps_check_reads_past_an_apostrophe():
+    """The old one-pass strip took ``'s LOUD word '`` for a quoted name."""
+    assert _caps("Seurat's LOUD word 'x'") == ["LOUD"]
+    assert _caps("the method's ``it's`` and ``ABCD``, a 'QUOTED' name") == []
+
+
 def _caps(text):
-    text = re.sub(r"``[^`]*``|`[^`]*`|'[^']*'|\"[^\"]*\"", "", text)   # code and quoted names
+    text = _strip_code_and_quotes(text)
     words = re.findall(r"\b[A-Z][A-Z_]{2,}\b", text)
     ids = set(registry.list_methods())                      # GLUE, MIRA ... are names
     return sorted({w for w in words if w not in _ALLOWED_CAPS and w not in ids
