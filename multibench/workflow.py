@@ -726,6 +726,47 @@ def _short_reason(text: str, method: str, dataset: str, category: str | None) ->
 _list_of_ids = registry.check_id_list
 
 
+#: The three representation-mismatch caveats of ``_resolve._preflight_caveats``
+#: (PEAK_IN_GAS / PEAK_FED_TO_GAS / GAS_FED_TO_PEAK): wanted, file, held.
+_WRONG_ATAC_RE = re.compile(r"^expects (gene activity|peaks); (\S+) holds (peaks|gene activity) ")
+
+
+def _wrong_atac_reason(method: str, caveats) -> str:
+    """The ``reason`` of a row whose ATAC file holds the other representation, or "".
+
+    ``scan`` marks such a row not runnable unless ``methods=`` names the
+    method, so ``run_all`` skips it by default (the one rule of both).
+    """
+    for text in caveats:
+        m = _WRONG_ATAC_RE.match(text)
+        if m:
+            want = "gene-activity" if m.group(1) == "gene activity" else "peak"
+            return (f"needs {want} ATAC; {m.group(2)} holds {m.group(3)}. To run "
+                    f"{method} anyway, name it in "
+                    + config.hint("methods=", "--methods"))
+    return ""
+
+
+def _is_wrong_atac(reason) -> "pd.Series | bool":
+    """Whether a scan ``reason`` (or a Series of them) carries :func:`_wrong_atac_reason`."""
+    if isinstance(reason, pd.Series):
+        return reason.astype(str).str.contains(" anyway, name it in ", regex=False)
+    return " anyway, name it in " in str(reason or "")
+
+
+#: How the two notes on starting a method begin (``runner.script_notes`` and
+#: ``runner._prepared_note``); scan appends them after every other clause.
+_START_NOTES = ("method scripts not found under ", _runner._PREPARED_PREFIX)
+
+
+def _run_caveat(caveat) -> str:
+    """A scan ``caveat`` without the notes on starting the method, which
+    ``run_all`` does itself: what its log and records keep of the caveat."""
+    text = str(caveat or "")
+    cuts = [i for i in (text.find(p) for p in _START_NOTES) if i >= 0]
+    return text[:min(cuts)].rstrip("; ") if cuts else text
+
+
 def _variant_consumes_atac(variant) -> bool:
     """Whether this variant takes an ATAC input.
 
@@ -743,8 +784,13 @@ def _variant_consumes_atac(variant) -> bool:
 def _modality_matcher(modalities):
     """A test ``(spec, variant_modalities) -> bool`` for ``scan(modalities=)``.
 
-    A list that names a variant's roles exactly (a scan row's ``modalities``
-    split on ``+``) keeps that variant. Otherwise the tokens name one
+    One representation token (``atac_peak`` / ``peak``, ``atac_gas`` /
+    ``gas`` / ``gene_activity``) first drops every variant whose
+    ``method_info(m)['atac']`` is the other representation, as
+    ``find_methods(atac=...)`` does: moETM, scMM and iPOLNG read peaks
+    through a role named ``atac_gas``. Then a list that names a variant's
+    roles exactly (a scan row's ``modalities`` split on ``+``) keeps that
+    variant. Otherwise the tokens name one
     combination: a base token (``rna``, ``adt`` / ``protein``, ``atac``)
     matches every role of that base (``atac`` matches ``atac``, ``atac_gas``,
     ``atac_peak`` and the numbered ``atac2``); a representation token
@@ -770,6 +816,7 @@ def _modality_matcher(modalities):
         rep = {"atac_peak": "peak", "atac_gas": "gene_activity"}.get(stem)
         fam = modality_family(t)
         toks.append((fam, rep, fam in ("rna", "adt", "atac")))
+    reps = {rep for _f, rep, _b in toks if rep}
 
     def covers(tok, role):
         fam, _rep, is_base = tok
@@ -778,6 +825,9 @@ def _modality_matcher(modalities):
     def match(spec, mods) -> bool:
         if not mods or not toks:
             return not mods and not toks
+        # the representation before the spelling: moETM's atac_gas role reads peaks
+        if len(reps) == 1 and spec.atac not in reps:
+            return False
         if exact == set(mods):
             return True
         if any(rep and spec.atac != rep for _f, rep, _b in toks):
@@ -900,7 +950,7 @@ def scan(dataset: str, category: str | None = None, *,
     runtime_tier        fast / medium / slow / very_slow / unknown
     observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
     caveat              what the run needs besides the files, or ""
-    runnable            files_ok & env_ok
+    runnable            both checks pass and the ATAC kind is right
     reason              short form of the non-empty reasons, "; "-joined
     files_ok            the inputs resolve, are oriented and labelled
     files_reason        full file-check text, full paths
@@ -914,7 +964,7 @@ def scan(dataset: str, category: str | None = None, *,
     ```
 
     **Two checks.** Every row carries two independent checks, each a flag
-    plus a reason, and ``runnable = files_ok & env_ok``:
+    plus a reason; ``runnable`` needs both:
 
     - ``files_ok`` / ``files_reason`` - the method's script is present, the
       input files resolve on disk and are oriented features x cells, every
@@ -967,6 +1017,9 @@ def scan(dataset: str, category: str | None = None, *,
     - a command that reads a file ``mtb.run`` writes first (see the command
       column below).
 
+    A row given the other ATAC representation is not runnable, and
+    ``run_all`` skips it. Name the method in ``methods=`` to run it anyway.
+
     **The command column.**
 
     - ``command`` is ``run(..., dry_run=True)``, ``shlex``-joined, writing
@@ -1013,9 +1066,9 @@ def scan(dataset: str, category: str | None = None, *,
     ``mtb.find_methods`` keeps every method that reads at least the named
     modalities, so the two can list different methods.
 
-    - a list that spells a row's modalities (the column split on ``"+"``)
-      keeps that row; the ``caveat`` column flags an ATAC file of the wrong
-      kind;
+    - a list that spells a row's modalities keeps that row, with one
+      exception: moETM, scMM and iPOLNG read peaks through a role named
+      ``atac_gas``, so ``atac_peak`` selects them and ``atac_gas`` does not;
     - a base token (``rna``, ``adt`` or its alias ``protein``, ``atac``)
       matches every role of that base: ``atac`` matches ``atac``,
       ``atac_gas``, ``atac_peak`` and numbered roles such as ``atac2``;
@@ -1106,7 +1159,7 @@ def scan(dataset: str, category: str | None = None, *,
         if why_script:
             file_problems.append(why_script)
             short_problems.append(_short_reason(why_script, spec.id, dataset, cat))
-        got = None
+        got, wrong_atac = None, ""
         try:
             got = _resolve.inputs_for(dataset, cat, spec.id, modalities=mods or None,
                                       data_path=data_path, check=True)
@@ -1114,6 +1167,8 @@ def scan(dataset: str, category: str | None = None, *,
                                                 method=spec.id)
             if extra:
                 rec["caveat"] = _join_clauses([rec["caveat"], *extra])
+            if methods is None:     # a method named in methods= runs anyway
+                wrong_atac = _wrong_atac_reason(spec.id, extra)
         except Exception as e:  # missing files / no variant / bad layout
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
@@ -1137,8 +1192,9 @@ def scan(dataset: str, category: str | None = None, *,
                 rec["env_ok"] = False
                 rec["env_reason"] = "; ".join(
                     r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
-        rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"])
-        rec["reason"] = "; ".join(r for r in (*short_problems, rec["env_reason"]) if r)
+        rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac)
+        rec["reason"] = "; ".join(r for r in (*short_problems, wrong_atac,
+                                              rec["env_reason"]) if r)
         # --- the command line: only when the files resolved (something to
         # hand the script); an env-blocked row still gets one. A setup step
         # the user must do first, and method scripts not yet on this machine,
@@ -1561,6 +1617,7 @@ class BatchResult:
         n_batches               distinct batch values used (1 = none)
         ARI, NMI, ASW, ...      one column per metric
         label_order_note        why label_order_confidence is blank
+        caveat                  scan's caveat for the method, or ""
         ```
 
         **Status values.**
@@ -1581,12 +1638,9 @@ class BatchResult:
         ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and
         ``RUN_OK_NO_LABEL_MATCH`` also appear in ``failures``.
 
-        **Graph methods.** Two methods can both be ``output_kind=graph`` and
-        still end differently: scMoMaT also writes a UMAP embedding among its
-        ``extra_outputs``, so it is scored through that
-        (``CHAIN_OK_GRAPH_METHOD``); Seurat_WNN writes only a neighbour graph,
-        so there is nothing to score (``RUN_OK_NO_EMBEDDING``) and its
-        ``emb_shape`` is ``None``.
+        **Graph methods.** scMoMaT also writes a UMAP, which is scored:
+        ``CHAIN_OK_GRAPH_METHOD``. Seurat_WNN writes only a neighbour graph:
+        ``RUN_OK_NO_EMBEDDING``, and its ``emb_shape`` is ``None``.
 
         **Batch columns.** ``batch_source`` / ``n_batches`` say which batch
         vector the batch metrics (ASW_batch, GC, iLISI ...) were computed
@@ -1605,12 +1659,9 @@ class BatchResult:
         two disjoint cell sets in a method-specific order.
 
         **Label-order confidence.** ``label_order_confidence`` is
-        ``(best - runner_up) / best`` over the candidate orderings' ARI, on a
-        0-1 scale. Near 1.0 - every alternative ordering scored near chance,
-        so the correspondence is unambiguous and the metrics can be read
-        normally. Below ~0.5 - two orderings explained the embedding
-        comparably well, which should not happen for a correct one; treat
-        that row with suspicion.
+        ``(best - runner_up) / best`` over the ARI of the candidate label
+        orders, from 0 to 1. Near 1, one order clearly fits. Below about 0.5,
+        two orders scored alike; check that row's label order.
 
         The score is a ratio to the best ARI, not a difference, because the
         runner-up sits near chance.
@@ -1645,14 +1696,17 @@ class BatchResult:
                            "label_order_confidence": _order_confidence(cands),
                            "batch_source": r.get("batch_source"),
                            "n_batches": r.get("n_batches")}
-                        | {m: v for m, v in (r.get("metrics") or {}).items()})
+                        | {m: v for m, v in (r.get("metrics") or {}).items()}
+                        | {"caveat": r.get("caveat")})
         if not rows:      # nothing ran (e.g. no method was runnable on this dataset)
             return pd.DataFrame(columns=["method", "status", "run_sec", "output_kind",
                                          "emb_shape", "n_tunable", "label_order",
                                          "label_order_confidence", "batch_source",
                                          "n_batches"])
-        return _with_label_order_note(
+        sm = _with_label_order_note(
             pd.DataFrame(rows).sort_values("method").reset_index(drop=True))
+        sm["caveat"] = sm.pop("caveat")          # new columns go last
+        return sm
 
     @property
     def long(self) -> pd.DataFrame:
@@ -1745,6 +1799,7 @@ class BatchResult:
         error, traceback, note      why a method failed or was not scored
         reused                      True when skip_existing reused the output
         env, output_kind, n_tunable the scan row the method ran from
+        caveat                      that row's caveat, or ""
         data_path, multibench_version, started_at   provenance of the run
         scripts_commit, env_flavor, hostname        the scripts, env build and computer
         _long                       internal; read BatchResult.long instead
@@ -1790,9 +1845,9 @@ class BatchResult:
 
         - ``FAIL`` and ``TIMEOUT``.
         - ``RUN_OK_EVAL_FAILED`` - the embedding exists, scoring it failed.
-        - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file matched the
-          output's cell count, so nothing could be scored; usually a
-          data-layout problem worth fixing.
+        - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file has as many
+          cells as the output, so nothing was scored. Check the folder with
+          ``mtb.inputs_for(check=True)`` and ``mtb.labels_for``.
 
         **Not listed.** ``RUN_OK_NO_EMBEDDING``: those methods ran correctly and
         emit a graph instead of an embedding, so there is nothing for
@@ -2398,15 +2453,18 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     says whether it must hold peaks or gene activity. Diagonal reads
     ``atac_peak.h5`` (peaks) and ``atac_gas.h5`` (gene activity). Mosaic
     reads ``atac<i>.h5`` (peaks). ``peak.h5``, and ``atac.h5`` for gene
-    activity, are accepted as older names. A method given the other
-    representation runs without an error and gives a wrong embedding;
-    ``mtb.scan`` shows it in ``caveat``.
+    activity, are accepted as older names.
+
+    ``run_all`` skips a method given the other representation unless
+    ``methods=`` names it; a named one runs without an error and gives a
+    wrong embedding.
 
     **Modality tokens.** ``modalities`` follows the rule of ``mtb.scan``: a
     row is kept when its modalities are exactly the named combination.
     ``atac`` matches every ATAC role, and ``atac_peak`` / ``atac_gas`` keep
-    the methods that need that representation. A scan row's ``modalities``
-    split on ``"+"`` selects that row.
+    the methods that need that representation. moETM, scMM and iPOLNG read
+    peaks through a role named ``atac_gas``, so ``atac_peak`` selects them
+    and ``atac_gas`` does not.
 
     **Errors raised.**
 
@@ -2417,7 +2475,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
       variant matches ..."); a dry run is never empty.
     - A dry run with a ``params`` key no planned variant of that method
       accepts - ``KeyError`` naming the accepted keys.
-    - Variants exist but not one passes both checks - the "nothing is
+    - Variants exist but not one is runnable - the "nothing is
       runnable ..." ``ValueError``. Its message lists the reason of every
       requested variant (or the first 3 of N when ``methods`` was not
       given), never the reasons of methods you did not ask for. On macOS or
@@ -2499,12 +2557,15 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                 msg += (f"; {n - k} blocked - see the reason column "
                         f"(files_ok / env_ok say which check; {doctor} for envs)")
             print(msg, flush=True)
-            for _, r in plan_df.iterrows():
-                note = _resolve.unused_batches_in(r["caveat"])
-                if note:
-                    print(f"[run_all] {r['method']} {note}", flush=True)
+            # every caveat of a row whose files resolve: the compact views clip it
+            for _, r in plan_df[plan_df["files_ok"]].iterrows():
+                if r["caveat"]:
+                    print(f"[run_all] {r['method']} {r['caveat']}", flush=True)
         return plan_df                     # = scan(): runnable rows first, blocked rows keep `reason`
     blocked = plan_df[~plan_df["runnable"]]
+    if verbose:
+        for _, r in blocked[_is_wrong_atac(blocked["reason"])].iterrows():
+            print(f"[run_all] skipping {r['method']}: {r['reason']}", flush=True)
     plan_df = plan_df[plan_df["runnable"]]
     if plan_df.empty:
         # A per-method failure is recorded, never raised - but "not one method
@@ -2530,6 +2591,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         rec = {"method": m, "category": category, "dataset": dataset,
                "modalities": mod_list, "output_kind": row["output_kind"],
                "env": row["env"], "n_tunable": row["n_tunable"], "status": "?", "_long": None,
+               "caveat": _run_caveat(row["caveat"]),
                # provenance: what ran, where, with what
                "params_used": dict(params.get(m) or {}),
                "out_dir": str(out_dir / f"{m}_{dataset}"),
@@ -2539,9 +2601,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         t0 = time.time()
         if verbose:
             print(f"[run_all] {m} ({category}/{dataset}) ...", flush=True)
-            note = _resolve.unused_batches_in(row["caveat"])
-            if note:
-                print(f"[run_all]   {m} {note}", flush=True)
+            if rec["caveat"]:
+                print(f"[run_all]   {m} {rec['caveat']}", flush=True)
         _deadline_prev = _NOT_ARMED
         try:
             _deadline_prev = _arm_deadline(timeout)

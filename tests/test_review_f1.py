@@ -1,7 +1,8 @@
 """Findings of the review of the round-1 integration (wp/f1_int).
 
 - A scan row's ``modalities`` split on ``+`` selects that row again, in
-  scan, run_all and the CLI; ``atac_peak`` with ``atac_gas`` means "reads both
+  scan, run_all and the CLI (since R3-01 a lone representation token must match
+  method_info(m)['atac']); ``atac_peak`` with ``atac_gas`` means "reads both
   files" (MultiMAP, Seurat_v3) instead of an error (L13 kept 0.3.1's calls).
 - inputs_for applies the representation rule of scan and find_methods when
   the tokens match a variant only loosely (L13).
@@ -36,7 +37,13 @@ def test_a_scan_rows_modalities_select_that_row_again(data, ds, cat):
         rows = sc[sc["modalities"] != "(data_dir)"]
         assert len(rows)
         for m, mods in zip(rows["method"], rows["modalities"]):
-            back = mtb.scan(ds, cat, methods=[m], modalities=mods.split("+"),
+            toks = mods.split("+")
+            # R3-01: moETM, scMM and iPOLNG read peaks through a role named
+            # atac_gas; the representation token selects them, not the role name
+            if mtb.method_info(m)["atac"] == "peak" and toks.count("atac_gas") == 1 \
+                    and "atac_peak" not in toks:
+                toks = ["atac_peak" if t == "atac_gas" else t for t in toks]
+            back = mtb.scan(ds, cat, methods=[m], modalities=toks,
                             data_path=data, verbose=False)
             assert ((back["method"] == m) & (back["modalities"] == mods)).any(), (m, mods)
 

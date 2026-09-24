@@ -131,7 +131,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         ``"atac_peak"`` / ``"atac_gas"`` also select by ATAC representation.
         ``None`` = no filter.
     runnable : bool | None
-        ``True`` = methods wired with at least one variant (not a check of
+        ``True`` = methods with a variant the package runs (not a check of
         your host: see ``mtb.scan``); ``False`` = declared stubs; ``None`` =
         both.
     tunable : bool | None
@@ -306,7 +306,7 @@ def list_methods(category: str | None = None) -> list[str]:
     Notes
     -----
     **Category membership.** A method is listed under a category when it has
-    a variant wired for that category - the same set ``scan``, ``run_all``
+    a variant for that category - the same set ``scan``, ``run_all``
     and ``find_methods(category=)`` dispatch.
 
     **Other keywords.** A ``find_methods`` filter such as ``task=`` or
@@ -443,10 +443,10 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     the per-variant answer read ``supports[i]['needs_labels']``;
     ``find_methods(needs_labels=...)`` filters per variant.
 
-    **Status.** ``status`` is the registry's wiring status. ``'verified'``
+    **Status.** ``status`` says how the method was checked. ``'verified'``
     means the command template was cross-checked against the upstream entrypoint
     and the method was executed end to end on a reference dataset;
-    ``'declared'`` = wired but not run.
+    ``'declared'`` = available but not run end to end.
 
     **GPU and CPU.** ``gpu``, ``cpu_params``, ``requires_gpu`` and
     ``gpu_evidence`` are the GPU/CPU contract of the upstream script, read
