@@ -70,3 +70,15 @@ def test_changes_page_run_dry_run_lines_follow_the_cli(tmp_path, monkeypatch, ca
     assert f"`{note}`" in text
     assert ("print `# Dry run. Nothing was executed.` first. `run --dry-run` then prints "
             "its notes, `# multibench run would execute:` and the command.") in text
+
+
+@needs_docs
+def test_changes_page_quotes_the_live_missing_batch_error():
+    import numpy as np
+    import pytest
+    from multibench.eval import pipeline
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError) as exc:
+        pipeline.evaluate(rng.normal(size=(40, 4)), labels=np.array(["A", "B"] * 20),
+                          metrics="all")
+    assert f"`{exc.value}`" in _flat("changes.md")
