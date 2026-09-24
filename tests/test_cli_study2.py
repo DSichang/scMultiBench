@@ -193,9 +193,9 @@ def test_cli_plot_input_with_category_concatenates_onto_stored(tmp_path, monkeyp
     cap = capsys.readouterr()
     assert rc == 0
     assert sorted(seen["df"]["method"].unique()) == ["A", "B", "Mine"]
-    assert "# overlay: 3 row(s) from --input (methods: Mine)" in cap.err
-    assert "stored vertical table (6 rows, source=rerun)" in cap.err
-    assert "overlay" not in cap.out
+    assert ("# Added your 3 rows (Mine) to the stored vertical table, which has "
+            "6 rows (source rerun).") in cap.err
+    assert "Added your" not in cap.out
 
 
 def test_cli_plot_input_is_repeatable_and_dataset_filters_inputs(tmp_path, monkeypatch, capsys):

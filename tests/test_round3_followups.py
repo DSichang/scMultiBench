@@ -47,5 +47,5 @@ def test_cli_plot_category_relies_on_api_warning(tmp_path):
     # one-method warning (grey fills); never the CLI's --input note
     assert r.stderr.count("The published table for cross/D52 has one method") == 1, r.stderr
     assert "Pass --source rerun." in r.stderr
-    assert r.stderr.count("only one method (scMoMaT) in this figure") == 1, r.stderr
+    assert r.stderr.count("Only one method, scMoMaT, is in this figure") == 1, r.stderr
     assert "this table has one method" not in r.stderr

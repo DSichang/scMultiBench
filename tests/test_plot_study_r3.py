@@ -163,9 +163,11 @@ def test_na_warning_names_the_stored_row_in_short_sentences():
     with pytest.raises(ValueError) as e:
         mtb.plot.build_table(_d28_with_mine(), na="raise")
     # R4-12: the error names na='warn' instead of offering to hide itself
+    # R5-11: and leaves out the Overall sentence, since no figure is drawn
     assert str(e.value) == (msg.replace("Pass na='skip' to hide this message.",
                                         "Pass na='warn' to draw the figure with "
-                                        "these gaps."))
+                                        "these gaps.")
+                            .replace(" Its Overall uses the metrics it has.", ""))
 
 
 def test_na_warning_names_your_row():

@@ -74,7 +74,7 @@ def test_dataset_mode_lone_dataset_next_to_shared_ones_gets_no_summary_advice():
     own = _mine(method="PCA_standin", dataset="LUNG", scored_with="leidenalg/sweep/0.3.1")
     _, msgs = _messages(mtb.plot.build_table, pd.concat([diag, own], ignore_index=True))
     assert not any("aggregate='summary'" in m for m in msgs), msgs
-    assert any(m.startswith("aggregate='dataset' but the frame holds 4 datasets")
+    assert any(m.startswith("This figure averages each method over 4 datasets")
                and m.endswith("Plot each dataset on its own.") for m in msgs), msgs
     assert any(m.startswith("dataset LUNG has only one method (PCA_standin)")
                for m in msgs), msgs
@@ -84,17 +84,16 @@ def test_dataset_mode_rerun_pair_still_suggests_the_summary():
     df = pd.concat([_stored("D11"), _stored("D11s")], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
     assert msgs == [
-        "aggregate='dataset' but the frame holds 2 datasets (D11, D11s): values are "
-        "averaged per method across them and rows mix datasets. Pass "
-        "aggregate='summary' for the paper's rank-averaged panel, or filter to one "
-        "dataset."]
+        "This figure averages each method over 2 datasets (D11, D11s), so its rows "
+        "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
+        "or filter to one dataset."]
 
 
 def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
     _, msgs = _messages(mtb.plot.build_table,
                         pd.concat([_stored("D11"), _stored("D11s")], ignore_index=True))
-    assert msgs[0].startswith("--aggregate dataset but the table holds 2 datasets")
+    assert msgs[0].startswith("This figure averages each method over 2 datasets")
     assert "Pass --aggregate summary" in msgs[0] and "aggregate='summary'" not in msgs[0]
 
 
@@ -134,9 +133,9 @@ def _ilisi_tie():
 
 def test_one_method_figure_warns_and_is_grey():
     _, msgs = _messages(mtb.plot.build_table, _mine())
-    assert msgs == ["only one method (PCA) in this figure: fill and rank show no "
-                    "comparison, so the fills are grey. Plot PCA with methods scored "
-                    "on the same dataset."]
+    assert msgs == ["Only one method, PCA, is in this figure. With nothing to rank "
+                    "it against, the fills are grey. Plot it with methods scored on "
+                    "the same dataset."]
     fig, msgs = _messages(mtb.plot.bubble, _mine())
     assert len(msgs) == 1
     assert len(_circles(fig, _grey())) == 4                  # every metric marker
@@ -149,8 +148,7 @@ def test_one_method_figure_warns_and_is_grey():
 
 def test_constant_column_warns_and_uses_the_neutral_fill():
     tbl, msgs = _messages(mtb.plot.build_table, _ilisi_tie())
-    assert msgs == ["all rows have the same value in iLISI (0.000): fill and rank "
-                    "show no comparison there, so that column is grey."]
+    assert msgs == ["All methods have the same iLISI (0.000), so that column is grey."]
     assert tbl.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]    # R parity kept
     assert tbl.ranks["iLISI"].tolist() == [3.0, 3.0, 3.0]
     fig = B.render(tbl)
@@ -171,7 +169,7 @@ def test_stored_demo_figures_are_unchanged():
         for ds in datasets:
             df = _stored(ds, source=source, category=category)
             tbl, msgs = _messages(B.build_table, df, na="skip")
-            assert not any("fill and rank show no comparison" in m for m in msgs), (ds, msgs)
+            assert not any("is grey" in m or "are grey" in m for m in msgs), (ds, msgs)
             fig = B.render(tbl)
             assert not [p for p in fig.axes[0].patches if p.get_facecolor() == _grey()], ds
             assert not any(t.get_text().startswith("Grey fill")

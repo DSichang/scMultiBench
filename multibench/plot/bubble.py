@@ -655,17 +655,23 @@ def _no_comparison_message(methods, constant: dict,
     """The warning for a figure whose fill and rank compare nothing somewhere.
 
     One method: every column. Several: the columns in ``constant`` (from
-    :func:`multibench.plot.style.constant_columns`). ``render`` draws those
-    fills in :data:`CONSTANT_FILL`.
+    :func:`multibench.plot.style.constant_columns`), as ``'All methods have
+    the same cLISI (1.000), so that column is grey.'``; under
+    ``aggregate="summary"`` the value is the mean rank. ``render`` draws
+    those fills in :data:`CONSTANT_FILL`.
     """
     if len(methods) == 1:
-        return (f"only one method ({methods[0]}) in this figure: fill and rank "
-                f"show no comparison, so the fills are grey. Plot {methods[0]} "
-                f"with methods scored on the same dataset.")
+        return (f"Only one method, {methods[0]}, is in this figure. With nothing "
+                f"to rank it against, the fills are grey. Plot it with methods "
+                f"scored on the same dataset.")
     if constant:
         which = "that column is" if len(constant) == 1 else "those columns are"
-        return (f"{_equal_columns(constant, aggregate)}: fill and rank show no "
-                f"comparison there, so {which} grey.")
+        if aggregate == "summary":
+            same = "mean rank in " + _both([f"{c} ({round(v, 2):g})"
+                                            for c, v in constant.items()])
+        else:
+            same = _both([f"{c} ({v:.3f})" for c, v in constant.items()])
+        return f"All methods have the same {same}, so {which} grey."
     return None
 
 
@@ -771,6 +777,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
     ``Your row`` when none do, else ``Row``; the dataset(s) and the stored
     source follow in parentheses. The rank rule is stated once in the
     Notes of ``build_table``; the message says only what the reader acts on.
+    Under ``"dataset"`` a sentence says the Overall uses the metrics a row
+    has, left out under ``"raise"``, which draws no figure.
     The last sentence names the other policy: ``na="skip"`` under
     ``"warn"``, ``na="warn"`` under ``"raise"`` (an error cannot be hidden).
     """
@@ -809,7 +817,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
     if aggregate == "summary":
         sentences.append("In the summary, a missing value counts as the lowest rank on "
                          "that dataset.")
-    else:
+    elif na != "raise":
+        # the Overall rule describes the figure, which na="raise" does not draw
         sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
                          else "Each row's Overall uses the metrics it has.")
     if na == "raise":
@@ -941,7 +950,27 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
         xs += 0.5
     total_w = xs - 0.5
 
-    fig = Figure(figsize=(0.6 * total_w + 2.8, 0.42 * n_rows + 2.9))
+    # ---- legend geometry: the legends under a table of few metrics are wider
+    # than the table, so the axes end at the right edge of the widest one ----
+    RAMP_X0, RAMP_STEP, RAMP_W = 1.2, 4.6, 40 * 0.07   # Score ramp per family
+    # room for the "High" label after a ramp: about 0.5 units in a tall
+    # figure, up to 0.7 in a one-row figure with a title
+    HIGH_W = 0.7
+    RANK_X0 = 1.5                    # first Rank circle; the next ones 1.0 apart
+    legend_right = RAMP_X0 + (len(tbl.blocks) - 1) * RAMP_STEP + RAMP_W + 0.12 + HIGH_W
+    if tbl.aggregate != "summary":
+        # min(5, n) legend bubbles - a fixed 5 would show sizes that cannot
+        # occur when fewer methods are plotted
+        n_bub = max(1, min(5, n_rows))
+        # legend sizes follow the plot's own mapping: 0.85 * sqrt(rank / n)
+        _fracs = (np.linspace(1, n_rows, n_bub) / n_rows) if n_bub > 1 else np.array([1.0])
+        rr = np.maximum(0.85 * np.sqrt(_fracs), 0.12)
+        legend_right = max(legend_right,
+                           RANK_X0 + (n_bub - 1) * 1.0 + R_MAX * rr[-1] * 0.9 + 0.15)
+    x_right = max(total_w + 0.45, legend_right)
+
+    # the width follows the x-range: 0.6 inch per unit past the table's own
+    fig = Figure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
     mappers = {fi: cm.ScalarMappable(norm=norm01,
@@ -1083,40 +1112,39 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
                 va="center", fontsize=8.6, color="#1a1a1a", zorder=3)
 
     # ---- legends: Score ramps + Rank size, under the table (scIB layout) ---
+    # gid="legend" marks every artist of the Score and Rank legends
     ly = -1.1
-    ax.text(-0.9, ly, "Score", fontsize=8, fontweight="bold", va="center")
+    ax.text(-0.9, ly, "Score", fontsize=8, fontweight="bold", va="center",
+            gid="legend")
     # the fill is min-max scaled within each column: the lightest fill is the
     # lowest value of its column, not zero. A second line keeps the legend
     # layout (one line this long would run into the "Low" label).
-    ax.text(-0.9, ly - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center")
+    ax.text(-0.9, ly - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
+            gid="legend")
     for fi, b in enumerate(tbl.blocks):
-        xoff = 1.2 + fi * 4.6
+        xoff = RAMP_X0 + fi * RAMP_STEP
         for k in range(40):
             ax.add_patch(Rectangle((xoff + k * 0.07, ly - 0.28), 0.07, 0.56,
                                    facecolor=mappers[fi].to_rgba(k / 39),
-                                   edgecolor="none", zorder=2))
-        ax.text(xoff - 0.12, ly, "Low", fontsize=6.6, ha="right", va="center")
-        ax.text(xoff + 40 * 0.07 + 0.12, ly, "High", fontsize=6.6, ha="left",
-                va="center")
+                                   edgecolor="none", zorder=2, gid="legend"))
+        ax.text(xoff - 0.12, ly, "Low", fontsize=6.6, ha="right", va="center",
+                gid="legend")
+        ax.text(xoff + RAMP_W + 0.12, ly, "High", fontsize=6.6, ha="left",
+                va="center", gid="legend")
     if tbl.aggregate != "summary":
         ly2 = ly - 1.35
-        ax.text(-0.9, ly2, "Rank", fontsize=8, fontweight="bold", va="center")
-        # min(5, n) legend bubbles - a fixed 5 would show sizes that cannot
-        # occur when fewer methods are plotted
-        n_bub = max(1, min(5, n_rows))
-        # legend sizes follow the plot's own mapping: 0.85 * sqrt(rank / n)
-        _fracs = (np.linspace(1, n_rows, n_bub) / n_rows) if n_bub > 1 else np.array([1.0])
-        rr = np.maximum(0.85 * np.sqrt(_fracs), 0.12)
-        xoff = 1.5
+        ax.text(-0.9, ly2, "Rank", fontsize=8, fontweight="bold", va="center",
+                gid="legend")
+        xoff = RANK_X0
         for k, r in enumerate(rr):
             ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,
                                 facecolor="#bbbbbb", edgecolor="#333333",
-                                linewidth=0.4, zorder=2))
+                                linewidth=0.4, zorder=2, gid="legend"))
         if n_bub > 1:
             ax.text(xoff - 0.65, ly2 - 0.62, str(n_rows), fontsize=6.6,
-                    ha="center")
+                    ha="center", gid="legend")
         ax.text(xoff + (n_bub - 1) * 1.0, ly2 - 0.62, "1", fontsize=6.6,
-                ha="center")
+                ha="center", gid="legend")
 
     # ---- how the rows were ordered (so bubble and bar can be reconciled) ---
     y_bottom = -2.9 if tbl.aggregate != "summary" else -1.8
@@ -1159,7 +1187,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
             labels.append(f"{m} \u00b7 {ds[0]}" if len(ds) == 1
                           else f"{m} \u00b7 {len(ds)} ds")
 
-    ax.set_xlim(-1.35, total_w + 0.45)
+    ax.set_xlim(-1.35, x_right)
     ax.set_ylim(y_bottom, band_y + 1.0)
     ax.set_yticks([n_rows - i - 0.5 for i in range(n_rows)])
     ax.set_yticklabels(labels, fontsize=8.6)
