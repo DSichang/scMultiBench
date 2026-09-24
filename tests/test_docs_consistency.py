@@ -1010,7 +1010,8 @@ def test_each_guide_warning_appears_once_on_the_site():
     docs = _docs_root()
     flat = {p.relative_to(docs).as_posix(): " ".join(p.read_text().split()).lower()
             for p in docs.rglob("*.md")}
-    for phrase, home in (("compare ranks, not decimals", "tutorials/evaluate.md"),
+    for phrase, home in (("most methods' scores vary slightly between runs. compare ranks.",
+                          "tutorials/evaluate.md"),
                          ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md"),
                          ("only warns, and such a method gives a wrong result", "tutorials/run.md")):
         found = {page: text.count(phrase) for page, text in flat.items() if phrase in text}

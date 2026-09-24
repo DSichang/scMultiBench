@@ -178,8 +178,10 @@ def test_run_guide_names_the_atac_override_and_one_dataset_name():
 def test_api_page_names_exit_code_3_and_the_atac_override():
     api = _flat("api.md")
     # worded by this run: failures.csv holds the merged folder (review of wp/f4_int)
-    assert ("`2` on a usage error, and `3` when `run-all` finished but a method of "
-            "this run failed or was skipped. A line on stderr names that method.") in api
+    # R5-16: only a skipped method named in --methods sets 3
+    assert ("`2` on a usage error, and `3` when `run-all` finished but a method failed, "
+            "or a method named in `--methods` was skipped. A line on stderr names those "
+            "methods.") in api
     assert ("`--allow-atac-mismatch` on `scan` and `run-all` counts a method as runnable "
             "when its ATAC file holds the other representation or peak names the method "
             "cannot read.") in api
