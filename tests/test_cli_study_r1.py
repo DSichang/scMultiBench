@@ -201,7 +201,7 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
     # to get the GPU builds once
     assert cli.main(["env", "plan", "--methods", "scMoMaT"]) == 0
     err = capsys.readouterr().err
-    assert "(CPU build, as this host has no NVIDIA GPU)" in err
+    assert "# CPU build, because this host has no NVIDIA GPU." in err
     assert "# for jobs on GPU nodes, pass --flavor gpu" in err
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert cli.main(["env", "install", "--packed", "--methods", "scMoMaT"]) == 0
@@ -214,7 +214,9 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
                  ["env", "install", "--packed", "--methods", "StabMap"]):
         assert cli.main(argv) == 0
         err = capsys.readouterr().err
-        assert "(GPU build; no CPU build is published for it)" in err, argv
+        assert ("# This env has a single build (the same archive for CPU and GPU "
+                "hosts).") in err, argv
+        assert "GPU build" not in err, argv
         assert "--flavor gpu" not in err and "CPU builds" not in err, argv
     for argv in (["env", "plan", "--methods", "StabMap", "--flavor", "cpu"],
                  ["env", "install", "--packed", "--methods", "StabMap", "--flavor", "gpu"]):

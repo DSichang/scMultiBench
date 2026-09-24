@@ -226,11 +226,15 @@ DU = ("unpacked envs are larger than the download, so check with du after the "
 
 
 def _total_lines(err):
-    """The ``# total`` line and the line after it, when that one is about sizes."""
+    """The ``# total`` line and the builds / unknown-size lines after it."""
     lines = err.splitlines()
     i = next(i for i, l in enumerate(lines) if l.startswith("# total"))
-    return lines[i:i + 2] if i + 1 < len(lines) and "not recorded" in lines[i + 1] \
-        else lines[i:i + 1]
+    out = [lines[i]]
+    for l in lines[i + 1:i + 3]:
+        if " build" not in l and "not recorded" not in l:
+            break
+        out.append(l)
+    return out
 
 
 @pytest.fixture
@@ -244,11 +248,12 @@ def tables(monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
 
 
-def test_plan_gpu_total_is_two_short_lines_with_the_du_advice(tables, capsys):
+def test_plan_gpu_total_is_short_lines_with_the_du_advice(tables, capsys):
     assert cli.main(["env", "plan", "--methods", "StabMap,scMoMaT", "--flavor", "gpu"]) == 0
     err = capsys.readouterr().err
     assert _total_lines(err) == [
-        "# total for 2 envs (GPU builds): 5.5 GB download",
+        "# total for 2 envs: 5.5 GB download",
+        "# GPU build. 1 env has a single build (the same archive for CPU and GPU hosts).",
         f"# size on disk not recorded for both envs; {DU}"]
     assert "sizes are those recorded" not in err and "summed the" not in err
     assert "--flavor gpu" not in err                  # asked for GPU builds already
@@ -261,8 +266,9 @@ def test_plan_auto_on_a_cpu_host_states_the_reason_and_the_advice_once(tables, m
     assert cli.main(["env", "plan", "--methods", "StabMap,scMoMaT"]) == 0
     err = capsys.readouterr().err
     assert _total_lines(err) == [
-        "# total for 2 envs (CPU builds, as this host has no NVIDIA GPU; 1 env has only "
-        "a GPU build): 1.8 GB download",
+        "# total for 2 envs: 1.8 GB download",
+        "# CPU build, because this host has no NVIDIA GPU. 1 env has a single build (the "
+        "same archive for CPU and GPU hosts).",
         f"# size on disk not recorded for 1 of 2 envs (2.6 GB for the other 1); {DU}"]
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert "# for jobs on GPU nodes, pass --flavor gpu" in err
@@ -277,7 +283,8 @@ def test_install_dry_run_states_the_no_gpu_fact_once(tables, monkeypatch, capsys
     assert cli.main(["env", "install", "--packed", "--methods", "StabMap,scMoMaT"]) == 0
     err = capsys.readouterr().err
     assert _total_lines(err) == [
-        "# total for 2 envs (CPU builds; 1 env has only a GPU build): 1.8 GB to download",
+        "# total for 2 envs: 1.8 GB to download",
+        "# CPU build. 1 env has a single build (the same archive for CPU and GPU hosts).",
         f"# size on disk not recorded for 1 of 2 envs (2.6 GB for the other 1); {DU}"]
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
     assert all(l.count(";") <= 2 for l in err.splitlines())
@@ -285,8 +292,10 @@ def test_install_dry_run_states_the_no_gpu_fact_once(tables, monkeypatch, capsys
 
 def test_size_total_known_sizes_are_one_line():
     sizes = {"a": {"archive_bytes": 3 * 10**9, "unpacked_bytes": 9 * 10**9}}
-    assert cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="gpu") == \
-        "# total for 1 env (GPU build): 3.0 GB download, 9.0 GB on disk"
+    both = {"a": "u", "a-cpu": "u"}                 # a GPU and a CPU build
+    assert cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="gpu",
+                                manifest=both) == \
+        "# total for 1 env: 3.0 GB download, 9.0 GB on disk\n# GPU build."
     assert cli._size_total_line([{"env": "a"}], sizes) == \
         "# total for 1 env: 3.0 GB download, 9.0 GB on disk"
 
@@ -297,8 +306,10 @@ def test_size_total_with_unknown_disk_gives_the_du_advice(n_known):
     sizes = {e: {"archive_bytes": 2 * 10**9,
                  "unpacked_bytes": 3 * 10**9 if i < n_known else None}
              for i, e in enumerate("abcdef")}
-    text = cli._size_total_line(rows, sizes, flavor="gpu")
+    text = cli._size_total_line(rows, sizes, flavor="gpu", manifest={})
     lines = text.splitlines()
-    assert len(lines) == 2 and lines[0] == "# total for 6 envs (GPU builds): 12.0 GB download"
-    assert DU in lines[1] and all(l.count(";") <= 2 for l in lines)
+    assert len(lines) == 3 and lines[0] == "# total for 6 envs: 12.0 GB download"
+    assert lines[1] == ("# All 6 envs have a single build (the same archive for CPU and "
+                        "GPU hosts).")
+    assert DU in lines[2] and all(l.count(";") <= 2 for l in lines)
     assert "on disk" not in lines[0]                 # an incomplete column is not a total
