@@ -114,7 +114,7 @@ def test_export_dataset_atac_kinds(tmp_path):
         ingest.export_dataset(peaks, tmp_path / "E", rna=None, atac="X")
     with pytest.raises(ValueError, match="needs atac_kind="):
         ingest.export_dataset(peaks, tmp_path / "E", rna=None, atac="X", atac_kind="gas")
-    with pytest.warns(UserWarning, match="look like peaks .* not gene activity"):
+    with pytest.warns(UserWarning, match="look like peaks such as chr1:100-200, not genes"):
         ingest.export_dataset(peaks, tmp_path / "W", rna=None, atac="X",
                               atac_kind="gene_activity")
 

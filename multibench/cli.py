@@ -369,7 +369,8 @@ def _cmd_scan(args) -> int:
                 f"{where}; methods present: "
                 f"{sorted(set(present))}")
         df = df[df["method"].isin(methods)]
-    _print_frame(df, columns=_csv_list(args.columns), fmt=args.format,
+    shown = _strict_table(df) if getattr(args, "strict", False) else df
+    _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
                  compact=_compact_plan_columns(df))
     if getattr(args, "strict", False):
         problem = _strict_problem(df, methods)
@@ -377,6 +378,28 @@ def _cmd_scan(args) -> int:
             print(f"error: --strict: {problem}", file=sys.stderr)
             return _EXIT_ERROR
     return _EXIT_OK
+
+
+#: The reason ``scan --strict`` prints for a row blocked only by the method scripts.
+_SCRIPTS_REASON = "method scripts not fetched (multibench fetch --scripts)"
+
+
+def _strict_table(df):
+    """The table ``scan --strict`` prints: it agrees with the error under it.
+
+    While the method scripts are not fetched, a row runnable but for them
+    shows ``runnable`` False and :data:`_SCRIPTS_REASON`. ``mtb.scan`` and
+    ``scan`` without ``--strict`` keep such rows runnable, with the caveat.
+    """
+    from . import config
+    if config.scripts_present() or "runnable" not in df:
+        return df
+    df = df.copy()
+    blocked = df["runnable"].astype(bool)
+    df.loc[blocked, "runnable"] = False
+    if "reason" in df:
+        df.loc[blocked, "reason"] = _SCRIPTS_REASON
+    return df
 
 
 def _strict_problem(df, methods) -> str | None:
