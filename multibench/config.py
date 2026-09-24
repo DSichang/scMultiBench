@@ -458,8 +458,9 @@ def scripts_ref_problem(repo=None) -> str | None:
 def run_provenance(env: str | None, repo=None) -> dict:
     """``scripts_commit``, ``env_flavor`` and ``hostname`` for a run record (internal).
 
-    ``env_flavor`` is ``'cpu'`` / ``'gpu'`` from the environment's install
-    record (``mtb.env.install`` of a packed archive), else ``'unknown'``
+    ``env_flavor`` is ``'cpu'`` / ``'gpu'`` / ``'single'`` from the
+    environment's install record (``mtb.env.install`` of a packed archive),
+    else ``'unknown'``
     (built from a lockfile, not installed, or ``env=None``).
     """
     flavor = None
@@ -586,7 +587,11 @@ def scripts_folder_problem(repo=None) -> str | None:
     p = Path(DEFAULT.repo_path if repo is None else repo)
     if any((q / "tools_scripts").is_dir() for q in (p, _ROOT)) or _fillable(p):
         return None
-    return f"{p} holds no method scripts. Remove it, then run multibench fetch --scripts"
+    where = hint("MULTIBENCH_REPO_PATH or mtb.config.DEFAULT.repo_path",
+                 "MULTIBENCH_REPO_PATH")
+    return (f"{p} holds other files and no method scripts. Set {where} to an empty "
+            f"or new folder, then run multibench fetch --scripts. If the folder is "
+            f"left over from an earlier fetch, you can remove it instead")
 
 
 def ensure_repo(path=None, ref=None):

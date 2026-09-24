@@ -396,17 +396,17 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
 def test_single_method_table_warns_when_other_source_has_more(result_dir, layout_tree):
     """The instructor got a silent 1-method cross/D52 table under the default
     source='published' (the CLI warns, the API did not)."""
-    with pytest.warns(UserWarning, match=r"only one method \(scMoMaT\) in the published table "
-                                         r"for cross/D52; ranks and Overall bars are not "
-                                         r"meaningful with a single method") as rec:
+    with pytest.warns(UserWarning, match=r"The published table for cross/D52 has one "
+                                         r"method, scMoMaT, so every rank is the same\. ") as rec:
         df = results.load_results("cross", dataset="D52", result_path=result_dir)
     assert set(df.method) == {"scMoMaT"}          # a warning, never an error
-    msgs = [str(w.message) for w in rec if "only one method" in str(w.message)]
+    msgs = [str(w.message) for w in rec if "has one method" in str(w.message)]
     assert len(msgs) == 1
-    assert "the rerun tables hold 8 methods for it" in msgs[0]
-    assert "pass source='rerun' (or 'both')" in msgs[0]
+    assert "The re-run tables have 8 methods for cross/D52: Concerto, " in msgs[0]
+    assert msgs[0].endswith('Pass source="rerun" or "both".')
+    assert "meaningful" not in msgs[0] and " - " not in msgs[0] and ";" not in msgs[0]
     # without a dataset filter the selection is named as the category
-    with pytest.warns(UserWarning, match=r"in the published table for cross; ranks"):
+    with pytest.warns(UserWarning, match=r"The published table for cross has one method"):
         results.load_results("cross", result_path=result_dir)
     # source='rerun' / 'both' for the same selection are quiet; so is a
     # published selection with >= 2 methods (D53 and the whole cross category

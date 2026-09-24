@@ -321,7 +321,7 @@ def test_scan_strict_exits_1_when_nothing_is_runnable(no_envs, capsys):
     cap = capsys.readouterr()
     assert rc == 1 and "Matilda" in cap.out                  # the table is still printed
     assert cap.err.startswith("error: --strict: 0 of ")
-    assert "env not ready in" in cap.err
+    assert "The environment is not ready in" in cap.err
 
 
 def test_scan_strict_names_a_requested_method_without_a_runnable_row(monkeypatch, capsys):
@@ -334,7 +334,7 @@ def test_scan_strict_names_a_requested_method_without_a_runnable_row(monkeypatch
     rc = cli.main(["scan", "D11", "--category", "vertical", "--strict",
                    "--methods", "Matilda,MIRA"])
     err = capsys.readouterr().err
-    assert rc == 1 and "no runnable row for MIRA" in err and "  MIRA: " in err
+    assert rc == 1 and "No runnable row for MIRA" in err and "  MIRA: " in err
     assert "Matilda:" not in err
     act = next(a for a in _sub("scan")._actions if a.dest == "strict")
     assert "multibench scan DS --category C --strict && sbatch" in act.help

@@ -142,7 +142,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     Returns
     -------
     list[str]
-        Method ids in registry order.
+        Method ids in the package's order.
 
     Raises
     ------
@@ -277,7 +277,7 @@ def _find_methods_filters_raise(fn):
 
 @_find_methods_filters_raise
 def list_methods(category: str | None = None) -> list[str]:
-    """Return the registry method ids, optionally restricted to one category.
+    """Return the method ids, optionally restricted to one category.
 
     Parameters
     ----------
@@ -288,7 +288,7 @@ def list_methods(category: str | None = None) -> list[str]:
     Returns
     -------
     list[str]
-        Method ids in registry order.
+        Method ids in the package's order.
 
     Raises
     ------
@@ -300,7 +300,7 @@ def list_methods(category: str | None = None) -> list[str]:
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.list_methods()                 # every registry id
+    >>> mtb.list_methods()                 # every method id
     >>> mtb.list_methods("vertical")       # ids with a vertical variant
 
     Notes
@@ -350,7 +350,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Parameters
     ----------
     method : str
-        Registry method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
     verbose : bool
         ``True`` adds ``notes_long``, the long upstream-audit notes.
 
@@ -377,10 +377,10 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
 
     Notes
     -----
-    **Key reference.** The dict merges the registry spec, the provenance
+    **Key reference.** The dict merges the method definition, the provenance
     record (repository, version, paper) and the observed runtime.
 
-    - ``id`` - the registry id.
+    - ``id`` - the method id.
     - ``language`` - ``'python'`` or ``'R'``.
     - ``categories`` / ``tasks`` - the categories it has a variant for and
       the tasks it serves.
@@ -602,7 +602,7 @@ def params_for(method: str, category: str | None = None,
     Parameters
     ----------
     method : str
-        Registry method id, e.g. ``"Matilda"``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
     category : str | None
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``; ``None`` = infer it from the other arguments.
@@ -646,7 +646,7 @@ def params_for(method: str, category: str | None = None,
     -----
     **Key reference.**
 
-    - ``method`` / ``variant`` - the registry id and the selected variant as
+    - ``method`` / ``variant`` - the method id and the selected variant as
       ``'category:mods'`` (``mods`` is ``-`` for a ``data_dir`` variant,
       e.g. ``'diagonal:-'``).
     - ``defaults`` - parameters the package emits on every run. Override them
@@ -817,7 +817,7 @@ def cite(*methods, fmt: str = "text") -> str:
     ----------
     *methods : str | list[str]
         Method ids, one per argument or as one list; ``"all"`` = every
-        registry method; none = the benchmark only.
+        method; none = the benchmark only.
     fmt : str
         ``"text"`` (one line per entry) or ``"bibtex"`` (one ``@article`` per
         entry).
@@ -842,9 +842,9 @@ def cite(*methods, fmt: str = "text") -> str:
     >>> import multibench as mtb
     >>> print(mtb.cite())                                  # the benchmark only
     >>> print(mtb.cite("Matilda", "MOFA2"))
-    >>> print(mtb.cite(["Matilda", "MOFA2"], fmt="bibtex"))
     >>> res = mtb.load_batch("out/")
-    >>> print(mtb.cite(list(res.summary.method)))          # everything a sweep ran
+    >>> ran = res.summary.query("status not in ['SKIPPED', 'FAIL', 'TIMEOUT']")
+    >>> print(mtb.cite(ran.method, fmt="bibtex"))      # methods that finished
 
     Notes
     -----

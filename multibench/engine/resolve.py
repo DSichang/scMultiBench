@@ -347,7 +347,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``.
     method : str
-        Registry method id, e.g. ``"Matilda"``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
     modalities : list[str] | set[str] | None
         Modality tokens that pick the variant, e.g. ``["rna", "adt"]``;
         ``None`` = the files in the dataset folder decide.
@@ -427,7 +427,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     An unknown token raises ``ValueError`` naming the vocabulary.
 
     **Validation.** A misspelt method id raises ``KeyError`` naming the
-    closest registry id; an unknown category raises ``ValueError`` listing
+    closest method id; an unknown category raises ``ValueError`` listing
     the four.
 
     **File resolution.** The dataset tree is flat
@@ -893,6 +893,16 @@ PEAK_FED_TO_GAS_CAVEAT = ("expects gene activity; {file} holds peaks (features l
                           "chr:start-end)")
 GAS_FED_TO_PEAK_CAVEAT = ("expects peaks; {file} holds gene activity (features do not "
                           "look like chr:start-end)")
+#: ``.format(file=, example=)`` caveat for a file a peak method reads whose
+#: names are neither chr:start-end nor the gene names of the folder's other
+#: files (``peak_0``): the kind cannot be told from the names, so it does not
+#: block the row.
+PEAK_NAMES_UNKNOWN_CAVEAT = ("expects peaks; {file} holds names that are not "
+                             "chr:start-end (e.g. {example})")
+#: The same for a method that reads gene activity: the names are neither
+#: chr:start-end nor the genes of the folder's RNA.
+GAS_NAMES_UNKNOWN_CAVEAT = ("expects gene activity; {file} holds names that are not "
+                            "the RNA's genes (e.g. {example})")
 #: ``.format(file=, example=)`` caveat for a peak file of a variant whose
 #: peak names ``mtb.run`` rewrites to chr:start-end (``normalize_peaks``) when
 #: more than 10% of the first 50 names are not chr<sep>start<sep>end, so the
@@ -962,6 +972,60 @@ def _peak_fraction_of(path: Path) -> float | None:
     if not feats:
         return None
     return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
+
+
+@functools.lru_cache(maxsize=64)
+def _all_features(path: str, mtime_ns: int) -> tuple:
+    """Every feature name of a canonical .h5 (cached by mtime), or ()."""
+    import h5py
+
+    try:
+        with h5py.File(path, "r") as f:
+            if "matrix/features" not in f:
+                return ()
+            raw = f["matrix/features"][:]
+    except OSError:
+        return ()
+    return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
+
+
+#: Ensembl gene ids (``ENSG00000141510``, ``ENSMUSG...``): gene names whatever
+#: the folder's RNA calls its genes
+_ENSEMBL_RE = re.compile(r"^ENS[A-Z]*G\d{6,}")
+
+
+def _names_are_genes(path: Path) -> bool | None:
+    """Whether the names of a non-peak ATAC file are gene names.
+
+    ``True`` when at least 1% of up to 2,000 evenly spaced names (and at
+    least one) occur, ignoring case, among the features of the folder's
+    ``rna*.h5`` and ``atac_gas*.h5`` files other than this one, or when most
+    of them are Ensembl gene ids. ``False`` otherwise (``peak_0``). ``None``
+    when the folder has no such file to compare with, or only files named
+    by Ensembl id, which gene symbols would not match.
+    """
+    def _sample(names):
+        return names[::max(1, len(names) // 2000)][:2000]
+
+    def _ensembl(names):
+        return sum(1 for x in names if _ENSEMBL_RE.match(x)) > 0.5 * len(names)
+
+    sample = _sample(_all_features(str(path), path.stat().st_mtime_ns))
+    if not sample:
+        return None
+    if _ensembl(sample):
+        return True
+    known: set[str] = set()
+    for q in sorted(path.parent.glob("*.h5")):
+        if q.resolve() == path.resolve() or not re.match(r"^(rna|atac_gas)\d*$", q.stem):
+            continue
+        names = _all_features(str(q), q.stat().st_mtime_ns)
+        if names and not _ensembl(_sample(names)):
+            known.update(x.upper() for x in names)
+    if not known:
+        return None
+    hits = sum(1 for x in sample if x.upper() in known)
+    return hits >= max(1, 0.01 * len(sample))
 
 
 def _unrewritable_peak_name(path: Path) -> str | None:
@@ -1175,7 +1239,13 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
       peaks-only multiome folder);
     * ``atac='peak'`` and <= 10% of the features look like peaks ->
       :data:`GAS_FED_TO_PEAK_CAVEAT` (e.g. moETM/scMM/iPOLNG, whose ``atac_gas``
-      role resolved to a real gene-activity ``atac_gas.h5``).
+      role resolved to a real gene-activity ``atac_gas.h5``), when the names
+      are gene names (:func:`_names_are_genes`: the folder's ``rna*.h5`` or
+      ``atac_gas*.h5`` hold them, or no such file exists to compare with).
+      Other names (``peak_0``) -> :data:`PEAK_NAMES_UNKNOWN_CAVEAT`, which
+      does not block the row;
+    * ``atac='gene_activity'`` and such other names ->
+      :data:`GAS_NAMES_UNKNOWN_CAVEAT`, which does not block the row either.
 
     A method with both an ``atac_peak`` and an ``atac_gas`` role (MultiMAP,
     Seurat_v3) reads peaks from the first and gene activity from the second;
@@ -1231,8 +1301,17 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
                 want = "peak" if role.startswith("atac_peak") else "gene_activity"
             if want == "gene_activity" and frac >= 0.9:
                 out.append(PEAK_FED_TO_GAS_CAVEAT.format(file=Path(path).name))
-            elif want == "peak" and frac <= 0.1:
-                out.append(GAS_FED_TO_PEAK_CAVEAT.format(file=Path(path).name))
+            elif frac <= 0.1:
+                # names that are not chr:start-end are gene activity only
+                # when they are the folder's gene names; peak_0 names are not
+                genes = _names_are_genes(Path(path))
+                if genes is False:
+                    first = _sniff_features(str(path), Path(path).stat().st_mtime_ns)
+                    unknown = (PEAK_NAMES_UNKNOWN_CAVEAT if want == "peak"
+                               else GAS_NAMES_UNKNOWN_CAVEAT)
+                    out.append(unknown.format(file=Path(path).name, example=first[0]))
+                elif want == "peak":
+                    out.append(GAS_FED_TO_PEAK_CAVEAT.format(file=Path(path).name))
     seen = set()
     for role, path in resolved.items():
         p = Path(path)
@@ -1337,7 +1416,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         ``cross``; with ``method``, selects the variant whose cell order is
         used. ``None`` = the default order.
     method : str | None
-        Registry method id; with ``category``, orders the files in that
+        Method id; with ``category``, orders the files in that
         variant's cell order. ``None`` = the default order.
     modalities : list[str] | set[str] | None
         Modality tokens that pick one of several variants; used only with

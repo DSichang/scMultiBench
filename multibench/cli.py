@@ -23,7 +23,8 @@ Exit codes and streams
 as ``error: ...`` on stderr; set ``MULTIBENCH_DEBUG=1`` to get the traceback);
 ``2`` a usage error (argparse: unknown flag, missing required flag, bad
 choice, or a flag combination the subcommand rejects); ``3`` ``run-all``
-finished and saved its files, but a method is listed in ``failures.csv``.
+finished and saved its files, but a method of this run failed or was
+skipped. Its line on stderr names it.
 
 Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
 lines); diagnostics go to stderr (``error: ...``, ``warning: ...``, progress
@@ -299,7 +300,7 @@ def _platform_note() -> str | None:
     problem = envs.host_platform_problem()
     if problem:
         print(f"warning: {envs.linux_only_text(problem)} `multibench env install "
-              f"--run` refuses here; --force tries anyway. The registry, stored "
+              f"--run` refuses here; --force tries anyway. The method list, stored "
               f"results, scan's file check, evaluate and plot work on this computer.",
               file=sys.stderr)
     return problem
@@ -383,13 +384,14 @@ def _strict_problem(df, methods) -> str | None:
 
     It fails when no row is runnable, or when a method named in
     ``--methods`` has no runnable row. The text counts the rows each check
-    blocks and, for named methods, gives the reason of each one's first row.
-    A GPU-only method on a host without a GPU is counted apart from a
-    missing env, with a pointer to ``--assume-gpu``; so are a row given the
-    wrong ATAC kind, a row whose peak names the method cannot read, and
-    scripts at another commit than ``MULTIBENCH_SCRIPTS_REF``. Method
-    scripts not fetched block every row, although ``runnable`` stays true:
-    a job on a node without network cannot fetch them.
+    blocks, one sentence per check, and, for named methods, gives the
+    reason of each one's first row with its files on disk. A GPU-only
+    method on a host without a GPU is counted apart from a missing env,
+    with a pointer to ``--assume-gpu``; so are a row given the wrong ATAC
+    kind, a row whose peak names the method cannot read, and scripts at
+    another commit than ``MULTIBENCH_SCRIPTS_REF``. Method scripts not
+    fetched block every row, although ``runnable`` stays true: a job on a
+    node without network cannot fetch them.
     """
     from . import config
     fetched = config.scripts_present()
@@ -401,42 +403,49 @@ def _strict_problem(df, methods) -> str | None:
         blocked = [] if len(runnable) else list(dict.fromkeys(df["method"]))
     if not blocked and (methods or len(runnable)):
         return None
-    head = f"{len(runnable)} of {len(df)} row(s) runnable"
+    rows_word = "row is" if len(df) == 1 else "rows are"
+    head = f"{len(runnable)} of {len(df)} {rows_word} runnable."
     rest = df[~ok]
     counts = []
     if "files_ok" in rest and (~rest["files_ok"].astype(bool)).any():
-        counts.append(f"input files missing in {int((~rest['files_ok'].astype(bool)).sum())}")
+        counts.append(f"input files are missing in "
+                      f"{int((~rest['files_ok'].astype(bool)).sum())}")
     from .workflow import PEAK_NAMES_REASON, _is_wrong_atac, _is_wrong_ref
     if "reason" in rest:
         wrong = _is_wrong_atac(rest["reason"])
         names = wrong & rest["reason"].astype(str).str.contains(PEAK_NAMES_REASON,
                                                                 regex=False)
         if (wrong & ~names).any():
-            counts.append(f"wrong ATAC kind in {int((wrong & ~names).sum())}")
+            counts.append(f"the ATAC kind is wrong in {int((wrong & ~names).sum())}")
         if names.any():
-            counts.append(f"unreadable peak names in {int(names.sum())}")
+            counts.append(f"peak names are unreadable in {int(names.sum())}")
         if _is_wrong_ref(rest["reason"]).any():
-            counts.append(f"scripts not at MULTIBENCH_SCRIPTS_REF in "
+            counts.append(f"the scripts are not at MULTIBENCH_SCRIPTS_REF in "
                           f"{int(_is_wrong_ref(rest['reason']).sum())}")
     if not fetched:
-        counts.append(f"method scripts not fetched in {len(df)}")
+        counts.append(f"method scripts are not fetched in {len(df)}")
     n_env, n_gpu, gpu_only = _env_and_gpu_counts(rest)
     if n_env:
-        counts.append(f"env not ready in {n_env}")
+        counts.append(f"the environment is not ready in {n_env}")
     if n_gpu:
-        counts.append(f"needs a GPU on this host in {n_gpu}")
+        counts.append(f"this host has no GPU for {n_gpu}")
     gpu_note = ("\nFor a job that runs on a GPU node, add --assume-gpu."
                 if gpu_only else "")
     if not fetched:                     # the fix for the scripts, before the GPU note
         fix = config.scripts_folder_problem() or "Run multibench fetch --scripts first"
         gpu_note = f"\n{fix}.{gpu_note}"
-    if counts:
-        head += f" ({'; '.join(counts)})"
+    head += "".join(f" {c[0].upper()}{c[1:]}." for c in counts)
     if not methods:
-        return head + "; the reason column says why" + gpu_note
+        # rows blocked only by the scripts have an empty reason
+        why = ("" if not fetched and df["runnable"].astype(bool).any()
+               else " The reason column says why.")
+        return head + why + gpu_note
     lines = []
     for m in blocked:
         rows = df[df["method"] == m]
+        if len(rows) and "files_ok" in rows:
+            # the row whose files are on disk says what blocks the method
+            rows = rows.sort_values("files_ok", ascending=False, kind="stable")
         reason = rows["reason"].iloc[0] if len(rows) else ""
         if len(rows) and _blank(reason):            # runnable but for the scripts
             reason = "method scripts not fetched"
@@ -444,7 +453,7 @@ def _strict_problem(df, methods) -> str | None:
         text = ("no row" if _blank(reason) else str(reason) if _is_wrong_atac(reason)
                 else _truncate(reason, 120))
         lines.append(f"  {m}: {text}")
-    return (head + f"; no runnable row for {', '.join(blocked)}:\n"
+    return (head + f" No runnable row for {', '.join(blocked)}:\n"
             + "\n".join(lines) + gpu_note)
 
 
@@ -1036,8 +1045,8 @@ def _cmd_plot(args) -> int:
         # (and names the source that holds more methods); --input-only
         # frames never pass through it. plot.bubble warns about one method
         # itself, so only bar needs this line
-        print("warning: only one method in this table; ranks and Overall bars "
-              "are not meaningful with a single method", file=sys.stderr)
+        print("warning: this table has one method, so every rank is the same",
+              file=sys.stderr)
     title = args.title
     if title is None:
         title = " ".join(x for x in (args.category, args.dataset) if x) or None
@@ -1211,18 +1220,30 @@ def _failed_line(res, where) -> str | None:
     ``# 1 of 2 methods failed: StabMap (FAIL). See runs/failures.csv.``;
     ``None`` when nothing failed. Counts are methods of this run, not of
     records merged from an earlier run in the same folder. A ``SKIPPED``
-    record of a method that ``--methods`` did not name is not counted.
+    record of a method that ``--methods`` did not name is not counted. A
+    method that the saved ``failures.csv`` does not list (a ``SKIPPED``
+    record never replaces an earlier record) says ``earlier record kept``.
     """
+    import pandas as pd
     bad = res.failures
     if bad.empty:
         return None
-    named = list(dict.fromkeys(f"{m} ({s})" for m, s in zip(bad["method"], bad["status"])))
+    try:
+        saved = set(pd.read_csv(where)["method"].astype(str))
+    except Exception:  # noqa: BLE001 - no saved file to compare with
+        saved = None
+    named = list(dict.fromkeys(
+        f"{m} ({s})" if saved is None or str(m) in saved
+        else f"{m} ({s}, earlier record kept)"
+        for m, s in zip(bad["method"], bad["status"])))
     n_bad = len(set(bad["method"]))
     n_all = len({r.get("method") for r in res.records
                  if r.get("status") != "SKIPPED" or r.get("requested")}
                 | set(bad["method"]))
+    see = (f" See {where}." if saved is None or saved & set(map(str, bad["method"]))
+           else "")
     return (f"# {n_bad} of {n_all} method{'s' if n_all != 1 else ''} failed: "
-            f"{', '.join(named)}. See {where}.")
+            f"{', '.join(named)}.{see}")
 
 
 @contextlib.contextmanager
@@ -1812,7 +1833,7 @@ _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' a
 #: ``--allow-atac-mismatch`` of scan and run-all
 _ATAC_MISMATCH_HELP = ("count a method as runnable when its ATAC file holds the other "
                        "representation or peak names the method cannot read. The "
-                       "caveat stays (allow_atac_mismatch=True)")
+                       "caveat is kept. Python: allow_atac_mismatch=True")
 _FORCE_HELP = ("try anyway on a computer that is not Linux (method environments run "
                "only on Linux; without --force the command refuses there before any "
                "download)")
@@ -1829,7 +1850,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "one function of the Python API (import multibench as mtb).",
         epilog="Exit codes: 0 ok, 1 runtime error (error: ... on stderr; "
                "MULTIBENCH_DEBUG=1 shows the traceback), 2 usage error, 3 run-all "
-               "finished but a method is listed in failures.csv. "
+               "finished but a method of this run failed or was skipped (a line on "
+               "stderr names it). "
                "Run `multibench <command> --help` for the flags of a command.")
     p.add_argument("--version", action="version",
                    version=f"%(prog)s {_version()}",
@@ -1840,7 +1862,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- list
     pl = sub.add_parser("list", help="list method ids (mtb.list_methods; --task/--runnable "
                                      "are mtb.find_methods filters)",
-                        description="Print registry method ids, one per line.")
+                        description="Print the method ids, one per line.")
     pl.add_argument("--category", help=_CATEGORY_HELP)
     pl.add_argument("--task", help=_TASK_HELP + " The same filter as "
                                                "mtb.find_methods(task=).")
@@ -2089,7 +2111,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="method ids to cite, space- or comma-separated (`cite A B` "
                           "and `cite A,B` are the same; none: the benchmark entry only)")
     pci.add_argument("--all", action="store_true",
-                     help="cite every registry method")
+                     help="cite every method")
     pci.add_argument("--format", choices=["bibtex", "text"], default="bibtex",
                      help="bibtex (default; one @article per entry) or text (one line "
                           "per entry)")
@@ -2199,7 +2221,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "on <data-path>/<DATASET>/, evaluate each output and save "
                     "summary.csv, long.csv, failures.csv and batch_result.json under "
                     "--out-dir. multibench plot bubble --input OUT draws the figure.",
-        epilog="Exit code 3: the run finished, but a method is listed in failures.csv.")
+        epilog="Exit code 3: the run finished, but a method of this run failed or was "
+               "skipped. A line on stderr names it.")
     pra.add_argument("dataset", help="dataset id = the folder name under --data-path")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pra.add_argument("--out-dir", "--out", dest="out",
@@ -2308,7 +2331,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "several columns")
     pe.add_argument("--method", help="method name for the rows of the long format "
                                      "(needs --dataset and --category); without "
-                                     "--labels it must be a registry method, which "
+                                     "--labels it must be a method of this package, which "
                                      "sets the label order")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
                                       "--method and --category); without --labels its "

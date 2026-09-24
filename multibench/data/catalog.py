@@ -67,19 +67,19 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
     name : str
         Any spelling of a method name (``"MOFA+"``, ``"totalvi"``, ``"Seurat(WNN)"``).
     strict : bool
-        ``True`` = raise for a name that is neither an alias nor a registry id;
+        ``True`` = raise for a name that is neither an alias nor a method id;
         ``False`` = return the folded name.
 
     Returns
     -------
     str
-        The canonical id (an alias target or a registry id); for an unknown
+        The canonical id (an alias target or a method id); for an unknown
         name, the input with spaces and dots collapsed to ``_``.
 
     Raises
     ------
     KeyError
-        ``strict=True`` and the name is neither an alias nor a registry id.
+        ``strict=True`` and the name is neither an alias nor a method id.
 
     Examples
     --------
@@ -95,24 +95,24 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
 
     1. the alias table, case-insensitive (``"MOFA+"`` -> ``"MOFA2"``,
        ``"Seurat(WNN)"`` -> ``"Seurat_WNN"``);
-    2. a case-folded match against the registry ids, after collapsing spaces
+    2. a case-folded match against the method ids, after collapsing spaces
        and dots to ``_`` (``"totalvi"`` -> ``"totalVI"``, ``"scmomat"`` ->
        ``"scMoMaT"``);
-    3. for a name the registry does not know (a result-directory token, a
+    3. for a name the package does not know (a result-directory token, a
        user's own method name): the input with separators collapsed to
        ``_``, unchanged in case.
 
     **Strict mode.** The error is the message ``mtb.method_info`` and
     ``mtb.scan`` give, with a did-you-mean hint, e.g. ``"unknown method
     'Matlida'; did you mean 'Matilda'?; see mtb.list_methods()"``. An
-    alias-table hit is returned without the registry check, even with
+    alias-table hit is returned without the method-id check, even with
     ``strict=True``: ``"Seurat v4"`` -> ``"Seurat_v4"``, which is not a
-    registry id. The default is lenient: result directories and user
-    frames can hold names the registry does not know.
+    method id. The default is lenient: result directories and user
+    frames can hold names the package does not know.
 
     See Also
     --------
-    mtb.list_methods : the registry ids.
+    mtb.list_methods : the method ids.
     mtb.catalog.canonical_metric : the same normalisation for metric codes.
     """
     key = str(name).strip().lower()
@@ -401,7 +401,7 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     **Column reference.**
 
     - ``method`` - the name as spelled in ``method.csv``;
-    - ``canonical_id`` - the registry id (``mtb.catalog.canonical_id``);
+    - ``canonical_id`` - the method id (``mtb.catalog.canonical_id``);
     - ``language`` - ``'python'`` or ``'r'`` (lower-cased);
     - ``deep_learning`` - ``'Yes'`` / ``'No'``, as in the CSV;
     - ``atac`` - ``'peak'``, ``'gene_activity'`` or ``None``;
@@ -409,16 +409,16 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     - ``needs_labels`` - bool, the method needs cell-type labels;
     - ``categories`` / ``tasks`` - lists of integration categories and tasks.
 
-    **Registry overlay.** For every registered id, ``needs_labels``,
-    ``atac``, ``categories`` and ``tasks`` come from the method registry,
-    the source ``mtb.method_info`` and ``mtb.scan`` read. A row without a
-    registry entry keeps the CSV values. ``language``, ``deep_learning`` and
+    **Package values.** For every method id, ``needs_labels``,
+    ``atac``, ``categories`` and ``tasks`` come from the package's method
+    definitions, which ``mtb.method_info`` and ``mtb.scan`` read. A row
+    without a method id keeps the CSV values. ``language``, ``deep_learning`` and
     ``output`` come from ``method.csv``.
 
     See Also
     --------
-    mtb.list_methods : the registry method ids, optionally per category.
-    mtb.method_info : everything the registry knows about one method.
+    mtb.list_methods : the method ids, optionally per category.
+    mtb.method_info : everything the package knows about one method.
     mtb.catalog.canonical_id : the normalisation behind the ``canonical_id`` column.
     """
     if files_dir is None:

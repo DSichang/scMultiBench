@@ -114,9 +114,10 @@ def test_strict_counts_unreadable_peak_names_apart(tmp_path, pinned, capsys):
     rc = _quiet(cli.main, ["scan", "LUNG_ids", "--category", "diagonal", "--data-path",
                            str(root), "--modalities", "rna,atac_peak", "--strict"])
     err = capsys.readouterr().err
-    # GLUE and Seurat_v3; MultiMAP reads peak_0 names as gene activity
-    assert rc == 1 and "unreadable peak names in 2" in err, err
-    assert "wrong ATAC kind in 1" in err
+    # GLUE and Seurat_v3. MultiMAP never reads the names: peak_0 names that
+    # are not the folder's genes are not gene activity (review of wp/f4_int)
+    assert rc == 1 and "Peak names are unreadable in 2." in err, err
+    assert "ATAC kind is wrong" not in err
 
 
 def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
@@ -263,7 +264,7 @@ def test_a_scripts_ref_mismatch_is_its_own_blocker(scripts_at_head, capsys):
                    "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "scripts not at MULTIBENCH_SCRIPTS_REF in 1" in err and "input files" not in err
+    assert "The scripts are not at MULTIBENCH_SCRIPTS_REF in 1." in err and "input files" not in err
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "totalVI",
                    "--dry-run"])
     cap = capsys.readouterr()

@@ -224,8 +224,9 @@ def test_install_packed_cpu_falls_back_with_one_warning(envs_dir, tmp_path, monk
     assert str(rec[0].message) == ("scmb_r has a single build (the same archive for CPU "
                                    "and GPU hosts); installing it (0.9 GB)")
     assert fetched == ["https://x/scmb_r.tar.gz"]
-    assert (envs_dir / "scmb_r" / envs.FLAVOR_FILE).read_text() == "gpu\n"
-    assert envs.installed_flavor("scmb_r") == "gpu"
+    # one archive for CPU and GPU hosts: recorded as a single build (review of wp/f4_int)
+    assert (envs_dir / "scmb_r" / envs.FLAVOR_FILE).read_text() == "single\n"
+    assert envs.installed_flavor("scmb_r") == "single"
     # listed, but the size is still null: the placeholder of an archive not
     # uploaded yet - the warning says the CPU archive is not published yet
     with pytest.warns(UserWarning) as rec:

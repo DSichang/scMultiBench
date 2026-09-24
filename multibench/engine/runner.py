@@ -41,8 +41,8 @@ class RunResult:
         Commit of the method scripts that ran; ``None`` when they are not a
         git checkout.
     env_flavor : str
-        ``'cpu'`` or ``'gpu'`` build of the method's environment, else
-        ``'unknown'``.
+        ``'cpu'`` or ``'gpu'`` build of the method's environment, ``'single'``
+        when it has one build for both, else ``'unknown'``.
     hostname : str
         Name of the computer that ran the method.
 
@@ -694,7 +694,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     Parameters
     ----------
     method : str
-        Registry method id, e.g. ``"Matilda"``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
     category : str
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``.

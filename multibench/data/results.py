@@ -448,7 +448,7 @@ def _check_methods(wanted: list, present) -> None:
                 f"unknown method {m!r}"
                 + (f"; did you mean {hint[0]!r}?" if hint else "")
                 + "; see mtb.list_methods() (a method absent from the loaded "
-                "tables but known to the registry gives an empty frame plus a "
+                "tables but known to the package gives an empty frame plus a "
                 "UserWarning instead)") from None
 
 
@@ -669,10 +669,10 @@ def load_results(
       ones present.
 
     **Method and metric names.** A ``methods`` entry that is neither a
-    registry id nor a method in the loaded frame raises ``KeyError`` with a
+    method id nor a method in the loaded frame raises ``KeyError`` with a
     did-you-mean hint (``"unknown method 'Matlida'; did you mean
     'Matilda'?"``). Method folders of the published tables are reported by
-    registry id (``MOFA+`` -> ``MOFA2``, ``Seurat(WNN)`` -> ``Seurat_WNN``);
+    method id (``MOFA+`` -> ``MOFA2``, ``Seurat(WNN)`` -> ``Seurat_WNN``);
     metric names read from the published tables or a file are canonical
     (``iFI`` -> ``iF1``).
 
@@ -712,9 +712,9 @@ def load_results(
     sweeps: Conos on D28).
 
     When the selection holds one method in the chosen source while the
-    other source holds more, a ``UserWarning`` says so (``"only one method
-    (scMoMaT) in the published table for cross/D52 ... pass source='rerun'
-    (or 'both')"``). No warning when the other source has nothing more.
+    other source holds more, a ``UserWarning`` says so (``"The published
+    table for cross/D52 has one method, scMoMaT, ... Pass source="rerun" or
+    "both"."``). No warning when the other source has nothing more.
 
     **Re-run version.** The sweep files stamp their rows
     ``rerun-<version>``; the ``source`` column reads plain ``"rerun"`` and
@@ -888,7 +888,7 @@ def _other_source_methods(source: str, cats: list, datasets, clustering: str,
 
 def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
                         clustering: str, base: Path, stacklevel: int = 4) -> None:
-    """One ``UserWarning`` (the CLI's "only one method in this table" text)
+    """One ``UserWarning`` (``_ONE_METHOD_WARNING`` matches its start)
     when the loaded selection holds a single method while the other stored
     source holds more methods for the same category/dataset(s). Silent when
     the other source has nothing more."""
@@ -904,12 +904,18 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
     where = category or "/".join(cats)
     if datasets:          # no dataset filter: the selection is the category
         where += f"/{datasets[0] if len(datasets) == 1 else list(datasets)}"
+    names = {"published": "published", "rerun": "re-run"}
+    fix = config.hint(f'Pass source="{other}" or "both".', f"Pass --source {other}.")
     warnings.warn(
-        f"only one method ({out['method'].iloc[0]}) in the {source} table for "
-        f"{where}; ranks and Overall bars are not meaningful with a single "
-        f"method - the {other} tables hold {len(have)} methods for it "
-        f"({', '.join(sorted(have, key=str.lower))}): pass source={other!r} "
-        f"(or 'both')", UserWarning, stacklevel=stacklevel)
+        f"The {names[source]} table for {where} has one method, "
+        f"{out['method'].iloc[0]}, so every rank is the same. The {names[other]} "
+        f"tables have {len(have)} methods for {where}: "
+        f"{', '.join(sorted(have, key=str.lower))}. {fix}",
+        UserWarning, stacklevel=stacklevel)
+
+
+#: how the one-method warning of :func:`_warn_single_method` starts (a filter pattern)
+_ONE_METHOD_WARNING = r"The (published|re-run) table for .+? has one method, "
 
 
 def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
@@ -1126,7 +1132,7 @@ def results_coverage(
     # are silenced for the per-variant probes made here
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DegenerateRerunWarning)
-        warnings.filterwarnings("ignore", message="only one method", category=UserWarning)
+        warnings.filterwarnings("ignore", message=_ONE_METHOD_WARNING, category=UserWarning)
         for cat in cats:
             if source in ("published", "both"):
                 for clus in _CLUSTERING_FILES:
@@ -1304,10 +1310,10 @@ def recommend(
     **Ranking rules.**
 
     - Only methods this package runs for the category are ranked - the set
-      ``mtb.list_methods(category=...)`` lists. Other registry methods in
+      ``mtb.list_methods(category=...)`` lists. Other package methods in
       the table (MOFA2 or Multigrate in a cross table) are dropped before
       the within-dataset ranks are taken, and named in the warning and in
-      ``attrs["dropped_methods"]``. A name the registry does not know (your
+      ``attrs["dropped_methods"]``. A method the package does not know (your
       own method in ``long_df``) is kept.
     - A dataset holding fewer than ``min_methods`` methods is dropped. The
       min-max of a single method is always 1.0, so a lone method would win
@@ -1328,8 +1334,8 @@ def recommend(
       on / datasets kept for the ranking;
     - ``coverage`` - ``n_datasets / n_datasets_total``;
     - ``needs_labels``, ``runtime_tier``, ``worst_sec``, ``env``,
-      ``output_kind`` - registry metadata for the category; ``None`` for
-      ids that are not registry methods (your own method, a result-dir
+      ``output_kind`` - package metadata for the category; ``None`` for
+      ids that are not package methods (your own method, a result-dir
       token);
     - ``datasets`` - the dataset ids the score comes from, comma-joined;
       ``""`` when unscored.
@@ -1353,7 +1359,7 @@ def recommend(
     - ``"source"`` - ``"published"`` / ``"rerun"`` / ``"both"``, or
       ``"long_df"``;
     - ``"not_scored"`` (also under ``"missing"``) - the unscored method ids;
-    - ``"dropped_methods"`` - registry methods present in the table but not
+    - ``"dropped_methods"`` - package methods present in the table but not
       run by this package for the category.
 
     **Selections.** ``metrics="batch"`` scores ASW_batch, GC, iLISI, kBET;
@@ -1475,14 +1481,17 @@ def recommend(
             have = _other_source_methods(source, [category], None, "default",
                                          _base_path(result_path))
             if len(have) >= min_methods:
-                hint = (f" The {other} tables hold {len(have)} methods for {category} "
-                        f"({', '.join(sorted(have, key=str.lower))}): pass "
-                        f"source={other!r} (or 'both').")
+                label = "re-run" if other == "rerun" else other
+                hint = (f" The {label} tables have {len(have)} methods for {category}: "
+                        f"{', '.join(sorted(have, key=str.lower))}. Pass "
+                        f'source="{other}" or "both".')
+        sizes = {ds: len(parts[ds].index) for ds in sorted(parts)}
+        counts = ", ".join(f"{ds} has {k}" for ds, k in sizes.items())
+        one = (" A min-max score over one method is always 1.0."
+               if sizes and max(sizes.values()) == 1 else "")
         raise ValueError(
-            f"no dataset in {category} holds >= {min_methods} methods "
-            f"({len(parts)} dataset(s): {sorted(parts)}); a ranking over "
-            f"single-method datasets is meaningless (min-max of one value is "
-            f"1.0).{hint} Otherwise pass long_df= with more methods, or lower "
+            f"No {category} dataset has {min_methods} or more methods. {counts}."
+            f"{one}{hint} Otherwise pass long_df= with more methods, or lower "
             f"min_methods.")
     per_ds = pd.DataFrame({ds: style.compute_overall(mat) for ds, mat in kept.items()})
     # igraph-scored rows ranked against the leidenalg-scored stored rows of

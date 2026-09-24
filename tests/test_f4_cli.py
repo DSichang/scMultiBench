@@ -161,7 +161,9 @@ def test_exit_code_3_is_documented_in_both_helps(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--help"])
     top = " ".join(capsys.readouterr().out.split())
-    assert "3 run-all finished but a method is listed in failures.csv" in top
+    # worded by this run: failures.csv holds the merged folder (review of wp/f4_int)
+    assert ("3 run-all finished but a method of this run failed or was skipped (a line "
+            "on stderr names it)") in top
     assert "``3`` ``run-all``" in cli.__doc__
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])

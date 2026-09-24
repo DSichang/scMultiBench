@@ -50,7 +50,8 @@ def _h5(path, feats, n=60):
 def _vertical(root, name, atac_file, feats, n=60):
     d = root / name
     d.mkdir()
-    _h5(d / "rna.h5", [f"g{i}" for i in range(30)], n)
+    # gene activity is named by the RNA's genes, as in real data
+    _h5(d / "rna.h5", GENES[:30], n)
     _h5(d / atac_file, feats, n)
     pd.DataFrame({"x": ["A", "B"] * (n // 2)}).to_csv(d / "cty.csv", index=False)
     return root
@@ -200,11 +201,11 @@ def test_scan_strict_counts_the_wrong_atac_kind_apart(tmp_path, capsys):
             "--modalities", "rna,atac_gas", "--strict"]
     rc = _quiet(cli.main, base)
     err = capsys.readouterr().err
-    assert rc == 1 and "wrong ATAC kind in 3" in err, err
+    assert rc == 1 and "The ATAC kind is wrong in 3." in err, err
     # R4-01: --methods naming them still fails; --allow-atac-mismatch passes
     rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC"])
     cap = capsys.readouterr()
-    assert rc == 1 and "wrong ATAC kind in 2" in cap.err, cap.err
+    assert rc == 1 and "The ATAC kind is wrong in 2." in cap.err, cap.err
     rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC", "--allow-atac-mismatch"])
     cap = capsys.readouterr()
     assert rc == 0, cap.err

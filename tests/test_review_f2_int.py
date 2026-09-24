@@ -180,7 +180,7 @@ def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
     rc = cli.main(["plot", "bar", "--input", str(path), "--out", str(tmp_path / "r.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert "warning: only one method in this table" in err
+    assert "warning: this table has one method, so every rank is the same" in err
 
 
 # ====================================================== cell checks in run()

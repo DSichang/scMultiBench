@@ -73,7 +73,8 @@ def _gasmos(root, name="GASMOS", n=40):
     """A D46-like mosaic folder whose batch-2 ATAC holds gene activity."""
     d = root / name
     d.mkdir(parents=True)
-    genes = [f"g{i}" for i in range(30)]
+    # gene activity is named by the RNA's genes, as in real data
+    genes = GENES[:30]
     for b in (1, 2, 3):
         bars = [f"b{b}c{i}" for i in range(n)]
         _h5(d / f"rna{b}.h5", genes, bars)
@@ -89,7 +90,7 @@ def _vertical(root, name, atac_feats, n=60):
     d = root / name
     d.mkdir(parents=True)
     bars = [f"c{i}" for i in range(n)]
-    _h5(d / "rna.h5", [f"g{i}" for i in range(30)], bars)
+    _h5(d / "rna.h5", GENES[:30], bars)
     _h5(d / "atac.h5", atac_feats, bars)
     _labels(d / "cty.csv", n)
     return root
@@ -137,7 +138,7 @@ def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned,
             "--methods", "StabMap,scMoMaT", "--strict", "--assume-gpu"]
     rc = _quiet(cli.main, base)
     err = capsys.readouterr().err
-    assert rc == 1 and "wrong ATAC kind in 2" in err, err
+    assert rc == 1 and "The ATAC kind is wrong in 2." in err, err
     for m in ("StabMap", "scMoMaT"):
         assert re.search(rf"^  {m}: needs peak ATAC; atac2.h5 holds gene activity\. Export "
                          r"the ATAC as peaks, or pass --allow-atac-mismatch to run "
@@ -358,7 +359,7 @@ def test_a_series_with_foreign_ids_raises(cite, tmp_path):
     kw = dict(methods=["Matilda"], modalities=["rna", "adt"], data_path=data,
               verbose=False)
     for extra in ({}, {"dry_run": True}):
-        with pytest.raises(ValueError, match=r"batch: 120 id\(s\) are not cells of MYCITE "
+        with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
                                              r"\(first: \['xc"):
             _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "x", batch=bad,
                    **kw, **extra)
@@ -438,8 +439,9 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert set(fails.index) == {"UnitedNet", "MIRA"}
     assert "logger.py" in fails.loc["MIRA", "error"]
     assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "error"]
-    assert "to run UnitedNet anyway; UnitedNet needs an NVIDIA GPU" in \
-        fails.loc["UnitedNet", "error"]
+    # the override ends the reason, after the GPU sentence
+    assert fails.loc["UnitedNet", "error"].endswith(
+        "or pass allow_atac_mismatch=True to run UnitedNet anyway.")
     disk = pd.read_csv(tmp_path / "out" / "summary.csv").set_index("method")
     assert disk.loc["MIRA", "status"] == "SKIPPED"
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())

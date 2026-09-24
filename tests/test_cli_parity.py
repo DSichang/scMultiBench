@@ -337,12 +337,12 @@ def test_cli_plot_single_method_warning_and_default_title(tmp_path, capsys, monk
     assert rc == 0
     # plot.bubble warns about one method itself (the fake here does not), so
     # the CLI adds no line of its own; plot bar still gets the CLI line
-    assert "only one method" not in cap.err
+    assert "only one method" not in cap.err and "has one method" not in cap.err
     assert seen["n"] == 1 and seen["title"] == "D1"
     monkeypatch.setattr(plot_ns, "bar", fake_bubble)
     rc = cli.main(["plot", "bar", "--input", str(csv), "--dataset", "D1",
                    "--out", str(tmp_path / "x.png")])
-    assert rc == 0 and "only one method" in capsys.readouterr().err
+    assert rc == 0 and "this table has one method" in capsys.readouterr().err
     # default title for stored results is '<category> <dataset>'
     monkeypatch.setattr(multibench, "load_results", lambda **k: _long_df())
     rc = cli.main(["plot", "bubble", "--category", "vertical", "--dataset", "D1",

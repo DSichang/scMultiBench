@@ -402,10 +402,12 @@ def installed_flavor(env: str, conda: str | None = None) -> str | None:
     Returns
     -------
     str or None
-        The word in ``<prefix>/.multibench_flavor`` (``'cpu'`` / ``'gpu'``,
-        written by :func:`install_packed`); ``None`` when the env is not
-        installed, was built from a lockfile or by conda (no record), or the
-        file holds anything else.
+        The word in ``<prefix>/.multibench_flavor`` (``'cpu'`` / ``'gpu'`` /
+        ``'single'``, written by :func:`install_packed`); ``None`` when the
+        env is not installed, was built from a lockfile or by conda (no
+        record), or the file holds anything else. An env with a single build
+        (:func:`_single_build`) reads ``'single'``, also from a record that
+        says ``'gpu'``.
     """
     prefix = env_prefix(env, conda)
     if prefix is None:
@@ -414,7 +416,13 @@ def installed_flavor(env: str, conda: str | None = None) -> str | None:
         words = (prefix / FLAVOR_FILE).read_text().split()
     except OSError:
         return None
-    return words[0] if words and words[0] in ("cpu", "gpu") else None
+    word = words[0] if words and words[0] in ("cpu", "gpu", "single") else None
+    if word in ("gpu", "single"):
+        try:
+            return "single" if _single_build(env) else "gpu"
+        except Exception:  # noqa: BLE001 - an unreadable manifest keeps the record
+            return word
+    return word
 
 
 _GROUPS_YAML = Path(__file__).resolve().parent / "env_groups.yaml"
@@ -434,7 +442,7 @@ def recipe(method: str) -> dict:
     Parameters
     ----------
     method : str
-        Registry method id, e.g. ``"Matilda"``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
 
     Returns
     -------
@@ -741,8 +749,8 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     - ``shared`` - the env serves several methods (``multibench env groups``
       lists these shared envs).
     - ``methods`` - the selected methods this env serves, sorted.
-    - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the env is installed here from
-      a packed archive, else ``None``.
+    - ``flavor`` - ``'cpu'`` / ``'gpu'`` / ``'single'`` when the env is
+      installed here from a packed archive, else ``None``.
 
     **Selection.** ``methods`` takes precedence over ``category``.
 
@@ -994,7 +1002,8 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         _conda_unpack(dest)
         # the record env status / doctor / plan show; written last, so a
         # prefix that failed to unpack never claims a flavour
-        (dest / FLAVOR_FILE).write_text(installed + "\n")
+        (dest / FLAVOR_FILE).write_text(
+            ("single" if build == "single" else installed) + "\n")
         _conda_prefixes.cache_clear()
         return True
     except Exception as e:  # noqa: BLE001 - degrade to the lockfile build
@@ -1102,7 +1111,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
     Returns
     -------
     list[dict] or pandas.DataFrame
-        One row per registry method. Read ``method``, ``env``, ``exists``
+        One row per package method. Read ``method``, ``env``, ``exists``
         and ``has_lock``; all keys are listed in Notes.
 
     Raises
@@ -1129,7 +1138,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
 
     **Keys.**
 
-    - ``method`` - the registry id.
+    - ``method`` - the method id.
     - ``env`` - the env the package uses for the method, the name
       ``mtb.scan`` and ``mtb.run`` use (``mtb.method_info(m)['env']``).
     - ``group`` - the same name as ``env``.
@@ -1144,7 +1153,8 @@ def status(conda: str | None = None, *, as_frame: bool = False):
       reference dataset (the ``*`` after the tag in ``multibench env status``).
     - ``has_recipe`` - the method declares a recipe (``mtb.env.recipe``).
     - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the installed env came from a
-      packed archive, else ``None``.
+      packed archive, ``'single'`` for an env with one archive for CPU and
+      GPU hosts, else ``None``.
 
     **Difficulty tags.** They describe how hard the env is to build from its
     recipe, not how well the method works (full text in
@@ -1698,8 +1708,8 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
       ``multibench env install --run`` can build it (``[L]`` while missing).
       A missing env without one (``[!]``) needs a packed archive or the
       recipe (``mtb.env.recipe``).
-    - ``flavor`` - ``'cpu'`` / ``'gpu'`` when the installed env came from a
-      packed archive, else ``None``.
+    - ``flavor`` - ``'cpu'`` / ``'gpu'`` / ``'single'`` when the installed
+      env came from a packed archive, else ``None``.
 
     **Next step.** A fresh machine reports ``exists=False`` everywhere.
     ``mtb.env.install(methods, dry_run=False)`` installs the missing envs,
@@ -1925,7 +1935,7 @@ def create(method: str, env_name: str | None = None, conda: str | None = None,
     Parameters
     ----------
     method : str
-        Registry method id.
+        Method id; see ``mtb.list_methods()``.
     env_name : str, optional
         Build into this env instead of :func:`default_env_name`.
     conda : str, optional
@@ -1996,7 +2006,7 @@ def _run_all(cmds: list[list[str]]) -> None:
             "conda/mamba not found on this machine, so method environments "
             "cannot be built here. They need Linux with conda (mamba "
             "recommended) - see the installation guide. Everything that does "
-            "not run a method (the registry, stored results, figures) works "
+            "not run a method (the method list, stored results, figures) works "
             "without them."
         )
     for c in cmds:

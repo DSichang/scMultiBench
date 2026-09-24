@@ -245,8 +245,8 @@ def test_strict_counts_the_gpu_test_on_its_own(login_node, capsys):
                    "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "needs a GPU on this host in 1" in err
-    assert "env not ready" not in err
+    assert "This host has no GPU for 1." in err
+    assert "environment is not ready" not in err
     assert "--assume-gpu" in err
 
 
@@ -257,7 +257,7 @@ def test_strict_counts_a_missing_env_and_a_missing_gpu_apart(monkeypatch, capsys
                    "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "env not ready in 2" in err and "needs a GPU on this host in 1" in err
+    assert "The environment is not ready in 2." in err and "This host has no GPU for 1." in err
     # the flag would not make SMILE runnable here: no pointer to it
     assert "--assume-gpu" not in err
 

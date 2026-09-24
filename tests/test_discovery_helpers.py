@@ -164,7 +164,8 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     assert msg.splitlines()[1].strip().startswith(
         "- Datasets D52, D54, D57, D58 and D59 have fewer than 2 methods and are left "
         "out of the ranking.")
-    with pytest.raises(ValueError, match="single-method") as e:
+    with pytest.raises(ValueError, match=r"No cross dataset has 50 or more methods\. D52 "
+                                         r"has 1, D53 has 4") as e:
         recommend("cross", min_methods=50, result_path=layout_tree)
     assert "pass source=" not in str(e.value)       # that tree has no other source
 
@@ -175,13 +176,16 @@ def test_recommend_single_dataset_category_names_the_other_source(result_dir):
     which hold eight methods for it."""
     import warnings
     from multibench.data.results import recommend
-    with pytest.raises(ValueError, match=r"no dataset in cross holds >= 2 methods \(1 dataset\(s\): \['D52'\]\)") as e:
+    with pytest.raises(ValueError, match=r"^No cross dataset has 2 or more methods\. D52 has "
+                                         r"1\. A min-max score over one method is always "
+                                         r"1\.0\.") as e:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             recommend("cross", result_path=result_dir)
     msg = str(e.value)
-    assert ("The rerun tables hold 8 methods for cross (Concerto, sciPENN, scMDC, scMM, "
-            "scMoMaT, StabMap, totalVI, UINMF): pass source='rerun' (or 'both')") in msg
+    assert ("The re-run tables have 8 methods for cross: Concerto, sciPENN, scMDC, scMM, "
+            "scMoMaT, StabMap, totalVI, UINMF. Pass source=\"rerun\" or \"both\".") in msg
+    assert "meaningless" not in msg and ">=" not in msg and "(s)" not in msg
     assert msg.endswith("Otherwise pass long_df= with more methods, or lower min_methods.")
     # that source ranks them on D52 + D52s, nothing dropped
     r, m = _rec("cross", source="rerun", result_path=result_dir)

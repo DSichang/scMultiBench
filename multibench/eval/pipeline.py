@@ -143,8 +143,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     rows after ``pd.concat``. ``load_results(result_path=...)`` keeps the
     column when it reads the CSV back.
 
-    **Plot badges.** The bubble figure shows ``?`` for a method name the
-    registry does not know. To badge a method of your own as supervised, add
+    **Plot badges.** The bubble figure shows ``?`` for a method the package
+    does not know, such as your own. To badge a method of your own as supervised, add
     a boolean ``needs_labels`` column to the frame.
 
     **Errors.** All are ``ValueError``:

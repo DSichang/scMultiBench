@@ -24,7 +24,12 @@ from multibench.engine import envs, registry
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
-FETCH = "Remove it, then run multibench fetch --scripts"
+#: the fix of a folder with other files: the safe action first (review of wp/f4_int)
+FIX = ("an empty or new folder, then run multibench fetch --scripts. If the folder is "
+       "left over from an earlier fetch, you can remove it instead")
+PY_FIX = f"Set MULTIBENCH_REPO_PATH or mtb.config.DEFAULT.repo_path to {FIX}"
+CLI_FIX = f"Set MULTIBENCH_REPO_PATH to {FIX}"
+OTHER = "holds other files and no method scripts."
 MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
            "--modalities", "rna,adt"]
 
@@ -126,14 +131,14 @@ def test_a_folder_with_other_files_is_refused_plainly(host, monkeypatch, capsys)
     target = host / "scripts"
     target.mkdir()
     (target / "gencode.gtf").write_text("x\n")
-    sentence = f"{target} holds no method scripts. {FETCH}"
+    sentence = f"{target} {OTHER} {PY_FIX}"
     with pytest.raises(RuntimeError) as e:
         config.ensure_repo(target)
     assert str(e.value) == sentence + "."
     assert " - " not in str(e.value)
     _use(monkeypatch, target)
     assert cli.main(["fetch", "--scripts"]) == 1
-    assert capsys.readouterr().err.startswith(f"error: {sentence}.\n")
+    assert capsys.readouterr().err.startswith(f"error: {target} {OTHER} {CLI_FIX}.\n")
     assert os.listdir(target) == ["gencode.gtf"]                 # nothing deleted
     assert config.scripts_folder_problem() == sentence
 
@@ -143,7 +148,8 @@ def test_scan_and_config_name_a_folder_with_other_files(host, monkeypatch, capsy
     target.mkdir()
     (target / "gencode.gtf").write_text("x\n")
     _use(monkeypatch, target)
-    sentence = f"{target} holds no method scripts. {FETCH}"
+    sentence = f"{target} {OTHER} {PY_FIX}"
+    cli_sentence = f"{target} {OTHER} {CLI_FIX}"
     row = _scan_row()
     assert not row["runnable"]
     assert row["reason"] == sentence
@@ -158,13 +164,13 @@ def test_scan_and_config_name_a_folder_with_other_files(host, monkeypatch, capsy
     row = next(r for r in config._sources() if r["name"] == "scripts_commit")
     assert (row["value"], row["source"]) == ("not fetched", sentence)
     assert cli.main(["config"]) == 0
-    assert f"({sentence})" in capsys.readouterr().out
+    assert f"({cli_sentence})" in capsys.readouterr().out
     # --strict: counted as not fetched; the tail is the sentence, not a fetch
     # that would refuse
     assert cli.main(MATILDA + ["--strict"]) == 1
     err = capsys.readouterr().err
-    assert "(method scripts not fetched in 1)" in err
-    assert err.rstrip().endswith(sentence + ".")
+    assert "Method scripts are not fetched in 1." in err
+    assert err.rstrip().endswith(cli_sentence + ".")
     assert "Run multibench fetch --scripts first." not in err
 
 
@@ -193,8 +199,8 @@ def test_scan_strict_fails_while_the_scripts_are_not_fetched(host, monkeypatch, 
     capsys.readouterr()
     assert cli.main(MATILDA + ["--strict"]) == 1
     err = capsys.readouterr().err
-    assert err.startswith("error: --strict: 0 of 1 row(s) runnable "
-                          "(method scripts not fetched in 1)")
+    assert err.startswith("error: --strict: 0 of 1 row is runnable. Method scripts "
+                          "are not fetched in 1.")
     assert "  Matilda: method scripts not fetched\n" in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
     assert "no row" not in err
@@ -205,8 +211,11 @@ def test_scan_strict_names_fetch_without_methods(host, monkeypatch, capsys):
     argv = ["scan", "D11", "--category", "vertical", "--modalities", "rna,adt", "--strict"]
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
-    assert re.search(r"^error: --strict: 0 of (\d+) row\(s\) runnable \(method scripts "
-                     r"not fetched in \1\); the reason column says why\n", err), err
+    # the rows blocked only by the scripts have no reason: the head does not
+    # send the reader to that column
+    assert re.search(r"^error: --strict: 0 of (\d+) rows are runnable\. Method scripts "
+                     r"are not fetched in \1\.\n", err), err
+    assert "reason column" not in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
 
 
@@ -220,7 +229,7 @@ def test_the_student_gate_on_a_mosaic_dataset(host, monkeypatch, capsys):
             "--strict", "--assume-gpu"]
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
-    assert "method scripts not fetched in 2" in err
+    assert "Method scripts are not fetched in 2." in err
     assert "Run multibench fetch --scripts first." in err
 
 

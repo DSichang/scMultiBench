@@ -53,7 +53,7 @@ def test_strict_with_allow_atac_mismatch_still_needs_fetched_scripts(tmp_path, m
         warnings.simplefilter("ignore")
         rc = cli.main(argv)
     err = capsys.readouterr().err
-    assert rc == 1 and "method scripts not fetched in 2" in err, err
+    assert rc == 1 and "Method scripts are not fetched in 2." in err, err
     assert err.rstrip().endswith("Run multibench fetch --scripts first."), err
     monkeypatch.setattr(config, "scripts_present", lambda cfg=None: True)
     with warnings.catch_warnings():
@@ -76,7 +76,10 @@ def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkey
         warnings.simplefilter("ignore")
         df = W.run_all("GASMOS", "mosaic", data_path=root, dry_run=True,
                        methods=["StabMap"], verbose=False)
-    sentence = f"{repo} holds no method scripts. Remove it, then run multibench fetch --scripts"
+    sentence = (f"{repo} holds other files and no method scripts. Set MULTIBENCH_REPO_PATH "
+                f"or mtb.config.DEFAULT.repo_path to an empty or new folder, then run "
+                f"multibench fetch --scripts. If the folder is left over from an earlier "
+                f"fetch, you can remove it instead")
     assert not df["runnable"].any() and df["reason"].str.startswith(sentence).all()
     err = capsys.readouterr().err
     assert err.count(f"# {sentence}\n") == 1, err

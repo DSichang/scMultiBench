@@ -233,7 +233,7 @@ def describe_layout(category: str | None = None) -> str:
     ```
 
     **Source of the lists.** The methods per ATAC representation and the
-    batch patterns are read from the method registry at call time, so they
+    batch patterns are read from the package's method list at call time, so they
     agree with ``method_info`` and ``mtb.find_methods``.
 
     See Also
@@ -1072,7 +1072,7 @@ def scan(dataset: str, category: str | None = None, *,
     **Column reference.** The full frame has 18 columns:
 
     ```text
-    method              registry id
+    method              method id
     category            integration category of the variant
     modalities          '+'-joined string ("rna+adt"); "(data_dir)" for a
                         directory-fed variant
@@ -1338,8 +1338,9 @@ def scan(dataset: str, category: str | None = None, *,
                     r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
                                and not wrong_ref)
-        rec["reason"] = _join_clauses([wrong_ref, *short_problems, wrong_atac,
-                                       rec["env_reason"]])
+        # the ATAC reason ends with its override, so it comes last
+        rec["reason"] = _join_clauses([wrong_ref, *short_problems, rec["env_reason"],
+                                       wrong_atac])
         # --- the command line: only when the files resolved (something to
         # hand the script); an env-blocked row still gets one. A setup step
         # the user must do first, and method scripts not yet on this machine,
@@ -1747,7 +1748,7 @@ class BatchResult:
         first ten columns below:
 
         ```text
-        method                  registry id
+        method                  method id
         status                  outcome; see "Status values"
         run_sec                 wall-clock seconds of the method run
         output_kind             embedding / graph
@@ -1852,6 +1853,12 @@ class BatchResult:
         sm = _with_label_order_note(
             pd.DataFrame(rows).sort_values("method").reset_index(drop=True))
         sm["caveat"] = sm.pop("caveat")          # new columns go last
+        # whole numbers stay whole next to the blanks of SKIPPED and FAIL rows
+        for col in ("n_batches", "n_tunable"):
+            try:
+                sm[col] = pd.to_numeric(sm[col]).astype("Int64")
+            except (TypeError, ValueError):     # not whole numbers: left as they are
+                pass
         return sm
 
     @property
@@ -2309,10 +2316,14 @@ class BatchResult:
         noemb = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_EMBEDDING")
         nolab = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_LABEL_MATCH")
         skipped = sum(1 for r in self.records if r.get("status") == "SKIPPED")
-        bad = len(self.failures)
+        fails = self.failures
+        # a named SKIPPED method is in failures too; count it once, as skipped
+        named = int((fails["status"] == "SKIPPED").sum()) if len(fails) else 0
+        bad = len(fails) - named
         extra = (f", {noemb} ran but not scorable" if noemb else "") + (
             f", {nolab} ran but no labels matched" if nolab else "") + (
-            f", {skipped} skipped" if skipped else "")
+            f", {skipped} skipped" if skipped else "") + (
+            f" ({named} named)" if named else "")
         return (f"<BatchResult {self.category}/{self.dataset}: "
                 f"{ok}/{len(self.records)} with metrics{extra}, {bad} failed>")
 
@@ -2522,6 +2533,11 @@ def _positional_batch_warning(batch, why: str, *, stacklevel: int = 4) -> None:
                   "this warning.", UserWarning, stacklevel=stacklevel)
 
 
+def _n_ids(n: int) -> str:
+    """``'1 id'`` or ``'2,864 ids'``."""
+    return "1 id" if n == 1 else f"{n:,} ids"
+
+
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
     """``batch`` as one id per cell, in the order of ``labels_for(dataset)``.
 
@@ -2545,20 +2561,29 @@ def _batch_vector(batch, dataset, data_path) -> np.ndarray:
     index = pd.Index([str(i) for i in batch.index])
     if list(index) == ids:
         return vals
-    fix = "Pass batch.to_numpy() to match by position."
+    # to_numpy() is right only for a vector already in the dataset's cell order
+    by_position = (f"pass batch.to_numpy() only when batch is already in the order "
+                   f"of mtb.labels_for({dataset!r})")
     if not index.is_unique:
         dup = index[index.duplicated()]
-        raise ValueError(f"batch: the index repeats {len(dup):,} id(s) (first: "
+        raise ValueError(f"batch: the index repeats {_n_ids(len(dup))} (first: "
                          f"{list(dup[:3])}), so it cannot be aligned to the cells of "
-                         f"{dataset}. {fix}")
+                         f"{dataset}. Give each cell one id, or {by_position}.")
     foreign = index.difference(pd.Index(ids), sort=False)
     if len(foreign):
-        raise ValueError(f"batch: {len(foreign):,} id(s) are not cells of {dataset} "
-                         f"(first: {list(foreign[:3])}). {fix}")
+        if pd.api.types.is_integer_dtype(batch.index):
+            raise ValueError(f"batch: the index holds row numbers (first: "
+                             f"{list(batch.index[:3])}), not cell barcodes. Set the "
+                             f"index to the dataset's barcodes, or {by_position}.")
+        raise ValueError(f"batch: {_n_ids(len(foreign))} "
+                         f"{'is not a cell' if len(foreign) == 1 else 'are not cells'} "
+                         f"of {dataset} (first: {list(foreign[:3])}). Rename the index "
+                         f"to the dataset's barcodes, or {by_position}.")
     missing = pd.Index(ids).difference(index, sort=False)
     if len(missing):
         raise ValueError(f"batch: {len(missing):,} of the {len(ids):,} cells of {dataset} "
-                         f"have no id in batch (first: {list(missing[:3])}). {fix}")
+                         f"have no id in batch (first: {list(missing[:3])}). Give a "
+                         f"batch id for every cell.")
     return np.asarray(pd.Series(vals, index=index).reindex(ids).to_numpy())
 
 
@@ -2787,6 +2812,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     ValueError
         Unknown ``category``, no matching variant, nothing runnable, a
         mismatched ``out_dir``, or conflicting arguments (Notes).
+    ValueError
+        A ``batch`` Series holds ids that are not cells of the dataset.
     KeyError
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
@@ -3094,8 +3121,14 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                     print(f"[run_all]   reusing existing output in {mdir}", flush=True)
                 res = None                       # read back from disk below
             else:
-                res = _run(method=m, category=category, inputs=inp,
-                           out_dir=str(mdir), params=mp)
+                with warnings.catch_warnings():
+                    # an allowed ATAC caveat is already in the log and the record
+                    warnings.filterwarnings(
+                        "ignore", category=UserWarning,
+                        message=re.escape(f"{m} ") + rf"({_WRONG_ATAC_RE.pattern[1:]}"
+                                rf"|{re.escape(PEAK_NAMES_REASON)})")
+                    res = _run(method=m, category=category, inputs=inp,
+                               out_dir=str(mdir), params=mp)
             rec["reused"] = bool(reused)
             rec["run_sec"] = round(time.time() - t0, 1)
             v = v0
@@ -3167,7 +3200,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     category : str
         Integration category of the variant to run.
     method : str
-        Registry method id, e.g. ``"Matilda"``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
     param : str
         Hyperparameter to sweep; one of the variant's ``tunable`` keys
         (``mtb.params_for``).

@@ -120,7 +120,7 @@ def test_step1_donor_block_is_two_plain_bullets():
             "pass each cell's sample as `batch=` to `run_all` or `evaluate`.") in step1
     assert ("- CITE-seq donors: use `vertical` in the same way. The `cross` category "
             "also fits three donors, one file each: see the "
-            "[One file per batch](tutorials/run.md#your-own-data-as-a-dataset-folder) tab.") in step1
+            "[One file per batch](tutorials/run.md#one-file-per-batch) tab.") in step1
     block = step1.split("For several samples or donors:", 1)[1]
     assert "fit both" not in block and "(" not in block.replace("](", "").replace(".md#", "")
     assert "stored table" not in block and "UINMF" not in block
@@ -177,9 +177,12 @@ def test_run_guide_names_the_atac_override_and_one_dataset_name():
 @needs_docs
 def test_api_page_names_exit_code_3_and_the_atac_override():
     api = _flat("api.md")
-    assert ("`2` on a usage error, and `3` when `run-all` finished but a method is "
-            "listed in `failures.csv`.") in api
-    assert "`--allow-atac-mismatch` on `scan` and `run-all` counts a method" in api
+    # worded by this run: failures.csv holds the merged folder (review of wp/f4_int)
+    assert ("`2` on a usage error, and `3` when `run-all` finished but a method of "
+            "this run failed or was skipped. A line on stderr names that method.") in api
+    assert ("`--allow-atac-mismatch` on `scan` and `run-all` counts a method as runnable "
+            "when its ATAC file holds the other representation or peak names the method "
+            "cannot read.") in api
     assert "It also exits with `1` while the method scripts are not fetched." in api
 
 

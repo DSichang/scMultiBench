@@ -262,7 +262,8 @@ def test_evaluate_and_run_help_texts():
     assert "they replace the sweep for ARI and NMI" in clus
     assert "iF1 still sweeps unless --metrics leaves it out" in clus
     meth = _opt_help(ev, "--method")
-    assert "must be a registry method, which sets the label order" in meth
+    assert "must be a method of this package, which sets the label order" in meth
+    assert "registry" not in meth
     dry = _opt_help(_sub("run"), "--dry-run")
     assert "environment activation included" in dry and "conda run -n" not in dry
 
