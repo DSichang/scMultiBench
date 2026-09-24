@@ -33,7 +33,7 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
                     verbose=False)
     msg = str(e.value)
     assert "nothing is runnable" in msg and "methods=['Matilda']" in msg
-    assert "one line per requested variant" in msg
+    assert "one line per requested row" in msg
     # every requested variant on its own line, with ITS reason
     assert "\n  Matilda (rna+adt): conda env 'matilda' is not installed" in msg
     assert "\n  Matilda (rna+atac): " in msg
@@ -47,9 +47,9 @@ def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False)
     msg = str(e.value)
-    m = re.search(r"First 3 of (\d+) blocked variants:\n", msg)
+    m = re.search(r"The first 3 of (\d+) blocked rows:\n", msg)
     assert m and int(m.group(1)) >= 10
-    body = msg.split("blocked variants:\n", 1)[1]
+    body = msg.split("blocked rows:\n", 1)[1]
     lines = [l for l in body.splitlines() if l.startswith("  ")]
     assert len(lines) == 3
     assert all(re.match(r"  \w+ \([\w+()]+\): \S", l) for l in lines), lines
@@ -158,11 +158,11 @@ def test_cli_run_all_dry_run_is_compact_too(capsys, tmp_path):
                    "--dry-run"])
     cap = capsys.readouterr()
     assert rc == 0
-    table = cap.out.split("\n# commands")[0]
+    table = cap.out.split("\n# Commands")[0]
     assert table.splitlines()[0].split() == cli._compact_plan_columns(
         mtb.scan("D11", "vertical", verbose=False))
     assert _widest(table) <= 160
-    assert "# dry run" in cap.err and "# dry run" not in cap.out
+    assert "# Dry run." in cap.err and "# Dry run." not in cap.out
 
 
 # ------------------------------------------------------------------ J3: dry-run prints the commands
@@ -175,7 +175,7 @@ def test_cli_run_all_dry_run_prints_commands(capsys, tmp_path, monkeypatch):
                    "--dry-run", "--methods", "Matilda,scMoMaT"])
     cap = capsys.readouterr()
     assert rc == 0
-    assert "# commands (" in cap.out
+    assert "# Commands of the 2 rows with resolvable inputs." in cap.out
     cmd_lines = [l for l in cap.out.splitlines() if l.startswith(("Matilda (", "scMoMaT ("))]
     assert len(cmd_lines) == 2                 # rna+adt rows only: the others lack files
     mat = next(l for l in cmd_lines if l.startswith("Matilda (rna+adt)"))
@@ -239,7 +239,7 @@ def test_cli_run_dry_run_prints_command(capsys):
     # conda may be printed as a bare word or as the resolved absolute path
     _first = cap.out.split()[0]
     assert _first.endswith("conda") and " run -n matilda " in cap.out and "--epochs 5" in cap.out
-    assert "dry run" in cap.err
+    assert "# Dry run." in cap.err
 
 
 # ------------------------------------------------------------------ J4: --param

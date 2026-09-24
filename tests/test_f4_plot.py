@@ -268,7 +268,7 @@ def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
     mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, verbose=True,
                 data_path=root / "data")
     (line,) = [ln for ln in capsys.readouterr().out.splitlines()
-               if ln.startswith("[run_all] dry run:")]
+               if ln.startswith("[run_all] Dry run:")]
     assert " blocked. The table's reason column says why, and its files_ok and env_ok " \
            "columns say which check failed. mtb.env.doctor() checks the environments." in line
     _no_log_joins(line)
@@ -281,7 +281,7 @@ def test_prepared_file_note_names_the_method(root):
         warnings.simplefilter("ignore")
         sc = mtb.scan("D28", "diagonal", data_path=root / "data", verbose=False)
     cav = sc.set_index("method").loc["GLUE", "caveat"]
-    assert ("the command reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
+    assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
             "first, so start GLUE with mtb.run or mtb.run_all. The printed command alone "
             "fails in a job script.") in cav
     assert "shell line" not in cav
@@ -293,8 +293,8 @@ def test_prepared_file_note_cli_spelling(monkeypatch):
     plan = {"atac": {"value": "/o/inputs/a.h5", "convert": True, "normpeaks_from": None},
             "rna": {"value": "/o/inputs/b.h5", "convert": True, "normpeaks_from": None}}
     assert runner._prepared_note(plan, "/o", "GLUE") == (
-        "the command reads inputs/a.h5, inputs/b.h5. `multibench run` writes those "
-        "files first, so start GLUE with `multibench run` or `multibench run-all`. The "
+        "GLUE reads inputs/a.h5, inputs/b.h5. multibench run writes those "
+        "files first, so start GLUE with multibench run or multibench run-all. The "
         "printed command alone fails in a job script.")
 
 

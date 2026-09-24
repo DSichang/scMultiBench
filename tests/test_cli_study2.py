@@ -281,11 +281,10 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
     assert "dl" not in lines["have_it"]
     # unknowns are counted per column: the row printing '? disk' is a disk unknown
     assert ("# total for 2 envs: at least 0.9 GB to download\n# Both envs have a single "
-            "build (the same archive for CPU and GPU hosts).\n# download size not "
-            "recorded for 1 of 2 "
-            "envs, size on disk for 1 of 2 envs (3.1 GB for the other 1); unpacked envs "
-            "are larger than the "
-            "download, so check with du after the first install") in cap.err
+            "build (the same archive for CPU and GPU hosts).\n# The download size of "
+            "mystery is not recorded.\n# 3.1 GB on disk for scmb_torch. mystery is not "
+            "measured.\n# Unpacked envs are larger than the download. Check with du "
+            "after the first install.") in cap.err
     assert not any(l.startswith("#") for l in cap.out.splitlines())
 
 

@@ -60,15 +60,15 @@ def test_scan_file_gate_runs_without_envs(tmp_path, no_envs):
     assert rows["files_reason"].str.contains("adt.h5").all()
     assert not rows["env_ok"].any()
     assert not rows["runnable"].any()
-    # reason joins BOTH parts with '; ' - the file problem is visible even though
+    # reason joins BOTH parts as sentences - the file problem is visible even though
     # the env is also missing. The file half is the SHORT form (no exception
     # class, no absolute paths); the env half is verbatim (it carries the
     # install command).
     for _, r in rows.iterrows():
         # the file half is built from the resolved paths (L31): the missing
         # file by name, never cut; the folder listing stays in files_reason
-        assert r["reason"] == f"missing adt.h5; {r['env_reason']}"
-        assert r["reason"].endswith("; " + r["env_reason"])
+        assert r["reason"] == f"adt.h5 is missing. {r['env_reason']}"
+        assert r["reason"].endswith(". " + r["env_reason"])
         assert "adt.h5" in r["reason"] and "not installed" in r["reason"]
         assert "FileNotFoundError" in r["files_reason"] and str(tmp_path) in r["files_reason"]
         assert "FileNotFoundError" not in r["reason"] and str(tmp_path) not in r["reason"]
@@ -154,7 +154,9 @@ def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
     df = mtb.scan("D11", "vertical")                  # verbose=True is the default
     out = capsys.readouterr().out
     n = len(df)
-    assert f"[scan] files OK for {int(df['files_ok'].sum())}/{n} method rows; 0/{n} envs installed" in out
+    k = int(df["files_ok"].sum())
+    assert (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
+            f"environment installed.") in out
     assert out.count("[scan]") == 1
     # verbose=False is silent (run_all(verbose=False) passes it through)
     mtb.scan("D11", "vertical", verbose=False)
@@ -217,7 +219,7 @@ def test_run_all_dry_run_prints_summary(capsys, no_envs):
     mtb.run_all("D11", "vertical", out_dir="/tmp/unused", methods=["Matilda"],
                 dry_run=True, verbose=True)
     out = capsys.readouterr().out
-    assert "[run_all] dry run: 0 of" in out and "reason column" in out
+    assert "[run_all] Dry run: 0 of" in out and "reason column" in out
 
 
 def test_run_all_dry_run_never_returns_empty():

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -338,7 +339,7 @@ def missing_script_fix(repo) -> str:
         return ("update it with git pull, or delete it so the next run fetches a "
                 "fresh copy")
     return (f"that folder is not a git checkout. If you made it by hand, move out "
-            f"the files you added, delete it, run `{FETCH_SCRIPTS_CMD}` and put the "
+            f"the files you added, delete it, run {FETCH_SCRIPTS_CMD} and put the "
             f"files back; otherwise copy a full scripts checkout there")
 
 
@@ -936,7 +937,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             print(f"# {note}", file=sys.stderr, flush=True)
         return argv
     if mismatch:
-        warnings.warn("; ".join(mismatch), UserWarning, stacklevel=2)
+        # one sentence per file: the peak-name caveat already ends with its fix
+        warnings.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
+                      UserWarning, stacklevel=2)
 
     spec = registry.get(method)
     variant = spec.select(category, _modality_roles(inputs))
@@ -979,11 +982,11 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
                 raise EnvironmentError(
                     f"{linux_only} Run {this} on a Linux machine; {preview_with} "
                     f"previews the method's command here.")
-            py = f" (or mtb.env.install([{method!r}], dry_run=False)); see mtb.env.doctor()"
+            py = f" (or mtb.env.install([{method!r}], dry_run=False)). See mtb.env.doctor()."
             raise EnvironmentError(
-                f"conda env {env_name!r} ({method}) is not installed - run "
-                f"`multibench env install --methods {method} --packed --run`"
-                + config.hint(py, "; see `multibench env doctor`"))
+                f"conda env {env_name!r} ({method}) is not installed. Run "
+                f"multibench env install --methods {method} --packed --run"
+                + config.hint(py, ". See multibench env doctor."))
 
     # Absolute paths + trailing separator on directory roles before conversion,
     # so canonical passthrough files are absolute too; converted copies live
@@ -1114,11 +1117,19 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     return argv, notes + ([prepared] if prepared else [])
 
 
-#: how :func:`_prepared_note` starts, so ``mtb.scan`` can pick it out of the notes
-_PREPARED_PREFIX = "the command reads "
+#: what :func:`_prepared_note` says after the method name; :func:`_prepared_at`
+#: finds the note in a scan caveat, which joins its clauses with ``"; "``
+_PREPARED_PREFIX = " reads inputs"
+_PREPARED_RE = re.compile(r"(?:^|(?<=; ))[^\s;]+" + re.escape(_PREPARED_PREFIX) + r"[\\/]")
 
 
-def _prepared_note(plan: dict, out_str: str, method: str = "the method") -> str | None:
+def _prepared_at(text) -> int:
+    """Where the :func:`_prepared_note` in ``text`` starts, or ``-1``."""
+    m = _PREPARED_RE.search(str(text or ""))
+    return m.start() if m else -1
+
+
+def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
     """The note for a command that reads files the run writes first, or ``None``.
 
     A converted input (``inputs/<role>.h5``) or a renamed peak file
@@ -1130,11 +1141,11 @@ def _prepared_note(plan: dict, out_str: str, method: str = "the method") -> str 
     if not files:
         return None
     that = "that file" if len(files) == 1 else "those files"
-    return f"{_PREPARED_PREFIX}{', '.join(files)}. " + config.hint(
+    return f"{method} reads {', '.join(files)}. " + config.hint(
         f"mtb.run writes {that} first, so start {method} with mtb.run or "
         f"mtb.run_all. The printed command alone fails in a job script.",
-        f"`multibench run` writes {that} first, so start {method} with "
-        f"`multibench run` or `multibench run-all`. The printed command alone "
+        f"multibench run writes {that} first, so start {method} with "
+        f"multibench run or multibench run-all. The printed command alone "
         f"fails in a job script.")
 
 
@@ -1151,5 +1162,5 @@ def _fetch_scripts(repo_path) -> Path:
         raise RuntimeError(
             f"could not clone the method scripts (PYangLab/scMultiBench) into "
             f"{target}: {e}. On a host without network, fetch them first on a "
-            f"connected machine with `{FETCH_SCRIPTS_CMD}` and copy the folder, or "
+            f"connected machine with {FETCH_SCRIPTS_CMD} and copy the folder, or "
             f"point repo_path at an existing checkout") from e

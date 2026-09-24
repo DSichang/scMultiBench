@@ -23,22 +23,26 @@ def _linux_no_envs(monkeypatch):
 
 
 # ----------------------------------------------------------------- plan summary
+def _count_named(named: str) -> int:
+    """How many envs ``a``, ``a and b``, ``a, b and c`` or ``5 envs`` names."""
+    m = re.fullmatch(r"(\d+) envs", named)
+    return int(m.group(1)) if m else len(re.split(r", | and ", named))
+
+
 def total_unknowns(text: str) -> tuple[int, int, int]:
     """``(n envs, unknown downloads, unknown disks)`` parsed from the ``# total``
-    line and the line after it that counts the unknown sizes."""
+    line and the lines after it that name the envs without a size."""
     n = int(re.search(r"# total for (\d+) envs?", text).group(1))
 
-    def unknown(what):
-        m = re.search(what + r" (?:not recorded )?for (?:(\d+) of \d+ envs|(both) envs|"
-                      r"all (\d+) envs|(this) env)", text)
-        if m is None:
-            return 0
-        k, both, every, this = m.groups()
-        return int(k) if k else 2 if both else int(every) if every else 1
-    # none known: the first line says so, and the second does not repeat it
+    def unknown(pattern):
+        m = re.search(pattern, text)
+        return _count_named(m.group(1)) if m else 0
+    # none known: the first line says so, and no later line repeats it
     dl = n if re.search(r"# total for [^\n]*: download size not recorded", text) \
-        else unknown("download size")
-    return n, dl, unknown("size on disk")
+        else unknown(r"# The download size of (.+?) is not recorded\.")
+    disk = (unknown(r"# The size on disk of (.+?) is not measured\.")
+            or unknown(r"GB on disk for .+?\. (.+?) (?:is|are) not measured\."))
+    return n, dl, disk
 
 
 def test_size_total_counts_unknowns_per_column():
@@ -52,10 +56,11 @@ def test_size_total_counts_unknowns_per_column():
     # stays as a lower bound (the figure a storage-quota request needs)
     assert line.splitlines() == [
         "# total for 3 envs: 3.0 GB download",
-        "# size on disk not recorded for 2 of 3 envs (2.0 GB for the other 1); unpacked "
-        "envs are larger than the download, so check with du after the first install"]
-    assert all(l.count(";") <= 2 for l in line.splitlines())
-    assert "on disk," not in line and "GB on disk" not in line
+        "# 2.0 GB on disk for a. b and c are not measured.",
+        "# Unpacked envs are larger than the download. Check with du after the first "
+        "install."]
+    assert ";" not in line
+    assert "on disk" not in line.splitlines()[0]
     full = cli._size_total_line(rows[:1], sizes)
     assert total_unknowns(full) == (1, 0, 0)
     assert full == "# total for 1 env: 1.0 GB download, 2.0 GB on disk"

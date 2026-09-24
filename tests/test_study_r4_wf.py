@@ -121,8 +121,8 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
     for m in ("StabMap", "scMoMaT"):
         assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
         assert df.loc[m, "reason"] == (
-            f"needs peak ATAC; atac2.h5 holds gene activity. Export the ATAC as peaks, "
-            f"or pass allow_atac_mismatch=True to run {m} anyway."), df.loc[m, "reason"]
+            f"{m} needs peak ATAC, and atac2.h5 holds gene activity. Export the ATAC as "
+            f"peaks, or pass allow_atac_mismatch=True to run {m} anyway."), df.loc[m, "reason"]
     ok = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False, allow_atac_mismatch=True)
     assert ok["runnable"].all() and ok["reason"].eq("").all()
@@ -138,10 +138,10 @@ def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned,
             "--methods", "StabMap,scMoMaT", "--strict", "--assume-gpu"]
     rc = _quiet(cli.main, base)
     err = capsys.readouterr().err
-    assert rc == 1 and "The ATAC kind is wrong in 2." in err, err
+    assert rc == 1 and "Rows with the wrong ATAC kind: 2." in err, err
     for m in ("StabMap", "scMoMaT"):
-        assert re.search(rf"^  {m}: needs peak ATAC; atac2.h5 holds gene activity\. Export "
-                         r"the ATAC as peaks, or pass --allow-atac-mismatch to run "
+        assert re.search(rf"^  {m}: {m} needs peak ATAC, and atac2.h5 holds gene activity\. "
+                         r"Export the ATAC as peaks, or pass --allow-atac-mismatch to run "
                          rf"{m} anyway\.$", err, re.M), err
     rc = _quiet(cli.main, base + ["--allow-atac-mismatch", "--format", "csv"])
     cap = capsys.readouterr()
@@ -155,8 +155,8 @@ def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinn
     plan = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
                   modalities=["rna", "atac"], data_path=root, dry_run=True, verbose=False)
     assert not plan["runnable"].any()
-    assert plan["reason"].iloc[0].startswith("needs gene-activity ATAC; atac.h5 holds "
-                                              "peaks. Export the ATAC as gene activity")
+    assert plan["reason"].iloc[0].startswith("Matilda needs gene-activity ATAC, and atac.h5 "
+                                              "holds peaks. Export the ATAC as gene activity")
     capsys.readouterr()
     plan = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
                   modalities=["rna", "atac"], data_path=root, dry_run=True,
@@ -197,9 +197,9 @@ def test_named_glue_with_peak_0_names_is_blocked(tmp_path, pinned):
                 verbose=False).set_index("method")
     assert not df.loc["GLUE", "runnable"] and df.loc["GLUE", "files_ok"]
     assert df.loc["GLUE", "reason"] == (
-        "reads peak names such as chr1:100-200; atac_peak.h5 holds other names (e.g. "
-        "peak_0). Rename them to chr:start-end, or pass allow_atac_mismatch=True to run "
-        "GLUE anyway.")
+        "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
+        "example peak_0. Rename them to chr:start-end, or pass allow_atac_mismatch=True to "
+        "run GLUE anyway.")
     assert W._is_wrong_atac(df["reason"]).loc[["GLUE", "Seurat_v3"]].all()
 
 
@@ -248,8 +248,8 @@ def test_cli_run_dry_run_prints_the_note(tmp_path, pinned, capsys):
                            "--out-dir", str(tmp_path / "o"), "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert "# GLUE reads peak names such as chr1:100-200; atac_peak.h5 holds other names " \
-           "(e.g. peak_0)" in err, err
+    assert ("# GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
+            "for example peak_0. Rename them to chr:start-end.\n") in err, err
 
 
 def test_layout_lines_name_the_override_in_short_sentences(monkeypatch):

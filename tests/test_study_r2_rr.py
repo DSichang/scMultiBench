@@ -288,7 +288,7 @@ def test_rna_cty_next_to_atac_cty_is_not_paired_labels(root, tmp_path):
     got = mtb.inputs_for("D28", "vertical", "UnitedNet", data_path=root / "data")
     assert got["cty"].endswith("/D28/cty.csv")
     row = _row("D28", "vertical", "UnitedNet", root / "data")
-    assert not row["files_ok"] and "missing cty.csv" in row["reason"]
+    assert not row["files_ok"] and "cty.csv is missing." in row["reason"]
 
 
 def test_unitednet_reason_names_atac_first_then_cty(tmp_path):
@@ -296,8 +296,8 @@ def test_unitednet_reason_names_atac_first_then_cty(tmp_path):
     d.mkdir()
     _h5(d / "rna.h5", GENES, [f"c{i}" for i in range(30)])
     row = _row("RNAONLY", "vertical", "UnitedNet", tmp_path)
-    assert row["reason"].startswith("needs gene-activity ATAC (atac.h5); not in the folder; "
-                                    "missing cty.csv")
+    assert row["reason"].startswith("UnitedNet needs gene-activity ATAC (atac.h5), which is "
+                                    "not in the folder. cty.csv is missing.")
 
 
 # --- M22: caveats lead with the problem ---------------------------------------

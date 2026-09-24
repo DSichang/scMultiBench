@@ -789,7 +789,7 @@ def _check_label_lengths(method, dataset, category, resolved):
                 f"every cell of a batch needs exactly one label in cty{batch}.csv, "
                 f"in the same order as the cells (see "
                 + config.hint(f"mtb.describe_layout({category!r})",
-                              f"`multibench layout {category}`") + ")")
+                              f"multibench layout {category}") + ")")
     if category == "diagonal":
         _check_diagonal_label_files(method, dataset, resolved)
     for role, path in resolved.items():
@@ -817,7 +817,7 @@ def _check_label_lengths(method, dataset, category, resolved):
                     f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
                     f"exactly one label, in the same order as the cells (see "
                     + config.hint(f"mtb.describe_layout({category!r})",
-                                  f"`multibench layout {category}`") + ")")
+                                  f"multibench layout {category}") + ")")
 
 
 def _check_diagonal_label_files(method, dataset, resolved):
@@ -850,7 +850,7 @@ def _check_diagonal_label_files(method, dataset, resolved):
                 f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
                 f"exactly one label, in the same order as the cells (see "
                 + config.hint("mtb.describe_layout('diagonal')",
-                              "`multibench layout diagonal`") + ")")
+                              "multibench layout diagonal") + ")")
 
 
 def _data_dir_files(variant, data_dir) -> dict:
@@ -907,9 +907,9 @@ GAS_NAMES_UNKNOWN_CAVEAT = ("expects gene activity; {file} holds names that are 
 #: peak names ``mtb.run`` rewrites to chr:start-end (``normalize_peaks``) when
 #: more than 10% of the first 50 names are not chr<sep>start<sep>end, so the
 #: rewrite cannot help; ``example`` is the first such name. No subject, like
-#: the other caveats: logs print it after the method name.
-PEAK_NAMES_CAVEAT = ("reads peak names such as chr1:100-200; {file} holds other "
-                     "names (e.g. {example})")
+#: the other caveats: logs print it after the method name. It ends with the fix.
+PEAK_NAMES_CAVEAT = ("reads peak names such as chr1:100-200. {file} holds other "
+                     "names, for example {example}. Rename them to chr:start-end.")
 #: ``.format(file=...)`` caveat for a modality file whose sampled values are not
 #: whole numbers (log-normalised data).
 NOT_COUNTS_CAVEAT = "expects raw counts; {file} holds non-integer values"
@@ -1153,7 +1153,7 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
         why = GAS_OTHER_ORDER_REASON.format(
             gas=gas.name, peak=peak.name,
             write=config.hint("mtb.io.to_canonical(..., modality='gas')",
-                              "`multibench convert SRC DIR --modality gas`"))
+                              "multibench convert SRC DIR --modality gas"))
     else:
         return
     raise ValueError(f"{method}/{dataset}/diagonal: {why}")

@@ -192,7 +192,7 @@ def test_schema_accepts_the_two_valid_shapes():
     spec = _parse(requires_gpu=True, gpu_evidence="tools_scripts/X/main.py:12")
     assert spec.requires_gpu and spec.cpu_params == {}
     assert spec.requires_gpu_reason == (
-        'X needs an NVIDIA GPU; this computer has none. '
+        'X needs an NVIDIA GPU, and this computer has none. '
         'See method_info("X")["requires_gpu"].')
     # absent keys -> the defaults
     spec = _parse()
@@ -322,7 +322,7 @@ def test_real_run_is_silent_on_gpu_host_and_with_explicit_key(tmp_path, monkeypa
 
 # ------------------------------------------------------------ runner: requires_gpu
 
-MOETM_REASON = ('moETM needs an NVIDIA GPU; this computer has none. '
+MOETM_REASON = ('moETM needs an NVIDIA GPU, and this computer has none. '
                 'See method_info("moETM")["requires_gpu"].')
 
 
@@ -393,7 +393,7 @@ def test_scan_joins_missing_env_and_missing_gpu(tmp_path, no_gpu, monkeypatch):
     r = df[df["modalities"] == "rna+adt"].iloc[0]
     assert not bool(r["env_ok"])
     assert r["env_reason"].startswith("conda env ") and "not installed" in r["env_reason"]
-    assert r["env_reason"].endswith("; " + MOETM_REASON)
+    assert r["env_reason"].endswith(". " + MOETM_REASON)
     assert r["reason"] == r["env_reason"]
 
 

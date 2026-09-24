@@ -213,7 +213,7 @@ def check_method(method_id: str) -> str:
     raise KeyError(
         f"unknown method {method_id!r}"
         + (f"; did you mean {hint[0]!r}?" if hint else "")
-        + "; see " + config.hint("mtb.list_methods()", "`multibench list`"))
+        + "; see " + config.hint("mtb.list_methods()", "multibench list"))
 
 
 def check_id_list(value, name: str):

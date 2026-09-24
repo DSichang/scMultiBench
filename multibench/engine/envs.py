@@ -122,8 +122,8 @@ VERIFIED_STAR = ("* = verified_working: the env ran the method end-to-end on "
 
 #: The symbol set of every env listing (``env status`` and ``env doctor``):
 #: installed / missing-with-lockfile / missing-without-lockfile.
-MARK_LEGEND = ("[x]=installed  [L]=missing, lockfile ready (run `multibench env "
-               "install --run`)  [!]=missing, no lockfile")
+MARK_LEGEND = ("[x]=installed  [L]=missing, lockfile ready (run multibench env "
+               "install --run)  [!]=missing, no lockfile")
 
 
 def env_mark(exists: bool, has_lock: bool) -> str:
@@ -1874,7 +1874,7 @@ def freeze(env_name: str, conda: str | None = None,
     if env_name not in installed_envs(conda):
         raise FileNotFoundError(
             f"no conda env named {env_name!r} on this machine "
-            f"(see `conda env list`); freeze captures existing envs only")
+            f"(conda env list shows them); freeze captures existing envs only")
     dst_dir = Path(out_dir) if out_dir else _LOCKS_DIR
     dst_dir.mkdir(parents=True, exist_ok=True)
 

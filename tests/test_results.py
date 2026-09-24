@@ -179,7 +179,8 @@ def test_missing_published_error_text(tmp_path):
         results.load_results("vertical", result_path=tmp_path)
     msg = str(e.value)
     assert "result_path" in msg and "multibench/result/scib_metric" in msg
-    assert "source='rerun'" in msg
+    # a category whose tables should be there: no mosaic advice (R5-06)
+    assert "source='rerun'" not in msg and "mosaic" not in msg
 
 
 def test_mosaic_rerun_loads(result_dir):

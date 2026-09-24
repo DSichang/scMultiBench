@@ -175,14 +175,34 @@ def _base_path(result_path) -> Path:
 _RESULT_PATH_HINT = " (pass result_path= for another results root)"
 
 
+#: the results the package ships (``multibench/result``)
+_SHIPPED_BASE = Path(__file__).resolve().parent.parent / "result"
+
+
+def _category_unpublished(category: str) -> bool:
+    """Whether the package ships no published tables for ``category`` (mosaic).
+
+    Read from disk: the shipped published tree exists and has no folder for
+    the category. A missing tree is an install problem, not this case.
+    """
+    tree = _SHIPPED_BASE / config.metric_set_dir("scib")
+    return tree.is_dir() and not (tree / config.category_folder(category)).is_dir()
+
+
+def _unpublished_msg(category: str) -> str:
+    """The error for a category without published tables: the fact, then the fix."""
+    return (f"{category} has no published tables. Pass source='rerun' to load the "
+            f"package's re-run tables, or load your own long CSV with "
+            f"result_path=<file>.")
+
+
 def _published_missing_msg(root: Path, base: Path, category: str) -> str:
+    if _category_unpublished(category):
+        return _unpublished_msg(category)
     return (
         f"no published scIB metric tables under {root}. The tables ship inside "
-        f"the multibench wheel at multibench/result/scib_metric; check "
-        f"result_path= / mtb.config.DEFAULT.result_path (currently {base}). "
-        f"mosaic has no published tables - use source='rerun' (package sweeps) "
-        f"or load your own long CSV with result_path=<file>."
-        + (f" (requested category={category!r})" if category else "")
+        f"the multibench wheel at multibench/result/scib_metric. Check "
+        f"result_path= / mtb.config.DEFAULT.result_path (currently {base})."
     )
 
 

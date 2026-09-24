@@ -541,7 +541,7 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                 who = config.hint(
                     (f"mtb.method_info({method!r})" if method else "method_info(m)")
                     + "['setup_hint']",
-                    f"`multibench info {method or 'METHOD'}`, setup_hint")
+                    f"multibench info {method or 'METHOD'}, setup_hint")
                 name = f"{method}'s script" if method else f"script {ep.name}"
                 files = " and ".join(gone)
                 return (f"{name} imports {files}, which the public scMultiBench "
@@ -556,6 +556,17 @@ def _join_clauses(parts) -> str:
     leave before the separator (``"... names.; setup: ..."``)."""
     parts = [p for p in parts if p]
     return "; ".join([p.rstrip().rstrip(".") for p in parts[:-1]] + parts[-1:])
+
+
+def _have_their(k: int) -> str:
+    """``has its`` after a count of 1, else ``have their`` (``3 of 14 rows have their``)."""
+    return "has its" if k == 1 else "have their"
+
+
+def _join_sentences(parts) -> str:
+    """Join the ``reason`` parts as sentences, each ending with a period."""
+    parts = [p.strip() for p in parts if p and p.strip()]
+    return " ".join(p if p[-1] in ".!?" else p + "." for p in parts)
 
 
 def _variant_rows(category=None):
@@ -589,11 +600,12 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
     says what this computer can do instead.
     """
     if _runner.linux_only_sentence():
-        return f"Linux-only environment {env} (not installable on this computer)"
+        return (f"The environment {env} is Linux-only and cannot be installed on this "
+                f"computer.")
     alt = f" (or --category {category})" if category else ""
-    return (f"conda env {env!r} is not installed - run "
-            f"`multibench env install --methods {method} --packed --run`{alt}; "
-            f"see {config.hint('mtb.env.doctor()', '`multibench env doctor`')}")
+    return (f"conda env {env!r} is not installed. Run "
+            f"multibench env install --methods {method} --packed --run{alt}. "
+            f"See {config.hint('mtb.env.doctor()', 'multibench env doctor')}.")
 
 
 #: The caveat of a GPU-only row that ``scan(assume_gpu=True)`` keeps runnable.
@@ -633,10 +645,11 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
 
     Built from the resolved paths, not from the exception text, so no path
     is ever cut. An ATAC file leads with what the method needs and what the
-    folder holds instead: ``needs gene-activity ATAC (atac_gas.h5); folder
-    has peaks (atac_peak.h5)``. Other files follow as ``missing adt.h5``,
-    then the per-batch hint of ``inputs_for`` when the folder holds
-    ``rna1.h5, rna2.h5, ...`` for a vertical or diagonal method.
+    folder holds instead: ``UnitedNet needs gene-activity ATAC (atac_gas.h5),
+    and the folder has peaks (atac_peak.h5).`` Other files follow as
+    ``adt.h5 is missing.``, then the per-batch hint of ``inputs_for`` when
+    the folder holds ``rna1.h5, rna2.h5, ...`` for a vertical or diagonal
+    method. Each part is a sentence with its own subject.
     """
     try:
         paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
@@ -661,7 +674,7 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
             want = "gene-activity"
         else:
             want = {"peak": "peak", "gene_activity": "gene-activity"}.get(spec.atac or "", "")
-        need = f"needs {want + ' ' if want else ''}ATAC ({want_file})"
+        need = f"{spec.id} needs {want + ' ' if want else ''}ATAC ({want_file})"
         found = [p.parent / f"{b}{digits}.h5" for b in ("atac", "atac_peak", "atac_gas", "peak")]
         found = [f for f in found if f.is_file() and f.name != want_file]
         # the right representation under a diagonal name: only the name is wrong
@@ -670,23 +683,24 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
                                          "gene-activity": "gene activity"}[want]]
         if same:
             atac_parts.append(
-                f"vertical reads {want_file}: rename {same[0].name} to {want_file}, or "
-                "write it with " + config.hint('category="vertical"',
-                                               "--category vertical"))
+                f"{spec.id} reads {want_file} for vertical. Rename {same[0].name} to "
+                f"{want_file}, or write it with " + config.hint('category="vertical"',
+                                                                "--category vertical"))
         elif found:
             has = ", ".join(f"{_atac_kind_of(f)} ({f.name})" for f in found)
-            atac_parts.append(f"{need}; folder has {has}")
+            atac_parts.append(f"{need}, and the folder has {has}")
         else:
-            atac_parts.append(f"{need}; not in the folder")
+            atac_parts.append(f"{need}, which is not in the folder")
     if other:
-        atac_parts.append("missing " + ", ".join(other))
+        atac_parts.append(", ".join(other) + (" is" if len(other) == 1 else " are")
+                          + " missing")
     # rna1.h5 + rna2.h5 where a vertical / diagonal method reads one rna.h5
     ds_dir = next(iter(missing.values())).parent
     batch_hint = _resolve._per_batch_hint(
         ds_dir, category, {st for r in missing for st in _resolve._role_stems(r)[0]})
     if batch_hint:
-        atac_parts.append(batch_hint)
-    return "; ".join(atac_parts)
+        atac_parts.append(batch_hint[:1].upper() + batch_hint[1:])
+    return _join_sentences(atac_parts)
 
 
 _ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}(),:;]*")
@@ -727,8 +741,9 @@ _list_of_ids = registry.check_id_list
 _WRONG_ATAC_RE = re.compile(r"^expects (gene activity|peaks); (\S+) holds (peaks|gene activity) ")
 #: ``_resolve.PEAK_NAMES_CAVEAT``: the peak file of a method whose peak names
 #: ``mtb.run`` rewrites holds names the rewrite cannot turn into chr:start-end.
-_PEAK_NAMES_RE = re.compile(r"^reads peak names such as (\S+); (\S+) holds other names")
-#: How the reason of a peak-name row starts (``cli._strict_problem`` counts them apart).
+_PEAK_NAMES_RE = re.compile(r"^reads peak names such as (\S+)\. (\S+) holds other names")
+#: What the reason of a peak-name row says after the method name
+#: (``cli._strict_problem`` counts them apart).
 PEAK_NAMES_REASON = "reads peak names such as "
 #: The override every blocking-ATAC reason names, in its Python and CLI
 #: spellings: the marker :func:`_is_wrong_atac` looks for, whatever the prose.
@@ -756,9 +771,10 @@ def _wrong_atac_reason(method: str, caveats) -> str:
         m = _WRONG_ATAC_RE.match(text)
         if m:
             want = "gene-activity" if m.group(1) == "gene activity" else "peak"
-            return (f"needs {want} ATAC; {m.group(2)} holds {m.group(3)}. Export the "
-                    f"ATAC as {m.group(1)}" + anyway)
-        return f"{text.rstrip('.')}. Rename them to chr:start-end" + anyway
+            return (f"{method} needs {want} ATAC, and {m.group(2)} holds {m.group(3)}. "
+                    f"Export the ATAC as {m.group(1)}" + anyway)
+        # the caveat ends with the fix (rename them); the override follows it
+        return f"{method} {text.rstrip('.')}" + anyway
     return ""
 
 
@@ -785,16 +801,17 @@ def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
         return []
 
 
-#: How the two notes on starting a method begin (``runner.script_notes`` and
-#: ``runner._prepared_note``); scan appends them after every other clause.
-_START_NOTES = ("method scripts not found under ", _runner._PREPARED_PREFIX)
+#: How the note that the method scripts are not here begins
+#: (``runner.script_notes``); scan appends it, then ``runner._prepared_note``
+#: (found by ``runner._prepared_at``), after every other clause.
+_START_NOTES = ("method scripts not found under ",)
 
 
 def _run_caveat(caveat) -> str:
     """A scan ``caveat`` without the notes on starting the method, which
     ``run_all`` does itself: what its log and records keep of the caveat."""
     text = str(caveat or "")
-    cuts = [i for i in (text.find(p) for p in _START_NOTES) if i >= 0]
+    cuts = [i for i in (text.find(_START_NOTES[0]), _runner._prepared_at(text)) if i >= 0]
     return text[:min(cuts)].rstrip("; ") if cuts else text
 
 
@@ -828,7 +845,8 @@ def _dry_run_notes(plan: "pd.DataFrame") -> tuple:
         text = str(r.get("caveat") or "")
         i = text.find(_START_NOTES[0])
         if scripts is None and i >= 0:
-            scripts = text[i:].split("; " + _runner._PREPARED_PREFIX, 1)[0]
+            j = _runner._prepared_at(text[i:])
+            scripts = text[i:][:j].rstrip("; ") if j >= 0 else text[i:]
         cav = _run_caveat(text)
         if _would_run(r) and cav:
             lines.append((r["method"], cav))
@@ -960,7 +978,7 @@ def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
         f"modalities={modalities}; "
         + (why or config.hint(
             f"see mtb.method_info(m)['supports'] and mtb.scan({dataset!r})",
-            f"see `multibench info METHOD` and `multibench scan {dataset}`")))
+            f"see multibench info METHOD and multibench scan {dataset}")))
     err.representation = bool(why)      # the CLI keeps this message as it is
     return err
 
@@ -981,7 +999,7 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
         argv, notes = _runner.preview(method, category, inputs=inputs,
                                       out_dir=Path(out_dir) / f"{method}_{dataset}",
                                       params=params, gpu=gpu)
-        prepared = [n for n in notes if n.startswith(_runner._PREPARED_PREFIX)]
+        prepared = [n for n in notes if _runner._prepared_at(n) == 0]
         return shlex.join(argv), prepared
     except Exception as e:  # noqa: BLE001 - a preview must never abort the scan
         return f"(no preview: {type(e).__name__}: {e})", []
@@ -1022,8 +1040,8 @@ def scan(dataset: str, category: str | None = None, *,
         ``{method: {key: value}}`` hyperparameter overrides, rendered into
         ``command`` and checked against the keys each method accepts.
     verbose : bool
-        Print one line ``[scan] files OK for k/n method rows; e/n envs
-        installed``.
+        Print one line: how many rows have their input files and their
+        environment.
     assume_gpu : bool
         ``True`` = skip this host's GPU test; for a login node without a GPU
         that checks a GPU-node job.
@@ -1083,7 +1101,7 @@ def scan(dataset: str, category: str | None = None, *,
     observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
     caveat              what the run needs besides the files, or ""
     runnable            both checks pass and nothing below blocks it
-    reason              short form of the non-empty reasons, "; "-joined
+    reason              short form of the non-empty reasons, as sentences
     files_ok            the inputs resolve, are oriented and labelled
     files_reason        full file-check text, full paths
     env_ok              the env exists (and a GPU, when the script needs one)
@@ -1112,7 +1130,7 @@ def scan(dataset: str, category: str | None = None, *,
       unconditionally (``method_info(m)['requires_gpu']``), ``env_ok`` also
       needs an NVIDIA GPU (``mtb.env.host_has_gpu()``); without one,
       ``env_reason`` carries the sentence ``run`` would raise (``"<method>
-      needs an NVIDIA GPU; this computer has none. See ..."``); the
+      needs an NVIDIA GPU, and this computer has none. See ..."``); the
       ``file:line`` evidence is in ``method_info(m)['gpu_evidence']``.
     - ``assume_gpu=True`` (``multibench scan --assume-gpu``) skips that GPU
       test, for a check on a login node before a GPU-node job. The row's
@@ -1121,11 +1139,12 @@ def scan(dataset: str, category: str | None = None, *,
 
     The file check runs whether or not any conda env is installed.
 
-    **Reason columns.** ``reason`` joins the non-empty reasons with ``"; "``
+    **Reason columns.** ``reason`` joins the non-empty reasons as sentences
     and is empty only when the row is runnable. It is the short form. A
     missing ATAC file leads with what the method needs and what the folder
-    holds (``needs gene-activity ATAC (atac_gas.h5); folder has peaks
-    (atac_peak.h5)``); other missing files read ``missing adt.h5``.
+    holds (``UnitedNet needs gene-activity ATAC (atac_gas.h5), and the folder
+    has peaks (atac_peak.h5).``). Other missing files read ``adt.h5 is
+    missing.``
 
     File names are never cut. ``files_reason`` / ``env_reason`` keep the
     full text with full paths; read them for a row you are debugging.
@@ -1266,7 +1285,7 @@ def scan(dataset: str, category: str | None = None, *,
             + config.hint("dataset= is the folder name and data_path= the folder that "
                           "contains it (see mtb.describe_layout())",
                           "DATASET is the folder name and --data-path the folder that "
-                          "contains it (see `multibench layout`)"))
+                          "contains it (see multibench layout)"))
     installed = _installed_envs()
     repo = _runner._repo_root_no_fetch()
     # scripts at another commit than $MULTIBENCH_SCRIPTS_REF, or a scripts
@@ -1334,13 +1353,13 @@ def scan(dataset: str, category: str | None = None, *,
                 rec["caveat"] = _join_clauses([rec["caveat"], GPU_NODE_CAVEAT])
             else:
                 rec["env_ok"] = False
-                rec["env_reason"] = "; ".join(
+                rec["env_reason"] = " ".join(
                     r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
                                and not wrong_ref)
         # the ATAC reason ends with its override, so it comes last
-        rec["reason"] = _join_clauses([wrong_ref, *short_problems, rec["env_reason"],
-                                       wrong_atac])
+        rec["reason"] = _join_sentences([wrong_ref, *short_problems, rec["env_reason"],
+                                         wrong_atac])
         # --- the command line: only when the files resolved (something to
         # hand the script); an env-blocked row still gets one. A setup step
         # the user must do first, and method scripts not yet on this machine,
@@ -1383,11 +1402,12 @@ def scan(dataset: str, category: str | None = None, *,
             f"modalities=[] to select them, or no modalities for every variant",
             UserWarning, stacklevel=2)
     if verbose:
-        n = len(df)
-        line = (f"[scan] files OK for {int(df['files_ok'].sum())}/{n} method rows; "
-                f"{int(df['env_ok'].sum())}/{n} envs installed")
+        n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
+        rows = "row" if n == 1 else "rows"
+        line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files)} input files. "
+                f"{k_env} of {n} {_have_their(k_env)} environment installed.")
         if _runner.linux_only_sentence():
-            line += f". {LINUX_ONLY_SUMMARY}"
+            line += f" {LINUX_ONLY_SUMMARY}"
         print(line, flush=True)
     return df
 
@@ -2355,7 +2375,14 @@ def _error_tail(error, width: int = 200) -> str:
     last = lines[-1]
     if len(lines) > 1 and lines[-2].startswith("Error") and lines[-2].endswith(":"):
         last = f"{lines[-2]} {last}"
-    return last if len(last) <= width else "..." + last[-(width - 3):]
+    if len(last) <= width:
+        return last
+    # clipped at a word boundary: the tail starts with a whole word
+    tail = last[-(width - 3):]
+    space = tail.find(" ")
+    if 0 <= space < len(tail) - 1:
+        tail = tail[space + 1:]
+    return "..." + tail
 
 
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
@@ -2379,21 +2406,23 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
             ["_files", "method"], kind="stable").drop(columns="_files")
     head = f"nothing is runnable for dataset={dataset!r} category={category!r}"
     platform = _platform_line(blocked)
-    doctor = config.hint("mtb.env.doctor()", "`multibench env doctor`")
+    doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
     if methods:
         lines = [_line(r) for _, r in blocked.iterrows()]
         where = config.hint(f"mtb.scan({dataset!r}, {category!r}, methods={list(methods)})",
-                            f"`multibench scan {dataset} --category {category} "
-                            f"--methods {','.join(methods)}`")
+                            f"multibench scan {dataset} --category {category} "
+                            f"--methods {','.join(methods)}")
         return (f"{head} (methods={list(methods)}).\n{platform}Blocked, one line per "
-                f"requested variant:\n" + "\n".join(lines) +
+                f"requested row:\n" + "\n".join(lines) +
                 f"\n{where} shows these rows. Its files_ok and env_ok columns say "
                 f"which check failed. {doctor} checks the environments.")
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
     where = config.hint(f"mtb.scan({dataset!r}, {category!r})",
-                        f"`multibench scan {dataset} --category {category}`")
-    return (f"{head}.\n{platform}First {k} of {n} blocked variants:\n" + "\n".join(lines) +
+                        f"multibench scan {dataset} --category {category}")
+    shown = (f"The first {k} of {n} blocked rows" if n > k
+             else "The blocked row" if n == 1 else f"The {n} blocked rows")
+    return (f"{head}.\n{platform}{shown}:\n" + "\n".join(lines) +
             f"\n{where} shows every row. Its files_ok and env_ok columns say "
             f"which check failed. {doctor} checks the environments.")
 
@@ -2406,8 +2435,8 @@ def _platform_line(blocked: pd.DataFrame) -> str:
     linux_only = _runner.linux_only_sentence()
     if not linux_only or "env_ok" not in blocked or blocked["env_ok"].all():
         return ""
-    return (f"{linux_only} Here you can check files, score embeddings and plot; run "
-            f"the methods on a Linux machine.\n")
+    return (f"{linux_only} On this computer you can check files, score embeddings and "
+            f"plot. Run the methods on a Linux machine.\n")
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
@@ -3023,11 +3052,12 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
-            msg = (f"[run_all] dry run: {k} of {n} requested variant(s) runnable on "
-                   f"{dataset} ({category})")
+            msg = (f"[run_all] Dry run: {k} of {n} requested {'row' if n == 1 else 'rows'} "
+                   f"can run on {dataset} ({category}).")
             if n > k:
                 doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
-                msg += (f". {n - k} blocked. The table's reason column says why, "
+                msg += (f" {n - k} {'is' if n - k == 1 else 'are'} blocked. The table's "
+                        f"reason column says why, "
                         f"and its files_ok and env_ok columns say which check "
                         f"failed. {doctor} checks the environments.")
             print(msg, flush=True)

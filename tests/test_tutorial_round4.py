@@ -165,7 +165,7 @@ def test_a_dry_run_command_alone_can_fail():
     from multibench.engine import runner as R
     plan = {"rna": {"value": "/o/inputs/rna.h5", "convert": True, "normpeaks_from": None}}
     note = R._prepared_note(plan, "/o", "X")
-    assert note.startswith("the command reads inputs/rna.h5.")
+    assert note.startswith("X reads inputs/rna.h5.")
     assert "The printed command alone fails in a job script." in note
 
 
@@ -234,7 +234,8 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
         for m in trio:
             r = df.loc[m]
             assert r.files_ok and r.env_ok and not r.runnable, (m, r.reason)
-            assert r.reason.startswith("needs peak ATAC; atac2.h5 holds gene activity"), r.reason
+            assert r.reason.startswith(f"{m} needs peak ATAC, and atac2.h5 holds gene "
+                                       "activity"), r.reason
     assert GEN.runnable_sentence("mosaic") in _visible(_markdown("tutorial_mosaic"))
 
 

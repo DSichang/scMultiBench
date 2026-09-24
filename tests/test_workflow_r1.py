@@ -153,8 +153,8 @@ def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no
     df = mtb.scan("D11", "vertical", methods=["totalVI"])
     out = capsys.readouterr().out
     r = df.iloc[0]
-    assert r["env_reason"] == (f"Linux-only environment {r['env']} "
-                               f"(not installable on this computer)")
+    assert r["env_reason"] == (f"The environment {r['env']} is Linux-only and cannot be "
+                               f"installed on this computer.")
     assert "multibench env install" not in r["reason"]
     assert out.count("[scan]") == 1 and W.LINUX_ONLY_SUMMARY in out
 
@@ -353,7 +353,8 @@ def test_scan_reason_leads_with_the_atac_meaning_and_never_cuts_a_path(tmp_path,
         assert not df[col].str.contains(r" \.\.\. ", regex=True).any(), col
     scalex = df[df["method"] == "SCALEX"].iloc[0]
     assert scalex["reason"].startswith(
-        "needs gene-activity ATAC (atac_gas.h5); folder has peaks (atac_peak.h5)")
+        "SCALEX needs gene-activity ATAC (atac_gas.h5), and the folder has peaks "
+        "(atac_peak.h5).")
     assert str(data / "LUNG" / "atac_gas.h5") in scalex["files_reason"]   # full path kept
 
 
