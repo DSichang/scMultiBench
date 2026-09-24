@@ -199,18 +199,27 @@ def atac_forms(cat):
 
 
 def diagonal_atac_sentence():
-    """The visible ATAC-form sentence of the diagonal tutorial's first cell."""
+    """The visible ATAC-form sentence of the diagonal tutorial's first cell.
+
+    It points to ``describe_layout``, which lists each method under the ATAC
+    files it needs. ``method_info(m)["atac"]`` names one form, and lists the
+    methods that read both files under peak."""
     gas, peak_only, both = atac_forms("diagonal")
     if not (peak_only and both and len(gas) > len(peak_only) + len(both)):
         raise SystemExit("diagonal ATAC forms changed: reword the diagonal title cell")
     import multibench as mtb
     if "same cells" not in mtb.method_info("Seurat_v5")["setup_hint"]:
         raise SystemExit("Seurat_v5's setup hint changed: reword the diagonal title cell")
+    layout = [ln.strip() for ln in mtb.describe_layout("diagonal").splitlines()]
+    if not any(ln.startswith("need both files:") and all(m in ln for m in both)
+               for ln in layout):
+        raise SystemExit("describe_layout no longer lists the methods that read both "
+                         "ATAC files: reword the diagonal title cell")
     return (f"Most diagonal methods read ATAC as gene-activity scores, made beforehand "
             f"with a tool such as Signac or ArchR. {and_list(peak_only)} read the peak "
             f"matrix, and {and_list(both)} need both. Seurat_v5 also needs RNA and ATAC "
-            f"from the same cells. `mtb.method_info(m)[\"atac\"]` says which form a "
-            f"method reads.")
+            f"from the same cells. `mtb.describe_layout(\"diagonal\")` lists each "
+            f"method's ATAC files.")
 
 
 def runnable_sentence(cat):
@@ -947,7 +956,7 @@ if not missing:
 | `env_ok` False: the method needs an NVIDIA GPU | run it on a GPU machine; `mtb.scan(..., assume_gpu=True)` checks everything else on a computer without one |
 | `FileExistsError` from `export_dataset` | the folder already holds the file: pass `overwrite=True` to replace it |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
-| `... which is cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` or `mtb.io.to_canonical` |
+| `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` or `mtb.io.to_canonical` |
 | a method fails | `res.failures.iloc[0]["error"]` ends with the method's stderr |
 | a method times out | raise `timeout=` in `run_all` |
 | low `label_order_confidence` | several label files fit the cell count: check `label_order_candidates` in `res.results` |

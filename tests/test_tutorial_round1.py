@@ -119,7 +119,9 @@ def test_diagonal_title_names_the_atac_form_of_each_method():
     read from the registry: every peak-reading method is named there."""
     import multibench as mtb
     title = _visible(_cells("tutorial_diagonal")[0][1])
-    assert "gene-activity scores" in title and 'method_info(m)["atac"]' in title
+    # the lookup call: describe_layout lists each method under the ATAC files
+    # it needs (round 7; method_info(m)["atac"] lists MultiMAP under peak)
+    assert "gene-activity scores" in title and 'mtb.describe_layout("diagonal")' in title
     for m in mtb.find_methods("diagonal", atac="peak"):
         assert m in title, f"diagonal title does not name {m}, which reads peaks"
 
