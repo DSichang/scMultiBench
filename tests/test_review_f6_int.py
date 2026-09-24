@@ -334,7 +334,7 @@ def test_the_dry_run_commands_header_counts_methods(monkeypatch, capsys):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run"], capsys)
     assert rc == 0
-    assert "Methods with files_ok False have none." in err
+    assert "A method whose input files are missing has no command." in err
     assert re.search(r"^# Commands of the \d+ methods whose input files are in place\. "
                      r"\[env missing\] marks a method whose environment", out, re.M), out
 

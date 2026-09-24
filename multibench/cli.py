@@ -1213,8 +1213,8 @@ def _run_all_command(args, stack) -> int:
         from .workflow import _rows_word
         print(f"# Dry run. Nothing was executed. {k} of {n} {_rows_word(df, n)} "
               f"can run on {args.dataset} ({args.category}). The commands below are what "
-              f"multibench run would execute. {_rows_word(df, 2).capitalize()} with "
-              f"files_ok False have none.", file=sys.stderr)
+              f"multibench run would execute. A {_rows_word(df, 1)} whose input files "
+              f"are missing has no command.", file=sys.stderr)
         wrong_ref = _scripts_ref_note()     # every row also carries it as its reason
         if wrong_ref:
             print(f"# {wrong_ref}", file=sys.stderr)

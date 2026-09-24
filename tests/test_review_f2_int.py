@@ -370,8 +370,8 @@ def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
                    "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0
-    assert ("The commands below are what multibench run would execute. Methods with "
-            "files_ok False have none.") in err
+    assert ("The commands below are what multibench run would execute. A method whose "
+            "input files are missing has no command.") in err
     assert "run()" not in err
     assert "method_info(" not in mtb.env.DIFFICULTY["blocked-script"]
 

@@ -23,6 +23,7 @@ import pytest
 import multibench as mtb
 from multibench import cli
 from multibench import workflow as W
+from multibench.engine import envs, runner as R
 from tests.test_f4_cli import working  # noqa: F401 - the stand-in Matilda env fixture
 
 
@@ -304,3 +305,142 @@ def test_the_docstrings_say_a_method_without_a_variant_raises():
             "``ValueError``, even when other named methods have one.") in _doc(W.scan)
     assert ("A named method or a selection with no variant: ``ValueError`` before "
             "anything runs, dry run included") in _doc(W.run_all)
+
+
+# ============================================================ R8-05
+MACOS = "Methods run only on Linux, and this computer runs macOS."
+
+
+@pytest.fixture
+def macos(monkeypatch, no_envs):
+    """This computer runs macOS, no environment is installed, a GPU is present
+    (so only the platform and the files block a row)."""
+    monkeypatch.setattr(R, "linux_only_sentence", lambda: MACOS)
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
+
+
+@pytest.fixture
+def mydata(tmp_path, monkeypatch):
+    """``<tmp>/data/MYDATA``: the D11 files (CITE-seq) under a relative data root."""
+    folder = tmp_path / "data" / "MYDATA"
+    folder.mkdir(parents=True)
+    for name in ("rna.h5", "adt.h5", "cty.csv"):
+        (folder / name).symlink_to(ROOT / "data" / "D11" / name)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+def _nothing_runnable(**kw):
+    with pytest.raises(ValueError) as e:
+        mtb.run_all("MYDATA", "vertical", out_dir="out", verbose=False, data_path="data",
+                    **kw)
+    return str(e.value)
+
+
+def _plan(**kw):
+    return mtb.scan("MYDATA", "vertical", data_path="data", verbose=False, **kw)
+
+
+def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
+    msg = _nothing_runnable(modalities=["rna", "adt"])
+    n = len(_plan(modalities=["rna", "adt"]))
+    lines = msg.splitlines()
+    assert lines[0] == "No method can run on MYDATA (vertical)."
+    assert lines[1].startswith(MACOS)
+    assert lines[2] == f"Nothing else blocks these {n} methods."
+    assert lines[3].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
+                               "modalities=['rna', 'adt']) shows every row.")
+    assert len(lines) == 4 and "not on this computer" not in msg
+    msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
+    assert msg.splitlines()[2] == "Nothing else blocks these 2 requested methods."
+    msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
+    assert msg.splitlines()[2] == "Nothing else blocks this requested method."
+
+
+def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
+    msg = _nothing_runnable(methods=["Matilda", "totalVI"])
+    lines = msg.splitlines()
+    assert lines[0] == ("None of the requested methods (Matilda, totalVI) can run on "
+                        "MYDATA (vertical).")
+    assert lines[2] == "1 of 3 requested rows is also blocked by something else:"
+    assert lines[3] == ("  Matilda (rna+atac): Matilda needs gene-activity ATAC (atac.h5), "
+                        "which is not in the folder.")
+    assert lines[4].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
+                               "methods=['Matilda', 'totalVI']) shows these rows.")
+    assert "not on this computer" not in msg
+
+
+def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata):
+    msg = _nothing_runnable()
+    plan = _plan()
+    others = plan[~plan["files_ok"]]
+    lines = msg.splitlines()
+    assert lines[2] == (f"{len(others)} of {len(plan)} rows are also blocked by something "
+                        "else. The first 3:")
+    listed = lines[3:6]
+    assert [l.split(" (")[0].strip() for l in listed] == sorted(others["method"])[:3]
+    assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
+    assert lines[6].startswith("mtb.scan('MYDATA', 'vertical', data_path='data') shows "
+                               "every row.")
+
+
+def test_a_gpu_block_is_listed_without_the_linux_sentence(macos, mydata, monkeypatch):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    msg = _nothing_runnable(modalities=["rna", "adt"])
+    plan = _plan(modalities=["rna", "adt"])
+    gpu = sorted(m for m in plan["method"] if mtb.method_info(m)["requires_gpu"])
+    assert "moETM" in gpu
+    lines = msg.splitlines()
+    verb = "is" if len(gpu) == 1 else "are"
+    assert lines[2] == (f"{len(gpu)} of {len(plan)} methods {verb} also blocked by "
+                        "something else:")
+    assert [l.split(" (")[0].strip() for l in lines[3:3 + len(gpu)]] == gpu
+    assert lines[3].endswith("needs an NVIDIA GPU, and this computer has none. See "
+                             f"method_info(\"{gpu[0]}\")[\"requires_gpu\"].")
+    assert "not on this computer" not in msg
+
+
+def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
+    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
+    msg = _nothing_runnable(modalities=["rna", "adt"])
+    plan = _plan(modalities=["rna", "adt"])
+    order = plan.assign(_f=~plan["files_ok"]).sort_values(["_f", "method"], kind="stable")
+    want = ("No method can run on MYDATA (vertical).\n"
+            f"The first 3 of {len(plan)} blocked methods:\n"
+            + "\n".join(f"  {r.method} ({r.modalities}): {r.reason}"
+                        for r in order.head(3).itertuples())
+            + "\nmtb.scan('MYDATA', 'vertical', data_path='data', modalities=['rna', "
+            "'adt']) shows every row. Its files_ok and env_ok columns say which check "
+            "failed. mtb.env.doctor() checks the environments.")
+    assert msg == want
+    assert "is not installed. Run multibench env install --methods" in msg
+    msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
+    assert "\nBlocked, one line per requested method:\n  totalVI (rna+adt): Environment " \
+           in msg
+
+
+def test_the_scan_frame_keeps_the_linux_sentence(macos, mydata):
+    plan = _plan(modalities=["rna", "adt"])
+    assert plan["env_reason"].str.endswith("runs only on Linux, not on this computer.").all()
+    assert list(plan.columns) == W.SCAN_COLUMNS
+
+
+def test_the_dry_run_header_names_no_column(no_envs, mydata, capsys):
+    rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
+                   "--modalities", "rna,adt", "--methods", "Matilda,totalVI",
+                   "--dry-run"])
+    err = capsys.readouterr().err
+    assert rc == 0, err
+    head = err.splitlines()[0]
+    assert "files_ok False" not in head
+    assert head.endswith(" A method whose input files are missing has no command."), head
+    rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
+                   "--methods", "Matilda", "--dry-run"])
+    head = capsys.readouterr().err.splitlines()[0]
+    assert head.endswith(" A row whose input files are missing has no command."), head
+
+
+def test_the_run_all_notes_describe_the_off_linux_list():
+    doc = _doc(W.run_all)
+    assert ("On macOS or Windows, its second line says that methods run only on Linux, "
+            "and it lists only the rows something else also blocks.") in doc

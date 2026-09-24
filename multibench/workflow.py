@@ -1366,6 +1366,26 @@ def scan(dataset: str, category: str | None = None, *,
 
     mtb.inputs_for : the ``{role: path}`` resolution behind ``files_ok``.
     """
+    return _scan(dataset, category, methods=methods, modalities=modalities,
+                 data_path=data_path, out_dir=out_dir, params=params, verbose=verbose,
+                 assume_gpu=assume_gpu, allow_atac_mismatch=allow_atac_mismatch,
+                 stacklevel=3)[0]
+
+
+def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
+          data_path=None, out_dir="<out_dir>", params: dict | None = None,
+          verbose: bool = True, assume_gpu: bool = False,
+          allow_atac_mismatch: bool = False,
+          stacklevel: int = 2) -> "tuple[pd.DataFrame, pd.Series]":
+    """:func:`scan`'s frame, and each row's reason without the platform sentence.
+
+    The Series is aligned with the frame. Off Linux, the environment part of
+    ``reason`` is the Linux-only sentence of :func:`_env_hint`; the Series
+    leaves it out and keeps what else blocks the row (files, a GPU, the ATAC
+    representation, the scripts). On Linux it equals ``reason``. run_all's
+    "No method can run" error lists it under its one platform line.
+    ``stacklevel`` makes scan's warnings point at the caller.
+    """
     registry.check_category(category)       # raises with the valid list on a typo
     _list_of_ids(methods, "methods")        # TypeError before iterating characters
     _list_of_ids(modalities, "modalities")
@@ -1376,7 +1396,7 @@ def scan(dataset: str, category: str | None = None, *,
         registry.check_method(_m)
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
-    dataset = _resolve.canonical_dataset(base, dataset)
+    dataset = _resolve.canonical_dataset(base, dataset, stacklevel=stacklevel + 1)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         from .plot.bubble import _and
@@ -1398,6 +1418,8 @@ def scan(dataset: str, category: str | None = None, *,
     wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
+    # off Linux, _env_hint gives only the platform sentence
+    off_linux = bool(_runner.linux_only_sentence())
     # one representation token already excludes a method that reads the other
     reps = _token_reps(modalities) if modalities is not None else set()
     for spec, v, cat, mods in _variant_rows(category):
@@ -1448,9 +1470,10 @@ def scan(dataset: str, category: str | None = None, *,
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         # --- check 2: env. ----------------------------------------------------
+        env_hint = gpu_hint = ""
         if rec["env"] and rec["env"] not in installed:
             rec["env_ok"] = False
-            rec["env_reason"] = _env_hint(rec["env"], spec.id, cat)
+            env_hint = _env_hint(rec["env"], spec.id, cat)
         # ... and the host: a script that calls CUDA unconditionally cannot
         # finish without an NVIDIA GPU, however complete the env - the same
         # sentence run() raises as OSError, so the sweep never starts it.
@@ -1461,12 +1484,16 @@ def scan(dataset: str, category: str | None = None, *,
                                                GPU_NODE_CAVEAT.format(method=spec.id)])
             else:
                 rec["env_ok"] = False
-                rec["env_reason"] = " ".join(
-                    r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
+                gpu_hint = spec.requires_gpu_reason or ""
+        rec["env_reason"] = " ".join(r for r in (env_hint, gpu_hint) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
                                and not wrong_ref)
         # the ATAC reason ends with its override, so it comes last
         rec["reason"] = _join_sentences([wrong_ref, *short_problems, rec["env_reason"],
+                                         wrong_atac])
+        # what else blocks the row, for run_all's error off Linux
+        rec["_other"] = _join_sentences([wrong_ref, *short_problems,
+                                         gpu_hint if off_linux else rec["env_reason"],
                                          wrong_atac])
         # --- the command line: only when the files resolved (something to
         # hand the script); an env-blocked row still gets one. A setup step
@@ -1488,9 +1515,10 @@ def scan(dataset: str, category: str | None = None, *,
             if notes:
                 rec["caveat"] = _join_clauses([rec["caveat"], *notes])
         rows.append(rec)
-    df = pd.DataFrame(rows, columns=SCAN_COLUMNS)
+    df = pd.DataFrame(rows, columns=[*SCAN_COLUMNS, "_other"])
     df = df.sort_values(["runnable", "category", "method"],
                         ascending=[False, True, True]).reset_index(drop=True)
+    others = df.pop("_other")
     if methods is not None:
         # a named method with no row (Matilda is not a cross method, or
         # modalities= dropped it) is a request problem, also when the other
@@ -1504,7 +1532,7 @@ def scan(dataset: str, category: str | None = None, *,
         # a variant fed a folder names no modality roles, so no token can
         # select it; say what was left out rather than dropping it unnoticed
         warnings.warn(_dropped_dirs_message(modalities, dropped_dirs),
-                      UserWarning, stacklevel=2)
+                      UserWarning, stacklevel=stacklevel)
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
         rows = _rows_word(df, n)
@@ -1518,7 +1546,7 @@ def scan(dataset: str, category: str | None = None, *,
             doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
             line += f" {doctor} checks the environments."
         print(line, flush=True)
-    return df
+    return df, others
 
 
 # ------------------------------------------------------------------- label order
@@ -2698,7 +2726,7 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
                               methods, *, data_path=None, modalities=None,
                               allow_atac_mismatch: bool = False,
-                              assume_gpu: bool = False) -> str:
+                              assume_gpu: bool = False, others=None) -> str:
     """The ``ValueError`` text for "not one requested variant can start".
 
     Scoped to what the caller asked for: with ``methods=`` every requested
@@ -2708,8 +2736,10 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     (then by method): an env install unblocks those. Reasons of methods the
     caller did not request are never listed: they would point at the wrong
     fix. Off Linux, when an environment blocks a row, the line after the
-    head says where methods run. The last line names the ``scan`` call with
-    the caller's selection (:func:`_scan_hint`); the list counts methods when
+    head says where methods run, and the list keeps only the rows that
+    something else also blocks, each with that reason from ``others``
+    (:func:`_other_blocks`). The last line names the ``scan`` call with the
+    caller's selection (:func:`_scan_hint`); the list counts methods when
     each method has one row (:func:`_rows_word`).
     """
     def _line(r):
@@ -2724,22 +2754,51 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                        modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
                        assume_gpu=assume_gpu)
     if methods:
-        lines = [_line(r) for _, r in blocked.iterrows()]
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
-        return (f"{head}.\n{platform}Blocked, one line per "
-                f"requested {_rows_word(blocked, 1)}:\n" + "\n".join(lines) +
+        listing = (_other_blocks(blocked, others, requested=True)
+                   if platform and others is not None else
+                   f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
+                   + "\n".join(_line(r) for _, r in blocked.iterrows()))
+        return (f"{head}.\n{platform}{listing}"
                 f"\n{where} shows these rows. Its files_ok and env_ok columns say "
                 f"which check failed. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
-    n, k = len(blocked), min(3, len(blocked))
-    lines = [_line(r) for _, r in blocked.head(k).iterrows()]
-    rows = _rows_word(blocked, n)
-    shown = (f"The first {k} of {n} blocked {rows}" if n > k
-             else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
-    return (f"{head}.\n{platform}{shown}:\n" + "\n".join(lines) +
+    if platform and others is not None:
+        listing = _other_blocks(blocked, others, requested=False)
+    else:
+        n, k = len(blocked), min(3, len(blocked))
+        rows = _rows_word(blocked, n)
+        shown = (f"The first {k} of {n} blocked {rows}" if n > k
+                 else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
+        listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
+    return (f"{head}.\n{platform}{listing}" +
             f"\n{where} shows every row. Its files_ok and env_ok columns say "
             f"which check failed. {doctor} checks the environments.")
+
+
+def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
+    """The list of the "No method can run" error under its platform line.
+
+    Only the rows that something besides the platform blocks, each with that
+    reason (``others``, aligned with ``blocked``), under a count line:
+    ``1 of 14 methods is also blocked by something else:``. With
+    ``methods=`` (``requested``) every such row, else the first 3 in the
+    order of ``blocked``. When no row has another block, one line:
+    ``Nothing else blocks these 14 methods.``
+    """
+    rest = others.reindex(blocked.index).fillna("")
+    listed = [(r, rest[i]) for i, r in blocked.iterrows() if rest[i]]
+    n, k = len(blocked), len(listed)
+    noun = ("requested " if requested else "") + _rows_word(blocked, n)
+    if not listed:
+        return (f"Nothing else blocks this {noun}." if n == 1
+                else f"Nothing else blocks these {n} {noun}.")
+    count = f"{k} of {n} {noun} {'is' if k == 1 else 'are'} also blocked by something else"
+    shown = listed if requested else listed[:3]
+    lines = "\n".join(f"  {r['method']} ({r['modalities']}): {text}" for r, text in shown)
+    return (f"{count}:" if len(shown) == k
+            else f"{count}. The first {len(shown)}:") + "\n" + lines
 
 
 def _platform_line(blocked: pd.DataFrame) -> str:
@@ -3507,10 +3566,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     - Nothing runnable: ``ValueError``. Its first line is
       ``No method can run on D11 (vertical).`` With ``methods=``, it starts
       ``None of the requested methods (Matilda, totalVI) can run on D11 (vertical).``
-      The message lists the reason of every requested variant. Without
-      ``methods``, it gives the first 3 of N. It never lists the reasons of
-      methods you did not ask for. On macOS or Windows, when an environment
-      blocks a row, its second line says that methods run only on Linux.
+      and lists every requested variant. Without ``methods``, it gives the
+      first 3 of N. It never lists the reasons of methods you did not ask
+      for. On macOS or Windows, its second line says that methods run only
+      on Linux, and it lists only the rows something else also blocks.
     - An ``out_dir`` that holds a saved result of another dataset or
       category: ``ValueError``, before any method runs.
     - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
@@ -3562,13 +3621,14 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     # missing dataset folder, ValueError when no variant of the requested
     # methods exists under this category and KeyError on a params key no
     # variant accepts all come from scan(); blocked rows are kept.
-    plan_df = scan(dataset, category, data_path=data_path, methods=methods,
-                   modalities=modalities, verbose=False, assume_gpu=assume_gpu,
-                   allow_atac_mismatch=allow_atac_mismatch,
-                   # the dry run renders (and validates) params in the frame; a real
-                   # run validates per method and records a bad override as FAIL
-                   params=params if dry_run else None,
-                   out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
+    plan_df, others = _scan(dataset, category, data_path=data_path, methods=methods,
+                            modalities=modalities, verbose=False, assume_gpu=assume_gpu,
+                            allow_atac_mismatch=allow_atac_mismatch,
+                            # the dry run renders (and validates) params in the frame; a
+                            # real run validates per method and records a bad override
+                            # as FAIL
+                            params=params if dry_run else None,
+                            out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
     if plan_df.empty:
         # only reachable through a modalities= selector that matches nothing:
         # a request problem, reported as such rather than as "nothing is
@@ -3614,7 +3674,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         raise ValueError(_nothing_runnable_message(
             dataset, category, blocked, methods, data_path=data_path,
             modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
-            assume_gpu=assume_gpu))
+            assume_gpu=assume_gpu, others=others))
 
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
     # saved in out_dir so that rescore can reuse it
