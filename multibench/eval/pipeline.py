@@ -342,14 +342,12 @@ def _labels_from_dict(d: dict, label_order) -> list:
         if keys == sorted(keys, key=_label_sort_key):
             return [d[k] for k in keys]
         raise ValueError(
-            f"labels: got a dict with {len(d)} label files {keys} that is not "
-            f"an unchanged mtb.labels_for dict and is not in the default "
-            f"cell order (cty1, cty2, ... numerically; rna before adt before "
-            f"atac; this is not alphabetical order); pass the dict "
-            f"mtb.labels_for(dataset, method=<method>, category=<category>) "
-            f"returns, unchanged (it is in that method's cell order), a list "
-            f"of paths in cell order, or label_order=[...] naming the keys in "
-            f"that order")
+            f"labels: the keys {keys} are in neither the method's cell order "
+            f"nor the default order. Pass the dict from "
+            f"mtb.labels_for(dataset, category, method) unchanged, a list of "
+            f"paths in cell order, or label_order=[...]. The default order is "
+            f"cty1, cty2, ... by number, with rna before adt before atac. It is "
+            f"not alphabetical.")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
         raise TypeError(
             f"label_order= must be a list of keys of the labels dict, e.g. "
@@ -728,10 +726,11 @@ def evaluate(
 
     - the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default
       neighbour graph (15 neighbours);
-    - cLISI and iLISI: scib builds a 15-neighbour graph from the embedding
-      and takes the 90 cells nearest by path length on it (k0 = 90,
-      perplexity 30). A cell with fewer than 90 reachable cells counts as
-      one label;
+    - cLISI and iLISI: scib builds scanpy's 15-neighbour graph from the
+      embedding. For each cell it takes the 90 cells with the shortest
+      paths on that graph, where the length of an edge is its connectivity
+      weight (``obsp["connectivities"]``), not its distance. Perplexity 30.
+      A cell with fewer than 90 reachable cells counts as one label;
     - ASW, iASW and ASW_batch use distances in the embedding;
     - kBET builds its own neighbour graph.
 
@@ -748,11 +747,13 @@ def evaluate(
     ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
     iASW       isolated_labels_asw   iso_threshold = number of batches + 1
     iF1        isolated_labels_f1    same threshold; best F1 over the sweep
-    cLISI      clisi_graph           type_="embed"; 90 nearest by path on the
+    cLISI      clisi_graph           type_="embed"; 90 nearest by path over
+                                     the connectivity weights of the
                                      15-neighbour graph; scaled to 0-1
     ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
     GC         graph_connectivity    on the 15-neighbour graph
-    iLISI      ilisi_graph           type_="embed"; 90 nearest by path on the
+    iLISI      ilisi_graph           type_="embed"; 90 nearest by path over
+                                     the connectivity weights of the
                                      15-neighbour graph; scaled to 0-1
     kBET       kBET                  computed only when named in metrics=[...]
     ```

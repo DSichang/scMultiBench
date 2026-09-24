@@ -121,7 +121,7 @@ def test_recommend_ranks_with_coverage(result_dir):
     assert sb.runtime_tier in {"fast", "medium", "slow", "very_slow", "unknown"}
     # the re-run sweep scores 12 of the 14 on D28/D28s: source='both' makes
     # the matrix incomplete and the warning says so
-    with pytest.warns(UserWarning, match="incomplete"):
+    with pytest.warns(UserWarning, match="scores on only part of the datasets"):
         rb = recommend("diagonal", source="both", result_path=result_dir)
     assert (rb.n_datasets <= rb.n_datasets_total).all() and (rb.coverage < 1.0).any()
     assert (rb.n_datasets_total == 4).all()
@@ -147,7 +147,8 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     smt = r[r.method == "scMoMaT"].iloc[0]
     assert pd.isna(smt.grand_score) and smt.n_datasets == 0 and smt.coverage == 0.0
     assert {"scMoMaT", "UINMF"} <= set(r.attrs["not_scored"])
-    assert "rows only in dropped dataset(s) for: scMoMaT, UINMF" in str(rec[0].message)
+    assert ("scMoMaT and UINMF have scores only on datasets left out of the "
+            "ranking, so they are listed last.") in str(rec[0].message)
     # a 1.0 is now only ever the best of >= 2 methods on a kept dataset
     # (sciPENN on D53), never a singleton artefact: every scored method sits
     # in a dataset that holds another method
@@ -160,7 +161,9 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     # ONE warning, one line per finding, the dropped-datasets line first
     assert len([w for w in rec if issubclass(w.category, UserWarning)
                 and "recommend(" in str(w.message)]) == 1
-    assert msg.splitlines()[1].strip().startswith("- dropped")
+    assert msg.splitlines()[1].strip().startswith(
+        "- Datasets D52, D54, D57, D58 and D59 have fewer than 2 methods and are left "
+        "out of the ranking.")
     with pytest.raises(ValueError, match="single-method") as e:
         recommend("cross", min_methods=50, result_path=layout_tree)
     assert "pass source=" not in str(e.value)       # that tree has no other source
@@ -240,14 +243,16 @@ def test_recommend_lists_unscored_methods(result_dir):
     assert r.attrs["source"] == "published"
     assert r.attrs["not_scored"] == r.attrs["missing"] == sorted(nan_rows.method, key=str.lower)
     import re
-    assert re.search(r"no rows in source='published' for: .*totalVI", msg)
-    assert 'try source="rerun"' in msg and "listed with grand_score NaN" in msg
-    # the old load-bearing phrases survive where the matrix IS incomplete
+    assert re.search(rf"These {len(nan_rows)} methods have no published scores and "
+                     r"are listed last: .*totalVI", msg)
+    assert msg.endswith('Try source="rerun".')
+    # the coverage line appears only where the matrix IS incomplete
     # (the single published vertical dataset scores its 6 methods completely;
     # diagonal source='both' lacks GLUE / Seurat_v5 in the re-run rows)
-    assert "incomplete" not in msg
+    assert "only part of the datasets" not in msg
     _, msg_b = _rec("diagonal", source="both", result_path=result_dir)
-    assert "incomplete" in msg_b and "partial coverage" in msg_b
+    assert "Some methods have scores on only part of the datasets: " in msg_b
+    assert "Check the coverage column before reading the order." in msg_b
 
 
 def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
@@ -255,8 +260,8 @@ def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
                   result_path=result_dir)
     assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
     assert r.attrs["source"] == "rerun" and r.attrs["not_scored"] == ["Seurat_WNN"]
-    assert "no rows in source='rerun' for: Seurat_WNN" in msg
-    assert 'try source="rerun"' not in msg
+    assert "Seurat_WNN has no re-run scores and is listed last." in msg
+    assert 'Try source="rerun"' not in msg
 
 
 def test_recommend_long_df_records_source_and_family(result_dir):
@@ -285,12 +290,14 @@ def test_recommend_scores_only_methods_the_registry_lists_for_the_category(resul
     assert set(r.method) <= listed
     assert not ({"MOFA2", "Multigrate"} & set(r.method))
     assert r.attrs["dropped_methods"] == ["MOFA2", "Multigrate"]
-    assert ("also scored in the published table but not run by this package for "
-            "cross: MOFA2, Multigrate") in msg
+    assert ("MOFA2 and Multigrate have scores in the published table, but this "
+            "package does not run them for cross, so they are left out of the "
+            "ranking.") in msg
     assert "mtb.list_methods(category='cross') does not list them" in msg
     # the dropped-datasets line stays first; the drop line follows it
     lines = [ln.strip() for ln in msg.splitlines()[1:]]
-    assert lines[0].startswith("- dropped") and lines[1].startswith("- also scored")
+    assert lines[0].startswith("- Datasets ") and "left out of the ranking" in lines[0]
+    assert lines[1].startswith("- MOFA2 and Multigrate have scores in")
     # the same rule on a user frame: registry methods foreign to the category
     # are dropped and named ("long_df frame"), an unknown name (yours) is kept
     long = mtb.load_results("cross", dataset="D53", result_path=layout_tree)
@@ -298,10 +305,11 @@ def test_recommend_scores_only_methods_the_registry_lists_for_the_category(resul
                        method="MyMethod", dataset="D53", category="cross")
     r2, msg2 = _rec("cross", long_df=pd.concat([long, mine]))
     assert "MyMethod" in set(r2.method) and "MOFA2" not in set(r2.method)
-    assert "also scored in the long_df frame but not run by this package for cross: MOFA2, Multigrate" in msg2
+    assert ("MOFA2 and Multigrate have scores in the long_df frame, but this package "
+            "does not run them for cross") in msg2
     # a category where every stored method is listed: nothing dropped, no line
     r3, msg3 = _rec("vertical", result_path=result_dir)
-    assert r3.attrs["dropped_methods"] == [] and "also scored" not in msg3
+    assert r3.attrs["dropped_methods"] == [] and "does not run" not in msg3
     # nothing rankable left -> ValueError naming the culprits
     with pytest.raises(ValueError, match=r"every row in long_df belongs to a method this package does not run for cross \(MOFA2"):
         mtb.recommend("cross", long_df=long[long.method == "MOFA2"])
@@ -319,7 +327,7 @@ def test_recommend_methods_keyword(layout_tree):
     # a requested method without rows is still listed as unscored
     r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], result_path=result_dir)
     assert r2.method.tolist() == ["sciPENN", "scMDC", "totalVI"]
-    assert "no rows in source='published' for: totalVI" in msg2
+    assert "totalVI has no published scores and is listed last." in msg2
     with pytest.raises(KeyError, match=r"unknown method 'Matlida'; did you mean 'Matilda'\?"):
         recommend("cross", methods=["Matlida"], result_path=result_dir)
     with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in source='published' for cross"):

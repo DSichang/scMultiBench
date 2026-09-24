@@ -1110,7 +1110,7 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     # (config.ensure_repo); mtb.scan reports it as the row's reason
     ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo)
     notes = ([ref] if ref else []) + script_notes(spec, variant, repo)
-    prepared = _prepared_note(plan, out_str)
+    prepared = _prepared_note(plan, out_str, spec.id)
     return argv, notes + ([prepared] if prepared else [])
 
 
@@ -1118,7 +1118,7 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
 _PREPARED_PREFIX = "the command reads "
 
 
-def _prepared_note(plan: dict, out_str: str) -> str | None:
+def _prepared_note(plan: dict, out_str: str, method: str = "the method") -> str | None:
     """The note for a command that reads files the run writes first, or ``None``.
 
     A converted input (``inputs/<role>.h5``) or a renamed peak file
@@ -1129,11 +1129,13 @@ def _prepared_note(plan: dict, out_str: str) -> str | None:
              if step["convert"] or step["normpeaks_from"]]
     if not files:
         return None
-    return f"{_PREPARED_PREFIX}{', '.join(files)}, " + config.hint(
-        "which mtb.run writes first: start the method with mtb.run or mtb.run_all, "
-        "not as a shell line",
-        "which `multibench run` writes first: start the method with `multibench run` "
-        "or `multibench run-all`, not as a shell line")
+    that = "that file" if len(files) == 1 else "those files"
+    return f"{_PREPARED_PREFIX}{', '.join(files)}. " + config.hint(
+        f"mtb.run writes {that} first, so start {method} with mtb.run or "
+        f"mtb.run_all. The printed command alone fails in a job script.",
+        f"`multibench run` writes {that} first, so start {method} with "
+        f"`multibench run` or `multibench run-all`. The printed command alone "
+        f"fails in a job script.")
 
 
 def _fetch_scripts(repo_path) -> Path:

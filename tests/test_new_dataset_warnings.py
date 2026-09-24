@@ -44,8 +44,8 @@ def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
     assert lone == ["dataset LABMOS has only one method (PCA_standin), so its Overall "
                     "there is always 1.0. Plot it with methods scored on the same "
                     "dataset."]
-    inc = [m for m in msgs if m.startswith("summary ranks an incomplete method x dataset")]
-    assert len(inc) == 1 and "PCA_standin seen in 1/" in inc[0]
+    inc = [m for m in msgs if m.startswith("The summary ranks ")]
+    assert len(inc) == 1 and "PCA_standin has scores on 1 of them." in inc[0]
     assert "Filter long_df to the methods scored on every dataset" in inc[0]
 
 
@@ -73,9 +73,10 @@ def test_datasets_sharing_no_method_get_the_stronger_warning():
         assert strong == ["rows come from 2 datasets (D1, MINE) that share no method, "
                           "so the figure ranks unrelated rows against each other. Plot "
                           "each dataset on its own, or score the same methods on every "
-                          "dataset."], fn
+                          "dataset. If these datasets hold the same cells, give their "
+                          "rows one dataset name first."], fn
         # it replaces the incomplete-matrix message, which says less
-        assert not any("incomplete method x dataset" in m for m in msgs), fn
+        assert not any(m.startswith("The summary ranks ") for m in msgs), fn
 
 
 def test_a_complete_frame_plots_without_these_warnings():

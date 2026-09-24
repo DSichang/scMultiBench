@@ -22,11 +22,13 @@ def _quiet(fn, *a, **kw):
 
 def test_warns_when_no_ranked_dataset_measured_the_modality():
     with pytest.warns(UserWarning, match=(
-            r"stored vertical scores come from D11, D11s \(rna\+adt\); none measured "
-            r"atac, so this ranking does not describe RNA\+ATAC data")):
+            r"Stored vertical scores come from D11, D11s \(rna\+adt\)\. None of these "
+            r"datasets measured atac, so this ranking does not describe RNA\+ATAC "
+            r"data\.")):
         mtb.recommend("vertical", modalities=["rna", "atac"], source="rerun")
     # atac= names the modality as well
-    with pytest.warns(UserWarning, match=r"come from D11 \(rna\+adt\); none measured atac"):
+    with pytest.warns(UserWarning, match=r"come from D11 \(rna\+adt\)\. None of these "
+                                         r"datasets measured atac"):
         mtb.recommend("vertical", atac="peak")
 
 
@@ -35,7 +37,7 @@ def test_no_modality_warning_when_the_data_measured_it():
                  lambda: mtb.recommend("diagonal", modalities=["rna", "atac"], source="rerun"),
                  lambda: mtb.recommend("vertical", source="rerun")):
         _, msgs = _quiet(call)
-        assert not any("none measured" in m for m in msgs), msgs
+        assert not any("datasets measured" in m for m in msgs), msgs
 
 
 def test_datasets_column_names_where_each_score_comes_from():
@@ -63,4 +65,4 @@ def test_a_dataset_of_unknown_modalities_is_not_judged():
             rows.append({"metric": metric, "value": v, "method": m, "dataset": "MINE"})
     _, msgs = _quiet(mtb.recommend, "vertical", modalities=["rna", "atac"],
                      long_df=pd.DataFrame(rows), metrics=["ARI", "NMI"])
-    assert not any("none measured" in m for m in msgs), msgs
+    assert not any("datasets measured" in m for m in msgs), msgs

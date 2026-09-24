@@ -103,11 +103,10 @@ def test_a_copied_or_reordered_dict_is_checked_like_any_dict(tmp_path):
     with pytest.raises(ValueError) as exc:
         mtb.evaluate(emb, labels=dict(d), metrics=["ASW"], verbose=False)
     msg = str(exc.value)
-    assert "mtb.labels_for(dataset, method=<method>, category=<category>)" in msg
-    assert "unchanged" in msg
+    assert "Pass the dict from mtb.labels_for(dataset, category, method) unchanged" in msg
     moved = mtb.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
     moved["cty2"] = moved.pop("cty2")          # same keys, cty2 moved to the end
-    with pytest.raises(ValueError, match="default cell order"):
+    with pytest.raises(ValueError, match="nor the default order"):
         mtb.evaluate(emb, labels=moved, metrics=["ASW"], verbose=False)
     # label_order= still overrides the recorded order
     got = mtb.evaluate(emb, labels=d, label_order=["cty2", "cty1", "cty3"],

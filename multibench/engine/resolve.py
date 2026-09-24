@@ -75,13 +75,20 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     return ds_dir / f"{stems[0]}{fallback_ext}"
 
 
+def _batch_column_advice() -> str:
+    """Export without per-batch files, then where the batch column goes."""
+    return config.hint("export without batch= and pass the batch column to "
+                       "run_all(batch=...) or evaluate(batch=...)",
+                       "convert without --batch and pass the batch column to "
+                       "run-all --batch or evaluate --batch")
+
+
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
     """What to do instead of per-batch files for a vertical / diagonal folder."""
     if category == "diagonal":
-        return ("diagonal methods read one rna.h5 and one ATAC file: export without "
-                "batch= and pass the batch column to evaluate(batch=...)")
-    return (f"{category} methods read one {stem}.h5: export without batch= and pass "
-            f"the batch column to evaluate(batch=...)"
+        return ("diagonal methods read one rna.h5 and one ATAC file: "
+                + _batch_column_advice())
+    return (f"{category} methods read one {stem}.h5: " + _batch_column_advice()
             + (", or use category='cross' (RNA+ADT)" if has_adt else ""))
 
 
@@ -1440,7 +1447,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     Vertical and diagonal methods read one ``rna.h5`` and one label file.
     With such a ``category``, ``check=None`` warns and ``check=True`` raises.
     Export without ``batch=`` and pass the batch column to
-    ``mtb.evaluate(batch=...)``.
+    ``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``.
 
     **Paths and names.** Paths are absolute. A dataset spelling that differs
     from the folder only in case (``'d52'`` for ``D52``) is replaced by the

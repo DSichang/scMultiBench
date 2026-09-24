@@ -116,6 +116,7 @@ def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
     for cat, read in (("vertical", "one rna.h5"), ("diagonal", "one rna.h5 and one ATAC file")):
         with pytest.raises(ValueError, match=f"{cat} methods read {read}: export without "
                                              r"batch= and pass the batch column to "
+                                             r"run_all\(batch=\.\.\.\) or "
                                              r"evaluate\(batch=\.\.\.\)") as ei:
             ingest.export_dataset(a, tmp_path / cat, adt="obsm:protein", batch="obs:batch",
                                   category=cat)

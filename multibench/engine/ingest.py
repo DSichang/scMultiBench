@@ -1299,7 +1299,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52). Only
     cross and mosaic methods read numbered files. For a vertical folder,
     export without ``batch`` and pass the batch column to
-    ``mtb.evaluate(batch=...)``.
+    ``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``.
 
     ``batch_index=N`` writes the whole object as batch ``N``. A mosaic
     delivery of one file per batch (the D46 pattern: CITE-seq, Multiome,
@@ -1565,13 +1565,15 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
     if batch is not None and category in ("vertical", "diagonal"):
         from .resolve import _one_file_advice
         raise ValueError(
-            "batch= writes per-batch files (rna1.h5, rna2.h5, ...); "
+            config.hint("batch=", "--batch") + " writes per-batch files (rna1.h5, "
+            "rna2.h5, ...); "
             + _one_file_advice(category, has_adt=adt is not None and atac is None))
     if batch is not None and category is None and atac is not None:
+        from .resolve import _batch_column_advice
         warnings.warn(
             "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic "
-            "pass category='mosaic'; otherwise export without batch= and pass the batch "
-            "column to evaluate(batch=...)", UserWarning, stacklevel=3)
+            "pass category='mosaic'; otherwise " + _batch_column_advice(),
+            UserWarning, stacklevel=3)
 
 
 def _names_of(spec):
