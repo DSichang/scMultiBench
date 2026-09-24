@@ -256,7 +256,7 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
     assert caught.count(text) == 1, caught
     rec = failed.results[0]
     assert rec["status"] == "RUN_OK_EVAL_FAILED"
-    assert ("metrics='all' needs batch labels for ASW_batch, GC, iLISI and kBET. "
+    assert ("metrics='all' needs batch labels for ASW_batch, GC and iLISI. "
             "Pass batch=<vector>, or metrics='clustering'.") in rec["error"]
     for k in ("batch_source", "n_batches", "metrics"):
         assert k not in rec, k
@@ -267,13 +267,13 @@ def test_the_batch_label_errors_are_short_sentences(monkeypatch):
     rng = np.random.default_rng(0)
     emb, ct = rng.normal(size=(60, 4)), np.array(["A", "B"] * 30)
     cases = {
-        "all": ("metrics='all' needs batch labels for ASW_batch, GC, iLISI and kBET. "
+        "all": ("metrics='all' needs batch labels for ASW_batch, GC and iLISI. "
                 "Pass batch=<vector>, or metrics='clustering'.",
-                "--metrics all needs batch labels for ASW_batch, GC, iLISI and kBET. "
+                "--metrics all needs batch labels for ASW_batch, GC and iLISI. "
                 "Pass --batch CSV, or --metrics clustering."),
-        "batch": ("metrics='batch' needs batch labels for ASW_batch, GC, iLISI and kBET. "
+        "batch": ("metrics='batch' needs batch labels for ASW_batch, GC and iLISI. "
                   "Pass batch=<vector>, or labels as a list of two or more files.",
-                  "--metrics batch needs batch labels for ASW_batch, GC, iLISI and kBET. "
+                  "--metrics batch needs batch labels for ASW_batch, GC and iLISI. "
                   "Pass --batch CSV, or two or more --labels files."),
     }
     for metrics, (py, cli) in cases.items():

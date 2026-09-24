@@ -92,3 +92,53 @@ def test_run_dry_run_header_notes_then_command(tmp_path, capsys):
     setup = [ln for ln in lines if "GENCODE" in ln]
     assert setup and setup[0].startswith("# GLUE needs the GENCODE v43 human annotation")
     assert not [ln for ln in lines if "setup:" in ln]
+
+
+# --------------------------------------------------------------- integration repairs
+# wf R6-02 x R6-05: rescore reuses the batch run_all saved. That batch is not
+# one the caller gave, so a metrics= without a batch metric must not warn
+# 'batch= changes nothing here' (the first Example of BatchResult.rescore).
+from tests.test_study_r4_wf import N, _batch_metrics, cite  # noqa: E402,F401
+from multibench.eval import pipeline  # noqa: E402
+
+_KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
+
+
+def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tmp_path):
+    data, batch, shuffled = cite
+    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", data_path=data,
+                 batch=shuffled, **_KW)
+    back = mtb.load_batch(tmp_path / "out")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        new = back.rescore(metrics=["ARI", "NMI"])
+    rec = new.results[0]
+    assert rec["status"] == "CHAIN_OK"
+    assert set(rec["metrics"]) == {"ARI", "NMI"}
+    assert round(float(new.summary["ARI"].iloc[0]), 4) == round(
+        float(res.summary["ARI"].iloc[0]), 4)
+    # the record still says which batch it has, and a later batch metric finds it
+    assert (rec["batch_source"], rec["n_batches"]) == ("user", 2)
+    assert rec["batch_file"] == res.results[0]["batch_file"]
+    new.save(tmp_path / "ari_only")
+    again = _quiet(mtb.load_batch(tmp_path / "ari_only").rescore)
+    assert _batch_metrics(again) == _batch_metrics(res)
+    # a batch the caller gives still warns, as R6-05 keeps
+    with pytest.warns(UserWarning, match=r"^batch= changes nothing here, because "
+                                         r"metrics=\['ARI'\] has no batch metric"):
+        back.rescore(batch=batch, metrics=["ARI"])
+
+
+def test_the_batch_label_errors_name_only_metrics_the_family_computes():
+    import numpy as np
+    rng = np.random.default_rng(0)
+    emb, ct = rng.normal(size=(80, 4)), np.array(["A", "B"] * 40)
+    bat = np.array(["x"] * 40 + ["y"] * 40)
+    for fam in ("all", "batch"):
+        with pytest.raises(ValueError) as exc:
+            pipeline.evaluate(emb, labels=ct, metrics=fam)
+        named = re.search(r"needs batch labels for (.*?)\. ", str(exc.value)).group(1)
+        named = set(re.split(r", | and ", named))
+        computed = set(_quiet(pipeline.evaluate, emb, labels=ct, batch=bat,
+                              metrics=fam, verbose=False).index)
+        assert named and named <= computed, (fam, named, computed)

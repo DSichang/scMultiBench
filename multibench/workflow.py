@@ -1595,7 +1595,7 @@ def _names_batch_metric(metrics) -> bool:
 
 
 def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
-                         user_batch=False, on_rank=None):
+                         user_batch=False, batch_given=True, on_rank=None):
     """Score each candidate label order, keep the best, return the full spread.
 
     ``batch`` (optional, one entry per cell in embedding order) replaces the
@@ -1604,13 +1604,14 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
     candidates already carry such a vector. ``metrics`` (a family token or a
     list of metric codes, ``evaluate(metrics=)``) restricts the set the
     winner is scored on; ``None`` = the family the batch structure implies
-    (screening still needs ARI only). A file-of-origin batch goes to
-    ``evaluate`` only when ``metrics`` can use it, so that ``evaluate`` does
-    not warn about a batch the caller never gave. ``on_rank(orders, cells)``
-    is called before several orders are ranked.
+    (screening still needs ARI only). A file-of-origin batch, or a user batch
+    with ``batch_given=False`` (the one ``run_all`` saved, reused by
+    ``rescore``), goes to ``evaluate`` only when ``metrics`` can use it, so
+    that ``evaluate`` does not warn about a batch the caller never gave.
+    ``on_rank(orders, cells)`` is called before several orders are ranked.
     """
     user_batch = user_batch or batch is not None
-    use_batch = user_batch or _names_batch_metric(metrics)
+    use_batch = (user_batch and batch_given) or _names_batch_metric(metrics)
 
     def _full(lab, bat, clustering=None):
         # several distinct source files (or a user batch with >1 level) => a
@@ -2381,7 +2382,7 @@ class BatchResult:
                     _score_record(rec, emb, self.dataset, self.category, dp, v,
                                   batch=bat, labels=lab, metrics=metrics,
                                   labels_by_cell=lab_by_cell, batch_by_cell=bat_by_cell,
-                                  keep_order=keep,
+                                  keep_order=keep, batch_given=batch is not None,
                                   on_rank=_rank_line(m) if verbose else None)
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
                 _drop_scores(rec)
@@ -2973,7 +2974,8 @@ def _drop_scores(rec: dict) -> dict:
 
 def _score_record(rec, emb, dataset, category, data_path, variant, *,
                   batch=None, labels=None, metrics=None, labels_by_cell=False,
-                  batch_by_cell=False, keep_order=None, on_rank=None):
+                  batch_by_cell=False, keep_order=None, on_rank=None,
+                  batch_given=True):
     """Fill ``rec`` with metrics for ``emb`` (shared by run_all and rescore).
 
     Sets ``status`` (``CHAIN_OK`` / ``CHAIN_OK_GRAPH_METHOD`` /
@@ -3000,7 +3002,10 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     except that a vector without ``batch_by_cell`` follows labels given in
     embedding row order. A batch in the dataset's order that meets such
     labels is put in the variant's own label-file order. A vector as long as
-    the embedding is used as given when no order fits.
+    the embedding is used as given when no order fits. ``batch_given=False``
+    marks a batch the caller did not pass (the saved one ``rescore`` reuses):
+    it is recorded as ``'user'`` but reaches ``evaluate`` only for a batch
+    metric.
     """
     stored = rec.get("label_order_candidates")
     _drop_scores(rec)
@@ -3067,6 +3072,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         return rec
     names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
                                               user_batch=batch is not None,
+                                              batch_given=batch_given,
                                               on_rank=on_rank)
     if val is None:
         rec["status"] = "RUN_OK_EVAL_FAILED"

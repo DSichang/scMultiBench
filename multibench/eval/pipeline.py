@@ -549,6 +549,8 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         available, or a code evaluate() cannot compute (``PCR``).
     """
     clu, bat = _metric_families()
+    # a family token computes kBET only when it is named
+    family_bat = [c for c in bat if c != "kBET"]
     sel = catalog.metric_selection(metrics)
     if sel.explicit:
         outside = [c for c in sel.codes if c not in clu and c not in bat]
@@ -577,7 +579,7 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
             if not has_batch:
                 raise ValueError(
                     f"{_metrics_spelling(metrics)} needs batch labels for "
-                    f"{_and_list(bat)}. "
+                    f"{_and_list(family_bat)}. "
                     + config.hint("Pass batch=<vector>, or metrics='clustering'.",
                                   "Pass --batch CSV, or --metrics clustering."))
             group = "all"
@@ -586,7 +588,7 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         if not has_batch:
             raise ValueError(
                 f"{_metrics_spelling(metrics)} needs batch labels for "
-                f"{_and_list(bat)}. "
+                f"{_and_list(family_bat)}. "
                 + config.hint("Pass batch=<vector>, or labels as a list of two or "
                               "more files.",
                               "Pass --batch CSV, or two or more --labels files."))
@@ -598,7 +600,7 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
             config.hint("batch= changes nothing here, because ",
                         "--batch changes nothing here, because ")
             + f"{_metrics_spelling(metrics)} has no batch metric. Add "
-            + _and_list([c for c in bat if c != "kBET"], "or")
+            + _and_list(family_bat, "or")
             + config.hint(", or pass metrics='all'.",
                           " to --metrics, or pass --metrics all."),
             UserWarning, stacklevel=4)
