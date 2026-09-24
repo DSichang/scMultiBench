@@ -1210,14 +1210,17 @@ def _failed_line(res, where) -> str | None:
 
     ``# 1 of 2 methods failed: StabMap (FAIL). See runs/failures.csv.``;
     ``None`` when nothing failed. Counts are methods of this run, not of
-    records merged from an earlier run in the same folder.
+    records merged from an earlier run in the same folder. A ``SKIPPED``
+    record of a method that ``--methods`` did not name is not counted.
     """
     bad = res.failures
     if bad.empty:
         return None
     named = list(dict.fromkeys(f"{m} ({s})" for m, s in zip(bad["method"], bad["status"])))
     n_bad = len(set(bad["method"]))
-    n_all = len({r.get("method") for r in res.records} | set(bad["method"]))
+    n_all = len({r.get("method") for r in res.records
+                 if r.get("status") != "SKIPPED" or r.get("requested")}
+                | set(bad["method"]))
     return (f"# {n_bad} of {n_all} method{'s' if n_all != 1 else ''} failed: "
             f"{', '.join(named)}. See {where}.")
 

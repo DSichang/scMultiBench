@@ -2975,7 +2975,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         # runnable" with other methods' reasons attached
         raise _no_variant_error(category, dataset, methods, modalities)
     if dry_run:
-        wrong_ref = config.scripts_ref_problem()
+        wrong_ref = config.scripts_ref_problem() or config.scripts_folder_problem()
         if wrong_ref:                      # every row carries it as its reason
             import sys
             print(f"# {wrong_ref}", file=sys.stderr, flush=True)
