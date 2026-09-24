@@ -2041,9 +2041,13 @@ class BatchResult:
                                          "emb_shape", "n_tunable", "label_order",
                                          "label_order_confidence", "batch_source",
                                          "n_batches", "label_order_note", "caveat",
-                                         "reason"])
-        sm = _with_label_order_note(
-            pd.DataFrame(rows).sort_values("method").reset_index(drop=True))
+                                         "reason"]).astype({"label_order_confidence":
+                                                            "float64"})
+        sm = pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
+        # float64 with NaN also when every row is blank (else object, None)
+        sm["label_order_confidence"] = pd.to_numeric(
+            sm["label_order_confidence"], errors="coerce").astype("float64")
+        sm = _with_label_order_note(sm)
         for col in ("caveat", "reason"):         # new columns go last
             sm[col] = sm.pop(col)
         # whole numbers stay whole next to the blanks of SKIPPED and FAIL rows
