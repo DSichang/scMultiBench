@@ -203,10 +203,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     for msg in style.coverage_warnings(
             parts, basis=overall,
             incomplete_fix=_config.hint(
-                "Filter long_df to the methods scored on every dataset to compare "
-                "like with like.",
-                "Pass --methods with the methods scored on every dataset to compare "
-                "like with like."),
+                "Filter long_df to the methods scored on every dataset.",
+                "Pass --methods with the methods scored on every dataset."),
             stored=style.stored_datasets(long_df)):
         warnings.warn(msg, UserWarning, stacklevel=2)
     shown = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]

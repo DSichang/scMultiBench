@@ -76,9 +76,9 @@ class DegenerateRerunWarning(UserWarning):
     **When it fires:**
 
     - a re-run row scored ARI below 0.01 where the published table scored
-      the same category, dataset and method above 0.2. Such a row usually
-      comes from a failed re-run (a collapsed embedding, a wrong label
-      order), not from the method;
+      the same category, dataset and method above 0.2. Such a row most
+      likely comes from a failed re-run, for example a collapsed embedding
+      or a wrong label order, not from the method itself;
     - never for a ``result_path`` file or a ``long_df`` frame passed to
       ``mtb.recommend``;
     - in the shipped sweeps: Conos on D28.
@@ -502,9 +502,9 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
     warnings.warn(
         f"degenerate re-run row(s) - ARI < {_DEGENERATE_RERUN_ARI} where the "
         f"published table scored > {_DEGENERATE_PUBLISHED_ARI}: {items}. Such a "
-        f"row usually comes from a failed re-run (a collapsed embedding or a "
-        f"wrong label order), not from the method; drop it before ranking "
-        f"(df[df.method != {bad.method.iloc[0]!r}]).",
+        f"row most likely comes from a failed re-run, for example a collapsed "
+        f"embedding or a wrong label order, not from the method itself. Drop it "
+        f"before ranking: df[df.method != {bad.method.iloc[0]!r}].",
         DegenerateRerunWarning, stacklevel=stacklevel)
 
 
@@ -693,7 +693,7 @@ def load_results(
     frame and a ``UserWarning``, not an error. Under ``source="published"``
     the warning also says whether the re-run sweeps hold that method
     (``"rerun has 1 dataset(s) ... pass source='rerun'"``): a published
-    table need not score every method wired for its category.
+    table need not score every method the package runs for its category.
 
     **Clustering variants.** A result directory named ``<method>_louvain`` /
     ``<method>_kmeans`` is that variant: it is reported under the method's
@@ -981,7 +981,7 @@ def available_datasets(
 
     Notes
     -----
-    **Stored is not downloadable.** Only a few of the benchmark's datasets
+    **Downloadable datasets.** Only a few of the benchmark's datasets
     are downloadable: the release assets of ``mtb.data.fetch``, listed by
     ``mtb.data.fetchable()``. An id returned here but not there has metric
     tables to plot and rank against, and no data file this package can
@@ -1096,8 +1096,7 @@ def results_coverage(
     has no rows.
 
     **Warnings.** The degenerate-row and one-method warnings of
-    ``mtb.load_results`` are silenced here: coverage says where rows are,
-    not whether they are sound or rankable.
+    ``mtb.load_results`` are silenced here.
 
     **Re-run version.** ``attrs["rerun_version"]`` holds the package version
     stamped on the re-run sweeps, as in ``mtb.load_results``.
@@ -1219,7 +1218,7 @@ def recommend(
     """Rank methods from stored results, with the share of datasets each was scored on.
 
     Scores each method on the stored metric tables (or ``long_df``) and also
-    lists every wired method it could not score; the rules are in Notes.
+    lists every available method it could not score; the rules are in Notes.
 
     Parameters
     ----------
@@ -1237,7 +1236,7 @@ def recommend(
         Rank only these methods (alias tolerant, case-insensitive), among
         themselves; ``None`` = every method.
     metrics : None, str or list of str
-        ``None`` = the ``"clustering"`` family (the benchmark's headline
+        ``None`` = the ``"clustering"`` family (the benchmark's main
         ranking); or ``"batch"``, ``"all"``, or a list of codes.
     long_df : pandas.DataFrame
         Frame to score (``metric, value, method, dataset``) instead of the
@@ -1273,7 +1272,7 @@ def recommend(
     >>> import multibench as mtb
     >>> r = mtb.recommend("vertical", modalities=["rna", "adt"])
     >>> r[["method", "grand_score", "coverage", "datasets"]]
-    >>> r.attrs["not_scored"]                   # wired, but no published rows
+    >>> r.attrs["not_scored"]                   # available, but no published rows
     >>> mtb.recommend("diagonal", atac="peak")  # methods that read peaks
     >>> mtb.recommend("cross", source="rerun")  # cross has one published method
 
@@ -1297,10 +1296,10 @@ def recommend(
       that dataset.
     - ``n_datasets`` / ``n_datasets_total`` / ``coverage`` say how much of
       the method x dataset matrix each score rests on.
-    - Every method wired for the category (and ``modalities``) that has no
-      rows in the chosen source is still listed, after the scored rows,
-      with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0. A
-      published table need not score every method wired for its category;
+    - Every method the package runs for the category (and ``modalities``)
+      that has no rows in the chosen source is still listed, after the scored
+      rows, with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0.
+      A published table need not score every such method;
       the re-run sweeps may cover more (``source="rerun"``).
 
     **Columns.**

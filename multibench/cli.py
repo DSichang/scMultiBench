@@ -343,9 +343,15 @@ def _cmd_scan(args) -> int:
     methods = _csv_list(args.methods)
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
-    df = multibench.scan(args.dataset, args.category, data_path=args.data_path,
-                         modalities=_csv_list(args.modalities), verbose=False,
-                         assume_gpu=getattr(args, "assume_gpu", False))
+    kw = dict(data_path=args.data_path, modalities=_csv_list(args.modalities),
+              verbose=False, assume_gpu=getattr(args, "assume_gpu", False))
+    try:
+        # named methods keep a wrong-ATAC-kind row runnable, as in mtb.scan
+        df = multibench.scan(args.dataset, args.category, methods=methods, **kw)
+    except ValueError:
+        if not methods:
+            raise
+        df = multibench.scan(args.dataset, args.category, **kw)   # names what is present
     if methods:
         unknown = sorted(set(methods) - set(df["method"]))
         if unknown:
@@ -373,7 +379,8 @@ def _strict_problem(df, methods) -> str | None:
     ``--methods`` has no runnable row. The text counts the rows each check
     blocks and, for named methods, gives the reason of each one's first row.
     A GPU-only method on a host without a GPU is counted apart from a
-    missing env, with a pointer to ``--assume-gpu``.
+    missing env, with a pointer to ``--assume-gpu``; so is a row given the
+    wrong ATAC kind.
     """
     ok = df["runnable"].astype(bool)
     runnable = df[ok]
@@ -388,6 +395,9 @@ def _strict_problem(df, methods) -> str | None:
     counts = []
     if "files_ok" in rest and (~rest["files_ok"].astype(bool)).any():
         counts.append(f"input files missing in {int((~rest['files_ok'].astype(bool)).sum())}")
+    from .workflow import _is_wrong_atac
+    if "reason" in rest and _is_wrong_atac(rest["reason"]).any():
+        counts.append(f"wrong ATAC kind in {int(_is_wrong_atac(rest['reason']).sum())}")
     n_env, n_gpu, gpu_only = _env_and_gpu_counts(rest)
     if n_env:
         counts.append(f"env not ready in {n_env}")
@@ -1107,11 +1117,9 @@ def _cmd_run_all(args) -> int:
         print(f"# dry run - nothing was executed; {k} of {n} variant(s) runnable on "
               f"{args.dataset} ({args.category}); commands below are what multibench "
               f"run would execute (rows with files_ok False have none)", file=sys.stderr)
-        from .engine.resolve import unused_batches_in
-        for _, r in df.iterrows():
-            note = unused_batches_in(r.get("caveat"))
-            if note:        # the compact table clips the caveat column
-                print(f"# {r['method']} {note}", file=sys.stderr)
+        for _, r in df[df["files_ok"]].iterrows():
+            if r.get("caveat"):     # the compact table clips the caveat column
+                print(f"# {r['method']} {r['caveat']}", file=sys.stderr)
         _print_frame(df, columns=columns, fmt=args.format, compact=_compact_plan_columns(df))
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]

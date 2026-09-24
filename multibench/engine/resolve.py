@@ -567,7 +567,7 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
     (falling back to ``atac.h5``), ``atac_peak`` reads ``atac_peak.h5``
     (falling back to ``peak.h5``) and a numbered ``atac<i>`` reads
     ``atac<i>.h5`` or ``atac_peak<i>.h5``. Return one hint per such role,
-    e.g. ``"atac.h5 not found; found atac_peak.h5 - vertical methods read
+    e.g. ``"atac.h5 not found; found atac_peak.h5 - vertical reads
     atac.h5 (pass the representation this method wants: see
     method_info(m)['atac'])"``; nothing for roles that are not ATAC or have
     no sibling. ``atac`` is the method's representation (``spec.atac``):
@@ -602,9 +602,12 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
             continue
         why = ("every mosaic method reads peaks" if m else
                "pass the representation this method wants: see method_info(m)['atac']")
-        hints.append(
-            f"{accepted[0]} not found; found {', '.join(found)} - {category} methods "
-            f"read {' or '.join(accepted)} ({why})")
+        rule = f"{accepted[0]} not found; found {', '.join(found)} - {category} methods " \
+               f"read {' or '.join(accepted)}"
+        if category == "vertical" and not m:
+            # the rule of the peak rows above, also for an atac_gas role
+            rule = f"atac.h5 not found; found {', '.join(found)} - vertical reads atac.h5"
+        hints.append(f"{rule} ({why})")
     return hints
 
 

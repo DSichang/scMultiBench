@@ -138,7 +138,7 @@ def test_near_miss_vertical_atac_names_the_peak_file(tmp_path):
         resolve.inputs_for("MM", "vertical", "Matilda", modalities=["rna", "atac"],
                            data_path=tmp_path, check=True)
     msg = str(ei.value)
-    assert ("atac.h5 not found; found atac_peak.h5 - vertical methods read atac.h5 "
+    assert ("atac.h5 not found; found atac_peak.h5 - vertical reads atac.h5 "
             "(pass the representation this method wants: see method_info(m)['atac'])") in msg
     # the warn-only form (check=None) carries the same hint
     with pytest.warns(UserWarning, match="found atac_peak.h5"):

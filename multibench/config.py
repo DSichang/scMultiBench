@@ -190,7 +190,7 @@ def metric_set_dir(token: str) -> str:
     Parameters
     ----------
     token : str
-        Only ``"scib"`` is wired.
+        Only ``"scib"`` is available.
 
     Returns
     -------
