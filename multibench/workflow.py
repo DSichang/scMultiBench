@@ -750,12 +750,14 @@ def _dropped_dirs_message(modalities, dropped: list) -> str:
     folder (scBridge): no modality token selects them."""
     one = len(dropped) == 1
     mods = _resolve._and_list([str(m) for m in modalities])
+    head = (f"The modality {mods} leaves" if len(modalities) == 1
+            else f"The modalities {mods} leave")
     fix = config.hint(
         f"Pass modalities=[] to select {'it' if one else 'them'}, or leave out "
         f"modalities= to see every variant.",
         f'Pass --modalities "" to select {"it" if one else "them"}, or leave out '
         f"--modalities to see every variant.")
-    return (f"The modalities {mods} leave out {_resolve._and_list(dropped)}, which "
+    return (f"{head} out {_resolve._and_list(dropped)}, which "
             f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
 
 
@@ -971,7 +973,7 @@ def _modality_matcher(modalities, named=None):
         rep = {"atac_peak": "peak", "atac_gas": "gene_activity"}.get(stem)
         fam = modality_family(t)
         toks.append((fam, rep, fam in ("rna", "adt", "atac")))
-    reps = {rep for _f, rep, _b in toks if rep}
+    reps = _token_reps(modalities)
 
     def covers(tok, role):
         fam, _rep, is_base = tok
@@ -999,6 +1001,18 @@ def _modality_matcher(modalities, named=None):
 _REP_OF_TOKEN = {"atac_peak": "peak", "atac_gas": "gene_activity"}
 _TOKEN_OF_REP = {v: k for k, v in _REP_OF_TOKEN.items()}
 _REP_WORDS = {"peak": "peaks", "gene_activity": "gene activity"}
+
+
+def _token_reps(modalities) -> set:
+    """The ATAC representations (``peak``, ``gene_activity``) the tokens name,
+    as :func:`_modality_matcher` reads them; empty for ``atac`` or no ATAC token."""
+    out = set()
+    for tok in modalities or ():
+        t = registry.MODALITY_ALIASES.get(str(tok).lower(), str(tok))
+        rep = _REP_OF_TOKEN.get(t.rstrip("0123456789"))
+        if rep:
+            out.add(rep)
+    return out
 
 
 def _representation_note(category, methods, modalities) -> str:
@@ -1151,8 +1165,9 @@ def scan(dataset: str, category: str | None = None, *,
     Warns
     -----
     UserWarning
-        ``dataset`` matches a folder only up to letter case, or ``modalities``
-        drops directory-input methods.
+        ``dataset`` matches a folder only up to letter case.
+    UserWarning
+        ``modalities`` drops a folder-fed method whose ATAC representation it allows.
 
     Examples
     --------
@@ -1319,9 +1334,9 @@ def scan(dataset: str, category: str | None = None, *,
     - a numbered token (``rna1``) matches that role only;
     - an unknown token raises ``ValueError`` listing the vocabulary.
 
-    A variant fed a folder (scBridge) has no modality roles. ``modalities=[]``
-    selects exactly those variants; any non-empty list leaves them out, and
-    a ``UserWarning`` names them.
+    A folder-fed variant (scBridge) has no modality roles. ``modalities=[]``
+    selects exactly those. Other lists drop them with a ``UserWarning``,
+    unless the tokens exclude their ATAC representation.
 
     **Choosing a category.** A CITE-seq folder (``rna.h5`` + ``adt.h5`` +
     ``cty.csv``) is ``vertical`` with modalities ``["rna", "adt"]``; RNA and
@@ -1377,12 +1392,15 @@ def scan(dataset: str, category: str | None = None, *,
     wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
+    # one representation token already excludes a method that reads the other
+    reps = _token_reps(modalities) if modalities is not None else set()
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
             continue
         mod_str = "+".join(mods) or "(data_dir)"
         if wanted is not None and not wanted(spec, mods):
-            if not mods and spec.id not in dropped_dirs:
+            other_rep = len(reps) == 1 and spec.atac and spec.atac not in reps
+            if not mods and not other_rep and spec.id not in dropped_dirs:
                 dropped_dirs.append(spec.id)
             continue
         rt = _runtimes().get(spec.id, {})
@@ -3350,8 +3368,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     Warns
     -----
     UserWarning
-        ``dataset`` matches a folder only up to letter case, or ``modalities``
-        drops directory-input methods.
+        ``dataset`` matches a folder only up to letter case.
+    UserWarning
+        ``modalities`` drops a folder-fed method whose ATAC representation it allows.
     UserWarning
         A ``batch`` Series or barcode-indexed CSV cannot be aligned and is matched by position.
 

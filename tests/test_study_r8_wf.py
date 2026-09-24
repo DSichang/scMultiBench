@@ -14,11 +14,14 @@ R8-06  template-like docstring passages; ``label_order_confidence`` was an
 """
 import inspect
 import math
+import warnings
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import cli
 from multibench import workflow as W
 from tests.test_f4_cli import working  # noqa: F401 - the stand-in Matilda env fixture
 
@@ -141,3 +144,66 @@ def test_the_rescore_lines_name_the_ari_or_end_with_the_status(swept, capsys):
     mtb.load_batch(out).rescore(metrics=["ASW"], verbose=True)
     (line,) = _result_lines(capsys.readouterr().out, "[rescore] Matilda -> ")
     assert line == "[rescore] Matilda -> CHAIN_OK"
+
+
+# ============================================================ R8-02
+ROOT = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture
+def lung(tmp_path, monkeypatch):
+    """``<tmp>/data/LUNG``: diagonal RNA and peaks with the two label files, no
+    gene-activity file; the working directory at ``<tmp>``."""
+    folder = tmp_path / "data" / "LUNG"
+    folder.mkdir(parents=True)
+    for name in ("rna.h5", "atac_peak.h5", "rna_cty.csv", "atac_cty.csv"):
+        (folder / name).symlink_to(ROOT / "data" / "D28" / name)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+def _scan_warnings(**kw):
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        mtb.scan("LUNG", "diagonal", data_path="data", verbose=False, **kw)
+    return [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
+
+
+@pytest.mark.parametrize("mods", [["rna", "atac_peak"], ["rna", "peak"]])
+def test_a_peak_token_does_not_name_scbridge(lung, mods):
+    assert mtb.method_info("scBridge")["atac"] == "gene_activity"
+    assert not [m for m in _scan_warnings(modalities=mods) if "scBridge" in m]
+
+
+@pytest.mark.parametrize("mods", [["rna", "atac_gas"], ["rna", "atac"],
+                                  ["rna", "atac_peak", "atac_gas"]])
+def test_other_tokens_still_name_scbridge(lung, mods):
+    (msg,) = [m for m in _scan_warnings(modalities=mods) if "scBridge" in m]
+    assert msg.startswith("The modalities rna"), msg
+    assert " leave out scBridge, which reads a folder instead of modality files." in msg
+
+
+def test_one_token_is_singular(lung):
+    (msg,) = [m for m in _scan_warnings(modalities=["rna"]) if "scBridge" in m]
+    assert msg.startswith("The modality rna leaves out scBridge, which reads a folder "
+                          "instead of modality files. Pass modalities=[] to select it"), msg
+
+
+def test_the_cli_scan_with_a_peak_token_does_not_name_scbridge(lung, capsys):
+    rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", "data",
+                   "--modalities", "rna,atac_peak"])
+    err = capsys.readouterr().err
+    assert rc == 0, err
+    assert "scBridge" not in err, err
+    rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", "data",
+                   "--modalities", "rna,atac_gas"])
+    assert "warning: The modalities rna and atac_gas leave out scBridge" in \
+        capsys.readouterr().err
+
+
+def test_the_docstrings_say_which_folder_fed_method_is_named():
+    for fn in (W.scan, W.run_all):
+        assert ("``modalities`` drops a folder-fed method whose ATAC representation it "
+                "allows.") in _doc(fn)
+    assert ("Other lists drop them with a ``UserWarning``, unless the tokens exclude "
+            "their ATAC representation.") in _doc(W.scan)

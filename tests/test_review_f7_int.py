@@ -192,11 +192,11 @@ def test_modalities_warning_on_the_cli_is_sentences(tmp_path, monkeypatch, capsy
     _lung_data(tmp_path)
     monkeypatch.chdir(tmp_path)
     rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", "data",
-                   "--modalities", "rna,atac_peak"])
+                   "--modalities", "rna,atac_gas"])
     err = capsys.readouterr().err
     assert rc == 0
     line = next(l for l in err.splitlines() if "scBridge" in l)
-    assert line.endswith("The modalities rna and atac_peak leave out scBridge, which reads "
+    assert line.endswith("The modalities rna and atac_gas leave out scBridge, which reads "
                          "a folder instead of modality files. Pass --modalities \"\" to "
                          "select it, or leave out --modalities to see every variant."), line
     assert "modalities=[" not in line and ";" not in line and "scan:" not in line
@@ -206,9 +206,9 @@ def test_modalities_warning_in_python_is_sentences(tmp_path):
     _lung_data(tmp_path)
     with pytest.warns(UserWarning) as rec:
         mtb.scan("LUNG", "diagonal", data_path=tmp_path / "data",
-                 modalities=["rna", "atac_peak"], verbose=False)
+                 modalities=["rna", "atac_gas"], verbose=False)
     msg = next(str(w.message) for w in rec if "scBridge" in str(w.message))
-    assert msg == ("The modalities rna and atac_peak leave out scBridge, which reads a "
+    assert msg == ("The modalities rna and atac_gas leave out scBridge, which reads a "
                    "folder instead of modality files. Pass modalities=[] to select it, or "
                    "leave out modalities= to see every variant.")
 
