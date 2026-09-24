@@ -1289,9 +1289,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ``'<mod>:<col>'`` reads ``mdata[mod].obs``, then muon's copy
     ``mdata.obs['<mod>:<col>']``; ``'mod:<mod>.obs:<col>'`` works too.
 
-    **Master cell order.** Every modality is written in one order -
-    ``data.obs_names`` when ``data`` is given, else the first modality
-    object's - and re-indexed to it by barcode:
+    **Master cell order.** Every modality is re-indexed by barcode to one
+    order: ``data.obs_names``, or the first modality's ``obs_names`` when
+    ``data`` is not given.
 
     - the same barcodes in another order are reordered;
     - a barcode set that differs raises ``ValueError`` naming the strays;

@@ -1345,8 +1345,8 @@ def recommend(
     - Every method the package runs for the category (and ``modalities``)
       that has no rows in the chosen source is still listed, after the scored
       rows, with ``grand_score`` NaN, ``n_datasets`` 0 and ``coverage`` 0.0.
-      A published table need not score every such method;
-      the re-run sweeps may cover more (``source="rerun"``).
+      The re-run tables may hold more of these methods
+      (``source="rerun"``).
 
     **Columns.**
 

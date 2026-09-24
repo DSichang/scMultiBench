@@ -821,11 +821,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     UnitedNet's label input is ``cty``. The older key ``rna_cty`` still
     works, with a ``DeprecationWarning``.
 
-    **GPU and CPU.** On a host without an NVIDIA GPU
-    (``mtb.env.host_has_gpu()`` is False), the method's ``cpu_params`` - the
-    flags that turn CUDA off in a script that has it on by default,
-    ``method_info(m)['cpu_params']`` - are merged into ``params`` first. A
-    key you pass always wins.
+    **GPU and CPU.** ``cpu_params`` are the flags that turn CUDA off in a
+    script that uses it by default (``method_info(m)['cpu_params']``). On a
+    host without an NVIDIA GPU (``mtb.env.host_has_gpu()`` is False), they
+    are merged into ``params`` first. A key you pass always wins.
 
     The dry run shows these flags too; a real run prints ``[run] no GPU on
     this host: applying <method> cpu_params {...}`` to stderr.

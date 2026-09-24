@@ -1195,8 +1195,8 @@ def scan(dataset: str, category: str | None = None, *,
     - Paths are absolute: a relative ``out_dir``, the placeholder included,
       is resolved against the working directory.
     - ``params`` are merged in the way ``run_all(params=)`` merges them.
-    - On a GPU-less host it already carries each method's ``cpu_params``
-      (the flags that turn CUDA off where a switch exists).
+    - On a GPU-less host the command already carries each method's
+      ``cpu_params``, the flags that turn CUDA off where a switch exists.
     - A row blocked only by ``env_ok`` still shows its command. Put it in a
       job script once the environment is built.
     - Some commands read a file that ``mtb.run`` writes first under
@@ -2004,9 +2004,9 @@ class BatchResult:
         ``''``.
 
         **Label-order evidence.** ``label_order_candidates`` holds every
-        ordering tried and the ARI each achieved - the evidence behind
-        ``summary``'s ``label_order_confidence``. It is present only when more
-        than one ordering was possible.
+        ordering tried and its ARI. ``summary``'s ``label_order_confidence``
+        is computed from them. It is present only when more than one ordering
+        was possible.
 
         See Also
         --------
@@ -2170,9 +2170,10 @@ class BatchResult:
         a different metric selection.
 
         **Arguments.** A ``labels`` array, list or plain CSV follows the
-        embedding rows. A ``batch`` array follows the cell order of ``run_all(batch=)``,
-        or the embedding rows when ``labels`` is matched by position. A CSV
-        path is read like a label file. The batch is recorded as
+        embedding rows. Without ``labels=``, a ``batch`` array follows the
+        order of ``mtb.labels_for(dataset)``. With a ``labels`` array in
+        embedding row order, the ``batch`` array follows the embedding rows
+        too. A CSV path is read like a label file. The batch is recorded as
         ``batch_source='user'``.
 
         **Aligned by barcode.** A Series or one-column DataFrame with a
