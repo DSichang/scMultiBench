@@ -1176,9 +1176,17 @@ def _cmd_run_all(args) -> int:
     the ``<out_dir>`` placeholder, as ``run_all(dry_run=True)`` does.
     ``--batch CSV`` becomes ``run_all(batch=CSV)``; a missing file exits 1
     before any method runs, and ``--dry-run`` reads the file as a check.
+    ``--batch-column NAME`` reads that column of the file (:func:`_batch_arg`).
     A finished run with a non-empty ``failures`` exits 3 (``_EXIT_METHOD_FAILED``)
     after saving; the Python ``run_all`` does not raise.
     """
+    with contextlib.ExitStack() as stack:
+        return _run_all_command(args, stack)
+
+
+def _run_all_command(args, stack) -> int:
+    """The body of :func:`_cmd_run_all`; ``stack`` removes the copy that
+    ``--batch-column`` makes of the ``--batch`` file."""
     import multibench
     if args.out is None and not args.dry_run:
         # the text argparse prints for a missing required option
@@ -1188,7 +1196,7 @@ def _cmd_run_all(args) -> int:
     if getattr(args, "assume_gpu", False) and not args.dry_run:
         _usage_error(args, "--assume-gpu applies to --dry-run only; a real run checks "
                            "this host's GPU")
-    batch = getattr(args, "batch", None)
+    batch = _batch_arg(args, stack)
     batch_vec = None
     if batch is not None:
         from .eval import io as eio
@@ -1425,6 +1433,18 @@ def _evaluate_labels(args, stack):
     return files[0] if len(files) == 1 else files
 
 
+def _batch_arg(args, stack):
+    """``--batch``, or with ``--batch-column`` a copy of that file with only
+    the cell ids and that column, which ``stack`` removes."""
+    batch, column = getattr(args, "batch", None), getattr(args, "batch_column", None)
+    if column is None:
+        return batch
+    if batch is None:
+        _usage_error(args, "--batch-column needs --batch")
+    from .eval import pipeline
+    return pipeline._one_column_file(batch, column, stack)
+
+
 def _label_order_problem(files, method, dataset, category) -> str | None:
     """Why ``--labels`` ``files`` contradict ``--method``'s cell order, or ``None``.
 
@@ -1541,9 +1561,10 @@ def _cmd_evaluate(args) -> int:
             metrics = args.task
     from .eval import pipeline
     with contextlib.ExitStack() as stack:
+        batch = _batch_arg(args, stack)
         labels = _evaluate_labels(args, stack)
         kw = dict(category=args.category, labels=labels, clustering=args.cluster,
-                  batch=getattr(args, "batch", None))
+                  batch=batch)
         if args.obsm is not None:
             kw["obsm"] = args.obsm
         # labels read from --dataset: a count error names that dataset's files
@@ -1979,6 +2000,7 @@ _FORCE_HELP = ("try anyway on a computer that is not Linux (method environments 
                "download)")
 #: the family tokens ``--metrics`` accepts besides a comma list of codes
 _METRIC_FAMILIES = ("clustering", "batch", "all")
+_BATCH_COLUMN_HELP = "the column to read in the --batch CSV when it has several columns"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2417,6 +2439,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="CSV as for evaluate --batch, cells in the order of the label "
                           "files; a first column of barcodes is aligned by barcode "
                           "(default: one batch per label file)")
+    pra.add_argument("--batch-column", dest="batch_column", metavar="NAME",
+                     help=_BATCH_COLUMN_HELP)
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                      help="Leiden backend of the clustering sweep when scoring "
                           "(default: shown by multibench config). leidenalg matches "
@@ -2455,6 +2479,8 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--batch", help="per-cell batch labels CSV; a first column of "
                                     "barcodes is aligned as for --labels. Without "
                                     "--metrics the batch metrics are then computed too")
+    pe.add_argument("--batch-column", dest="batch_column", metavar="NAME",
+                    help=_BATCH_COLUMN_HELP)
     pe.add_argument("--clustering", "--cluster", dest="cluster", metavar="PATH",
                     help="precomputed clusters (CSV, or an .h5 read from "
                          "/obs/cluster_leiden); they replace the sweep for ARI and NMI "

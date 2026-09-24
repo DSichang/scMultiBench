@@ -2792,7 +2792,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     A dataset folder that is not found is named; ``moved`` (rescore) adds
     the fix for a saved result read from another directory.
     """
-    from .eval.pipeline import _carries_ids
+    from .eval.pipeline import _carries_ids, _pick
     order = order or config.hint(f"the order of mtb.labels_for({dataset!r})",
                                  f"the order of the label files of {dataset}")
     folder = _dataset_folder(dataset, data_path)
@@ -2805,9 +2805,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                f"repeated barcodes)")
         fix, no_ids = f"Check that it follows {order}.", why
     if isinstance(x, (str, Path)):
-        vals, first = _eio.read_labels_ids(
-            x, what=what, pick="Keep one column in the file, or the cell ids and one "
-                                "column.")
+        vals, first = _eio.read_labels_ids(x, what=what, pick=_pick(what))
         if first is None:
             return np.asarray(vals), False
         return _eio.by_id_column(
