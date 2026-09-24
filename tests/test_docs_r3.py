@@ -74,17 +74,20 @@ def test_intro_sends_each_data_shape_to_its_recipe():
 
 @needs_docs
 def test_step1_names_both_routes_for_citeseq_donors():
-    """R3-23: the counts on the page are the registry's."""
+    """R3-23: the counts on the page are the registry's. R4-16 keeps both
+    routes visible and moves the counts to the Step 1 Details block."""
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
+    whole = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         n_v = len(mtb.find_methods("vertical", modalities=["rna", "adt"]))
         n_c = len(mtb.find_methods("cross", modalities=["rna", "adt"]))
         assert "D11" in set(mtb.results_coverage("vertical").dataset)
         assert "D52" in set(mtb.results_coverage("cross").dataset)
-    assert "CITE-seq donors fit both `vertical` and `cross`." in step1
-    assert f"({n_v} methods, stored table D11)" in step1
-    assert f"({n_c} methods that integrate the donors as batches, stored table D52)" in step1
+    assert "CITE-seq donors: use `vertical` in the same way." in step1
+    assert "The `cross` category also fits three donors, one file each" in step1
+    assert f"the `vertical` category has {n_v} RNA + ADT methods and the stored table D11" in whole
+    assert f"The `cross` category has {n_c} methods, which integrate the donors as batches" in whole
 
 
 @needs_docs
@@ -95,7 +98,9 @@ def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
     assert "`evaluate(batch=...)`" not in step1
     assert "pass each cell's sample as `batch=` to `run_all` or `evaluate`." in step1
-    assert "scores donor mixing with `batch=` on `run_all` or `evaluate`." in step1
+    # R4-16: "in the same way" on the CITE-seq line refers to the Multiome line above it
+    assert step1.index("pass each cell's sample as `batch=` to `run_all` or `evaluate`.") \
+        < step1.index("CITE-seq donors: use `vertical` in the same way.")
     assert "pass each cell's sample as `batch=` to `run_all` or `evaluate`." \
         in _flat("tutorials/discover.md")
 

@@ -491,10 +491,11 @@ def test_pages_state_the_donor_count_cross_reads():
         for m in re.sub(r"\(demo \w+\)", "", methods).split(","):
             reads[m.strip()] = top
     assert reads.pop("UINMF") == 2 and set(reads.values()) == {3}
-    step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
-    assert f"({len(reads) + 1} methods that integrate the donors as batches" in step1
-    assert ("The `cross` methods read three donors, as batches 1-3; UINMF reads the "
-            "first two. With another number of donors, use `vertical`.") in step1
+    # R4-16 moved the counts from the visible bullet to the Step 1 Details block
+    step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
+    assert f"The `cross` category has {len(reads) + 1} methods, which integrate the donors" in step1
+    assert "The cross methods read batches 1-3. UINMF reads only the first two." in step1
+    assert "also fits three donors, one file each" in step1
     run = _flat("tutorials/run.md")
     assert ('category="cross") ``` The cross methods read batches 1-3. '
             '`describe_layout("cross")` lists them.') in run

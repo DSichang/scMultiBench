@@ -371,7 +371,8 @@ def test_printed_examples_match_the_live_package(capsys):
             text = path.read_text()
             assert "multibench run --method SCALEX --category diagonal" in text \
                 and "--dry-run" in text, "quickstart.md must show one `multibench run ... --dry-run` line"
-            assert "'source': 'manual'" in text
+            # R4-16 shortened the runtime comment; its two fields are checked live above.
+            assert "'tier': 'slow', 'worst_sec': 2233" in text
             assert "'scBridge'" in text
 
 
@@ -1011,6 +1012,6 @@ def test_each_guide_warning_appears_once_on_the_site():
             for p in docs.rglob("*.md")}
     for phrase, home in (("compare ranks, not decimals", "tutorials/evaluate.md"),
                          ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md"),
-                         ("runs without an error but gives a wrong result", "tutorials/run.md")):
+                         ("only warns, and such a method gives a wrong result", "tutorials/run.md")):
         found = {page: text.count(phrase) for page, text in flat.items() if phrase in text}
         assert found == {home: 1}, (phrase, found)
