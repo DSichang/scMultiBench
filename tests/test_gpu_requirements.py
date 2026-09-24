@@ -404,7 +404,8 @@ def test_run_all_never_dispatches_a_requires_gpu_method(tmp_path, no_gpu, all_en
                        out_dir=str(tmp_path / "res"), dry_run=True, verbose=False)
     row = plan[plan["modalities"] == "rna+adt"].iloc[0]
     assert not bool(row["runnable"]) and row["reason"] == MOETM_REASON
-    with pytest.raises(ValueError, match="nothing is runnable") as e:
+    with pytest.raises(ValueError, match=r"^None of the requested methods \(moETM\) can "
+                                         r"run on CITE \(vertical\)\.") as e:
         mtb.run_all("CITE", "vertical", methods=["moETM"], data_path=tmp_path,
                     out_dir=str(tmp_path / "res"), verbose=False)
     assert "needs an NVIDIA GPU" in str(e.value)

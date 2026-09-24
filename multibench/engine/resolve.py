@@ -83,13 +83,21 @@ def _batch_column_advice() -> str:
                        "run-all --batch or evaluate --batch")
 
 
+def _and_list(names) -> str:
+    """``['a', 'b', 'c']`` -> ``'a, b and c'``."""
+    names = [str(n) for n in names]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f" and {names[-1]}"
+
+
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
     """What to do instead of per-batch files for a vertical / diagonal folder."""
+    advice = _batch_column_advice()
+    advice = advice[:1].upper() + advice[1:] + "."
     if category == "diagonal":
-        return ("diagonal methods read one rna.h5 and one ATAC file: "
-                + _batch_column_advice())
-    return (f"{category} methods read one {stem}.h5: " + _batch_column_advice()
-            + (", or use category='cross' (RNA+ADT)" if has_adt else ""))
+        return "Diagonal methods read one rna.h5 and one ATAC file. " + advice
+    cross = config.hint('category="cross"', "--category cross")
+    return (f"{category.capitalize()} methods read one {stem}.h5. " + advice
+            + (f" For RNA+ADT batches, use {cross}." if has_adt else ""))
 
 
 #: modality file stems whose numbered copies (rna1.h5, rna2.h5) mark a per-batch folder
@@ -113,7 +121,7 @@ def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | Non
     if not hit:
         return None
     ex = hit[0]
-    return (f"this folder holds per-batch files ({ex}1.h5, {ex}2.h5, ...); "
+    return (f"This folder holds per-batch files ({ex}1.h5, {ex}2.h5, ...). "
             + _one_file_advice(category, stem=ex,
                                has_adt="adt" in numbered
                                and not any(b.startswith("atac") for b in numbered)))
@@ -523,26 +531,22 @@ def inputs_for(dataset: str, category: str, method: str, *,
     variant = select_variant(spec, category, modalities, ds_dir=ds_dir)
     out = _resolve_variant_inputs(variant, ds_dir, method)
     missing = {r: p for r, p in out.items() if not Path(p).exists()}
-    near = _near_miss_hints(ds_dir, missing, category, atac=spec.atac)
+    near = _near_miss_hints(ds_dir, missing, category, atac=spec.atac, method=method)
     batch_hint = _per_batch_hint(
         ds_dir, category, {st for r in missing for st in _role_stems(r)[0]})
     if batch_hint:
         near.append(batch_hint)
     if check:
         if missing:
-            raise FileNotFoundError(
-                f"{method}/{dataset}/{category}: input files not found on disk: "
-                f"{missing}. Available files in {ds_dir}: "
-                f"{sorted(q.name for q in ds_dir.glob('*')) if ds_dir.is_dir() else '(dir missing)'}"
-                + (" - " + "; ".join(near) if near else "")
-            )
+            raise FileNotFoundError(_missing_inputs_text(method, category, ds_dir,
+                                                         missing, near))
         _check_orientation(method, dataset, category, out)
         _check_same_cells(method, dataset, category, out)
         if category == "diagonal":
             _check_atac_gas_cells(method, dataset, out)
         _check_label_lengths(method, dataset, category, out)
         if "data_dir" in out:
-            ok, why = _check_data_dir(variant, out["data_dir"])
+            ok, why = _check_data_dir(variant, out["data_dir"], method)
             if not ok:
                 raise FileNotFoundError(f"{method}/{dataset}/{category}: {why}")
             if category == "diagonal":
@@ -551,12 +555,27 @@ def inputs_for(dataset: str, category: str, method: str, *,
                 _check_diagonal_label_files(method, dataset, named)
     elif check is None and missing:
         warnings.warn(
-            f"{method}/{dataset}/{category}: {len(missing)} resolved input path(s) "
-            f"do not exist: {missing}"
-            + (" (" + "; ".join(near) + ")" if near else "")
-            + "; pass check=True to raise, check=False to silence",
+            _missing_inputs_text(method, category, ds_dir, missing, near)
+            + " Pass check=True to raise this as an error, or check=False to silence it.",
             UserWarning, stacklevel=2)
     return out
+
+
+def _missing_inputs_text(method: str, category: str, ds_dir: Path, missing: dict,
+                         hints: list) -> str:
+    """The ``inputs_for`` text for input files that are not on disk: what the
+    method needs, what the folder holds, then the layout ``hints``. Each
+    full path stays inside one sentence."""
+    ds_dir = Path(ds_dir)
+    names = [Path(p).name if Path(p).parent == ds_dir else str(p)
+             for p in dict.fromkeys(missing.values())]
+    if ds_dir.is_dir():
+        held = sorted(q.name for q in ds_dir.glob("*"))
+        holds = f"The folder holds {_and_list(held)}." if held else "The folder is empty."
+    else:
+        holds = "The folder does not exist."
+    return " ".join([f"{method} ({category}) needs {_and_list(names)} in {ds_dir}.",
+                     holds, *hints])
 
 
 # Every on-disk base name an ATAC-family role may be looked up under, so a
@@ -568,18 +587,18 @@ _KIND_BY_BASE = {"atac_peak": "peak", "peak": "peak", "atac_gas": "gene_activity
 
 
 def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
-                     atac: str | None = None) -> list[str]:
-    """For each missing ATAC-family role, name the sibling file that is there.
+                     atac: str | None = None, method: str | None = None) -> list[str]:
+    """For each missing ATAC-family role with a sibling file, the rule it breaks.
 
     The ``atac`` role reads ``atac.h5``; ``atac_gas`` reads ``atac_gas.h5``
     (falling back to ``atac.h5``), ``atac_peak`` reads ``atac_peak.h5``
     (falling back to ``peak.h5``) and a numbered ``atac<i>`` reads
     ``atac<i>.h5`` or ``atac_peak<i>.h5``. Return one hint per such role,
-    e.g. ``"atac.h5 not found; found atac_peak.h5 - vertical reads
-    atac.h5 (pass the representation this method wants: see
-    method_info(m)['atac'])"``; nothing for roles that are not ATAC or have
-    no sibling. ``atac`` is the method's representation (``spec.atac``):
-    when a vertical sibling holds it (by name: ``atac_peak`` / ``peak`` are
+    e.g. ``'Diagonal methods read atac_gas.h5 or atac.h5.
+    method_info("SCALEX")["atac"] says which ATAC SCALEX needs.'``; nothing
+    for roles that are not ATAC or have no sibling (the caller lists the
+    folder). ``atac`` is the method's representation (``spec.atac``): when
+    a vertical sibling holds it (by name: ``atac_peak`` / ``peak`` are
     peaks, ``atac_gas`` gene activity), the hint names the rename instead,
     as scan's short reason does.
     """
@@ -604,18 +623,19 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
             # one rule for every vertical ATAC role: the atac_gas role of the
             # peak methods (moETM, scMM, iPOLNG) also reads atac.h5
             hints.append(
-                f"atac.h5 not found; found {', '.join(found)} - vertical reads "
-                f"atac.h5: rename {same[0]} to atac.h5, or write it with "
-                + config.hint('category="vertical"', "--category vertical"))
+                f"Vertical methods read atac.h5. Rename {same[0]} to atac.h5, or write "
+                f"it with " + config.hint('category="vertical"', "--category vertical")
+                + ".")
             continue
-        why = ("every mosaic method reads peaks" if m else
-               "pass the representation this method wants: see method_info(m)['atac']")
-        rule = f"{accepted[0]} not found; found {', '.join(found)} - {category} methods " \
-               f"read {' or '.join(accepted)}"
+        who = method or "the method"
+        why = ("Every mosaic method reads peak ATAC." if m else config.hint(
+            (f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]'),
+            f"multibench info {method or 'METHOD'}") + f" says which ATAC {who} needs.")
+        rule = f"{category.capitalize()} methods read {' or '.join(accepted)}."
         if category == "vertical" and not m:
             # the rule of the peak rows above, also for an atac_gas role
-            rule = f"atac.h5 not found; found {', '.join(found)} - vertical reads atac.h5"
-        hints.append(f"{rule} ({why})")
+            rule = "Vertical methods read atac.h5."
+        hints.append(f"{rule} {why}")
     return hints
 
 
@@ -862,65 +882,71 @@ def _data_dir_files(variant, data_dir) -> dict:
             if a.const and str(a.const).endswith(".h5")}
 
 
-def _check_data_dir(variant, data_dir) -> tuple[bool, str]:
+def _check_data_dir(variant, data_dir, method: str = "The method") -> tuple[bool, str]:
     """Does a ``data_dir`` really hold what the method needs? -> (ok, why).
 
     ``data_dir`` resolves to the dataset directory itself when there is no
     ``processed/`` subdir, so the path always exists and existence proves
     nothing. A ``data_dir`` method (scBridge) names its files via ``const``
-    args; every named ``.h5`` / ``.csv`` file must be present.
+    args; every named ``.h5`` / ``.csv`` file must be present. ``why`` is a
+    sentence that starts with ``method``:
+    ``scBridge needs atac_gas.h5, and <folder> has no such file.``
     """
     d = Path(data_dir)
     if not d.is_dir():
-        return False, f"no such directory: {d}"
+        return False, f"{method} needs the folder {d}, which does not exist."
     needed = [a.const for a in variant.args if a.const and str(a.const).endswith((".h5", ".csv"))]
-    missing = [f for f in needed if not (d / f).exists()]
+    missing = [str(f) for f in needed if not (d / f).exists()]
+    if len(missing) == 1:
+        return False, f"{method} needs {missing[0]}, and {d} has no such file."
     if missing:
-        return False, f"missing files in {d}: {missing}"
+        names = ", ".join(missing[:-1]) + f" and {missing[-1]}"
+        return False, f"{method} needs {names}, and {d} has none of them."
     return True, ""
 
 
-# Every caveat leads with the problem: the compact CLI table clips the caveat
-# column to 40 characters, so the first 30 carry the warning.
-#: Caveat text appended by scan() when an ``atac_gas`` role falls back to a
-#: peak matrix in ``atac.h5`` (the wanted representation not given).
-PEAK_IN_GAS_CAVEAT = ("expects gene activity; atac.h5 holds peaks (features look like "
-                      "chr:start-end)")
-#: ``.format(file=...)`` templates of the two representation-mismatch caveats
-#: reported when the method's wanted ATAC representation is known
+# Every caveat is one or more sentences that start with the method name, so
+# the 40-character clip of the compact CLI table still shows the problem.
+# ``method`` is the method id (``"The method"`` when the caller has none).
+#: ``.format(method=)`` caveat reported by scan() when an ``atac_gas`` role
+#: falls back to a peak matrix in ``atac.h5`` (the wanted representation not given).
+PEAK_IN_GAS_CAVEAT = ("{method} needs gene-activity ATAC. atac.h5 holds peaks, because "
+                      "its features look like chr:start-end.")
+#: ``.format(method=, file=)`` templates of the two representation-mismatch
+#: caveats reported when the method's wanted ATAC representation is known
 #: (``_preflight_caveats(resolved, atac=method_info(m)['atac'])``).
-PEAK_FED_TO_GAS_CAVEAT = ("expects gene activity; {file} holds peaks (features look like "
-                          "chr:start-end)")
-GAS_FED_TO_PEAK_CAVEAT = ("expects peaks; {file} holds gene activity (features do not "
-                          "look like chr:start-end)")
-#: ``.format(file=, example=)`` caveat for a file a peak method reads whose
-#: names are neither chr:start-end nor the gene names of the folder's other
-#: files (``peak_0``): the kind cannot be told from the names, so it does not
-#: block the row.
-PEAK_NAMES_UNKNOWN_CAVEAT = ("expects peaks; {file} holds names that are not "
-                             "chr:start-end (e.g. {example})")
+PEAK_FED_TO_GAS_CAVEAT = ("{method} needs gene-activity ATAC. {file} holds peaks, because "
+                          "its features look like chr:start-end.")
+GAS_FED_TO_PEAK_CAVEAT = ("{method} needs peak ATAC. {file} holds gene activity, because "
+                          "its features do not look like chr:start-end.")
+#: ``.format(method=, file=, example=)`` caveat for a file a peak method reads
+#: whose names are neither chr:start-end nor the gene names of the folder's
+#: other files (``peak_0``): the kind cannot be told from the names, so it
+#: does not block the row.
+PEAK_NAMES_UNKNOWN_CAVEAT = ("{method} needs peak ATAC. {file} holds names such as "
+                             "{example}, not chr:start-end.")
 #: The same for a method that reads gene activity: the names are neither
 #: chr:start-end nor the genes of the folder's RNA.
-GAS_NAMES_UNKNOWN_CAVEAT = ("expects gene activity; {file} holds names that are not "
-                            "the RNA's genes (e.g. {example})")
-#: ``.format(file=, example=)`` caveat for a peak file of a variant whose
-#: peak names ``mtb.run`` rewrites to chr:start-end (``normalize_peaks``) when
-#: more than 10% of the first 50 names are not chr<sep>start<sep>end, so the
-#: rewrite cannot help; ``example`` is the first such name. No subject, like
-#: the other caveats: logs print it after the method name. It ends with the fix.
-PEAK_NAMES_CAVEAT = ("reads peak names such as chr1:100-200. {file} holds other "
+GAS_NAMES_UNKNOWN_CAVEAT = ("{method} needs gene-activity ATAC. {file} holds names such "
+                            "as {example}, not the RNA's genes.")
+#: ``.format(method=, file=, example=)`` caveat for a peak file of a variant
+#: whose peak names ``mtb.run`` rewrites to chr:start-end (``normalize_peaks``)
+#: when more than 10% of the first 50 names are not chr<sep>start<sep>end, so
+#: the rewrite cannot help; ``example`` is the first such name. It ends with the fix.
+PEAK_NAMES_CAVEAT = ("{method} reads peak names such as chr1:100-200. {file} holds other "
                      "names, for example {example}. Rename them to chr:start-end.")
-#: ``.format(file=...)`` caveat for a modality file whose sampled values are not
-#: whole numbers (log-normalised data).
-NOT_COUNTS_CAVEAT = "expects raw counts; {file} holds non-integer values"
-#: Caveat for a diagonal folder whose only label file is ``cty.csv``.
-DIAGONAL_CTY_CAVEAT = ("needs rna_cty.csv and atac_cty.csv for diagonal; the folder has "
-                       "only cty.csv")
-#: ``.format(used=, n=, unused=)`` caveat for a variant that reads fewer numbered
-#: batches than the folder holds: ``reads batches 1-2 of 3; batch 3 is not used``.
-UNUSED_BATCHES_CAVEAT = "reads batches {used} of {n}; {unused}"
-_UNUSED_BATCHES_RE = re.compile(r"reads batches [\d, and-]+ of \d+; batch(?:es)? "
-                                r"[\d, and-]+ (?:is|are) not used")
+#: ``.format(method=, file=)`` caveat for a modality file whose sampled values
+#: are not whole numbers (log-normalised data).
+NOT_COUNTS_CAVEAT = "{method} needs raw counts. {file} holds non-integer values."
+#: ``.format(method=)`` caveat for a diagonal folder whose only label file is ``cty.csv``.
+DIAGONAL_CTY_CAVEAT = ("{method} needs rna_cty.csv and atac_cty.csv for diagonal. The "
+                       "folder has only cty.csv.")
+#: ``.format(method=, used=, n=, unused=)`` caveat for a variant that reads
+#: fewer numbered batches than the folder holds:
+#: ``UINMF reads batches 1-2 of 3. Batch 3 is not used.``
+UNUSED_BATCHES_CAVEAT = "{method} reads batches {used} of {n}. {unused}."
+_UNUSED_BATCHES_RE = re.compile(r"\S+ reads batches [\d, and-]+ of \d+\. Batch(?:es)? "
+                                r"[\d, and-]+ (?:is|are) not used\.")
 # file stems (batch digits allowed) whose values must be raw counts
 _COUNT_FILE_RE = re.compile(r"^(rna|adt|atac_peak)\d*$")
 
@@ -1190,7 +1216,7 @@ def _span(nums) -> str:
     return " and ".join(map(str, nums))
 
 
-def _unused_batches_note(resolved) -> str | None:
+def _unused_batches_note(resolved, method: str = "The method") -> str | None:
     """:data:`UNUSED_BATCHES_CAVEAT` when the numbered roles of ``resolved``
     name fewer batches than the folder holds (UINMF reads batches 1-2 of a
     3-batch cross folder), else None."""
@@ -1205,13 +1231,13 @@ def _unused_batches_note(resolved) -> str | None:
     unused = sorted(held - used)
     if not unused:
         return None
-    verb = "batch {} is not used" if len(unused) == 1 else "batches {} are not used"
-    return UNUSED_BATCHES_CAVEAT.format(used=_span(used), n=len(held),
+    verb = "Batch {} is not used" if len(unused) == 1 else "Batches {} are not used"
+    return UNUSED_BATCHES_CAVEAT.format(method=method, used=_span(used), n=len(held),
                                         unused=verb.format(_span(unused)))
 
 
 def unused_batches_in(caveat) -> str | None:
-    """The ``reads batches ... not used`` note inside a scan ``caveat`` text, or None."""
+    """The ``<method> reads batches ... not used.`` note inside a scan ``caveat``, or None."""
     m = _UNUSED_BATCHES_RE.search(str(caveat or ""))
     return m.group(0) if m else None
 
@@ -1262,6 +1288,8 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     First of all: numbered roles that name fewer batches than the folder
     holds -> :data:`UNUSED_BATCHES_CAVEAT`.
 
+    Every caveat starts with ``method`` (``"The method"`` without it).
+
     With ``method`` and ``category``: a role the method's variant renames
     (``normalize_peaks``; ``mtb.run`` passes a chr:start-end copy) is judged
     by its names instead of the representation check above. Underscore or
@@ -1271,20 +1299,22 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     a file check of :func:`inputs_for`, not a caveat.
     """
     out: list[str] = []
-    note = _unused_batches_note(resolved)
+    who = method or "The method"
+    note = _unused_batches_note(resolved, who)
     if note:
         out.append(note)
     renamed = _renamed_peak_roles(method, category, resolved)
     for role in renamed:
         bad = _unrewritable_peak_name(Path(resolved[role]))
         if bad is not None:
-            out.append(PEAK_NAMES_CAVEAT.format(file=Path(resolved[role]).name, example=bad))
+            out.append(PEAK_NAMES_CAVEAT.format(method=who, file=Path(resolved[role]).name,
+                                                example=bad))
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":
             frac = _peak_fraction_of(p)
             if frac is not None and frac >= 0.9:
-                out.append(PEAK_IN_GAS_CAVEAT)
+                out.append(PEAK_IN_GAS_CAVEAT.format(method=who))
     else:
         # a method that reads both files (MultiMAP, Seurat_v3) wants gene
         # activity in its atac_gas role and peaks in its atac_peak role
@@ -1300,7 +1330,7 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
             if both and role.rstrip("0123456789") in ("atac_peak", "atac_gas"):
                 want = "peak" if role.startswith("atac_peak") else "gene_activity"
             if want == "gene_activity" and frac >= 0.9:
-                out.append(PEAK_FED_TO_GAS_CAVEAT.format(file=Path(path).name))
+                out.append(PEAK_FED_TO_GAS_CAVEAT.format(method=who, file=Path(path).name))
             elif frac <= 0.1:
                 # names that are not chr:start-end are gene activity only
                 # when they are the folder's gene names; peak_0 names are not
@@ -1309,9 +1339,11 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
                     first = _sniff_features(str(path), Path(path).stat().st_mtime_ns)
                     unknown = (PEAK_NAMES_UNKNOWN_CAVEAT if want == "peak"
                                else GAS_NAMES_UNKNOWN_CAVEAT)
-                    out.append(unknown.format(file=Path(path).name, example=first[0]))
+                    out.append(unknown.format(method=who, file=Path(path).name,
+                                              example=first[0]))
                 elif want == "peak":
-                    out.append(GAS_FED_TO_PEAK_CAVEAT.format(file=Path(path).name))
+                    out.append(GAS_FED_TO_PEAK_CAVEAT.format(method=who,
+                                                             file=Path(path).name))
     seen = set()
     for role, path in resolved.items():
         p = Path(path)
@@ -1321,14 +1353,14 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
         if p.suffix != ".h5" or not _COUNT_FILE_RE.match(p.stem) or not p.is_file():
             continue
         if _h5_has_fraction(str(p), p.stat().st_mtime_ns):
-            out.append(NOT_COUNTS_CAVEAT.format(file=p.name))
+            out.append(NOT_COUNTS_CAVEAT.format(method=who, file=p.name))
     if category == "diagonal" and resolved:
         ds_dir = next((Path(v) if k == "data_dir" else Path(v).parent
                        for k, v in resolved.items()), None)
         if ds_dir is not None and (ds_dir / "cty.csv").is_file() \
                 and not (ds_dir / "rna_cty.csv").is_file() \
                 and not (ds_dir / "atac_cty.csv").is_file():
-            out.append(DIAGONAL_CTY_CAVEAT)
+            out.append(DIAGONAL_CTY_CAVEAT.format(method=who))
     return out
 
 

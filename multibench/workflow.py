@@ -576,10 +576,15 @@ def _missing_script(variant, *, method: str | None = None) -> str:
 
 
 def _join_clauses(parts) -> str:
-    """Join caveat clauses with ``"; "``, dropping the period a clause would
-    leave before the separator (``"... names.; setup: ..."``)."""
-    parts = [p for p in parts if p]
-    return "; ".join([p.rstrip().rstrip(".") for p in parts[:-1]] + parts[-1:])
+    """Join the ``caveat`` parts as sentences (:func:`_join_sentences`)."""
+    return _join_sentences(parts)
+
+
+def _rows_word(df: "pd.DataFrame", k: int) -> str:
+    """What ``k`` counts in a count line over the scan frame ``df``:
+    ``methods`` when each method has one row, else ``rows`` (singular for 1)."""
+    noun = "method" if len(df) and df["method"].is_unique else "row"
+    return noun if k == 1 else noun + "s"
 
 
 def _have_their(k: int) -> str:
@@ -631,13 +636,15 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
             f"See {config.hint('mtb.env.doctor()', 'multibench env doctor')}.")
 
 
-#: The caveat of a GPU-only row that ``scan(assume_gpu=True)`` keeps runnable.
-GPU_NODE_CAVEAT = "assumes the job runs on a GPU node"
+#: ``.format(method=)`` caveat of a GPU-only row that ``scan(assume_gpu=True)``
+#: keeps runnable.
+GPU_NODE_CAVEAT = ("{method} needs an NVIDIA GPU. This check assumes the job runs on a "
+                   "GPU node.")
 
 #: What the scan summary line adds off Linux, after the counts.
-LINUX_ONLY_SUMMARY = ("Method environments are Linux-only: here you can check files, "
-                      "score embeddings and plot. The commands use this computer's "
-                      "paths, so run scan again on the Linux machine.")
+LINUX_ONLY_SUMMARY = ("Method environments run only on Linux. On this computer you can "
+                      "check files, score embeddings and plot. The commands use this "
+                      "computer's paths, so run scan again on the Linux machine.")
 
 
 def _first_sentence(text: str) -> str:
@@ -760,14 +767,18 @@ _list_of_ids = registry.check_id_list
 
 
 #: The three representation-mismatch caveats of ``_resolve._preflight_caveats``
-#: (PEAK_IN_GAS / PEAK_FED_TO_GAS / GAS_FED_TO_PEAK): wanted, file, held.
-_WRONG_ATAC_RE = re.compile(r"^expects (gene activity|peaks); (\S+) holds (peaks|gene activity) ")
-#: ``_resolve.PEAK_NAMES_CAVEAT``: the peak file of a method whose peak names
-#: ``mtb.run`` rewrites holds names the rewrite cannot turn into chr:start-end.
-_PEAK_NAMES_RE = re.compile(r"^reads peak names such as (\S+)\. (\S+) holds other names")
-#: What the reason of a peak-name row says after the method name
-#: (``cli._strict_problem`` counts them apart).
+#: (PEAK_IN_GAS / PEAK_FED_TO_GAS / GAS_FED_TO_PEAK) after the method name:
+#: wanted, file, held.
+_WRONG_ATAC_BODY = (r"needs (gene-activity|peak) ATAC\. (\S+) holds (peaks|gene activity), "
+                    r"because ")
+_WRONG_ATAC_RE = re.compile(r"^\S+ " + _WRONG_ATAC_BODY)
+#: What the reason and the caveat of a peak-name row say after the method name
+#: (``cli._strict_problem`` counts them apart): ``_resolve.PEAK_NAMES_CAVEAT``,
+#: the peak file of a method whose peak names ``mtb.run`` rewrites holds names
+#: the rewrite cannot turn into chr:start-end.
 PEAK_NAMES_REASON = "reads peak names such as "
+_PEAK_NAMES_RE = re.compile(r"^\S+ " + re.escape(PEAK_NAMES_REASON)
+                            + r"(\S+)\. (\S+) holds other names")
 #: The override every blocking-ATAC reason names, in its Python and CLI
 #: spellings: the marker :func:`_is_wrong_atac` looks for, whatever the prose.
 _ATAC_OVERRIDE = ("allow_atac_mismatch=True", "--allow-atac-mismatch")
@@ -793,11 +804,12 @@ def _wrong_atac_reason(method: str, caveats) -> str:
     for text in _blocking_caveats(caveats):
         m = _WRONG_ATAC_RE.match(text)
         if m:
-            want = "gene-activity" if m.group(1) == "gene activity" else "peak"
-            return (f"{method} needs {want} ATAC, and {m.group(2)} holds {m.group(3)}. "
-                    f"Export the ATAC as {m.group(1)}" + anyway)
-        # the caveat ends with the fix (rename them); the override follows it
-        return f"{method} {text.rstrip('.')}" + anyway
+            as_ = "gene activity" if m.group(1) == "gene-activity" else "peaks"
+            return (f"{method} needs {m.group(1)} ATAC, and {m.group(2)} holds "
+                    f"{m.group(3)}. Export the ATAC as {as_}" + anyway)
+        # the caveat starts with the method and ends with the fix (rename
+        # them); the override follows it
+        return text.rstrip(".") + anyway
     return ""
 
 
@@ -825,9 +837,9 @@ def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
 
 
 #: How the note that the method scripts are not here begins
-#: (``runner.script_notes``); scan appends it, then ``runner._prepared_note``
-#: (found by ``runner._prepared_at``), after every other clause.
-_START_NOTES = ("method scripts not found under ",)
+#: (``runner.SCRIPTS_NOT_HERE``); scan appends it, then ``runner._prepared_note``
+#: (found by ``runner._prepared_at``), after every other sentence.
+_START_NOTES = (_runner.SCRIPTS_NOT_HERE,)
 
 
 def _run_caveat(caveat) -> str:
@@ -835,7 +847,7 @@ def _run_caveat(caveat) -> str:
     ``run_all`` does itself: what its log and records keep of the caveat."""
     text = str(caveat or "")
     cuts = [i for i in (text.find(_START_NOTES[0]), _runner._prepared_at(text)) if i >= 0]
-    return text[:min(cuts)].rstrip("; ") if cuts else text
+    return text[:min(cuts)].rstrip() if cuts else text
 
 
 def _is_wrong_ref(reason) -> "pd.Series | bool":
@@ -869,7 +881,7 @@ def _dry_run_notes(plan: "pd.DataFrame") -> tuple:
         i = text.find(_START_NOTES[0])
         if scripts is None and i >= 0:
             j = _runner._prepared_at(text[i:])
-            scripts = text[i:][:j].rstrip("; ") if j >= 0 else text[i:]
+            scripts = text[i:][:j].rstrip() if j >= 0 else text[i:]
         cav = _run_caveat(text)
         if _would_run(r) and cav:
             lines.append((r["method"], cav))
@@ -1157,8 +1169,8 @@ def scan(dataset: str, category: str | None = None, *,
       ``requires_gpu`` and the code line in ``gpu_evidence``.
     - ``assume_gpu=True`` (``multibench scan --assume-gpu``) skips that GPU
       test, for a check on a login node before a GPU-node job. The row's
-      ``caveat`` then says ``assumes the job runs on a GPU node``, and
-      ``command`` leaves out the CPU flags.
+      ``caveat`` then says ``This check assumes the job runs on a GPU node.``,
+      and ``command`` leaves out the CPU flags.
 
     The file check runs whether or not any conda env is installed.
 
@@ -1182,8 +1194,8 @@ def scan(dataset: str, category: str | None = None, *,
     - diagonal: a folder whose only label file is ``cty.csv``; diagonal
       needs ``rna_cty.csv`` and ``atac_cty.csv``;
     - a method that reads fewer numbered batches than the folder holds
-      (``reads batches 1-2 of 3; batch 3 is not used``);
-    - ``setup: ...`` - a step the user must do first, the first sentence of
+      (``UINMF reads batches 1-2 of 3. Batch 3 is not used.``);
+    - a step the user must do first, the first sentence of
       ``method_info(m)['setup_hint']`` (GLUE's GENCODE annotation file);
     - method scripts that are not on this machine yet: the first real run
       clones them with ``git``; on a host without network, fetch them first
@@ -1207,8 +1219,8 @@ def scan(dataset: str, category: str | None = None, *,
     - Paths are absolute: a relative ``out_dir``, the placeholder included,
       is resolved against the working directory.
     - ``params`` are merged in the way ``run_all(params=)`` merges them.
-    - On a GPU-less host it already carries each method's ``cpu_params``
-      (the flags that turn CUDA off where a switch exists).
+    - On a GPU-less host the command already carries each method's
+      ``cpu_params``, the flags that turn CUDA off where a switch exists.
     - A row blocked only by ``env_ok`` still shows its command. Put it in a
       job script once the environment is built.
     - Some commands read a file that ``mtb.run`` writes first under
@@ -1373,7 +1385,8 @@ def scan(dataset: str, category: str | None = None, *,
         # assume_gpu checks a job for a GPU node from a host without one.
         if spec.requires_gpu and not envs.host_has_gpu():
             if assume_gpu:
-                rec["caveat"] = _join_clauses([rec["caveat"], GPU_NODE_CAVEAT])
+                rec["caveat"] = _join_clauses([rec["caveat"],
+                                               GPU_NODE_CAVEAT.format(method=spec.id)])
             else:
                 rec["env_ok"] = False
                 rec["env_reason"] = " ".join(
@@ -1392,16 +1405,14 @@ def scan(dataset: str, category: str | None = None, *,
                                                      dataset=dataset,
                                                      params=params.get(spec.id),
                                                      gpu=True if assume_gpu else None)
-            # the setup note in its first sentence: the full hint is one
-            # method_info(m)['setup_hint'] away
-            notes = [f"setup: {_first_sentence(n[len('setup: '):])}"
-                     if n.startswith("setup: ") else n
+            # the setup note in its first sentence, which starts with the
+            # method name: the full hint is one method_info(m)['setup_hint']
+            # away. A same-cells requirement (Seurat_v5) is checked on the
+            # files above; its caveat appears only when the files fail it.
+            notes = [n if n != spec.setup_hint else
+                     "" if spec.id in _resolve._SAME_CELL_ROLES else _first_sentence(n)
                      for n in _runner.script_notes(spec, v, repo)]
-            if spec.id in _resolve._SAME_CELL_ROLES:
-                # a same-cells requirement is checked on the files above;
-                # its caveat appears only when the files fail it
-                notes = [n for n in notes if not n.startswith("setup: ")]
-            notes += prepared
+            notes = [n for n in notes if n] + prepared
             if notes:
                 rec["caveat"] = _join_clauses([rec["caveat"], *notes])
         rows.append(rec)
@@ -1426,7 +1437,7 @@ def scan(dataset: str, category: str | None = None, *,
             UserWarning, stacklevel=2)
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
-        rows = "row" if n == 1 else "rows"
+        rows = _rows_word(df, n)
         line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files)} input files. "
                 f"{k_env} of {n} {_have_their(k_env)} environment installed.")
         if _runner.linux_only_sentence():
@@ -2097,9 +2108,9 @@ class BatchResult:
         ``''``.
 
         **Label-order evidence.** ``label_order_candidates`` holds every
-        ordering tried and the ARI each achieved - the evidence behind
-        ``summary``'s ``label_order_confidence``. It is present only when more
-        than one ordering was possible.
+        ordering tried and its ARI. ``summary``'s ``label_order_confidence``
+        is computed from them. It is present only when more than one ordering
+        was possible.
 
         See Also
         --------
@@ -2263,9 +2274,10 @@ class BatchResult:
         a different metric selection.
 
         **Arguments.** A ``labels`` array, list or plain CSV follows the
-        embedding rows. A ``batch`` array follows the cell order of ``run_all(batch=)``,
-        or the embedding rows when ``labels`` is matched by position. A CSV
-        path is read like a label file. The batch is recorded as
+        embedding rows. Without ``labels=``, a ``batch`` array follows the
+        order of ``mtb.labels_for(dataset)``. With a ``labels`` array in
+        embedding row order, the ``batch`` array follows the embedding rows
+        too. A CSV path is read like a label file. The batch is recorded as
         ``batch_source='user'``.
 
         **Aligned by barcode.** A Series or one-column DataFrame with a
@@ -2427,7 +2439,7 @@ class BatchResult:
         earlier records are kept, and all four files are rewritten from the
         merged set. This result object is not changed.
 
-        A line ``# merged with N earlier record(s) in <folder> (StabMap)``
+        A line ``# Merged with 1 earlier record in <folder> (StabMap).``
         names the kept methods.
 
         **Jobs in parallel.** Jobs running at the same time should use one
@@ -2480,7 +2492,8 @@ class BatchResult:
                        "records": slim}, fh, indent=1, default=str)
         if kept:
             names = ", ".join(dict.fromkeys(str(r.get("method")) for r in kept))
-            print(f"# merged with {len(kept)} earlier record(s) in {d} ({names})",
+            records = "record" if len(kept) == 1 else "records"
+            print(f"# Merged with {len(kept)} earlier {records} in {d} ({names}).",
                   flush=True)
         return d
 
@@ -2560,7 +2573,6 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     if "files_ok" in blocked.columns:
         blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
             ["_files", "method"], kind="stable").drop(columns="_files")
-    head = f"nothing is runnable for dataset={dataset!r} category={category!r}"
     platform = _platform_line(blocked)
     doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
     if methods:
@@ -2568,10 +2580,13 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
         where = config.hint(f"mtb.scan({dataset!r}, {category!r}, methods={list(methods)})",
                             f"multibench scan {dataset} --category {category} "
                             f"--methods {','.join(methods)}")
-        return (f"{head} (methods={list(methods)}).\n{platform}Blocked, one line per "
+        head = (f"None of the requested methods ({', '.join(methods)}) can run on "
+                f"{dataset} ({category})")
+        return (f"{head}.\n{platform}Blocked, one line per "
                 f"requested row:\n" + "\n".join(lines) +
                 f"\n{where} shows these rows. Its files_ok and env_ok columns say "
                 f"which check failed. {doctor} checks the environments.")
+    head = f"No method can run on {dataset} ({category})"
     n, k = len(blocked), min(3, len(blocked))
     lines = [_line(r) for _, r in blocked.head(k).iterrows()]
     where = config.hint(f"mtb.scan({dataset!r}, {category!r})",
@@ -3363,7 +3378,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
-            msg = (f"[run_all] Dry run: {k} of {n} requested {'row' if n == 1 else 'rows'} "
+            msg = (f"[run_all] Dry run: {k} of {n} requested {_rows_word(plan_df, n)} "
                    f"can run on {dataset} ({category}).")
             if n > k:
                 doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
@@ -3376,8 +3391,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             scripts, lines = _dry_run_notes(plan_df)
             if scripts:
                 print(f"[run_all] {scripts}", flush=True)
-            for m, cav in lines:
-                print(f"[run_all] {m} {cav}", flush=True)
+            for _m, cav in lines:          # each caveat starts with its method
+                print(f"[run_all] {cav}", flush=True)
             if batch_vec is not None:
                 bad = _batch_length_problem(plan_df, batch_vec, dataset, category,
                                             data_path)
@@ -3441,8 +3456,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         t0 = time.time()
         if verbose:
             print(f"[run_all] {m} ({category}/{dataset}) ...", flush=True)
-            if rec["caveat"]:
-                print(f"[run_all]   {m} {rec['caveat']}", flush=True)
+            if rec["caveat"]:              # it starts with the method name
+                print(f"[run_all]   {rec['caveat']}", flush=True)
         _deadline_prev = _NOT_ARMED
         try:
             _deadline_prev = _arm_deadline(timeout)
@@ -3474,7 +3489,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                     # an allowed ATAC caveat is already in the log and the record
                     warnings.filterwarnings(
                         "ignore", category=UserWarning,
-                        message=re.escape(f"{m} ") + rf"({_WRONG_ATAC_RE.pattern[1:]}"
+                        message=re.escape(f"{m} ") + rf"({_WRONG_ATAC_BODY}"
                                 rf"|{re.escape(PEAK_NAMES_REASON)})")
                     res = _run(method=m, category=category, inputs=inp,
                                out_dir=str(mdir), params=mp)

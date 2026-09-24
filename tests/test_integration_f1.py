@@ -48,7 +48,7 @@ def test_scan_reason_names_a_per_batch_folder(tmp_path):
     for reason in sc["reason"]:
         assert re.match(r"rna\.h5, adt\.h5(, cty\.csv)? are missing\. ", reason), reason
         assert "This folder holds per-batch files (rna1.h5, rna2.h5, ...)" in reason
-        assert "or use category='cross' (RNA+ADT)" in reason
+        assert 'For RNA+ADT batches, use category="cross".' in reason
 
 
 def test_scan_reason_has_no_batch_hint_on_a_plain_folder(root):

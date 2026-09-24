@@ -128,20 +128,20 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
     df = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False)
     r = df.iloc[0]
     assert r["files_ok"]
-    assert ("setup: GLUE needs the GENCODE v43 human annotation "
+    assert ("GLUE needs the GENCODE v43 human annotation "
             "(gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in "
-            "<repo_path>/tools_scripts/GLUE/") in r["caveat"]
+            "<repo_path>/tools_scripts/GLUE/.") in r["caveat"]
     assert "mouse" not in r["caveat"]                   # first sentence only
     # a method without a hint gets no setup note
     tv = mtb.scan("D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]
-    assert "setup:" not in tv["caveat"]
+    assert "needs the" not in tv["caveat"]
 
 
 def test_dry_run_prints_the_setup_hint_to_stderr_once(capsys):
     inp = mtb.inputs_for("D28", "diagonal", "GLUE")
     argv = mtb.run("GLUE", "diagonal", inputs=inp, out_dir="/tmp/unused/GLUE", dry_run=True)
     err = capsys.readouterr().err
-    assert err.count("# setup: GLUE needs the GENCODE v43 human annotation") == 1
+    assert err.count("# GLUE needs the GENCODE v43 human annotation") == 1
     assert isinstance(argv, list)
     # scan previews every row without printing
     mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False)
@@ -193,8 +193,8 @@ def test_dry_run_says_when_the_method_scripts_are_not_here(no_scripts, capsys):
     inp = mtb.inputs_for("D11", "vertical", "totalVI")
     mtb.run("totalVI", "vertical", inputs=inp, out_dir="/tmp/unused/t", dry_run=True)
     err = capsys.readouterr().err
-    assert f"# method scripts not found under {no_scripts}: the first real run clones " \
-           f"PYangLab/scMultiBench with git" in err
+    assert f"# The method scripts are not in {no_scripts}. The first real run clones " \
+           f"PYangLab/scMultiBench with git." in err
     assert "multibench fetch --scripts" in err
     assert not no_scripts.exists()                   # nothing fetched or created
 
@@ -204,13 +204,13 @@ def test_cli_dry_run_says_it_too(no_scripts, capsys, tmp_path):
     rc = cli.main(["run", "--method", "totalVI", "--category", "vertical",
                    "--input", f"rna={d / 'rna.h5'}", "--input", f"adt={d / 'adt.h5'}",
                    "--out", str(tmp_path / "o"), "--dry-run"])
-    assert rc == 0 and "method scripts not found under" in capsys.readouterr().err
+    assert rc == 0 and "The method scripts are not in" in capsys.readouterr().err
 
 
 def test_scan_notes_missing_scripts_in_caveat_not_files_ok(no_scripts):
     df = mtb.scan("D11", "vertical", modalities=["rna", "adt"], verbose=False)
     assert df["files_ok"].all()
-    assert df["caveat"].str.contains("method scripts not found under").all()
+    assert df["caveat"].str.contains("The method scripts are not in").all()
 
 
 def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch):
@@ -236,7 +236,8 @@ def test_save_merges_jobs_that_share_one_out_dir(tmp_path, capsys):
     _res("StabMap").save(tmp_path)
     assert capsys.readouterr().out == ""                    # nothing to merge yet
     _res("scMoMaT").save(tmp_path)
-    assert f"# merged with 1 earlier record(s) in {tmp_path} (StabMap)" in capsys.readouterr().out
+    assert (f"# Merged with 1 earlier record in {tmp_path} (StabMap).\n"
+            in capsys.readouterr().out)
     back = mtb.load_batch(tmp_path)
     assert sorted(r["method"] for r in back.records) == ["StabMap", "scMoMaT"]
     assert set(pd.read_csv(tmp_path / "summary.csv")["method"]) == {"StabMap", "scMoMaT"}
@@ -354,7 +355,8 @@ def test_scan_reason_leads_with_the_atac_meaning_and_never_cuts_a_path(tmp_path,
     assert scalex["reason"].startswith(
         "SCALEX needs gene-activity ATAC (atac_gas.h5), and the folder has peaks "
         "(atac_peak.h5).")
-    assert str(data / "LUNG" / "atac_gas.h5") in scalex["files_reason"]   # full path kept
+    # full folder path kept, in the sentence that names the file (R6-12)
+    assert f"SCALEX (diagonal) needs atac_gas.h5 in {data / 'LUNG'}." in scalex["files_reason"]
 
 
 def test_cli_json_carries_the_full_reason(tmp_path, no_envs, capsys):
@@ -365,7 +367,7 @@ def test_cli_json_carries_the_full_reason(tmp_path, no_envs, capsys):
     assert rc == 0
     scalex = next(r for r in rows if r["method"] == "SCALEX")
     assert " ... " not in scalex["reason"] and " ... " not in scalex["files_reason"]
-    assert str(data / "LUNG" / "atac_gas.h5") in scalex["files_reason"]
+    assert f"needs atac_gas.h5 in {data / 'LUNG'}." in scalex["files_reason"]
 
 
 # ----------------------------------------------------------------- L32: atac column
@@ -498,6 +500,6 @@ def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkey
     script.write_text("from logger import *")
     spec = registry.get("MIRA")
     v = spec.variants[0]
-    assert runner.script_notes(spec, v, tmp_path)[0].startswith("setup: MIRA needs a logger.py")
+    assert runner.script_notes(spec, v, tmp_path)[0].startswith("MIRA needs a logger.py")
     (script.parent / "logger.py").write_text("")
     assert runner.script_notes(spec, v, tmp_path) == []

@@ -94,8 +94,8 @@ def test_scan_caveat_names_the_non_integer_file(tmp_path):
         ingest.export_dataset(a, tmp_path / "LOG", adt="obsm:protein", labels="obs:cell_type")
     sc = mtb.scan("LOG", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
     assert sc["files_ok"].all()                      # a caveat, not a file failure
-    assert sc["caveat"].str.contains(
-        "expects raw counts; rna.h5 holds non-integer values").all()
+    assert all(f"{m} needs raw counts. rna.h5 holds non-integer values." in c
+               for m, c in zip(sc["method"], sc["caveat"])), sc["caveat"].tolist()
     assert not sc["caveat"].str.contains("adt.h5").any()
     b = _cite()
     ingest.export_dataset(b, tmp_path / "INT", adt="obsm:protein", labels="obs:cell_type")
@@ -114,15 +114,15 @@ def test_demo_folders_hold_raw_counts(root, ds, cat):
 def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
     a = _cite()
     for cat, read in (("vertical", "one rna.h5"), ("diagonal", "one rna.h5 and one ATAC file")):
-        with pytest.raises(ValueError, match=f"{cat} methods read {read}: export without "
-                                             r"batch= and pass the batch column to "
-                                             r"run_all\(batch=\.\.\.\) or "
-                                             r"evaluate\(batch=\.\.\.\)") as ei:
+        with pytest.raises(ValueError, match=f"{cat.capitalize()} methods read {read}\\. "
+                                             r"Export without batch= and pass the batch "
+                                             r"column to run_all\(batch=\.\.\.\) or "
+                                             r"evaluate\(batch=\.\.\.\)\.") as ei:
             ingest.export_dataset(a, tmp_path / cat, adt="obsm:protein", batch="obs:batch",
                                   category=cat)
         assert not (tmp_path / cat).exists()
         # cross is RNA+ADT: never offered to a diagonal (RNA+ATAC) user
-        assert ("category='cross'" in str(ei.value)) == (cat == "vertical")
+        assert ('category="cross"' in str(ei.value)) == (cat == "vertical")
 
 
 def test_batch_with_atac_and_no_category_warns(tmp_path):
@@ -219,8 +219,8 @@ def test_scan_checks_diagonal_label_rows_and_flags_a_lone_cty(tmp_path):
     sc = mtb.scan("LC", "diagonal", data_path=tmp_path)
     glue = sc[sc["method"] == "GLUE"].iloc[0]
     assert glue["files_ok"]
-    assert ("needs rna_cty.csv and atac_cty.csv for diagonal; the folder has only cty.csv"
-            in glue["caveat"])
+    assert glue["caveat"].startswith("GLUE needs rna_cty.csv and atac_cty.csv for diagonal. "
+                                     "The folder has only cty.csv. ")
 
 
 def test_cli_success_line_lists_only_what_this_call_wrote(tmp_path, capsys):
@@ -310,7 +310,7 @@ def test_mosaic_batch_split_writes_atac_i(tmp_path, capsys):
     sc = mtb.scan("MOS", "mosaic", data_path=tmp_path)
     ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])]
     assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()
-    with pytest.warns(UserWarning, match="every mosaic method reads peaks"):
+    with pytest.warns(UserWarning, match="Every mosaic method reads peak ATAC"):
         ingest.export_dataset(m, tmp_path / "G", rna=None, atac="obsm:peaks",
                               atac_kind="gene_activity", batch="obs:batch", category="mosaic")
 

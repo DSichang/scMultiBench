@@ -70,15 +70,15 @@ def test_dash_peaks_need_no_caveat(tmp_path):
 def test_peak_ids_without_coordinates_get_the_peak_names_caveat(tmp_path):
     _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(1, 61)])
     cav = _scan_row(tmp_path, "LUNG_ids", "GLUE")["caveat"]
-    # no subject, like the other caveats: logs print it after the method name
-    assert cav.startswith("reads peak names such as chr1:100-200. atac_peak.h5 "
+    # like every caveat, it starts with the method name (R6-10)
+    assert cav.startswith("GLUE reads peak names such as chr1:100-200. atac_peak.h5 "
                           "holds other names, for example peak_1. Rename them to "
-                          "chr:start-end")
+                          "chr:start-end.")
     # one caveat for the file, not also the representation guess
     assert "holds gene activity" not in cav
     # the same content check for the other method whose peaks mtb.run renames
     cav = _scan_row(tmp_path, "LUNG_ids", "Seurat_v3")["caveat"]
-    assert cav.startswith("reads peak names such as chr1:100-200")
+    assert cav.startswith("Seurat_v3 reads peak names such as chr1:100-200")
 
 
 def test_d28_glue_caveat_does_not_name_the_dataset():
@@ -128,8 +128,8 @@ def scripts(tmp_path, monkeypatch):
 
 
 def _mismatch(head):
-    return (f"method scripts are at {head[:7]}, not deadbeef (MULTIBENCH_SCRIPTS_REF). "
-            f"Fetch that ref into a new repo_path, or unset the variable")
+    return (f"The method scripts are at {head[:7]}, not deadbeef (MULTIBENCH_SCRIPTS_REF). "
+            f"Unset the variable, or fetch that ref into a new repo_path.")
 
 
 @needs_git
@@ -160,7 +160,8 @@ def test_scan_strict_fails_under_another_scripts_ref(scripts, monkeypatch, capsy
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
     # the CLI spelling of the fix
-    assert f"method scripts are at {head[:7]}, not deadbeef (MULTIBENCH_SCRIPTS_REF)" in err
+    assert (f"The method scripts are at {head[:7]}, not deadbeef (MULTIBENCH_SCRIPTS_REF)"
+            in err)
     assert "repo_path" not in err.split("MULTIBENCH_SCRIPTS_REF)", 1)[1]
 
 
@@ -181,16 +182,16 @@ def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_pat
                    "--out", str(tmp_path / "o"), "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0
-    assert err.count(f"# method scripts are at {head[:7]}, not deadbeef") == 1
-    assert "then multibench fetch --scripts)" in err and "`" not in err
+    assert err.count(f"# The method scripts are at {head[:7]}, not deadbeef") == 1
+    assert "and run multibench fetch --scripts." in err and "`" not in err
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
                    "--dry-run"])
     assert rc == 0
-    assert capsys.readouterr().err.count("# method scripts are at ") == 1
+    assert capsys.readouterr().err.count("# The method scripts are at ") == 1
     # the real run refuses with the same sentence, naming the scripts folder
     with pytest.raises(RuntimeError, match=re.escape(
-            f"the method scripts in {repo} are at "
-            + _mismatch(head).split("method scripts are at ", 1)[1])):
+            f"The method scripts in {repo} are at "
+            + _mismatch(head).split("The method scripts are at ", 1)[1])):
         config.ensure_repo()
 
 

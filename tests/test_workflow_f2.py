@@ -271,7 +271,8 @@ def test_scan_assume_gpu_keeps_the_row_and_says_so(login_node):
     assert not plain["runnable"] and "NVIDIA GPU" in plain["env_reason"]
     row = mtb.scan("D45", "mosaic", assume_gpu=True, **kw).iloc[0]
     assert row["runnable"] and row["env_ok"] and row["env_reason"] == ""
-    assert "assumes the job runs on a GPU node" in row["caveat"]
+    assert row["caveat"].startswith("SMILE needs an NVIDIA GPU. This check assumes the job "
+                                    "runs on a GPU node.")
 
 
 def test_scan_assume_gpu_previews_the_gpu_node_command(login_node, tmp_path):
@@ -304,7 +305,7 @@ def test_cli_run_all_dry_run_takes_assume_gpu(login_node, capsys):
     rc = cli.main(["run-all", "D45", "--category", "mosaic", "--out-dir", "out/",
                    "--methods", "SMILE", "--dry-run", "--assume-gpu"])
     cap = capsys.readouterr()
-    assert rc == 0 and "1 of 1 row can run" in cap.err
+    assert rc == 0 and "1 of 1 method can run" in cap.err
     with pytest.raises(SystemExit) as ei:
         cli.main(["run-all", "D45", "--category", "mosaic", "--out-dir", "out/",
                   "--methods", "SMILE", "--assume-gpu"])

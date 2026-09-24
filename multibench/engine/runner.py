@@ -343,6 +343,11 @@ def missing_script_fix(repo) -> str:
             f"files back; otherwise copy a full scripts checkout there")
 
 
+#: How the note that no method scripts are on this machine begins
+#: (:func:`script_notes`); ``mtb.scan`` finds it in a ``caveat`` by this text.
+SCRIPTS_NOT_HERE = "The method scripts are not in "
+
+
 def script_notes(spec, variant, repo: Path) -> list[str]:
     """Setup facts a preview must show before the real run fails on them.
 
@@ -355,22 +360,24 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
 
     Returns plain sentences, without a comment marker; :func:`run` prints
     them to stderr on a dry run and ``mtb.scan`` adds them to ``caveat``.
-    The setup note always comes first and starts with ``"setup: "``.
+    The setup note always comes first: it is ``spec.setup_hint`` itself,
+    which starts with the method name.
     """
     notes = []
     ep = Path(variant.entrypoint)
     helpers = getattr(variant, "helpers", None) or []
     done = bool(helpers) and all((repo / ep).parent.joinpath(h).exists() for h in helpers)
     if spec.setup_hint and not done:
-        notes.append(f"setup: {spec.setup_hint}")
+        notes.append(spec.setup_hint)
     if not (repo / ep).exists():
         if (repo / "tools_scripts").is_dir():
-            notes.append(f"method script {ep} not found in the checkout at {repo}: "
-                         + missing_script_fix(repo))
+            fix = missing_script_fix(repo)
+            notes.append(f"{spec.id}'s script {ep} is not in the checkout at {repo}. "
+                         f"{fix[:1].upper()}{fix[1:]}.")
         elif not config.scripts_folder_problem(repo):      # else preview() names it
-            notes.append(f"method scripts not found under {repo}: the first real run "
-                         f"clones PYangLab/scMultiBench with git; on a host without "
-                         f"network, fetch them first ({FETCH_SCRIPTS_CMD})")
+            notes.append(f"{SCRIPTS_NOT_HERE}{repo}. The first real run clones "
+                         f"PYangLab/scMultiBench with git. On a host without network, "
+                         f"run {FETCH_SCRIPTS_CMD} first.")
     return notes
 
 
@@ -821,11 +828,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     UnitedNet's label input is ``cty``. The older key ``rna_cty`` still
     works, with a ``DeprecationWarning``.
 
-    **GPU and CPU.** On a host without an NVIDIA GPU
-    (``mtb.env.host_has_gpu()`` is False), the method's ``cpu_params`` - the
-    flags that turn CUDA off in a script that has it on by default,
-    ``method_info(m)['cpu_params']`` - are merged into ``params`` first. A
-    key you pass always wins.
+    **GPU and CPU.** ``cpu_params`` are the flags that turn CUDA off in a
+    script that uses it by default (``method_info(m)['cpu_params']``). On a
+    host without an NVIDIA GPU (``mtb.env.host_has_gpu()`` is False), they
+    are merged into ``params`` first. A key you pass always wins.
 
     The dry run shows these flags too; a real run prints ``[run] no GPU on
     this host: applying <method> cpu_params {...}`` to stderr.
@@ -928,7 +934,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # the ATAC checks of mtb.scan: the other representation, or peak names
     # the script cannot read (workflow imports this module, hence here)
     from ..workflow import _atac_mismatch_caveats
-    mismatch = [f"{method} {c}" for c in _atac_mismatch_caveats(method, category, inputs)]
+    # each caveat starts with the method name
+    mismatch = _atac_mismatch_caveats(method, category, inputs)
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
                               params=params, convert=convert,
@@ -1118,9 +1125,10 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
 
 
 #: what :func:`_prepared_note` says after the method name; :func:`_prepared_at`
-#: finds the note in a scan caveat, which joins its clauses with ``"; "``
+#: finds the note in a scan caveat, which joins its sentences with a space
 _PREPARED_PREFIX = " reads inputs"
-_PREPARED_RE = re.compile(r"(?:^|(?<=; ))[^\s;]+" + re.escape(_PREPARED_PREFIX) + r"[\\/]")
+_PREPARED_RE = re.compile(r"(?:^|(?<=[.!?] ))[^\s;]+" + re.escape(_PREPARED_PREFIX)
+                          + r"[\\/]")
 
 
 def _prepared_at(text) -> int:

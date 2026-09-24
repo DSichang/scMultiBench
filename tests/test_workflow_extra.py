@@ -146,7 +146,7 @@ def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
     with pytest.raises(ValueError) as e:
         mtb.run_all("EMPTYDS", "vertical", data_path=tmp_path,
                     out_dir=tmp_path / "out", verbose=False)
-    assert "nothing is runnable" in str(e.value)
+    assert str(e.value).startswith("No method can run on EMPTYDS (vertical).\n")
     assert "mtb.scan" in str(e.value)          # tells you how to diagnose it
 
 

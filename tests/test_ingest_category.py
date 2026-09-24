@@ -76,7 +76,7 @@ def test_export_dataset_vertical_writes_plain_atac_only(tmp_path):
     assert list(ingest.read_canonical(out / "atac.h5").var_names) == list(g.var_names)
     # per-batch files are what no vertical method reads: refused before any write
     g.obs["b"] = ["x"] * 3 + ["y"] * 3
-    with pytest.raises(ValueError, match="vertical methods read one rna.h5: export "
+    with pytest.raises(ValueError, match="Vertical methods read one rna.h5. Export "
                                          "without batch="):
         ingest.export_dataset(g, tmp_path / "VB", rna=None, atac="X",
                               atac_kind="gene_activity", batch="obs:b", category="vertical")
@@ -93,7 +93,9 @@ def test_export_dataset_explicit_other_category_keeps_representation_names(tmp_p
                                 category="cross", batch_index=1)
     assert sorted(p.name for p in out.iterdir()) == ["atac_gas1.h5"]
     # mosaic: the atac<i>.h5 every mosaic variant reads, whatever the kind (L06)
-    with pytest.warns(UserWarning, match="every mosaic method reads peaks"):
+    with pytest.warns(UserWarning, match=r"^Every mosaic method reads peak ATAC\. Export "
+                                         r"the ATAC as peaks \(atac_kind='peak'\), or pass "
+                                         r"allow_atac_mismatch=True to scan and run_all\.$"):
         out = ingest.export_dataset(g, tmp_path / "MG", rna=None, atac="X",
                                     atac_kind="gene_activity", category="mosaic",
                                     batch_index=2)

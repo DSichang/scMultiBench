@@ -168,8 +168,11 @@ def test_atac_gas_peak_caveat(tmp_path):
     _h5(d / "atac.h5", 40, 45, feats=[f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)])
     got = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path, check=True)
     assert got["atac_gas"].endswith("atac.h5")
-    assert resolve._preflight_caveats(got) == [resolve.PEAK_IN_GAS_CAVEAT]
-    assert "chr:start-end" in resolve.PEAK_IN_GAS_CAVEAT
+    assert resolve._preflight_caveats(got) == [
+        "The method needs gene-activity ATAC. atac.h5 holds peaks, because its features "
+        "look like chr:start-end."]
+    assert resolve._preflight_caveats(got, method="Portal") == [
+        resolve.PEAK_IN_GAS_CAVEAT.format(method="Portal")]
     # a real atac_gas.h5 (gene names) -> no caveat; so does gene-named atac.h5
     _h5(d / "atac_gas.h5", 40, 45)
     assert resolve._preflight_caveats(resolve.inputs_for("PK", "diagonal", "Portal",
@@ -182,7 +185,9 @@ def test_atac_gas_peak_caveat(tmp_path):
 
 def test_inputs_for_check_true_rejects_data_dir_without_the_named_files(tmp_path):
     (tmp_path / "D27").mkdir()
-    with pytest.raises(FileNotFoundError, match="missing files in"):
+    with pytest.raises(FileNotFoundError, match=r"scBridge needs rna\.h5, atac_gas\.h5, "
+                                                r"rna_cty\.csv and atac_cty\.csv, and "
+                                                r".*D27 has none of them\."):
         resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path, check=True)
     # default (warn-only) still hands back the directory
     got = resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path)
@@ -207,15 +212,19 @@ def test_check_data_dir_names_the_missing_files(tmp_path):
     from multibench.engine import registry
     v = registry.get("scBridge").select("diagonal", set())
     d = tmp_path / "S"; d.mkdir()
-    assert resolve._check_data_dir(v, d) == (
-        False, f"missing files in {d}: ['rna.h5', 'atac_gas.h5', 'rna_cty.csv', 'atac_cty.csv']")
+    assert resolve._check_data_dir(v, d, "scBridge") == (
+        False, f"scBridge needs rna.h5, atac_gas.h5, rna_cty.csv and atac_cty.csv, and {d} "
+               f"has none of them.")
     for name in ("rna.h5", "atac_gas.h5", "rna_cty.csv"):
         (d / name).write_text("")
-    assert resolve._check_data_dir(v, d) == (False, f"missing files in {d}: ['atac_cty.csv']")
+    assert resolve._check_data_dir(v, d, "scBridge") == (
+        False, f"scBridge needs atac_cty.csv, and {d} has no such file.")
+    assert resolve._check_data_dir(v, d)[1].startswith("The method needs atac_cty.csv")
     (d / "atac_cty.csv").write_text("")
     assert resolve._check_data_dir(v, d) == (True, "")
     gone = tmp_path / "nope"
-    assert resolve._check_data_dir(v, gone) == (False, f"no such directory: {gone}")
+    assert resolve._check_data_dir(v, gone, "scBridge") == (
+        False, f"scBridge needs the folder {gone}, which does not exist.")
     # the workflow alias delegates here
     from multibench import workflow as W
     assert W._data_dir_usable(v, d) == (True, "")

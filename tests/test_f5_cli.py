@@ -253,11 +253,12 @@ def test_prepared_note_starts_with_the_method(monkeypatch):
     assert cli_note == ("GLUE reads inputs/atac_peak_normpeaks.h5. multibench run writes "
                         "that file first, so start GLUE with multibench run or multibench "
                         "run-all. The printed command alone fails in a job script.")
-    # the matchers find it at the start of a caveat or after another clause
+    # the matchers find it at the start of a caveat or after another sentence
+    counts = "GLUE needs raw counts. rna.h5 holds non-integer values."
     assert runner._prepared_at(cli_note) == 0
-    assert runner._prepared_at("expects raw counts; " + cli_note) == len("expects raw counts; ")
-    assert runner._prepared_at("reads peak names such as chr1:100-200") == -1
-    assert W._run_caveat("expects raw counts; " + cli_note) == "expects raw counts"
+    assert runner._prepared_at(counts + " " + cli_note) == len(counts + " ")
+    assert runner._prepared_at("GLUE reads peak names such as chr1:100-200.") == -1
+    assert W._run_caveat(counts + " " + cli_note) == counts
 
 
 def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
@@ -332,12 +333,12 @@ def test_cli_dry_run_headers_are_sentences(monkeypatch, capsys, tmp_path):
     cap = capsys.readouterr()
     assert rc == 0
     assert cap.err.startswith(
-        "# Dry run. Nothing was executed. 0 of 1 row can run on D11 (vertical). The "
+        "# Dry run. Nothing was executed. 0 of 1 method can run on D11 (vertical). The "
         "commands below are what multibench run would execute. Rows with files_ok False "
         "have none.\n")
-    assert ("# Commands of the 1 row with resolvable inputs. [env missing]: blocked by "
-            "env_ok only. [use multibench run]: reads a file under inputs/ that multibench "
-            "run writes first.") in cap.out
+    assert ("# Commands of the 1 row whose input files are in place. [env missing] marks "
+            "a row whose environment is not installed. [use multibench run] marks a "
+            "command that reads a file multibench run writes first.") in cap.out
     for text in (cap.out, cap.err):
         assert "`" not in text and "(s)" not in text
 

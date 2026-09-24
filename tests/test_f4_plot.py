@@ -306,13 +306,13 @@ def test_prepared_file_note_cli_spelling(monkeypatch):
 def test_batch_advice_names_run_all_and_evaluate(monkeypatch):
     from multibench.engine import resolve
     py = resolve._one_file_advice("vertical", has_adt=True)
-    assert py == ("vertical methods read one rna.h5: export without batch= and pass the "
-                  "batch column to run_all(batch=...) or evaluate(batch=...), or use "
-                  "category='cross' (RNA+ADT)")
+    assert py == ("Vertical methods read one rna.h5. Export without batch= and pass the "
+                  "batch column to run_all(batch=...) or evaluate(batch=...). For RNA+ADT "
+                  "batches, use category=\"cross\".")
     monkeypatch.setattr(config, "_CLI", True)
     assert resolve._one_file_advice("diagonal") == (
-        "diagonal methods read one rna.h5 and one ATAC file: convert without --batch "
-        "and pass the batch column to run-all --batch or evaluate --batch")
+        "Diagonal methods read one rna.h5 and one ATAC file. Convert without --batch "
+        "and pass the batch column to run-all --batch or evaluate --batch.")
 
 
 def test_batch_with_atac_warning_names_run_all():

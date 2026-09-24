@@ -97,7 +97,8 @@ def test_peak_ids_leave_multimap_runnable_and_block_glue_and_seurat_v3(tmp_path,
     assert sc.loc["MultiMAP", "runnable"], sc.loc["MultiMAP", "reason"]
     assert sc.loc["MultiMAP", "reason"] == ""
     assert sc.loc["MultiMAP", "caveat"].startswith(
-        "expects peaks; atac_peak.h5 holds names that are not chr:start-end (e.g. peak_0)")
+        "MultiMAP needs peak ATAC. atac_peak.h5 holds names such as peak_0, not "
+        "chr:start-end.")
     assert "gene activity" not in sc.loc["MultiMAP", "caveat"]
     for m in ("GLUE", "Seurat_v3"):
         assert not sc.loc[m, "runnable"], m
@@ -115,10 +116,10 @@ def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned
                 modalities=["rna", "atac"], data_path=root, verbose=False).set_index("method")
     assert sc["runnable"].all(), sc["reason"].tolist()
     assert sc.loc["scMVP", "caveat"].startswith(
-        "expects peaks; atac.h5 holds names that are not chr:start-end (e.g. peak_0)")
+        "scMVP needs peak ATAC. atac.h5 holds names such as peak_0, not chr:start-end.")
     assert sc.loc["Matilda", "caveat"].startswith(
-        "expects gene activity; atac.h5 holds names that are not the RNA's genes (e.g. "
-        "peak_0)")
+        "Matilda needs gene-activity ATAC. atac.h5 holds names such as peak_0, not the "
+        "RNA's genes.")
 
 
 def test_gene_names_in_the_peak_file_still_block_multimap(tmp_path, pinned):
@@ -178,9 +179,9 @@ def test_run_all_with_the_override_does_not_warn_again(tmp_path, pinned, monkeyp
         res = mtb.run_all("MU_PEAK", "vertical", tmp_path / "out", methods=["Matilda"],
                           modalities=["rna", "atac"], data_path=root,
                           allow_atac_mismatch=True)
-    assert not [w for w in rec if "expects gene activity" in str(w.message)], \
+    assert not [w for w in rec if "needs gene-activity ATAC" in str(w.message)], \
         [str(w.message) for w in rec]
-    assert "[run_all]   Matilda expects gene activity; atac.h5 holds peaks" in \
+    assert "[run_all]   Matilda needs gene-activity ATAC. atac.h5 holds peaks" in \
         capsys.readouterr().out
     assert res.records[0]["status"] == "FAIL" and "stand-in env" in res.records[0]["error"]
     # a direct mtb.run still warns, once
@@ -190,7 +191,7 @@ def test_run_all_with_the_override_does_not_warn_again(tmp_path, pinned, monkeyp
         warnings.simplefilter("always")
         with pytest.raises(_Stop):
             mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
-    hits = [w for w in rec if "expects gene activity" in str(w.message)]
+    hits = [w for w in rec if "needs gene-activity ATAC" in str(w.message)]
     assert len(hits) == 1 and issubclass(hits[0].category, UserWarning)
 
 

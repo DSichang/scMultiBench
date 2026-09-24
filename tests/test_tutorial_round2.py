@@ -100,7 +100,7 @@ def test_cross_tutorial_says_which_batches_uinmf_reads():
     import multibench as mtb
     assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2"]
     sc = mtb.scan("D52", "cross", methods=["UINMF"], verbose=False)
-    assert sc.caveat.iloc[0] == "reads batches 1-2 of 3; batch 3 is not used"
+    assert sc.caveat.iloc[0] == "UINMF reads batches 1-2 of 3. Batch 3 is not used."
     run = _markdown("tutorial_cross", "### Run the methods")
     assert ("UINMF reads only batches 1 and 2 of 3, and `scan` says so in its `caveat` "
             "column.") in run

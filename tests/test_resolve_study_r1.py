@@ -45,9 +45,10 @@ def test_per_batch_folder_fails_every_vertical_row_with_the_hint(tmp_path):
     sc = mtb.scan("MB", "vertical", data_path=tmp_path)
     assert len(sc) > 20 and not sc["files_ok"].any()
     assert sc["files_reason"].str.contains(
-        r"this folder holds per-batch files \(rna1.h5, rna2.h5, \.\.\.\); vertical methods "
-        r"read one rna.h5: export without batch=").all()
-    with pytest.raises(FileNotFoundError, match=r"or use category='cross' \(RNA\+ADT\)"):
+        r"This folder holds per-batch files \(rna1.h5, rna2.h5, \.\.\.\)\. Vertical methods "
+        r"read one rna.h5\. Export without batch=").all()
+    with pytest.raises(FileNotFoundError,
+                       match=r'For RNA\+ADT batches, use category="cross"\.'):
         resolve.inputs_for("MB", "vertical", "totalVI", data_path=tmp_path, check=True)
     # the same folder is a valid cross folder
     got = resolve.inputs_for("MB", "cross", "totalVI", data_path=tmp_path, check=True)
@@ -56,10 +57,10 @@ def test_per_batch_folder_fails_every_vertical_row_with_the_hint(tmp_path):
 
 def test_labels_for_vertical_on_a_per_batch_folder_warns_or_raises(tmp_path):
     _per_batch_folder(tmp_path / "MB")
-    with pytest.warns(UserWarning, match="this folder holds per-batch files"):
+    with pytest.warns(UserWarning, match="This folder holds per-batch files"):
         lab = mtb.labels_for("MB", "vertical", data_path=tmp_path)
     assert list(lab) == ["cty1", "cty2", "cty3"]
-    with pytest.raises(ValueError, match="export without batch="):
+    with pytest.raises(ValueError, match="Export without batch="):
         mtb.labels_for("MB", "vertical", data_path=tmp_path, check=True)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -103,8 +104,8 @@ def test_numbered_atac_near_miss_names_the_right_file(tmp_path):
     assert hints == []
     _h5(d / "atac_gas2.h5", 30, 40)
     hints = resolve._near_miss_hints(d, {"atac2": str(d / "atac2.h5")}, "mosaic")
-    assert hints == ["atac2.h5 not found; found atac_gas2.h5 - mosaic methods read atac2.h5 "
-                     "or atac_peak2.h5 (every mosaic method reads peaks)"]
+    assert hints == ["Mosaic methods read atac2.h5 or atac_peak2.h5. Every mosaic method "
+                     "reads peak ATAC."]
     assert "atac22" not in hints[0]
 
 

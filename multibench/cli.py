@@ -474,9 +474,10 @@ def _strict_problem(df, methods) -> str | None:
             rows = rows.sort_values("files_ok", ascending=False, kind="stable")
         reason = rows["reason"].iloc[0] if len(rows) else ""
         if len(rows) and _blank(reason):            # runnable but for the scripts
-            reason = "method scripts not fetched"
-        # an ATAC reason ends with its override: never clipped
-        text = ("no row" if _blank(reason) else str(reason) if _is_wrong_atac(reason)
+            reason = "The method scripts are not fetched."   # the fix follows once
+        # an ATAC or scripts-ref reason ends with its fix: never clipped
+        text = ("no row" if _blank(reason) else str(reason)
+                if _is_wrong_atac(reason) or _is_wrong_ref(reason)
                 else _truncate(reason, 120))
         lines.append(f"  {m}: {text}")
     return (head + f" No runnable row for {', '.join(blocked)}:\n"
@@ -1217,7 +1218,8 @@ def _run_all_command(args, stack) -> int:
                                     allow_atac_mismatch=getattr(
                                         args, "allow_atac_mismatch", False))
         k, n = int(df["runnable"].sum()), len(df)
-        print(f"# Dry run. Nothing was executed. {k} of {n} {'row' if n == 1 else 'rows'} "
+        from .workflow import _rows_word
+        print(f"# Dry run. Nothing was executed. {k} of {n} {_rows_word(df, n)} "
               f"can run on {args.dataset} ({args.category}). The commands below are what "
               f"multibench run would execute. Rows with files_ok False have none.",
               file=sys.stderr)
@@ -1225,8 +1227,8 @@ def _run_all_command(args, stack) -> int:
         scripts, lines = _dry_run_notes(df)
         if scripts:
             print(f"# {scripts}", file=sys.stderr)
-        for m, cav in lines:
-            print(f"# {m} {cav}", file=sys.stderr)
+        for _m, cav in lines:              # each caveat starts with its method
+            print(f"# {cav}", file=sys.stderr)
         if batch_vec is not None:
             bad = _batch_length_problem(df, batch_vec, args.dataset, args.category,
                                         args.data_path)
@@ -1238,9 +1240,9 @@ def _run_all_command(args, stack) -> int:
             print()
             from .engine.runner import _prepared_at
             print(f"# Commands of the {len(have)} {'row' if len(have) == 1 else 'rows'} "
-                  f"with resolvable inputs. [env missing]: blocked by env_ok only. "
-                  f"[use multibench run]: reads a file under inputs/ that multibench run "
-                  f"writes first.")
+                  f"whose input files are in place. [env missing] marks a row whose "
+                  f"environment is not installed. [use multibench run] marks a command "
+                  f"that reads a file multibench run writes first.")
             for _, r in have.iterrows():
                 tag = "" if r["env_ok"] else " [env missing]"
                 if _prepared_at(r.get("caveat", "")) >= 0:

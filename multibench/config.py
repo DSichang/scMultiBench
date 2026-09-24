@@ -419,15 +419,14 @@ def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR,
             return None
     except (OSError, subprocess.SubprocessError):
         pass
-    # no final period: scan joins this into its reason column with "; "
     if source == SCRIPTS_REF_VAR:
-        fix = hint("Fetch that ref into a new repo_path, or unset the variable",
-                   f"Fetch that ref into a new folder (set {REPO_PATH_VAR}, then "
-                   f"multibench fetch --scripts), or unset the variable")
+        fix = hint("Unset the variable, or fetch that ref into a new repo_path.",
+                   f"Unset {SCRIPTS_REF_VAR}, or set {REPO_PATH_VAR} to a new folder "
+                   f"and run multibench fetch --scripts.")
     else:
-        fix = (f"Fetch that ref into a new folder: set {REPO_PATH_VAR}, then run "
-               f"multibench fetch --scripts --ref {ref}")
-    what = f"the method scripts in {repo}" if folder else "method scripts"
+        fix = (f"Set {REPO_PATH_VAR} to a new folder and run multibench fetch "
+               f"--scripts --ref {ref}.")
+    what = f"The method scripts in {repo}" if folder else "The method scripts"
     return f"{what} are at {head[:7]}, not {ref} ({source}). {fix}"
 
 

@@ -60,7 +60,7 @@ def test_strict_table_agrees_with_its_error(no_scripts, capsys):
     assert list(df["runnable"]) == [False]
     assert list(df["reason"]) == [REASON]
     # the caveat is unchanged
-    assert "method scripts not found under" in df["caveat"].iloc[0]
+    assert "The method scripts are not in" in df["caveat"].iloc[0]
 
 
 def test_strict_table_every_row_without_methods(no_scripts, capsys):

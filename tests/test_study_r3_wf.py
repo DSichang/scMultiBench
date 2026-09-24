@@ -93,8 +93,9 @@ def test_gene_activity_near_miss_states_the_vertical_rule(tmp_path):
                 verbose=False)
     for m in ("scMDC", "UnitedNet", "Matilda"):
         text = df.loc[df.method == m, "files_reason"].iloc[0]
-        assert ("atac.h5 not found; found atac_peak.h5 - vertical reads atac.h5 "
-                "(pass the representation") in text, (m, text)
+        assert ("Vertical methods read atac.h5. method_info(\"" + m + "\")[\"atac\"] says "
+                "which ATAC " + m + " needs.") in text, (m, text)
+        assert "The folder holds atac_peak.h5" in text, (m, text)
         assert "atac_gas.h5 or atac.h5" not in text
 
 
@@ -117,7 +118,8 @@ def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
             assert r.reason == (f"{m} needs gene-activity ATAC, and atac.h5 holds peaks. "
                                 f"Export the ATAC as gene activity, or pass "
                                 f"allow_atac_mismatch=True to run {m} anyway."), r.reason
-            assert r.caveat.startswith("expects gene activity; atac.h5 holds peaks")
+            assert r.caveat.startswith(f"{m} needs gene-activity ATAC. atac.h5 holds peaks, "
+                                       f"because its features look like chr:start-end.")
         assert df.loc[["moETM", "scMM", "iPOLNG", "scMVP"], "runnable"].all()
     # R4-01: naming the method no longer runs it; allow_atac_mismatch does
     named = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
@@ -127,7 +129,7 @@ def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
                      modalities=["rna", "atac"], data_path=root, dry_run=True,
                      verbose=False, allow_atac_mismatch=True)
     assert allowed["runnable"].all() and allowed["reason"].eq("").all()
-    assert allowed["caveat"].str.startswith("expects gene activity").all()
+    assert allowed["caveat"].str.startswith("Matilda needs gene-activity ATAC").all()
 
 
 def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
@@ -177,16 +179,17 @@ def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatc
                  evaluate=False, allow_atac_mismatch=True)
     log = capsys.readouterr().out
     assert calls[-1] == "Matilda"
-    assert "[run_all]   Matilda expects gene activity; atac.h5 holds peaks" in log
+    assert "[run_all]   Matilda needs gene-activity ATAC. atac.h5 holds peaks" in log
     sm = res.summary
     # R5-03: reason follows caveat as the last column
     assert list(sm.columns[-2:]) == ["caveat", "reason"]
-    assert sm["caveat"].iloc[0].startswith("expects gene activity; atac.h5 holds peaks")
+    assert sm["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC. atac.h5 holds "
+                                           "peaks")
     disk = pd.read_csv(tmp_path / "named" / "summary.csv")
     assert list(disk.columns)[-2:] == ["caveat", "reason"]
-    assert disk["caveat"].iloc[0].startswith("expects gene activity")
+    assert disk["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC")
     blob = json.loads((tmp_path / "named" / "batch_result.json").read_text())
-    assert blob["records"][0]["caveat"].startswith("expects gene activity")
+    assert blob["records"][0]["caveat"].startswith("Matilda needs gene-activity ATAC")
     assert mtb.load_batch(tmp_path / "named").summary["caveat"].iloc[0] == sm["caveat"].iloc[0]
 
 
@@ -194,7 +197,7 @@ def test_dry_run_prints_the_whole_caveat(tmp_path, capsys):
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"], data_path=root,
            dry_run=True, allow_atac_mismatch=True)
-    assert ("[run_all] Matilda expects gene activity; atac.h5 holds peaks"
+    assert ("[run_all] Matilda needs gene-activity ATAC. atac.h5 holds peaks"
             in capsys.readouterr().out)
 
 
@@ -282,7 +285,7 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
     monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_checkout")
     plan = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda"],
                   modalities=["rna", "atac"], data_path=root, verbose=False)
-    assert "method scripts not found under" in plan["caveat"].iloc[0]
+    assert "The method scripts are not in" in plan["caveat"].iloc[0]
     monkeypatch.setattr(W, "_run", lambda method, category, inputs, out_dir, params=None:
                         _Res(np.zeros((60, 5))))
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out", methods=["Matilda"],
@@ -290,9 +293,10 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
                  allow_atac_mismatch=True)
     log = capsys.readouterr().out
     cav = res.results[0]["caveat"]
-    assert cav == ("expects gene activity; atac.h5 holds peaks (features look like "
-                   "chr:start-end)"), cav
-    assert "method scripts not found" not in log
+    assert cav == ("Matilda needs gene-activity ATAC. atac.h5 holds peaks, because its "
+                   "features look like chr:start-end."), cav
+    assert "The method scripts are not in" not in log
     assert W._run_caveat("Matilda reads inputs/a.h5. mtb.run writes that file first") == ""
-    assert W._run_caveat("expects raw counts; Matilda reads inputs/a.h5. mtb.run writes "
-                         "that file first") == "expects raw counts"
+    assert W._run_caveat("Matilda needs raw counts. rna.h5 holds non-integer values. "
+                         "Matilda reads inputs/a.h5. mtb.run writes that file first") == (
+        "Matilda needs raw counts. rna.h5 holds non-integer values.")

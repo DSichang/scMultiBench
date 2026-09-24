@@ -1289,9 +1289,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ``'<mod>:<col>'`` reads ``mdata[mod].obs``, then muon's copy
     ``mdata.obs['<mod>:<col>']``; ``'mod:<mod>.obs:<col>'`` works too.
 
-    **Master cell order.** Every modality is written in one order -
-    ``data.obs_names`` when ``data`` is given, else the first modality
-    object's - and re-indexed to it by barcode:
+    **Master cell order.** Every modality is re-indexed by barcode to one
+    order: ``data.obs_names``, or the first modality's ``obs_names`` when
+    ``data`` is not given.
 
     - the same barcodes in another order are reordered;
     - a barcode set that differs raises ``ValueError`` naming the strays;
@@ -1435,8 +1435,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             "category='diagonal' names the label file after the modality it labels "
             "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
     if category == "mosaic" and atac is not None and atac_kind == "gene_activity":
-        warnings.warn("atac_kind='gene_activity' with category='mosaic': every mosaic "
-                      "method reads peaks (atac<i>.h5)", UserWarning, stacklevel=2)
+        warnings.warn("Every mosaic method reads peak ATAC. " + config.hint(
+            "Export the ATAC as peaks (atac_kind='peak'), or pass "
+            "allow_atac_mismatch=True to scan and run_all.",
+            "Convert the ATAC as peaks (--atac-kind peak), or pass "
+            "--allow-atac-mismatch to scan and run-all."), UserWarning, stacklevel=2)
     if category in ("mosaic", "cross") and batch is None and batch_index is None:
         warnings.warn(f"category={category!r} methods read numbered files (rna1.h5, "
                       f"cty1.csv, ...): pass batch_index= (this object is one batch) "
@@ -1594,7 +1597,7 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
         from .resolve import _one_file_advice
         raise ValueError(
             config.hint("batch=", "--batch") + " writes per-batch files (rna1.h5, "
-            "rna2.h5, ...); "
+            "rna2.h5, ...). "
             + _one_file_advice(category, has_adt=adt is not None and atac is None))
     if batch is not None and category is None and atac is not None:
         from .resolve import _batch_column_advice

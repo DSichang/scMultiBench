@@ -32,7 +32,8 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
         mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused",
                     verbose=False)
     msg = str(e.value)
-    assert "nothing is runnable" in msg and "methods=['Matilda']" in msg
+    assert msg.startswith("None of the requested methods (Matilda) can run on D11 "
+                          "(vertical).")
     assert "one line per requested row" in msg
     # every requested variant on its own line, with ITS reason
     assert "\n  Matilda (rna+adt): conda env 'matilda' is not installed" in msg
@@ -175,7 +176,7 @@ def test_cli_run_all_dry_run_prints_commands(capsys, tmp_path, monkeypatch):
                    "--dry-run", "--methods", "Matilda,scMoMaT"])
     cap = capsys.readouterr()
     assert rc == 0
-    assert "# Commands of the 2 rows with resolvable inputs." in cap.out
+    assert "# Commands of the 2 rows whose input files are in place." in cap.out
     cmd_lines = [l for l in cap.out.splitlines() if l.startswith(("Matilda (", "scMoMaT ("))]
     assert len(cmd_lines) == 2                 # rna+adt rows only: the others lack files
     mat = next(l for l in cmd_lines if l.startswith("Matilda (rna+adt)"))

@@ -468,7 +468,7 @@ def test_present_scripts_must_be_at_the_requested_ref(tmp_path, monkeypatch):
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, "v2")
     # the real run names the scripts folder
     with pytest.raises(RuntimeError,
-                       match=rf"^the method scripts in {re.escape(str(repo))} are at "
+                       match=rf"^The method scripts in {re.escape(str(repo))} are at "
                              rf"{head[:7]}, not v2 \(MULTIBENCH_SCRIPTS_REF\)"):
         config.ensure_repo(repo)                                     # silently other code: no
     with pytest.raises(RuntimeError, match=r"not a \(--ref\)"):
