@@ -5,7 +5,7 @@ math shared by :func:`multibench.plot.bubble` and :func:`multibench.plot.bar`:
 :func:`per_dataset_ranks`, :func:`mean_rank_matrix` and
 :func:`overall_by_basis`. Both figures call these, so with the same
 ``overall=`` and the metrics of one family they order methods identically
-(see the Notes of ``plot.bubble``).
+(see the Notes of ``plot.build_table``).
 """
 from __future__ import annotations
 
@@ -308,7 +308,7 @@ def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
     """Across-dataset Overall per method under the given ``basis``.
 
     ``parts`` is the dict from :func:`per_dataset_ranks`. The two formulas
-    (spelled out again in the Notes of ``plot.bubble`` and ``plot.bar``):
+    (spelled out again in the Notes of ``plot.build_table``):
 
     - ``"rank"``: ``minmax(mean over metrics of max-rank(mean over datasets
       of within-dataset max-rank))``; a method absent from a dataset scores

@@ -106,51 +106,20 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     - X label: the single dataset, or the formula and the number of
       datasets.
 
-    **Overall formulas.** The two can order methods differently on the same
-    frame.
-
-    - ``"rank"`` (bubble's default): ``minmax(mean over metrics of
-      max-rank(mean over datasets of within-dataset max-rank))`` - the
-      per-dataset ranks are averaged per metric, re-ranked across methods,
-      averaged over metrics and min-max scaled. A method absent from a
-      dataset scores rank 0 there (the paper's summary rule), which pulls it
-      down.
-    - ``"mean_overall"`` (bar's default): ``mean over datasets of
-      minmax(mean over metrics of within-dataset max-rank)`` - each dataset
-      gets its own min-max-scaled overall, and these are averaged; a dataset
-      the method lacks is skipped.
-
     **Reading the score.** It is rank-based, so it is only meaningful
     relative to the other methods in the same figure. A method lacking a
-    metric is compared on the metrics it has under ``"mean_overall"`` (the
-    within-dataset mean skips NaN cells); under ``"rank"`` the missing cell
-    is rank 0 in that dataset.
-
-    **Bubble and bar.** Ties are broken the way ``mtb.plot.bubble`` breaks
-    them (a stable sort, alphabetical within a tie). With the same
-    ``overall=`` and the metrics of one family (e.g. ``group="clustering"``
-    against a bubble of those metrics with ``aggregate="summary"``), both
-    figures order methods identically. Across both families they can
-    differ: bubble averages the family Overalls, bar scores all metrics
-    together.
+    metric is compared on the metrics it has under ``"mean_overall"``;
+    under ``"rank"`` the missing cell is rank 0 in that dataset.
 
     **Input.** Concatenate several datasets' frames to summarise across
     them; ``mtb.to_long`` and the ``BatchResult.long`` property give the same
     frame for your own runs. ``metrics`` is case- and alias-tolerant
     (``"ari"`` -> ``"ARI"``).
 
-    **A new dataset.** Each dataset's scores rank only the methods scored on
-    it. A method alone on its dataset gets an Overall of 1.0 there under
-    ``"mean_overall"``, so a ``UserWarning`` names such a dataset. Another
-    warning says when no method spans two of the datasets, and names the
-    methods missing from some dataset. Plot a new dataset with the methods
-    scored on it.
-
-    **Leiden backend.** The stored tables were clustered with leidenalg. A
-    ``UserWarning`` names your methods whose ``scored_with`` starts with
-    ``igraph/`` when ARI, NMI or iF1 is scored next to stored rows. Set
-    ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` before
-    ``mtb.evaluate`` to compare them.
+    **Shared rules.** The Overall formulas, the tie-break shared with
+    ``mtb.plot.bubble`` and the warnings are those of
+    ``mtb.plot.build_table`` with ``aggregate="summary"``; its Notes give
+    them.
 
     **Errors.** An unknown ``metrics`` code gets a did-you-mean hint and the
     list of metrics present. Batch metrics need a multi-batch dataset: a

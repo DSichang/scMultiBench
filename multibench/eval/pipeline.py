@@ -658,8 +658,10 @@ def evaluate(
 
     - the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default
       neighbour graph (15 neighbours);
-    - cLISI and iLISI use k0 = 90 neighbours (scib default; perplexity
-      k0/3);
+    - cLISI and iLISI: scib builds a 15-neighbour graph from the embedding
+      and takes the 90 cells nearest by path length on it (k0 = 90,
+      perplexity 30). A cell with fewer than 90 reachable cells counts as
+      one label;
     - ASW, iASW and ASW_batch use distances in the embedding;
     - kBET builds its own neighbour graph.
 
@@ -676,10 +678,12 @@ def evaluate(
     ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
     iASW       isolated_labels_asw   iso_threshold = number of batches + 1
     iF1        isolated_labels_f1    same threshold; best F1 over the sweep
-    cLISI      clisi_graph           type_="embed", k0 = 90; scaled to 0-1
+    cLISI      clisi_graph           type_="embed"; 90 nearest by path on the
+                                     15-neighbour graph; scaled to 0-1
     ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
     GC         graph_connectivity    on the 15-neighbour graph
-    iLISI      ilisi_graph           type_="embed", k0 = 90; scaled to 0-1
+    iLISI      ilisi_graph           type_="embed"; 90 nearest by path on the
+                                     15-neighbour graph; scaled to 0-1
     kBET       kBET                  computed only when named in metrics=[...]
     ```
 

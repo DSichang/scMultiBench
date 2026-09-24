@@ -109,8 +109,7 @@ class BubbleTable:
         ``{method: bool}`` from an optional ``needs_labels`` column, empty
         without it; overrides the registry for the ``L`` badge.
     na_cells : list of str or None
-        One line per method with ``n/a`` cells, in row order: the text of
-        the ``na="warn"`` warning.
+        One line per method and family with ``n/a`` cells, in row order.
 
     Examples
     --------
@@ -140,9 +139,6 @@ class BubbleTable:
 
     **Blocks.** Paper order: DR and clustering (blues), batch correction
     (greens), then "Other" (purples) for any metric outside the two.
-
-    **Drawing.** ``mtb.plot.bubble`` builds this table from the same long
-    table and draws it.
 
     See Also
     --------
@@ -284,7 +280,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     overall : {"rank", "mean_overall"}
         Formula for each family's Overall under ``aggregate="summary"``:
         ``"rank"`` (the paper's panel rule) or ``"mean_overall"`` (bar's
-        default); see ``mtb.plot.bubble``.
+        default); formulas in Notes.
     na : {"warn", "skip", "raise"}
         How to report ``n/a`` cells (a method lacking a metric): ``"warn"``,
         ``"skip"`` (silent, nothing is dropped) or ``"raise"``; also stored
@@ -339,25 +335,47 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     Notes
     -----
-    **Missing-metric rule.** A method may lack a value for some metric (an
-    ``n/a`` cell, drawn as a dash):
+    **Missing cells.** A metric not computed for a method is an ``n/a``
+    cell, drawn as a dash.
 
-    - ``aggregate="dataset"``: the cell is simply absent. The family
-      *Overall* averages the ranks of the metrics the method has (a method
-      scored on 3 of 4 metrics is compared on those 3), and a column's ranks
-      count only the methods scored in it.
+    - ``aggregate="dataset"``: the family *Overall* averages the ranks of
+      the metrics the method has, and a column's ranks count only the
+      methods scored in it.
     - ``aggregate="summary"``: the cell is rank 0 in that dataset (the
       paper's rule), in the metric columns and in the ``overall="rank"``
       Overall; ``overall="mean_overall"`` skips it.
 
-    Neither rule is visible in the numbers, so ``na`` sets how it is
-    reported; the warning reads like ``"YukiNet: DR and clustering Overall
-    over 3 of 4 metrics (cLISI n/a)"``.
+    ``na`` sets how this is reported. ``na_cells`` holds one line per
+    method and family, e.g. ``"YukiNet: DR and clustering Overall over 3 of
+    4 metrics (cLISI n/a)"``.
+
+    **Overall formulas.** ``overall=`` sets the family *Overall* under
+    ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
+    over metrics of max-rank)``. The two can order methods differently on
+    the same frame.
+
+    - ``"rank"`` (bubble's default): ``minmax(mean over metrics of
+      max-rank(mean over datasets of within-dataset max-rank))`` - the
+      per-dataset ranks are averaged per metric, re-ranked across methods,
+      averaged over metrics and min-max scaled. A method absent from a
+      dataset scores rank 0 there (the paper's summary rule), which pulls it
+      down.
+    - ``"mean_overall"`` (bar's default): ``mean over datasets of
+      minmax(mean over metrics of within-dataset max-rank)`` - each dataset
+      gets its own min-max-scaled overall, and these are averaged; a dataset
+      the method lacks is skipped.
 
     **Row order.** The combined Overall is the mean of the family Overalls,
     sorted best first with a stable sort, so tied methods keep alphabetical
-    order - the tie-break ``mtb.plot.bar`` uses. Ranks and scores always
-    come from the whole filtered frame; ``order`` only moves rows.
+    order. Ranks and scores always come from the whole filtered frame;
+    ``order`` only moves rows.
+
+    **Bubble and bar.** ``mtb.plot.bar`` uses the same formulas and
+    tie-break. With ``aggregate="summary"``, the same ``overall=`` and the
+    metrics of one family (e.g. against ``bar(group="clustering")``), both
+    figures order methods identically. Across both families they can
+    differ: bubble averages the family Overalls, bar scores all metrics
+    together.
 
     **require_complete.** One ``UserWarning`` names each dropped method and
     the datasets it lacks (``"require_complete=True dropped 1 method(s) ...:
@@ -365,31 +383,45 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     ``aggregate="dataset"``.
 
     **A new dataset.** A figure compares methods only where they share a
-    dataset. A ``UserWarning`` names a dataset that holds one method, and
-    says so when no method spans two of the datasets. Plot such a dataset on
-    its own, or score the same methods on it.
+    dataset, and the stored tables hold only the demo datasets. A
+    ``UserWarning`` names a dataset that holds one method, and says so when
+    no method spans two of the datasets. Plot such a dataset on its own, or
+    score your method on the demo dataset of its category and add that row.
 
-    Under ``"dataset"``, the several-datasets warning suggests
-    ``aggregate="summary"`` only when every method has rows in at least two
-    datasets and no dataset holds a single method.
+    A method alone on its dataset gets an Overall of 1.0 there under
+    ``"mean_overall"``. Under ``"dataset"``, the several-datasets warning
+    suggests ``aggregate="summary"`` only when every method has rows in at
+    least two datasets and no dataset holds a single method.
 
     **No comparison.** A column whose rows all hold the same value, and
     every column of a one-method figure, compares nothing: one
     ``UserWarning`` names the columns, and the figure draws them in grey.
     Ranks and scores stay as computed.
 
-    **Leiden backend.** The stored tables were clustered with leidenalg.
-    When rows whose ``scored_with`` starts with ``igraph/`` meet stored
-    rows, and ARI, NMI or iF1 is shown, one ``UserWarning`` names those
-    methods and the fix: set ``mtb.config.DEFAULT.leiden_flavor =
-    "leidenalg"`` before ``mtb.evaluate``.
+    **Leiden backend.** The stored tables were clustered with leidenalg; the
+    igraph default can move ARI by up to about 0.1. When rows whose
+    ``scored_with`` starts with ``igraph/`` meet stored rows, and ARI, NMI
+    or iF1 is shown, one ``UserWarning`` names those methods and the fix:
+    set ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` before
+    ``mtb.evaluate``.
 
-    **Input columns.** ``dataset`` groups rows for ``aggregate="summary"``
-    (absent = one dataset) and is part of the duplicate-row key. A boolean
-    ``needs_labels`` column overrides the registry's supervised badge per
-    method (NaN = no override); a single ``category`` value makes the badge
-    follow that category's variants. Rows whose ``metric`` is NaN are
-    dropped.
+    **Input columns.** Only ``method``, ``metric`` and ``value`` are
+    required.
+
+    - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
+      dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
+      that mixes datasets averages them per method and adds a dataset cue to
+      each row label (``Name · D11`` or ``Name · 3 ds``).
+    - ``category`` - a single value makes the ``L`` badge follow that
+      category's variants.
+    - ``needs_labels`` (bool) - overrides the registry's ``L`` badge per
+      method; the only way to badge a method the registry does not know.
+      NaN = no override.
+    - Rows whose ``metric`` is NaN are dropped.
+
+    To draw your own runs next to the stored table, concatenate the frames:
+    ``pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])``,
+    with ``res`` from ``mtb.run_all``.
 
     **Name matching.** ``metrics``, ``methods`` and ``order`` match the
     frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
@@ -1139,6 +1171,10 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     Notes
     -----
+    ``bubble`` draws the table that ``mtb.plot.build_table`` computes. The
+    Notes of ``build_table`` give the Overall formulas, missing cells, row
+    order, input columns, name matching, errors and warnings.
+
     **Reading the figure.** What each mark encodes:
 
     - Metric circle (``aggregate="dataset"``): radius = within-column rank,
@@ -1153,84 +1189,13 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     - Family *Overall* bar: length = the family score min-max scaled across
       the rows; fill = the score itself (the two differ only under
       ``overall="mean_overall"``).
-    - Rows: ordered by the mean of the family Overall scores, best first.
-      ``order`` moves rows but never changes a rank or a score.
+    - Rows: best mean Overall first; ``order`` moves rows only.
     - *Rank* legend: 1 = best, whereas ``BubbleTable.ranks`` /
       ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
     - Grey fill: every row of that column holds the same value, or the
       figure has one method, so there is nothing to compare.
     - Footnote: the Overall formula in use, the grey columns, the ``n/a``
       rule when a dash is drawn, and the chip key.
-
-    **Overall formulas.** ``overall=`` sets the family *Overall* under
-    ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
-    over metrics of max-rank)``. The two can order methods differently on
-    the same frame.
-
-    - ``"rank"`` (bubble's default): ``minmax(mean over metrics of
-      max-rank(mean over datasets of within-dataset max-rank))`` - the
-      per-dataset ranks are averaged per metric, re-ranked across methods,
-      averaged over metrics and min-max scaled. A method absent from a
-      dataset scores rank 0 there (the paper's summary rule), which pulls it
-      down.
-    - ``"mean_overall"`` (bar's default): ``mean over datasets of
-      minmax(mean over metrics of within-dataset max-rank)`` - each dataset
-      gets its own min-max-scaled overall, and these are averaged; a dataset
-      the method lacks is skipped.
-
-    **Bubble and bar.** ``mtb.plot.bar`` uses the same formulas and the same
-    tie-break (alphabetical within a tie). With ``aggregate="summary"``, the
-    same ``overall=`` and the metrics of one family (e.g. against
-    ``bar(group="clustering")``), both figures order methods identically.
-    Across both families they can differ: bubble averages the family
-    Overalls, bar scores all metrics together.
-
-    **Missing cells.** A metric not computed for a method shows a dash
-    (``n/a``) instead of a marker.
-
-    - ``aggregate="dataset"``: the family Overall averages the metrics the
-      method has; a column's ranks count only the scored methods.
-    - ``aggregate="summary"``: the cell is rank 0 in that dataset for the
-      metric bar (the paper's rule); the family Overall counts it as rank 0
-      under ``overall="rank"`` and skips it under ``"mean_overall"``.
-
-    ``na="warn"`` names each method in one warning per figure, e.g.
-    ``"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
-
-    **Input columns.** Only ``method``, ``metric`` and ``value`` are
-    required.
-
-    - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
-      dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
-      that mixes datasets averages them per method and adds a dataset cue to
-      each row label (``Name · D11`` or ``Name · 3 ds``).
-    - ``category`` - a single value makes the ``L`` badge follow that
-      category's variants.
-    - ``needs_labels`` (bool) - overrides the registry's ``L`` badge per
-      method; the only way to badge a method the registry does not know.
-      NaN = no override.
-    - Rows whose ``metric`` is NaN are dropped.
-
-    To draw your own runs next to the stored table, concatenate the frames:
-    ``pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])``,
-    with ``res`` from ``mtb.run_all``.
-
-    **A new dataset.** The stored tables hold only the demo datasets, so
-    rows from your own dataset have nothing stored to rank against. Plot
-    that dataset on its own, or score your method on the demo dataset of
-    its category and add that row. A ``UserWarning`` names a dataset that
-    holds one method, and says so when no method spans two datasets.
-
-    **Leiden backend.** The stored tables were clustered with leidenalg; the
-    igraph default can move ARI by up to about 0.1. When your rows say
-    ``igraph/...`` in ``scored_with`` and ARI, NMI or iF1 is shown, a
-    ``UserWarning`` names them. Set ``mtb.config.DEFAULT.leiden_flavor =
-    "leidenalg"`` before ``mtb.evaluate`` to compare them.
-
-    **Name matching.** ``metrics``, ``methods`` and ``order`` match the
-    frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
-    case-insensitively; the frame's own spelling is kept. The family blocks
-    always stay in paper order.
 
     **Chips and badge** (``show_language``).
 
@@ -1241,13 +1206,6 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
       follows the variants of the frame's single ``category`` (scMoMaT is
       supervised in mosaic only); without one, the registry's method-level
       flag.
-
-    **Errors.** A frame that looks like ``mtb.evaluate``'s wide output gets a
-    hint to convert it with ``mtb.to_long`` first; an unknown name gets a
-    did-you-mean hint and the values present. Duplicate rows raise
-    ``ValueError``: deduplicate, or name the variants distinctly (as
-    ``mtb.sweep`` does). A method with both ``True`` and ``False``
-    ``needs_labels`` rows, or an empty frame, also raises ``ValueError``.
 
     See Also
     --------
@@ -1268,7 +1226,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 # The `overall` parameter text is style.OVERALL_DOC, written out verbatim in
 # the docstrings of bubble and bar (a runtime splice is invisible to the
 # static docs build); tests/test_bubble.py and tests/test_bar.py pin parity.
-# The two formulas are in both Notes and in style.overall_by_basis.
+# The two formulas are in the Notes of build_table and in style.overall_by_basis.
 
 #: deprecated 0.2.x name of :func:`bubble` (DeprecationWarning; removed in 0.4)
 plot_bubble = _compat.deprecated_alias("mtb.plot.plot_bubble", "mtb.plot.bubble", bubble)

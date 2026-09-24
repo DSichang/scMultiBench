@@ -53,7 +53,13 @@ def test_evaluate_notes_name_each_neighbourhood():
     doc = " ".join(inspect.getdoc(pipeline.evaluate).split())
     assert "scib 1.x" not in doc
     assert "``scib >= 1.1``" in doc and 'attrs["scib_version"]' in doc
-    assert "cLISI and iLISI use k0 = 90 neighbours (scib default; perplexity k0/3)" in doc
+    # R3-15: LISI takes the 90 cells nearest by path on scib's own 15-neighbour
+    # graph, not a 90-nearest-neighbour graph in the embedding
+    assert ("cLISI and iLISI: scib builds a 15-neighbour graph from the embedding "
+            "and takes the 90 cells nearest by path length on it (k0 = 90, "
+            "perplexity 30). A cell with fewer than 90 reachable cells counts as "
+            "one label") in doc
+    assert "k0 = 90 neighbours" not in doc
     assert ("the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default neighbour "
             "graph (15 neighbours)") in doc
     assert "ARI can be slightly below 0, which means a random clustering" in doc
@@ -73,6 +79,14 @@ def test_stated_scib_facts_match_the_requirement_and_scib_defaults():
     import scib.metrics as me
     for fn in (me.clisi_graph, me.ilisi_graph):
         assert inspect.signature(fn).parameters["k0"].default == 90, fn
+    # the graph LISI walks on: scib recomputes a 15-neighbour graph for
+    # type_="embed", perplexity defaults to k0 / 3, and a cell without k0
+    # reachable cells gets a Simpson index of 1 (one label)
+    from scib.metrics import lisi
+    knn = inspect.getsource(lisi.recompute_knn)
+    assert 'if type_ == "embed":' in knn and "n_neighbors=15" in knn
+    assert "np.floor(n_neighbors / 3)" in inspect.getsource(lisi.lisi_graph_py)
+    assert "simpson[i] = 1" in inspect.getsource(lisi.compute_simpson_index_graph)
 
 
 def test_catalog_describes_clisi_in_plain_direction():
