@@ -109,11 +109,11 @@ def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypa
 
 
 def test_scan_notes_quote_the_gpu_refusal_run_raises():
-    """scan's Notes quote the env_reason of a GPU-only row only in its current
+    """scan's Notes quote the env_reason of a GPU-only row in its current
     form (the one plain sentence), never the old CUDA/file:line text."""
     notes = " ".join(inspect.getdoc(W.scan).split())
     lead = registry.get("moETM").requires_gpu_reason.split(". ")[0].replace("moETM", "<method>")
-    assert "<method> needs an NVIDIA GPU" not in notes or f"{lead}." in notes
+    assert f"{lead}." in notes
     assert "needs an NVIDIA GPU; this computer has none" not in notes
     assert "calls CUDA unconditionally (<file>:<line>)" not in notes
 
@@ -263,8 +263,8 @@ def test_evaluate_and_run_help_texts():
     assert "they replace the sweep for ARI and NMI" in clus
     assert "iF1 still sweeps unless --metrics leaves it out" in clus
     meth = _opt_help(ev, "--method")
-    assert meth.startswith("package method whose label order is used; also the row name "
-                           "unless --name is given")
+    assert meth.startswith("package method whose label order is used, or with --labels "
+                           "any row name. It is also the row name unless --name is given")
     assert "registry" not in meth
     dry = _opt_help(_sub("run"), "--dry-run")
     assert "environment activation included" in dry and "conda run -n" not in dry

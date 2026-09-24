@@ -206,7 +206,7 @@ def test_help_defaults_point_to_multibench_config_not_python():
     for path, flag in ((("scan",), "--data-path"), (("run-all",), "--leiden-flavor"),
                        (("evaluate",), "--leiden-flavor")):
         text = _opt_help(_sub(*path), flag)
-        assert "default: see `multibench config`" in text, (path, flag)
+        assert "default: shown by multibench config" in text, (path, flag)
         assert "mtb." not in text, (path, flag)
 
 

@@ -66,8 +66,8 @@ def envs_installed(monkeypatch):
 
 
 # --- M15: Seurat_v5 needs its bridge files from the same cells ---------------
-SEURAT_D28 = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge; these "
-              "files hold different cells (6,408 and 4,606, 0 shared)")
+SEURAT_D28 = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. These "
+              "files share 0 of 6,408 and 4,606 cells")
 
 
 def test_seurat_v5_is_not_file_ready_on_d28(root, envs_installed):
@@ -81,8 +81,8 @@ def test_seurat_v5_unpaired_folder_fails_the_file_check(tmp_path, envs_installed
     _diagonal(tmp_path, "UNPAIRED", [f"c{i}" for i in range(50)], [f"a{i}" for i in range(45)])
     row = _row("UNPAIRED", "diagonal", "Seurat_v5", tmp_path)
     assert not row["files_ok"] and not row["runnable"]
-    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge; these files "
-            "hold different cells (50 and 45, 0 shared)") in row["reason"]
+    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. These files "
+            "share 0 of 50 and 45 cells") in row["reason"]
     with pytest.raises(ValueError, match="Seurat_v5 needs RNA and ATAC from the same cells"):
         mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
     # check=False keeps returning the paths

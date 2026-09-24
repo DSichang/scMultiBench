@@ -19,14 +19,14 @@ same parameter names where a flag exists (``--category``, ``--metrics``,
 
 Exit codes and streams
 ----------------------
-``0`` success; ``1`` a runtime error raised by the API (the message is printed
-as ``error: ...`` on stderr; set ``MULTIBENCH_DEBUG=1`` to get the traceback);
-``2`` a usage error (argparse: unknown flag, missing required flag, bad
-choice, or a flag combination the subcommand rejects); ``3`` ``run-all``
-finished and saved its files, but a method failed, or a method named in
-``--methods`` was skipped. Without ``--methods``, a skipped method is only
-logged and marked ``SKIPPED`` in ``summary.csv``. A line on stderr names
-the methods.
+``0`` means success. ``1`` is a runtime error raised by the API. The message
+is printed as ``error: ...`` on stderr, and ``MULTIBENCH_DEBUG=1`` adds the
+traceback. ``2`` is a usage error: an unknown flag, a missing required flag,
+a bad choice, or a flag combination the subcommand rejects. ``3`` means
+``run-all`` finished and saved its files, but a method failed or a method
+named in ``--methods`` was skipped. Without ``--methods``, a skipped method
+is only logged and marked ``SKIPPED`` in ``summary.csv``. A line on stderr
+names the methods.
 
 Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
 lines); diagnostics go to stderr (``error: ...``, ``warning: ...``, progress
@@ -1237,7 +1237,10 @@ def _cmd_run_all(args) -> int:
                 tag = "" if r["env_ok"] else " [env missing]"
                 if _prepared_at(r.get("caveat", "")) >= 0:
                     tag += " [use multibench run]"
-                print(f"{r['method']} ({r['modalities']}){tag}: {r['command']}")
+                # a data_dir method's modalities already read "(data_dir)"
+                mods = str(r["modalities"])
+                mods = mods if mods.startswith("(") else f"({mods})"
+                print(f"{r['method']} {mods}{tag}: {r['command']}")
         return _EXIT_OK
     with _quiet_stdout(), _leiden_flavor(getattr(args, "leiden_flavor", None)):
         res = multibench.run_all(args.dataset, args.category, out_dir=args.out,
@@ -1401,8 +1404,9 @@ def _evaluate_labels(args, stack):
         if bad:
             raise ValueError(bad)
     if args.column is not None:
-        # one column out of each file, written as the one-column files the
-        # stacking reader expects, so several files still count as batches
+        # one column out of each file, written as column x after the file's
+        # first column, which may hold the cell ids evaluate aligns by; several
+        # files still count as batches
         import tempfile
 
         import pandas as pd
@@ -1413,7 +1417,9 @@ def _evaluate_labels(args, stack):
             # the file keeps its name: evaluate's errors name the files typed
             out = tmp / str(i) / Path(f).name
             out.parent.mkdir()
-            pd.DataFrame({"x": eio.read_labels(f, args.column)}).to_csv(out, index=False)
+            vals, first = eio.read_labels_ids(f, args.column)
+            cols = {"x": vals} if first is None else {"id": first.to_numpy(), "x": vals}
+            pd.DataFrame(cols).to_csv(out, index=False, sep=eio._sep_for(out))
             picked.append(str(out))
         files = picked
     return files[0] if len(files) == 1 else files
@@ -1510,10 +1516,13 @@ def _cmd_evaluate(args) -> int:
         from .engine import registry
         try:
             registry.check_method(args.method)
-        except KeyError as e:
+        except KeyError:
             # with --name, --method only sets the label order: it must be known
-            raise KeyError(f"{e.args[0]}. With --name, --method must be a package "
-                           f"method, because it sets the label order") from None
+            near = registry.closest_method(args.method)
+            raise KeyError(f"With --name, --method must be a package method. "
+                           f"{args.method} is not one."
+                           + (f" Did you mean {near}?" if near else "")
+                           + " multibench list shows the methods.") from None
     # one metric-selection knob: --metrics (a family token or a comma list of
     # codes); --only and --task are older spellings of it
     metrics = _csv_list(args.metrics)
@@ -1951,7 +1960,7 @@ _CATEGORY_HELP = ("integration category: vertical (several modalities measured i
                   "modality) or cross (several batches, each with RNA and ADT).")
 _TASK_HELP = ("task within the category: clustering, batch or dimension_reduction. "
               "mtb.list_tasks() lists them.")
-_METHODS_HELP = "comma-separated method ids (as printed by `multibench list`)"
+_METHODS_HELP = "comma-separated method ids, as printed by multibench list"
 _FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
                 "(the same env without the CUDA libraries, 3-4x smaller) where "
@@ -1979,12 +1988,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run, evaluate and plot single-cell multimodal integration "
                     "methods from the scMultiBench benchmark. Each command wraps "
                     "one function of the Python API (import multibench as mtb).",
-        epilog="Exit codes: 0 ok, 1 runtime error (error: ... on stderr; "
-               "MULTIBENCH_DEBUG=1 shows the traceback), 2 usage error, 3 run-all "
-               "finished, but a method failed, or a method named in --methods was "
-               "skipped. Without --methods, a skipped method is only logged and "
-               "marked SKIPPED in summary.csv. "
-               "Run `multibench <command> --help` for the flags of a command.")
+        epilog="Exit codes: 0 means success. 1 is a runtime error, printed as "
+               "error: ... on stderr. MULTIBENCH_DEBUG=1 shows the traceback. 2 is a "
+               "usage error. 3 means run-all finished, but a method failed or a "
+               "method named in --methods was skipped. Without --methods, a skipped "
+               "method is only logged and marked SKIPPED in summary.csv. "
+               "Run multibench <command> --help for the flags of a command.")
     p.add_argument("--version", action="version",
                    version=f"%(prog)s {_version()}",
                    help="print the multibench version and exit")
@@ -2027,7 +2036,7 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--tunable", nargs="?", const="true", choices=["true", "false"],
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods exposing hyperparameters "
-                         "to --param (`multibench params METHOD` lists them); false: "
+                         "to --param (multibench params METHOD lists them); false: "
                          "only methods that hardcode them; absent: no filter")
     pf.set_defaults(func=_cmd_find, _parser=pf)
 
@@ -2041,8 +2050,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "knobs it does not expose. Without --category/--modalities every "
                     "variant is printed. An empty tunable table means the script "
                     "hardcodes its hyperparameters.")
-    ppa.add_argument("method", help="method id (see `multibench list`; unknown id -> "
-                                    "did-you-mean error)")
+    ppa.add_argument("method", help="method id, as printed by multibench list. An "
+                                    "unknown id gets a did-you-mean error")
     ppa.add_argument("--category", help=_CATEGORY_HELP + " Only that category's variants.")
     ppa.add_argument("--modalities", help="comma-separated modality roles selecting one "
                                           "variant, e.g. rna,adt ('protein' is accepted "
@@ -2062,7 +2071,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "it needs labels, which ATAC representation it reads, its variants "
                     "(category and input roles), each observed runtime with its cell "
                     "count and host, and the setup hint.")
-    pin.add_argument("method", help="method id (see `multibench list`)")
+    pin.add_argument("method", help="method id, as printed by multibench list")
     pin.add_argument("--format", choices=["text", "json"], default="text",
                      help="text (default) or json (the whole mtb.method_info dict)")
     pin.set_defaults(func=_cmd_info, _parser=pin)
@@ -2091,7 +2100,7 @@ def build_parser() -> argparse.ArgumentParser:
                           "already present must be at that commit or tag.")
     pfe.add_argument("--data-path", dest="data_path",
                      help="data root to download into (default: the configured "
-                          "data_path, see `multibench config`)")
+                          "data_path, shown by multibench config)")
     pfe.set_defaults(func=_cmd_fetch, _parser=pfe)
 
     # ---- config
@@ -2128,10 +2137,10 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--category", help=_CATEGORY_HELP + " Default: every category, "
                                                         "as mtb.scan(dataset) does.")
     ps.add_argument("--data-path", dest="data_path",
-                    help="folder that contains the dataset folder (default: see "
-                         "`multibench config`)")
-    ps.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown "
-                                                      "id -> did-you-mean error)")
+                    help="folder that contains the dataset folder (default: shown "
+                         "by multibench config)")
+    ps.add_argument("--methods", help=_METHODS_HELP + ". Only those rows. An unknown "
+                                                      "id gets a did-you-mean error")
     ps.add_argument("--modalities", help="comma-separated modality roles to restrict the "
                                          "variants to, e.g. rna,adt ('protein' is "
                                          "accepted for adt); atac_peak and atac_gas "
@@ -2169,14 +2178,14 @@ def build_parser() -> argparse.ArgumentParser:
     pc = sub.add_parser(
         "convert", help="convert .h5ad/.h5mu/.csv to the canonical .h5 files "
                         "(mtb.io.to_canonical / mtb.io.export_dataset)",
-        description="Two modes. (1) One file: `convert SRC OUT [--modality M]` writes "
+        description="Two modes. (1) One file: convert SRC OUT [--modality M] writes "
                     "one canonical .h5 (features x cells, matrix/data + features + "
                     "barcodes); OUT may be a directory when --modality is given "
                     "(the canonical filename rna.h5 / adt.h5 / atac_peak.h5 / "
                     "atac_gas.h5 is appended). (2) Whole dataset: any of --rna/--adt/"
                     "--atac/--labels/--batch/--batch-index switches to export_dataset, which "
                     "reads SRC (.h5ad or .h5mu) and writes OUT/ as a dataset folder "
-                    "ready for `multibench scan OUT_NAME --data-path <parent>`. "
+                    "ready for multibench scan OUT_NAME --data-path <parent>. "
                     "Give raw counts: the methods normalise the data themselves.",
         epilog=_CONVERT_EPILOG, formatter_class=_HelpFormatter)
     pc.add_argument("src", help="input: .h5ad, .h5mu (then --mod or mod: selectors), "
@@ -2240,8 +2249,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "given (in that order). Methods without a verified DOI are "
                     "emitted as a comment naming their repository.")
     pci.add_argument("methods", nargs="*", metavar="METHOD",
-                     help="method ids to cite, space- or comma-separated (`cite A B` "
-                          "and `cite A,B` are the same; none: the benchmark entry only)")
+                     help="method ids to cite, space- or comma-separated: cite A B "
+                          "and cite A,B are the same. Without ids, only the benchmark "
+                          "entry is printed")
     pci.add_argument("--all", action="store_true",
                      help="cite every method")
     pci.add_argument("--format", choices=["bibtex", "text"], default="bibtex",
@@ -2256,8 +2266,8 @@ def build_parser() -> argparse.ArgumentParser:
                      "(mtb.plot.bubble / mtb.plot.bar)",
         description="Plot stored result tables (--category [--dataset] [--source]), "
                     "your own long table (--input long.csv or a run_all output "
-                    "dir, as written by `multibench evaluate --method/--dataset` "
-                    "and `multibench run-all`), or both: --input together with "
+                    "dir, as written by multibench evaluate --method/--dataset "
+                    "and multibench run-all), or both: --input together with "
                     "--category adds your rows to the stored table.")
     pp.add_argument("kind", choices=["bubble", "bar"],
                     help="bubble: paper-style bubble table (methods x metrics, best "
@@ -2313,17 +2323,18 @@ def build_parser() -> argparse.ArgumentParser:
     pr = sub.add_parser(
         "run", help="run one method on explicit input files (mtb.run)",
         description="Run one method in its conda env on the given role=path inputs "
-                    "and write its outputs under --out-dir. Use `multibench scan` "
+                    "and write its outputs under --out-dir. Use multibench scan "
                     "first to see which roles a method needs and whether its env is "
-                    "installed; `multibench run-all` runs every method of a category "
+                    "installed. multibench run-all runs every method of a category "
                     "on a laid-out dataset folder.")
-    pr.add_argument("--method", required=True, help="method id (see `multibench list`)")
+    pr.add_argument("--method", required=True, help="method id, as printed by "
+                                                    "multibench list")
     pr.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pr.add_argument("--task", default="clustering", help=_TASK_HELP + " Default: clustering.")
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
                     help="one input as role=path, repeatable, e.g. --input rna=rna.h5 "
-                         "--input adt=adt.h5 --input cty=cty.csv (roles: see "
-                         "`multibench layout`); non-canonical files are converted")
+                         "--input adt=adt.h5 --input cty=cty.csv. multibench layout "
+                         "lists the roles. Non-canonical files are converted")
     pr.add_argument("--out-dir", "--out", dest="out", required=True,
                     help="output directory for this run (embedding.h5, metric.csv, "
                          "log); --out is an alias")
@@ -2336,10 +2347,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="one hyperparameter override, repeatable: --param epochs=5 "
                          "--param lr=0.001 (METHOD:KEY=VALUE is accepted when METHOD "
                          "is --method). VALUE is parsed as a scalar: 5 -> int, 0.1 -> "
-                         "float, true/false -> bool, else string. Keys a method does "
-                         "not accept are rejected naming the accepted ones; `multibench "
-                         "params METHOD` lists them (mtb.params_for(METHOD, category, "
-                         "modalities))")
+                         "float, true/false -> bool, else string. A key the method "
+                         "does not accept is rejected, and the error names the "
+                         "accepted ones. multibench params METHOD lists them "
+                         "(mtb.params_for)")
     pr.add_argument("--dry-run", dest="dry_run", action="store_true",
                     help="print the exact command line the run would execute, "
                          "environment activation included, and execute nothing")
@@ -2353,9 +2364,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "on <data-path>/<DATASET>/, evaluate each output and save "
                     "summary.csv, long.csv, failures.csv and batch_result.json under "
                     "--out-dir. multibench plot bubble --input OUT draws the figure.",
-        epilog="Exit code 3: the run finished, but a method failed, or a method named "
-               "in --methods was skipped. Without --methods, a skipped method is only "
-               "logged and marked SKIPPED in summary.csv.")
+        epilog="Exit code 3 means the run finished, but a method failed or a method "
+               "named in --methods was skipped. Without --methods, a skipped method is "
+               "only logged and marked SKIPPED in summary.csv.")
     pra.add_argument("dataset", help="dataset id = the folder name under --data-path")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pra.add_argument("--out-dir", "--out", dest="out",
@@ -2368,8 +2379,8 @@ def build_parser() -> argparse.ArgumentParser:
                                           "method variants to, e.g. rna,adt; atac_peak "
                                           "and atac_gas select by what the method reads")
     pra.add_argument("--data-path", dest="data_path",
-                     help="folder that contains the dataset folder (default: see "
-                          "`multibench config`)")
+                     help="folder that contains the dataset folder (default: shown "
+                          "by multibench config)")
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
                      help="print the plan (one row per method variant, as in "
                           "multibench scan) and the commands; nothing runs")
@@ -2379,14 +2390,14 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
                      action="store_true", help=_ATAC_MISMATCH_HELP)
     pra.add_argument("--param", "-p", action="append", metavar="METHOD:KEY=VALUE",
-                     help="one hyperparameter override, repeatable: --param "
-                          "Matilda:epochs=5 --param Matilda:lr=0.001 -> params="
-                          "{'Matilda': {'epochs': 5, 'lr': 0.001}}. VALUE is parsed "
-                          "as a scalar (5 -> int, 0.1 -> float, true/false -> bool, "
-                          "else string). Unknown METHOD -> did-you-mean error; a key "
-                          "the method does not accept is rejected naming the accepted "
-                          "ones (checked in --dry-run too); `multibench params METHOD` "
-                          "lists them (mtb.params_for). Not allowed with --skip-existing")
+                     help="one hyperparameter override, repeatable, e.g. --param "
+                          "Matilda:epochs=5 --param Matilda:lr=0.001. This is "
+                          "params={'Matilda': {'epochs': 5, 'lr': 0.001}} in Python. "
+                          "VALUE is read as an int (5), a float (0.1), true/false or "
+                          "text. An unknown METHOD gets a did-you-mean error. A key "
+                          "the method does not accept is rejected, also with "
+                          "--dry-run. multibench params METHOD lists the keys "
+                          "(mtb.params_for). Not allowed with --skip-existing")
     pra.add_argument("--columns", help="comma-separated columns of the printed table "
                                        "(plan with --dry-run, summary otherwise), or "
                                        "'all' (default: compact plan columns in table "
@@ -2407,9 +2418,9 @@ def build_parser() -> argparse.ArgumentParser:
                           "files; a first column of barcodes is aligned by barcode "
                           "(default: one batch per label file)")
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                     help="Leiden backend of the clustering sweep when scoring (default: "
-                          "see `multibench config`); leidenalg matches both stored "
-                          "tables (published and re-run)")
+                     help="Leiden backend of the clustering sweep when scoring "
+                          "(default: shown by multibench config). leidenalg matches "
+                          "both stored tables, published and re-run")
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
 
     # ---- evaluate
@@ -2419,7 +2430,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "the metric table (or writes it with --out). With --method, "
                     "--dataset and --category the table is written in the long "
                     "format (metric,value,method,dataset,category,clustering,source,"
-                    "scored_with) that `multibench plot --input` reads.")
+                    "scored_with) that multibench plot --input reads.")
     pe.add_argument("--output", required=True,
                     help="the embedding, cells x dims: .h5 (dataset 'data', the "
                          "benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
@@ -2429,18 +2440,18 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--task", choices=["clustering", "batch", "all"],
                     help="deprecated: use --metrics with the same word")
     pe.add_argument("--labels", action="append", metavar="CSV",
-                    help="cell-type labels CSV, one row per cell in the embedding's "
-                         "order (header row; column 'x', the only column, or see "
-                         "--column). A first column of barcodes is aligned to the "
-                         "obs_names of an .h5ad --output. Repeat it for several files: "
-                         "they are stacked in "
-                         "the order given and each file counts as one batch. Without "
-                         "it, --dataset/--method/--category read the dataset's label "
-                         "files (mtb.labels_for)")
+                    help="cell-type labels CSV with a header row, one row per cell "
+                         "in the embedding's order. The labels are column x, the only "
+                         "column, or --column. A first column of barcodes is aligned "
+                         "to the obs_names of an .h5ad --output. Repeat --labels for "
+                         "several files. They are stacked in the order given, and "
+                         "each file counts as one batch. Without --labels, --dataset, "
+                         "--method and --category read the dataset's label files "
+                         "(mtb.labels_for)")
     pe.add_argument("--data-path", dest="data_path",
                     help="with --dataset/--method/--category and no --labels: the "
                          "folder that holds the dataset folder (default: the "
-                         "configured data_path, see `multibench config`)")
+                         "configured data_path, shown by multibench config)")
     pe.add_argument("--batch", help="per-cell batch labels CSV; a first column of "
                                     "barcodes is aligned as for --labels. Without "
                                     "--metrics the batch metrics are then computed too")
@@ -2457,18 +2468,19 @@ def build_parser() -> argparse.ArgumentParser:
                                       "clustering, plus batch when --batch or several "
                                       "--labels are given")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                    help="Leiden backend of the clustering sweep (default: see "
-                         "`multibench config`); leidenalg matches both stored tables "
-                         "(published and re-run)")
+                    help="Leiden backend of the clustering sweep (default: shown by "
+                         "multibench config). leidenalg matches both stored tables, "
+                         "published and re-run")
     pe.add_argument("--only", help=argparse.SUPPRESS)     # deprecated spelling of --metrics
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
                                    "embedding (default X_emb; 'X' = .X)")
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")
-    pe.add_argument("--method", help="package method whose label order is used; also "
-                                     "the row name unless --name is given (needs "
-                                     "--dataset and --category)")
+    pe.add_argument("--method", help="package method whose label order is used, or "
+                                     "with --labels any row name. It is also the row "
+                                     "name unless --name is given. Needs --dataset and "
+                                     "--category")
     pe.add_argument("--name", help="row name in the long table, e.g. SCALEX_rerun "
                                    "(needs --method)")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
@@ -2483,8 +2495,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "recipes (mtb.env)",
         description="Every method runs in its own (or a shared) conda env built from "
                     "a committed lockfile or a published packed archive. Typical "
-                    "flow: `env doctor --category C` then `env install --category C "
-                    "--packed --run`.")
+                    "flow: env doctor --category C, then env install --category C "
+                    "--packed --run.")
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
     es = ev.add_parser("status", help="per method: env installed? env name, difficulty",
@@ -2498,16 +2510,15 @@ def build_parser() -> argparse.ArgumentParser:
                         description="Shared conda envs (one env serving several methods) "
                                     "and the methods in each.")
     egr.set_defaults(func=_cmd_env, _parser=egr)
-    _NAME_HELP = ("environment name (default: the env the package uses for METHOD - "
-                  "the name `multibench scan` shows in its env column and "
-                  "run/env doctor/env create use; e.g. "
-                  "`multibench env recipe Matilda` -> matilda, "
-                  "`multibench env recipe UINMF` -> scmb_r)")
+    _NAME_HELP = ("environment name. The default is the environment the package "
+                  "uses for METHOD, shown in the env column of multibench scan and "
+                  "used by run, env doctor and env create. For example, Matilda uses "
+                  "matilda and UINMF uses scmb_r")
     er = ev.add_parser("recipe", help="print the conda/pip commands that build a method's env",
                        description="Print, without running, the hand-written recipe "
                                    "commands that create the environment for METHOD, "
                                    "named as scan/run expect it (first line: a comment "
-                                   "naming that env). `env create METHOD` builds the same "
+                                   "naming that env). env create METHOD builds the same "
                                    "env from its committed lockfile - the reproducible "
                                    "path; the recipe is the transparent one.")
     er.add_argument("method", help="method id")
@@ -2516,7 +2527,7 @@ def build_parser() -> argparse.ArgumentParser:
     ey = ev.add_parser("yml", help="print/write a conda environment.yml for a method",
                        description="Emit an environment.yml for METHOD (stdout, or --out) "
                                    "whose name: is the env scan/run expect (the env "
-                                   "column of `multibench scan`).")
+                                   "column of multibench scan).")
     ey.add_argument("method", help="method id")
     ey.add_argument("--name", help=_NAME_HELP)
     ey.add_argument("--out", help="write the yml here instead of stdout")
@@ -2545,7 +2556,7 @@ def build_parser() -> argparse.ArgumentParser:
     eg = ev.add_parser("create-group", help="create one shared group env (dry run unless --run)",
                        description="Create the shared conda env GROUP; without --run only "
                                    "the commands are printed.")
-    eg.add_argument("group", help="group name (see `multibench env groups`)")
+    eg.add_argument("group", help="group name, as printed by multibench env groups")
     eg.add_argument("--run", action="store_true",
                     help="actually create the env; without it the command is a dry run")
     eg.add_argument("--force", action="store_true", help=_FORCE_HELP)
@@ -2559,8 +2570,8 @@ def build_parser() -> argparse.ArgumentParser:
     edoc.add_argument("--category", help=_CATEGORY_HELP)
     edoc.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     edoc.add_argument("--strict", action="store_true",
-                      help="exit 1 when any env is missing (for scripts: "
-                           "`env doctor --strict || env install ...`)")
+                      help="exit 1 when any env is missing. For scripts: env doctor "
+                           "--strict || env install ...")
     edoc.set_defaults(func=_cmd_env, _parser=edoc)
     ei = ev.add_parser(
         "install", help="build every needed env from its lockfile or packed archive "

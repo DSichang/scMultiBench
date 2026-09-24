@@ -155,8 +155,12 @@ def test_fetch_outputs_names_the_url(tmp_path, monkeypatch, dead, why):
         mtb.data.fetch_outputs("D11", data_path=root, quiet=True)
     msg = str(e.value)
     assert msg.startswith(f"Could not download the stored outputs of D11 from {url} ")
-    assert why in msg and "Get the data" in msg
-    assert str(root / "outputs" / "D11") in msg
+    # the archive's own layout decides where it lands: the message names the
+    # file that must exist, not the dataset recipe of 'Get the data'
+    dest = root / "outputs" / "D11"
+    assert why in msg and "Get the data" not in msg
+    assert msg.endswith(f"unpack it into {dest}, so that {dest / 'batch_result.json'} "
+                        f"exists.")
     assert not root.exists()
 
 

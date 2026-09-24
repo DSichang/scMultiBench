@@ -140,8 +140,8 @@ def test_name_needs_a_package_method(diag, capsys):
                    name="mine")
     err = capsys.readouterr().err
     assert rc == 1
-    assert "unknown method 'uniPort_rerun'" in err and "multibench list" in err
-    assert "With --name, --method must be a package method" in err
+    assert ("error: With --name, --method must be a package method. uniPort_rerun is "
+            "not one. Did you mean uniPort? multibench list shows the methods.") in err
 
 
 def test_name_needs_method(diag, capsys):
@@ -168,8 +168,8 @@ def test_evaluate_help_names_both_flags():
     pe = sub.choices["evaluate"]
     helps = {a.option_strings[0]: a.help for a in pe._actions if a.option_strings}
     assert helps["--method"].startswith(
-        "package method whose label order is used; also the row name unless --name "
-        "is given")
+        "package method whose label order is used, or with --labels any row name. It "
+        "is also the row name unless --name is given")
     assert helps["--name"].startswith("row name in the long table, e.g. SCALEX_rerun")
 
 
@@ -204,6 +204,14 @@ def test_no_cli_variant_of_config_hint_has_a_backtick():
             if name == "hint" and any("`" in t for t in _strings(node.args[1])):
                 found.append(f"{path.relative_to(_PKG)}:{node.lineno}")
     assert found == []
+
+
+def test_no_help_text_of_any_parser_has_a_backtick():
+    """The --help of every command and subcommand, as a shell prints it."""
+    from tests.test_content_scope import _walk_parsers
+    bad = [(name, line.strip()) for name, p in _walk_parsers(cli.build_parser())
+           for line in p.format_help().splitlines() if "`" in line]
+    assert bad == []
 
 
 def test_no_runtime_string_of_cli_py_has_a_backtick():
@@ -274,14 +282,12 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
     sc = _quiet(mtb.scan, "LUNG_ids", "diagonal", methods=["GLUE"], data_path=root,
                 verbose=False).iloc[0]
     assert sc["reason"] == (
-        f"The environment {sc['env']} is Linux-only and cannot be installed on this "
-        f"computer. GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
+        f"Environment {sc['env']} runs only on Linux, not on this computer. GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
         f"names, for example peak_0. Rename them to chr:start-end, or pass "
         f"allow_atac_mismatch=True to run GLUE anyway.")
     moetm = _quiet(mtb.scan, "D11", "vertical", methods=["moETM"], verbose=False).iloc[0]
     assert moetm["reason"] == (
-        f"The environment {moetm['env']} is Linux-only and cannot be installed on this "
-        f"computer. moETM needs an NVIDIA GPU, and this computer has none. See "
+        f"Environment {moetm['env']} runs only on Linux, not on this computer. moETM needs an NVIDIA GPU, and this computer has none. See "
         f"method_info(\"moETM\")[\"requires_gpu\"].")
     assert ";" not in moetm["reason"]
 

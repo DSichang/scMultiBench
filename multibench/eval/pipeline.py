@@ -314,13 +314,12 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
                 f"columns: {list(map(str, adata.obs.columns))}) nor an existing "
                 f"file")
     if isinstance(x, (str, Path)) and column is None:
-        vals, first = io.read_labels_ids(x)
+        vals, first = io.read_labels_ids(x, what=what, pick=_pick(what))
         unique = ids is not None and pd.Index(ids).is_unique
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=Path(x).name,
             target="the output", order="the rows of the output",
-            no_ids="the output repeats cell ids" if ids is not None
-            else "the output has no cell ids", stacklevel=5)[0]
+            no_ids=_no_ids(ids), stacklevel=5)[0]
     if _carries_ids(x):
         if ids is not None:
             return io.align_vector(x, ids, what=what, column=column)
@@ -331,6 +330,48 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
             # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
             UserWarning, stacklevel=4)
     return io.as_vector(x, what=what, column=column)
+
+
+def _pick(what: str) -> str:
+    """How to fix a label file with several columns and no clear label column."""
+    py = "Keep one column in the file, or the cell ids and one column."
+    return config.hint(py, "Pass --column <name>.") if what == "labels" else py
+
+
+def _no_ids(ids) -> str:
+    return ("the output repeats cell ids" if ids is not None
+            else "the output has no cell ids")
+
+
+def _stack_label_files(files, ids):
+    """Several label files, stacked in the given order, and each row's file (1, 2, ...).
+
+    When every file has a first column of cell ids, the stacked rows are
+    aligned to ``ids`` by those columns, as a single file is
+    (:func:`multibench.eval.io.by_id_column`); the file of origin moves with
+    its rows. Otherwise the rows stay in file order, and a first column that
+    looks like cell ids gets the positional warning.
+    """
+    read = [io.read_labels_ids(f, what="labels", pick=_pick("labels")) for f in files]
+    vals = np.concatenate([np.asarray(v) for v, _ in read])
+    origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(read)])
+    names = [Path(f).name for f in files]
+    unique = ids is not None and pd.Index(ids).is_unique
+    order = "the rows of the output"
+    if all(first is not None for _, first in read):
+        name = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        # a caller of evaluate is 5 frames up: by_id_column, this, evaluate, its wrapper
+        pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
+            [first for _, first in read], ignore_index=True), ids if unique else None,
+            what="labels", name=name, target="the output", order=order,
+            no_ids=_no_ids(ids), stacklevel=5)
+        return vals[pos], origin[pos]
+    for (v, first), name in zip(read, names):
+        io.by_id_column(v, first, None, what="labels", name=name, target="the output",
+                        order=order, stacklevel=5, no_ids=(
+                            "the other label files have none" if unique
+                            else _no_ids(ids)))
+    return vals, origin
 
 
 def _labels_from_dict(d: dict, label_order) -> list:
@@ -790,18 +831,22 @@ def evaluate(
     ``metrics`` selection that has no batch metric changes nothing, and a
     ``UserWarning`` says so.
 
-    **Cell order.** Arrays, lists and files are matched positionally to the
-    rows of ``output``. A ``Series`` / ``DataFrame`` with a non-default
-    index is aligned by cell id when ``output`` carries ids (an AnnData, or
-    a DataFrame with a non-default index): rows are reindexed to the
-    output's order, and a missing or extra id raises ``ValueError`` naming
-    the first ones.
+    **Cell order.** Arrays, lists and label files without a cell-id column
+    are matched by position to the rows of ``output``. A ``Series`` /
+    ``DataFrame`` with a non-default index is aligned by cell id when
+    ``output`` carries ids (an AnnData, or a DataFrame with a non-default
+    index): rows are reindexed to the output's order, and a missing or
+    extra id raises ``ValueError`` naming the first ones.
 
     A CSV whose first column holds the output's cell ids, as
     ``obs[["batch"]].to_csv(path)`` writes it, is aligned by that column in
-    the same way. A first column where only some values are cell ids
-    raises ``ValueError``. Text with no cell id gives a match by position,
-    with a ``UserWarning``.
+    the same way, and so is a list of such files. A first column where only
+    some values are cell ids raises ``ValueError``.
+
+    A first column of text that holds none of the cell ids is matched by
+    position, with a ``UserWarning``. Numbers there, such as R's row
+    numbers, are matched by position unless they are exactly the output's
+    cell ids.
 
     When ``output`` is a bare array there is nothing to align against: the
     Series, or a CSV with text in its first column, is matched positionally
@@ -882,13 +927,11 @@ def evaluate(
     ids = _cell_ids(output)
     emb = np.asarray(io.as_matrix(output, obsm=obsm))
     if _is_label_path_list(labels):
-        # several label files: concatenate in the given order; remember the
-        # sizes so the file of origin can serve as the batch below
-        parts = [np.asarray(io.read_labels(p)) for p in labels]
-        ct = np.concatenate(parts)
+        # several label files: stacked in the given order (or aligned by their
+        # id columns); the file of origin can serve as the batch below
+        ct, origin = _stack_label_files(labels, ids)
     else:
-        parts = None
-        ct = _obs_or_vector(labels, adata, what="labels", ids=ids)
+        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids), None
     # Orient to cells x dims. read_embedding() already does this for h5 inputs;
     # do the same for everything else so a caller can pass run().output (dims x
     # cells for many methods) directly. Transpose only when the label count
@@ -910,7 +953,7 @@ def evaluate(
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids)
     elif batch_from_files and group in {"batch", "all"}:
         # batch = which label file each cell came from (1-based, as run_all)
-        ba = np.concatenate([np.full(len(v), i + 1) for i, v in enumerate(parts)])
+        ba = origin
     else:
         # clustering metrics need a batch_key but it is a no-op there, so a
         # constant vector is acceptable when no batch labels are supplied.

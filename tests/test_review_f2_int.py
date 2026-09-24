@@ -185,7 +185,7 @@ def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
 def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
     inp = mtb.inputs_for("D28", "diagonal", "Seurat_v5")
     want = ("Seurat_v5/D28/diagonal: Seurat_v5 needs RNA and ATAC from the same cells "
-            "as its bridge; these files hold different cells (6,408 and 4,606, 0 shared)")
+            "as its bridge. These files share 0 of 6,408 and 4,606 cells")
     for dry in (True, False):
         with pytest.raises(ValueError) as e:
             mtb.run("Seurat_v5", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),

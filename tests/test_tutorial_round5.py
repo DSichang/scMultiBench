@@ -109,9 +109,10 @@ def test_category_replacement_prints_the_download_error_as_a_sentence(download_f
         "Could not download the stored outputs of D11 from https://"), line
     assert "(HTTP 404)" in line
     # the package's message ends the line; no parenthesis wraps it
-    assert line.endswith("under 'Get the data' in the installation guide."), line
+    dest = download_fails / "data" / "outputs" / "D11"
+    assert line.endswith(f"unpack it into {dest}, so that "
+                         f"{dest / 'batch_result.json'} exists."), line
     assert not line.endswith(")"), line
-    assert str(download_fails / "data" / "outputs" / "D11") in line
 
 
 def test_end_to_end_replacement_prints_the_download_error_as_a_sentence(download_fails, capsys):
@@ -124,7 +125,7 @@ def test_end_to_end_replacement_prints_the_download_error_as_a_sentence(download
     assert line.startswith(
         "replacement: the package's stored scores for Matilda. OSError from fetch_outputs: "
         "Could not download the stored outputs of D11 from https://"), line
-    assert line.endswith("under 'Get the data' in the installation guide."), line
+    assert line.endswith("batch_result.json exists."), line
 
 
 @pytest.mark.parametrize("src", [GEN.REPLACEMENT_FN, "E2E"], ids=["category", "end_to_end"])

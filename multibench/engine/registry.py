@@ -204,16 +204,21 @@ def check_method(method_id: str) -> str:
     ids = [s.id for s in load()]
     if method_id in ids:
         return method_id
-    hint = difflib.get_close_matches(str(method_id), ids, n=1, cutoff=0.6)
-    if not hint:
-        # case-insensitive exact match is a better hint than fuzzy distance
-        lower = {i.lower(): i for i in ids}
-        if str(method_id).lower() in lower:
-            hint = [lower[str(method_id).lower()]]
+    hint = closest_method(method_id)
     raise KeyError(
         f"unknown method {method_id!r}"
-        + (f"; did you mean {hint[0]!r}?" if hint else "")
+        + (f"; did you mean {hint!r}?" if hint else "")
         + "; see " + config.hint("mtb.list_methods()", "multibench list"))
+
+
+def closest_method(method_id: str) -> str | None:
+    """The registry id closest to ``method_id``, or ``None`` when none is close."""
+    ids = [s.id for s in load()]
+    hint = difflib.get_close_matches(str(method_id), ids, n=1, cutoff=0.6)
+    if hint:
+        return hint[0]
+    # case-insensitive exact match is a better hint than fuzzy distance
+    return {i.lower(): i for i in ids}.get(str(method_id).lower())
 
 
 def check_id_list(value, name: str):

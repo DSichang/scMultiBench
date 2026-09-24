@@ -102,8 +102,8 @@ def test_scan_has_no_setup_note_for_the_checked_bridge_requirement(root):
     assert "setup:" not in row["caveat"]
     # the requirement is a file check now (study round 2, M15), not a caveat
     assert not row["files_ok"]
-    assert "needs RNA and ATAC from the same cells as its bridge; these files hold " \
-        "different cells" in row["reason"]
+    assert "needs RNA and ATAC from the same cells as its bridge. These files share " \
+        in row["reason"]
     assert mtb.method_info("Seurat_v5")["setup_hint"]           # still in method_info
 
 

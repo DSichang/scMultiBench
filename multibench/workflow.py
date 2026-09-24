@@ -91,6 +91,10 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     **Record order.** ``methods=`` only filters: the kept records stay in the
     order the tree ran them, not the order of ``methods``.
 
+    **Moved folders.** A record whose ``out_dir`` does not exist is pointed
+    at the folder of the same name next to ``batch_result.json``. So a
+    ``fetch_outputs`` tree or a copied ``run_all`` folder can be re-scored.
+
     See Also
     --------
     mtb.BatchResult : the object returned.
@@ -110,6 +114,12 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
             raise KeyError(f"no record for {unknown} in {d}; methods in the "
                            f"tree: {have}")
         recs = [r for r in recs if r.get("method") in set(methods)]
+    for r in recs:
+        # a tree from another host or another folder: the method's output
+        # folder sits next to batch_result.json under the same name
+        od = r.get("out_dir")
+        if od and not Path(od).exists() and (d / Path(od).name).is_dir():
+            r["out_dir"] = str(d / Path(od).name)
     lp = d / "long.csv"
     if lp.exists():
         lng = pd.read_csv(lp)
@@ -541,12 +551,14 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                 who = config.hint(
                     (f"mtb.method_info({method!r})" if method else "method_info(m)")
                     + "['setup_hint']",
-                    f"multibench info {method or 'METHOD'}, setup_hint")
-                name = f"{method}'s script" if method else f"script {ep.name}"
+                    f"multibench info {method or 'METHOD'}")
+                name = f"{method}'s script" if method else f"The script {ep.name}"
                 files = " and ".join(gone)
-                return (f"{name} imports {files}, which the public scMultiBench "
-                        f"repository does not include; put {'a ' if len(gone) == 1 else ''}"
-                        f"{files} next to {ep.name} ({who})")
+                one = len(gone) == 1
+                return (f"{name} imports {files}. The public scMultiBench repository "
+                        f"does not include {'it' if one else 'them'}. Put "
+                        f"{'a ' if one else ''}{files} next to {ep.name}. {who} shows "
+                        f"how.")
             return ""
     return ""            # no checkout yet: run()/run_all() fetch one
 
@@ -600,8 +612,7 @@ def _env_hint(env: str, method: str, category: str | None) -> str:
     says what this computer can do instead.
     """
     if _runner.linux_only_sentence():
-        return (f"The environment {env} is Linux-only and cannot be installed on this "
-                f"computer.")
+        return f"Environment {env} runs only on Linux, not on this computer."
     alt = f" (or --category {category})" if category else ""
     return (f"conda env {env!r} is not installed. Run "
             f"multibench env install --methods {method} --packed --run{alt}. "
@@ -1125,7 +1136,7 @@ def scan(dataset: str, category: str | None = None, *,
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command
       (``multibench env install --methods X --packed --run``). On macOS
-      and Windows it says the environment is Linux-only.
+      and Windows it says the environment runs only on Linux.
     - ``env_ok`` on a GPU-only method - when the upstream script calls CUDA
       unconditionally, ``env_ok`` also checks for an NVIDIA GPU
       (``mtb.env.host_has_gpu()``). Without one, ``env_reason`` gives the
@@ -1563,8 +1574,9 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None):
             # combination look like 'no label file matched'
             return names, None, [{"order": names,
                                   "error": f"{type(e).__name__}: {str(e)[:300]}"}]
-        return names, val, [{"order": names,
-                             "ARI": round(float(val["Value"]["ARI"]), 4)}]
+        # metrics= may leave ARI out: the one order needs no ranking
+        ari = round(float(val["Value"]["ARI"]), 4) if "ARI" in val.index else None
+        return names, val, [{"order": names, "ARI": ari}]
 
     # Ranking orderings needs only ARI, and the Leiden sweep behind ARI depends
     # on the embedding alone, not on the label vector. So sweep once, reuse it
@@ -2157,8 +2169,8 @@ class BatchResult:
         has instead of the file-of-origin rule, with your own labels, or with
         a different metric selection.
 
-        **Arguments.** A ``labels`` array, list or CSV follows the embedding
-        rows. A ``batch`` array follows the cell order of ``run_all(batch=)``,
+        **Arguments.** A ``labels`` array, list or plain CSV follows the
+        embedding rows. A ``batch`` array follows the cell order of ``run_all(batch=)``,
         or the embedding rows when ``labels`` is matched by position. A CSV
         path is read like a label file. The batch is recorded as
         ``batch_source='user'``.
@@ -2181,18 +2193,18 @@ class BatchResult:
 
         **Record status.** A method that emits no embedding (graph-only) is
         marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. ``SKIPPED``, ``FAIL``
-        and ``TIMEOUT`` records are kept as they are. A record
-        whose output file is gone (a deleted ``out_dir``) or whose new scoring
-        fails (wrong ``batch`` length, say - ``batch has N entries, embedding
-        has M cells``) becomes ``RUN_OK_EVAL_FAILED`` with the reason in
-        ``error``.
+        and ``TIMEOUT`` records are kept as they are. A record whose output
+        file is gone becomes ``RUN_OK_EVAL_FAILED``, with the reason in
+        ``error``. So does a record whose new scoring fails, for example on a
+        ``batch`` of the wrong length (``batch has N entries, embedding has M
+        cells``).
 
         **Other hosts.** Records keep ``out_dir`` and ``data_path`` as
-        ``run_all`` received them - relative if you passed a relative path.
-        A tree fetched or copied from another host, or re-scored from another
-        working directory, re-scores only where those folders exist: a
-        missing output folder gives ``RUN_OK_EVAL_FAILED``, a missing
-        ``data_path`` (without ``labels=``) ``RUN_OK_NO_LABEL_MATCH``.
+        ``run_all`` received them, relative when you passed a relative path.
+        ``mtb.load_batch`` points a missing ``out_dir`` at the folder of the
+        same name next to ``batch_result.json``. A ``data_path`` that does
+        not exist here gives ``RUN_OK_NO_LABEL_MATCH`` unless ``labels=`` is
+        given.
 
         **Persisting.** ``mtb.load_batch`` keeps returning the original result
         until the new one is saved.
@@ -2400,7 +2412,7 @@ def _error_tail(error, width: int = 200) -> str:
     # clipped at a word boundary: the tail starts with a whole word
     tail = last[-(width - 3):]
     space = tail.find(" ")
-    if 0 <= space < len(tail) - 1:
+    if last[-(width - 3) - 1] != " " and 0 <= space < len(tail) - 1:
         tail = tail[space + 1:]
     return "..." + tail
 
@@ -2576,9 +2588,7 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     return ids if ids and len(set(ids)) == len(ids) else None
 
 
-def _n_ids(n: int) -> str:
-    """``'1 id'`` or ``'2,864 ids'``."""
-    return "1 id" if n == 1 else f"{n:,} ids"
+_n_ids = _eio._n_ids
 
 
 #: the order an argument of run_all / rescore follows when it is matched by position
@@ -2601,9 +2611,12 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     warning, which is raised one call deeper than the Series warning.
     """
     from .eval.pipeline import _carries_ids
-    order = order or f"the order of mtb.labels_for({dataset!r})"
+    order = order or config.hint(f"the order of mtb.labels_for({dataset!r})",
+                                 f"the order of the label files of {dataset}")
     if isinstance(x, (str, Path)):
-        vals, first = _eio.read_labels_ids(x)
+        vals, first = _eio.read_labels_ids(
+            x, what=what, pick="Keep one column in the file, or the cell ids and one "
+                                "column.")
         if first is None:
             return np.asarray(vals), False
         return _eio.by_id_column(

@@ -385,7 +385,7 @@ def test_env_name_help_shows_resolved_example():
     subs = next(a for a in env._actions if a.dest == "env_cmd").choices
     for name in ("recipe", "yml", "create"):
         act = next(a for a in subs[name]._actions if a.dest == "name")
-        assert "the name `multibench scan` shows in its env column" in act.help
+        assert "shown in the env column of multibench scan" in act.help
         assert "matilda" in act.help and "default_env_name" not in act.help
 
 

@@ -33,10 +33,10 @@ class AmbiguousVariantError(ValueError, KeyError):
     **What to do.** Pass ``modalities=`` (and ``category=``) exactly as the
     message shows.
 
-    **Catching it.** It is a ``ValueError`` - the package reserves
-    ``KeyError`` for unknown ids, such as a typo in a method name - that also
-    derives from ``KeyError``, so ``except KeyError`` handlers catch it too;
-    ``str(exc)`` is the plain message, without ``KeyError`` quoting.
+    **Catching it.** It is a ``ValueError`` and also a ``KeyError``, so
+    ``except KeyError`` catches it too. The package uses ``KeyError`` for
+    unknown ids, such as a mistyped method name. ``str(exc)`` is the plain
+    message, without ``KeyError`` quoting.
 
     See Also
     --------

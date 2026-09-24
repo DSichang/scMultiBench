@@ -110,7 +110,8 @@ def test_zero_row_filter_warns(result_dir):
                                   result_path=result_dir)
     assert len(df) == 0 and list(df.columns) == COLS
     msg = str(rec[0].message)
-    assert "rerun has 1 dataset(s) (D11)" in msg and "pass source='rerun'" in msg
+    assert msg.endswith(". The re-run tables hold 1 dataset (D11). Pass source='rerun' "
+                        "or 'both'.")
     # a KNOWN metric absent from the tables: still the empty-frame-plus-warning
     with pytest.warns(UserWarning, match="kBET"):
         df = results.load_results("vertical", dataset="D11", metrics=["kBET"],

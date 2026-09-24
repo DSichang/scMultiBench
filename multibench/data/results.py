@@ -717,7 +717,8 @@ def load_results(
     **Empty results.** A known method or metric with no rows gives an empty
     frame and a ``UserWarning``, not an error. Under ``source="published"``
     the warning also says whether the re-run sweeps hold that method
-    (``"rerun has 1 dataset(s) ... pass source='rerun'"``).
+    (``"The re-run tables hold 1 dataset (D11). Pass source='rerun' or
+    'both'."``).
 
     **Clustering variants.** A result directory named ``<method>_louvain`` /
     ``<method>_kmeans`` is that variant: it is reported under the method's
@@ -938,8 +939,9 @@ _ONE_METHOD_WARNING = r"The (published|re-run) table for .+? has one method, "
 
 
 def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
-    """'; rerun has N dataset(s) (...) - pass source="rerun"' when the re-run
-    sweeps hold rows for a method the published tables lack, else ''."""
+    """'. The re-run tables hold N datasets (...). Pass source="rerun" ...'
+    when the re-run sweeps hold rows for a method the published tables lack,
+    else ''."""
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -951,11 +953,12 @@ def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
     if datasets:
         cov = cov[cov["dataset"].astype(str).isin([str(d) for d in datasets])]
     if cov.empty:
-        return ("; results_coverage(source='both') lists no rows for it in any "
-                "source either")
+        return (". results_coverage(source='both') lists no rows for it in any "
+                "source either.")
     ds = sorted(cov["dataset"].astype(str).unique())
-    return (f"; rerun has {len(ds)} dataset(s) ({', '.join(ds)}) - pass "
-            f"source='rerun' (or 'both')")
+    return (f". The re-run tables hold {len(ds)} dataset{'' if len(ds) == 1 else 's'} "
+            f"({', '.join(ds)}). "
+            + config.hint("Pass source='rerun' or 'both'.", "Pass --source rerun."))
 
 
 def _list_datasets(category, base: Path, source: str, clustering: str) -> list[str]:

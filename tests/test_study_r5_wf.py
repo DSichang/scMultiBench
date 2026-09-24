@@ -500,14 +500,14 @@ def test_summary_reason_comes_from_the_record_also_for_older_folders(tmp_path):
 
 
 def test_exit_code_texts_name_the_methods_rule(capsys):
-    rule = ("a method failed, or a method named in --methods was skipped. Without "
+    rule = ("a method failed or a method named in --methods was skipped. Without "
             "--methods, a skipped method is only logged and marked SKIPPED in "
             "summary.csv.")
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])
     assert rule in " ".join(capsys.readouterr().out.split())
     doc = " ".join(cli.__doc__.split())
-    assert ("but a method failed, or a method named in ``--methods`` was skipped. "
+    assert ("but a method failed or a method named in ``--methods`` was skipped. "
             "Without ``--methods``, a skipped method is only logged and marked "
             "``SKIPPED`` in ``summary.csv``.") in doc
     assert "failed or was skipped" not in doc

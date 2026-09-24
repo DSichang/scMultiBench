@@ -58,11 +58,11 @@ def _download(url: str) -> Path:
     return Path(tgz)
 
 
-def _download_or_explain(url: str, what: str, dest: Path) -> Path:
+def _download_or_explain(url: str, what: str, by_hand: str) -> Path:
     """:func:`_download`, with a failure raised as ``OSError`` naming ``url``.
 
     ``what`` names the download in the message ("D46", "the stored outputs
-    of D11"); ``dest`` is the folder the archive is unpacked into by hand.
+    of D11"); ``by_hand`` is the sentence that says how to get it by hand.
     """
     try:
         return _download(url)
@@ -75,8 +75,7 @@ def _download_or_explain(url: str, what: str, dest: Path) -> Path:
         err = e
     raise OSError(
         f"Could not download {what} from {url} ({why}). Check the network or "
-        f"proxy, or download the file by hand and unpack it into {dest}, as shown "
-        "under 'Get the data' in the installation guide.") from err
+        f"proxy, or {by_hand}") from err
 
 
 def _output_urls() -> dict:
@@ -159,7 +158,9 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
         url = f"{RELEASE_URL}/{ds}.tar.gz"
         if not quiet:
             print(f"downloading {ds} ({AVAILABLE[ds]}) from {url} ...", flush=True)
-        tgz = _download_or_explain(url, ds, root)
+        tgz = _download_or_explain(
+            url, ds, f"download the file by hand and unpack it into {root}, as shown "
+                     "under 'Get the data' in the installation guide.")
         root.mkdir(parents=True, exist_ok=True)
         # extract to a scratch dir first and move into place atomically, so an
         # interrupted download/extract can never masquerade as a complete
@@ -238,9 +239,9 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     ``mtb.load_batch(out, methods=[...])``.
 
     **Idempotence.** When ``<data_path>/outputs/<dataset>/batch_result.json``
-    exists nothing is downloaded. An empty leftover folder is replaced; a
-    non-empty one without ``batch_result.json`` raises ``RuntimeError`` -
-    remove it and call again.
+    exists nothing is downloaded. An empty leftover folder is replaced. A
+    non-empty one without ``batch_result.json`` raises ``RuntimeError``.
+    Remove it and call again.
 
     **Atomic extraction.** The archive is unpacked into a temporary folder
     and then moved into place. The archive may be rooted at the tree itself
@@ -274,7 +275,10 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
         if not quiet:
             print(f"downloading run_all outputs for {dataset} from {urls[dataset]} ...",
                   flush=True)
-        tgz = _download_or_explain(urls[dataset], f"the stored outputs of {dataset}", dest)
+        tgz = _download_or_explain(
+            urls[dataset], f"the stored outputs of {dataset}",
+            f"download the file by hand and unpack it into {dest}, so that "
+            f"{dest / 'batch_result.json'} exists.")
         outputs.mkdir(parents=True, exist_ok=True)
         tmp = Path(_tempfile.mkdtemp(dir=outputs, prefix=f".{dataset}-"))
         try:

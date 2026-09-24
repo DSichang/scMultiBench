@@ -189,7 +189,7 @@ def test_leiden_flavor_help_names_both_stored_tables(cmd, capsys):
     with pytest.raises(SystemExit):
         cli.main([cmd, "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    assert "leidenalg matches both stored tables (published and re-run)" in text
+    assert "leidenalg matches both stored tables, published and re-run" in text
     assert "backend of the published tables" not in text
 
 

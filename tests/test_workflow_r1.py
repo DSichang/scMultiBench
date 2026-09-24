@@ -153,8 +153,7 @@ def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no
     df = mtb.scan("D11", "vertical", methods=["totalVI"])
     out = capsys.readouterr().out
     r = df.iloc[0]
-    assert r["env_reason"] == (f"The environment {r['env']} is Linux-only and cannot be "
-                               f"installed on this computer.")
+    assert r["env_reason"] == f"Environment {r['env']} runs only on Linux, not on this computer."
     assert "multibench env install" not in r["reason"]
     assert out.count("[scan]") == 1 and W.LINUX_ONLY_SUMMARY in out
 

@@ -118,7 +118,9 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
        unique (an index / barcode column);
     5. otherwise the file is ambiguous and a ``ValueError`` asks for
        ``column=``: a silent pick could score the wrong column without any
-       error.
+       error. When the first of two columns is an index that repeats a
+       barcode (text without a header, or 90% distinct), the ``ValueError``
+       names the repeated ids instead.
 
     Parameters
     ----------
@@ -142,36 +144,60 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     return read_labels_ids(path, column)[0]
 
 
-def read_labels_ids(path: Path | str, column: str | None = None):
+def read_labels_ids(path: Path | str, column: str | None = None, *,
+                    what: str | None = None, pick: str | None = None):
     """:func:`read_labels`, plus the first column it left out.
 
     Returns ``(values, first)``. ``first`` is the file's first column (a
-    ``pandas.Series``) when rule 2 picked ``x`` from a file whose first
-    column is another one, or rule 4 dropped a unique first column; it may
-    hold cell ids. Otherwise ``first`` is ``None``.
+    ``pandas.Series``) when ``column`` or rule 2 picked another column, or
+    rule 4 dropped a unique first column; it may hold cell ids. Otherwise
+    ``first`` is ``None``.
+
+    ``what`` ("labels", "batch") starts the messages of the errors; ``pick``
+    is the sentence an ambiguous file's error ends with, for callers that
+    have no ``column`` argument (default: pass ``column=``).
     """
     path = _require_file(path, "labels file")
     d = pd.read_csv(path, sep=_sep_for(path))
     cols = [str(c) for c in d.columns]
+    first = d.iloc[:, 0] if d.shape[1] > 1 else None
     if column is not None:
         if column not in d.columns:
             raise ValueError(
                 f"{path}: no column named {column!r}; columns are {cols}")
-        return d[column].to_numpy(), None
+        other = first is not None and str(d.columns[0]) != str(column)
+        return d[column].to_numpy(), (first if other else None)
     if "x" in d.columns:
-        extra = d.shape[1] > 1 and str(d.columns[0]) != "x"
-        return d["x"].to_numpy(), (d.iloc[:, 0] if extra else None)
+        extra = first is not None and str(d.columns[0]) != "x"
+        return d["x"].to_numpy(), (first if extra else None)
     if d.shape[1] == 1:
         return d.iloc[:, 0].to_numpy(), None
-    first_unique = d.shape[1] > 1 and d.iloc[:, 0].is_unique
+    first_unique = first.is_unique
     if d.shape[1] == 2 and first_unique:
         # index/barcode column + one label column: the obs-style export
-        return d.iloc[:, -1].to_numpy(), d.iloc[:, 0]
+        return d.iloc[:, -1].to_numpy(), first
+    # barcodes with a repeat, not a sample or batch column: an index written
+    # without a header (pandas' and R's to_csv), or text that is 90% distinct
+    index_like = str(d.columns[0]).startswith("Unnamed: ") or (
+        len(first) >= 10 and first.nunique() >= 0.9 * len(first))
+    if d.shape[1] == 2 and _looks_like_ids(first) and index_like:
+        dup = pd.Index(first[first.duplicated()].astype(str)).unique()
+        raise ValueError(
+            f"{what or path}: the first column of {path.name} repeats "
+            f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
+    if pick:
+        raise ValueError(f"{what or path}: {path.name} has {d.shape[1]} columns {cols}, "
+                         f"and none is named x. {pick}")
     hint = (" The first column looks like cell barcodes (all unique); write the "
             "CSV with index=False to drop it." if first_unique else "")
     raise ValueError(
         f"{path}: {d.shape[1]} columns {cols}; cannot tell which holds the "
         f"labels - pass column=<name>.{hint}")
+
+
+def _n_ids(n: int) -> str:
+    """``'1 id'`` or ``'2,864 ids'``."""
+    return "1 id" if n == 1 else f"{n:,} ids"
 
 
 def _looks_like_ids(col: pd.Series) -> bool:
@@ -190,14 +216,19 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     the target's cell ids (``None`` when it has none, ``no_ids`` says why).
     Returns ``(vector, aligned)``:
 
-    - every value of ``first`` is a cell of the target: the file is aligned
-      by it, and a repeated id or a cell without a row raises ``ValueError``;
-    - some values are cells and others are not: ``ValueError`` naming a few
-      of the others;
-    - no value is a cell, or the target has no ids: the file is matched by
-      position (``aligned`` False), with a ``UserWarning`` when ``first``
-      holds text that is not a number. ``order`` names the order the rows
-      must then follow.
+    - a first column of text whose values are all cells of the target: the
+      file is aligned by it, and a repeated id or a cell without a row
+      raises ``ValueError``;
+    - text where some values are cells and others are not: ``ValueError``
+      naming a few of the others;
+    - text with no cell, or a target without ids: the file is matched by
+      position (``aligned`` False), with a ``UserWarning`` when the column
+      is unique text (a repeated column such as a sample column is not an
+      id column). ``order`` names the order the rows must then follow;
+    - numbers: R's row numbers ``1..n`` or pandas' ``0..n-1``. They align
+      the file only when they are exactly the target's ids in some order
+      (an AnnData with the default ``obs_names``); otherwise the file is
+      matched by position, silently, as before.
     """
     vals = np.asarray(values)
     if first is None:
@@ -206,7 +237,7 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     by_position = (f"The file is matched by position. Check that its rows follow "
                    f"{order}")
     if ids is None:
-        if text:
+        if text and first.is_unique:
             warnings.warn(f"The first column of {name} looks like cell ids, but "
                           f"{no_ids}. {by_position}.", UserWarning,
                           stacklevel=stacklevel)
@@ -214,8 +245,12 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     keys = pd.Index([str(v) for v in first])
     ids = pd.Index([str(i) for i in ids])
     known = keys.isin(ids)
+    if not text:
+        if known.all() and keys.is_unique and len(keys) == len(ids):
+            return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
+        return vals, False
     if not known.any():
-        if text:
+        if first.is_unique:
             warnings.warn(f"The first column of {name} looks like cell ids, but none "
                           f"is a cell of {target}. {by_position}, or use the barcodes "
                           f"of {target} in that column.", UserWarning,
@@ -228,9 +263,9 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
             f"{name} are not cells of {target} (first: {_first(other, 3)}). Use the "
             f"barcodes of {target}, or drop that column when the rows follow {order}.")
     if not keys.is_unique:
-        dup = keys[keys.duplicated()]
+        dup = keys[keys.duplicated()].unique()
         raise ValueError(
-            f"{what}: the first column of {name} repeats {len(dup):,} id(s) (first: "
+            f"{what}: the first column of {name} repeats {_n_ids(len(dup))} (first: "
             f"{_first(dup, 3)}). Give each cell one row.")
     missing = ids.difference(keys, sort=False)
     if len(missing):

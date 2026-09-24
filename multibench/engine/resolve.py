@@ -1062,8 +1062,8 @@ def _renamed_peak_roles(method: str | None, category: str | None, resolved) -> l
 _SAME_CELL_ROLES = {"Seurat_v5": ("rna", "atac_peak")}
 #: ``.format(method=, n_a=, n_b=, shared=)`` template of the file-check failure
 #: when those two files hold different barcode sets
-SAME_CELLS_REASON = ("{method} needs RNA and ATAC from the same cells as its bridge; these "
-                     "files hold different cells ({n_a:,} and {n_b:,}, {shared:,} shared)")
+SAME_CELLS_REASON = ("{method} needs RNA and ATAC from the same cells as its bridge. These "
+                     "files share {shared:,} of {n_a:,} and {n_b:,} cells")
 #: ``.format(gas=, peak=, n_gas=, n_peak=, shared=)``: a diagonal gene-activity
 #: file whose cells are not the cells of the peak file next to it
 GAS_OTHER_CELLS_REASON = ("{gas} and {peak} hold different cells ({n_gas:,} and "

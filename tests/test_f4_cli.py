@@ -162,10 +162,10 @@ def test_exit_code_3_is_documented_in_both_helps(capsys):
         cli.main(["--help"])
     top = " ".join(capsys.readouterr().out.split())
     # R5-03: only a skip of a method named in --methods sets exit 3
-    assert ("3 run-all finished, but a method failed, or a method named in --methods "
-            "was skipped. Without --methods, a skipped method is only logged and "
-            "marked SKIPPED in summary.csv.") in top
-    assert "``3`` ``run-all``" in cli.__doc__
+    assert ("3 means run-all finished, but a method failed or a method named in "
+            "--methods was skipped. Without --methods, a skipped method is only logged "
+            "and marked SKIPPED in summary.csv.") in top
+    assert "``3`` means ``run-all``" in " ".join(cli.__doc__.split())
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])
     text = capsys.readouterr().out
@@ -286,7 +286,7 @@ def test_run_all_data_path_and_dry_run_help():
     p = _sub("run-all")
     data = " ".join(next(a.help for a in p._actions if "--data-path" in a.option_strings)
                     .split())
-    assert data.endswith("(default: see `multibench config`)"), data
+    assert data.endswith("(default: shown by multibench config)"), data
     dry = " ".join(next(a.help for a in p._actions if "--dry-run" in a.option_strings)
                    .split())
     # the ledger's wording ('as multibench scan prints it') wraps to three lines
