@@ -508,7 +508,9 @@ def _missing_script(variant, *, method: str | None = None) -> str:
       first fetch would be wrong;
     * a local helper module the entrypoint imports from its own directory
       (``variant.helpers``, e.g. MIRA's ``logger.py``) that the public
-      repository does not ship - the script would ``ImportError`` at start.
+      repository does not ship - the script would ``ImportError`` at start;
+    * a checkout at another commit than ``$MULTIBENCH_SCRIPTS_REF``: the run
+      refuses at start (``config.scripts_ref_problem``).
 
     Parameters
     ----------
@@ -523,6 +525,9 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     repo = _P(config.DEFAULT.repo_path)
     for root in (repo, _P(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
+            wrong_ref = config.scripts_ref_problem(root)
+            if wrong_ref:
+                return wrong_ref
             if not (root / ep).exists():
                 return (f"method script {ep} is missing from the reference checkout at "
                         f"{root}: " + _runner.missing_script_fix(root))
@@ -2477,6 +2482,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             + config.hint(f"mtb.method_info(m)['supports'] and mtb.scan({dataset!r})",
                           f"`multibench info METHOD` and `multibench scan {dataset}`"))
     if dry_run:
+        wrong_ref = config.scripts_ref_problem()
+        if wrong_ref:                      # every row carries it as its reason
+            import sys
+            print(f"# {wrong_ref}", file=sys.stderr, flush=True)
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
             msg = (f"[run_all] dry run: {k} of {n} requested variant(s) runnable on "
