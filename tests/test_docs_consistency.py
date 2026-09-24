@@ -828,6 +828,7 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     (tmp_path / "pkg" / "multibench").mkdir(parents=True)
     (tmp_path / "pkg" / "multibench" / "__init__.py").write_text('__version__ = "9.9.9"\n')
     gate.pypi_releases = lambda *a, **k: {"9.9.9"}
+    gate.data_problems = lambda checkout: []                   # its own test: test_review_f3_int
     monkeypatch.delenv("DEPLOY_GATE", raising=False)
     gate.on_startup(command="build", dirty=False)
     assert gate.on_config(config) is config
@@ -895,6 +896,7 @@ def test_deploy_gate_refuses_a_version_that_is_not_on_pypi(tmp_path, monkeypatch
     _write_nb(pkg / "notebooks" / "tutorial_a.ipynb", [("code", "x = 1")], executed=False)
     _write_nb(site / "a.ipynb", [("code", "x = 1")])
     gate.package_checkout = lambda cfg: pkg
+    monkeypatch.setattr(gate, "data_problems", lambda checkout: [])
     monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1"})
     gate.on_startup(command="gh-deploy", dirty=False)
     with pytest.raises(Abort, match=r"multibench-sc 0\.3\.2 .* is not on PyPI") as e:

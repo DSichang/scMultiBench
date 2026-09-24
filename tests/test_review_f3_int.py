@@ -529,3 +529,37 @@ def test_discover_details_say_a_representation_token_keeps_the_readers():
         got = set(mtb.scan("D28", "diagonal", modalities=["rna", "atac_peak"],
                            verbose=False)["method"])
     assert {"MultiMAP", "Seurat_v3"} <= got
+
+
+@needs_docs
+def test_deploy_gate_refuses_while_the_data_release_is_not_public(tmp_path, monkeypatch):
+    """mtb.data.fetch reads RELEASE_URL; a private release answers 404."""
+    import importlib
+    import importlib.util
+    fetch = importlib.import_module("multibench.data.fetch")     # the module, not mtb.data.fetch
+    spec = importlib.util.spec_from_file_location(
+        "deploy_gate", _docs_root().parent / "hooks" / "deploy_gate.py")
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+    from pathlib import Path
+    root = Path(mtb.__file__).resolve().parent.parent
+    assert gate.checkout_release_url(root) == fetch.RELEASE_URL
+    asked = []
+    monkeypatch.setattr(gate, "asset_status", lambda url, timeout=15: asked.append(url) or 404)
+    (msg,) = gate.data_problems(root)
+    assert asked == [f"{fetch.RELEASE_URL}/D11.tar.gz"]
+    assert msg.endswith("answers HTTP 404 to an anonymous request: make the data release "
+                        "public before the deploy, or mtb.data.fetch and the site's "
+                        "download steps fail")
+    monkeypatch.setattr(gate, "asset_status", lambda url, timeout=15: 302)
+    assert gate.data_problems(root) == []                    # GitHub redirects a public asset
+
+    def offline(url, timeout=15):
+        raise OSError("no network")
+    monkeypatch.setattr(gate, "asset_status", offline)
+    (msg,) = gate.data_problems(root)
+    assert msg.startswith("could not reach ") and "cannot be checked" in msg
+    assert gate.data_problems(tmp_path) == [
+        f"no RELEASE_URL in {tmp_path / 'multibench' / 'data' / 'fetch.py'}"]
+    assert "data_problems(checkout)" in (_docs_root().parent / "hooks" /
+                                         "deploy_gate.py").read_text()
