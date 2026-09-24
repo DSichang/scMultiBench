@@ -15,6 +15,7 @@ import json
 import re
 import shlex
 import subprocess
+import warnings
 from pathlib import Path
 
 import h5py
@@ -68,8 +69,11 @@ def test_scan_base_atac_token_keeps_the_atac_gas_rows_of_vertical():
 def test_scan_representation_token_uses_the_methods_atac():
     """'atac_peak' means ATAC + the method's representation, like
     find_methods(atac='peak'); it used to keep only the rna+atac_peak roles."""
-    with pytest.warns(UserWarning, match="scBridge"):
+    # scBridge reads gene activity: the peak token excludes it, so no warning names it
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
         df = mtb.scan("D28", "diagonal", modalities=["rna", "atac_peak"], verbose=False)
+    assert not [w for w in seen if "scBridge" in str(w.message)]
     want = set(mtb.find_methods("diagonal", atac="peak")) - {"scBridge"}
     assert set(df["method"]) == want
     assert "MultiMAP" in want and "SCALEX" not in want

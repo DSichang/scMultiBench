@@ -129,7 +129,7 @@ def test_cli_scan_unknown_column_and_method_errors(capsys):
     # a KNOWN id with no variant in this category is still reported as absent
     rc = cli.main(["scan", "D28", "--category", "diagonal", "--methods", "Matilda"])
     err = capsys.readouterr().err
-    assert rc == 1 and "not in the scan table" in err
+    assert rc == 1 and "Matilda does not run on diagonal data." in err
 
 
 def test_cli_scan_without_category_scans_every_category(capsys):

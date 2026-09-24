@@ -194,14 +194,14 @@ def test_modalities_help_says_the_representation_tokens_select_by_what_is_read()
         assert "atac_peak and atac_gas select by what the method reads" in h, sub
 
 
-def test_scan_error_lists_the_categorys_methods_for_a_mixed_list(capsys):
+def test_scan_error_names_the_method_of_another_category_in_a_mixed_list(capsys):
     rc = _quiet(cli.main, ["scan", "D11", "--category", "diagonal", "--methods",
                            "GLUE,Matilda"])
     err = capsys.readouterr().err
     assert rc == 1
-    present = sorted(set(mtb.list_methods("diagonal")))
-    assert "method(s) ['Matilda'] are not in the scan table for D11/diagonal" in err
-    assert f"methods present: {present}" in err, err
+    # the sentence mtb.scan raises, with the method's own categories
+    assert "error: Matilda does not run on diagonal data. Its categories: vertical." in err
+    assert "GLUE" not in err, err
 
 
 # ---------------------------------------------------------- dry-run caveat lines

@@ -51,8 +51,6 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
 def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     """Reload a saved ``run_all`` result.
 
-    Use it to inspect, re-plot or re-score a finished sweep.
-
     Parameters
     ----------
     out_dir : path-like
@@ -752,12 +750,14 @@ def _dropped_dirs_message(modalities, dropped: list) -> str:
     folder (scBridge): no modality token selects them."""
     one = len(dropped) == 1
     mods = _resolve._and_list([str(m) for m in modalities])
+    head = (f"The modality {mods} leaves" if len(modalities) == 1
+            else f"The modalities {mods} leave")
     fix = config.hint(
         f"Pass modalities=[] to select {'it' if one else 'them'}, or leave out "
         f"modalities= to see every variant.",
         f'Pass --modalities "" to select {"it" if one else "them"}, or leave out '
         f"--modalities to see every variant.")
-    return (f"The modalities {mods} leave out {_resolve._and_list(dropped)}, which "
+    return (f"{head} out {_resolve._and_list(dropped)}, which "
             f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
 
 
@@ -973,7 +973,7 @@ def _modality_matcher(modalities, named=None):
         rep = {"atac_peak": "peak", "atac_gas": "gene_activity"}.get(stem)
         fam = modality_family(t)
         toks.append((fam, rep, fam in ("rna", "adt", "atac")))
-    reps = {rep for _f, rep, _b in toks if rep}
+    reps = _token_reps(modalities)
 
     def covers(tok, role):
         fam, _rep, is_base = tok
@@ -1001,6 +1001,18 @@ def _modality_matcher(modalities, named=None):
 _REP_OF_TOKEN = {"atac_peak": "peak", "atac_gas": "gene_activity"}
 _TOKEN_OF_REP = {v: k for k, v in _REP_OF_TOKEN.items()}
 _REP_WORDS = {"peak": "peaks", "gene_activity": "gene activity"}
+
+
+def _token_reps(modalities) -> set:
+    """The ATAC representations (``peak``, ``gene_activity``) the tokens name,
+    as :func:`_modality_matcher` reads them; empty for ``atac`` or no ATAC token."""
+    out = set()
+    for tok in modalities or ():
+        t = registry.MODALITY_ALIASES.get(str(tok).lower(), str(tok))
+        rep = _REP_OF_TOKEN.get(t.rstrip("0123456789"))
+        if rep:
+            out.add(rep)
+    return out
 
 
 def _representation_note(category, methods, modalities) -> str:
@@ -1038,31 +1050,37 @@ def _representation_note(category, methods, modalities) -> str:
 
 
 def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
-    """The ``ValueError`` of a selection that matches no variant: what does
-    not run, then why (a representation token) or where to look."""
+    """The ``ValueError`` of named methods that have no row, or of a selection
+    that matches no variant: what does not run, then why.
+
+    A named method with no variant under ``category`` gets its own sentence
+    (``totalVI does not run on mosaic data. Its categories: vertical,
+    cross.``). The named methods that ``modalities`` dropped share one
+    sentence, then the representation note or where to look.
+    """
     from .engine.schema import no_category_message
     from .plot.bubble import _and
     where = f"{category} data" if category else "any category"
-    if modalities is None:
-        # the named methods have no variant under this category
-        head = " ".join(no_category_message(
-            m, dict.fromkeys(c for _s, _v, c, _m in _variant_rows()
-                             if _s.id == m and c), category) for m in methods or ()
-        ) or f"No method runs on {where}."
-    else:
+    methods = list(methods or ())
+    cats = {m: dict.fromkeys(c for s, _v, c, _m in _variant_rows() if s.id == m and c)
+            for m in methods}
+    # no variant under this category at all, whatever the modalities
+    off = [m for m in methods
+           if modalities is None or (category and category not in cats[m])]
+    dropped = [m for m in methods if m not in off]
+    parts = [no_category_message(m, cats[m], category) for m in off]
+    if modalities is not None and (dropped or not methods):
         mods = "+".join(map(str, modalities or ())) or "a data folder"
-        head = (f"{_and(methods)} {'does' if len(methods) == 1 else 'do'} not read "
-                f"{mods} in {where}." if methods else f"No method reads {mods} in {where}.")
-    why = _representation_note(category, methods, modalities)
-    one = methods[0] if methods and len(methods) == 1 else None
-    fix = "" if modalities is None else config.hint(
-        f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
-        "mtb.method_info(m)['supports'] lists what each method reads.",
-        f"multibench info {one} lists what {one} reads." if one else
-        "multibench info METHOD lists what each method reads.")
-    err = ValueError(" ".join(t for t in (head, why or fix) if t))
-    err.representation = bool(why)      # the CLI keeps this message as it is
-    return err
+        parts.append(f"{_and(dropped)} {'does' if len(dropped) == 1 else 'do'} not read "
+                     f"{mods} in {where}." if dropped else
+                     f"No method reads {mods} in {where}.")
+        one = dropped[0] if len(dropped) == 1 else None
+        parts.append(_representation_note(category, dropped, modalities) or config.hint(
+            f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
+            "mtb.method_info(m)['supports'] lists what each method reads.",
+            f"multibench info {one} lists what {one} reads." if one else
+            "multibench info METHOD lists what each method reads."))
+    return ValueError(" ".join(parts) or f"No method runs on {where}.")
 
 
 def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset: str,
@@ -1143,8 +1161,9 @@ def scan(dataset: str, category: str | None = None, *,
     FileNotFoundError
         ``<data_path>/<dataset>`` does not exist; the message lists the folders present.
     ValueError
-        Unknown ``category`` or modality token, or no variant of ``methods``
-        exists under ``category``.
+        Unknown ``category`` or modality token.
+    ValueError
+        A method in ``methods`` has no variant in ``category`` or ``modalities``.
     KeyError
         Unknown id in ``methods`` or ``params``, or a ``params`` key no variant accepts.
     TypeError
@@ -1153,8 +1172,9 @@ def scan(dataset: str, category: str | None = None, *,
     Warns
     -----
     UserWarning
-        ``dataset`` matches a folder only up to letter case, or ``modalities``
-        drops directory-input methods.
+        ``dataset`` matches a folder only up to letter case.
+    UserWarning
+        ``modalities`` drops a folder-fed method whose ATAC representation it allows.
 
     Examples
     --------
@@ -1290,9 +1310,8 @@ def scan(dataset: str, category: str | None = None, *,
       values.
     - ``methods`` - an unknown id raises ``KeyError`` with a did-you-mean
       hint; blocked rows of the selected methods are kept, with their reason.
-      A selection with no variant under ``category`` (a known id with no
-      diagonal variant, say) raises ``ValueError`` instead of returning an
-      empty frame.
+      A named method with no variant under ``category`` or ``modalities``
+      raises ``ValueError``, even when other named methods have one.
     - ``params`` - a key no variant of that method accepts raises
       ``KeyError`` naming the accepted keys.
     - ``dataset`` - a spelling that differs from the folder only in case
@@ -1321,9 +1340,9 @@ def scan(dataset: str, category: str | None = None, *,
     - a numbered token (``rna1``) matches that role only;
     - an unknown token raises ``ValueError`` listing the vocabulary.
 
-    A variant fed a folder (scBridge) has no modality roles. ``modalities=[]``
-    selects exactly those variants; any non-empty list leaves them out, and
-    a ``UserWarning`` names them.
+    A folder-fed variant (scBridge) has no modality roles. ``modalities=[]``
+    selects exactly those. Other lists drop them with a ``UserWarning``,
+    unless the tokens exclude their ATAC representation.
 
     **Choosing a category.** A CITE-seq folder (``rna.h5`` + ``adt.h5`` +
     ``cty.csv``) is ``vertical`` with modalities ``["rna", "adt"]``; RNA and
@@ -1347,6 +1366,26 @@ def scan(dataset: str, category: str | None = None, *,
 
     mtb.inputs_for : the ``{role: path}`` resolution behind ``files_ok``.
     """
+    return _scan(dataset, category, methods=methods, modalities=modalities,
+                 data_path=data_path, out_dir=out_dir, params=params, verbose=verbose,
+                 assume_gpu=assume_gpu, allow_atac_mismatch=allow_atac_mismatch,
+                 stacklevel=3)[0]
+
+
+def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
+          data_path=None, out_dir="<out_dir>", params: dict | None = None,
+          verbose: bool = True, assume_gpu: bool = False,
+          allow_atac_mismatch: bool = False,
+          stacklevel: int = 2) -> "tuple[pd.DataFrame, pd.Series]":
+    """:func:`scan`'s frame, and each row's reason without the platform sentence.
+
+    The Series is aligned with the frame. Off Linux, the environment part of
+    ``reason`` is the Linux-only sentence of :func:`_env_hint`; the Series
+    leaves it out and keeps what else blocks the row (files, a GPU, the ATAC
+    representation, the scripts). On Linux it equals ``reason``. run_all's
+    "No method can run" error lists it under its one platform line.
+    ``stacklevel`` makes scan's warnings point at the caller.
+    """
     registry.check_category(category)       # raises with the valid list on a typo
     _list_of_ids(methods, "methods")        # TypeError before iterating characters
     _list_of_ids(modalities, "modalities")
@@ -1357,7 +1396,7 @@ def scan(dataset: str, category: str | None = None, *,
         registry.check_method(_m)
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
-    dataset = _resolve.canonical_dataset(base, dataset)
+    dataset = _resolve.canonical_dataset(base, dataset, stacklevel=stacklevel + 1)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         from .plot.bubble import _and
@@ -1379,12 +1418,17 @@ def scan(dataset: str, category: str | None = None, *,
     wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
+    # off Linux, _env_hint gives only the platform sentence
+    off_linux = bool(_runner.linux_only_sentence())
+    # one representation token already excludes a method that reads the other
+    reps = _token_reps(modalities) if modalities is not None else set()
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
             continue
         mod_str = "+".join(mods) or "(data_dir)"
         if wanted is not None and not wanted(spec, mods):
-            if not mods and spec.id not in dropped_dirs:
+            other_rep = len(reps) == 1 and spec.atac and spec.atac not in reps
+            if not mods and not other_rep and spec.id not in dropped_dirs:
                 dropped_dirs.append(spec.id)
             continue
         rt = _runtimes().get(spec.id, {})
@@ -1426,9 +1470,10 @@ def scan(dataset: str, category: str | None = None, *,
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         # --- check 2: env. ----------------------------------------------------
+        env_hint = gpu_hint = ""
         if rec["env"] and rec["env"] not in installed:
             rec["env_ok"] = False
-            rec["env_reason"] = _env_hint(rec["env"], spec.id, cat)
+            env_hint = _env_hint(rec["env"], spec.id, cat)
         # ... and the host: a script that calls CUDA unconditionally cannot
         # finish without an NVIDIA GPU, however complete the env - the same
         # sentence run() raises as OSError, so the sweep never starts it.
@@ -1439,12 +1484,16 @@ def scan(dataset: str, category: str | None = None, *,
                                                GPU_NODE_CAVEAT.format(method=spec.id)])
             else:
                 rec["env_ok"] = False
-                rec["env_reason"] = " ".join(
-                    r for r in (rec["env_reason"], spec.requires_gpu_reason) if r)
+                gpu_hint = spec.requires_gpu_reason or ""
+        rec["env_reason"] = " ".join(r for r in (env_hint, gpu_hint) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
                                and not wrong_ref)
         # the ATAC reason ends with its override, so it comes last
         rec["reason"] = _join_sentences([wrong_ref, *short_problems, rec["env_reason"],
+                                         wrong_atac])
+        # what else blocks the row, for run_all's error off Linux
+        rec["_other"] = _join_sentences([wrong_ref, *short_problems,
+                                         gpu_hint if off_linux else rec["env_reason"],
                                          wrong_atac])
         # --- the command line: only when the files resolved (something to
         # hand the script); an env-blocked row still gets one. A setup step
@@ -1466,21 +1515,24 @@ def scan(dataset: str, category: str | None = None, *,
             if notes:
                 rec["caveat"] = _join_clauses([rec["caveat"], *notes])
         rows.append(rec)
-    df = pd.DataFrame(rows, columns=SCAN_COLUMNS)
+    df = pd.DataFrame(rows, columns=[*SCAN_COLUMNS, "_other"])
     df = df.sort_values(["runnable", "category", "method"],
                         ascending=[False, True, True]).reset_index(drop=True)
-    if df.empty and methods is not None:
-        # no variant of the requested methods exists under this category: a
-        # request problem (Matilda is not a cross method), reported as such
-        # rather than as a silently empty frame
-        raise _no_variant_error(category, dataset, methods, modalities)
+    others = df.pop("_other")
+    if methods is not None:
+        # a named method with no row (Matilda is not a cross method, or
+        # modalities= dropped it) is a request problem, also when the other
+        # named methods have rows: raised, not dropped
+        missing = [m for m in dict.fromkeys(methods) if m not in set(df["method"])]
+        if missing or df.empty:
+            raise _no_variant_error(category, dataset, missing or methods, modalities)
     if params:
         _check_param_keys(df, params)       # a typo'd key must not start a sweep
     if dropped_dirs and modalities:
         # a variant fed a folder names no modality roles, so no token can
         # select it; say what was left out rather than dropping it unnoticed
         warnings.warn(_dropped_dirs_message(modalities, dropped_dirs),
-                      UserWarning, stacklevel=2)
+                      UserWarning, stacklevel=stacklevel)
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
         rows = _rows_word(df, n)
@@ -1494,7 +1546,7 @@ def scan(dataset: str, category: str | None = None, *,
             doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
             line += f" {doctor} checks the environments."
         print(line, flush=True)
-    return df
+    return df, others
 
 
 # ------------------------------------------------------------------- label order
@@ -1687,7 +1739,8 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
             return names, None, [{"order": names,
                                   "error": f"{type(e).__name__}: {str(e)[:300]}"}]
         # metrics= may leave ARI out: the one order needs no ranking
-        ari = round(float(val["Value"]["ARI"]), 4) if "ARI" in val.index else None
+        # + 0.0: a tiny negative ARI rounds to 0.0, not -0.0
+        ari = round(float(val["Value"]["ARI"]), 4) + 0.0 if "ARI" in val.index else None
         return names, val, [{"order": names, "ARI": ari}]
 
     # Ranking orderings needs only ARI, and the Leiden sweep behind ARI depends
@@ -1743,7 +1796,7 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
         raise RuntimeError(
             f"evaluation failed for the winning label order {names}: "
             f"{type(e).__name__}: {e}") from e
-    spread = [{"order": n, "ARI": round(a, 4)} for a, n, _, _, _ in scored]
+    spread = [{"order": n, "ARI": round(a, 4) + 0.0} for a, n, _, _, _ in scored]
     return names, val, spread
 
 
@@ -1835,8 +1888,8 @@ def _warn_unsaved_batch(records, result) -> None:
 class BatchResult:
     """The result of ``mtb.run_all``: its summary table, long table and figure.
 
-    Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. It keeps
-    the per-method records; ``rescore`` and ``plot`` work from them.
+    ``mtb.run_all`` and ``mtb.load_batch`` build it. It keeps one record per
+    method, which ``rescore`` and ``plot`` read.
 
     Parameters
     ----------
@@ -2004,9 +2057,9 @@ class BatchResult:
         they are slightly optimistic. ``label_order_confidence`` shows how far
         ahead the chosen order was.
 
-        **Blank confidence.** The column stays numeric, so ``> 0.5`` and
-        ``.isna()`` behave. It is ``None`` in three cases, named by
-        ``label_order_note``:
+        **Blank confidence.** The column is numeric, and a blank is ``NaN``.
+        So ``> 0.5`` is ``False`` for it and ``.isna()`` finds it. It is blank
+        in three cases, named by ``label_order_note``:
 
         - ``"single ordering"`` - only one ordering was possible (normal for a
           paired/vertical dataset with a single ``cty.csv``).
@@ -2041,9 +2094,13 @@ class BatchResult:
                                          "emb_shape", "n_tunable", "label_order",
                                          "label_order_confidence", "batch_source",
                                          "n_batches", "label_order_note", "caveat",
-                                         "reason"])
-        sm = _with_label_order_note(
-            pd.DataFrame(rows).sort_values("method").reset_index(drop=True))
+                                         "reason"]).astype({"label_order_confidence":
+                                                            "float64"})
+        sm = pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
+        # float64 with NaN also when every row is blank (else object, None)
+        sm["label_order_confidence"] = pd.to_numeric(
+            sm["label_order_confidence"], errors="coerce").astype("float64")
+        sm = _with_label_order_note(sm)
         for col in ("caveat", "reason"):         # new columns go last
             sm[col] = sm.pop(col)
         # whole numbers stay whole next to the blanks of SKIPPED and FAIL rows
@@ -2277,10 +2334,10 @@ class BatchResult:
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
                 verbose: bool = False) -> "BatchResult":
-        """Re-evaluate the stored outputs with different labels / batch / metrics.
+        """Score the saved outputs again with new labels, batch or metrics.
 
-        Scores the saved outputs again; no method is re-run. Each record's
-        embedding is read back from its ``out_dir``.
+        No method is re-run. Each record's embedding is read back from its
+        ``out_dir``.
 
         Parameters
         ----------
@@ -2324,10 +2381,6 @@ class BatchResult:
 
         Notes
         -----
-        **Typical uses.** Re-score with the batch vector the dataset really
-        has instead of the file-of-origin rule, with your own labels, or with
-        a different metric selection.
-
         **Arguments.** A ``labels`` array, list or plain CSV follows the
         embedding rows. Without ``labels=``, a ``batch`` array follows the
         order of ``mtb.labels_for(dataset)``. With a ``labels`` array in
@@ -2453,8 +2506,8 @@ class BatchResult:
                 em = f"{type(e).__name__}: {e}"
                 rec["error"] = em if len(em) <= 600 else "... " + em[-596:]
             if verbose:
-                print(f"[rescore] {m} -> {rec['status']} "
-                      f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
+                print(f"[rescore] {m} -> {rec['status']} {_ari_tail(rec)}".rstrip(),
+                      flush=True)
             new.records.append(rec)
         # a saved batch that fits no label order: the batch metrics are gone
         unused = next((r["note"] for r in new.records
@@ -2595,6 +2648,20 @@ _R_CALLS = re.compile(r"^Calls: ")
 _R_WARNINGS = re.compile(r"^In addition: Warning messages?:")
 
 
+def _ari_tail(rec) -> str:
+    """The end of a ``run_all`` / ``rescore`` result line: ``ARI 0.629``,
+    rounded to 3 decimals and never ``-0.000``; ``""`` when the record has
+    no ARI (missing, ``None`` or NaN)."""
+    ari = (rec.get("metrics") or {}).get("ARI")
+    try:
+        ari = float(ari)
+    except (TypeError, ValueError):
+        return ""
+    if ari != ari:          # NaN
+        return ""
+    return f"ARI {round(ari, 3) + 0.0:.3f}"
+
+
 def _error_tail(error, width: int = 200) -> str:
     """The last line of ``error`` that names a cause, clipped from the left to ``width``.
 
@@ -2659,7 +2726,7 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
                               methods, *, data_path=None, modalities=None,
                               allow_atac_mismatch: bool = False,
-                              assume_gpu: bool = False) -> str:
+                              assume_gpu: bool = False, others=None) -> str:
     """The ``ValueError`` text for "not one requested variant can start".
 
     Scoped to what the caller asked for: with ``methods=`` every requested
@@ -2669,8 +2736,10 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     (then by method): an env install unblocks those. Reasons of methods the
     caller did not request are never listed: they would point at the wrong
     fix. Off Linux, when an environment blocks a row, the line after the
-    head says where methods run. The last line names the ``scan`` call with
-    the caller's selection (:func:`_scan_hint`); the list counts methods when
+    head says where methods run, and the list keeps only the rows that
+    something else also blocks, each with that reason from ``others``
+    (:func:`_other_blocks`). The last line names the ``scan`` call with the
+    caller's selection (:func:`_scan_hint`); the list counts methods when
     each method has one row (:func:`_rows_word`).
     """
     def _line(r):
@@ -2685,22 +2754,51 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                        modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
                        assume_gpu=assume_gpu)
     if methods:
-        lines = [_line(r) for _, r in blocked.iterrows()]
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
-        return (f"{head}.\n{platform}Blocked, one line per "
-                f"requested {_rows_word(blocked, 1)}:\n" + "\n".join(lines) +
+        listing = (_other_blocks(blocked, others, requested=True)
+                   if platform and others is not None else
+                   f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
+                   + "\n".join(_line(r) for _, r in blocked.iterrows()))
+        return (f"{head}.\n{platform}{listing}"
                 f"\n{where} shows these rows. Its files_ok and env_ok columns say "
                 f"which check failed. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
-    n, k = len(blocked), min(3, len(blocked))
-    lines = [_line(r) for _, r in blocked.head(k).iterrows()]
-    rows = _rows_word(blocked, n)
-    shown = (f"The first {k} of {n} blocked {rows}" if n > k
-             else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
-    return (f"{head}.\n{platform}{shown}:\n" + "\n".join(lines) +
+    if platform and others is not None:
+        listing = _other_blocks(blocked, others, requested=False)
+    else:
+        n, k = len(blocked), min(3, len(blocked))
+        rows = _rows_word(blocked, n)
+        shown = (f"The first {k} of {n} blocked {rows}" if n > k
+                 else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
+        listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
+    return (f"{head}.\n{platform}{listing}" +
             f"\n{where} shows every row. Its files_ok and env_ok columns say "
             f"which check failed. {doctor} checks the environments.")
+
+
+def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
+    """The list of the "No method can run" error under its platform line.
+
+    Only the rows that something besides the platform blocks, each with that
+    reason (``others``, aligned with ``blocked``), under a count line:
+    ``1 of 14 methods is also blocked by something else:``. With
+    ``methods=`` (``requested``) every such row, else the first 3 in the
+    order of ``blocked``. When no row has another block, one line:
+    ``Nothing else blocks these 14 methods.``
+    """
+    rest = others.reindex(blocked.index).fillna("")
+    listed = [(r, rest[i]) for i, r in blocked.iterrows() if rest[i]]
+    n, k = len(blocked), len(listed)
+    noun = ("requested " if requested else "") + _rows_word(blocked, n)
+    if not listed:
+        return (f"Nothing else blocks this {noun}." if n == 1
+                else f"Nothing else blocks these {n} {noun}.")
+    count = f"{k} of {n} {noun} {'is' if k == 1 else 'are'} also blocked by something else"
+    shown = listed if requested else listed[:3]
+    lines = "\n".join(f"  {r['method']} ({r['modalities']}): {text}" for r, text in shown)
+    return (f"{count}:" if len(shown) == k
+            else f"{count}. The first {len(shown)}:") + "\n" + lines
 
 
 def _platform_line(blocked: pd.DataFrame) -> str:
@@ -3236,7 +3334,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         if errs:
             rec["error"] = errs[0]
         return rec
-    rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4))
+    # + 0.0: a tiny negative score rounds to 0.0, not -0.0
+    rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4) + 0.0)
                       for k, x in val["Value"].items()}
     rec["labels_used"] = names
     if kept and stored:
@@ -3336,8 +3435,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     Warns
     -----
     UserWarning
-        ``dataset`` matches a folder only up to letter case, or ``modalities``
-        drops directory-input methods.
+        ``dataset`` matches a folder only up to letter case.
+    UserWarning
+        ``modalities`` drops a folder-fed method whose ATAC representation it allows.
     UserWarning
         A ``batch`` Series or barcode-indexed CSV cannot be aligned and is matched by position.
 
@@ -3458,17 +3558,18 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     - An unknown ``category``: ``ValueError`` listing the four.
     - An unknown id in ``methods`` or ``params``: ``KeyError`` with a
       did-you-mean hint, before anything runs.
-    - A selection that matches no variant: ``ValueError``, such as
-      "Matilda does not run on cross data."; a dry run is never empty.
+    - A named method or a selection with no variant: ``ValueError`` before
+      anything runs, dry run included, such as "Matilda does not run on
+      cross data."
     - A dry run with a ``params`` key no planned variant of that method
       accepts: ``KeyError`` naming the accepted keys.
     - Nothing runnable: ``ValueError``. Its first line is
       ``No method can run on D11 (vertical).`` With ``methods=``, it starts
       ``None of the requested methods (Matilda, totalVI) can run on D11 (vertical).``
-      The message lists the reason of every requested variant. Without
-      ``methods``, it gives the first 3 of N. It never lists the reasons of
-      methods you did not ask for. On macOS or Windows, when an environment
-      blocks a row, its second line says that methods run only on Linux.
+      and lists every requested variant. Without ``methods``, it gives the
+      first 3 of N. It never lists the reasons of methods you did not ask
+      for. On macOS or Windows, its second line says that methods run only
+      on Linux, and it lists only the rows something else also blocks.
     - An ``out_dir`` that holds a saved result of another dataset or
       category: ``ValueError``, before any method runs.
     - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
@@ -3520,13 +3621,14 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     # missing dataset folder, ValueError when no variant of the requested
     # methods exists under this category and KeyError on a params key no
     # variant accepts all come from scan(); blocked rows are kept.
-    plan_df = scan(dataset, category, data_path=data_path, methods=methods,
-                   modalities=modalities, verbose=False, assume_gpu=assume_gpu,
-                   allow_atac_mismatch=allow_atac_mismatch,
-                   # the dry run renders (and validates) params in the frame; a real
-                   # run validates per method and records a bad override as FAIL
-                   params=params if dry_run else None,
-                   out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
+    plan_df, others = _scan(dataset, category, data_path=data_path, methods=methods,
+                            modalities=modalities, verbose=False, assume_gpu=assume_gpu,
+                            allow_atac_mismatch=allow_atac_mismatch,
+                            # the dry run renders (and validates) params in the frame; a
+                            # real run validates per method and records a bad override
+                            # as FAIL
+                            params=params if dry_run else None,
+                            out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
     if plan_df.empty:
         # only reachable through a modalities= selector that matches nothing:
         # a request problem, reported as such rather than as "nothing is
@@ -3572,7 +3674,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         raise ValueError(_nothing_runnable_message(
             dataset, category, blocked, methods, data_path=data_path,
             modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
-            assume_gpu=assume_gpu))
+            assume_gpu=assume_gpu, others=others))
 
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
     # saved in out_dir so that rescore can reuse it
@@ -3703,8 +3805,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         finally:
             _disarm_deadline(_deadline_prev)
         if verbose:
-            tail = (_error_tail(rec["error"]) if rec.get("error")
-                    else (rec.get("metrics") or {}).get("ARI", ""))
+            tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
             print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) {tail}".rstrip(),
                   flush=True)
         if rec.get("reused"):
