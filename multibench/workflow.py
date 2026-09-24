@@ -51,8 +51,6 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
 def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     """Reload a saved ``run_all`` result.
 
-    Use it to inspect, re-plot or re-score a finished sweep.
-
     Parameters
     ----------
     out_dir : path-like
@@ -1835,8 +1833,8 @@ def _warn_unsaved_batch(records, result) -> None:
 class BatchResult:
     """The result of ``mtb.run_all``: its summary table, long table and figure.
 
-    Built by ``mtb.run_all`` and ``mtb.load_batch``, not by hand. It keeps
-    the per-method records; ``rescore`` and ``plot`` work from them.
+    ``mtb.run_all`` and ``mtb.load_batch`` build it. It keeps one record per
+    method, which ``rescore`` and ``plot`` read.
 
     Parameters
     ----------
@@ -2004,9 +2002,9 @@ class BatchResult:
         they are slightly optimistic. ``label_order_confidence`` shows how far
         ahead the chosen order was.
 
-        **Blank confidence.** The column stays numeric, so ``> 0.5`` and
-        ``.isna()`` behave. It is ``None`` in three cases, named by
-        ``label_order_note``:
+        **Blank confidence.** The column is numeric, and a blank is ``NaN``.
+        So ``> 0.5`` is ``False`` for it and ``.isna()`` finds it. It is blank
+        in three cases, named by ``label_order_note``:
 
         - ``"single ordering"`` - only one ordering was possible (normal for a
           paired/vertical dataset with a single ``cty.csv``).
@@ -2281,10 +2279,10 @@ class BatchResult:
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
                 verbose: bool = False) -> "BatchResult":
-        """Re-evaluate the stored outputs with different labels / batch / metrics.
+        """Score the saved outputs again with new labels, batch or metrics.
 
-        Scores the saved outputs again; no method is re-run. Each record's
-        embedding is read back from its ``out_dir``.
+        No method is re-run. Each record's embedding is read back from its
+        ``out_dir``.
 
         Parameters
         ----------
@@ -2328,10 +2326,6 @@ class BatchResult:
 
         Notes
         -----
-        **Typical uses.** Re-score with the batch vector the dataset really
-        has instead of the file-of-origin rule, with your own labels, or with
-        a different metric selection.
-
         **Arguments.** A ``labels`` array, list or plain CSV follows the
         embedding rows. Without ``labels=``, a ``batch`` array follows the
         order of ``mtb.labels_for(dataset)``. With a ``labels`` array in
