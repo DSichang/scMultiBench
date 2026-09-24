@@ -2134,8 +2134,8 @@ class BatchResult:
         the batch metrics.
 
         **Record status.** A method that emits no embedding (graph-only) is
-        marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. A ``SKIPPED`` record
-        is kept as it is. A record
+        marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. ``SKIPPED``, ``FAIL``
+        and ``TIMEOUT`` records are kept as they are. A record
         whose output file is gone (a deleted ``out_dir``) or whose new scoring
         fails (wrong ``batch`` length, say - ``batch has N entries, embedding
         has M cells``) becomes ``RUN_OK_EVAL_FAILED`` with the reason in
@@ -2177,7 +2177,9 @@ class BatchResult:
             rec = copy.deepcopy({k: v for k, v in r.items() if k != "_long"})
             rec["_long"] = None
             m = rec.get("method")
-            if rec.get("status") == "SKIPPED":       # nothing was run
+            # nothing was run, or the run failed: there is no output to score
+            if rec.get("status") == "SKIPPED" or str(rec.get("status", "")).startswith(
+                    ("FAIL", "TIMEOUT")):
                 new_records.append(rec)
                 continue
             try:
@@ -2318,19 +2320,30 @@ class BatchResult:
 # ---------------------------------------------------------------------- run_all
 #: closing lines that name no cause (R's after any error); the line before them does
 _ERROR_TRAILERS = ("Execution halted",)
+#: R prints the call trace and then any warnings after the error message
+_R_CALLS = re.compile(r"^Calls: ")
+_R_WARNINGS = re.compile(r"^In addition: Warning messages?:")
 
 
 def _error_tail(error, width: int = 200) -> str:
     """The last line of ``error`` that names a cause, clipped from the left to ``width``.
 
     ``run_all``'s ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with it, so
-    a job log shows why without opening ``failures.csv``.
+    a job log shows why without opening ``failures.csv``. R's call trace and
+    trailing warning block are skipped, and an R message that continues on
+    the line after ``Error in f() :`` is joined to it.
     """
     lines = [l.strip() for l in str(error or "").splitlines()]
     lines = [l for l in lines if l and l not in _ERROR_TRAILERS]
+    cut = next((i for i in range(len(lines) - 1, 0, -1) if _R_WARNINGS.match(lines[i])), None)
+    if cut is not None:
+        lines = lines[:cut]
+    lines = [l for l in lines if not _R_CALLS.match(l)]
     if not lines:
         return ""
     last = lines[-1]
+    if len(lines) > 1 and lines[-2].startswith("Error") and lines[-2].endswith(":"):
+        last = f"{lines[-2]} {last}"
     return last if len(last) <= width else "..." + last[-(width - 3):]
 
 
