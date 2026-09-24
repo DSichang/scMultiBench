@@ -158,7 +158,7 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
         msg = str(e.value)
         # the platform sentence is the first line after the head (L18)
         assert msg.splitlines()[1].startswith(
-            "Methods run only on Linux (this computer is darwin/arm64).")
+            "Methods run only on Linux, and this computer runs macOS.")
         assert ("On this computer you can check files, score embeddings and plot. Run "
                 "the methods on a Linux machine.") in msg
         assert not re.search(r"\n  Methods", msg)       # never looks like a variant line

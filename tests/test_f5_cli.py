@@ -302,8 +302,9 @@ def test_scan_env_reason_on_linux_names_the_command_without_backticks(monkeypatc
     row = json.loads(capsys.readouterr().out)[0]
     assert rc == 0
     assert row["reason"] == (
-        "conda env 'matilda' is not installed. Run multibench env install --methods "
-        "Matilda --packed --run (or --category vertical). See multibench env doctor.")
+        "Environment matilda is not installed. Run multibench env install --methods "
+        "Matilda --packed --run. --category vertical installs the environments of every "
+        "vertical method.")
 
 
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
@@ -349,7 +350,7 @@ def test_platform_line_is_two_sentences(monkeypatch, tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False)
     assert str(e.value).splitlines()[1] == (
-        "Methods run only on Linux (this computer is darwin/arm64). On this computer you "
+        "Methods run only on Linux, and this computer runs macOS. On this computer you "
         "can check files, score embeddings and plot. Run the methods on a Linux machine.")
 
 

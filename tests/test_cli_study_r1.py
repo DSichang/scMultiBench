@@ -372,7 +372,9 @@ def test_scan_reason_names_the_cli_install_check(no_envs, capsys):
     rc = cli.main(["scan", "D11", "--category", "vertical", "--methods", "Matilda",
                    "--format", "csv", "--columns", "reason"])
     out = capsys.readouterr().out
-    assert rc == 0 and "See multibench env doctor." in out and "mtb.env.doctor()" not in out
+    # R7-10: the reason leads with the shell install command, and names no Python call
+    assert rc == 0 and "multibench env install --methods Matilda --packed --run." in out
+    assert "mtb.env" not in out
     assert "`" not in out
 
 

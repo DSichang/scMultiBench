@@ -76,14 +76,24 @@ def _host_of(problem: str) -> str:
     return f"{sys.platform}/{_platform.machine() or '?'}"
 
 
+def _host_system_name(problem: str) -> str:
+    """The operating system of a :func:`host_platform_problem` text, for users.
+
+    ``'macOS'`` for darwin, ``'Windows'`` for win32 and cygwin, otherwise the
+    platform name itself (``'freebsd14'``).
+    """
+    system = _host_of(problem).split("/", 1)[0]
+    return {"darwin": "macOS", "win32": "Windows", "cygwin": "Windows"}.get(system, system)
+
+
 def linux_only_text(problem: str) -> str:
     """The first sentence every off-Linux env message starts with.
 
-    ``"Method environments run only on Linux (this computer is
-    darwin/arm64)."`` - worded like the runner's ``"Methods run only on
-    Linux ..."``.
+    ``"Method environments run only on Linux, and this computer runs
+    macOS."`` - worded like the runner's ``"Methods run only on Linux ..."``.
     """
-    return f"Method environments run only on Linux (this computer is {_host_of(problem)})."
+    return (f"Method environments run only on Linux, and this computer runs "
+            f"{_host_system_name(problem)}.")
 
 
 def _require_linux(force: bool) -> None:
@@ -94,7 +104,7 @@ def _require_linux(force: bool) -> None:
     problem = None if force else host_platform_problem()
     if problem:
         raise RuntimeError(
-            f"{linux_only_text(problem)} Run the install on a Linux machine; "
+            f"{linux_only_text(problem)} Run the install on a Linux machine. "
             f"{config.hint('force=True', '--force')} tries anyway.")
 
 

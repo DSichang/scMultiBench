@@ -171,8 +171,8 @@ def test_run_off_linux_starts_with_the_platform(off_linux, tmp_path, monkeypatch
             mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
                     out_dir=str(tmp_path / "out"))
         msg = str(e.value)
-        assert msg.startswith("Methods run only on Linux (this computer is darwin/arm64). "
-                              "Run this call on a Linux machine; dry_run=True previews "
+        assert msg.startswith("Methods run only on Linux, and this computer runs macOS. "
+                              "Run this call on a Linux machine. dry_run=True previews "
                               "the method's command here.")
         # R3-16: off Linux an install refuses, so no install line follows
         assert "is not installed" not in msg and "env install" not in msg

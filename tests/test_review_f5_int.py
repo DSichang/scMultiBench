@@ -270,9 +270,10 @@ def test_the_mira_and_bridge_reasons_are_sentences(tmp_path, monkeypatch):
                           "main_MIRA.py.")
     assert ";" not in why and "(" not in why.replace("('MIRA')", "")
     from multibench.engine.resolve import SAME_CELLS_REASON
-    text = SAME_CELLS_REASON.format(method="Seurat_v5", n_a=6408, n_b=4606, shared=0)
+    text = SAME_CELLS_REASON.format(method="Seurat_v5", dataset="D28", a="rna.h5",
+                                    b="atac_peak.h5", n_a=6408, n_b=4606, shared=0)
     assert text == ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. "
-                    "These files share 0 of 6,408 and 4,606 cells")
+                    "In D28, rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
 
 
 def test_dry_run_commands_do_not_double_the_parentheses(capsys):

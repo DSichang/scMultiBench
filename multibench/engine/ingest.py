@@ -99,11 +99,13 @@ def _matrix_has_fraction(X) -> bool | None:
 
 
 def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int) -> None:
-    """``UserWarning`` when ``X`` holds non-integer values (log-normalised?)."""
+    """``UserWarning`` when ``X`` holds non-integer values, which look
+    log-normalised; ``hint`` is the selector of the raw counts."""
     if _matrix_has_fraction(X):
         warnings.warn(
-            f"{name} values are not whole numbers (log-normalised?). The methods "
-            f"normalise raw counts themselves: export raw counts, e.g. {hint}.",
+            f"The {name} values are not whole numbers, so they look log-normalised. "
+            f"The methods normalise raw counts themselves. Export raw counts, for "
+            f"example with {hint}.",
             UserWarning, stacklevel=stacklevel + 1)
 
 
@@ -1532,10 +1534,12 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     hint = config.hint("adt='obsm:protein_counts'",
                                        "--adt obsm:protein_counts")
                 else:
-                    hint = config.hint(f"{what}='layer:counts' (MuData: "
-                                       f"{what}='mod:{what}.layer:counts')",
-                                       f"--{what} layer:counts (MuData: "
-                                       f"--{what} mod:{what}.layer:counts)")
+                    # the MuData form only for a selector that reads a modality
+                    sel = {"rna": rna, "adt": adt, "atac": atac}.get(what)
+                    sel = _split_var_filter(sel)[0] if isinstance(sel, str) else ""
+                    mod = sel[4:].partition(".")[0] if sel.startswith("mod:") else None
+                    counts = f"mod:{mod}.layer:counts" if mod else "layer:counts"
+                    hint = config.hint(f"{what}='{counts}'", f"--{what} {counts}")
                 _warn_not_counts(X, what, hint, stacklevel=2)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
@@ -1554,9 +1558,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask]))
     existing = [pth.name for pth, _, _ in plan if pth.exists() or pth.is_symlink()]
     if existing and not overwrite:
+        from .resolve import _and_list
         raise FileExistsError(
-            f"{out} already holds {existing}, which this call would write; "
-            f"pass {config.hint('overwrite=True', '--overwrite')} to replace them")
+            f"{out} already holds {_and_list(existing)}. Pass "
+            f"{config.hint('overwrite=True', '--overwrite')} to replace "
+            f"{'it' if len(existing) == 1 else 'them'}.")
     for pth, kind, payload in plan:
         if kind == "matrix":
             sub, feats, sub_bars = payload

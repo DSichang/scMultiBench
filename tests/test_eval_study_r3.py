@@ -162,8 +162,8 @@ def test_run_off_linux_is_the_linux_sentence_alone(tmp_path, monkeypatch):
         mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
-    assert msg == ("Methods run only on Linux (this computer is darwin/arm64). Run this "
-                   "call on a Linux machine; dry_run=True previews the method's command "
+    assert msg == ("Methods run only on Linux, and this computer runs macOS. Run this "
+                   "call on a Linux machine. dry_run=True previews the method's command "
                    "here.")
     assert "env install" not in msg and "is not installed" not in msg
 

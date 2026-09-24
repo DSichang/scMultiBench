@@ -184,8 +184,8 @@ def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
 # ====================================================== cell checks in run()
 def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
     inp = mtb.inputs_for("D28", "diagonal", "Seurat_v5")
-    want = ("Seurat_v5/D28/diagonal: Seurat_v5 needs RNA and ATAC from the same cells "
-            "as its bridge. These files share 0 of 6,408 and 4,606 cells")
+    want = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, "
+            "rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
     for dry in (True, False):
         with pytest.raises(ValueError) as e:
             mtb.run("Seurat_v5", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
@@ -213,9 +213,9 @@ def _diagonal(root, name, gas_order):
 def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
     d = _diagonal(tmp_path, "SHUF", list(range(23, -1, -1)))
     inp = {r: str(d / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")}
-    with pytest.raises(ValueError, match=r"^MultiMAP/SHUF/diagonal: atac_gas\.h5 lists "
-                                         r"the ATAC cells in another order than "
-                                         r"atac_peak\.h5"):
+    with pytest.raises(ValueError, match=r"^MultiMAP reads atac_gas\.h5 of SHUF, which "
+                                         r"lists the ATAC cells in another order than "
+                                         r"atac_peak\.h5\."):
         mtb.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
                 dry_run=True)
     # SCALEX reads rna + atac_gas: the peak file next to it sets the order
@@ -228,7 +228,7 @@ def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
     for f in ("rna.h5", "atac_peak.h5"):
         shutil.copy(d / f, d2 / f)
     _h5(d2 / "atac_gas.h5", [f"g{i}" for i in range(20)], [f"x{i}" for i in range(24)])
-    with pytest.raises(ValueError, match="hold different cells"):
+    with pytest.raises(ValueError, match="which holds other cells than atac_peak.h5"):
         mtb.run("MultiMAP", "diagonal",
                 inputs={r: str(d2 / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")},
                 out_dir=str(tmp_path / "o"), dry_run=True)

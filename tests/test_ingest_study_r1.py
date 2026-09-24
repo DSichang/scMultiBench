@@ -64,11 +64,11 @@ def test_log_normalised_rna_warns_on_export_and_to_canonical(tmp_path):
     a = _cite()
     a.layers["counts"] = a.X.copy()
     a.X = np.log1p(a.X)
-    with pytest.warns(UserWarning, match=r"rna values are not whole numbers .*"
-                                         r"rna='layer:counts' \(MuData: "
-                                         r"rna='mod:rna.layer:counts'\)"):
+    # R7-09: an AnnData export names the AnnData selector only
+    with pytest.warns(UserWarning, match=r"rna values are not whole numbers.*"
+                                         r"rna='layer:counts'\.$"):
         ingest.export_dataset(a, tmp_path / "LOG", adt="obsm:protein", labels="obs:cell_type")
-    with pytest.warns(UserWarning, match=r"rna values are not whole numbers .*layer='counts'"):
+    with pytest.warns(UserWarning, match=r"rna values are not whole numbers.*layer='counts'"):
         ingest.to_canonical(a, tmp_path / "x.h5", modality="rna")
     # raw counts: no warning at all
     with warnings.catch_warnings():
@@ -196,8 +196,8 @@ def test_existing_files_raise_unless_overwrite(tmp_path):
     a = _cite()
     ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
     before = {p.name: p.stat().st_mtime_ns for p in (tmp_path / "D").iterdir()}
-    with pytest.raises(FileExistsError, match=r"pass overwrite=True to "
-                                              r"replace them") as ei:
+    with pytest.raises(FileExistsError, match=r"Pass overwrite=True to "
+                                              r"replace them\.") as ei:
         ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
     assert "rna.h5" in str(ei.value) and "cty.csv" in str(ei.value)
     assert {p.name: p.stat().st_mtime_ns for p in (tmp_path / "D").iterdir()} == before

@@ -119,7 +119,7 @@ def test_scan_env_reason_names_method_and_category(no_envs):
     assert "--methods StabMap" in row["env_reason"]
     assert "--category cross" in row["env_reason"]
     assert "--packed --run" in row["env_reason"]
-    assert f"conda env {row['env']!r} is not installed" in row["env_reason"]
+    assert row["env_reason"].startswith(f"Environment {row['env']} is not installed.")
     assert not row["env_ok"]
 
 

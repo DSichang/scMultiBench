@@ -119,7 +119,7 @@ def test_wide_csv_read_back_is_marked_unknown(tmp_path):
     assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
     assert set(long["scored_with"]) == {"unknown"}
     assert msgs == [pipeline.NO_SCORING_RECORD]
-    assert msgs[0].startswith("these scores carry no record of how they were scored")
+    assert msgs[0].startswith("These scores carry no record of how they were scored.")
     assert "mtb.to_long(...)" in msgs[0]
 
 

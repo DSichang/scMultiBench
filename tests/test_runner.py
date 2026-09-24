@@ -153,7 +153,8 @@ def test_run_preflight_raises_when_env_missing(tmp_path, monkeypatch):
     msg = str(e.value)
     assert "is not installed" in msg
     assert "multibench env install --methods SCALEX" in msg
-    assert "mtb.env.doctor()" in msg
+    # R7-10: the Python call follows the shell command (the doctor pointer is gone)
+    assert "In Python, call mtb.env.install(['SCALEX'], dry_run=False)." in msg
     assert not out.exists(), "preflight must fail before anything is written"
 
 

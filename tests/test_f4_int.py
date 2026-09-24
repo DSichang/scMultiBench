@@ -81,5 +81,11 @@ def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkey
                 f"multibench fetch --scripts. If the folder is left over from an earlier "
                 f"fetch, you can remove it instead")
     assert not df["runnable"].any() and df["reason"].str.startswith(sentence).all()
-    err = capsys.readouterr().err
-    assert err.count(f"# {sentence}\n") == 1, err
+    # R7-07: the note is printed with verbose=True only, after the count line
+    assert sentence not in capsys.readouterr().err
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        W.run_all("GASMOS", "mosaic", data_path=root, dry_run=True, methods=["StabMap"],
+                  verbose=True)
+    out = capsys.readouterr().out
+    assert out.count(f"[run_all] {sentence}.\n") == 1, out

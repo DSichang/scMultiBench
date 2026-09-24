@@ -170,8 +170,8 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
     same_cells = ("" if stored else
                   " If these datasets hold the same cells, give their rows one "
                   "dataset name first.")
-    return (f"rows come from {n} datasets ({', '.join(names)}) that share no "
-            f"method, so the figure ranks unrelated rows against each other. "
+    return (f"The rows come from {n} datasets, {_and(names)}, that share no method. "
+            f"The figure ranks unrelated rows against each other. "
             f"Plot each dataset on its own, or {remedy}.{same_cells}")
 
 
@@ -185,7 +185,8 @@ def _lone_method_messages(parts: dict, consequence: str) -> list:
     """One message per dataset that holds one method while the frame holds several."""
     if len(coverage(parts)) <= 1:
         return []
-    return [f"dataset {ds} has only one method ({mat.index[0]}), so {consequence}. "
+    return [f"Dataset {ds} has only one method, {mat.index[0]}. "
+            f"{consequence[:1].upper()}{consequence[1:]}. "
             f"Plot it with methods scored on the same dataset."
             for ds, mat in parts.items() if len(mat.index) == 1]
 

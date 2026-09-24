@@ -36,7 +36,7 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
                           "(vertical).")
     assert "one line per requested row" in msg
     # every requested variant on its own line, with ITS reason
-    assert "\n  Matilda (rna+adt): conda env 'matilda' is not installed" in msg
+    assert "\n  Matilda (rna+adt): Environment matilda is not installed" in msg
     assert "\n  Matilda (rna+atac): " in msg
     # nobody else's reason - Concerto/MIRA/MOFA2 were not requested
     for other in ("Concerto", "MIRA", "MOFA2", "scmb_concerto"):
