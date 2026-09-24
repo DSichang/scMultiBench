@@ -1333,9 +1333,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     The representation is not recorded on disk. Check that
     ``method_info(m)['atac']`` is the kind exported. ``mtb.scan`` and
-    ``run_all`` skip a method whose file holds the other representation;
-    named in ``methods=``, or given to ``mtb.run``, it runs and gives a wrong
-    embedding.
+    ``run_all`` skip a method whose file holds the other representation,
+    unless ``allow_atac_mismatch=True``. ``mtb.run`` only warns, and the
+    method gives a wrong embedding.
 
     **Existing files.** Every check runs before ``dataset_dir`` is created;
     a failed call writes nothing. When a file the call would write already

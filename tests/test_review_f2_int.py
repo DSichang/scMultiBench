@@ -428,8 +428,9 @@ def test_docstrings_drop_the_justification_tails():
             "the stored tables.") in flat["to_long"]
     assert "the placeholder the plotting layer uses" not in flat["to_long"]
     assert "bounded above by the ARI itself" not in flat["summary"]
-    assert ("The score is a ratio to the best ARI, not a difference, because the "
-            "runner-up sits near chance.") in flat["summary"]
+    # R4-14 deleted the ratio sentence; the formula stays
+    assert "not a difference, because" not in flat["summary"]
+    assert "``(best - runner_up) / best``" in flat["summary"]
     assert "so a whole category needs only a few envs" not in flat["plan"]
     assert "go straight to" not in flat["load_results"]
 

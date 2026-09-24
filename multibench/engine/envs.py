@@ -1336,7 +1336,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
     Parameters
     ----------
     category : str, optional
-        Restrict to the methods wired for this category; default: all.
+        Methods with a variant in this category; default: all.
     methods : list of str, optional
         Explicit method ids (``KeyError`` with a did-you-mean hint on a typo).
     conda : str, optional

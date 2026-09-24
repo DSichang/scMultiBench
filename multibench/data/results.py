@@ -709,8 +709,7 @@ def load_results(
     When the selection holds one method in the chosen source while the
     other source holds more, a ``UserWarning`` says so (``"only one method
     (scMoMaT) in the published table for cross/D52 ... pass source='rerun'
-    (or 'both')"``): a one-method table yields meaningless ranks. No warning
-    when the other source has nothing more.
+    (or 'both')"``). No warning when the other source has nothing more.
 
     **Re-run version.** The sweep files stamp their rows
     ``rerun-<version>``; the ``source`` column reads plain ``"rerun"`` and
@@ -954,9 +953,8 @@ def available_datasets(
     source: str = "published",
     result_path: Path | str | None = None,
 ) -> list[str]:
-    """Dataset ids that ship stored results, not the datasets that can be downloaded.
+    """Dataset ids that have stored results.
 
-    Stored results are the metric tables ``mtb.load_results`` reads;
     ``mtb.data.fetchable`` lists the ids that can be downloaded.
 
     Parameters
@@ -987,11 +985,8 @@ def available_datasets(
 
     Notes
     -----
-    **Downloadable datasets.** Only a few of the benchmark's datasets
-    are downloadable: the release assets of ``mtb.data.fetch``, listed by
-    ``mtb.data.fetchable()``. An id returned here but not there has metric
-    tables to plot and rank against, and no data file this package can
-    obtain.
+    **Downloadable datasets.** An id listed here but not by
+    ``mtb.data.fetchable()`` has metric tables and no data file to download.
 
     **What counts.** Published ids are those holding at least one method's
     default-clustering table (``metric.csv``) - what
