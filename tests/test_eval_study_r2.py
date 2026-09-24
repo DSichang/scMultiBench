@@ -54,11 +54,18 @@ def test_evaluate_notes_name_each_neighbourhood():
     assert "scib 1.x" not in doc
     assert "``scib >= 1.1``" in doc and 'attrs["scib_version"]' in doc
     # R3-15: LISI takes the 90 cells nearest by path on scib's own 15-neighbour
-    # graph, not a 90-nearest-neighbour graph in the embedding
-    assert ("cLISI and iLISI: scib builds a 15-neighbour graph from the embedding "
-            "and takes the 90 cells nearest by path length on it (k0 = 90, "
-            "perplexity 30). A cell with fewer than 90 reachable cells counts as "
-            "one label") in doc
+    # graph, not a 90-nearest-neighbour graph in the embedding. R4-10: an
+    # edge's length is its connectivity weight (scib 1.1.7 lisi.py writes
+    # obsp['connectivities'] for knn_graph.o), not its distance
+    assert ("cLISI and iLISI: scib builds scanpy's 15-neighbour graph from the "
+            "embedding. For each cell it takes the 90 cells with the shortest "
+            "paths on that graph, where the length of an edge is its "
+            "connectivity weight (``obsp[\"connectivities\"]``), not its "
+            "distance. Perplexity 30. A cell with fewer than 90 reachable cells "
+            "counts as one label") in doc
+    assert doc.count("90 nearest by path over the connectivity weights of the "
+                     "15-neighbour graph") == 2
+    assert "nearest by path length on it" not in doc
     assert "k0 = 90 neighbours" not in doc
     assert ("the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default neighbour "
             "graph (15 neighbours)") in doc
@@ -85,8 +92,12 @@ def test_stated_scib_facts_match_the_requirement_and_scib_defaults():
     from scib.metrics import lisi
     knn = inspect.getsource(lisi.recompute_knn)
     assert 'if type_ == "embed":' in knn and "n_neighbors=15" in knn
-    assert "np.floor(n_neighbors / 3)" in inspect.getsource(lisi.lisi_graph_py)
+    graph_py = inspect.getsource(lisi.lisi_graph_py)
+    assert "np.floor(n_neighbors / 3)" in graph_py
     assert "simpson[i] = 1" in inspect.getsource(lisi.compute_simpson_index_graph)
+    # the shortest-path search reads the connectivity weights as edge lengths
+    assert 'connectivities = adata.obsp["connectivities"]' in graph_py
+    assert "mmwrite(mtx_file_path, connectivities" in graph_py
 
 
 def test_catalog_describes_clisi_in_plain_direction():
