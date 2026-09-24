@@ -25,6 +25,10 @@ from multibench import cli, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
 GENES = [f"GENE{i}" for i in range(40)]
@@ -118,8 +122,7 @@ def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
             assert r.reason == (f"{m} needs gene-activity ATAC, and atac.h5 holds peaks. "
                                 f"Export the ATAC as gene activity, or pass "
                                 f"allow_atac_mismatch=True to run {m} anyway."), r.reason
-            assert r.caveat.startswith(f"{m} needs gene-activity ATAC. atac.h5 holds peaks, "
-                                       f"because its features look like chr:start-end.")
+            assert r.caveat.startswith(f"{m} {GAS_CAV}")
         assert df.loc[["moETM", "scMM", "iPOLNG", "scMVP"], "runnable"].all()
     # R4-01: naming the method no longer runs it; allow_atac_mismatch does
     named = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
@@ -179,12 +182,11 @@ def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatc
                  evaluate=False, allow_atac_mismatch=True)
     log = capsys.readouterr().out
     assert calls[-1] == "Matilda"
-    assert "[run_all]   Matilda needs gene-activity ATAC. atac.h5 holds peaks" in log
+    assert f"[run_all]   Matilda {GAS_CAV}" in log
     sm = res.summary
     # R5-03: reason follows caveat as the last column
     assert list(sm.columns[-2:]) == ["caveat", "reason"]
-    assert sm["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC. atac.h5 holds "
-                                           "peaks")
+    assert sm["caveat"].iloc[0].startswith(f"Matilda {GAS_CAV}")
     disk = pd.read_csv(tmp_path / "named" / "summary.csv")
     assert list(disk.columns)[-2:] == ["caveat", "reason"]
     assert disk["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC")
@@ -197,7 +199,7 @@ def test_dry_run_prints_the_whole_caveat(tmp_path, capsys):
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"], data_path=root,
            dry_run=True, allow_atac_mismatch=True)
-    assert ("[run_all] Matilda needs gene-activity ATAC. atac.h5 holds peaks"
+    assert (f"[run_all] Matilda {GAS_CAV}"
             in capsys.readouterr().out)
 
 
@@ -293,8 +295,7 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
                  allow_atac_mismatch=True)
     log = capsys.readouterr().out
     cav = res.results[0]["caveat"]
-    assert cav == ("Matilda needs gene-activity ATAC. atac.h5 holds peaks, because its "
-                   "features look like chr:start-end."), cav
+    assert cav == f"Matilda {GAS_CAV}", cav
     assert "The method scripts are not in" not in log
     assert W._run_caveat("Matilda reads inputs/a.h5. mtb.run writes that file first") == ""
     assert W._run_caveat("Matilda needs raw counts. rna.h5 holds non-integer values. "

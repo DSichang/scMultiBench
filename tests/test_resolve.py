@@ -169,8 +169,8 @@ def test_atac_gas_peak_caveat(tmp_path):
     got = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path, check=True)
     assert got["atac_gas"].endswith("atac.h5")
     assert resolve._preflight_caveats(got) == [
-        "The method needs gene-activity ATAC. atac.h5 holds peaks, because its features "
-        "look like chr:start-end."]
+        "The method needs gene-activity ATAC. The features of atac.h5 look like "
+        "chr:start-end, so it holds peaks."]
     assert resolve._preflight_caveats(got, method="Portal") == [
         resolve.PEAK_IN_GAS_CAVEAT.format(method="Portal")]
     # a real atac_gas.h5 (gene names) -> no caveat; so does gene-named atac.h5

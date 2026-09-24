@@ -123,8 +123,8 @@ def test_a_batch_sheet_without_a_column_names_the_flag(cite, tmp_path, capsys):
     lab = _one_column(tmp_path / "cty.csv", CELLTYPE)
     assert _evaluate(h5ad, "--labels", str(lab), "--batch", str(sheet)) == 1
     err = capsys.readouterr().err
-    assert ("error: batch: obs_sheet.csv has several columns after the cell ids: "
-            "celltype, sample. Choose one with --batch-column.") in err
+    assert ("error: The --batch file obs_sheet.csv has several columns after the cell "
+            "ids: celltype, sample. Choose one with --batch-column.") in err
     assert "Unnamed" not in err and "named x" not in err
     # run-all reads the file in its dry run and says the same
     data, batch, _ = cite
@@ -132,16 +132,16 @@ def test_a_batch_sheet_without_a_column_names_the_flag(cite, tmp_path, capsys):
     dsheet = _sheet(tmp_path / "d" / "obs_sheet.csv", BARS, batch)
     assert _dry_run(data, "--batch", str(dsheet)) == 1
     err = capsys.readouterr().err
-    assert ("error: batch: obs_sheet.csv has several columns after the cell ids: "
-            "celltype, sample. Choose one with --batch-column.") in err
+    assert ("error: The --batch file obs_sheet.csv has several columns after the cell "
+            "ids: celltype, sample. Choose one with --batch-column.") in err
     assert "Unnamed" not in err
     # a label file keeps pointing to --column and to the label column x
     assert _evaluate(h5ad, "--labels", str(sheet), "--batch", str(sheet),
                      "--batch-column", "sample") == 1
     err = capsys.readouterr().err
-    assert ("error: labels: obs_sheet.csv has several columns after the cell ids: "
-            "celltype, sample. Choose one with --column, or name the label column x.") \
-        in err
+    assert ("error: The --labels file obs_sheet.csv has several columns after the cell "
+            "ids: celltype, sample. Choose one with --column, or name the label column "
+            "x.") in err
     assert "Unnamed" not in err
 
 
@@ -152,8 +152,9 @@ def test_an_unknown_batch_column_lists_the_columns(tmp_path, capsys):
     assert _evaluate(h5ad, "--labels", str(lab), "--batch", str(sheet),
                      "--batch-column", "donor") == 1
     err = capsys.readouterr().err
-    assert ("error: batch: obs_sheet.csv has no column named 'donor'. Its columns "
-            "after the cell ids are celltype, sample.") in err
+    assert ("error: The --batch file obs_sheet.csv has no column named 'donor'. Its "
+            "columns after the cell ids are celltype, sample.") in err
+    assert "error: batch:" not in err
     assert "Unnamed" not in err
 
 
@@ -171,8 +172,8 @@ def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(sheet), metrics=METRICS)
     msg = str(e.value)
-    assert msg == ("batch: obs_sheet.csv has several columns after the cell ids: "
-                   "celltype, sample. Pass one column as a Series, for example "
+    assert msg == ("The batch file obs_sheet.csv has several columns after the cell "
+                   "ids: celltype, sample. Pass one column as a Series, for example "
                    f'pd.read_csv({quoted}, index_col=0)["sample"].')
     # the suggested call, pasted, gives the scores of the obs column
     series = eval(_example(msg), {"pd": pd})
@@ -181,16 +182,18 @@ def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
         mtb.evaluate(a, labels="celltype", batch="sample", metrics=METRICS))
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels=str(sheet), metrics=["ASW"])
-    assert str(e.value) == ("labels: obs_sheet.csv has several columns after the cell "
-                            "ids: celltype, sample. Pass one column as a Series, for "
+    assert str(e.value) == ("The labels file obs_sheet.csv has several columns after "
+                            "the cell ids: celltype, sample. Pass one column as a "
+                            "Series, for "
                             f'example pd.read_csv({quoted}, index_col=0)["celltype"], '
                             "or name the label column x.")
     # run_all reads the file before any method runs, with the same advice
     data, batch, _ = cite
     (tmp_path / "d").mkdir()
     dsheet = _sheet(tmp_path / "d" / "obs_sheet.csv", BARS, batch)
-    with pytest.raises(ValueError, match=r"^batch: obs_sheet\.csv has several columns "
-                                         r"after the cell ids: celltype, sample\. Pass "
+    with pytest.raises(ValueError, match=r"^The batch file obs_sheet\.csv has several "
+                                         r"columns after the cell ids: celltype, sample\. "
+                                         r"Pass "
                                          r"one column as a Series, for example "
                                          r"pd\.read_csv\("):
         mtb.run_all("MYCITE", "vertical", dry_run=True, batch=dsheet, data_path=data,
@@ -203,7 +206,8 @@ def test_files_without_an_id_column_and_tsv_files(tmp_path):
     pd.DataFrame({"celltype": CELLTYPE, "sample": SAMPLES}).to_csv(plain, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(plain), metrics=METRICS)
-    assert str(e.value) == ("batch: meta.csv has several columns: celltype, sample. "
+    assert str(e.value) == ("The batch file meta.csv has several columns: celltype, "
+                            "sample. "
                             "Pass one column as a Series, for example "
                             f'pd.read_csv({json.dumps(str(plain))})["sample"].')
     tsv = _sheet(tmp_path / "obs.tsv", list(a.obs_names), sep="\t")
@@ -219,8 +223,8 @@ def test_files_without_an_id_column_and_tsv_files(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(rn), metrics=METRICS)
     msg = str(e.value)
-    assert msg.startswith("batch: rn.csv has several columns after the row numbers: "
-                          "celltype, sample. ")
+    assert msg.startswith("The batch file rn.csv has several columns after the row "
+                          "numbers: celltype, sample. ")
     assert f'pd.read_csv({json.dumps(str(rn))})["sample"]' in msg
     pd.testing.assert_frame_equal(
         mtb.evaluate(a, labels="celltype", batch=eval(_example(msg), {"pd": pd}),

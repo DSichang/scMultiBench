@@ -51,9 +51,11 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     for _, r in blocked.iterrows():
         # the file half is verbatim: the exception class and the absolute
         # dataset path survive (a script-gate part, e.g. MIRA's missing
-        # logger.py helper, may precede it - the two halves are joined by '; ')
-        parts = r["files_reason"].split("; ")
-        assert any(p.startswith("FileNotFoundError: ") for p in parts) and root in r["files_reason"]
+        # logger.py helper, may precede it - the two halves are joined by ' ')
+        text = r["files_reason"]
+        assert (text.startswith("FileNotFoundError: ") or ". FileNotFoundError: " in text) \
+            and root in text
+        assert ".; " not in text
         assert "FileNotFoundError" not in r["reason"] and root not in r["reason"]
         assert r["reason"].endswith(". " + r["env_reason"])      # env half verbatim
         assert "--packed --run" in r["reason"]                    # install command kept

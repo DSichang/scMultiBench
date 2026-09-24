@@ -334,10 +334,10 @@ def test_cli_dry_run_headers_are_sentences(monkeypatch, capsys, tmp_path):
     assert rc == 0
     assert cap.err.startswith(
         "# Dry run. Nothing was executed. 0 of 1 method can run on D11 (vertical). The "
-        "commands below are what multibench run would execute. Rows with files_ok False "
-        "have none.\n")
-    assert ("# Commands of the 1 row whose input files are in place. [env missing] marks "
-            "a row whose environment is not installed. [use multibench run] marks a "
+        "commands below are what multibench run would execute. Methods with files_ok "
+        "False have none.\n")
+    assert ("# Commands of the 1 method whose input files are in place. [env missing] marks "
+            "a method whose environment is not installed. [use multibench run] marks a "
             "command that reads a file multibench run writes first.") in cap.out
     for text in (cap.out, cap.err):
         assert "`" not in text and "(s)" not in text

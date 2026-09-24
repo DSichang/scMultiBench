@@ -804,8 +804,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     The dry run prints to stderr what the real run would need first: the
     method's ``setup_hint`` (``method_info(m)['setup_hint']``), a note when
     the method scripts are not on this machine yet or not at
-    ``MULTIBENCH_SCRIPTS_REF``, and a note when the command reads a file
-    under ``inputs/`` that the run writes first.
+    ``MULTIBENCH_SCRIPTS_REF``, a note when the command reads a file under
+    ``inputs/`` that the run writes first, and a note for an input path
+    that does not exist.
 
     An ATAC file that ``mtb.scan`` would block gets a note too: it holds the
     other representation, or peak names the method cannot read. The real

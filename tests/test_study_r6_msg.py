@@ -30,6 +30,10 @@ from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GENES = [f"GENE{i}" for i in range(60)]
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
@@ -167,9 +171,7 @@ def test_the_atac_caveats_start_with_the_method(tmp_path, pinned):
     sc = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda", "scMVP"],
                 modalities=["rna", "atac"], data_path=_mu_peak(tmp_path),
                 verbose=False, allow_atac_mismatch=True).set_index("method")
-    assert sc.loc["Matilda", "caveat"].startswith(
-        "Matilda needs gene-activity ATAC. atac.h5 holds peaks, because its features look "
-        "like chr:start-end. ")
+    assert sc.loc["Matilda", "caveat"].startswith(f"Matilda {GAS_CAV} ")
     # the reason the row carries without the override is unchanged
     blocked = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda"],
                      modalities=["rna", "atac"], data_path=tmp_path,
@@ -355,8 +357,8 @@ def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
     rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
                          "--out-dir", str(tmp_path)], capsys)
     assert rc == 0
-    assert re.search(r"^# Commands of the 13 rows whose input files are in place\. "
-                     r"\[env missing\] marks a row whose environment is not installed\. "
+    assert re.search(r"^# Commands of the 13 methods whose input files are in place\. "
+                     r"\[env missing\] marks a method whose environment is not installed\. "
                      r"\[use multibench run\] marks a command that reads a file multibench "
                      r"run writes first\.$", out, re.M), out
     # D28 has one row per method: the count line counts methods

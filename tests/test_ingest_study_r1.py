@@ -212,7 +212,7 @@ def test_scan_checks_diagonal_label_rows_and_flags_a_lone_cty(tmp_path):
     sc = mtb.scan("LC", "diagonal", data_path=tmp_path)
     glue = sc[sc["method"] == "GLUE"].iloc[0]
     assert not glue["files_ok"]
-    assert "atac_cty.csv has 10 labels but atac_peak.h5 has 90 cells" in glue["files_reason"]
+    assert "atac_cty.csv has 10 labels, but atac_peak.h5 has 90 cells" in glue["files_reason"]
     # a diagonal folder whose only label file is cty.csv: caveat
     (d / "atac_cty.csv").unlink()
     (d / "rna_cty.csv").rename(d / "cty.csv")

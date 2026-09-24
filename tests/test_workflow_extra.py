@@ -156,7 +156,8 @@ def test_run_all_missing_dataset_folder_is_filenotfound():
     with pytest.raises(FileNotFoundError) as e:
         mtb.run_all("NO_SUCH_DATASET_XYZ", "vertical",
                     out_dir="/tmp/mtb_empty_test", verbose=False)
-    assert "NO_SUCH_DATASET_XYZ" in str(e.value) and "folders present" in str(e.value)
+    assert str(e.value).startswith("The folder ") and "NO_SUCH_DATASET_XYZ does not exist. " \
+        in str(e.value)
     assert "D11" in str(e.value)
 
 

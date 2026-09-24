@@ -15,6 +15,10 @@ import multibench as mtb
 from multibench import workflow as W
 from multibench.engine import envs, registry
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 OLD_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tunable",
                "runtime_tier", "observed_worst_sec", "caveat", "runnable", "reason"]
@@ -197,7 +201,7 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
     df = mtb.scan("PEAKY", "diagonal", data_path=tmp_path)
     portal = df[df["method"] == "Portal"].iloc[0]          # wants gene activity
     assert portal["files_ok"]
-    assert "Portal needs gene-activity ATAC. atac.h5 holds peaks" in portal["caveat"]
+    assert f"Portal {GAS_CAV}" in portal["caveat"]
     assert "chr:start-end" in portal["caveat"]
     # a method that WANTS peaks behind the atac_gas role gets no caveat
     peak_wanters = df[(df["atac"] == "peak") & df["modalities"].str.contains("atac_gas")]
@@ -224,7 +228,7 @@ def test_run_all_dry_run_prints_summary(capsys, no_envs):
 
 
 def test_run_all_dry_run_never_returns_empty():
-    with pytest.raises(ValueError, match="no 'diagonal' variant matches"):
+    with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):
         mtb.run_all("D28", "diagonal", out_dir="/tmp/unused", methods=["Matilda"],
                     dry_run=True, verbose=False)
 
@@ -260,5 +264,5 @@ def test_scan_is_the_dry_run_frame(no_envs):
                     dry_run=True, verbose=False)
     pd.testing.assert_frame_equal(a, b)
     assert len(a) >= 1 and not a["runnable"].any()
-    with pytest.raises(ValueError, match="no 'diagonal' variant matches"):
+    with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):
         mtb.scan("D28", "diagonal", methods=["Matilda"], verbose=False)

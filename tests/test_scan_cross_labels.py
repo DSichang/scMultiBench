@@ -97,7 +97,8 @@ def test_missing_cty_file_is_not_a_length_problem(tmp_path, no_envs):
 
 def test_inputs_for_check_true_raises_with_the_same_message(tmp_path):
     _numbered(tmp_path, "BADLAB", short=(1, 5))
-    with pytest.raises(ValueError, match=r"cty1\.csv has 35 labels but rna1\.h5 has 40 cells .* batch 1"):
+    with pytest.raises(ValueError, match=r"^cty1\.csv has 35 labels, but rna1\.h5 has 40 cells\. Give each cell of "
+                                         r"batch 1 one label, in the order of the cells\. "):
         mtb.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=True)
     # default (check=None) and check=False stay silent about content
     mtb.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path)
@@ -126,8 +127,8 @@ def test_reference_d52_copy_with_five_rows_cut(tmp_path, no_envs):
     df = mtb.scan("BADLAB", "cross", data_path=tmp_path)
     rows = df[df["modalities"] != "(data_dir)"]
     assert len(rows) >= 8 and not rows["files_ok"].any()
-    assert rows["files_reason"].str.contains(r"cty1\.csv has \d+ labels but rna1\.h5 has \d+ cells").all()
+    assert rows["files_reason"].str.contains(r"cty1\.csv has \d+ labels, but rna1\.h5 has \d+ cells").all()
     assert rows["files_reason"].str.contains("batch 1").all()
     # and the untouched reference dataset still passes the label check
     ok = mtb.scan("D52", "cross")
-    assert not ok["files_reason"].str.contains("labels but").any()
+    assert not ok["files_reason"].str.contains("labels, but").any()

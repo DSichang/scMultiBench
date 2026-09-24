@@ -38,6 +38,10 @@ from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
@@ -155,12 +159,14 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
         with pytest.raises(ValueError) as e:
             _quiet(call, "D28", "vertical", methods=["moETM"],
                    modalities=["rna", "gene_activity"], verbose=False)
-        assert str(e.value).endswith(
-            "moETM reads peaks through its atac_gas input; pass modalities=['rna', "
-            "'atac_peak'] (or 'atac')"), str(e.value)
+        assert str(e.value) == (
+            "moETM does not read rna+gene_activity in vertical data. moETM reads peaks "
+            "through its atac_gas input. Pass modalities=['rna', 'atac_peak'] or "
+            "['rna', 'atac']."), str(e.value)
         assert "method_info(m)['supports']" not in str(e.value)
-    with pytest.raises(ValueError, match=r"Matilda reads gene activity; pass "
-                                         r"modalities=\['rna', 'atac_gas'\] \(or 'atac'\)$"):
+    with pytest.raises(ValueError, match=r"Matilda reads gene activity\. Pass "
+                                         r"modalities=\['rna', 'atac_gas'\] or "
+                                         r"\['rna', 'atac'\]\.$"):
         _quiet(mtb.scan, "D11", "vertical", methods=["Matilda"],
                modalities=["rna", "atac_peak"], verbose=False)
     # the command line keeps the message and gives its own spelling
@@ -169,8 +175,8 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
                 "--modalities", "rna,gas"] + (["--dry-run"] if sub == "run-all" else [])
         assert _quiet(cli.main, argv) == 1
         err = capsys.readouterr().err
-        assert "moETM reads peaks through its atac_gas input; pass --modalities " \
-               "rna,atac_peak (or rna,atac)" in err, err
+        assert "moETM reads peaks through its atac_gas input. Pass --modalities " \
+               "rna,atac_peak or rna,atac." in err, err
 
 
 def test_scan_notes_list_gas_among_the_tokens():
@@ -227,7 +233,7 @@ def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, caps
     _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
            modalities=["rna", "atac"], data_path=root, dry_run=True,
            allow_atac_mismatch=True)
-    assert "[run_all] Matilda needs gene-activity ATAC. atac.h5 holds peaks, because" in \
+    assert f"[run_all] Matilda {GAS_CAV}" in \
         capsys.readouterr().out
 
 
@@ -270,7 +276,7 @@ def test_a_scripts_ref_mismatch_is_its_own_blocker(scripts_at_head, capsys):
                    "--dry-run"])
     cap = capsys.readouterr()
     assert rc == 0
-    assert "# Commands of the 1 row whose input files are in place." in cap.out
+    assert "# Commands of the 1 method whose input files are in place." in cap.out
     assert "totalVI (rna+adt): " in cap.out
 
 

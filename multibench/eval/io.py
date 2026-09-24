@@ -116,7 +116,8 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     2. the column named ``x`` when present;
     3. the only column when the file has one;
     4. the last column when the file has exactly two and the first is all
-       unique or has no header (an index / barcode column);
+       unique (an index / barcode column), or has no header and holds the
+       row numbers of ``pd.concat([...]).to_csv(path)`` (runs of 0..k-1);
     5. otherwise the file is ambiguous and a ``ValueError`` lists the
        columns after the cell ids and asks for ``column=``: a silent pick
        could score the wrong column without any error. When the first of
@@ -161,9 +162,11 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     a Series (:func:`_series_example`), for callers that have no ``column``
     argument (default: pass ``column=``).
     """
+    from .. import config
     path = _require_file(path, "labels file")
     d = pd.read_csv(path, sep=_sep_for(path))
-    head = f"{what}: {path.name}" if what else str(path)
+    head = (config.hint(f"The {what} file {path.name}", f"The --{what} file {path.name}")
+            if what else str(path))
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
     if column is not None:
         if column not in d.columns:
@@ -191,10 +194,14 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
         raise ValueError(
             f"{what or path}: the first column of {path.name} repeats "
             f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
-    if d.shape[1] == 2 and no_header:
-        # an index without a header that repeats numbers, such as the
-        # RangeIndex of pd.concat([...]).to_csv(path): the other column
+    if d.shape[1] == 2 and no_header and _stacked_row_numbers(first):
+        # the RangeIndex of each frame of pd.concat([...]).to_csv(path),
+        # 0..k-1 again and again: the rows are in file order
         return d.iloc[:, -1].to_numpy(), first
+    if d.shape[1] == 2 and no_header and pd.api.types.is_integer_dtype(first):
+        # the same, with the rows reordered after the concat
+        raise ValueError(f"{head} has row numbers that repeat out of order, so its rows "
+                         f"may not follow the cells. Save it in cell order.")
     kind, names = _data_columns(d)
     if callable(pick):
         # barcodes become the Series index; row numbers would not match any cell
@@ -202,6 +209,16 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     after = f" after the {kind}" if kind else ""
     raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. "
                      f"{pick or 'Pass column=<name>.'}")
+
+
+def _stacked_row_numbers(col: pd.Series) -> bool:
+    """Runs of ``0, 1, ..., k-1``: the row numbers of several frames that
+    ``pd.concat([...]).to_csv(path)`` writes one after another. Numbers in
+    any other order (rows sorted after the concat) are not."""
+    if not pd.api.types.is_integer_dtype(col) or not len(col):
+        return False
+    v = col.to_numpy()
+    return bool(v[0] == 0 and np.all((np.diff(v) == 1) | (v[1:] == 0)))
 
 
 def _no_header(name) -> bool:

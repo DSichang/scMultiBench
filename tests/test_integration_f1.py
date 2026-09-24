@@ -190,7 +190,7 @@ def test_scan_checks_label_rows_for_a_folder_fed_method(tmp_path):
                   verbose=False)
     row = sc.iloc[0]
     assert not row["files_ok"]
-    assert "atac_cty.csv has 10 labels but atac_gas.h5 has 40 cells" in row["files_reason"]
+    assert "atac_cty.csv has 10 labels, but atac_gas.h5 has 40 cells" in row["files_reason"]
     pd.DataFrame({"x": ["T"] * 40}).to_csv(d / "atac_cty.csv", index=False)
     sc = mtb.scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
                   verbose=False)

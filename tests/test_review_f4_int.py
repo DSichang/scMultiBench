@@ -33,6 +33,10 @@ from multibench.engine import envs, registry
 from multibench.engine import resolve as RS
 from multibench.engine import runner as R
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
 GENES = [f"GENE{i}" for i in range(60)]
@@ -181,7 +185,7 @@ def test_run_all_with_the_override_does_not_warn_again(tmp_path, pinned, monkeyp
                           allow_atac_mismatch=True)
     assert not [w for w in rec if "needs gene-activity ATAC" in str(w.message)], \
         [str(w.message) for w in rec]
-    assert "[run_all]   Matilda needs gene-activity ATAC. atac.h5 holds peaks" in \
+    assert f"[run_all]   Matilda {GAS_CAV}" in \
         capsys.readouterr().out
     assert res.records[0]["status"] == "FAIL" and "stand-in env" in res.records[0]["error"]
     # a direct mtb.run still warns, once

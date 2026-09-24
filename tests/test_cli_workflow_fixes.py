@@ -63,7 +63,7 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
         with pytest.raises(ValueError) as e:
             mtb.run_all("D52", "cross", methods=["Matilda"], out_dir="/tmp/unused",
                         dry_run=dry, verbose=False)
-        assert "no 'cross' variant matches dataset='D52' methods=['Matilda']" in str(e.value)
+        assert str(e.value) == "Matilda does not run on cross data. Its categories: vertical."
         assert "nothing is runnable" not in str(e.value)
 
 
@@ -450,7 +450,7 @@ def test_read_only_commands_put_data_on_stdout_and_notes_on_stderr(argv, capsys,
     (["cite", "BOGUS"], 1, "BOGUS"),
     (["env", "recipe", "Matlda"], 1, "Did you mean Matilda"),
     (["run-all", "D52", "--category", "cross", "--out-dir", "/tmp/unused", "--methods",
-      "Matilda"], 1, "no 'cross' variant matches"),
+      "Matilda"], 1, "Matilda does not run on cross data."),
 ])
 def test_runtime_errors_go_to_stderr_with_exit_1(argv, code, needle, capsys):
     rc = cli.main(argv)

@@ -310,7 +310,7 @@ def test_cli_plot_unknown_method_and_bad_input(tmp_path, capsys):
     rc = cli.main(["plot", "bar", "--input", str(csv), "--methods", "Zed",
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
-    assert rc == 1 and "unknown method(s) ['Zed']" in err and "methods in the table" in err
+    assert rc == 1 and "error: Unknown method Zed. The table has A and B." in err
     bad = tmp_path / "bad.csv"
     pd.DataFrame({"a": [1]}).to_csv(bad, index=False)
     rc = cli.main(["plot", "bar", "--input", str(bad), "--out", str(tmp_path / "x.png")])

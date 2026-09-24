@@ -204,6 +204,26 @@ def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
                           aggfunc="mean")
 
 
+def _unknown_names(unknown, available, kind: str) -> str:
+    """The error for ``unknown`` names of ``kind`` (``"method"``, ``"metric"``)
+    that the table does not have: a suggestion from the table's names (for a
+    method also the registry's), then the names the table has."""
+    import difflib
+    pool = [str(a) for a in available]
+    hints = []
+    for u in unknown:
+        h = difflib.get_close_matches(str(u), pool, n=1, cutoff=0.6)
+        if not h and kind == "method":
+            from ..engine import registry
+            h = [c for c in (registry.closest_method(str(u)),) if c]
+        hints += h
+    text = f"Unknown {kind if len(unknown) == 1 else kind + 's'} {_and(unknown)}."
+    if hints:
+        text += f" Did you mean {_and(hints)}?"
+    have = sorted(set(pool))
+    return text + (f" The table has {_and(have)}." if have else " The table is empty.")
+
+
 def _resolve(requested, available, kind: str, canon) -> list:
     """Map user-supplied selector names onto the frame's own spellings.
 
@@ -233,13 +253,7 @@ def _resolve(requested, available, kind: str, canon) -> list:
         else:
             unknown.append(r)
     if unknown:
-        import difflib
-        hints = {u: difflib.get_close_matches(str(u), [str(a) for a in available],
-                                             n=1, cutoff=0.6) for u in unknown}
-        did = " ".join(f"{u!r}: did you mean {h[0]!r}?" for u, h in hints.items() if h)
-        raise ValueError(
-            f"unknown {kind}(s) {unknown}" + (f" ({did})" if did else "")
-            + f"; available in this frame: {sorted(map(str, available))}")
+        raise ValueError(_unknown_names(unknown, available, kind))
     dup = sorted({x for x in out if out.count(x) > 1})
     if dup:
         raise ValueError(

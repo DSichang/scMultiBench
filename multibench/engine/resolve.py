@@ -549,7 +549,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
         if "data_dir" in out:
             ok, why = _check_data_dir(variant, out["data_dir"], method)
             if not ok:
-                raise FileNotFoundError(f"{method}/{dataset}/{category}: {why}")
+                raise FileNotFoundError(why)      # it starts with the method
             if category == "diagonal":
                 named = _data_dir_files(variant, out["data_dir"])
                 _check_atac_gas_cells(method, dataset, named)
@@ -804,13 +804,8 @@ def _check_label_lengths(method, dataset, category, resolved):
         if n_feat == n_cell:              # orientation ambiguous: cannot tell cells
             continue
         if n_lab != n_cell:
-            raise ValueError(
-                f"{method}/{dataset}/{category}: {lab.name} has {n_lab} labels but "
-                f"{q.name} has {n_cell} cells (matrix/barcodes) - batch {batch}: "
-                f"every cell of a batch needs exactly one label in cty{batch}.csv, "
-                f"in the same order as the cells (see "
-                + config.hint(f"mtb.describe_layout({category!r})",
-                              f"multibench layout {category}") + ")")
+            raise ValueError(_label_count_text(lab.name, n_lab, q.name, n_cell,
+                                               category, batch=batch))
     if category == "diagonal":
         _check_diagonal_label_files(method, dataset, resolved)
     for role, path in resolved.items():
@@ -833,12 +828,8 @@ def _check_label_lengths(method, dataset, category, resolved):
             if n_feat == n_cell:          # orientation ambiguous: cannot tell cells
                 continue
             if n_lab != n_cell:
-                raise ValueError(
-                    f"{method}/{dataset}/{category}: {p.name} has {n_lab} labels but "
-                    f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
-                    f"exactly one label, in the same order as the cells (see "
-                    + config.hint(f"mtb.describe_layout({category!r})",
-                                  f"multibench layout {category}") + ")")
+                raise ValueError(_label_count_text(p.name, n_lab, q.name, n_cell,
+                                                   category))
 
 
 def _check_diagonal_label_files(method, dataset, resolved):
@@ -866,12 +857,18 @@ def _check_diagonal_label_files(method, dataset, resolved):
         if n_feat == n_cell:
             continue
         if n_lab != n_cell:
-            raise ValueError(
-                f"{method}/{dataset}/diagonal: {lab.name} has {n_lab} labels but "
-                f"{q.name} has {n_cell} cells (matrix/barcodes) - every cell needs "
-                f"exactly one label, in the same order as the cells (see "
-                + config.hint("mtb.describe_layout('diagonal')",
-                              "multibench layout diagonal") + ")")
+            raise ValueError(_label_count_text(lab.name, n_lab, q.name, n_cell,
+                                               "diagonal"))
+
+
+def _label_count_text(labels: str, n_lab: int, data: str, n_cell: int, category: str,
+                      *, batch=None) -> str:
+    """The error of a label file whose length is not its data file's cell count."""
+    each = f"each cell of batch {batch}" if batch is not None else "each cell"
+    return (f"{labels} has {n_lab} labels, but {data} has {n_cell} cells. Give {each} "
+            f"one label, in the order of the cells. "
+            + config.hint(f"mtb.describe_layout({category!r})",
+                          f"multibench layout {category}") + " shows the files.")
 
 
 def _data_dir_files(variant, data_dir) -> dict:
@@ -911,15 +908,15 @@ def _check_data_dir(variant, data_dir, method: str = "The method") -> tuple[bool
 # ``method`` is the method id (``"The method"`` when the caller has none).
 #: ``.format(method=)`` caveat reported by scan() when an ``atac_gas`` role
 #: falls back to a peak matrix in ``atac.h5`` (the wanted representation not given).
-PEAK_IN_GAS_CAVEAT = ("{method} needs gene-activity ATAC. atac.h5 holds peaks, because "
-                      "its features look like chr:start-end.")
+PEAK_IN_GAS_CAVEAT = ("{method} needs gene-activity ATAC. The features of atac.h5 look "
+                      "like chr:start-end, so it holds peaks.")
 #: ``.format(method=, file=)`` templates of the two representation-mismatch
 #: caveats reported when the method's wanted ATAC representation is known
 #: (``_preflight_caveats(resolved, atac=method_info(m)['atac'])``).
-PEAK_FED_TO_GAS_CAVEAT = ("{method} needs gene-activity ATAC. {file} holds peaks, because "
-                          "its features look like chr:start-end.")
-GAS_FED_TO_PEAK_CAVEAT = ("{method} needs peak ATAC. {file} holds gene activity, because "
-                          "its features do not look like chr:start-end.")
+PEAK_FED_TO_GAS_CAVEAT = ("{method} needs gene-activity ATAC. The features of {file} "
+                          "look like chr:start-end, so it holds peaks.")
+GAS_FED_TO_PEAK_CAVEAT = ("{method} needs peak ATAC. The features of {file} do not look "
+                          "like chr:start-end, so it seems to hold gene activity.")
 #: ``.format(method=, file=, example=)`` caveat for a file a peak method reads
 #: whose names are neither chr:start-end nor the gene names of the folder's
 #: other files (``peak_0``): the kind cannot be told from the names, so it

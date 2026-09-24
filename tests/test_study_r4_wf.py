@@ -34,6 +34,13 @@ from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import runner as R
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+#: the caveat of a peak method given gene activity in atac2.h5 (after the method)
+GP_CAV = ("needs peak ATAC. The features of atac2.h5 do not look like chr:start-end, "
+          "so it seems to hold gene activity.")
+
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
 GENES = [f"GENE{i}" for i in range(40)]
@@ -126,8 +133,7 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
     ok = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False, allow_atac_mismatch=True)
     assert ok["runnable"].all() and ok["reason"].eq("").all()
-    assert all(c.startswith(f"{m} needs peak ATAC. atac2.h5 holds gene activity, because its "
-                            f"features do not look like chr:start-end.")
+    assert all(c.startswith(f"{m} {GP_CAV}")
                for m, c in zip(ok["method"], ok["caveat"])), ok["caveat"].tolist()
 
 
@@ -149,7 +155,7 @@ def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned,
     cap = capsys.readouterr()
     assert rc == 0, cap.err
     df = pd.read_csv(__import__("io").StringIO(cap.out))
-    assert all(c.startswith(f"{m} needs peak ATAC. atac2.h5 holds gene activity")
+    assert all(c.startswith(f"{m} {GP_CAV}")
                for m, c in zip(df["method"], df["caveat"])), df["caveat"].tolist()
 
 
@@ -165,9 +171,8 @@ def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinn
                   modalities=["rna", "atac"], data_path=root, dry_run=True,
                   allow_atac_mismatch=True)
     assert plan["runnable"].all() and plan["reason"].eq("").all()
-    assert plan["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC. atac.h5 "
-                                             "holds peaks")
-    assert "[run_all] Matilda needs gene-activity ATAC. atac.h5 holds peaks" in \
+    assert plan["caveat"].iloc[0].startswith(f"Matilda {GAS_CAV}")
+    assert f"[run_all] Matilda {GAS_CAV}" in \
         capsys.readouterr().out
 
 
@@ -190,7 +195,7 @@ def test_real_run_all_with_the_override_runs_and_keeps_the_caveat(tmp_path, pinn
                  methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
                  evaluate=False, allow_atac_mismatch=True)
     assert calls == ["Matilda"]
-    assert "[run_all]   Matilda needs gene-activity ATAC. atac.h5 holds peaks" in \
+    assert f"[run_all]   Matilda {GAS_CAV}" in \
         capsys.readouterr().out
     assert res.summary["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC")
 
@@ -223,8 +228,8 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
     _quiet(mtb.run, "Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"),
            dry_run=True)
     err = capsys.readouterr().err
-    assert re.search(r"^# Matilda needs gene-activity ATAC\. atac\.h5 holds peaks", err,
-                     re.M), err
+    assert re.search(r"^# Matilda needs gene-activity ATAC\. The features of atac\.h5 look "
+                     r"like chr:start-end, so it holds peaks\.$", err, re.M), err
 
     class Stop(Exception):
         pass
@@ -232,8 +237,9 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
     def stop(spec):
         raise Stop
     monkeypatch.setattr(R, "check_gpu_requirement", stop)
-    with pytest.warns(UserWarning, match=r"^Matilda needs gene-activity ATAC\. atac\.h5 "
-                                         r"holds peaks"):
+    with pytest.warns(UserWarning, match=r"^Matilda needs gene-activity ATAC\. The features "
+                                         r"of atac\.h5 look like chr:start-end, so it holds "
+                                         r"peaks\.$"):
         with pytest.raises(Stop):
             mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
     # the right representation: no note
@@ -482,8 +488,8 @@ def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, caps
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out", data_path=root,
                  evaluate=False)
     log = capsys.readouterr().out
-    m = re.search(r"^\[run_all\] (\d+) other variants need files this folder does not "
-                  r"have; see mtb\.scan$", log, re.M)
+    m = re.search(r"^\[run_all\] (\d+) more rows need files this folder does not "
+                  r"have\. mtb\.scan shows them\.$", log, re.M)
     assert m, log
     statuses = {r["method"]: r["status"] for r in res.records}
     assert "totalVI" not in statuses          # rna+adt only: adt.h5 is not there
@@ -498,7 +504,8 @@ def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
     log = capsys.readouterr().out
     assert [r["status"] for r in res.records] == ["RUN_OK"]
     assert res.failures.empty
-    assert "[run_all] 1 other variant needs files this folder does not have" in log
+    assert ("[run_all] 1 more row needs files this folder does not have. mtb.scan shows "
+            "it.") in log
     assert "skipping Multigrate" not in log
 
 

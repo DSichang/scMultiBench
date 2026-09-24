@@ -72,6 +72,8 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     ------
     FileNotFoundError
         ``out_dir`` holds no ``batch_result.json``.
+    ValueError
+        ``data_path`` does not hold the dataset folder.
     KeyError
         A name in ``methods`` has no record; the message lists the methods that do.
 
@@ -96,8 +98,9 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     **Moved folders.** A record whose ``out_dir`` does not exist is pointed
     at the folder of the same name next to ``batch_result.json``. The
     dataset folder is looked up under ``data_path=``, the recorded
-    ``data_path`` and then ``data_root``. So a ``fetch_outputs`` tree or a
-    copied ``run_all`` folder can be re-scored.
+    ``data_path`` and then ``data_root``, and the one found is recorded as
+    an absolute path. So a ``fetch_outputs`` tree or a copied ``run_all``
+    folder can be re-scored.
 
     See Also
     --------
@@ -118,17 +121,18 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
             raise KeyError(f"no record for {unknown} in {d}; methods in the "
                            f"tree: {have}")
         recs = [r for r in recs if r.get("method") in set(methods)]
+    _check_data_path(data_path, blob["dataset"])
     for r in recs:
         # a tree from another host or another folder: the method's output
         # folder sits next to batch_result.json under the same name
         od = r.get("out_dir")
         if od and not Path(od).exists() and (d / Path(od).name).is_dir():
-            r["out_dir"] = str(d / Path(od).name)
-        # the first data root that holds the dataset; left as recorded when
-        # none does, and rescore then names the missing folder
+            r["out_dir"] = str((d / Path(od).name).resolve())
+        # the first data root that holds the dataset, as an absolute path;
+        # left as recorded when none does, and rescore then names the roots
         root, found = _dataset_root(r, blob["dataset"], data_path)
-        if found:
-            r["data_path"] = root
+        if found and root is not None:
+            r["data_path"] = r["data_root"] = root
     lp = d / "long.csv"
     if lp.exists():
         lng = pd.read_csv(lp)
@@ -587,9 +591,10 @@ def _rows_word(df: "pd.DataFrame", k: int) -> str:
     return noun if k == 1 else noun + "s"
 
 
-def _have_their(k: int) -> str:
-    """``has its`` after a count of 1, else ``have their`` (``3 of 14 rows have their``)."""
-    return "has its" if k == 1 else "have their"
+def _have_their(k: int, n: int) -> str:
+    """The verb after ``k of n <rows>``: ``has its`` when ``k`` or ``n`` is 1
+    (``0 of 1 method has its``), else ``have their`` (``3 of 14 rows have their``)."""
+    return "has its" if 1 in (k, n) else "have their"
 
 
 def _join_sentences(parts) -> str:
@@ -740,26 +745,23 @@ _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
 def _short_reason(text: str, method: str, dataset: str, category: str | None) -> str:
     """The ``reason`` column form of a ``files_reason``: what is missing, no noise.
 
-    ``files_reason`` keeps the verbatim exception text (``FileNotFoundError:
-    UnitedNet/D11/vertical: input files not found on disk: {'atac_gas':
-    '/path/to/data/D11/atac_gas.h5', ...}``) because the full path is what a
-    user greps for. ``reason`` is what the scan frame, the CLI table
-    and the "nothing is runnable" error show, so it drops what every row
-    repeats: the exception class, the ``method/dataset/category:`` prefix and
-    the absolute directory (each path becomes its basename). The env half of
-    ``reason`` is untouched - it carries the copy-pasteable install command.
+    ``text`` is one part of ``files_reason``: a missing-script sentence, or
+    the verbatim exception text (``FileNotFoundError: SCALEX (diagonal)
+    needs atac_gas.h5 in /path/to/data/LUNG. ...``), which keeps the full
+    path because that is what a user greps for. ``reason`` is what the scan
+    frame, the CLI table and the "No method can run" error show, so it drops
+    what every row repeats: the exception class, a ``method/dataset/category:``
+    prefix and the absolute directory (each path becomes its basename). The
+    env half of ``reason`` is untouched - it carries the copy-pasteable
+    install command.
     """
     if not text:
         return text
-    parts = []
-    for part in text.split("; "):
-        part = _EXC_PREFIX_RE.sub("", part)
-        prefix = f"{method}/{dataset}/{category}: "
-        if part.startswith(prefix):
-            part = part[len(prefix):]
-        part = _ABS_PATH_RE.sub(lambda m: m.group(0).rstrip("/").rsplit("/", 1)[-1], part)
-        parts.append(part)
-    return "; ".join(parts)
+    part = _EXC_PREFIX_RE.sub("", text)
+    prefix = f"{method}/{dataset}/{category}: "
+    if part.startswith(prefix):
+        part = part[len(prefix):]
+    return _ABS_PATH_RE.sub(lambda m: m.group(0).rstrip("/").rsplit("/", 1)[-1], part)
 
 
 # Reject a bare string where a list of ids is expected (shared with mtb.env.*).
@@ -769,8 +771,9 @@ _list_of_ids = registry.check_id_list
 #: The three representation-mismatch caveats of ``_resolve._preflight_caveats``
 #: (PEAK_IN_GAS / PEAK_FED_TO_GAS / GAS_FED_TO_PEAK) after the method name:
 #: wanted, file, held.
-_WRONG_ATAC_BODY = (r"needs (gene-activity|peak) ATAC\. (\S+) holds (peaks|gene activity), "
-                    r"because ")
+_WRONG_ATAC_BODY = (r"needs (gene-activity|peak) ATAC\. The features of (\S+) (?:do not )?"
+                    r"look like chr:start-end, so it (?:seems to hold|holds) "
+                    r"(peaks|gene activity)\.")
 _WRONG_ATAC_RE = re.compile(r"^\S+ " + _WRONG_ATAC_BODY)
 #: What the reason and the caveat of a peak-name row say after the method name
 #: (``cli._strict_problem`` counts them apart): ``_resolve.PEAK_NAMES_CAVEAT``,
@@ -999,21 +1002,36 @@ def _representation_note(category, methods, modalities) -> str:
         via = f" through its {other} input" if other else ""
         fixed = [_TOKEN_OF_REP[spec.atac] if rep(t) else t for t in toks]
         base = ["atac" if rep(t) else t for t in toks]
-        notes.append(f"{spec.id} reads {_REP_WORDS[spec.atac]}{via}; pass " + config.hint(
-            f"modalities={fixed!r} (or 'atac')",
-            f"--modalities {','.join(fixed)} (or {','.join(base)})"))
-    return "; ".join(notes)
+        notes.append(f"{spec.id} reads {_REP_WORDS[spec.atac]}{via}. Pass " + config.hint(
+            f"modalities={fixed!r} or {base!r}.",
+            f"--modalities {','.join(fixed)} or {','.join(base)}."))
+    return " ".join(notes)
 
 
 def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
-    """The ``ValueError`` of a selection that matches no variant."""
+    """The ``ValueError`` of a selection that matches no variant: what does
+    not run, then why (a representation token) or where to look."""
+    from .engine.schema import no_category_message
+    from .plot.bubble import _and
+    where = f"{category} data" if category else "any category"
+    if modalities is None:
+        # the named methods have no variant under this category
+        head = " ".join(no_category_message(
+            m, dict.fromkeys(c for _s, _v, c, _m in _variant_rows()
+                             if _s.id == m and c), category) for m in methods or ()
+        ) or f"No method runs on {where}."
+    else:
+        mods = "+".join(map(str, modalities or ())) or "a data folder"
+        head = (f"{_and(methods)} {'does' if len(methods) == 1 else 'do'} not read "
+                f"{mods} in {where}." if methods else f"No method reads {mods} in {where}.")
     why = _representation_note(category, methods, modalities)
-    err = ValueError(
-        f"no {category!r} variant matches dataset={dataset!r} methods={methods} "
-        f"modalities={modalities}; "
-        + (why or config.hint(
-            f"see mtb.method_info(m)['supports'] and mtb.scan({dataset!r})",
-            f"see multibench info METHOD and multibench scan {dataset}")))
+    one = methods[0] if methods and len(methods) == 1 else None
+    fix = "" if modalities is None else config.hint(
+        f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
+        "mtb.method_info(m)['supports'] lists what each method reads.",
+        f"multibench info {one} lists what {one} reads." if one else
+        "multibench info METHOD lists what each method reads.")
+    err = ValueError(" ".join(t for t in (head, why or fix) if t))
     err.representation = bool(why)      # the CLI keeps this message as it is
     return err
 
@@ -1313,14 +1331,17 @@ def scan(dataset: str, category: str | None = None, *,
     dataset = _resolve.canonical_dataset(base, dataset)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
+        from .plot.bubble import _and
         dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
+        holds = (f"{base} holds {_and(dirs)}." if dirs else
+                 f"{base} holds no folders." if base.is_dir() else
+                 f"{base} does not exist either.")
         raise FileNotFoundError(
-            f"dataset folder '{ds_dir}' does not exist; folders present under {base}: "
-            f"{dirs}. "
-            + config.hint("dataset= is the folder name and data_path= the folder that "
-                          "contains it (see mtb.describe_layout())",
-                          "DATASET is the folder name and --data-path the folder that "
-                          "contains it (see multibench layout)"))
+            f"The folder {ds_dir} does not exist. {holds} "
+            + config.hint("dataset= is the folder name, and data_path= the folder that "
+                          "holds it. mtb.describe_layout() shows the layout.",
+                          "DATASET is the folder name, and --data-path the folder that "
+                          "holds it. multibench layout shows the layout."))
     installed = _installed_envs()
     repo = _runner._repo_root_no_fetch()
     # scripts at another commit than $MULTIBENCH_SCRIPTS_REF, or a scripts
@@ -1374,7 +1395,7 @@ def scan(dataset: str, category: str | None = None, *,
                 _missing_files_reason(spec, v, cat, mods, dataset, data_path)
                 or _short_reason(full, spec.id, dataset, cat))
         if file_problems:
-            rec["files_ok"], rec["files_reason"] = False, "; ".join(file_problems)
+            rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         # --- check 2: env. ----------------------------------------------------
         if rec["env"] and rec["env"] not in installed:
             rec["env_ok"] = False
@@ -1438,8 +1459,8 @@ def scan(dataset: str, category: str | None = None, *,
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
         rows = _rows_word(df, n)
-        line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files)} input files. "
-                f"{k_env} of {n} {_have_their(k_env)} environment installed.")
+        line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files, n)} input files. "
+                f"{k_env} of {n} {_have_their(k_env, n)} environment installed.")
         if _runner.linux_only_sentence():
             line += f" {LINUX_ONLY_SUMMARY}"
         print(line, flush=True)
@@ -2288,9 +2309,10 @@ class BatchResult:
         label-order search, so ``label_order`` names the file order chosen.
         Labels matched by position read ``(user labels)``.
 
-        With ``labels=None`` and several label files, ``rescore`` ranks the
-        file orders by ARI, which needs one Leiden sweep. It keeps the stored
-        order and skips the sweep when ``metrics=`` has no ARI, NMI or iF1.
+        **Label order.** With ``labels=None`` and several label files,
+        ``rescore`` ranks the file orders by ARI, which needs one Leiden sweep.
+        It keeps the stored order and skips the sweep when ``metrics=`` has no
+        ARI, NMI or iF1.
 
         **Labels without batch.** Given ``labels`` and no ``batch``, the batch
         that ``run_all(batch=)`` saved is reused. Without a saved batch, every
@@ -2306,12 +2328,10 @@ class BatchResult:
         ``batch`` of the wrong length (``batch has N entries, embedding has M
         cells``).
 
-        **Other hosts.** Records keep ``out_dir`` and ``data_path`` as
-        ``run_all`` received them, and ``data_root`` as an absolute path.
-        ``mtb.load_batch`` finds moved folders; see its Notes. When the
-        dataset folder is not found, ``labels=None`` gives
+        **Other hosts.** ``mtb.load_batch(data_path=)`` finds moved folders.
+        When the dataset folder is not found, ``labels=None`` gives
         ``RUN_OK_NO_LABEL_MATCH`` with a ``note``. A Series or CSV is then
-        matched by position, with a warning.
+        matched by position, with a warning, and the saved batch is not used.
 
         **Persisting.** ``mtb.load_batch`` keeps returning the original result
         until the new one is saved.
@@ -2325,7 +2345,12 @@ class BatchResult:
         import copy
         new = BatchResult([], self.dataset, self.category, out_dir=self.out_dir)
         # the data folder of each record: the recorded data_path, else data_root
-        roots = [_dataset_root(r, self.dataset)[0] for r in self.records]
+        found = [_dataset_root(r, self.dataset) for r in self.records]
+        roots = [dp for dp, _ in found]
+        # the roots searched for each data folder, named when it is not found
+        tried: dict = {}
+        for dp, r in zip(roots, self.records):
+            tried.setdefault(dp, _root_tries(r))
         # labels and batch per data folder, before any record is scored: ids
         # that are not cells of the dataset raise here
         lab_vec: dict = {}
@@ -2334,19 +2359,20 @@ class BatchResult:
                                 if r.get("status") != "SKIPPED"):
             if labels is not None:
                 lab_vec[dp] = _cell_vector(labels, self.dataset, dp, what="labels",
-                                           order=_ROWS, stacklevel=4, moved=True)
+                                           order=_ROWS, stacklevel=4, moved=True,
+                                           tried=tried[dp])
             # a batch vector follows labels given in embedding row order
             rows = labels is not None and not lab_vec[dp][1]
             if batch is not None:
                 vec, by_cell = _cell_vector(batch, self.dataset, dp, what="batch",
                                             order=_ROWS if rows else None,
-                                            stacklevel=4, moved=True)
+                                            stacklevel=4, moved=True, tried=tried[dp])
                 # saved with the result, unless it follows the embedding rows
                 file = None if rows and not by_cell else _batch_csv(vec, self.dataset, dp)
                 bat_vec[dp] = (vec, by_cell, file)
-        if batch is None:
+        if batch is None and _names_batch_metric(metrics):
             _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
-        for r, dp in zip(self.records, roots):
+        for r, (dp, ok) in zip(self.records, found):
             rec = copy.deepcopy({k: v for k, v in r.items() if k != "_long"})
             rec["_long"] = None
             m = rec.get("method")
@@ -2355,6 +2381,8 @@ class BatchResult:
                 new.records.append(rec)
                 continue
             rec["data_path"] = dp
+            if ok and dp is not None:
+                rec["data_root"] = dp           # the folder found, absolute
             try:
                 mods = rec.get("modalities") or []
                 v = registry.get(m).select(self.category, set(mods))
@@ -2383,7 +2411,8 @@ class BatchResult:
                                   batch=bat, labels=lab, metrics=metrics,
                                   labels_by_cell=lab_by_cell, batch_by_cell=bat_by_cell,
                                   keep_order=keep, batch_given=batch is not None,
-                                  on_rank=_rank_line(m) if verbose else None)
+                                  on_rank=_rank_line(m) if verbose else None,
+                                  tried=tried[dp])
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
                 _drop_scores(rec)
                 rec["status"] = "RUN_OK_EVAL_FAILED"
@@ -2393,6 +2422,12 @@ class BatchResult:
                 print(f"[rescore] {m} -> {rec['status']} "
                       f"{(rec.get('metrics') or {}).get('ARI', '')}", flush=True)
             new.records.append(rec)
+        # a saved batch that fits no label order: the batch metrics are gone
+        unused = next((r["note"] for r in new.records
+                       if str(r.get("note") or "").startswith("The saved batch is not used")),
+                      None)
+        if unused:
+            warnings.warn(unused, UserWarning, stacklevel=2)
         return new
 
     def save(self, out_dir=None) -> "Path":
@@ -2437,8 +2472,8 @@ class BatchResult:
         holds ``batch_result.json`` for the same dataset and category, the
         records are merged. A method in this result replaces its earlier
         record, unless it is ``SKIPPED`` and the earlier one is not; the other
-        earlier records are kept, and all four files are rewritten from the
-        merged set. This result object is not changed.
+        earlier records are kept, and every file in the list above is
+        rewritten from the merged set. This result object is not changed.
 
         A line ``# Merged with 1 earlier record in <folder> (StabMap).``
         names the kept methods.
@@ -2715,23 +2750,38 @@ def _dataset_folder(dataset, data_path) -> Path:
     return Path(base) / dataset
 
 
+def _root_tries(rec: dict, override=None) -> list:
+    """The data roots a saved record's dataset folder is looked up under, in
+    order: ``override``, the recorded ``data_path`` (read from the current
+    directory; ``None`` = config's) and ``data_root``."""
+    tries = [override] if override is not None else []
+    tries.append(rec.get("data_path"))
+    if rec.get("data_root"):
+        tries.append(rec["data_root"])
+    return tries
+
+
 def _dataset_root(rec: dict, dataset: str, override=None) -> tuple:
     """``(root, found)``: the data root a saved record is scored from.
 
-    The first of ``override``, the recorded ``data_path`` (read from the
-    current directory; ``None`` = config's) and ``data_root`` whose
-    ``<root>/<dataset>`` is a folder. When none is, the recorded
-    ``data_path`` and ``False``.
+    The first root of :func:`_root_tries` whose ``<root>/<dataset>`` is a
+    folder, as an absolute path (``None`` stays ``None``: config's). When
+    none is, the recorded ``data_path`` and ``False``.
     """
-    recorded = rec.get("data_path")
-    tries = [override] if override is not None else []
-    tries.append(recorded)
-    if rec.get("data_root"):
-        tries.append(rec["data_root"])
-    for root in tries:
+    for root in _root_tries(rec, override):
         if _dataset_folder(dataset, root).is_dir():
-            return (None if root is None else str(root)), True
-    return recorded, False
+            return (None if root is None else str(Path(root).resolve())), True
+    return rec.get("data_path"), False
+
+
+def _check_data_path(data_path, dataset: str) -> None:
+    """``ValueError`` when ``load_batch(data_path=)`` does not hold ``dataset``."""
+    if data_path is None or _dataset_folder(dataset, data_path).is_dir():
+        return
+    root = Path(data_path)
+    here = f", here {root.parent}" if root.name == dataset else ""
+    raise ValueError(f"{root / dataset} is not a folder. data_path= is the folder "
+                     f"that holds {dataset}{here}.")
 
 
 #: what to do when a saved result's dataset folder is not found
@@ -2739,9 +2789,29 @@ _MOVED_FIX = ("Pass data_path= to mtb.load_batch, or run rescore from the folder
               "where run_all ran.")
 
 
-def _folder_missing(folder) -> str:
-    """The reason a saved result's cell ids cannot be read, as a clause."""
-    return f"the dataset folder {folder} is not found from this directory"
+def _or(values) -> str:
+    """``'A'``, ``'A or B'``, ``'A, B or C'``."""
+    v = list(values)
+    return v[0] if len(v) == 1 else ", ".join(v[:-1]) + " or " + v[-1]
+
+
+def _folder_missing(dataset: str, roots) -> str:
+    """Why a saved result's cell ids cannot be read, as a clause: the dataset
+    folder is under none of the data ``roots`` (``None`` = config's), each
+    named as an absolute path."""
+    where = dict.fromkeys(os.path.abspath(config.DEFAULT.data_path if r is None else r)
+                          for r in roots)
+    return f"the dataset folder {dataset} is not found in {_or(where)}"
+
+
+def _unplaced_batch_note(dataset: str, data_path, tried, n_ids: int) -> str:
+    """The ``note`` of a record whose saved batch fits no label order."""
+    if not _dataset_folder(dataset, data_path).is_dir():
+        why = _folder_missing(dataset, tried or [data_path])
+        return f"The saved batch is not used, because {why}. {_MOVED_FIX}"
+    total = sum(n for _, n in _label_file_sizes(dataset, data_path=data_path))
+    return (f"The saved batch is not used, because it has {n_ids:,} ids and the label "
+            f"files of {dataset} have {total:,} cells.")
 
 
 def _batch_csv(vec, dataset, data_path) -> tuple[str, str]:
@@ -2792,7 +2862,8 @@ _ROWS = "the embedding rows"
 
 
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
-                 stacklevel: int = 5, moved: bool = False) -> tuple[np.ndarray, bool]:
+                 stacklevel: int = 5, moved: bool = False,
+                 tried=None) -> tuple[np.ndarray, bool]:
     """``x`` as one value per cell, and whether it was aligned by cell id.
 
     Aligned (``True``): a Series or one-column DataFrame whose index is not
@@ -2805,15 +2876,16 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     returned as given (``False``): positional, in ``order`` (default: the
     order of ``labels_for(dataset)``). ``stacklevel`` is that of the CSV
     warning, which is raised one call deeper than the Series warning.
-    A dataset folder that is not found is named; ``moved`` (rescore) adds
-    the fix for a saved result read from another directory.
+    A dataset folder that is not found is named with the data roots
+    ``tried`` (default: ``data_path``); ``moved`` (rescore) adds the fix for
+    a saved result read from another directory.
     """
     from .eval.pipeline import _carries_ids, _pick
     order = order or config.hint(f"the order of mtb.labels_for({dataset!r})",
                                  f"the order of the label files of {dataset}")
     folder = _dataset_folder(dataset, data_path)
     if not folder.is_dir():
-        why = _folder_missing(folder)
+        why = _folder_missing(dataset, tried or [data_path])
         fix = _MOVED_FIX if moved else f"Check that it follows {order}."
         no_ids = f"{why}. {fix[:-1]}" if moved else why
     else:
@@ -2975,7 +3047,7 @@ def _drop_scores(rec: dict) -> dict:
 def _score_record(rec, emb, dataset, category, data_path, variant, *,
                   batch=None, labels=None, metrics=None, labels_by_cell=False,
                   batch_by_cell=False, keep_order=None, on_rank=None,
-                  batch_given=True):
+                  batch_given=True, tried=None):
     """Fill ``rec`` with metrics for ``emb`` (shared by run_all and rescore).
 
     Sets ``status`` (``CHAIN_OK`` / ``CHAIN_OK_GRAPH_METHOD`` /
@@ -3001,13 +3073,19 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     order of ``labels_for(dataset)`` and goes into each candidate order,
     except that a vector without ``batch_by_cell`` follows labels given in
     embedding row order. A batch in the dataset's order that meets such
-    labels is put in the variant's own label-file order. A vector as long as
-    the embedding is used as given when no order fits. ``batch_given=False``
-    marks a batch the caller did not pass (the saved one ``rescore`` reuses):
-    it is recorded as ``'user'`` but reaches ``evaluate`` only for a batch
-    metric.
+    labels is put in the stored ``labels_used`` order when its files hold
+    the embedding's cells, else in the variant's own label-file order. A
+    positional vector as long as the embedding is used as given when no
+    order fits. A ``batch_by_cell`` batch that fits no order (the dataset
+    folder is not found, or its label files changed) is not used: the record
+    gets a ``note`` and no batch metric. ``batch_given=False`` marks a batch
+    the caller did not pass (the saved one ``rescore`` reuses): it is
+    recorded as ``'user'`` but reaches ``evaluate`` only for a batch metric.
+    ``tried`` are the data roots searched for the dataset folder, named in
+    the note when it is not found (default: ``data_path``).
     """
     stored = rec.get("label_order_candidates")
+    stored_used = rec.get("labels_used")
     _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
     n = emb.shape[0]
@@ -3018,7 +3096,12 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         # in the dataset's cell order: each label order gets the ids of its files
         if batch_by_cell or not rows:
             segments = _batch_segments(dataset, data_path, batch)
-        if len(batch) != n and segments is None:
+        if batch_by_cell and segments is None:
+            # cells in the dataset's order, but no label files to place them
+            # by: the batch metrics would see the ids in the wrong rows
+            rec["note"] = _unplaced_batch_note(dataset, data_path, tried, len(batch))
+            batch = None
+        elif len(batch) != n and segments is None:
             raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
     if rows:
         labels = np.asarray(labels)
@@ -3046,12 +3129,17 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         cands = kept
     if batch is not None:
         # the user's ids replace each candidate's file-of-origin batch, put in
-        # that candidate's order (the variant's own order for labels given in
-        # embedding rows); a vector as long as the embedding is kept
-        own = ([k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
-                                                modalities=rec.get("modalities") or None,
-                                                data_path=data_path)]
-               if rows and segments is not None else None)
+        # that candidate's order. Labels given in embedding rows follow the
+        # stored label order when its files hold the embedding's cells, else
+        # the variant's own order; a vector as long as the embedding is kept
+        own = None
+        if rows and segments is not None:
+            used = list(stored_used or ())
+            own = (used if used and all(k in segments for k in used)
+                   and sum(len(segments[k]) for k in used) == n else
+                   [k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
+                                                    modalities=rec.get("modalities") or None,
+                                                    data_path=data_path)])
         placed = []
         for names, lab, bat in cands:
             keys = own if rows else names
@@ -3065,9 +3153,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         cands = placed
     if not cands:
         rec["status"] = "RUN_OK_NO_LABEL_MATCH"
-        folder = _dataset_folder(dataset, data_path)
-        if not folder.is_dir():
-            why = _folder_missing(folder)
+        if not _dataset_folder(dataset, data_path).is_dir():
+            why = _folder_missing(dataset, tried or [data_path])
             rec["note"] = f"{why[:1].upper()}{why[1:]}. {_MOVED_FIX}"
         return rec
     names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
@@ -3226,8 +3313,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     **Saved files.** The result is saved automatically under ``out_dir``
     (``summary.csv``, ``failures.csv``, ``batch_result.json``, ``long.csv``
-    when some method produced metrics, and the ``batch`` vector); reload it
-    with ``mtb.load_batch``.
+    when some method produced metrics); reload it with ``mtb.load_batch``.
+    With ``batch=``, the vector is saved as ``batch_<hash>.csv``.
 
     **Several jobs, one folder.** A later run into the same ``out_dir`` is
     merged with the records already there: methods it re-ran are replaced,
@@ -3299,23 +3386,24 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     **Errors raised.**
 
-    - An unknown ``category`` - ``ValueError`` listing the four.
-    - An unknown id in ``methods`` or ``params`` - ``KeyError`` with a
+    - An unknown ``category``: ``ValueError`` listing the four.
+    - An unknown id in ``methods`` or ``params``: ``KeyError`` with a
       did-you-mean hint, before anything runs.
-    - A selection that matches no variant - ``ValueError`` ("no 'cross'
-      variant matches ..."); a dry run is never empty.
+    - A selection that matches no variant: ``ValueError``, such as
+      "Matilda does not run on cross data."; a dry run is never empty.
     - A dry run with a ``params`` key no planned variant of that method
-      accepts - ``KeyError`` naming the accepted keys.
-    - Variants exist but not one is runnable - the "nothing is
-      runnable ..." ``ValueError``. Its message lists the reason of every
-      requested variant (or the first 3 of N when ``methods`` was not
-      given), never the reasons of methods you did not ask for. On macOS or
-      Windows, when an environment blocks a row, its second line says that
-      methods run only on Linux.
+      accepts: ``KeyError`` naming the accepted keys.
+    - Nothing runnable: the "No method can run on <dataset> (<category>)."
+      ``ValueError`` ("None of the requested methods ..." with
+      ``methods=``). Its message lists the reason of every requested variant
+      (or the first 3 of N when ``methods`` was not given), never the
+      reasons of methods you did not ask for. On macOS or Windows, when an
+      environment blocks a row, its second line says that methods run only
+      on Linux.
     - An ``out_dir`` that holds a saved result of another dataset or
-      category - ``ValueError``, before any method runs.
+      category: ``ValueError``, before any method runs.
     - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
-      real run - ``ValueError``; a real run checks this host's GPU.
+      real run: ``ValueError``; a real run checks this host's GPU.
 
     **Dataset spelling.** A ``dataset`` that differs from the folder only in
     case (``'d52'``) is replaced by the on-disk spelling, with a
@@ -3436,9 +3524,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             mods = f" ({r['modalities']})" if several.get(r["method"], 0) > 1 else ""
             print(f"[run_all] skipping {r['method']}{mods}: {r['reason']}", flush=True)
         if others:
-            print(f"[run_all] {others} other variant{'s need' if others > 1 else ' needs'} "
-                  f"files this folder does not have; see "
-                  + config.hint("mtb.scan", "multibench scan"), flush=True)
+            rows = "row needs" if others == 1 else "rows need"
+            print(f"[run_all] {others} more {rows} files this folder does not have. "
+                  + config.hint("mtb.scan", "multibench scan")
+                  + f" shows {'it' if others == 1 else 'them'}.", flush=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []
     # a reused output keeps the provenance of the run that made it
@@ -3646,7 +3735,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     ``modalities=None`` and several variants in ``category`` (Matilda under
     ``vertical``), an unknown ``param`` is recorded as ``FAIL`` for every
     setting instead - pass ``modalities`` to get the ``KeyError``. Errors of
-    ``mtb.run_all`` (e.g. nothing is runnable) propagate.
+    ``mtb.run_all`` (e.g. no method can run) propagate.
 
     See Also
     --------

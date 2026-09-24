@@ -466,8 +466,7 @@ def _check_methods(wanted: list, present) -> None:
             hint = difflib.get_close_matches(str(m), pool, n=1, cutoff=0.6)
             from ..engine import registry
             raise KeyError(registry.unknown_method_message(m, hint[0] if hint else "")
-                           + " A package method absent from the loaded tables "
-                           "gives an empty frame and a UserWarning.") from None
+                           ) from None
 
 
 def _degenerate_rerun_rows(out: pd.DataFrame, base: Path) -> pd.DataFrame:

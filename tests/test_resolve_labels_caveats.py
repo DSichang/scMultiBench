@@ -15,6 +15,10 @@ import pytest
 import multibench as mtb
 from multibench.engine import resolve
 
+#: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
+GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
+           "so it holds peaks.")
+
 
 def _h5(path, n_feat, n_cell, feats=None):
     with h5py.File(path, "w") as f:
@@ -95,8 +99,8 @@ def test_gas_fed_to_peak_method_is_flagged(tmp_path):
                              data_path=tmp_path, check=True)
     assert got["atac_gas"].endswith("atac_gas.h5")
     cav = resolve._preflight_caveats(got, atac="peak", method="moETM")
-    assert cav == ["moETM needs peak ATAC. atac_gas.h5 holds gene activity, because its "
-                   "features do not look like chr:start-end."]
+    assert cav == ["moETM needs peak ATAC. The features of atac_gas.h5 do not look like "
+                   "chr:start-end, so it seems to hold gene activity."]
     # legacy call (no atac=): today's single check, nothing for this case
     assert resolve._preflight_caveats(got) == []
     # a peak file satisfies a peak method
@@ -113,8 +117,7 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     got = resolve.inputs_for("PK", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
     cav = resolve._preflight_caveats(got, atac="gene_activity", method="Matilda")
-    assert cav == ["Matilda needs gene-activity ATAC. atac.h5 holds peaks, because its "
-                   "features look like chr:start-end."]
+    assert cav == [f"Matilda {GAS_CAV}"]
     # the legacy atac_gas-role check is unchanged
     _h5(d / "atac.h5", 40, 50, feats=PEAKS)
     got2 = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path)

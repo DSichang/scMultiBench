@@ -197,9 +197,9 @@ def test_metrics_order_is_honoured():
 
 
 def test_unknown_metric_raises_with_available():
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['F1'\]") as e:
+    with pytest.raises(ValueError, match=r"^Unknown metric F1\. ") as e:
         bubble.build_table(_three(), metrics=["ARI", "NMI", "F1"])
-    assert "available in this frame" in str(e.value) and "ARI" in str(e.value)
+    assert "The table has ARI, NMI and iF1." in str(e.value)
 
 
 def test_unknown_method_raises_with_suggestion():
@@ -208,7 +208,8 @@ def test_unknown_method_raises_with_suggestion():
     assert tbl.methods == ["scJoint"]
     with pytest.raises(ValueError) as e:
         bubble.build_table(long, methods=["scjiont"])
-    assert "did you mean" in str(e.value) and "scJoint" in str(e.value)
+    assert str(e.value) == ("Unknown method scjiont. Did you mean scJoint? The table has "
+                            "B, C and scJoint.")
 
 
 def test_metric_alias_resolves():
@@ -229,7 +230,7 @@ def test_order_reorders_without_filtering():
     tbl = bubble.build_table(_three(), order=["A"])
     assert tbl.methods == ["A", "C", "B"]          # A pinned first, rest best-first
     assert tbl.overall["C"] > tbl.overall["B"]
-    with pytest.raises(ValueError, match=r"unknown method\(s\) \['nope'\]"):
+    with pytest.raises(ValueError, match=r"^Unknown method nope\. "):
         bubble.build_table(_three(), order=["nope"])
 
 

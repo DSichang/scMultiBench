@@ -489,9 +489,6 @@ REFERENCE = {
     "mtb.config.Config": ("config.md", "multibench.config.Config"),
 }
 NAMESPACES = ("env", "io", "plot", "data", "catalog", "config")
-DOCSTRINGS_PENDING = pytest.mark.xfail(
-    strict=False,
-    reason="docstrings land in wp/A_docstrings_core, wp/B_docstrings_eval_data, wp/C_docstrings_plot_io_config")
 MKDOCS = Path(os.environ.get(
     "SCMULTIBENCH_MKDOCS",
     Path.home() / "Documents" / "multitask-omics" / "_work" / "venv" / "bin" / "mkdocs"))
@@ -612,7 +609,6 @@ def built_site(tmp_path_factory):
     return strict_ok, log, site
 
 
-@DOCSTRINGS_PENDING
 def test_docs_build_strictly_with_mkdocstrings(built_site):
     """(b) ``mkdocs build --strict`` passes - every griffe docstring-parse
     warning (a documented parameter missing from the signature, a line the
@@ -641,8 +637,11 @@ def _stray_headings(page_html, path, obj):
             break
         pos = k + 10
     block = page_html[i:j if j > 0 else len(page_html)]
-    heads = re.findall(r"<h[3-6][^>]*>(.*?)</h[3-6]>", block, re.S)
-    heads = [html_mod.unescape(re.sub(r"<[^>]+>", "", h)).strip() for h in heads]
+    heads = re.findall(r"<h[3-6]([^>]*)>(.*?)</h[3-6]>", block, re.S)
+    # a member mkdocstrings renders (a method, or a property with its label)
+    # has an id under the object's path
+    heads = [" ".join(html_mod.unescape(re.sub(r"<[^>]+>", "", h)).split())
+             for attrs, h in heads if f'id="{path}.' not in attrs]
     known = {"Parameters", "Returns", "Raises", "Examples", "Notes", "See Also", "Attributes", "Warns", "Yields"}
     members = set(dir(obj)) if inspect.isclass(obj) else set()
     return [h for h in heads
@@ -651,7 +650,6 @@ def _stray_headings(page_html, path, obj):
             and h.split("(")[0].split(" ")[0] not in members]
 
 
-@DOCSTRINGS_PENDING
 def test_no_stray_heading_inside_any_rendered_object(built_site):
     """(c) a dashed line inside a docstring body renders as a heading and
     lands in the page's table of contents; none may survive."""

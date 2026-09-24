@@ -181,7 +181,8 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
                                                                               index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(wide), metrics=["iLISI"])
-    assert str(e.value) == ("batch: wide.csv has several columns: sample, donor, day. "
+    assert str(e.value) == ("The batch file wide.csv has several columns: sample, donor, "
+                            "day. "
                             "Pass one column as a Series, for example "
                             f'pd.read_csv("{wide}")["sample"].')
     assert "column=" not in str(e.value)

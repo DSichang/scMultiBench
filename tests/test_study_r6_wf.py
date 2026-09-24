@@ -135,23 +135,23 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch("../out")
     assert back.results[0]["data_path"] == "data"         # left as recorded
-    folder = Path("data") / "MYCITE"
+    # the roots tried: the recorded data_path from here, then data_root
+    where = f"{Path.cwd() / 'data'} or {back.results[0]['data_root']}"
     with pytest.warns(UserWarning, match=re.escape(
             f"The labels Series is matched by position, because the dataset folder "
-            f"{folder} is not found from this directory. {MOVED}")):
+            f"MYCITE is not found in {where}. {MOVED}")):
         back.rescore(labels=_shuffled_labels())
     csv = root / "labels.csv"
     _shuffled_labels().to_frame("celltype").to_csv(csv)
     with pytest.warns(UserWarning, match=re.escape(
             f"The first column of labels.csv looks like cell ids, but the dataset "
-            f"folder {folder} is not found from this directory. {MOVED[:-1]}. The file "
+            f"folder MYCITE is not found in {where}. {MOVED[:-1]}. The file "
             f"is matched by position.")):
         back.rescore(labels=csv)
     new = _quiet(back.rescore, metrics=["ARI"])
     rec = new.results[0]
     assert rec["status"] == "RUN_OK_NO_LABEL_MATCH"
-    assert rec["note"] == (f"The dataset folder {folder} is not found from this "
-                           f"directory. {MOVED}")
+    assert rec["note"] == f"The dataset folder MYCITE is not found in {where}. {MOVED}"
     for k in ("metrics", "batch_source", "n_batches", "labels_used"):
         assert k not in rec, k
     row = new.summary.iloc[0]
@@ -172,7 +172,9 @@ def test_unusable_barcodes_keep_their_own_message(rel):
 def test_rescore_from_the_run_folder_and_of_a_fetched_tree_is_unchanged(rel, monkeypatch):
     res, root = rel
     again = _quiet(mtb.load_batch("out").rescore)
-    assert again.results[0]["data_path"] == "data"
+    # the folder found, as an absolute path (review of round 6)
+    assert again.results[0]["data_path"] == again.results[0]["data_root"] == \
+        str((root / "data").resolve())
     assert again.summary.iloc[0]["label_order"] == "cty.csv" and _ari(again) == _ari(res)
     # a fetch_outputs tree: data_path None (config's), out_dir from another host
     tree = root / "tree"

@@ -465,7 +465,10 @@ def _strict_problem(df, methods) -> str | None:
         # rows blocked only by the scripts have an empty reason
         why = ("" if not fetched and df["runnable"].astype(bool).any()
                else " The reason column says why.")
-        return head + why + gpu_note
+        # the scripts-ref reason is the same on every row, and the table clips it
+        ref = (config.scripts_ref_problem()
+               if "reason" in rest and _is_wrong_ref(rest["reason"]).any() else None)
+        return head + why + (f"\n{ref}" if ref else "") + gpu_note
     lines = []
     for m in blocked:
         rows = df[df["method"] == m]
@@ -997,12 +1000,14 @@ def _filter_own_rows(frames: list, args) -> list:
                 f"Your {n} rows are for dataset {_names(whole['dataset'])}, and "
                 f"--dataset {args.dataset} removed all of them. {fix}")
     if methods:
+        from .plot.bubble import _and
         by_method = whole["method"].astype(str).isin(methods)
         if (keep & ~by_method).any() and not (keep & by_method).any():
+            own = list(dict.fromkeys(whole.loc[keep, "method"].astype(str)))
+            noun = "method" if len(own) == 1 else "methods"
             raise ValueError(
-                f"Your rows are for method {_names(whole.loc[keep, 'method'])}, and "
-                f"--methods {args.methods} removed all of them. Add "
-                f"{_names(whole.loc[keep, 'method'])} to --methods.")
+                f"Your rows are for {noun} {_and(own)}, and --methods {args.methods} "
+                f"removed all of them. Add {_and(own)} to --methods.")
         keep &= by_method
     dropped = whole[~keep]
     if len(dropped):
@@ -1079,11 +1084,11 @@ def _cmd_plot(args) -> int:
         present = sorted(df["method"].astype(str).unique())
         unknown = [m for m in methods if m not in present]
         if unknown:
-            raise ValueError(f"unknown method(s) {unknown}; methods in the "
-                             f"table: {present}")
+            from .plot.bubble import _unknown_names
+            raise ValueError(_unknown_names(unknown, present, "method"))
         df = df[df["method"].isin(methods)]
     if len(df) == 0:
-        raise ValueError("the results table is empty after filtering - nothing to plot")
+        raise ValueError("Nothing is left to plot after the filters.")
     if df["method"].nunique() == 1 and args.category is None and args.kind == "bar":
         # --category frames come through load_results, which already warns
         # (and names the source that holds more methods); --input-only
@@ -1225,8 +1230,8 @@ def _run_all_command(args, stack) -> int:
         from .workflow import _rows_word
         print(f"# Dry run. Nothing was executed. {k} of {n} {_rows_word(df, n)} "
               f"can run on {args.dataset} ({args.category}). The commands below are what "
-              f"multibench run would execute. Rows with files_ok False have none.",
-              file=sys.stderr)
+              f"multibench run would execute. {_rows_word(df, 2).capitalize()} with "
+              f"files_ok False have none.", file=sys.stderr)
         # the caveats of the rows the sweep would run: the compact table clips them
         scripts, lines = _dry_run_notes(df)
         if scripts:
@@ -1243,10 +1248,11 @@ def _run_all_command(args, stack) -> int:
             have = df[df["command"].astype(str).str.len() > 0]
             print()
             from .engine.runner import _prepared_at
-            print(f"# Commands of the {len(have)} {'row' if len(have) == 1 else 'rows'} "
-                  f"whose input files are in place. [env missing] marks a row whose "
-                  f"environment is not installed. [use multibench run] marks a command "
-                  f"that reads a file multibench run writes first.")
+            print(f"# Commands of the {len(have)} {_rows_word(df, len(have))} "
+                  f"whose input files are in place. [env missing] marks a "
+                  f"{_rows_word(df, 1)} whose environment is not installed. "
+                  f"[use multibench run] marks a command that reads a file "
+                  f"multibench run writes first.")
             for _, r in have.iterrows():
                 tag = "" if r["env_ok"] else " [env missing]"
                 if _prepared_at(r.get("caveat", "")) >= 0:
