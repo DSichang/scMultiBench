@@ -122,3 +122,9 @@ def layout_tree(tmp_path):
         _metric_csv(root / "scib_metric" / "diagonal integration" / ds / "GLUE" / "metric.csv",
                     **_clustering(0.5))
     return root
+
+
+
+# tests/_serve.py (archive download fakes) is imported by several test files
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))

@@ -922,6 +922,72 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
     return None
 
 
+def archive_urls(key: str, manifest: dict | None = None) -> list[str]:
+    """The download URLs of the archive ``key``, in order.
+
+    A ``packed_urls.json`` entry is one URL, or a list of URLs for an archive
+    split into parts (GitHub release assets must be under 2 GiB); the parts
+    concatenate to the archive. Without an entry: ``<PACKED_URL>/<key>.tar.gz``.
+    """
+    manifest = packed_manifest() if manifest is None else manifest
+    entry = manifest.get(key) or f"{PACKED_URL}/{key}.tar.gz"
+    return [entry] if isinstance(entry, str) else list(entry)
+
+
+def download_archive(urls: list[str], target: Path, *, label: str,
+                     total: int | None = None, attempts: int = 4,
+                     timeout: float = 60) -> int:
+    """Stream ``urls`` in order into ``target`` and print the progress.
+
+    One line when the download starts and one per tenth of ``total`` (per
+    500 MB when the size is unknown). A dropped or stalled connection
+    (nothing for ``timeout`` seconds) resumes where it stopped, up to
+    ``attempts`` times per URL. ``urllib.error.HTTPError`` (such as a 404)
+    is raised at once. ``total`` only sizes the progress lines. Returns the
+    number of bytes written.
+    """
+    import time
+    import urllib.error
+    import urllib.request
+    step = total // 10 if total else 500_000_000
+    size = f" {_gb(total)}" if total else ""
+    print(f"[env] downloading {label}{size} ...", flush=True)
+    done, mark, t0 = 0, step, time.monotonic()
+    with open(target, "wb") as out:
+        for url in urls:
+            start = done
+            for attempt in range(1, attempts + 1):
+                have = done - start
+                req = urllib.request.Request(
+                    url, headers={"Range": f"bytes={have}-"} if have else {})
+                try:
+                    with urllib.request.urlopen(req, timeout=timeout) as resp:
+                        if have and getattr(resp, "status", 200) != 206:
+                            # the server sent the whole file again
+                            out.seek(start)
+                            out.truncate()
+                            done = start
+                        while chunk := resp.read(1 << 20):
+                            out.write(chunk)
+                            done += len(chunk)
+                            if done >= mark:
+                                rate = done / max(time.monotonic() - t0, 1e-3) / 1e6
+                                print(f"[env]   {_gb(done)}" + (f" of {_gb(total)}" if total else "")
+                                      + f" ({rate:.0f} MB/s)", flush=True)
+                                while mark <= done:
+                                    mark += step
+                    break
+                except urllib.error.HTTPError:
+                    raise
+                except (OSError, TimeoutError) as e:
+                    if attempt == attempts:
+                        raise
+                    print(f"[env]   connection lost ({type(e).__name__}); resuming",
+                          flush=True)
+                    time.sleep(3 * attempt)
+    return done
+
+
 def install_packed(env: str, *, envs_dir: Path | str | None = None,
                    conda: str | None = None, force: bool = False,
                    flavor: str = "auto") -> bool:
@@ -995,13 +1061,20 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     if resolve_flavor(flavor) == "cpu" and installed == "gpu":
         warnings.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning,
                       stacklevel=2)
-    url = manifest.get(key) or f"{PACKED_URL}/{key}.tar.gz"
-    try:
-        tgz, _ = urllib.request.urlretrieve(url)
-    except urllib.error.HTTPError:
-        return False
+    urls = archive_urls(key, manifest)
     build = "single" if _single_build(env, manifest=manifest) else installed
-    print(f"[env] unpacking prebuilt {env} ({build} build) -> {dest} ...", flush=True)
+    envs_root.mkdir(parents=True, exist_ok=True)
+    tgz = envs_root / f".{key}.tar.gz.download"
+    try:
+        download_archive(urls, tgz, label=f"{env} ({build} build)",
+                         total=(sizes.get(key) or {}).get("archive_bytes"))
+    except urllib.error.HTTPError:
+        tgz.unlink(missing_ok=True)
+        return False
+    except BaseException:
+        tgz.unlink(missing_ok=True)
+        raise
+    print(f"[env] unpacking {env} -> {dest} ...", flush=True)
     from ..data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
@@ -1028,6 +1101,8 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
               f"{str(e)[:120]}); falling back to the lockfile build",
               flush=True)
         return False
+    finally:
+        tgz.unlink(missing_ok=True)
 
 
 def _conda_unpack(prefix: Path) -> None:
@@ -1415,6 +1490,11 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
 _PACKED_MANIFEST = Path(__file__).resolve().parent / "packed_urls.json"
 
 
+def _first_url(entry):
+    """The URL a plan shows: the archive's, or its first part's."""
+    return entry[0] if isinstance(entry, list) and entry else entry
+
+
 def packed_manifest() -> dict:
     """The ``{env: archive_url}`` map shipped as ``engine/packed_urls.json`` (``{}`` if absent).
 
@@ -1658,7 +1738,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
             key, eff = env, None
         installed = installed_flavor(env, conda) if (r["exists"] or env in unpacked) else None
         sz = sizes.get(key) or {}
-        out.append({**r, "state": state, "packed_url": manifest.get(key),
+        out.append({**r, "state": state, "packed_url": _first_url(manifest.get(key)),
                     "archive_bytes": sz.get("archive_bytes"),
                     "unpacked_bytes": sz.get("unpacked_bytes"),
                     "flavor": installed if (r["exists"] or env in unpacked) else eff})

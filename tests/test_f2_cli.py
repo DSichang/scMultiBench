@@ -389,7 +389,7 @@ def test_scripts_ref_fetches_that_commit_or_tag(tmp_path, monkeypatch, capsys):
     ran.clear()
     monkeypatch.delenv(config.SCRIPTS_REF_VAR)
     config.ensure_repo(tmp_path / "c")
-    assert ran[0][:4] == ["git", "clone", "--depth", "1"]
+    assert ran[0][:5] == ["git", "clone", "-q", "--depth", "1"]
 
 
 def test_ref_flag_needs_scripts(capsys):

@@ -66,7 +66,7 @@ def du_bytes(path: Path) -> int | None:
 
 def build(urls: dict, *, previous: dict | None = None, envs_dir: Path | None = None,
           opener=None, today: str | None = None) -> dict:
-    """The sizes table for ``urls`` (``{env: url}``).
+    """The sizes table for ``urls`` (``{env: url or [part url, ...]}``).
 
     Measures ``archive_bytes`` by HEAD request and ``unpacked_bytes`` under
     ``envs_dir`` when given; a value that cannot be measured falls back to
@@ -82,7 +82,11 @@ def build(urls: dict, *, previous: dict | None = None, envs_dir: Path | None = N
     }}
     for env in sorted(urls):
         prev = previous.get(env) or {}
-        arch = head_content_length(urls[env], opener=opener)
+        # an archive published as parts: the sum of their sizes, known only
+        # when every part answers
+        parts = [urls[env]] if isinstance(urls[env], str) else list(urls[env])
+        lengths = [head_content_length(u, opener=opener) for u in parts]
+        arch = None if None in lengths else sum(lengths)
         unp = du_bytes(envs_dir / env) if envs_dir else None
         out[env] = {"archive_bytes": arch if arch is not None else prev.get("archive_bytes"),
                     "unpacked_bytes": unp if unp is not None else prev.get("unpacked_bytes")}

@@ -31,6 +31,7 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, runner
+from _serve import serve_archives
 
 MARKER = "MTB_ACTIVATED_MARKER"
 
@@ -339,7 +340,7 @@ def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, mon
     fetched = []
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     import urllib.request
-    monkeypatch.setattr(urllib.request, "urlretrieve",
+    serve_archives(monkeypatch,
                         lambda url: (fetched.append(url), (str(tgz), None))[1])
     assert envs.install_packed("matilda") is True
     prefix = envs_dir / "matilda"
@@ -353,7 +354,7 @@ def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, mon
     assert envs.env_prefix("matilda") == prefix
     assert envs.installed_envs() == ["matilda"]
     # idempotent: an existing prefix returns True without downloading again
-    monkeypatch.setattr(urllib.request, "urlretrieve",
+    serve_archives(monkeypatch,
                         lambda url: pytest.fail("must not download twice"))
     assert envs.install_packed("matilda") is True
 
@@ -362,7 +363,7 @@ def test_install_packed_explicit_envs_dir(envs_dir, tmp_path, monkeypatch):
     tgz = _tiny_archive(tmp_path / "x.tar.gz")
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     import urllib.request
-    monkeypatch.setattr(urllib.request, "urlretrieve", lambda url: (str(tgz), None))
+    serve_archives(monkeypatch, lambda url: (str(tgz), None))
     other = tmp_path / "elsewhere"
     assert envs.install_packed("scmb_r", envs_dir=other) is True
     assert (other / "scmb_r" / "bin" / "python").exists()
@@ -373,7 +374,7 @@ def test_install_packed_unpack_failure_cleans_up(envs_dir, tmp_path, monkeypatch
     tgz = _tiny_archive(tmp_path / "bad.tar.gz", unpack_ok=False)
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     import urllib.request
-    monkeypatch.setattr(urllib.request, "urlretrieve", lambda url: (str(tgz), None))
+    serve_archives(monkeypatch, lambda url: (str(tgz), None))
     assert envs.install_packed("matilda") is False
     assert not (envs_dir / "matilda").exists() and not (envs_dir / "matilda.partial").exists()
     assert "falling back to the lockfile build" in capsys.readouterr().out
@@ -387,7 +388,7 @@ def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
 
     def gone(url):
         raise urllib.error.HTTPError(url, 404, "nope", {}, None)
-    monkeypatch.setattr(urllib.request, "urlretrieve", gone)
+    serve_archives(monkeypatch, gone)
     assert envs.install_packed("matilda") is False
     assert not (envs_dir / "matilda").exists()
 
@@ -395,7 +396,7 @@ def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
 def test_install_packed_platform_guard_precedes_download(envs_dir, monkeypatch):
     import urllib.request
     monkeypatch.setattr(envs, "host_platform_problem", lambda: "this host is darwin/arm64")
-    monkeypatch.setattr(urllib.request, "urlretrieve",
+    serve_archives(monkeypatch,
                         lambda url: pytest.fail("downloaded on a non-linux host"))
     with pytest.raises(RuntimeError, match="this computer runs macOS"):
         envs.install_packed("matilda")
