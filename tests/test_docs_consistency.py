@@ -995,7 +995,7 @@ def test_guides_keep_the_round2_facts_visible():
         for name in ("plot.md", "run.md", "evaluate.md", "discover.md"))
     panel = plot.split('```python title="d11_panel.py"', 1)[1].split("```", 1)[0]
     assert 'mtb.config.DEFAULT.leiden_flavor = "leidenalg"' in panel
-    assert "### A scanpy baseline on D11" in plot and "mtb.config.DEFAULT.data_path" in plot
+    assert "### Try it with a PCA of D11" in plot and "mtb.config.DEFAULT.data_path" in plot
     assert "release_43.html" in run and "`multibench config` prints `repo_path`" in run
     assert "{env_cmd}" in run and '=== "Slurm job step"' in run
     assert 'mtb.find_methods("diagonal", atac="peak")' in run
