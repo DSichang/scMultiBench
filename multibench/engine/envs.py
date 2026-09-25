@@ -169,7 +169,7 @@ def packed_sizes() -> dict:
     Read from the shipped ``engine/packed_sizes.json``, a snapshot that
     ``tools/packed_sizes.py`` writes from one HEAD request per URL in
     ``packed_urls.json``. No request is made at runtime: compute nodes can be
-    offline and Zenodo rate-limits. Keys starting with ``_`` are metadata,
+    offline. Keys starting with ``_`` are metadata,
     not envs.
 
     Returns
@@ -1054,7 +1054,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     if dest.exists():
         return True
     # A shipped manifest maps env -> archive URL, so archives can live where
-    # their size dictates (GitHub release assets up to 2 GiB, Zenodo beyond);
+    # their size dictates (one GitHub release asset under 2 GiB, parts beyond);
     # envs without an entry fall back to the release-asset convention.
     manifest, sizes = packed_manifest(), packed_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
