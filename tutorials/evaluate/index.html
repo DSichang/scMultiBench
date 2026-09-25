@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -709,6 +709,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The result">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-metric-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each metric measures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -716,17 +733,6 @@
     <span class="md-ellipsis">
       
         Are my numbers comparable?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reshape-for-plotting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reshape for plotting
       
     </span>
   </a>
@@ -1534,6 +1540,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1615,6 +1649,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The result">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-metric-measures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each metric measures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1622,17 +1673,6 @@
     <span class="md-ellipsis">
       
         Are my numbers comparable?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reshape-for-plotting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reshape for plotting
       
     </span>
   </a>
@@ -1712,10 +1752,11 @@
 
 
 <h1 id="evaluate-a-run">Evaluate a run<a class="headerlink" href="#evaluate-a-run" title="Anchor link to this section">&para;</a></h1>
-<p><code>mtb.evaluate</code> scores a run output (an embedding) against cell-type labels and
-returns the scIB metrics.</p>
+<p><code>mtb.evaluate</code> scores an embedding against cell-type labels and returns the
+scIB metrics. An embedding is a table with one row per cell, like
+<code>adata.obsm["X_pca"]</code>.</p>
 <div class="admonition tip">
-<p class="admonition-title">TL;DR</p>
+<p class="admonition-title">Summary</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
@@ -1730,100 +1771,194 @@ returns the scIB metrics.</p>
 <h2 id="choose-the-metrics">Choose the metrics<a class="headerlink" href="#choose-the-metrics" title="Anchor link to this section">&para;</a></h2>
 <p><code>metrics=</code> takes a <a href="../../api/#the-metrics-vocabulary">family</a> (<code>"clustering"</code>,
 <code>"batch"</code>, <code>"all"</code>) or a list of metric codes. The default computes every
-metric your inputs allow.</p>
+metric your inputs allow except kBET.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)[</span><span class="s2">"cty"</span><span class="p">]</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">"ASW"</span><span class="p">])</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="n">my_clusters</span><span class="p">,</span>   <span class="c1"># your own clusters</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>             <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">])</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># my_clusters: your own clusters, one per cell</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">clustering</span><span class="o">=</span><span class="n">my_clusters</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>             <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">])</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Leiden sweep.</strong> ARI, NMI and iF1 need scIB's Leiden resolution sweep on
-the embedding. A list without these three skips it.</p>
-<p><strong>Your own clusters.</strong> <code>clustering=</code> replaces the sweep for ARI and NMI.
-iF1 still runs it unless you leave iF1 out.</p>
-<p><strong>kBET</strong> is computed only when a list names it, and can take hours on
+<p>ARI, NMI and iF1 need scIB's Leiden resolution sweep. The sweep
+clusters the embedding at ten resolutions from 0.2 to 2.0 and keeps
+the clustering with the highest NMI against the labels. A list
+without these three metrics skips it.</p>
+<p><code>clustering=</code> replaces the sweep for ARI and NMI. iF1 still runs the
+sweep unless you leave iF1 out.</p>
+<p>kBET is computed only when a list names it, and can take hours on
 large datasets.</p>
 </details>
 <hr />
 <h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Anchor link to this section">&para;</a></h2>
-<p>Pass the embedding and one cell-type label per cell, in the embedding's row
-order. Both can be paths or in-memory objects; the
-<a href="../../reference/score/#multibench.eval.pipeline.evaluate">reference</a> lists the
-accepted forms.</p>
-<details class="note">
-<summary>Details</summary>
-<p><strong>Cell ids.</strong> A <code>Series</code> indexed by cell id is aligned by id when the
-output is indexed by cell id too: an AnnData or <code>.h5ad</code>, or a DataFrame
-indexed by cell id. Otherwise it is matched by position, with a warning.
-Plain arrays, lists and label files are always matched by position.</p>
-</details>
-<h3 id="batch-metrics">Batch metrics<a class="headerlink" href="#batch-metrics" title="Anchor link to this section">&para;</a></h3>
-<p>Batch metrics also need one batch per cell: pass <code>batch=</code>, or the
-<code>mtb.labels_for</code> dict of a multi-batch dataset, whose files then serve as
-batches. Give <code>labels_for</code> the category and method, so the files come in
-the order the method stacked its cells.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>                                      <span class="c1"># a StabMap run on D52</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D52"</span><span class="p">,</span> <span class="s2">"cross"</span><span class="p">,</span> <span class="s2">"StabMap"</span><span class="p">),</span>   <span class="c1"># cty3, cty1, cty2: each file is a batch</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
+<p>Pass the embedding and one cell-type label per cell, in the embedding's
+row order. Both can be paths or in-memory objects. The
+<a href="../../reference/score/#multibench.eval.pipeline.evaluate">reference</a> lists
+the accepted forms.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># embedding and labels in one AnnData</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"celltype"</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">"X_pca"</span><span class="p">)</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>File order.</strong> Without a method, <code>labels_for</code> uses the default order:
-numbered files ascending, <code>rna</code> before <code>adt</code> before <code>atac</code>. StabMap
-stacks its reference batch first, <code>cty3</code> on <code>D52</code>; a wrong order gives
-wrong scores without an error. <code>run_all</code> detects each method's order and
-records it in <code>summary.label_order</code>.</p>
-<p><strong>Your own dict.</strong> A dict you build or reorder yourself goes in as is
-only in the default order; name any other order with <code>label_order=</code>.</p>
-<p><strong>Batches inside one file.</strong> <code>run_all</code> also uses each cell's label file as
-its batch, so batches inside one file (donors, say) are not scored.
-Re-score the saved outputs with the real vector; nothing is re-run:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="s2">"out/"</span><span class="p">)</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">rescored</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">rescore</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>
+<p>With an AnnData, <code>labels</code> and <code>batch</code> can name <code>.obs</code> columns, and
+<code>obsm=</code> names the embedding. A MuData works the same way, with the
+joint embedding in its <code>.obsm</code>.</p>
+<p>A <code>Series</code> indexed by cell id is aligned by id when the output has
+cell ids: an AnnData, an <code>.h5ad</code> file, or a DataFrame indexed by cell
+id. A CSV whose first column holds the cell ids is aligned the same
+way. When the output is a bare array, the Series and the CSV are
+matched by position, with a warning. Plain arrays, lists and other
+label files are matched by position.</p>
+</details>
+<h3 id="batch-metrics">Batch metrics<a class="headerlink" href="#batch-metrics" title="Anchor link to this section">&para;</a></h3>
+<p>Batch metrics also need one batch per cell. Pass <code>batch=</code>, or the
+<code>mtb.labels_for</code> dict of a multi-batch dataset: each of its files is then
+a batch. Give <code>labels_for</code> the category and the method, so the files
+follow the rows of the method's output. A wrong order gives wrong scores
+without an error.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># a StabMap run on D52; labels_for lists cty3, cty1, cty2 for it</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D52"</span><span class="p">,</span> <span class="s2">"cross"</span><span class="p">,</span> <span class="s2">"StabMap"</span><span class="p">),</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">"all"</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p>Without a method, <code>labels_for</code> uses the default order: numbered files
+ascending, and <code>rna</code> before <code>adt</code> before <code>atac</code>. StabMap puts its
+reference batch first, which is <code>cty3</code> on D52.
+<a href="../run/#what-run-returns">What run returns</a> lists the other methods
+with their own order.</p>
+<p><code>evaluate</code> takes a <code>labels_for</code> dict as it is. A dict you build
+yourself must follow the default order, or <code>label_order=</code> must list
+its keys in the order of the rows.</p>
+<p>Without <code>batch=</code>, <code>run_all</code> uses each cell's label file as its batch,
+so batches inside one file, such as donors, are not scored. Pass
+<code>batch=</code> to <code>run_all</code>, or re-score saved outputs with the real batch
+vector. No method is re-run:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="s2">"out/"</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">rescored</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">rescore</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>
 </span></code></pre></div>
 </details>
 <hr />
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Anchor link to this section">&para;</a></h2>
-<p>A DataFrame indexed by metric name with one <code>Value</code> column, the shape of the
-benchmark's <code>metric.csv</code>. A metric that cannot run on your machine is <code>NaN</code>,
-with a warning; the others are still computed.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">metrics</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s2">"metric.csv"</span><span class="p">)</span>
+<p><code>evaluate</code> returns a DataFrame indexed by metric name, with one <code>Value</code>
+column. A metric that cannot run on your machine is <code>NaN</code>, with a warning.
+Save the scores with <code>mtb.to_long</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"MyMethod"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>                   <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mine</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s2">"mine.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>cLISI and iLISI</strong> need scib's compiled LISI helper. Where the binary scib
-ships cannot run, <code>evaluate</code> rebuilds it once if a C++ compiler (<code>g++</code>,
-<code>c++</code> or <code>clang++</code>) is on <code>PATH</code>. Otherwise the warning prints the build
-command.</p>
-<p><strong>kBET</strong> needs R through <code>rpy2</code>; without it kBET is <code>NaN</code>.</p>
+<p>A long table has one row per method, dataset and metric, like the
+tables <code>mtb.load_results</code> returns. Its <code>source</code> column reads <code>user</code>.
+<a href="../plot/#add-your-own-method">Add your own method</a> concatenates it
+with a stored table.</p>
+<p><code>metrics.to_csv("metric.csv")</code> writes the wide shape of the
+benchmark's <code>metric.csv</code>. That file loses the scoring record: <code>to_long</code>
+on it sets <code>scored_with</code> to <code>unknown</code>, with a warning.</p>
+</details>
+<h3 id="what-each-metric-measures">What each metric measures<a class="headerlink" href="#what-each-metric-measures" title="Anchor link to this section">&para;</a></h3>
+<p>All metrics are scaled so that higher is better. Most lie between 0 and 1.
+ARI can be slightly below 0, which means a random clustering.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Family</th>
+<th>What it measures</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ARI</td>
+<td>clustering</td>
+<td>How well the Leiden clusters match the cell types</td>
+</tr>
+<tr>
+<td>NMI</td>
+<td>clustering</td>
+<td>How much the Leiden clusters tell about the cell types</td>
+</tr>
+<tr>
+<td>ASW</td>
+<td>clustering</td>
+<td>How well cells of one type separate from other types</td>
+</tr>
+<tr>
+<td>iASW</td>
+<td>clustering</td>
+<td>The same, for each cell type against all other cells</td>
+</tr>
+<tr>
+<td>iF1</td>
+<td>clustering</td>
+<td>How well one Leiden cluster captures each cell type</td>
+</tr>
+<tr>
+<td>cLISI</td>
+<td>clustering</td>
+<td>How much each cell's neighbours share its cell type</td>
+</tr>
+<tr>
+<td>ASW_batch</td>
+<td>batch</td>
+<td>How well the batches mix within each cell type</td>
+</tr>
+<tr>
+<td>GC</td>
+<td>batch</td>
+<td>How much of each cell type stays in one connected group of neighbours</td>
+</tr>
+<tr>
+<td>iLISI</td>
+<td>batch</td>
+<td>How many batches appear among each cell's neighbours</td>
+</tr>
+<tr>
+<td>kBET</td>
+<td>batch</td>
+<td>How often a neighbourhood holds the overall batch mix</td>
+</tr>
+</tbody>
+</table>
+<p><a href="../../reference/catalog/#multibench.data.catalog.metrics"><code>mtb.catalog.metrics()</code></a>
+describes each metric in one line.
+<a href="../../reference/score/#multibench.eval.pipeline.evaluate">evaluate's Notes</a>
+give the exact computation.</p>
+<details class="note">
+<summary>Details</summary>
+<p>cLISI and iLISI need scib's compiled LISI helper. Where the binary
+scib ships cannot run, <code>evaluate</code> rebuilds it once if a C++ compiler
+(<code>g++</code>, <code>c++</code> or <code>clang++</code>) is on <code>PATH</code>. Otherwise the warning prints
+the build command.</p>
+<p>kBET needs R through <code>rpy2</code>. Otherwise kBET is <code>NaN</code>.</p>
 </details>
 <hr />
 <h2 id="are-my-numbers-comparable">Are my numbers comparable?<a class="headerlink" href="#are-my-numbers-comparable" title="Anchor link to this section">&para;</a></h2>
-<p>To compare with the stored tables, score against the dataset's own labels
-(<code>mtb.labels_for</code>) with the default clustering. Most methods are stochastic:
-compare ranks, not decimals.</p>
+<p>To compare with the stored tables, published or re-run, use the Leiden
+backend they were scored with and the dataset's own labels:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">leiden_flavor</span> <span class="o">=</span> <span class="s2">"leidenalg"</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">))</span>
+</span></code></pre></div>
+<p>The default <code>igraph</code> backend is faster but can move ARI by up to about
+0.1. Most methods' scores vary slightly between runs. Compare ranks.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Default clustering.</strong> scIB's optimal-resolution Leiden sweep: ten
-resolutions from 0.2 to 2.0, keeping the one with the highest NMI against
-the labels.</p>
-<p><strong>Leiden backend.</strong> The sweep runs on igraph by default.
-<code>mtb.config.DEFAULT.leiden_flavor = "leidenalg"</code> switches to the backend
-scib itself uses; scores can differ slightly between the two.</p>
-<p><strong>Isolated-label metrics.</strong> iASW and iF1 score every cell type, whereas
-scib's default scores only types confined to few batches.</p>
+<p><code>mtb.config.DEFAULT.leiden_flavor</code> takes <code>"igraph"</code>, the default, or
+<code>"leidenalg"</code>, the backend scib itself uses. Both stored sources were
+scored with leidenalg. The re-run tables were scored by <code>evaluate</code> from
+multibench 0.2.1.</p>
+<p>iASW and iF1 score every cell type, whereas scib's default scores only
+types confined to few batches. The re-run tables use the same rule.</p>
+<p><code>metrics.attrs</code> records how the scores were computed: the Leiden
+backend, where the clusters came from, and the multibench and scib
+versions. <code>mtb.to_long</code> keeps the first three in its <code>scored_with</code>
+column, such as <code>leidenalg/sweep/0.3.2</code>.</p>
 </details>
-<hr />
-<h2 id="reshape-for-plotting">Reshape for plotting<a class="headerlink" href="#reshape-for-plotting" title="Anchor link to this section">&para;</a></h2>
-<p><code>mtb.to_long</code> turns the result into the long frame <code>mtb.load_results</code> returns,
-so it can be concatenated with a stored table. Its <code>source</code> column reads
-<code>user</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"MyMethod"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
-</span></code></pre></div>
 <hr />
 <p>Next: draw it next to the stored tables in
 <a href="../plot/#add-your-own-method">Load and plot results</a>.</p>

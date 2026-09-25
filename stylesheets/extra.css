@@ -52,7 +52,7 @@
   --text-muted:    #334155;   /* slate-700 — secondary */
   --text-faint:    #64748b;   /* slate-500 — meta, anchors */
 
-  /* Swiss spatial system */
+  /* Swiss grid system */
   --grid-max:      1200px;
   --grid-gutter:   24px;
   --space-unit:    8px;
@@ -221,9 +221,11 @@ body, .md-typeset {
 .md-typeset strong { font-weight: 600; color: var(--text); }
 .md-typeset em { font-style: italic; }
 
+/* No ligatures in code: '>=', '->' and '!=' stay the characters a reader types. */
 .md-typeset code, .md-typeset pre, .md-typeset kbd {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-feature-settings: "calt", "liga";
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0, "liga" 0;
 }
 /* Code BLOCKS on markdown pages were ~18.5px (Material's 0.84rem at our 22px root)
    — bigger than the 15px body. Pin to the site's 13px code size (= notebook code).
@@ -3015,7 +3017,8 @@ input:focus-visible,
 }
 
 /* ---- the page's summary table (tools/gen_reference_tables.py) and the
-   other plain tables of a reference page (config.md's environment variables) ---- */
+   other plain tables of a reference page (config.md's environment variables)
+   and of the API overview (api.md's entry-point tables) ---- */
 .md-typeset .api-summary .md-typeset__scrollwrap,
 .md-typeset .api-table .md-typeset__scrollwrap { margin: 1.2em 0 0.4em; }
 .md-typeset .api-summary .md-typeset__table,
@@ -3059,7 +3062,8 @@ input:focus-visible,
   font-weight: 600;
   color: var(--text);
 }
-.md-typeset .api-summary table:not([class]) td:first-child a code { color: var(--brand-600); }
+.md-typeset .api-summary table:not([class]) td:first-child a code,
+.md-typeset .api-table table:not([class]) td:first-child a code { color: var(--brand-600); }
 .md-typeset .api-summary table:not([class]) td:first-child a:hover code,
 .md-typeset .api-table table:not([class]) td:first-child a:hover code { text-decoration: underline; }
 .md-typeset .api-summary table:not([class]) tr:hover,

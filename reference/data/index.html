@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1495,6 +1495,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1811,15 +1839,28 @@
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="OSError">OSError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>The download failed; the message names the URL.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
 
 <p><span class="doc-section-title">Examples</span></p>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">root</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)</span>                     <span class="c1"># &lt;data_path&gt;/D11/, about 11 MB</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="n">root</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"D28"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">quiet</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># the data root; D11 lands in &lt;data_path&gt;/D11/ (about 11 MB)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">root</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="n">root</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"D28"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">quiet</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span></code></pre></div>
 
 
@@ -1832,11 +1873,9 @@ scMultiBench README ("Get the data" in the installation guide).</p>
 <p><strong>Idempotence.</strong> A non-empty <code>&lt;data_path&gt;/&lt;dataset&gt;/</code> counts as present
 and is left alone, whatever it holds (even for an id that is not a
 release asset); an empty leftover folder is removed and fetched again.</p>
-<p><strong>Atomic extraction.</strong> Each archive is extracted into a scratch folder
-under the data root and moved into place, so an interrupted download or
-extraction never looks like a complete dataset on the next call. An
-archive entry that would write outside that folder raises
-<code>RuntimeError</code>.</p>
+<p><strong>Atomic extraction.</strong> Each archive is unpacked into a temporary folder
+under the data root and then moved into place. An archive entry that
+would write outside that folder raises <code>RuntimeError</code>.</p>
 </details>
 
 <details class="see-also">
@@ -1866,8 +1905,8 @@ mtb.config.Config : <code>data_path</code>, the default data root.</p>
     <div class="doc doc-contents first">
 
         <p>Download precomputed <code>run_all</code> outputs for a tutorial dataset.</p>
-<p>A stand-in for running the methods on a host without their conda envs
-(Colab, a laptop): <code>evaluate</code> and <code>plot</code> then run on real embeddings.</p>
+<p>Use it on a host without the method environments, such as Colab or a
+laptop. <code>evaluate</code> and <code>plot</code> then run on the stored outputs.</p>
 
 
 <table>
@@ -2028,6 +2067,18 @@ is downloaded either way.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="OSError">OSError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>The download failed; the message names the URL.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2044,21 +2095,18 @@ is downloaded either way.</p>
   <summary>Notes</summary>
   <p><strong>Tree contents.</strong> Exactly what <code>mtb.run_all</code> writes and
 <code>mtb.load_batch</code> reads: <code>batch_result.json</code>, <code>long.csv</code>,
-<code>summary.csv</code> and one folder per method holding its <code>embedding.h5</code>.
-The download URLs come from the shipped manifest
-<code>multibench/engine/output_urls.json</code>.</p>
-<p><strong>Selecting methods.</strong> <code>methods</code> only validates the names, so a typo
-fails here rather than as an empty plot later. To restrict what is
-loaded, use <code>mtb.load_batch(out, methods=[...])</code>.</p>
+<code>summary.csv</code> and one folder per method holding its <code>embedding.h5</code>.</p>
+<p><strong>Selecting methods.</strong> <code>methods</code> only checks the names; the whole tree
+is downloaded. To restrict what is loaded, use
+<code>mtb.load_batch(out, methods=[...])</code>.</p>
 <p><strong>Idempotence.</strong> When <code>&lt;data_path&gt;/outputs/&lt;dataset&gt;/batch_result.json</code>
-exists nothing is downloaded. An empty leftover folder is replaced; a
-non-empty one without <code>batch_result.json</code> raises <code>RuntimeError</code> -
-remove it and call again.</p>
-<p><strong>Atomic extraction.</strong> The archive is extracted into a scratch folder and
-moved into place, so an interrupted download never looks like a complete
-tree on the next call. The archive may be rooted at the tree itself or
-at one folder (<code>outputs-D11/</code>, <code>D11/</code>); an entry that would write
-outside the scratch folder raises <code>RuntimeError</code>.</p>
+exists nothing is downloaded. An empty leftover folder is replaced. A
+non-empty one without <code>batch_result.json</code> raises <code>RuntimeError</code>.
+Remove it and call again.</p>
+<p><strong>Atomic extraction.</strong> The archive is unpacked into a temporary folder
+and then moved into place. The archive may be rooted at the tree itself
+or at one folder (<code>outputs-D11/</code>, <code>D11/</code>); an entry that would write
+outside the temporary folder raises <code>RuntimeError</code>.</p>
 </details>
 
 <details class="see-also">
@@ -2124,9 +2172,8 @@ stored results; the two sets overlap but are not the same.</p>
 <details class="note">
   <summary>Notes</summary>
   <p><strong>Overlap with stored results:</strong> <code>D24</code> has published metric tables and
-no downloadable file, <code>D46</code> downloads and has no stored table; the
-list is read from the fetcher's own asset table, so it always agrees
-with what <code>fetch()</code> accepts.</p>
+no downloadable file, <code>D46</code> downloads and has no stored table. The
+list is exactly the set of ids <code>fetch()</code> accepts.</p>
 </details>
 
     </div>

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -747,6 +747,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Filter by what your data has">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#my-atac-is-peaks-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        My ATAC is peaks only
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1539,6 +1556,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1602,6 +1647,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Filter by what your data has">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#my-atac-is-peaks-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        My ATAC is peaks only
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1722,21 +1784,22 @@
 
 
 <h1 id="discover-methods">Discover methods<a class="headerlink" href="#discover-methods" title="Anchor link to this section">&para;</a></h1>
-<p>These calls show which of the 36 registered methods fit your data and your
-task. They only read the package's registry: no environments, GPUs or data
-are needed.</p>
+<p>These calls show which of the 36 methods fit your data and your task. They
+need no environments, <abbr title="Graphics Processing Unit">GPU</abbr> or data.</p>
 <div class="admonition tip">
-<p class="admonition-title">TL;DR</p>
+<p class="admonition-title">Summary</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">()</span>                                 <span class="c1"># ['batch', 'classification', 'clustering', ...]</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>            <span class="c1"># every method in a category</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span>            <span class="c1"># filter by what your data has</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                 <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">()</span>                        <span class="c1"># the tasks methods are scored on</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>   <span class="c1"># every method in a category</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># filter by what your data has</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                 <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>                        <span class="c1"># everything known about one method</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>   <span class="c1"># ranked by stored scores</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">]))</span>                      <span class="c1"># the benchmark and the method, one line each</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>               <span class="c1"># everything known about one method</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># rank by the stored scores</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># the benchmark and the method, one line each</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">]))</span>
 </span></code></pre></div>
 </div>
 <hr />
@@ -1771,19 +1834,21 @@ another.</p>
 <tr>
 <td><strong>cross</strong></td>
 <td>Several batches, each with every modality</td>
-<td>replicate cohorts</td>
+<td><abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>+<abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> (the only cross data this package runs)</td>
 </tr>
 </tbody>
 </table>
+<p>Several samples of 10x Multiome (<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>+<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>) belong in vertical: one folder
+with all cells. To score batch mixing, pass each cell's sample as <code>batch=</code>
+to <code>run_all</code> or <code>evaluate</code>.</p>
 <hr />
 <h2 id="list-what-exists">List what exists<a class="headerlink" href="#list-what-exists" title="Anchor link to this section">&para;</a></h2>
-<p><code>list_tasks</code> and <code>list_methods</code> show what the registry holds.
-<code>list_methods</code> filters by category only; to filter by task, use
+<p><code>list_methods</code> filters by category only. To filter by task, use
 <code>find_methods</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">()</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># ['batch', 'classification', 'clustering', 'dimension_reduction', 'imputation']</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># ['batch', 'clustering', 'dimension_reduction']</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span>                       <span class="c1"># all 36 methods</span>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>    <span class="c1"># paired-design methods only</span>
@@ -1794,79 +1859,147 @@ another.</p>
 <p><a href="../../reference/discover/#multibench.discover.find_methods"><code>find_methods</code></a>
 filters by task and by what your data has: the modalities you measured, how
 your <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> is encoded, and whether you have cell-type labels.</p>
+<p>Each method reads <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> either as peaks or as gene activity. Give each
+method the representation it reads: <code>atac=</code> keeps the methods that read
+yours.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># unpaired RNA and ATAC batches, no cell-type labels</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span> <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># ['SCALEX', 'Seurat_v5', 'VIPCCA', 'Portal', ...]</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"gene_activity"</span><span class="p">)</span>   <span class="c1"># ATAC as gene activity</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">tunable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>          <span class="c1"># hyperparameters can be set</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                 <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># ['SCALEX', 'Seurat_v5', 'VIPCCA', 'Portal', ...]</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">)</span>   <span class="c1"># ATAC as peaks</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">tunable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># settable parameters</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>How filters combine.</strong> A method matches when one of its variants
-meets all the filters together. <code>None</code>, the default, turns a filter
-off.</p>
-<p><strong>modalities.</strong> The variant must take every listed type, so <code>["rna"]</code>
-is broad and <code>["rna", "atac"]</code> stricter. <code>protein</code> means <code>adt</code>, and a
-role name such as <code>atac_gas</code> counts as <code>atac</code>.</p>
-<p><strong>atac.</strong> The <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation the method's script reads:
-<code>"gene_activity"</code> (alias <code>"gas"</code>) or <code>"peak"</code> (alias <code>"peaks"</code>). The
-role name can mislead: moETM, scMM and iPOLNG take a role called
-<code>atac_gas</code> but read peaks.</p>
-<p><strong>needs_labels.</strong> Judged per variant. <code>method_info(m)["needs_labels"]</code>
+<p>A method matches when one of its variants meets all the filters
+together. A variant is the version of a method for one category and
+one set of inputs. <code>None</code>, the default, turns a filter off.</p>
+<p><code>modalities=</code> keeps the variants that take every listed type, so
+<code>["rna"]</code> is broad and <code>["rna", "atac"]</code> stricter. <code>"atac"</code> matches
+any <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> input, and <code>protein</code> means <code>adt</code>.</p>
+<p>The other <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tokens select by what the method reads. <code>"gas"</code>,
+<code>"gene_activity"</code> and <code>"atac_gas"</code> keep the methods that read gene
+activity. <code>"peak"</code> and <code>"atac_peak"</code> keep those that read peaks,
+including moETM, scMM and iPOLNG, whose input is named <code>atac_gas</code>.
+Naming both representations keeps MultiMAP and Seurat_v3, which read
+both files.</p>
+<p><code>atac=</code> takes <code>"peak"</code> or <code>"gene_activity"</code>, and the aliases
+<code>"peaks"</code> and <code>"gas"</code>. A representation token that contradicts
+<code>atac=</code> raises <code>ValueError</code>.</p>
+<p><code>mtb.scan</code> and <code>run_all</code> use the same tokens. They keep a row only
+when its modalities are exactly the listed ones, so scMoMaT's
+rna+adt+atac row is not kept for <code>["rna", "atac"]</code>. A representation
+token keeps every row whose method reads it, so <code>"atac_peak"</code> also
+keeps MultiMAP and Seurat_v3.</p>
+<p><code>needs_labels</code> is judged per variant. <code>method_info(m)["needs_labels"]</code>
 is <code>True</code> when any variant needs labels: for scMoMaT only its mosaic
-variant does.</p>
-<p><strong>tunable.</strong> <code>True</code> keeps the methods whose command line exposes at
-least one hyperparameter for <code>run(params=...)</code>.</p>
-<p><strong>Typos.</strong> An unknown token raises <code>ValueError</code> listing the valid
-values. A bare string such as <code>modalities="rna"</code> raises <code>TypeError</code>.</p>
+variant does. <code>tunable=True</code> keeps the methods whose command line
+exposes at least one hyperparameter for <code>run(params=...)</code>.</p>
+<p>An unknown token raises <code>ValueError</code> listing the valid values. A bare
+string such as <code>modalities="rna"</code> raises <code>TypeError</code>.</p>
+</details>
+<h3 id="my-atac-is-peaks-only">My <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> is peaks only<a class="headerlink" href="#my-atac-is-peaks-only" title="Anchor link to this section">&para;</a></h3>
+<p>Most diagonal methods read gene activity. With a peak matrix alone, check
+which methods can run:</p>
+<ul>
+<li>GLUE runs on peaks. It reads peak names such as <code>chr1:100-200</code>, and
+  <code>mtb.run</code> rewrites <code>chr1_100_200</code> or <code>chr1-100-200</code> into that form. It
+  also needs the GENCODE annotation file. See
+  <a href="../run/#install-the-methods-environment">Run a method</a>.</li>
+<li>Seurat_v5 needs a third dataset: a paired bridge with <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
+  from the same cells. The package passes your <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files as that
+  bridge, so it cannot run on unpaired data here.</li>
+<li>MultiMAP and Seurat_v3 also need gene activity for the same <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells.</li>
+<li>The other ten need gene activity instead of peaks, for the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells
+  of <code>atac_peak.h5</code>. Make it outside the package, for example with Signac
+  <code>GeneActivity</code>. Save it with
+  <code>mtb.io.to_canonical(gas, "data/X/", modality="gas")</code>.
+  From R, <code>write.csv(t(as.matrix(gas)), "gas.csv")</code> writes the matrix as
+  cells x genes. Pass <code>"gas.csv"</code> as <code>gas</code>.</li>
+</ul>
+<p><code>mtb.scan</code> then shows which methods have their files.</p>
+<details class="note">
+<summary>Details</summary>
+<p><code>mtb.scan</code> and <code>inputs_for(..., check=True)</code> compare the cells of
+<code>atac_gas.h5</code> with those of <code>atac_peak.h5</code>. Other cells, or the same
+cells in another order, fail the file check. Barcodes that differ only
+in a suffix such as <code>-1</code> or <code>-2</code> count as the same cell.</p>
+<p><code>to_canonical</code> writes the rows in the cell order of <code>atac_peak.h5</code>,
+which <code>atac_cty.csv</code> follows. The call warns when the gene-activity
+matrix holds other cells than <code>atac_peak.h5</code>. To re-order an
+<code>atac_gas.h5</code> you already wrote, pass <code>mtb.io.read_canonical(path)</code> to
+<code>to_canonical</code> as the source.</p>
 </details>
 <hr />
 <h2 id="inspect-a-single-method">Inspect a single method<a class="headerlink" href="#inspect-a-single-method" title="Anchor link to this section">&para;</a></h2>
 <p><a href="../../reference/discover/#multibench.discover.method_info"><code>method_info</code></a>
-returns what the registry knows about one method: its variants,
-environment, label needs, observed runtime and reference.</p>
+returns what the package knows about one method.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">"env"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"atac"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"needs_labels"</span><span class="p">]</span>   <span class="c1"># ('scmb_torch', 'gene_activity', False)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">info</span><span class="p">[</span><span class="s2">"supports"</span><span class="p">]</span>     <span class="c1"># one entry per variant: category, modalities, output kind, labels</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">info</span><span class="p">[</span><span class="s2">"runtime"</span><span class="p">]</span>      <span class="c1"># {'observed': [...], 'tier': 'slow', 'worst_sec': 2233, ...}</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">))</span>                         <span class="c1"># the benchmark and the method, one line each</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">"env"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"atac"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"needs_labels"</span><span class="p">]</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># ('scmb_torch', 'gene_activity', False)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">info</span><span class="p">[</span><span class="s2">"supports"</span><span class="p">]</span>    <span class="c1"># one entry per variant: category, modalities, labels, ...</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">info</span><span class="p">[</span><span class="s2">"runtime"</span><span class="p">]</span>     <span class="c1"># {..., 'tier': 'slow', 'worst_sec': 2233, ...}</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">))</span>   <span class="c1"># the benchmark and the method, one line each</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Runtime.</strong> <code>observed</code> lists measured runs (dataset, cells, seconds)
-and <code>tier</code> summarises them, from <code>fast</code> to <code>very_slow</code>. Use it to set
-<code>run_all(timeout=...)</code>. On a <abbr title="Central Processing Unit">CPU</abbr>, training methods take much longer
-than these times.</p>
-<p><strong>Hyperparameters.</strong> <code>mtb.params_for(method)</code> lists what
-<code>run(params=...)</code> can change and what the script fixes.</p>
-<p><strong>Catalog columns.</strong> <code>deep_learning</code> and <code>output</code> are in
-<code>mtb.catalog.methods()</code>, not in <code>method_info</code>.</p>
-<p><strong>Citing.</strong> <code>mtb.cite("SCALEX", "GLUE")</code> takes one id per argument or
-one list. <code>fmt="bibtex"</code> returns <code>.bib</code> entries.</p>
-<p><strong>Unknown ids</strong> raise <code>KeyError</code> with a did-you-mean hint.</p>
+<p><code>runtime["observed"]</code> lists measured runs, with dataset, cells and
+seconds, and <code>tier</code> summarises them from <code>fast</code> to <code>very_slow</code>. Use it
+to set <code>run_all(timeout=...)</code>. On a <abbr title="Central Processing Unit">CPU</abbr>, training methods take much
+longer than these times.</p>
+<p><code>info["setup_hint"]</code> names what a method needs before its first run,
+such as GLUE's annotation file. <code>setup_hint</code> is empty for most methods.
+<code>mtb.params_for(method)</code> lists what <code>run(params=...)</code> can change and
+what the script fixes.</p>
+<p><code>deep_learning</code> and <code>output</code> are in <code>mtb.catalog.methods()</code>, not in
+<code>method_info</code>.</p>
+<p><code>mtb.cite("SCALEX", "GLUE")</code> takes one id per argument or one list,
+and <code>fmt="bibtex"</code> returns <code>.bib</code> entries. Unknown ids raise
+<code>KeyError</code> with a did-you-mean hint.</p>
 </details>
 <hr />
 <h2 id="rank-from-stored-results">Rank from stored results<a class="headerlink" href="#rank-from-stored-results" title="Anchor link to this section">&para;</a></h2>
 <p><a href="../../reference/compare/#multibench.data.results.recommend"><code>recommend</code></a>
-ranks a category's methods by their stored scores and shows how many
-datasets each was scored on (<code>coverage</code>).</p>
+ranks a category's methods by their stored scores.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">#   method  grand_score  n_datasets  n_datasets_total  coverage  needs_labels  runtime_tier  worst_sec ...</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">#   method  grand_score  n_datasets  ...  output_kind  datasets</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">)</span>   <span class="c1"># only methods that read peaks</span>
 </span></code></pre></div>
+<p><code>grand_score</code> compares a category's methods with each other. On each
+dataset, the best of the category's scored methods gets 1 and the lowest
+gets 0. <code>grand_score</code> is the mean over the datasets a method was scored
+on. It is not a quality score.</p>
+<p>The stored scores cover few datasets: for vertical, only D11. Read the
+ranking as a hint. The full benchmark ranking is in the
+<a href="../../shiny/">interactive explorer</a> and in
+<a href="https://doi.org/10.1038/s41592-025-02856-3">Fig. 6 of the paper</a>.
+Methods with <code>needs_labels=True</code> train on your cell types, so compare them
+only with each other.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Unscored methods.</strong> Methods that fit the category but have no stored
-scores are listed last, with <code>grand_score</code> NaN and <code>coverage</code> 0.0. One
-<code>UserWarning</code> names them, and any datasets left out for having too few
-methods.</p>
-<p><strong>Other sources.</strong> <code>source="rerun"</code> ranks the package's re-run tables
-instead of the published ones. To rank your own method alongside,
-pass <code>long_df=pd.concat([mtb.load_results(category), mine])</code>.</p>
-<p><strong>Metrics.</strong> <code>metrics=</code> picks the metric family; the default ranks on
-the clustering metrics.</p>
-<p><strong>needs_labels</strong> here follows the category's variants: scMoMaT is
-<code>False</code> in a vertical ranking.</p>
+<p><code>coverage</code> is the share of the ranked datasets a method was scored on,
+and <code>datasets</code> names them.</p>
+<p>The Seurat_v5 script reads its bridge as two extra files. Its stored
+diagonal scores come from runs with a separate paired bridge dataset.
+They do not mean that it runs on your unpaired folder.</p>
+<p><code>source="rerun"</code> ranks the package's re-run tables instead of the
+published ones. The two hold different methods: for vertical D11 the
+published table has six and the re-run table 13. So the two can name
+different winners. To rank your own method alongside, score it with
+the leidenalg backend and pass
+<code>long_df=pd.concat([mtb.load_results(category), mine])</code>.</p>
+<p>Methods that fit the category but have no stored scores are listed
+last, with <code>grand_score</code> NaN and <code>coverage</code> 0.0. One <code>UserWarning</code>
+names them and any datasets left out for having too few methods. The
+same warning says when <code>modalities=</code> or <code>atac=</code> names a modality that
+no ranked dataset measured.</p>
+<p><code>modalities=</code> and <code>atac=</code> follow the <code>find_methods</code> rule above. They
+only shorten the list, so a filtered list can start below 1 and end
+above 0.</p>
+<p><code>metrics=</code> picks the metric family. The default ranks on the
+clustering metrics. <code>needs_labels</code> follows the category's variants:
+scMoMaT is <code>False</code> in a vertical ranking.</p>
 </details>
 <hr />
 <h2 id="the-full-benchmark-catalog">The full benchmark catalog<a class="headerlink" href="#the-full-benchmark-catalog" title="Anchor link to this section">&para;</a></h2>
@@ -1874,25 +2007,25 @@ the clustering metrics.</p>
 DataFrames, and maps free-text names to canonical ones.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="kn">import</span> <span class="n">catalog</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">catalog</span><span class="o">.</span><span class="n">methods</span><span class="p">()</span>                    <span class="c1"># one row per method: language, deep_learning, atac, output, ...</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>                   <span class="c1"># one row per dataset: simulated, category, has_results, ...</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">()</span>                    <span class="c1"># the metric details</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">"Seurat v5"</span><span class="p">)</span>    <span class="c1"># 'Seurat_v5'</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">"kbet"</span><span class="p">)</span>     <span class="c1"># 'kBET'</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">catalog</span><span class="o">.</span><span class="n">methods</span><span class="p">()</span>                  <span class="c1"># one row per method: language, atac, ...</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>                 <span class="c1"># one row per dataset, with its category</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">()</span>                  <span class="c1"># what each metric measures, range, direction</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">"Seurat v5"</span><span class="p">)</span>  <span class="c1"># 'Seurat_v5'</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">"kbet"</span><span class="p">)</span>   <span class="c1"># 'kBET'</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Datasets.</strong> <code>catalog.datasets()</code> also lists the ids that exist only
-as stored results, such as the re-run subsamples <code>D11s</code> and <code>D28s</code>.
-The <code>simulated</code> column marks the simulated datasets.</p>
-<p><strong>Unknown names.</strong> <code>canonical_id</code> returns an unknown name unchanged;
-<code>canonical_id(name, strict=True)</code> raises <code>KeyError</code> instead.</p>
-<p><strong>Metric codes.</strong> <code>catalog.known_metrics()</code> lists the ten scIB codes and
-<code>PCR</code>.</p>
+<p><code>catalog.datasets()</code> also lists the ids that exist only as stored
+results, such as the re-run subsamples <code>D11s</code> and <code>D28s</code>. The
+<code>simulated</code> column marks the simulated datasets.</p>
+<p><code>canonical_id</code> returns an unknown name with its spaces and dots
+replaced by <code>_</code>. <code>canonical_id(name, strict=True)</code> raises <code>KeyError</code>
+instead.
+<code>catalog.known_metrics()</code> lists the ten scIB codes and <code>PCR</code>.</p>
 </details>
 <hr />
 <h2 id="before-running">Before running<a class="headerlink" href="#before-running" title="Anchor link to this section">&para;</a></h2>
-<p>Check your folder with <code>mtb.scan("MYDATA", category)</code>: it reports
+<p>Check your folder with <code>mtb.scan("MYDATA", category)</code>. It reports
 <code>files_ok</code> and <code>env_ok</code> per method. Then run them with <code>run_all</code>.</p>
 <hr />
 <p>Next: run a chosen method in <a href="../run/">Run a method</a>, score it in

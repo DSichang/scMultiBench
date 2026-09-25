@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1448,10 +1448,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#env-install-run-refuses-on-macos-windows" class="md-nav__link">
+  <a href="#env-install-run-refuses-on-macos-or-windows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        env install --run refuses on macOS / Windows
+        env install --run refuses on macOS or Windows
       
     </span>
   </a>
@@ -1482,6 +1482,34 @@
     
   
     Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
   
 
     
@@ -1551,10 +1579,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#env-install-run-refuses-on-macos-windows" class="md-nav__link">
+  <a href="#env-install-run-refuses-on-macos-or-windows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        env install --run refuses on macOS / Windows
+        env install --run refuses on macOS or Windows
       
     </span>
   </a>
@@ -1636,25 +1664,23 @@
 <h1 id="faq">FAQ<a class="headerlink" href="#faq" title="Anchor link to this section">&para;</a></h1>
 <h2 id="where-to-look">Where to look<a class="headerlink" href="#where-to-look" title="Anchor link to this section">&para;</a></h2>
 <ul>
-<li><strong>Installation and environments</strong>: <a href="../installation/">Installation</a>.</li>
-<li><strong>Running methods and reading metrics</strong>: the tutorials for
+<li>Installation and environments: <a href="../installation/">Installation</a>.</li>
+<li>Running methods and reading metrics: the tutorials for
   <a href="../tutorials/vertical/">vertical</a>, <a href="../tutorials/diagonal/">diagonal</a>,
   <a href="../tutorials/mosaic/">mosaic</a> and <a href="../tutorials/cross/">cross</a> integration.</li>
-<li><strong>The full benchmark rankings</strong>: the <a href="../shiny/">interactive explorer</a>.</li>
+<li>The full benchmark rankings: the <a href="../shiny/">interactive explorer</a>.</li>
 </ul>
 <h2 id="clisi-ilisi-are-nan-on-my-mac"><code>cLISI</code> / <code>iLISI</code> are <code>NaN</code> on my Mac<a class="headerlink" href="#clisi-ilisi-are-nan-on-my-mac" title="Anchor link to this section">&para;</a></h2>
-<p>Install a C++ compiler (on macOS: <code>xcode-select --install</code>), then run
-<code>evaluate</code> again in a new Python session. See
-<a href="../installation/#troubleshooting">Troubleshooting</a>.</p>
-<h2 id="env-install-run-refuses-on-macos-windows"><code>env install --run</code> refuses on macOS / Windows<a class="headerlink" href="#env-install-run-refuses-on-macos-windows" title="Anchor link to this section">&para;</a></h2>
-<p>The method environments are linux-64, so run methods on a Linux host.
-Everything else works on any platform: the registry, the stored results,
-<code>scan</code>'s file check, <code>evaluate</code> and the figures. See
-<a href="../installation/#method-environments">Method environments</a>.</p>
+<p>Install a C++ compiler, then run <code>evaluate</code> again in a new Python session.
+On macOS, <code>xcode-select --install</code> installs one.</p>
+<h2 id="env-install-run-refuses-on-macos-or-windows"><code>env install --run</code> refuses on macOS or Windows<a class="headerlink" href="#env-install-run-refuses-on-macos-or-windows" title="Anchor link to this section">&para;</a></h2>
+<p>The method environments run only on Linux, so the install refuses here.
+<a href="../installation/">Installation</a> lists what works on macOS and Windows.</p>
+<p>To run on a Linux server, make the commands there. <code>scan</code> and <code>--dry-run</code>
+write the absolute paths of the machine they run on.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Override.</strong> <code>--force</code> (<code>force=True</code> in Python) attempts the install
-anyway.</p>
+<p><code>--force</code> (<code>force=True</code> in Python) attempts the install anyway.</p>
 </details>
 
 

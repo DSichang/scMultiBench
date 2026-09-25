@@ -15,7 +15,8 @@
    2. Sticky header shadow on scroll. */
 
 (function () {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // With reduced motion only the landing card runs, and it draws a still frame.
+  const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ANIM_SELECTOR =
     '.md-typeset .grid.cards > ul > li, ' +
@@ -588,8 +589,29 @@
     return g;
   };
 
-  /* Task-flow showcase (iter 54) — six downstream tasks, smooth in-place
-     morphs + per-scene legends on the right. No arrows. GSAP master timeline. */
+  /* Still frame without GSAP: give every registered element of a scene its
+     final 'to' state (opacity, SVG attributes, x/y as a translate). Morphs are
+     applied in the order they were added, so the last value of a property wins. */
+  const tfStill = (scene) => {
+    const offsets = new Map();
+    scene.morphs.forEach(({ el, to }) => {
+      Object.keys(to).forEach((k) => {
+        const v = to[k];
+        if (k === 'attr') Object.keys(v).forEach((a) => el.setAttribute(a, v[a]));
+        else if (k === 'opacity') el.setAttribute('opacity', v);
+        else if (k === 'x' || k === 'y') {
+          const o = offsets.get(el) || { x: 0, y: 0 };
+          o[k] = v;
+          offsets.set(el, o);
+        }
+      });
+    });
+    offsets.forEach((o, el) => el.setAttribute('transform', `translate(${o.x} ${o.y})`));
+    scene.g.setAttribute('opacity', 1);
+  };
+
+  /* Task-flow showcase — the landing card's run → evaluate → plot scenes,
+     smooth in-place morphs + per-scene legends. GSAP master timeline. */
   const taskFlow = () => {
     const wrap = document.querySelector('.taskflow');
     // instant-nav: a previous page's hero card may have left its perpetual
@@ -610,351 +632,15 @@
     scenesG.innerHTML = '';
 
     const mk = tfMk, label = tfLabel;
-    const BLUES = ['#dbeafe', '#93c5fd', '#60a5fa', '#3b82f6', '#1d4ed8'];
     const CT = ['#3b82f6', '#10b981', '#ef4444'];
-    const COND_A = '#f59e0b', COND_B = '#3b82f6', UNK = '#cbd5e1';
-    const rnd = (a) => a[Math.floor(Math.random() * a.length)];
-    const PERSON = 'M11 2.4a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6zm0 8.1c3.7 0 6.6 1.8 6.6 4.1V17H4.4v-2.4c0-2.3 2.9-4.1 6.6-4.1z';
-    const person = (cx, cy, h, fill) => {
-      const s = h / 19;
-      const outer = mk('g', {});
-      const inner = mk('g', { transform: `translate(${(cx - 11 * s).toFixed(1)},${(cy - 9.5 * s).toFixed(1)}) scale(${s.toFixed(3)})` });
-      const p = mk('path', { d: PERSON, fill });
-      inner.appendChild(p); outer.appendChild(inner); outer.__path = p;
-      return outer;
-    };
-    const cell = (cx, cy, color, tri, striped) => {
-      const g = mk('g', {});
-      if (tri) g.appendChild(mk('polygon', { points: `${cx},${cy - 7} ${cx + 6.4},${cy + 5.5} ${cx - 6.4},${cy + 5.5}`, fill: color }));
-      else g.appendChild(mk('circle', { cx, cy, r: 6, fill: color }));
-      if (striped) {
-        g.appendChild(mk('line', { x1: cx - 3.5, y1: cy + 3, x2: cx + 3, y2: cy - 3.5, stroke: '#fff', 'stroke-width': 1.1, opacity: 0.85 }));
-        g.appendChild(mk('line', { x1: cx - 0.5, y1: cy + 4.5, x2: cx + 4.5, y2: cy - 0.5, stroke: '#fff', 'stroke-width': 1.1, opacity: 0.85 }));
-      }
-      return g;
-    };
 
     const reg = (arr, el, from, to, dur, delay) => arr.push({ el, from, to, dur: dur || 1.3, delay: delay || 0 });
 
     /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       Per-project scene sets. Each builder returns a fresh `scenes[]` array so the
-       same task-flow card can switch between M3 / scMultiBench / Matilda demos.
-       The active set is chosen by `.taskflow[data-taskflow]` and, on the ecosystem
-       landing, by the `.tf-switch` segmented control.
+       Scene sets. Each builder returns a fresh `scenes[]` array; the active set
+       is chosen by `.taskflow[data-taskflow]`.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
     const BUILDERS = {};
-
-    BUILDERS.m3 = () => {
-    const scenes = [];
-
-    /* ① Factorised DR — big feature matrix SHRINKS + factorises into low-dim strips */
-    (() => {
-      const g = tfScene(); const m = [];
-      const stripCol = ['#7c3aed', '#e11d48', '#fb7185', '#64748b'];
-      const stripY = [58, 84, 110, 136];     // tighter row spacing (26px)
-      const PERROW = 6, KEEP = 4 * PERROW;   // fewer per row
-      for (let i = 0; i < 54; i++) {
-        const col = i % 9, row = Math.floor(i / 9);
-        const fx = 44 + col * 15, fy = 46 + row * 15;
-        const r = mk('rect', { x: fx, y: fy, width: 13, height: 13, rx: 1, fill: rnd(BLUES) });
-        g.appendChild(r);
-        if (i < KEEP) {
-          const strip = Math.floor(i / PERROW), pos = i % PERROW;
-          reg(m, r, { attr: { x: fx, y: fy, width: 13, height: 13, fill: rnd(BLUES) } }, { attr: { x: 80 + pos * 20, y: stripY[strip], width: 18, height: 18, fill: stripCol[strip] } }, 1.3, i * 0.012);
-        } else {
-          reg(m, r, { attr: { width: 13, height: 13 }, opacity: 1 }, { attr: { width: 3, height: 3 }, opacity: 0 }, 1.0, (i - KEEP) * 0.01);
-        }
-      }
-      tfLegend(m, g, 300, 56, [
-        { title: 'Factors' },
-        { swatch: 'sq', color: '#7c3aed', text: 'Cell type' },
-        { swatch: 'sq', color: '#e11d48', text: 'Condition 1' },
-        { swatch: 'sq', color: '#fb7185', text: 'Condition 2' },
-        { swatch: 'sq', color: '#64748b', text: 'Batch' },
-      ]);
-      scenes.push({ num: 1, title: 'Factorised dimension reduction', g, morphs: m });
-    })();
-
-    /* ② Batch correction — cells cluster by (cell type × condition); organic blobs */
-    (() => {
-      const g = tfScene(); const m = [];
-      // 6 groups = 3 cell types × 2 conditions, laid out like the paper
-      const groups = [
-        { color: CT[2], striped: false, cx: 70,  cy: 58 },   // red  · cond 1
-        { color: CT[2], striped: true,  cx: 162, cy: 62 },   // red  · cond 2
-        { color: CT[1], striped: true,  cx: 248, cy: 84 },   // green· cond 2
-        { color: CT[1], striped: false, cx: 250, cy: 158 },  // green· cond 1
-        { color: CT[0], striped: true,  cx: 96,  cy: 144 },  // blue · cond 2
-        { color: CT[0], striped: false, cx: 178, cy: 158 },  // blue · cond 1
-      ];
-      groups.forEach((grp) => {
-        const blob = mk('path', { d: tfBlob(grp.cx, grp.cy, 34, 30), fill: grp.color, opacity: 0 });
-        g.appendChild(blob);
-        reg(m, blob, { opacity: 0 }, { opacity: 0.15 }, 0.6, 1.2);
-        const N = 5;
-        for (let i = 0; i < N; i++) {
-          const ang = (i / N) * Math.PI * 2 + Math.random() * 0.6;
-          const rr = 6 + Math.random() * 15;
-          const tx = grp.cx + Math.cos(ang) * rr, ty = grp.cy + Math.sin(ang) * rr * 0.9;
-          const sx = 40 + Math.random() * 220, sy = 36 + Math.random() * 150;
-          const cg = cell(sx, sy, grp.color, i % 2 === 0, grp.striped);
-          g.appendChild(cg);
-          reg(m, cg, { x: 0, y: 0 }, { x: tx - sx, y: ty - sy }, 1.5, Math.random() * 0.35);
-        }
-      });
-      tfLegend(m, g, 302, 40, [
-        { title: 'Cell type' },
-        { swatch: 'dot', color: CT[0], text: 'Type A' }, { swatch: 'dot', color: CT[1], text: 'Type B' }, { swatch: 'dot', color: CT[2], text: 'Type C' },
-        { title: 'Batch' }, { swatch: 'ring', text: 'Batch 1' }, { swatch: 'tri', text: 'Batch 2' },
-        { title: 'Condition' }, { swatch: 'dot', color: '#94a3b8', text: 'Cond 1' }, { swatch: 'striped', color: '#94a3b8', text: 'Cond 2' },
-      ]);
-      scenes.push({ num: 2, title: 'Condition-aware batch correction', g, morphs: m });
-    })();
-
-    /* ③ Mosaic imputation — an ENTIRE missing modality is generated */
-    (() => {
-      const g = tfScene(); const m = [];
-      // no legend on this scene → centre the grid in the full 460-wide stage
-      const cols = 8, c0 = 15, gap = 2, gridW = cols * c0 + (cols - 1) * gap;
-      const x0 = Math.round(230 - gridW / 2), y1 = 44, y2 = 116;
-      for (let r = 0; r < 3; r++) for (let c = 0; c < cols; c++)
-        g.appendChild(mk('rect', { x: x0 + c * (c0 + gap), y: y1 + r * (c0 + gap), width: c0, height: c0, rx: 1, fill: rnd(BLUES) }));
-      for (let r = 0; r < 3; r++) for (let c = 0; c < cols; c++) {
-        const rect = mk('rect', { x: x0 + c * (c0 + gap), y: y2 + r * (c0 + gap), width: c0, height: c0, rx: 1, fill: rnd(BLUES) });
-        g.appendChild(rect);
-        reg(m, rect, { attr: { 'fill-opacity': 0, stroke: '#94a3b8', 'stroke-width': 0.8, 'stroke-dasharray': '2 1.5' } }, { attr: { 'fill-opacity': 1, 'stroke-width': 0 } }, 0.5, c * 0.09 + r * 0.04);
-      }
-      g.appendChild(label(x0, y1 - 6, 'Modality 1 (observed)', 'start', 9));
-      g.appendChild(label(x0, y2 - 6, 'Modality 2 (missing → imputed)', 'start', 9));
-      scenes.push({ num: 3, title: 'Mosaic integration & imputation', g, morphs: m });
-    })();
-
-    /* ④ Patient inference — unknown (grey) donors get inferred to a condition */
-    (() => {
-      const g = tfScene(); const m = [];
-      const plan = [COND_A, COND_A, COND_A, COND_B, COND_B, COND_B, UNK, UNK, UNK, UNK];
-      const infer = [null, null, null, null, null, null, COND_B, COND_A, COND_B, COND_A];
-      const cols = 5, gx = 56, x0 = 230 - (cols - 1) * gx / 2 - 70;
-      plan.forEach((col, i) => {
-        const cx = x0 + (i % cols) * gx, cy = 70 + Math.floor(i / cols) * 64;
-        const pe = person(cx, cy, 44, col);
-        g.appendChild(pe);
-        if (infer[i]) reg(m, pe.__path, { attr: { fill: UNK } }, { attr: { fill: infer[i] } }, 0.7, 0.7 + (i - 6) * 0.2);
-      });
-      tfLegend(m, g, 300, 72, [
-        { title: 'Condition' },
-        { swatch: 'dot', color: COND_A, text: 'Diseased' },
-        { swatch: 'dot', color: COND_B, text: 'Healthy' },
-        { swatch: 'dot', color: UNK, text: 'Unknown' },
-      ]);
-      scenes.push({ num: 4, title: 'Patient-level condition inference', g, morphs: m });
-    })();
-
-    /* ⑤ Sample generation — input people stay, generated people grow in */
-    (() => {
-      const g = tfScene(); const m = [];
-      const genCol = [COND_B, COND_A];
-      const cols = 6, rows = 3, gx = 62, x0 = 230 - (cols - 1) * gx / 2;
-      let idx = 0;
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-        const cx = x0 + c * gx, cy = 54 + r * 50;
-        const pe = person(cx, cy, 40, genCol[(r + c) % 2]);
-        g.appendChild(pe);
-        if (idx < 4) reg(m, pe, { opacity: 1, scale: 1, svgOrigin: `${cx} ${cy}` }, { opacity: 1, scale: 1, svgOrigin: `${cx} ${cy}` }, 0.3, 0);
-        else reg(m, pe, { opacity: 0, scale: 0, svgOrigin: `${cx} ${cy}` }, { opacity: 1, scale: 1, svgOrigin: `${cx} ${cy}` }, 0.5, (idx - 4) * 0.05);
-        idx++;
-      }
-      scenes.push({ num: 5, title: 'Patient-level sample generation', g, morphs: m });
-    })();
-
-    /* ⑥ Attribution — highlight cells / genes / cell types important for disease */
-    (() => {
-      const g = tfScene(); const m = [];
-      const REFCT = ['#6366f1', '#14b8a6', '#fb7185'];   // refined indigo / teal / coral
-      const IMP = '#be123c';                              // elegant crimson rings
-      const centers = [[78, 70], [162, 58], [118, 138]];
-      // deterministic two-row layout: every pair ≥17px apart so cells never
-      // touch and an emphasis ring never clips a neighbour
-      const off = [[-17, -11], [0, -15], [17, -11], [-17, 9], [0, 13], [17, 9]];
-      const dots = [];
-      for (let c = 0; c < 3; c++) for (let i = 0; i < 6; i++) {
-        const cx = centers[c][0] + off[i][0], cy = centers[c][1] + off[i][1];
-        const d = mk('circle', { cx, cy, r: 5.5, fill: REFCT[c] });
-        g.appendChild(d); dots.push(d);
-      }
-      g.appendChild(label(118, 184, 'Cells', 'middle', 9));
-      // emphasis = a crimson ring drawn AROUND select cells; cell size stays equal
-      [2, 6, 11, 16].forEach((k, j) => {
-        const d = dots[k]; if (!d) return;
-        const cx = +d.getAttribute('cx'), cy = +d.getAttribute('cy');
-        const halo = mk('circle', { cx, cy, r: 10, fill: 'none', stroke: IMP, 'stroke-width': 2.2, opacity: 0 });
-        g.appendChild(halo);
-        reg(m, halo, { opacity: 0, scale: 1.4, svgOrigin: `${cx} ${cy}` }, { opacity: 1, scale: 1, svgOrigin: `${cx} ${cy}` }, 0.5, 0.7 + j * 0.1);
-      });
-      // dashed cell-type region around the coral cluster
-      const region = mk('ellipse', { cx: centers[2][0], cy: centers[2][1], rx: 38, ry: 32, fill: 'none', stroke: IMP, 'stroke-width': 1.6, 'stroke-dasharray': '5 3', opacity: 0 });
-      g.appendChild(region); reg(m, region, { opacity: 0 }, { opacity: 1 }, 0.5, 1.0);
-      for (let i = 0; i < 9; i++) {
-        const rr = mk('rect', { x: 40 + i * 13, y: 196, width: 11, height: 11, rx: 1.5, fill: '#e2e8f0' });
-        g.appendChild(rr);
-        if ([1, 4, 7].includes(i)) reg(m, rr, { attr: { fill: '#e2e8f0' } }, { attr: { fill: IMP } }, 0.4, 0.8 + i * 0.04);
-      }
-      g.appendChild(label(40, 192, 'Genes', 'start', 9));
-      // disease patient keeps the amber 'Diseased' colour from the earlier scenes
-      g.appendChild(person(262, 60, 54, COND_A));
-      g.appendChild(label(262, 102, 'Disease', 'middle', 11, 'currentColor', '600'));
-      tfLegend(m, g, 300, 108, [
-        { title: 'Important for' },
-        { title: 'prediction:', gap: 18 },
-        { swatch: 'dot', color: IMP, text: 'Cells' },
-        { swatch: 'sq', color: IMP, text: 'Genes' },
-        { swatch: 'ring', color: IMP, text: 'Cell Type', dashed: true },
-      ]);
-      scenes.push({ num: 6, title: 'Multi-resolution attribution', g, morphs: m });
-    })();
-
-    return scenes;
-    };  /* end BUILDERS.m3 */
-
-    /* ══════════════════════════ Matilda ══════════════════════════ */
-    BUILDERS.matilda = () => {
-    const scenes = [];
-
-    /* ① Multimodal integration — three modality inputs → arrow → a centred shared latent z.
-       Balanced left→centre→right layout (inputs left, z centre, legend right) so the
-       frame never goes lopsided the way a lone z + right legend did. */
-    (() => {
-      const g = tfScene(); const m = [];
-      const mods = [
-        { color: '#7c3aed', y: 60 },   // RNA
-        { color: '#0ea5e9', y: 100 },  // ADT
-        { color: '#f59e0b', y: 140 },  // ATAC
-      ];
-      // three modality input strips on the left (colours are keyed in the legend; no inline text)
-      const sN = 4, ssq = 14, sgap = 4, sx0 = 40;
-      mods.forEach((mod, mi) => {
-        for (let i = 0; i < sN; i++) {
-          const rr = mk('rect', { x: sx0 + i * (ssq + sgap), y: mod.y, width: ssq, height: ssq, rx: 2, fill: mod.color, opacity: 0 });
-          g.appendChild(rr);
-          reg(m, rr, { opacity: 0 }, { opacity: 0.9 }, 0.4, 0.15 + mi * 0.08 + i * 0.05);
-        }
-      });
-      // arrow — fades in WITH the modality strips (not before, in a blank frame)
-      const arr1 = mk('line', { x1: 128, y1: 104, x2: 192, y2: 104, stroke: '#94a3b8', 'stroke-width': 2.2, opacity: 0 });
-      g.appendChild(arr1);
-      const arh1 = mk('polygon', { points: '192,99 203,104 192,109', fill: '#94a3b8', opacity: 0 });
-      g.appendChild(arh1);
-      reg(m, arr1, { opacity: 0 }, { opacity: 1 }, 0.4, 0.25);
-      reg(m, arh1, { opacity: 0 }, { opacity: 1 }, 0.4, 0.3);
-      // shared latent z — centred in the frame (column centre ≈ x230)
-      const latX = 224;
-      const lat = mk('g', {});
-      for (let k = 0; k < 6; k++) lat.appendChild(mk('rect', { x: latX, y: 64 + k * 16, width: 14, height: 14, rx: 2, fill: '#6d28d9' }));
-      g.appendChild(lat);
-      reg(m, lat, { opacity: 0, scale: 0.5, svgOrigin: (latX + 7) + ' 112' }, { opacity: 1, scale: 1, svgOrigin: (latX + 7) + ' 112' }, 0.7, 0.55);
-      const zlab = label(latX + 7, 56, 'z', 'middle', 11, '#6d28d9', '700'); zlab.setAttribute('opacity', 0);
-      g.appendChild(zlab);
-      reg(m, zlab, { opacity: 0 }, { opacity: 1 }, 0.5, 0.85);
-      // legend fades in with the rest of the scene (synced, not ahead of the right side)
-      tfLegend(m, g, 300, 58, [
-        { title: 'Modalities' },
-        { swatch: 'sq', color: '#7c3aed', text: 'RNA' },
-        { swatch: 'sq', color: '#0ea5e9', text: 'ADT' },
-        { swatch: 'sq', color: '#f59e0b', text: 'ATAC' },
-        { title: 'VAE encoder' },
-        { swatch: 'sq', color: '#6d28d9', text: 'Shared latent z' },
-      ], false);
-      scenes.push({ num: 1, title: 'Multimodal integration', g, morphs: m });
-    })();
-
-    /* ② Data simulation — a few real cells → an arrow → many neatly-tiled simulated cells */
-    (() => {
-      const g = tfScene(); const m = [];
-      // a few real "seed" cells on the left, one per cell type — these fade in first
-      CT.forEach((col, i) => {
-        const rc = mk('circle', { cx: 60, cy: 78 + i * 36, r: 7, fill: col, opacity: 0 });
-        g.appendChild(rc);
-        reg(m, rc, { opacity: 0 }, { opacity: 1 }, 0.4, 0.1 + i * 0.05);
-      });
-      // arrow — appears WITH the real cells (not before), then the grid grows from it
-      const arr2 = mk('line', { x1: 92, y1: 114, x2: 150, y2: 114, stroke: '#94a3b8', 'stroke-width': 2.4, opacity: 0 });
-      g.appendChild(arr2);
-      const arh2 = mk('polygon', { points: '150,109 161,114 150,119', fill: '#94a3b8', opacity: 0 });
-      g.appendChild(arh2);
-      reg(m, arr2, { opacity: 0 }, { opacity: 1 }, 0.4, 0.2);
-      reg(m, arh2, { opacity: 0 }, { opacity: 1 }, 0.4, 0.25);
-      // many VAE-simulated cells in a TIDY GRID (1 → many); tile in row by row
-      const cols = 5, rows = 5, dx = 22, dy = 22, gx0 = 178, gy0 = 64;
-      let idx = 0;
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-        const cx = gx0 + c * dx, cy = gy0 + r * dy;
-        const ci = mk('circle', { cx, cy, r: 6, fill: CT[(r + c) % 3] });
-        g.appendChild(ci);
-        reg(m, ci, { opacity: 0, scale: 0, svgOrigin: cx + ' ' + cy }, { opacity: 1, scale: 1, svgOrigin: cx + ' ' + cy }, 0.45, 0.3 + idx * 0.03);
-        idx++;
-      }
-      // legend matches the actual cells (coloured by type); real vs simulated is shown by the arrow
-      tfLegend(m, g, 300, 70, [
-        { title: 'Cell type' },
-        { swatch: 'dot', color: CT[0], text: 'Type A' },
-        { swatch: 'dot', color: CT[1], text: 'Type B' },
-        { swatch: 'dot', color: CT[2], text: 'Type C' },
-      ]);
-      scenes.push({ num: 2, title: 'Data simulation', g, morphs: m });
-    })();
-
-    /* ③ Cell-type classification — query cells are coloured by their predicted type */
-    (() => {
-      const g = tfScene(); const m = [];
-      const cols = 5, rows = 3, gx = 42, gy = 44, x0 = 60, y0 = 58;
-      let idx = 0;
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-        const cx = x0 + c * gx, cy = y0 + r * gy;
-        const col = CT[(c + r) % 3];
-        const ci = mk('circle', { cx, cy, r: 6.5, fill: '#cbd5e1' });
-        g.appendChild(ci);
-        reg(m, ci, { attr: { fill: '#cbd5e1' } }, { attr: { fill: col } }, 0.5, 0.5 + idx * 0.045);
-        idx++;
-      }
-      tfLegend(m, g, 300, 64, [
-        { title: 'Predicted' },
-        { swatch: 'dot', color: CT[0], text: 'Type A' },
-        { swatch: 'dot', color: CT[1], text: 'Type B' },
-        { swatch: 'dot', color: CT[2], text: 'Type C' },
-      ]);
-      scenes.push({ num: 3, title: 'Cell-type classification', g, morphs: m });
-    })();
-
-    /* ④ Feature selection — integrated gradients highlight markers across modalities */
-    (() => {
-      const g = tfScene(); const m = [];
-      const IMP = '#be123c';
-      const rows = [
-        { name: 'RNA',  y: 56,  imp: [2, 5, 8] },
-        { name: 'ADT',  y: 104, imp: [1, 4] },
-        { name: 'ATAC', y: 152, imp: [0, 3, 6, 9] },
-      ];
-      const N = 11, sq = 13, gap = 4, x0 = 70;
-      rows.forEach((row) => {
-        g.appendChild(label(x0 - 30, row.y + 10, row.name, 'start', 8.5, 'currentColor', '700'));
-        for (let i = 0; i < N; i++) {
-          const fx = x0 + i * (sq + gap);
-          const r = mk('rect', { x: fx, y: row.y, width: sq, height: sq, rx: 1.5, fill: '#e2e8f0' });
-          g.appendChild(r);
-          if (row.imp.includes(i)) reg(m, r, { attr: { fill: '#e2e8f0' } }, { attr: { fill: IMP } }, 0.4, 0.6 + i * 0.05);
-        }
-      });
-      tfLegend(m, g, 300, 84, [
-        { title: 'Integrated' },
-        { title: 'gradients', gap: 18 },
-        { swatch: 'sq', color: IMP, text: 'Important' },
-        { swatch: 'sq', color: '#e2e8f0', text: 'Other' },
-      ]);
-      scenes.push({ num: 4, title: 'Feature selection', g, morphs: m });
-    })();
-
-    return scenes;
-    };  /* end BUILDERS.matilda */
 
     /* ══════════════════════════ scMultiBench ══════════════════════════
        run → evaluate → plot, the scIB-style benchmark pipeline.
@@ -1163,7 +849,7 @@
 
     /* ── Render the active scene-set; dots are rebuilt to match its length ── */
     const render = (key) => {
-      if (!BUILDERS[key]) key = 'm3';
+      if (!BUILDERS[key]) key = 'multibench';
       if (window.__tfTl) { window.__tfTl.kill(); window.__tfTl = null; }
       scenesG.innerHTML = '';
       const scenes = BUILDERS[key]();
@@ -1187,17 +873,14 @@
     };
 
     const gsap = window.gsap;
-    if (!gsap) { scenes[0].g.setAttribute('opacity', 1); setHead(0); return; }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      scenes[0].g.setAttribute('opacity', 1);
-      scenes[0].morphs.forEach((mo) => gsap.set(mo.el, mo.to));
-      setHead(0); return;
-    }
-
     setHead(0);
+    // No GSAP (blocked CDN) or reduced motion: show the first scene as a still frame.
+    if (!gsap || REDUCED_MOTION) { tfStill(scenes[0]); return; }
+
     const master = gsap.timeline({ repeat: -1 });
     window.__tfTl = master;
     const startTimes = [];                   // where each scene begins on the master
+    const builtAt = [];                      // where each scene's build-up has finished
     scenes.forEach((s, idx) => {
       startTimes[idx] = master.duration();   // current end = this scene's start time
       const st = gsap.timeline();
@@ -1211,8 +894,15 @@
         maxEnd = Math.max(maxEnd, 0.45 + mo.delay + mo.dur);
       });
       st.to(s.g, { opacity: 0, duration: 0.45, ease: 'power2.in' }, maxEnd + 3.3); /* +2s hold */
+      builtAt[idx] = startTimes[idx] + maxEnd;
       master.add(st);
     });
+
+    /* Open the loop on the first scene's finished frame. seek() renders at
+       once, without waiting for an animation frame, so the card has content
+       in a headless render, a background tab or a paused timeline. The next
+       loops play the first scene's build-up from the start. */
+    master.seek(builtAt[0]);
 
     /* Clickable dots: jump to any scene and keep auto-playing from there.
        The master is one declarative timeline, so seeking to a scene's start
@@ -1224,7 +914,7 @@
     });
     };  /* end render() */
 
-    render((wrap.dataset.taskflow) || 'm3');
+    render((wrap.dataset.taskflow) || 'multibench');
 
     /* Perf: pause the perpetual loop when the card is scrolled off-screen, so it
        isn't burning CPU/rAF the whole time you're reading further down the page. */
@@ -1242,23 +932,6 @@
         });
       }, { threshold: 0.01 });
       window.__tfIO.observe(wrap);
-    }
-
-    /* Ecosystem landing only: a segmented control swaps the active scene-set. */
-    const switchWrap = document.querySelector('.tf-switch');
-    if (switchWrap && !switchWrap.dataset.wired) {
-      switchWrap.dataset.wired = '1';
-      const btns = switchWrap.querySelectorAll('[data-tf]');
-      btns.forEach((btn) => {
-        btn.addEventListener('click', () => {
-          btns.forEach((b) => {
-            const on = b === btn;
-            b.classList.toggle('is-active', on);
-            b.setAttribute('aria-selected', on ? 'true' : 'false');
-          });
-          render(btn.dataset.tf);
-        });
-      });
     }
   };
 
@@ -1304,6 +977,7 @@
   };
 
   const init = () => {
+    if (REDUCED_MOTION) { taskFlow(); return; }
     enableSectionNumbersOnHome();
     tagSectionEyebrows();
     heroReveal();

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -553,7 +553,7 @@
   <a href="#step-1-create-an-isolated-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1, Create an isolated environment
+        Step 1: Create an isolated environment
       
     </span>
   </a>
@@ -564,7 +564,7 @@
   <a href="#step-2-install-multibench" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2, Install multibench
+        Step 2: Install multibench
       
     </span>
   </a>
@@ -575,7 +575,7 @@
   <a href="#step-3-verify-the-install" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3, Verify the install
+        Step 3: Verify the install
       
     </span>
   </a>
@@ -618,6 +618,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-a-cluster-with-offline-compute-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a cluster with offline compute nodes
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1556,6 +1567,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1593,7 +1632,7 @@
   <a href="#step-1-create-an-isolated-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1, Create an isolated environment
+        Step 1: Create an isolated environment
       
     </span>
   </a>
@@ -1604,7 +1643,7 @@
   <a href="#step-2-install-multibench" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2, Install multibench
+        Step 2: Install multibench
       
     </span>
   </a>
@@ -1615,7 +1654,7 @@
   <a href="#step-3-verify-the-install" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 3, Verify the install
+        Step 3: Verify the install
       
     </span>
   </a>
@@ -1658,6 +1697,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-a-cluster-with-offline-compute-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a cluster with offline compute nodes
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1756,18 +1806,19 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Anchor link to this section">&para;</a></h1>
-<p><code>pip install multibench-sc</code> installs the API on Linux or macOS, Python 3.9 or
-newer. Running a method also needs that method's environment, which is
-Linux-only and installed separately.</p>
+<p><code>pip install multibench-sc</code> installs the API on Python 3.9 or newer. On macOS
+and Windows you can use the stored results, check your data with <code>scan</code>,
+score embeddings and plot. Running a method needs Linux. Windows is not
+tested.</p>
 <div class="admonition tip">
-<p class="admonition-title">TL;DR</p>
+<p class="admonition-title">Summary</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>multibench<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11<span class="w"> </span>-y<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>conda<span class="w"> </span>activate<span class="w"> </span>multibench
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import multibench as mtb; print(mtb.__version__)"</span>
 </span></code></pre></div>
 </div>
 <hr />
-<h2 id="step-1-create-an-isolated-environment">Step 1, Create an isolated environment<a class="headerlink" href="#step-1-create-an-isolated-environment" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-1-create-an-isolated-environment">Step 1: Create an isolated environment<a class="headerlink" href="#step-1-create-an-isolated-environment" title="Anchor link to this section">&para;</a></h2>
 <p>Any fresh Python 3.9+ environment works. Conda is optional: the method
 environments install without it.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="conda-recommended" name="__tabbed_1" type="radio" /><input id="mamba-faster-solver" name="__tabbed_1" type="radio" /><input id="venv" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="conda-recommended">Conda (recommended)</label><label for="mamba-faster-solver">Mamba (faster solver)</label><label for="venv">venv</label></div>
@@ -1786,27 +1837,30 @@ environments install without it.</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3.11<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
 </span></code></pre></div>
+<p>On Windows, activate it with <code>.venv\Scripts\activate</code>.</p>
 </div>
 </div>
 </div>
 <hr />
-<h2 id="step-2-install-multibench">Step 2, Install multibench<a class="headerlink" href="#step-2-install-multibench" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-2-install-multibench">Step 2: Install multibench<a class="headerlink" href="#step-2-install-multibench" title="Anchor link to this section">&para;</a></h2>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
 </span></code></pre></div>
 <details class="note">
-<summary>Details</summary>
-<p><strong>Dependencies.</strong> The install brings <code>numpy</code>, <code>pandas</code>, <code>h5py</code>, <code>anndata</code>,
-<code>matplotlib</code>, <code>pyyaml</code>, <code>scanpy</code> and <code>scib</code>. PyTorch, R and the method
-packages are not installed here; they live in each method's environment.</p>
-<p><strong>Developer install.</strong> Clone the repository only to edit the notebooks or
-run the test suite:</p>
+<summary>Dependencies</summary>
+<p>The install brings <code>numpy</code>, <code>pandas</code>, <code>h5py</code>, <code>anndata</code>, <code>matplotlib</code>,
+<code>pyyaml</code>, <code>scanpy</code> and <code>scib</code>. PyTorch, R and the method packages are not
+installed here. Each method's environment holds them.</p>
+</details>
+<details class="note">
+<summary>Developer install</summary>
+<p>Clone the repository only to edit the notebooks or run the test suite:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/DSichang/scMultiBench.git
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>scMultiBench
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[dev]"</span><span class="w"> </span>--config-settings<span class="w"> </span><span class="nv">editable_mode</span><span class="o">=</span>compat
 </span></code></pre></div>
 </details>
 <hr />
-<h2 id="step-3-verify-the-install">Step 3, Verify the install<a class="headerlink" href="#step-3-verify-the-install" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-3-verify-the-install">Step 3: Verify the install<a class="headerlink" href="#step-3-verify-the-install" title="Anchor link to this section">&para;</a></h2>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import multibench as mtb; print(mtb.__version__)"</span>
 </span></code></pre></div>
 <p>These calls need no method environment:</p>
@@ -1818,111 +1872,180 @@ run the test suite:</p>
 </span></code></pre></div>
 <hr />
 <h2 id="method-environments">Method environments<a class="headerlink" href="#method-environments" title="Anchor link to this section">&para;</a></h2>
-<p>Each method runs in its own Linux environment, because the methods'
-dependencies conflict. Install only the ones you need; <code>--packed</code> downloads
-prebuilt archives. No conda binary is needed for the packed path.</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor<span class="w">                                      </span><span class="c1"># installed or missing, with the install line</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>plan<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w">                    </span><span class="c1"># environments a category needs, with sizes</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>SCALEX<span class="w"> </span>--packed<span class="w"> </span>--run<span class="w">     </span><span class="c1"># one method</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--packed<span class="w"> </span>--run<span class="w">  </span><span class="c1"># one category</span>
+<p>Each method runs in its own Linux environment. Install only the ones you
+need. <code>--packed</code> downloads prebuilt archives.
+No conda binary is needed for the packed path.</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># installed or missing, with the install line</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>multibench<span class="w"> </span>env<span class="w"> </span>doctor
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># the environments a category needs, with sizes</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>multibench<span class="w"> </span>env<span class="w"> </span>plan<span class="w"> </span>--category<span class="w"> </span>vertical
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># one method</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>SCALEX<span class="w"> </span>--packed<span class="w"> </span>--run
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># one category</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--packed<span class="w"> </span>--run
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Where they go.</strong> <code>mtb.config.DEFAULT.envs_dir</code>: <code>$MULTIBENCH_ENVS_DIR</code>
-when set, else the envs directory of the conda or mamba on <code>PATH</code>, else
-<code>~/.cache/multibench/envs</code>.</p>
-<p><strong>Without <code>--packed</code>.</strong> The environment is built from its lockfile, which
-needs conda or mamba and takes longer. A failed archive download also
-falls back to this build.</p>
-<p><strong><abbr title="Central Processing Unit">CPU</abbr> and <abbr title="Graphics Processing Unit">GPU</abbr> builds.</strong> On a host without an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>, <code>--packed</code>
-installs the smaller <abbr title="Central Processing Unit">CPU</abbr> build of the PyTorch environments that have one.
-<code>--flavor cpu</code> or <code>--flavor gpu</code> overrides the choice.</p>
-<p><strong>macOS and Windows.</strong> <code>env install --run</code> refuses unless you pass
-<code>--force</code>; dry runs work. The stored results, <code>scan</code>, <code>evaluate</code> and the
-plots work on any OS.</p>
-<p><strong>Sizes.</strong> Categories share environments, so two categories cost less
-than the sum of their <code>env plan</code> totals. <code>? disk</code> means the size on disk
-is not measured yet, so the disk total is a lower bound.</p>
-<p><strong>Resuming.</strong> <code>env install</code> skips environments that already exist, so
-rerunning it resumes an interrupted install. With no <code>--methods</code> or
-<code>--category</code> it installs all 26; run <code>multibench env plan</code> first to see
-the total.</p>
-<p><strong>From Python.</strong> <code>mtb.env.status</code>, <code>plan</code>, <code>install</code>, <code>doctor</code> and
-<code>recipe</code> mirror the CLI; <code>mtb.env.install</code> is a dry run until
-<code>dry_run=False</code> (<a href="../reference/env/">reference</a>).</p>
-<p><strong>Method scripts.</strong> The first <code>mtb.run</code> clones the method scripts
-(PYangLab/scMultiBench) with <code>git</code> into <code>mtb.config.DEFAULT.repo_path</code>
-(<code>~/.cache/multibench/scMultiBench_ref</code> after <code>pip install</code>). On a host
-without network or <code>git</code>, copy a clone of that repository there, or pass
-its path as <code>repo_path=</code>.</p>
-<p><strong>Custom launch.</strong> <code>mtb.run(..., cmd_template=...)</code> (<code>--runner</code> on the
-command line) replaces how the command is launched, for example with a
-container wrapper.</p>
-<p><strong>Preview a run.</strong> <code>--dry-run</code> prints the command a run would execute,
-without running it:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>&lt;data_path&gt;/D28/rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>&lt;data_path&gt;/D28/atac_gas.h5<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--out-dir<span class="w"> </span>runs/scalex_d28<span class="w"> </span>--dry-run
-</span></code></pre></div>
+<ul>
+<li><code>mtb.config.DEFAULT.envs_dir</code> is where they go: <code>$MULTIBENCH_ENVS_DIR</code>
+  when set, else the envs directory of the conda or mamba on <code>PATH</code>,
+  else <code>~/.cache/multibench/envs</code>. <code>multibench config</code> shows the folder
+  in use.</li>
+<li>Without <code>--packed</code>, each environment is built from its lockfile. This
+  needs conda or mamba and takes longer. A failed archive download also
+  falls back to this build.</li>
+<li><code>--flavor cpu|gpu</code> picks the build. By default, a host without an
+  NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> gets the smaller <abbr title="Central Processing Unit">CPU</abbr> build of the PyTorch environments that
+  have one.</li>
+<li><code>env plan</code> totals: categories share environments, so two categories
+  cost less than the sum of their totals. <code>? disk</code> means the size on
+  disk is not recorded.</li>
+<li><code>env install</code> skips environments that already exist, so a rerun
+  resumes an interrupted install. With no <code>--methods</code> or <code>--category</code>, it
+  installs all 26. Check the total with <code>multibench env plan</code> first.</li>
+<li><code>mtb.env.status</code>, <code>plan</code>, <code>install</code>, <code>doctor</code> and <code>recipe</code> mirror the
+  CLI. <code>mtb.env.install</code> is a dry run until <code>dry_run=False</code>
+  (<a href="../reference/env/">reference</a>).</li>
+</ul>
+</details>
+<details class="note">
+<summary>Details: method scripts</summary>
+<p>The first <code>mtb.run</code> clones the method scripts from PYangLab/scMultiBench
+with <code>git</code>. They go to <code>mtb.config.DEFAULT.repo_path</code>, which is
+<code>~/.cache/multibench/scMultiBench_ref</code> after <code>pip install</code>.
+<code>multibench fetch --scripts</code> fetches them ahead of time and prints the
+commit. <code>--ref</code>, or the variable <code>MULTIBENCH_SCRIPTS_REF</code>, fetches a
+given commit or tag.</p>
+<p>On a host without network, fetch the method scripts on another machine
+and copy them. Then set <code>MULTIBENCH_REPO_PATH</code> to the copy, or pass
+<code>repo_path=</code>.</p>
 </details>
 <h3 id="google-colab">Google Colab<a class="headerlink" href="#google-colab" title="Anchor link to this section">&para;</a></h3>
 <p>The category tutorials open in Colab from their badge and run on the free
-<abbr title="Central Processing Unit">CPU</abbr> runtime. By default (<code>INSTALL_ENVS = False</code>) nothing is downloaded and the
-method cells use stored outputs; <code>INSTALL_ENVS = True</code> installs the
+<abbr title="Central Processing Unit">CPU</abbr> runtime. The default is <code>INSTALL_ENVS = False</code>: nothing is downloaded,
+and the method cells use stored outputs. <code>INSTALL_ENVS = True</code> installs the
 environments and runs the methods.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Default.</strong> <strong>Run all</strong> is safe: the run cells load the benchmark's
-stored outputs for the dataset, so <code>evaluate</code> scores real embeddings.
-Offline, the package's stored metric table is used instead, and a printed
-line says so.</p>
-<p><strong>Running methods.</strong> <code>INSTALL_ENVS = True</code> needs Colab or a Linux host;
-on macOS the environment install refuses.</p>
-<p><strong><abbr title="Graphics Processing Unit">GPU</abbr> runtime.</strong> Choose one before setting the flag (Runtime -&gt; Change
-runtime type -&gt; T4 <abbr title="Graphics Processing Unit">GPU</abbr>). On a <abbr title="Central Processing Unit">CPU</abbr> runtime the <abbr title="Central Processing Unit">CPU</abbr> builds are installed and
-training methods run much slower.</p>
-<p><strong>Download per tutorial.</strong> <abbr title="Graphics Processing Unit">GPU</abbr> builds: cross 3.0 GB, diagonal 5.1 GB,
-mosaic 5.5 GB, vertical 6.2 GB. <abbr title="Central Processing Unit">CPU</abbr> builds: cross 1.4 GB, diagonal
-1.6 GB, mosaic 1.8 GB, vertical 1.5 GB.</p>
+<p>With the default, every cell runs with Run all. The run cells load the
+benchmark's stored outputs for the dataset, so <code>evaluate</code> scores real
+embeddings. Offline, the package's stored metric table is used instead,
+and a printed line says so.</p>
+<p><code>INSTALL_ENVS = True</code> needs Colab or a Linux host. On macOS the
+environment install refuses. On Colab, choose a <abbr title="Graphics Processing Unit">GPU</abbr> runtime before you
+set the flag: Runtime -&gt; Change runtime type -&gt; T4 <abbr title="Graphics Processing Unit">GPU</abbr>. On a <abbr title="Central Processing Unit">CPU</abbr> runtime
+the <abbr title="Central Processing Unit">CPU</abbr> builds are installed, and training methods run much slower.</p>
+<p>Each tutorial downloads the environments of the methods it runs. The
+first size is with <code>--flavor gpu</code>, the second with <code>--flavor cpu</code>:</p>
+<ul>
+<li>vertical 6.2 GB, 1.5 GB: Matilda, sciPENN and scMM</li>
+<li>diagonal 5.1 GB, 1.6 GB: online_iNMF, iNMF and scJoint</li>
+<li>mosaic 5.5 GB, 1.8 GB: StabMap and scMoMaT</li>
+<li>cross 3.0 GB, 1.4 GB: UINMF, sciPENN and StabMap</li>
+</ul>
 </details>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
 <p>Each tutorial downloads its dataset on first run. Datasets go to
 <code>mtb.config.DEFAULT.data_path</code>: <code>~/.cache/multibench/data</code> after
 <code>pip install</code>, <code>&lt;repo&gt;/data</code> in a developer install.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetchable</span><span class="p">()</span>      <span class="c1"># ['D11', 'D28', 'D45', 'D46', 'D52']</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)</span>     <span class="c1"># no-op when already present</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetchable</span><span class="p">()</span>      <span class="c1"># ['D11', 'D28', 'D45', 'D46', 'D52']</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)</span>     <span class="c1"># no-op when already present</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Sizes.</strong> <code>D11</code> (vertical) 11 MB, <code>D28</code> (diagonal) 137 MB, <code>D45</code>
-(mosaic) 290 MB, <code>D46</code> (mosaic) 97 MB, <code>D52</code> (cross) 179 MB.</p>
-<p><strong>Cache location.</strong> When <code>XDG_CACHE_HOME</code> is set, the pip-install data
-path is <code>$XDG_CACHE_HOME/multibench/data</code>.</p>
-<p><strong>Manual download</strong>, for example <code>D11</code>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nv">DATA</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import multibench as mtb; print(mtb.config.DEFAULT.data_path)'</span><span class="k">)</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">"</span><span class="nv">$DATA</span><span class="s2">"</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>wget<span class="w"> </span>-qO-<span class="w"> </span>https://github.com/DSichang/scMultiBench/releases/download/data-v1/D11.tar.gz<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span><span class="s2">"</span><span class="nv">$DATA</span><span class="s2">"</span>
+<p>The demo datasets are <code>D11</code> (vertical, 11 MB), <code>D28</code> (diagonal, 137 MB),
+<code>D45</code> (mosaic, 290 MB), <code>D46</code> (mosaic, 97 MB) and <code>D52</code> (cross, 179 MB).</p>
+<p><code>MULTIBENCH_DATA_PATH</code> sets the data path. Without it, and with
+<code>XDG_CACHE_HOME</code> set, the data path after <code>pip install</code> is
+<code>$XDG_CACHE_HOME/multibench/data</code>. <code>multibench config</code> shows the path in
+use.</p>
+<p>To download a dataset by hand, for example <code>D11</code>:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">DATA</span><span class="o">=</span><span class="k">$(</span>multibench<span class="w"> </span>config<span class="w"> </span>--get<span class="w"> </span>data_path<span class="k">)</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">URL</span><span class="o">=</span>https://github.com/DSichang/scMultiBench/releases/download/data-v1
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">"</span><span class="nv">$DATA</span><span class="s2">"</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>wget<span class="w"> </span>-qO-<span class="w"> </span><span class="s2">"</span><span class="nv">$URL</span><span class="s2">/D11.tar.gz"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>xz<span class="w"> </span>-C<span class="w"> </span><span class="s2">"</span><span class="nv">$DATA</span><span class="s2">"</span>
 </span></code></pre></div>
-<p><strong>Other datasets.</strong> The full collection of processed datasets is linked
-from the <a href="https://github.com/PYangLab/scMultiBench#readme">scMultiBench README</a>.
+<p>The full collection of processed datasets is linked from the
+<a href="https://github.com/PYangLab/scMultiBench#readme">scMultiBench README</a>.
 Unpack a dataset under the data path, or anywhere else and pass
 <code>data_path=</code> (<code>--data-path</code> on the command line). <code>dataset</code> is the folder
-name; <code>data_path</code> is the folder that contains it.</p>
+name, and <code>data_path</code> is the folder that contains it.</p>
+</details>
+<hr />
+<h2 id="on-a-cluster-with-offline-compute-nodes">On a cluster with offline compute nodes<a class="headerlink" href="#on-a-cluster-with-offline-compute-nodes" title="Anchor link to this section">&para;</a></h2>
+<p>Prepare everything on a login node with network. The compute nodes then need
+no download. Keep the folders below on storage that the compute nodes can
+read.</p>
+<div class="language-bash highlight"><span class="filename">login node</span><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/shared/multibench/venv
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nb">source</span><span class="w"> </span>/shared/multibench/venv/bin/activate
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># 0.3.2 or newer: fetch --scripts and --assume-gpu need it</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"multibench-sc&gt;=0.3.2"</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MULTIBENCH_ENVS_DIR</span><span class="o">=</span>/shared/multibench/envs
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MULTIBENCH_DATA_PATH</span><span class="o">=</span>/shared/multibench/data
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MULTIBENCH_REPO_PATH</span><span class="o">=</span>/shared/multibench/scripts
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="c1"># export MULTIBENCH_SCRIPTS_REF=&lt;commit&gt;  # optional: pin the scripts</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="c1"># --flavor gpu: for jobs on GPU nodes</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>StabMap,scMoMaT<span class="w"> </span>--packed<span class="w"> </span>--flavor<span class="w"> </span>gpu<span class="w"> </span>--run
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>multibench<span class="w"> </span>fetch<span class="w"> </span>--scripts
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="c1"># optional: a demo mosaic dataset to test the setup</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>multibench<span class="w"> </span>fetch<span class="w"> </span>D46
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="c1"># LAB: your dataset folder under $MULTIBENCH_DATA_PATH</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="c1"># --assume-gpu: check GPU-only methods for the GPU nodes, not this node</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="c1"># --strict: exit 1 when any method in --methods has no runnable row</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>multibench<span class="w"> </span>scan<span class="w"> </span>LAB<span class="w"> </span>--category<span class="w"> </span>mosaic<span class="w"> </span>--methods<span class="w"> </span>StabMap,scMoMaT<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span>--strict<span class="w"> </span>--assume-gpu
+</span></code></pre></div>
+<p>Submit one job per method, each with its own <code>--out-dir</code>. Request a <abbr title="Graphics Processing Unit">GPU</abbr> only
+for a method that uses one. <code>multibench info M</code> shows whether a method uses a
+<abbr title="Graphics Processing Unit">GPU</abbr>.</p>
+<div class="language-bash highlight"><span class="filename">job.sh (Slurm)</span><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="ch">#!/bin/bash</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1">#SBATCH --time=05:00:00</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nb">source</span><span class="w"> </span>/shared/multibench/venv/bin/activate
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MULTIBENCH_ENVS_DIR</span><span class="o">=</span>/shared/multibench/envs
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MULTIBENCH_DATA_PATH</span><span class="o">=</span>/shared/multibench/data
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MULTIBENCH_REPO_PATH</span><span class="o">=</span>/shared/multibench/scripts
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># export MULTIBENCH_SCRIPTS_REF=&lt;commit&gt;  # optional: pin the scripts</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># exits 3 when the method fails, so Slurm marks the job as failed</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>multibench<span class="w"> </span>run-all<span class="w"> </span>LAB<span class="w"> </span>--category<span class="w"> </span>mosaic<span class="w"> </span>--methods<span class="w"> </span><span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span>--out-dir<span class="w"> </span><span class="s2">"runs/</span><span class="nv">$1</span><span class="s2">"</span><span class="w"> </span>--timeout<span class="w"> </span><span class="m">14400</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><span class="filename">login node</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># StabMap does not use a GPU; scMoMaT uses one when present</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>sbatch<span class="w"> </span>job.sh<span class="w"> </span>StabMap
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>sbatch<span class="w"> </span>--gres<span class="o">=</span>gpu:1<span class="w"> </span>job.sh<span class="w"> </span>scMoMaT
+</span></code></pre></div>
+<p>When the jobs have finished, plot them together:</p>
+<div class="language-bash highlight"><span class="filename">login node</span><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--input<span class="w"> </span>runs/StabMap<span class="w"> </span>--input<span class="w"> </span>runs/scMoMaT<span class="w"> </span>--out<span class="w"> </span>lab.pdf
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p><code>env plan</code> gives download sizes. An unpacked environment is larger.
+Check it with <code>du</code> after the first install.</p>
+<p>Each input file is read as a dense matrix. Request at least features x
+cells x 8 bytes of memory per input file.</p>
+<p>The runtimes that <code>multibench info M</code> prints were observed on a <abbr title="Graphics Processing Unit">GPU</abbr>
+host. For a method that uses a <abbr title="Graphics Processing Unit">GPU</abbr>, allow several times longer on a <abbr title="Central Processing Unit">CPU</abbr>
+node.</p>
 </details>
 <hr />
 <h2 id="upgrading-from-021">Upgrading from 0.2.1<a class="headerlink" href="#upgrading-from-021" title="Anchor link to this section">&para;</a></h2>
 <p>0.3 renamed a few functions and merged the metric selectors into one
 <code>metrics=</code> argument. Some old spellings still work in 0.3 with a
-<code>DeprecationWarning</code>; others were removed and raise an error. The old -&gt; new
-table is in the <a href="../api/#deprecated-in-030">API reference</a>.</p>
+<code>DeprecationWarning</code>. Others were removed and raise an error. The old -&gt; new
+table is on the <a href="../changes/#deprecated-in-030">Changes</a> page.</p>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Anchor link to this section">&para;</a></h2>
 <details class="note">
-<summary><code>OSError: conda env '&lt;env&gt;' (&lt;method&gt;) is not installed</code></summary>
+<summary><code>OSError: Environment &lt;env&gt; of &lt;method&gt; is not installed</code></summary>
 <p>The method's environment is missing. Run the install command the message
-names, for example <code>multibench env install --methods &lt;method&gt; --packed --run</code>.</p>
-<p><code>scan()</code> shows the same per method in its <code>env_ok</code> column.</p>
+names, for example <code>multibench env install --methods &lt;method&gt; --packed --run</code>.
+<code>scan()</code> shows the same per method in its <code>env_ok</code> column.</p>
+</details>
+<details class="note">
+<summary><code>OSError: Methods run only on Linux ...</code></summary>
+<p>Methods cannot run on macOS or Windows. Run the call on a Linux machine.
+<code>dry_run=True</code> (<code>--dry-run</code>) previews the command on this computer.</p>
 </details>
 <details class="note">
 <summary><code>FileNotFoundError: ... 'conda'</code> from <code>mtb.run</code></summary>
@@ -1932,13 +2055,13 @@ Install the method's environment with
 </details>
 <details class="note">
 <summary><code>OSError</code> naming <code>envs_dir</code>, with <code>MULTIBENCH_RUN_MODE=prefix</code></summary>
-<p>Prefix mode is forced, but the environment is not under <code>envs_dir</code>.</p>
-<p>Install it (<code>multibench env install --methods &lt;method&gt; --packed --run</code>),
+<p>Prefix mode is forced, but the environment is not under <code>envs_dir</code>.
+Install it (<code>multibench env install --methods &lt;method&gt; --packed --run</code>),
 point <code>MULTIBENCH_ENVS_DIR</code> at the folder that holds it, or unset
 <code>MULTIBENCH_RUN_MODE</code>.</p>
 </details>
 <details class="note">
-<summary><code>RuntimeError: no conda/mamba on this host; &lt;env&gt; has a packed archive - pass packed=True</code></summary>
+<summary><code>RuntimeError: Conda is not installed on this computer. Environment &lt;env&gt; has a packed archive.</code></summary>
 <p>Only a lockfile build needs conda. Pass <code>packed=True</code> (<code>--packed</code> on the
 command line).</p>
 </details>
@@ -1959,14 +2082,15 @@ warning prints. The other metrics are computed either way.</p>
 <details class="note">
 <summary><code>unsupported input format</code> from <code>mtb.io.to_canonical</code></summary>
 <p>Accepted inputs: <code>.h5ad</code>, <code>.h5mu</code>, <code>.csv</code> / <code>.tsv</code>, <code>.loom</code>, in-memory
-<code>AnnData</code> / <code>MuData</code>, or an already-canonical scMultiBench <code>.h5</code>. Convert
-other formats first.</p>
-<p>For a whole dataset folder, use <code>mtb.io.export_dataset</code> or
+<code>AnnData</code> / <code>MuData</code>, or a <code>.h5</code> file already in the package's layout.
+<code>.loom</code> needs <code>pip install "multibench-sc[loom]"</code>. Convert other formats
+first. For a whole dataset folder, use <code>mtb.io.export_dataset</code> or
 <code>multibench convert</code>.</p>
 </details>
-<p><strong>Still broken?</strong> <a href="https://github.com/PYangLab/scMultiBench/issues/new">Open an issue</a>
-with the output of <code>python -c "import multibench as mtb; print(mtb.__version__)"</code>
-and <code>pip freeze</code>.</p>
+<p>If the problem remains,
+<a href="https://github.com/PYangLab/scMultiBench/issues/new">open an issue</a> with the
+output of <code>python -c "import multibench as mtb; print(mtb.__version__)"</code> and
+<code>pip freeze</code>.</p>
 <hr />
 <p>Next: the <a href="../quickstart/">Quickstart</a>, or run a method with the
 <a href="../tutorials/run/">Run a method</a> tutorial.</p>

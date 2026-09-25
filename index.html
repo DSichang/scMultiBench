@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1420,6 +1420,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1483,15 +1511,15 @@
   
 
 
-<div class="lp">
+<div class="lp" style="justify-content: flex-start; gap: 40px;">
 <!-- ━━━━━━━━━━━━━━━━━━━━ HERO (text + task-flow card) ━━━━━━━━━━━━━━━━━━━━ -->
 <section class="lp-hero">
 <div class="lp-hero-text">
 <h1 id="scmultibench">scMultiBench<a class="headerlink" href="#scmultibench" title="Anchor link to this section">&para;</a></h1>
 <p class="lp-sub">
-  A benchmark of single-cell multimodal integration methods. Run 36 methods
-  through one Python API, score them with scIB metrics, and compare them in
-  bubble tables and rankings.
+  scMultiBench is a benchmark of single-cell multimodal integration methods.
+  The <code>multibench</code> package runs 36 of them from Python or the
+  command line and scores their output with the benchmark's metrics.
 </p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
 </span></code></pre></div>
@@ -1506,7 +1534,21 @@
 <span class="tf-title">Run a method</span>
 </div>
 <div class="tf-stage">
-<svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" aria-hidden="true"><g class="tf-scenes"></g></svg>
+<svg viewBox="0 0 460 210" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" aria-hidden="true"><g class="tf-scenes">
+<g class="tf-fallback" font-size="12" text-anchor="middle" fill="#1e293b">
+<rect x="14" y="78" width="124" height="54" rx="8" fill="#eef2f7"/>
+<text x="76" y="102" font-weight="700">Run a method</text>
+<text x="76" y="119" font-size="10" fill="#475569">36 methods</text>
+<path d="M144 105 H164 M158 100 L164 105 L158 110" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+<rect x="168" y="78" width="124" height="54" rx="8" fill="#eef2f7"/>
+<text x="230" y="102" font-weight="700">Evaluate</text>
+<text x="230" y="119" font-size="10" fill="#475569">scIB metrics</text>
+<path d="M298 105 H318 M312 100 L318 105 L312 110" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+<rect x="322" y="78" width="124" height="54" rx="8" fill="#eef2f7"/>
+<text x="384" y="102" font-weight="700">Plot</text>
+<text x="384" y="119" font-size="10" fill="#475569">bubble tables, ranks</text>
+</g>
+</g></svg>
 </div>
 <div class="tf-dots"><span class="is-active"></span></div>
 </div>
@@ -1543,26 +1585,6 @@
 <span class="lp-card-title">Interactive explorer</span>
 <span class="lp-card-desc">Browse the full benchmark results in the Shiny explorer.</span>
 </a>
-</div>
-</div>
-</section>
-<!-- ━━━━━━━━━━━━━━━━━━━━ FEATURES (three pillars, full-width grey band) ━━━━━━━━━━━━━━━━━━━━ -->
-<section class="lp-section lp-section--band">
-<div class="lp-feature-row">
-<div class="lp-feat">
-<span class="lp-feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 7.5 12 12 21 7.5 12 3Z"/><path d="M3 12 12 16.5 21 12"/><path d="M3 16.5 12 21 21 16.5"/></svg></span>
-<span class="lp-feat-title">36 methods, one API</span>
-<span class="lp-feat-desc">Vertical, diagonal, mosaic and cross integration through the <code>multibench</code> API. The methods run in separate environments.</span>
-</div>
-<div class="lp-feat">
-<span class="lp-feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="1"/><rect x="12" y="7" width="3" height="10" rx="1"/><rect x="17" y="4" width="3" height="13" rx="1"/></svg></span>
-<span class="lp-feat-title">A metric panel per task</span>
-<span class="lp-feat-desc">scIB batch-correction and bio-conservation scores, classification accuracy, marker overlap, RMSE, runtime and memory, combined into per-method rank scores.</span>
-</div>
-<div class="lp-feat">
-<span class="lp-feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M19.5 19.5l-4.6-4.6"/><path d="M8.5 12v-1.5M10.5 12V8.5M12.5 12v-2.5"/></svg></span>
-<span class="lp-feat-title">Compare methods</span>
-<span class="lp-feat-desc">Rank methods per category from the stored results with <code>mtb.recommend</code>, or browse them in the explorer.</span>
 </div>
 </div>
 </section>

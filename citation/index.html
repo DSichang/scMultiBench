@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -17,6 +17,8 @@
       
         <link rel="prev" href="../faq/">
       
+      
+        <link rel="next" href="../changes/">
       
       
         
@@ -1482,6 +1484,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1615,8 +1645,11 @@ you run. <a href="../reference/discover/#multibench.discover.cite"><code>mtb.cit
 both:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"MOFA2"</span><span class="p">))</span>                <span class="c1"># the benchmark, then one line per method</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">"bibtex"</span><span class="p">))</span>  <span class="c1"># every method of batch = mtb.run_all(...), as BibTeX</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># the benchmark, then one line per method</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"MOFA2"</span><span class="p">))</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># BibTeX for every method that ran in batch = mtb.run_all(...)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">ran</span> <span class="o">=</span> <span class="n">batch</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">"status not in ['SKIPPED', 'FAIL', 'TIMEOUT']"</span><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="n">ran</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">"bibtex"</span><span class="p">))</span>
 </span></code></pre></div>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>multibench<span class="w"> </span>cite<span class="w"> </span>Matilda<span class="w"> </span>MOFA2<span class="w"> </span>--format<span class="w"> </span>bibtex<span class="w"> </span>--out<span class="w"> </span>refs.bib
 </span></code></pre></div>
@@ -1639,9 +1672,10 @@ both:</p>
 <hr />
 <h2 id="source-code">Source code<a class="headerlink" href="#source-code" title="Anchor link to this section">&para;</a></h2>
 <ul>
-<li><strong>Benchmark and method scripts:</strong> <a href="https://github.com/PYangLab/scMultiBench">https://github.com/PYangLab/scMultiBench</a></li>
-<li><strong><code>multibench</code> API (this documentation, the tutorials, PyPI releases):</strong>
-  <a href="https://github.com/DSichang/scMultiBench">https://github.com/DSichang/scMultiBench</a>, a fork of the repository above</li>
+<li>Benchmark and method scripts: <a href="https://github.com/PYangLab/scMultiBench">https://github.com/PYangLab/scMultiBench</a></li>
+<li>The <code>multibench</code> API, this documentation, the tutorials and the PyPI
+  releases: <a href="https://github.com/DSichang/scMultiBench">https://github.com/DSichang/scMultiBench</a>, a fork of the
+  repository above</li>
 </ul>
 <p>To cite the software, set <code>version</code> and <code>year</code> to the release you used
 (<code>multibench.__version__</code>).</p>
@@ -1650,19 +1684,24 @@ both:</p>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="na">title</span><span class="w">     </span><span class="p">=</span><span class="w"> </span><span class="s">{{scMultiBench}: a benchmark and Python API for single-cell</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s">               multimodal omics integration}</span><span class="p">,</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="na">url</span><span class="w">       </span><span class="p">=</span><span class="w"> </span><span class="s">{https://github.com/PYangLab/scMultiBench}</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="na">note</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{multibench Python package, https://github.com/DSichang/scMultiBench}</span><span class="p">,</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="na">version</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="s">{0.3.1}</span><span class="p">,</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="na">year</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{2025}</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="na">note</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{multibench Python package,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="s">               https://github.com/DSichang/scMultiBench}</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="na">version</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="s">{0.3.2}</span><span class="p">,</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="na">year</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="s">{2026}</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">}</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details: reporting a run</summary>
-<p><strong>What to record.</strong> The package version (<code>multibench.__version__</code>), each
-method's environment, and the command it ran (<code>RunResult.cmd</code>).</p>
-<p><strong><code>run_all</code> records.</strong> <code>run_all</code> saves one record per method under
-<code>out_dir</code>, with its environment, parameters and package version.</p>
-<p><strong>Stored tables.</strong> Frames of re-run results carry the package version of
-the re-run in <code>frame.attrs["rerun_version"]</code>.</p>
+<p>Record the package version (<code>multibench.__version__</code>), each method's
+environment, and the command it ran (<code>RunResult.cmd</code>).</p>
+<p><code>run_all</code> saves one record per method under <code>out_dir</code>. The record holds
+the environment and its build (<code>cpu</code>, <code>gpu</code> or <code>single</code>), the
+parameters, the package version, the commit of the method scripts and
+the computer. The table
+<code>mtb.evaluate</code> returns names its Leiden backend, clustering and package
+version in <code>attrs</code>.</p>
+<p>Tables loaded with <code>source="rerun"</code> carry the package version of the
+re-run in <code>df.attrs["rerun_version"]</code>.</p>
 </details>
 
 
@@ -1720,6 +1759,22 @@ the re-run in <code>frame.attrs["rerun_version"]</code>.</p>
             </div>
           </a>
         
+        
+          
+          <a href="../changes/" class="md-footer__link md-footer__link--next" aria-label="Next: Changes">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Changes
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
         
       </nav>
     

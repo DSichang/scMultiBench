@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -690,15 +690,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#step-1-load-a-tidy-results-frame" class="md-nav__link">
+  <a href="#step-1-load-a-results-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1, Load a tidy results frame
+        Step 1: Load a results table
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Step 1, Load a tidy results frame">
+    <nav class="md-nav" aria-label="Step 1: Load a results table">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -729,15 +729,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-render-the-scib-bubble-table" class="md-nav__link">
+  <a href="#step-2-draw-the-bubble-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2, Render the scIB bubble table
+        Step 2: Draw the bubble table
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Step 2, Render the scIB bubble table">
+    <nav class="md-nav" aria-label="Step 2: Draw the bubble table">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -800,6 +800,17 @@
   
     <nav class="md-nav" aria-label="Add your own method">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-scanpy-baseline-on-d11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A scanpy baseline on D11
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#from-the-shell" class="md-nav__link">
@@ -1590,6 +1601,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1624,15 +1663,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#step-1-load-a-tidy-results-frame" class="md-nav__link">
+  <a href="#step-1-load-a-results-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 1, Load a tidy results frame
+        Step 1: Load a results table
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Step 1, Load a tidy results frame">
+    <nav class="md-nav" aria-label="Step 1: Load a results table">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1663,15 +1702,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-2-render-the-scib-bubble-table" class="md-nav__link">
+  <a href="#step-2-draw-the-bubble-table" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 2, Render the scIB bubble table
+        Step 2: Draw the bubble table
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Step 2, Render the scIB bubble table">
+    <nav class="md-nav" aria-label="Step 2: Draw the bubble table">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1734,6 +1773,17 @@
   
     <nav class="md-nav" aria-label="Add your own method">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-scanpy-baseline-on-d11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A scanpy baseline on D11
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#from-the-shell" class="md-nav__link">
@@ -1825,11 +1875,11 @@
 
 <h1 id="load-and-plot-results">Load and plot results<a class="headerlink" href="#load-and-plot-results" title="Anchor link to this section">&para;</a></h1>
 <p><a href="../../reference/compare/#multibench.data.results.load_results"><code>mtb.load_results</code></a>
-reads the stored metric tables into one long frame;
+reads the stored metric tables into one long table.
 <a href="../../reference/plot/#multibench.plot.bubble.bubble"><code>mtb.plot.bubble</code></a> draws
 the scIB-style bubble table from it.</p>
 <div class="admonition tip">
-<p class="admonition-title">TL;DR</p>
+<p class="admonition-title">Summary</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">)</span>
@@ -1842,9 +1892,9 @@ the scIB-style bubble table from it.</p>
 </span></code></pre></div>
 </div>
 <hr />
-<h2 id="step-1-load-a-tidy-results-frame">Step 1, Load a tidy results frame<a class="headerlink" href="#step-1-load-a-tidy-results-frame" title="Anchor link to this section">&para;</a></h2>
-<p><code>load_results</code> returns one row per method, dataset and metric. Every plotting
-function takes this frame.</p>
+<h2 id="step-1-load-a-results-table">Step 1: Load a results table<a class="headerlink" href="#step-1-load-a-results-table" title="Anchor link to this section">&para;</a></h2>
+<p><code>load_results</code> returns a long table: one row per method, dataset and
+metric. Every plotting function takes this table.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span>
@@ -1861,19 +1911,20 @@ function takes this frame.</p>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Filters.</strong> <code>methods=</code> and <code>metrics=</code> narrow the frame and accept aliases
-(<code>"mofa+"</code> for <code>MOFA2</code>). <code>metrics=</code> takes the same values as in
+<p><code>methods=</code> and <code>metrics=</code> narrow the table and accept aliases, such as
+<code>"mofa+"</code> for <code>MOFA2</code>. <code>metrics=</code> takes the same values as in
 <a href="../evaluate/#choose-the-metrics"><code>evaluate</code></a>.</p>
-<p><strong>Your own tables.</strong> <code>result_path=</code> reads a long CSV you saved, or another
-results root, instead of the shipped tables.</p>
+<p><code>result_path=</code> reads a long CSV you saved, or another results root,
+instead of the shipped tables.</p>
 </details>
 <h3 id="published-and-re-run-tables">Published and re-run tables<a class="headerlink" href="#published-and-re-run-tables" title="Anchor link to this section">&para;</a></h3>
-<p><code>source=</code> picks the table: <code>"published"</code> (the default, the scIB tables),
-<code>"rerun"</code> (the package's own re-run sweeps) or <code>"both"</code>.
-<code>mtb.available_datasets(category, source=...)</code> lists the datasets each holds.</p>
+<p><code>source=</code> picks the table. <code>"published"</code>, the default, holds the
+benchmark's scIB tables, <code>"rerun"</code> the package's own re-run sweeps, and
+<code>"both"</code> joins the two. <code>mtb.available_datasets(category, source=...)</code>
+lists the datasets each holds.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Datasets per source.</strong></p>
+<p>The datasets in each source:</p>
 <table>
 <thead>
 <tr>
@@ -1905,28 +1956,29 @@ results root, instead of the shipped tables.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Different methods per source.</strong> The two sources can hold different
-methods for one dataset: for D52, one under <code>published</code> and eight under
-<code>rerun</code>. <code>mtb.results_coverage(category)</code> lists what each holds.</p>
-<p><strong>Same method in both.</strong> The two sources give different numbers; compare
-ranks, not decimals.</p>
-<p><strong>Failed re-run rows.</strong> A re-run row with an ARI near 0, where the
-published table scored the same method well, triggers
-<code>mtb.DegenerateRerunWarning</code>. The warning names the row and the line that
-drops it.</p>
+<p>The two sources can hold different methods for one dataset. For D52,
+<code>published</code> holds one method and <code>rerun</code> eight.
+<code>mtb.results_coverage(category)</code> lists what each holds.</p>
+<p>The re-run table was scored with this package's <code>evaluate</code> and
+leidenalg. The published table follows the benchmark's own scoring. A
+method in both gets different numbers from each: see
+<a href="../evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>.</p>
+<p>A re-run row with an ARI near 0, where the published table scored the
+same method well, triggers <code>mtb.DegenerateRerunWarning</code>. The warning
+names the row and the line that drops it.</p>
 </details>
 <h3 id="clustering-variants">Clustering variants<a class="headerlink" href="#clustering-variants" title="Anchor link to this section">&para;</a></h3>
 <p><code>clustering=</code> selects the clustering behind the clustering metrics:
 <code>"default"</code> (Leiden), <code>"louvain"</code> or <code>"kmeans"</code>. In the published tables,
-<strong>diagonal</strong> ships all three variants for <code>D24</code>, <code>D25</code> and <code>D28</code>; <strong>vertical</strong>
-and <strong>cross</strong> ship <code>default</code> only.</p>
+<strong>diagonal</strong> has all three variants for <code>D24</code>, <code>D25</code> and <code>D28</code>. <strong>vertical</strong>
+and <strong>cross</strong> have <code>default</code> only.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Re-run tables</strong> are <code>default</code> only. With <code>source="rerun"</code>, every row is
-tagged <code>default</code> whatever <code>clustering=</code> asks for.</p>
+<p>The re-run tables are <code>default</code> only. With <code>source="rerun"</code>, every row
+is tagged <code>default</code> whatever <code>clustering=</code> asks for.</p>
 </details>
 <hr />
-<h2 id="step-2-render-the-scib-bubble-table">Step 2, Render the scIB bubble table<a class="headerlink" href="#step-2-render-the-scib-bubble-table" title="Anchor link to this section">&para;</a></h2>
+<h2 id="step-2-draw-the-bubble-table">Step 2: Draw the bubble table<a class="headerlink" href="#step-2-draw-the-bubble-table" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.plot.bubble</code> draws one row per method, best on top, and one column per
 metric. It returns a Matplotlib <code>Figure</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span>
@@ -1938,34 +1990,41 @@ metric. It returns a Matplotlib <code>Figure</code>.</p>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Options</strong> used most often (all of them in the
-<a href="../../reference/plot/#multibench.plot.bubble.bubble">reference</a>):</p>
+<p>The <a href="../../reference/plot/#multibench.plot.bubble.bubble">reference</a>
+lists every option. These are used most often:</p>
 <ul>
 <li><code>methods=[...]</code> keeps only these methods, before ranking.</li>
-<li><code>order=[...]</code> puts these methods first, in this order; the rest follow best first.</li>
+<li><code>order=[...]</code> puts these methods first, in this order. The rest
+  follow, best first.</li>
 <li><code>show_language=False</code> hides the language chips and the <code>L</code> badge.</li>
 <li><code>na="skip"</code> silences the warning about missing metrics.</li>
 </ul>
 </details>
 <h3 id="reading-the-figure">Reading the figure<a class="headerlink" href="#reading-the-figure" title="Anchor link to this section">&para;</a></h3>
-<p>Circle size shows the rank within a column (bigger is better); fill shows the
-value (darker is higher). Each metric family starts with an <strong>Overall</strong> bar,
-and rows are ordered by the mean of those bars.</p>
+<p>Circle size shows the rank within a column. A bigger circle is better.
+Fill colour is scaled within each column of this figure. The lightest
+fill is the lowest value in that column. Each metric family starts with
+an Overall bar, and rows are ordered by the mean of those bars.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Families.</strong> Blue columns are the dimension-reduction and clustering
-metrics, green columns the batch-correction metrics.</p>
-<p><strong>Missing metrics.</strong> A dash marks a metric not computed for that method.
-Its Overall averages the metrics it has; a warning names each such method.</p>
-<p><strong>Chips.</strong> <code>Py</code> / <code>R</code> give the method's language; <code>?</code> marks a method that
-is not in the registry, such as your own. <code>L</code> marks a method that uses
-cell-type labels (supervised), so its scores are not comparable with the
-unsupervised rows.</p>
+<p>Blue columns are the dimension-reduction and clustering metrics, and
+green columns the batch-correction metrics.</p>
+<p>A grey column holds the same value in every row. In a summary panel
+it holds the same mean rank. A figure with one method is grey in every
+column. A warning and the footnote name the grey columns.</p>
+<p>A dash marks a metric not computed for that method. Its Overall
+averages the metrics it has, and a warning names each such method.</p>
+<p>The chips give each method's language, <code>Py</code> or <code>R</code>. <code>?</code> marks a name
+the package does not know, such as your own method or a renamed
+re-run. <code>L</code> marks a method that uses cell-type labels. Its scores are
+not comparable with the rows without labels.</p>
 </details>
 <h3 id="individual-vs-summary-panels">Individual vs. summary panels<a class="headerlink" href="#individual-vs-summary-panels" title="Anchor link to this section">&para;</a></h3>
-<p><code>aggregate="dataset"</code> (the default) plots one dataset's values.
+<p><code>aggregate="dataset"</code>, the default, plots one dataset's values.
 <code>aggregate="summary"</code> ranks methods within each dataset, then averages the
-ranks across datasets.</p>
+ranks across datasets. A summary compares methods scored on the same
+datasets. <code>require_complete=True</code> keeps only the methods scored on every
+dataset.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="p">[</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"D11s"</span><span class="p">],</span> <span class="n">source</span><span class="o">=</span><span class="s2">"rerun"</span><span class="p">)</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">,</span> <span class="s2">"ASW"</span><span class="p">,</span> <span class="s2">"cLISI"</span><span class="p">],</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                      <span class="n">aggregate</span><span class="o">=</span><span class="s2">"summary"</span><span class="p">,</span> <span class="n">require_complete</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -1973,15 +2032,21 @@ ranks across datasets.</p>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Several datasets under <code>"dataset"</code>.</strong> Values are averaged per method, a
-warning says so, and the row labels carry the dataset ids.</p>
-<p><strong>Methods missing from a dataset.</strong> Under <code>"summary"</code> and the default
-<code>overall="rank"</code>, such a method scores rank 0 in that dataset, which pulls
-it down; a warning lists them. <code>require_complete=True</code> keeps only methods
-present in every dataset.</p>
-<p><strong><code>overall=</code>.</strong> <code>"rank"</code> (the bubble default) and <code>"mean_overall"</code> (the bar
-default) combine datasets differently and can order methods differently.
-Pass the same value to <code>plot.bubble</code> and <code>plot.bar</code> for the same order.</p>
+<p>D11s, D28s, D45s and D52s are random subsamples of the full datasets,
+scored in the re-run tables. They cannot be rebuilt. For a summary
+with your own method, use the full datasets.</p>
+<p>Under <code>"dataset"</code>, several datasets are averaged per method. Each row
+label shows the method's dataset, or how many datasets it averages
+(<code>Matilda · 2 ds</code>). A warning says so. When the datasets share no
+method, plot each dataset on its own. If they hold the same cells, set
+one dataset name first: <code>df.assign(dataset="MYDATA")</code>.</p>
+<p>Under <code>"summary"</code> with the default <code>overall="rank"</code>, a method missing
+from a dataset scores rank 0 there, which pulls it down. A warning
+lists these methods.</p>
+<p><code>overall="rank"</code>, the bubble default, and <code>"mean_overall"</code>, the bar
+default, combine datasets differently and can order methods
+differently. Pass the same value to <code>plot.bubble</code> and <code>plot.bar</code> for
+the same order.</p>
 </details>
 <h3 id="audit-the-numbers-before-drawing">Audit the numbers before drawing<a class="headerlink" href="#audit-the-numbers-before-drawing" title="Anchor link to this section">&para;</a></h3>
 <p><code>mtb.plot.build_table</code> takes the same selection arguments and returns the
@@ -1999,56 +2064,75 @@ datasets, for one metric family.</p>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Dots.</strong> With several datasets and the default <code>overall="mean_overall"</code>,
-one dot per dataset sits behind each bar, so a method that is good
-everywhere can be told from one that wins on a single dataset.</p>
+<p>With several datasets and the default <code>overall="mean_overall"</code>, one
+dot per dataset sits behind each bar.</p>
 </details>
 <hr />
 <h2 id="add-your-own-method">Add your own method<a class="headerlink" href="#add-your-own-method" title="Anchor link to this section">&para;</a></h2>
 <p>Score your run with <code>mtb.evaluate</code>, reshape it with <code>mtb.to_long</code>, and
-concatenate it with a stored table.</p>
+concatenate it with a stored table. Score with the leidenalg backend, as
+<a href="../evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>
+explains.</p>
 <div class="language-python highlight"><span class="filename">d11_panel.py</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">bench</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"rerun"</span><span class="p">)</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># emb: your embedding, cells x dims, in the order of the D11 labels</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">emb</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)[</span><span class="s2">"cty"</span><span class="p">]),</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>                   <span class="n">method</span><span class="o">=</span><span class="s2">"MyMethod"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">both</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">bench</span><span class="p">,</span> <span class="n">mine</span><span class="p">])</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="n">metrics</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">,</span> <span class="s2">"ASW"</span><span class="p">,</span> <span class="s2">"cLISI"</span><span class="p">]</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">both</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">"Vertical integration, D11 + MyMethod"</span><span class="p">,</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>                      <span class="n">save</span><span class="o">=</span><span class="s2">"d11_vertical.pdf"</span><span class="p">)</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="n">table</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">both</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">)</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">methods</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">"MyMethod"</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>   <span class="c1"># its row in the figure</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># the Leiden backend of the stored tables</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">leiden_flavor</span> <span class="o">=</span> <span class="s2">"leidenalg"</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">bench</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">"rerun"</span><span class="p">)</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="c1"># emb: your embedding, cells x dims, in the order of the D11 labels</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">emb</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)[</span><span class="s2">"cty"</span><span class="p">]),</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>                   <span class="n">method</span><span class="o">=</span><span class="s2">"MyMethod"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="n">both</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">bench</span><span class="p">,</span> <span class="n">mine</span><span class="p">])</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="n">metrics</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">,</span> <span class="s2">"ASW"</span><span class="p">,</span> <span class="s2">"cLISI"</span><span class="p">]</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">both</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>                      <span class="n">title</span><span class="o">=</span><span class="s2">"Vertical integration, D11 + MyMethod"</span><span class="p">,</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>                      <span class="n">save</span><span class="o">=</span><span class="s2">"d11_vertical.pdf"</span><span class="p">)</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="n">table</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">build_table</span><span class="p">(</span><span class="n">both</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">)</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">methods</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">"MyMethod"</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>   <span class="c1"># its row in the figure</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Unique names.</strong> Give your run a name the stored table does not use.
-Duplicate (method, dataset, metric) rows raise instead of being averaged.</p>
-<p><strong>Supervised methods.</strong> Add <code>mine["needs_labels"] = True</code> to show the <code>L</code>
-badge for a method that uses cell-type labels.</p>
+<p>Give your run a name the stored table does not use. Duplicate
+(method, dataset, metric) rows raise instead of being averaged.</p>
+<p>Add <code>mine["needs_labels"] = True</code> to show the <code>L</code> badge for a method
+that uses cell-type labels.</p>
 </details>
+<h3 id="a-scanpy-baseline-on-d11">A scanpy baseline on D11<a class="headerlink" href="#a-scanpy-baseline-on-d11" title="Anchor link to this section">&para;</a></h3>
+<p>To try the recipe without a method of your own, use a PCA of D11's <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>
+as <code>emb</code>. Put these lines above <code>bench = ...</code> in <code>d11_panel.py</code>, then run
+the script.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">d</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">data_path</span> <span class="o">/</span> <span class="s2">"D11"</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">d</span> <span class="o">/</span> <span class="s2">"rna.h5"</span><span class="p">)</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">normalize_total</span><span class="p">(</span><span class="n">rna</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">rna</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">highly_variable_genes</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="n">n_top_genes</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">rna</span><span class="p">)</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">rna</span><span class="o">.</span><span class="n">obsm</span><span class="p">[</span><span class="s2">"X_pca"</span><span class="p">]</span>
+</span></code></pre></div>
 <h3 id="from-the-shell">From the shell<a class="headerlink" href="#from-the-shell" title="Anchor link to this section">&para;</a></h3>
 <p>The same figure without Python, with your rows saved by
 <code>mine.to_csv("mine.csv", index=False)</code>:</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D11<span class="w"> </span>--source<span class="w"> </span>rerun<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>--input<span class="w"> </span>mine.csv<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW,cLISI<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span>--out<span class="w"> </span>d11_vertical.pdf
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D11<span class="w"> </span>--source<span class="w"> </span>rerun<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>--input<span class="w"> </span>mine.csv<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span>--metrics<span class="w"> </span>ARI,NMI,ASW,cLISI<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span>--out<span class="w"> </span>d11_vertical.pdf
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Options.</strong> <code>--aggregate</code>, <code>--overall</code>, <code>--require-complete</code>, <code>--methods</code>
-and <code>--title</code> match the Python keywords. <code>--result-path DIR</code> reads another
+<p><code>--aggregate</code>, <code>--overall</code>, <code>--require-complete</code>, <code>--methods</code> and
+<code>--title</code> match the Python keywords. <code>--result-path DIR</code> reads another
 results root.</p>
-<p><strong>Inputs.</strong> <code>--input</code> takes a long CSV or a <code>run_all</code> output directory and
-can be repeated. Alone it plots your table; with <code>--category</code> your rows
-are added to the stored table.</p>
-<p><strong>Bars and formats.</strong> <code>multibench plot bar --group clustering</code> draws the
-summary bars. The <code>--out</code> extension sets the format (<code>.pdf</code>, <code>.png</code>, ...).</p>
+<p><code>--input</code> takes a long CSV or a <code>run_all</code> output directory and can be
+repeated. Alone it plots your table. With <code>--category</code>, your rows are
+added to the stored table.</p>
+<p><code>multibench plot bar --group clustering</code> draws the summary bars. The
+<code>--out</code> extension sets the format (<code>.pdf</code>, <code>.png</code>, ...).</p>
 </details>
 
 

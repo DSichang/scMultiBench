@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -710,17 +710,6 @@
     <span class="md-ellipsis">
       
         Choosing a cmd_template
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reading-other-output-kinds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reading other output kinds
       
     </span>
   </a>
@@ -1556,6 +1545,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1672,17 +1689,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#reading-other-output-kinds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reading other output kinds
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1757,11 +1763,12 @@
 
 <h1 id="run-a-method">Run a method<a class="headerlink" href="#run-a-method" title="Anchor link to this section">&para;</a></h1>
 <p><a href="../../reference/run/#multibench.engine.runner.run"><code>mtb.run</code></a> runs one
-method on your inputs in the method's own environment and returns its
-output. Install that environment first
-(<a href="#install-the-methods-environment">next section</a>). <code>mtb.run_all</code> runs and
+method on your inputs and returns its output. <code>mtb.run_all</code> runs and
 scores every method that fits a dataset, as in the
 <a href="../vertical/">category tutorials</a>.</p>
+<p>Methods run only on Linux, each in its own environment. On macOS and
+Windows, <code>mtb.run(..., dry_run=True)</code> previews the command. Run the call
+itself on the Linux machine.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">)</span>                  <span class="c1"># 137 MB; skipped when already present</span>
@@ -1774,164 +1781,295 @@ scores every method that fits a dataset, as in the
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>What a call does.</strong> <code>run</code> picks the method variant that matches
-<code>category</code> and the roles in <code>inputs</code>, converts the inputs to the
-canonical <code>.h5</code> format and runs the method's script with <code>out_dir</code> as
-the working directory. It then loads the output.</p>
-<p><strong>Paths.</strong> Relative paths are fine: <code>run</code> makes the inputs and
-<code>out_dir</code> absolute before it starts.</p>
-<p><strong>Preview.</strong> <code>mtb.run(..., dry_run=True)</code> returns the command line
-without running anything or creating files. <code>multibench run ... --dry-run</code>
-prints it for a job script; <code>mtb.scan(...)["command"]</code> shows it per
-method.</p>
+<p><code>run</code> finds the version of the method that fits your category and
+files, converts the files if needed, runs the method script in
+<code>out_dir</code> and loads the output.</p>
+<p>Relative paths in <code>inputs</code> and <code>out_dir</code> are fine.</p>
+<p><code>mtb.run(..., dry_run=True)</code> returns the command line and creates no
+files. <code>multibench run ... --dry-run</code> prints the same command, and
+<code>mtb.scan(...)["command"]</code> shows it per method.</p>
+<p>Some commands read a file that <code>run</code> writes first under
+<code>&lt;out_dir&gt;/inputs/</code>, such as a converted AnnData or the renamed peak
+file of GLUE and Seurat_v3. The dry run and the <code>caveat</code> column of
+<code>scan</code> say so. Put <code>multibench run</code> in the job script for those
+methods.</p>
 </details>
 <hr />
 <h2 id="install-the-methods-environment">Install the method's environment<a class="headerlink" href="#install-the-methods-environment" title="Anchor link to this section">&para;</a></h2>
-<p>Each method runs in its own Linux environment, which must be installed
-before the first run (on macOS and Windows only dry runs work).
+<p>Install the method's environment before its first run.
 <code>multibench env doctor</code> lists what is installed and what is missing.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>multibench<span class="w"> </span>env<span class="w"> </span>install<span class="w"> </span>--methods<span class="w"> </span>SCALEX<span class="w"> </span>--packed<span class="w"> </span>--run
 </span></code></pre></div>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"env"</span><span class="p">]</span>                <span class="c1"># 'scmb_torch'</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">],</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>      <span class="c1"># the same install from Python</span>
 </span></code></pre></div>
+<p>Three methods need more before their first run:</p>
+<ul>
+<li>GLUE: first fetch the method scripts with <code>multibench fetch --scripts</code>.
+  Then download <code>gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz</code> from
+  <a href="https://www.gencodegenes.org/human/release_43.html">GENCODE release 43</a>
+  into <code>&lt;repo_path&gt;/tools_scripts/GLUE/</code>.
+  <code>multibench config</code> prints <code>repo_path</code>.</li>
+<li>Seurat_v5 uses your <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files as its paired bridge, so both
+  must hold the same cells. Unpaired data cannot run through the package.</li>
+<li>MIRA: first fetch the method scripts the same way. Then put a <code>logger.py</code>
+  next to <code>main_MIRA.py</code> in <code>&lt;repo_path&gt;/tools_scripts/MIRA/</code>. The public
+  scMultiBench repository does not include this file.</li>
+</ul>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Missing environment.</strong> When other environments are installed, <code>run</code>
-raises <code>OSError</code> naming the install command before anything is written.</p>
-<p><strong>No environment and no conda.</strong> On such a host <code>run</code> cannot check and
-fails with <code>FileNotFoundError</code> for <code>conda</code>. Run <code>multibench env doctor</code>.</p>
-<p><strong>Prebuilt archives.</strong> <code>--packed</code> downloads a prebuilt environment
-instead of building one.</p>
+<p>A missing environment stops <code>run</code> with <code>OSError</code> before anything is
+written. On Linux the message names the install command. On macOS and
+Windows it says that methods run only on Linux.</p>
+<p>A Linux host with no installed environment and no conda gives
+<code>FileNotFoundError</code> for <code>conda</code> instead. Run <code>multibench env doctor</code>
+to see what is missing.</p>
+<p><code>--packed</code> downloads a prebuilt environment instead of building one.</p>
+<p>GLUE runs its human script only, so mouse data does not run through
+the package.</p>
+<p><code>mtb.scan</code> reports these requirements in its <code>caveat</code> or <code>reason</code>
+column, and a dry run prints them. <code>mtb.method_info(m)["setup_hint"]</code>
+holds the full text.</p>
 </details>
 <hr />
 <h2 id="what-run-returns">What <code>run</code> returns<a class="headerlink" href="#what-run-returns" title="Anchor link to this section">&para;</a></h2>
 <p><code>res</code> is a <code>RunResult</code>. <code>res.output</code> is the method's main output, here the
-joint embedding as an array.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>            <span class="c1"># numpy array, shape (11014, 10)</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">res</span><span class="o">.</span><span class="n">extra</span>             <span class="c1"># other declared outputs, keyed by filename ({} for SCALEX)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>               <span class="c1"># the command line that ran</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">res</span><span class="o">.</span><span class="n">out_dir</span>           <span class="c1"># absolute path of the run folder</span>
+joint embedding as an array. An embedding is a table with one row per cell.
+For MIRA, scMoMaT and Seurat_WNN, <code>res.output</code> is a cell graph instead.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">res</span><span class="o">.</span><span class="n">output</span>       <span class="c1"># numpy array, shape (11014, 10)</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">res</span><span class="o">.</span><span class="n">obs_names</span>    <span class="c1"># barcodes of the rows of res.output</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">res</span><span class="o">.</span><span class="n">extra</span>        <span class="c1"># other declared outputs, keyed by file name ({} for SCALEX)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">res</span><span class="o">.</span><span class="n">cmd</span>          <span class="c1"># the command line that ran</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">res</span><span class="o">.</span><span class="n">out_dir</span>      <span class="c1"># absolute path of the run folder</span>
 </span></code></pre></div>
-<p>Score the embedding with the dataset's label files, then see
-<a href="../evaluate/">Evaluate a run</a>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="s2">"SCALEX"</span><span class="p">),</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>                       <span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span>
+<p>For a vertical folder the rows follow your cells, so
+<code>adata.obsm["X_totalVI"] = res.output</code> works when <code>res.obs_names</code> matches
+<code>adata.obs_names</code>.</p>
+<p>Score the embedding with the dataset's label files, as in
+<a href="../evaluate/">Evaluate a run</a>. Give <code>labels_for</code> the category and the
+method, so the label files follow the rows of <code>res.output</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="s2">"SCALEX"</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                       <span class="n">metrics</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Other fields.</strong> <code>res.method</code> is the method id; <code>res.stdout</code> and
-<code>res.stderr</code> hold the method's captured output.</p>
-<p><strong>Failed runs.</strong> A method that exits with an error raises
+<p><code>res.method</code> is the method id. <code>res.stdout</code> and <code>res.stderr</code> hold the
+method's captured output. A method that exits with an error raises
 <code>RuntimeError</code> with the end of its output.</p>
-<p><strong>Label order.</strong> With <code>category</code> and <code>method</code>, <code>mtb.labels_for</code> lists the
-files in the order that method stacks its cells, and <code>evaluate</code> takes
-the dict as is. Without them it uses the default order: <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>,
-<code>cty1, cty2, ...</code>.</p>
-<p><strong>Methods with another order</strong> include uniPort (<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> first), StabMap in
-<code>cross</code> (its reference batch first) and SMILE and MultiVI in <code>mosaic</code>.
-A wrong order gives wrong scores without an error; <code>run_all</code> records
-each method's order in <code>summary.label_order</code>.</p>
-<p><strong>Your own dict.</strong> A dict you build or reorder yourself goes in as is
-only in the default order; name any other order with <code>label_order=</code>.</p>
-<p><strong>Batches.</strong> With two or more label files, each cell's file is its
-batch for the batch metrics.</p>
+<p><code>res.obs_names</code> is <code>None</code>, with a warning, when the barcodes cannot be
+matched to the output rows. scBridge, which reads a whole folder, is
+one such method. Most methods write cells x dimensions. When the
+first axis differs from <code>len(res.obs_names)</code>, store <code>res.output.T</code>.</p>
+<p>Without a category and a method, <code>labels_for</code> uses the default order:
+<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, and <code>cty1, cty2, ...</code>. Five methods use another
+order. uniPort and Seurat_v5 put the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells first. StabMap in
+<code>cross</code> puts its reference batch first. SMILE and MultiVI in <code>mosaic</code>
+use their own batch order. <code>run_all</code> records each method's order in
+<code>summary.label_order</code>.</p>
+<p>A method that reads only some batches gets only their label files.
+UINMF in <code>cross</code> reads batches 1 and 2 of D52, so it gets <code>cty1</code> and
+<code>cty2</code>.</p>
+<p><code>method_info(m)["supports"]</code> gives each variant's <code>output_kind</code>,
+<code>embedding</code> or <code>graph</code>. Embedding metrics such as ASW do not apply to
+a graph. <code>run_all</code> scores scMoMaT through the <abbr title="Uniform Manifold Approximation and Projection">UMAP</abbr> embedding that
+scMoMaT also writes, and records MIRA and Seurat_WNN as
+<code>RUN_OK_NO_EMBEDDING</code>.</p>
+<p>Each file in <code>res.extra</code> loads as a numpy array. A text file loads as
+a list of its lines.</p>
 </details>
 <hr />
 <h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Anchor link to this section">&para;</a></h2>
 <p><code>inputs</code> maps each modality role to a file path or an in-memory
-<code>AnnData</code>. <code>method_info(m)["supports"]</code> lists the roles each variant
-expects; for a dataset folder, <code>mtb.inputs_for</code> builds the dict.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"supports"</span><span class="p">]</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># [{'category': 'diagonal', 'modalities': ['rna', 'atac_gas'], 'output_kind': 'embedding',</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">#   'n_tunable': 0, 'needs_labels': False, 'labels': []}]</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="s2">"SCALEX"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">"rna"</span><span class="p">:</span> <span class="s2">"data/D28/rna.h5"</span><span class="p">,</span> <span class="s2">"atac_gas"</span><span class="p">:</span> <span class="s2">"data/D28/atac_gas.h5"</span><span class="p">},</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">"runs/scalex_d28"</span><span class="p">,</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="p">)</span>
+<code>AnnData</code>. A role is the name of one input, such as <code>rna</code> or <code>atac_gas</code>.
+For a dataset folder, <code>mtb.inputs_for</code> builds the dict.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"supports"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"modalities"</span><span class="p">]</span>   <span class="c1"># ['rna', 'atac_gas']</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="s2">"SCALEX"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">inputs</span><span class="o">=</span><span class="p">{</span><span class="s2">"rna"</span><span class="p">:</span> <span class="s2">"my_rna.h5ad"</span><span class="p">,</span> <span class="s2">"atac_gas"</span><span class="p">:</span> <span class="s2">"my_gene_activity.h5ad"</span><span class="p">},</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">"runs/scalex_mine"</span><span class="p">,</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>No matching variant.</strong> Inputs whose roles match no variant raise
-<code>KeyError</code> listing the variants the method has. Rename the <code>inputs</code>
-keys to fix it.</p>
-<p><strong>No or several variants fit.</strong> For a method with several variants,
-<code>inputs_for</code> raises <code>mtb.AmbiguousVariantError</code> when the folder holds
-the files for none or more than one of them. Pass <code>modalities=</code>;
-<code>["rna", "atac"]</code> also matches an <code>atac_gas</code> or <code>atac_peak</code> variant.</p>
-<p><strong>Checking files.</strong> <code>inputs_for(..., check=True)</code> raises when a file is
-missing, a matrix is transposed or a label file has the wrong number of
-rows.</p>
-<p><strong>Formats.</strong> These are converted for you (see
+<p>Each entry of <code>supports</code> is one variant. A variant is the version of a
+method for one category and one set of roles. Inputs whose roles
+match no variant raise <code>KeyError</code> listing the variants the method
+has. Rename the <code>inputs</code> keys to fix it.</p>
+<p>For a method with several variants, <code>inputs_for</code> raises
+<code>mtb.AmbiguousVariantError</code> when the folder holds the files for none
+or more than one of them. Pass <code>modalities=</code>, such as
+<code>["rna", "adt"]</code>. The token <code>"atac"</code> matches any <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> role.</p>
+<p><code>inputs_for(..., check=True)</code> raises when a file is missing, a matrix
+is transposed, a label file has the wrong number of rows, or two files
+that must hold the same cells do not.</p>
+<p><code>run</code> converts these inputs to the <code>.h5</code> files the method scripts read
+(see
 <a href="../../reference/io/#multibench.engine.ingest.to_canonical"><code>to_canonical</code></a>):</p>
 <ul>
 <li><code>.h5ad</code> files</li>
-<li><code>.csv</code> / <code>.tsv</code> (cells x features) and <code>.loom</code> files</li>
+<li><code>.csv</code> and <code>.tsv</code> files (cells x features)</li>
+<li><code>.loom</code> files, which need <code>pip install "multibench-sc[loom]"</code></li>
 <li>in-memory <code>AnnData</code></li>
-<li>canonical <code>.h5</code> files, passed through unchanged</li>
+<li><code>.h5</code> files in that layout, passed through unchanged</li>
 </ul>
-<p><strong>MuData.</strong> A <code>.h5mu</code> path raises <code>ValueError</code>. Pass each modality as an
-<code>AnnData</code> (<code>mdata["rna"]</code>), or convert it first with
-<code>mtb.io.to_canonical(src, out, mod="rna")</code>.</p>
-<p><strong>Disk size.</strong> The canonical matrix is stored dense, so filter to highly
-variable genes or informative peaks first. Converting yourself with
-<code>mtb.io.to_canonical(..., dtype="float32")</code> halves the size.</p>
-<p><strong>No conversion.</strong> <code>mtb.run(..., convert=False)</code> passes your paths to
-the method unchanged.</p>
+<p>A MuData, in memory or as an <code>.h5mu</code> file, raises <code>ValueError</code>. Pass
+one modality per role, such as <code>mdata["rna"]</code>, or write a dataset
+folder with <code>mtb.io.export_dataset</code>.</p>
+<p><code>mtb.run(..., convert=False)</code> passes your file paths to the method
+unchanged. It needs paths: an in-memory <code>AnnData</code> raises <code>ValueError</code>.</p>
 </details>
 <h3 id="your-own-data-as-a-dataset-folder">Your own data as a dataset folder<a class="headerlink" href="#your-own-data-as-a-dataset-folder" title="Anchor link to this section">&para;</a></h3>
-<p><code>mtb.io.export_dataset</code> writes an AnnData or MuData as a dataset folder
-that <code>scan</code>, <code>run_all</code> and <code>inputs_for</code> read. <code>mtb.describe_layout(category)</code>
-prints the expected files.</p>
+<p><code>mtb.io.export_dataset</code> writes an AnnData or MuData as a dataset folder,
+which <code>scan</code>, <code>run_all</code> and <code>inputs_for</code> read.</p>
+<p>Give raw counts for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and peaks. The methods normalise the data
+themselves. The folder stores each matrix dense, so drop genes or peaks
+you do not need first.</p>
+<p>With <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, set <code>atac_kind=</code> to <code>"peak"</code> or <code>"gene_activity"</code>. Most methods
+read one of the two, and <code>method_info(m)["atac"]</code> names it. MultiMAP and
+Seurat_v3 read both. <code>scan</code> and <code>run_all</code> skip a method whose file holds
+the other one, also when <code>methods=</code> names it. <code>mtb.run</code> only warns, and
+such a method gives a wrong result.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="cite-seq" name="__tabbed_1" type="radio" /><input id="10x-multiome-mudata" name="__tabbed_1" type="radio" /><input id="unpaired-rna--atac" name="__tabbed_1" type="radio" /><input id="one-file-per-batch" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="cite-seq"><abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr></label><label for="10x-multiome-mudata">10x Multiome (MuData)</label><label for="unpaired-rna--atac">Unpaired <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr></label><label for="one-file-per-batch">One file per batch</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ad</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">a</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">"my_citeseq.h5ad"</span><span class="p">)</span>     <span class="c1"># X = RNA, obsm['protein'] = ADT</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="s2">"data/MYCITE"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">)</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"rna:celltype"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>   <span class="c1"># from a MuData</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">)</span>    <span class="c1"># files_ok / env_ok per method</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">"my_citeseq.h5ad"</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># X = RNA counts, obsm["protein"] = ADT counts</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"data/MYCITE"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">)</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
 </span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">mudata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">md</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">mdata</span> <span class="o">=</span> <span class="n">md</span><span class="o">.</span><span class="n">read_h5mu</span><span class="p">(</span><span class="s2">"my_multiome.h5mu"</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># labels in mdata.obs; use rna:celltype for mdata["rna"].obs</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>                      <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYMULTIOME"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">,</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>         <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">])</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># on Linux: the methods that read peaks; batch = the sample of each cell</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"MYMULTIOME"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span><span class="p">,</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>                  <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac_peak"</span><span class="p">],</span> <span class="n">batch</span><span class="o">=</span><span class="n">mdata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"sample"</span><span class="p">])</span>
+</span></code></pre></div>
+<p>Keep all samples in one folder and pass each cell's sample as <code>batch=</code>.
+<code>atac_peak</code> keeps the seven methods that read peaks. Matilda, scMDC and
+UnitedNet read gene activity, which goes in <code>atac.h5</code> of a second
+folder.</p>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ad</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">"lung_rna.h5ad"</span><span class="p">)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">atac</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">"lung_atac.h5ad"</span><span class="p">)</span>     <span class="c1"># other cells than rna</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"data/LUNG"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="n">atac</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:cell_type"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">peak_methods</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"LUNG"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">peak_methods</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>scan</code> checks the four methods that read peaks. With peaks alone, only
+GLUE passes the file check. To add gene activity, see
+<a href="../discover/#my-atac-is-peaks-only">My <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> is peaks only</a>.</p>
+</div>
+<div class="tabbed-block">
+<p>A mosaic or cross dataset can arrive as one file per batch. Here
+<code>cite</code>, <code>multiome</code> and <code>rna_only</code> hold one batch each.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">kw</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="s2">"obs:cell_type"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"mosaic"</span><span class="p">)</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">cite</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                      <span class="n">batch_index</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">multiome</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna_only</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">(</span><span class="s2">"mosaic"</span><span class="p">))</span>
+</span></code></pre></div>
+<p><code>batch_index=N</code> writes the whole object as batch N. Number the batches
+to match a pattern the methods read. <code>describe_layout("mosaic")</code> lists
+them. For cross, write each donor file the same way with
+<code>category="cross"</code>. One file with a donor column is split by <code>batch=</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"data/MYCITE3"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="s2">"obs:donor"</span><span class="p">,</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>                      <span class="n">category</span><span class="o">=</span><span class="s2">"cross"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The cross methods read batches 1-3. <code>describe_layout("cross")</code> lists
+them.</p>
+<p>From the shell, <code>multibench convert</code> takes <code>--batch-index N</code>.</p>
+</div>
+</div>
+</div>
 <details class="note">
-<summary>Details</summary>
-<p><strong>Batches.</strong> <code>batch="obs:sample"</code> writes one file per batch
-(<code>rna1.h5</code>, <code>adt1.h5</code>, <code>cty1.csv</code>, ...).</p>
-<p><strong>One file at a time.</strong> <code>mtb.io.to_canonical(src, "data/MYDIAG/",
-modality="rna")</code> writes one modality under its canonical filename;
-keep the trailing <code>/</code> when the folder does not exist yet.
+<summary>Details: files and labels</summary>
+<p><code>mtb.io.to_canonical(src, "data/MYDIAG/", modality="rna")</code> writes one
+modality under its file name. Keep the trailing <code>/</code> when the folder
+does not exist yet. <code>export_dataset(..., dtype="float32")</code> or
+<code>to_canonical(..., dtype="float32")</code> halves the size of each file.
 <code>mtb.io.read_canonical</code> reads a file back as an AnnData.</p>
-<p><strong>Label files.</strong> A one-column CSV: a header line <code>x</code>, then one label
-per cell, e.g. <code>pd.Series(labels, name="x").to_csv(path, index=False)</code>.</p>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>: peaks or gene activity.</strong> Say which one the matrix holds
-(<code>atac_kind=</code>). Each method expects one of the two
-(<code>method_info(m)["atac"]</code>), and the wrong one runs without an error.</p>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file names.</strong> With <code>category="vertical"</code> the file is <code>atac.h5</code>,
-whatever it holds, so write the representation the method expects.
-Other categories keep <code>atac_peak.h5</code> / <code>atac_gas.h5</code>.</p>
-<p><strong>Checks.</strong> <code>scan</code>'s <code>caveat</code> column flags an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file that looks like
-the wrong representation. <code>inputs_for</code> and <code>scan</code> name the other <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
-file when the expected one is missing.</p>
+<p>A label file is a one-column CSV: a header line <code>x</code>, then one label
+per cell, for example
+<code>pd.Series(labels, name="x").to_csv(path, index=False)</code>.</p>
+<p>A 10x Multiome AnnData read with <code>gex_only=False</code> holds genes and
+peaks in one <code>X</code>. Select each part with a feature filter:
+<code>rna="X[feature_types=Gene Expression]"</code> and
+<code>atac="X[feature_types=Peaks]"</code>.</p>
+<p>Running an export again raises <code>FileExistsError</code> for the files already
+in the folder. <code>overwrite=True</code> replaces them. A call that fails
+writes nothing.</p>
+<p><code>mtb.scan</code> checks the folder for each method. Its <code>caveat</code> column
+flags values that are not whole numbers. When an expected file is
+missing, <code>scan</code> and <code>inputs_for</code> name the file they found instead.</p>
+</details>
+<details class="note">
+<summary>Details: <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr></summary>
+<p>The <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file name depends on the category. Vertical reads <code>atac.h5</code>,
+which holds what <code>method_info(m)["atac"]</code> says. Diagonal reads
+<code>atac_peak.h5</code> for peaks and <code>atac_gas.h5</code> for gene activity. Mosaic
+reads <code>atac&lt;i&gt;.h5</code>, which holds peaks. The older names <code>peak.h5</code>, and
+<code>atac.h5</code> for gene activity, still work.</p>
+<p>GLUE and Seurat_v3 read peak names such as <code>chr1:100-200</code>. <code>scan</code> and
+<code>run_all</code> also skip these two methods when the peak names cannot be
+rewritten in that form, such as <code>peak_0</code>. With such names, <code>scan</code>
+cannot tell peaks from gene activity. The other methods run, with a
+caveat that names the file. scBridge reads the whole folder, and <code>scan</code>
+does not check its <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file.</p>
+<p>To run a method that is skipped for its <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file, pass
+<code>allow_atac_mismatch=True</code> to <code>scan</code> and <code>run_all</code>. On the command
+line, the flag is <code>--allow-atac-mismatch</code>. <code>run_all</code> then runs the
+method, and its caveat stays in the log and in the summary.</p>
+<p>The peak and gene-activity folders of the Multiome tab hold the same
+cells. To rank all their methods in one figure, give both results one
+dataset name:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="c1"># res_ga: the run_all result of the gene-activity folder</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">both</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">res</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">res_ga</span><span class="o">.</span><span class="n">long</span><span class="p">])</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="s2">"MYMULTIOME"</span><span class="p">)</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">both</span><span class="p">)</span>
+</span></code></pre></div>
 </details>
 <hr />
 <h2 id="gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?<a class="headerlink" href="#gpu-or-cpu" title="Anchor link to this section">&para;</a></h2>
 <p>Most methods also run without a <abbr title="Graphics Processing Unit">GPU</abbr>, only slower. Six need an NVIDIA
-<abbr title="Graphics Processing Unit">GPU</abbr>: on a host without one, <code>run</code> refuses them with <code>OSError</code> before
-starting, and <code>scan</code> / <code>run_all</code> mark them not runnable.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span> <span class="k">if</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">m</span><span class="p">)[</span><span class="s2">"requires_gpu"</span><span class="p">]]</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="p">[</span><span class="s1">'scBridge'</span><span class="p">,</span> <span class="s1">'moETM'</span><span class="p">,</span> <span class="s1">'SMILE'</span><span class="p">,</span> <span class="s1">'sciCAN'</span><span class="p">,</span> <span class="s1">'UnitedNet'</span><span class="p">,</span> <span class="s1">'iPOLNG'</span><span class="p">]</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"scJoint"</span><span class="p">)[</span><span class="s2">"cpu_params"</span><span class="p">]</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">{</span><span class="s1">'use_cuda'</span><span class="p">:</span> <span class="s1">''</span><span class="p">}</span>
+<abbr title="Graphics Processing Unit">GPU</abbr>. On a host without one, <code>run</code> refuses them with <code>OSError</code> before
+starting, and <code>scan</code> and <code>run_all</code> mark them not runnable.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span> <span class="k">if</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">m</span><span class="p">)[</span><span class="s2">"requires_gpu"</span><span class="p">]]</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="p">[</span><span class="s1">'scBridge'</span><span class="p">,</span> <span class="s1">'moETM'</span><span class="p">,</span> <span class="s1">'SMILE'</span><span class="p">,</span> <span class="s1">'sciCAN'</span><span class="p">,</span> <span class="s1">'UnitedNet'</span><span class="p">,</span> <span class="s1">'iPOLNG'</span><span class="p">]</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"scJoint"</span><span class="p">)[</span><span class="s2">"cpu_params"</span><span class="p">]</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p">{</span><span class="s1">'use_cuda'</span><span class="p">:</span> <span class="s1">''</span><span class="p">}</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
-<p><strong><abbr title="Central Processing Unit">CPU</abbr> switches.</strong> scJoint and scMDC use CUDA unless told otherwise. On a
-host without a <abbr title="Graphics Processing Unit">GPU</abbr>, <code>run</code> adds the flags in
-<code>method_info(m)["cpu_params"]</code> and prints one line to stderr. A key you
-pass in <code>params</code> wins.</p>
-<p><strong>Environment builds.</strong> The torch environments of the tutorial methods
-also come as smaller <abbr title="Central Processing Unit">CPU</abbr>-only builds, which <code>mtb.env.install</code> picks on
-a host without a <abbr title="Graphics Processing Unit">GPU</abbr>. See
-<a href="../../api/#archive-flavours-cpu-and-gpu">Archive flavours</a>.</p>
+<p>scJoint and scMDC use CUDA unless told otherwise. On a host without a
+<abbr title="Graphics Processing Unit">GPU</abbr>, <code>run</code> adds the flags in <code>method_info(m)["cpu_params"]</code> and prints
+one line to stderr. A key you pass in <code>params</code> wins.</p>
+<p>The torch environments of the tutorial methods also come as smaller
+<abbr title="Central Processing Unit">CPU</abbr>-only builds, which <code>mtb.env.install</code> picks on a host without a
+<abbr title="Graphics Processing Unit">GPU</abbr>. See <a href="../../api/#archive-flavours-cpu-and-gpu">Archive flavours</a>.</p>
+<p>A login node often has no <abbr title="Graphics Processing Unit">GPU</abbr> while the jobs run on <abbr title="Graphics Processing Unit">GPU</abbr> nodes. There,
+<code>mtb.scan(..., assume_gpu=True)</code> skips this host's <abbr title="Graphics Processing Unit">GPU</abbr> test, and so
+does <code>mtb.run_all(..., dry_run=True, assume_gpu=True)</code>. On the command
+line the flag is <code>--assume-gpu</code>.</p>
 </details>
 <hr />
 <h2 id="how-the-environment-is-entered-prefix-and-conda-modes">How the environment is entered: prefix and conda modes<a class="headerlink" href="#how-the-environment-is-entered-prefix-and-conda-modes" title="Anchor link to this section">&para;</a></h2>
@@ -1941,66 +2079,60 @@ binary is needed. When no folder exists but conda is installed, it uses
 mode.</p>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Where environments live.</strong> In <code>&lt;envs_dir&gt;/&lt;env&gt;</code>, where
+<p>Environments live in <code>&lt;envs_dir&gt;/&lt;env&gt;</code>, where
 <code>multibench env install --packed --run</code> unpacks them. <code>envs_dir</code>
-defaults to <code>MULTIBENCH_ENVS_DIR</code> when set; the other defaults are
-listed under <a href="../../reference/config/#multibench.config.Config"><code>Config</code></a>.</p>
-<p><strong>Prefix mode.</strong> The command runs under <code>bash -c</code> after setting
+defaults to <code>MULTIBENCH_ENVS_DIR</code> when set.
+<a href="../../reference/config/#multibench.config.Config"><code>Config</code></a> lists the
+other defaults.</p>
+<p>In prefix mode the command runs under <code>bash -c</code> after setting
 <code>CONDA_PREFIX</code>, putting <code>&lt;prefix&gt;/bin</code> first on <code>PATH</code> and sourcing
 <code>&lt;prefix&gt;/etc/conda/activate.d/*.sh</code>.</p>
-<p><strong>Forced prefix mode.</strong> <code>MULTIBENCH_RUN_MODE=prefix</code> with no
-environment folder raises <code>OSError</code> naming <code>envs_dir</code>.</p>
-</details>
-<h2 id="choosing-a-cmd_template">Choosing a <code>cmd_template</code><a class="headerlink" href="#choosing-a-cmd_template" title="Anchor link to this section">&para;</a></h2>
-<p>Pass <code>cmd_template</code> to run the command another way, for example in a
-container. <code>{cmd}</code> stands for the built command. You then manage the
-environment yourself: <code>run</code> skips its environment check.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="explicit-conda-env" name="__tabbed_1" type="radio" /><input id="singularity--apptainer" name="__tabbed_1" type="radio" /><input id="run-in-the-current-env" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="explicit-conda-env">Explicit conda env</label><label for="singularity--apptainer">Singularity / Apptainer</label><label for="run-in-the-current-env">Run in the current env</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
-</span></code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"singularity exec multibench.sif </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
-</span></code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"</span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>   <span class="c1"># no wrapper: the active interpreter</span>
-</span></code></pre></div>
-</div>
-</div>
-</div>
-<details class="note">
-<summary>Details</summary>
-<p><strong>Placement.</strong> Put <code>{cmd}</code> last: the rest of the template is placed in
-front of the command.</p>
-<p><strong>Method scripts.</strong> <code>repo_path=</code> points at your own checkout of the
-scMultiBench method scripts. By default the package fetches one on the
-first run.</p>
+<p><code>MULTIBENCH_RUN_MODE=prefix</code> with no environment folder raises
+<code>OSError</code> naming <code>envs_dir</code>.</p>
 </details>
 <hr />
-<h2 id="reading-other-output-kinds">Reading other output kinds<a class="headerlink" href="#reading-other-output-kinds" title="Anchor link to this section">&para;</a></h2>
-<p><code>res.output</code> is a numpy array for every method. Predicted labels
-(Matilda, scBridge, UnitedNet, Seurat_v3) come back in <code>res.extra</code> as lists
-of strings.</p>
+<h2 id="choosing-a-cmd_template">Choosing a <code>cmd_template</code><a class="headerlink" href="#choosing-a-cmd_template" title="Anchor link to this section">&para;</a></h2>
+<p>Pass <code>cmd_template</code> to launch the command another way, for example as a
+Slurm job step or in a container. <code>{env_cmd}</code> is the command inside the
+method's environment. <code>{cmd}</code> is the bare command. With <code>{cmd}</code>, you manage
+the environment yourself.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:4"><input checked="checked" id="slurm-job-step" name="__tabbed_2" type="radio" /><input id="explicit-conda-env" name="__tabbed_2" type="radio" /><input id="singularity--apptainer" name="__tabbed_2" type="radio" /><input id="run-in-the-current-env" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="slurm-job-step">Slurm job step</label><label for="explicit-conda-env">Explicit conda env</label><label for="singularity--apptainer">Singularity / Apptainer</label><label for="run-in-the-current-env">Run in the current env</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"srun --gres=gpu:1 </span><span class="si">{env_cmd}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>atac_gas.h5<span class="w"> </span>--out-dir<span class="w"> </span>runs/scalex<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span>--runner<span class="w"> </span><span class="s2">"srun --gres=gpu:1 {env_cmd}"</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"singularity exec multibench.sif </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># no wrapper: the active interpreter runs the script</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"</span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+</div>
+</div>
+</div>
 <details class="note">
 <summary>Details</summary>
-<p><strong>Kinds.</strong> <code>method_info(m)["supports"]</code> gives each variant's
-<code>output_kind</code>: <code>embedding</code> or <code>graph</code>.</p>
-<p><strong>Extra outputs.</strong> <code>res.extra</code> maps each extra file name to its content:
-an array for an embedding or a graph, a list of strings for predicted
-labels.</p>
-<p><strong>Graph methods.</strong> MIRA, scMoMaT and Seurat_WNN return a cell graph,
-not an embedding, so embedding metrics such as ASW do not apply to
-<code>res.output</code>.</p>
-<p><strong>Graph methods in <code>run_all</code>.</strong> It scores scMoMaT through the <abbr title="Uniform Manifold Approximation and Projection">UMAP</abbr>
-embedding scMoMaT also writes, and records MIRA and Seurat_WNN as
-<code>RUN_OK_NO_EMBEDDING</code>.</p>
+<p>Put <code>{env_cmd}</code> or <code>{cmd}</code> last: the rest of the template goes in
+front of the command. A template uses one of the two, not both.</p>
+<p>With <code>{env_cmd}</code>, <code>run</code> checks the environment as it does without a
+template. With <code>{cmd}</code>, it skips that check.</p>
+<p><code>repo_path=</code> points at your own checkout of the scMultiBench method
+scripts. By default the package fetches one on the first run.</p>
 </details>
 <hr />
 <p>Next: turn a run's output into scIB metrics in
-<a href="../evaluate/">Evaluate a run</a>, then render the
+<a href="../evaluate/">Evaluate a run</a>, then draw the
 <a href="../plot/">bubble table</a>.</p>
 
 

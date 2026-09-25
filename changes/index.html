@@ -1,0 +1,2665 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+      
+      
+        <meta name="author" content="PYangLab">
+      
+      
+        <link rel="canonical" href="https://dsichang.github.io/scMultiBench/changes/">
+      
+      
+        <link rel="prev" href="../citation/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/m3-logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Changes - scMultiBench</title>
+      
+    
+    
+  
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+  <style>
+    /* Colab-button styling shipped INLINE with the page HTML (not via the
+       separately-cached extra.css), so a stale cached stylesheet can't revert
+       it. Absolute (not float) so it doesn't squeeze mkdocs-jupyter's
+       .jp-Notebook narrower, and above the .jupyter-wrapper so it stays
+       clickable. Same pattern as the M3 / Matilda sites. */
+    .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
+    .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+  </style>
+
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-header__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../assets/m3-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            scMultiBench
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../installation/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorials/vertical/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  How scMultiBench works
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api/" class="md-tabs__link">
+          
+  
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../faq/" class="md-tabs__link">
+          
+  
+  
+  Resources
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-nav__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../assets/m3-logo.png" alt="logo">
+
+    </a>
+    scMultiBench
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/end_to_end/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    End-to-end walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluate a run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load and plot results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discover methods
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shiny/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive explorer (Shiny)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/vertical/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/diagonal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagonal integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/mosaic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mosaic integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cross/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scMultiBench works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/inputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prepare inputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/score/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/compare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data I/O (mtb.io)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plot (mtb.plot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets (mtb.data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration (mtb.config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-032" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New in 0.3.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commands-and-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands and flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-arguments-and-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python arguments and settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-fields-in-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New fields in results
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behaviour-changes-in-032" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes in 0.3.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behaviour changes in 0.3.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dataset-folders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset folders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scores-and-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scores and figures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command line
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloads
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removed-in-031" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed in 0.3.1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deprecated-in-030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecated in 0.3.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-032" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="New in 0.3.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commands-and-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands and flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-arguments-and-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python arguments and settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-fields-in-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New fields in results
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behaviour-changes-in-032" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes in 0.3.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behaviour changes in 0.3.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dataset-folders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset folders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scores-and-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scores and figures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command line
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloads
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removed-in-031" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed in 0.3.1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deprecated-in-030" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecated in 0.3.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../faq/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Resources
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+  
+  
+  
+  
+                  
+
+
+  
+  
+
+
+<h1 id="changes">Changes<a class="headerlink" href="#changes" title="Anchor link to this section">&para;</a></h1>
+<p>What each release adds and changes, newest first. A script that uses anything
+listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
+<code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-032">New in 0.3.2<a class="headerlink" href="#new-in-032" title="Anchor link to this section">&para;</a></h2>
+<h3 id="commands-and-flags">Commands and flags<a class="headerlink" href="#commands-and-flags" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>multibench fetch D46 D11</code> downloads demo datasets. <code>--outputs</code> downloads
+  their stored <code>run-all</code> outputs instead, <code>--scripts</code> the method scripts, and
+  <code>--ref</code> picks a commit or tag of the scripts.</li>
+<li><code>multibench config</code> lists the paths in use and where each one comes from.
+  Its <code>scripts_commit</code> row is the commit of the method scripts. With
+  <code>MULTIBENCH_SCRIPTS_REF</code> set, a <code>scripts_ref</code> row says whether it matches.
+  <code>--get data_path</code> prints one value.</li>
+<li><code>multibench info METHOD</code> prints what one method needs: environment, <abbr title="Graphics Processing Unit">GPU</abbr>
+  use, labels, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> input, variants and observed runtimes with cell counts.</li>
+<li><code>multibench scan --strict</code> exits with <code>1</code> when no requested row is
+  runnable. With <code>--methods</code>, it exits with <code>1</code> when any named method has no
+  runnable row. The error counts the blocked rows by cause: missing files,
+  missing environment, no <abbr title="Graphics Processing Unit">GPU</abbr> on this computer, wrong <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> kind, unreadable
+  peak names and scripts not at <code>MULTIBENCH_SCRIPTS_REF</code>. It also exits with
+  <code>1</code> while the method scripts are not fetched.</li>
+<li><code>multibench scan --assume-gpu</code> and <code>multibench run-all --dry-run --assume-gpu</code>
+  check a <abbr title="Graphics Processing Unit">GPU</abbr>-node job from a login node without a <abbr title="Graphics Processing Unit">GPU</abbr>.</li>
+<li><code>multibench scan --allow-atac-mismatch</code> and
+  <code>multibench run-all --allow-atac-mismatch</code> count a method as runnable when
+  its <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file holds the other representation or peak names the method
+  cannot read. The caveat stays.</li>
+<li><code>multibench run-all --dry-run</code> runs without <code>--out-dir</code>. Its commands then
+  show <code>&lt;out_dir&gt;</code>.</li>
+<li><code>multibench evaluate --leiden-flavor</code> and <code>multibench run-all --leiden-flavor</code>
+  set the Leiden backend of the scoring.</li>
+<li><code>multibench run-all --batch CSV</code> gives one batch id per cell, as
+  <code>mtb.run_all(batch=...)</code> does. With <code>--dry-run</code>, a file of the wrong
+  length exits with <code>1</code>.</li>
+<li><code>multibench evaluate --batch-column NAME</code> and
+  <code>multibench run-all --batch-column NAME</code> read the batch from one column of
+  a <code>--batch</code> CSV with several columns, such as a sample sheet. A first
+  column of cell ids still aligns the rows to the cells.</li>
+<li><code>multibench evaluate --labels A.csv --labels B.csv</code> stacks several label
+  files in the order given, one batch per file. With <code>--dataset</code>,
+  <code>--category</code> and <code>--method</code>, an order that contradicts the method's cell
+  order exits with <code>1</code>.</li>
+<li><code>multibench evaluate --dataset D --method M --category C</code> without <code>--labels</code>
+  reads the label files of <code>mtb.labels_for</code>. <code>--data-path</code> sets their folder.</li>
+<li><code>multibench evaluate --name NAME</code> sets the row name of the long table, such
+  as <code>SCALEX_rerun</code>. With <code>--labels</code>, <code>--method</code> can be left out. A
+  <code>--method</code> given with <code>--name</code> must be a package method. It sets the label
+  order, and a <code>needs_labels</code> column gives the rows the <code>L</code> badge of
+  <code>plot bubble</code> when the method uses labels.</li>
+<li><code>multibench convert --overwrite</code> replaces files already in the folder.</li>
+<li><code>multibench convert --batch-index N</code> writes one file as batch <code>N</code> of a
+  mosaic or cross dataset.</li>
+<li><code>multibench convert --atac-from atac.h5ad --category diagonal</code> reads the
+  <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells from a second file.</li>
+<li><code>multibench plot bubble --na warn|skip|raise</code> sets what happens to metrics
+  a method lacks.</li>
+<li><code>multibench run --runner "srun --gres=gpu:1 {env_cmd}"</code>: <code>{env_cmd}</code> is the
+  command inside the method environment. <code>mtb.run(cmd_template=...)</code> takes it
+  too.</li>
+</ul>
+<h3 id="python-arguments-and-settings">Python arguments and settings<a class="headerlink" href="#python-arguments-and-settings" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.io.export_dataset(..., overwrite=True)</code> replaces files already in the
+  folder.</li>
+<li><code>mtb.io.export_dataset(..., batch_index=N)</code> writes the whole object as
+  batch <code>N</code> of a mosaic or cross dataset.</li>
+<li><code>mtb.io.export_dataset(rna, folder, atac=atac, atac_kind="peak", category="diagonal")</code>
+  writes <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> from different cells.</li>
+<li>A selector can end with a feature filter, such as
+  <code>rna="X[feature_types=Gene Expression]"</code>. <code>multibench convert</code> takes it too.</li>
+<li><code>mtb.scan(..., assume_gpu=True)</code> and
+  <code>mtb.run_all(..., dry_run=True, assume_gpu=True)</code> skip this computer's <abbr title="Graphics Processing Unit">GPU</abbr>
+  test.</li>
+<li><code>mtb.scan(..., allow_atac_mismatch=True)</code> and
+  <code>mtb.run_all(..., allow_atac_mismatch=True)</code> do what
+  <code>--allow-atac-mismatch</code> does.</li>
+<li><code>mtb.labels_for(..., check=True)</code> raises for a vertical or diagonal
+  category on a folder of per-batch files. The default, <code>None</code>, warns.</li>
+<li><code>mtb.recommend(..., atac="peak")</code> filters by <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation, as
+  <code>mtb.find_methods</code> does.</li>
+<li><code>MULTIBENCH_DATA_PATH</code> and <code>MULTIBENCH_REPO_PATH</code> set <code>data_path</code> and
+  <code>repo_path</code>. <code>MULTIBENCH_SCRIPTS_REF</code> picks a commit or tag of the method
+  scripts. When the scripts present are at another commit, <code>scan</code> marks
+  every row not runnable, <code>run_all</code> raises <code>ValueError</code> before any method
+  starts, and the dry runs print a note. <code>run_all(dry_run=True)</code> prints the
+  note only with <code>verbose=True</code>, as a <code>[run_all]</code> line on stdout after its
+  count line. The <a href="../reference/config/">config page</a> lists every variable.</li>
+<li><code>data_path</code>, <code>repo_path</code> and <code>envs_dir</code> of <code>mtb.config.DEFAULT</code> accept a
+  string.</li>
+<li><code>mtb.load_batch(out_dir, data_path=...)</code> says where the dataset folders of
+  a saved result are. A <code>data_path</code> without the dataset folder raises
+  <code>ValueError</code>. Without it, <code>load_batch</code> and <code>rescore</code> look for the
+  dataset folder under the recorded <code>data_path</code>, then under <code>data_root</code>.</li>
+</ul>
+<h3 id="new-fields-in-results">New fields in results<a class="headerlink" href="#new-fields-in-results" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>RunResult.obs_names</code> holds the cell barcodes of the output rows.</li>
+<li><code>RunResult.scripts_commit</code>, <code>env_flavor</code> and <code>hostname</code> record the method
+  scripts, the environment build (<code>cpu</code>, <code>gpu</code> or <code>single</code>) and the
+  computer. Each <code>run_all</code> record in <code>BatchResult.records</code> has them too. A
+  record of a reused output
+  (<code>skip_existing=True</code>) copies them from the earlier record.</li>
+<li><code>BatchResult.summary</code> and <code>summary.csv</code> end with a <code>caveat</code> column and a
+  <code>reason</code> column. <code>reason</code> says why a <code>SKIPPED</code> method did not run. Each
+  record in <code>BatchResult.records</code> and <code>batch_result.json</code> has a <code>caveat</code> key.
+  A record saved before 0.3.2 has none, and <code>summary</code> shows NaN there.</li>
+<li>Each <code>run_all</code> record has <code>data_root</code>, the absolute path of the data
+  folder it used. <code>batch_result.json</code> holds it too. <code>load_batch</code> and
+  <code>rescore</code> write the folder they find into <code>data_path</code> and <code>data_root</code>.</li>
+<li><code>run_all(batch=...)</code> and <code>run-all --batch</code> save the batch in <code>out_dir</code> as
+  <code>batch_&lt;hash&gt;.csv</code>. The record key <code>batch_file</code> names the file.
+  <code>BatchResult.save</code> writes it too, also after <code>rescore(batch=...)</code>.
+  <code>BatchResult.rescore()</code> reuses that batch, also with <code>labels=</code>. It drops
+  the batch, with a warning, when the dataset folder is not found. For an
+  older result it warns once when <code>metrics=</code> includes a batch metric: pass
+  <code>batch=</code> again to keep the batch metrics.</li>
+<li><code>mtb.method_info(m)["gpu"]</code> is <code>required</code>, <code>used when present</code>, <code>not used</code>
+  or <code>unknown</code>.</li>
+<li><code>reference_batch</code> in each entry of <code>mtb.method_info(m)["supports"]</code> names a
+  fixed reference batch, such as batch 3 for StabMap in cross.</li>
+<li>The <code>datasets</code> column of <code>mtb.recommend</code> names the datasets each score
+  comes from.</li>
+<li><code>mtb.evaluate(...).attrs</code> holds <code>leiden_flavor</code>, <code>clustering</code>,
+  <code>multibench_version</code> and <code>scib_version</code>.</li>
+<li>The <code>scored_with</code> column of <code>mtb.to_long</code> records how the scores were
+  computed, such as <code>leidenalg/sweep/0.3.2</code>.</li>
+</ul>
+<h2 id="behaviour-changes-in-032">Behaviour changes in 0.3.2<a class="headerlink" href="#behaviour-changes-in-032" title="Anchor link to this section">&para;</a></h2>
+<p>These changes can stop a 0.3.1 script or change its result.</p>
+<h3 id="dataset-folders">Dataset folders<a class="headerlink" href="#dataset-folders" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.io.export_dataset</code> and <code>multibench convert</code> refuse to replace existing
+  files. <code>FileExistsError</code> lists them. Pass <code>overwrite=True</code> or <code>--overwrite</code>.
+  A failed call writes nothing.</li>
+<li><code>category="mosaic"</code> writes <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> as <code>atac&lt;i&gt;.h5</code>, where 0.3.1 wrote
+  <code>atac_peak&lt;i&gt;.h5</code>. Folders with the old names still work.</li>
+<li><code>category="diagonal"</code> pairs no barcodes, so <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> may come from
+  different cells. The labels go to <code>rna_cty.csv</code> and <code>atac_cty.csv</code>, not
+  <code>cty.csv</code>.</li>
+<li><code>batch=</code> with <code>category="vertical"</code> or <code>"diagonal"</code> raises <code>ValueError</code>.
+  0.3.1 wrote per-batch files that no vertical method reads.</li>
+<li>A missing label (NaN, None or <code>''</code>) raises <code>ValueError</code>.</li>
+<li><abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or peak values that are not whole numbers give a <code>UserWarning</code>.
+  The methods expect raw counts.</li>
+<li><code>mtb.io.to_canonical(src, folder, modality="gas")</code> into a folder with
+  <code>atac_peak.h5</code> writes the rows in that file's cell order.</li>
+</ul>
+<h3 id="file-checks">File checks<a class="headerlink" href="#file-checks" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>A vertical folder of per-batch files (<code>rna1.h5</code>, <code>rna2.h5</code>, ...) fails the
+  file check. 0.3.1 read <code>rna1.h5</code> as <code>rna.h5</code>.</li>
+<li>Seurat_v5 needs <code>rna.h5</code> and <code>atac_peak.h5</code> from the same cells. A folder
+  whose two files hold different cells, D28 included, fails its file check,
+  and <code>run_all</code> skips Seurat_v5 there.</li>
+<li><code>mtb.labels_for(..., "Seurat_v5")</code> lists <code>atac_cty</code> before <code>rna_cty</code>,
+  Seurat_v5's cell order.</li>
+<li><code>mtb.labels_for(dataset, category, method)</code> returns only the label files of
+  the batches the method reads. UINMF on D52 gets <code>cty1</code> and <code>cty2</code>, and the
+  caveat of <code>scan</code> and <code>run_all</code> says
+  <code>UINMF reads batches 1-2 of 3. Batch 3 is not used.</code></li>
+<li>In a diagonal folder, <code>atac_gas.h5</code> must hold the cells of <code>atac_peak.h5</code>
+  in the same order. Otherwise the methods that read <code>atac_gas.h5</code> fail the
+  file check. Barcodes that differ only in a trailing <code>-&lt;n&gt;</code> count as the
+  same cell.</li>
+<li>UnitedNet reads <code>cty.csv</code>, where 0.3.1 read <code>rna_cty.csv</code>. <code>inputs_for</code>
+  returns the key <code>cty</code>. A folder with only <code>rna_cty.csv</code> still works, and
+  <code>labels_for(..., "vertical", "UnitedNet")</code> returns that file under <code>cty</code>.
+  The input key <code>rna_cty</code> of <code>mtb.run</code> and <code>multibench run --input</code> still
+  works, with a <code>DeprecationWarning</code>.</li>
+<li><code>modalities=["rna", "atac_peak"]</code> selects the methods that read peaks, and
+  <code>"atac_gas"</code> the methods that read gene activity. In 0.3.1, <code>find_methods</code>
+  and <code>recommend</code> returned every <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>+<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> method for either token.</li>
+<li>In <code>scan</code> and <code>run_all</code>, <code>"atac_gas"</code> no longer selects moETM, scMM and
+  iPOLNG, which read peaks, unless <code>methods=</code> names them. Pass <code>"atac_peak"</code>
+  for them. <code>"atac_peak"</code> also lists MultiMAP and Seurat_v3, which read both
+  <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files.</li>
+<li>A row whose <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file holds the other representation, such as peaks for
+  Matilda, is not runnable in <code>scan</code>, and <code>run_all</code> skips it, also when
+  <code>methods=</code> names the method. <code>allow_atac_mismatch=True</code> or
+  <code>--allow-atac-mismatch</code> runs it with the caveat, as 0.3.1 did.</li>
+<li>GLUE and Seurat_v3 are not runnable in <code>scan</code> when the peak file holds
+  names without chromosome, start and end, such as <code>peak_1</code>.
+  <code>allow_atac_mismatch=True</code> runs them anyway. 0.3.1 checked only GLUE on
+  D28.</li>
+</ul>
+<h3 id="runs">Runs<a class="headerlink" href="#runs" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>run_all</code> into an <code>out_dir</code> that holds a saved result of the same dataset
+  and category merges the records. Another dataset or category raises
+  <code>ValueError</code> before any method runs. <code>BatchResult.save</code> does the same.</li>
+<li><code>mtb.run(..., dry_run=True)</code> checks the inputs as a real run does. A MuData
+  or <code>.h5mu</code> input raises <code>ValueError</code>. An input file that does not exist
+  gets only a note, such as
+  <code>SCALEX reads data/LUNG/atac_gas.h5, which does not exist.</code></li>
+<li><code>mtb.run</code> and <code>multibench run</code>, dry run included, apply the cell checks of
+  the file check to the files you pass. Seurat_v5 inputs from different
+  cells, or an <code>atac_gas</code> file whose cells differ from <code>atac_peak</code> in set or
+  order, raise <code>ValueError</code> before anything runs.</li>
+<li>GLUE reads a copy of <code>atac_peak.h5</code> whose peak names <code>mtb.run</code> rewrites
+  to <code>chr:start-end</code>, as for Seurat_v3. The <code>command</code> column of <code>scan</code> names
+  that copy, which <code>mtb.run</code> writes first. Start GLUE with <code>mtb.run</code>,
+  <code>run_all</code> or <code>multibench run</code>. The printed command alone fails in a job
+  script.</li>
+<li><code>mtb.run</code> and <code>multibench run</code> warn once when an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> input holds the
+  other representation or peak names the method cannot read, and still run.
+  The dry run prints the same text on a line that starts with <code>#</code>.</li>
+<li><code>run_all</code> prints the caveat of each row it runs in its log, in the dry run
+  too.</li>
+<li>The result lines of <code>run_all</code> and <code>rescore</code> name the ARI, such as
+  <code>ARI 0.629</code>. A <code>FAIL</code> or <code>TIMEOUT</code> line ends with the last line of the
+  error that names a cause.</li>
+<li>A real <code>run_all</code> logs <code>skipping &lt;method&gt;: &lt;reason&gt;</code> for a method it does
+  not start, and records it with status <code>SKIPPED</code> and the reason in <code>error</code>.
+  This covers each named method with no runnable row and each blocked method
+  whose files are present. <code>failures</code> lists it only when <code>methods=</code> named it.
+  A <code>SKIPPED</code> record never replaces an earlier run of that method in
+  <code>out_dir</code>. When no requested method can start, <code>run_all</code> raises
+  <code>ValueError</code> instead, and <code>multibench run-all</code> exits with <code>1</code>.</li>
+<li><code>scan</code> and <code>run_all</code>, dry run included, raise <code>ValueError</code> before anything
+  runs when <code>methods=</code> names a method with no variant in the category or
+  modalities. 0.3.1 dropped that method. <code>multibench run-all</code> exits with <code>1</code>.</li>
+<li><code>BatchResult.rescore</code> keeps <code>FAIL</code> and <code>TIMEOUT</code> records as they are.
+  0.3.1 scored them again, and a failed method came back as <code>CHAIN_OK</code>,
+  <code>RUN_OK_EVAL_FAILED</code> or <code>RUN_OK_NO_EMBEDDING</code>.</li>
+<li>A record that <code>rescore</code> cannot score, <code>RUN_OK_NO_LABEL_MATCH</code> or
+  <code>RUN_OK_EVAL_FAILED</code>, keeps no metrics, <code>batch_source</code> or <code>n_batches</code> from
+  an earlier scoring. 0.3.1 kept the batch columns, and the metrics when the
+  output file could not be read.</li>
+<li><code>BatchResult.rescore(metrics=...)</code> with no ARI, NMI or iF1 keeps the stored
+  label order and runs no Leiden sweep. 0.3.1 ranked the label orders again.</li>
+<li><code>BatchResult.rescore(verbose=True)</code> prints a line before each label-order
+  ranking.</li>
+<li><code>BatchResult.rescore</code> no longer warns about the batch it takes from the
+  label files when <code>metrics=</code> has no batch metric, such as
+  <code>rescore(metrics=["ARI", "NMI"])</code> on a result with several label files.</li>
+<li><code>run_all(batch=...)</code> takes the ids in the cell order of
+  <code>labels_for(dataset)</code> and puts them in each method's cell order. 0.3.1
+  used the vector as given for every method. A Series or one-column
+  DataFrame indexed by barcode is matched by barcode, in
+  <code>BatchResult.rescore(batch=...)</code> too.</li>
+<li><code>BatchResult.rescore(labels=...)</code> aligns a Series or one-column DataFrame
+  indexed by barcode, where 0.3.1 matched it by position. <code>label_order</code> then
+  names the file order chosen.</li>
+<li>A batch or labels CSV whose first column holds cell ids is aligned by that
+  column. 0.3.1 matched its rows by position. This applies to <code>run_all</code>,
+  <code>rescore</code> and <code>run-all --batch</code>, and to <code>evaluate</code> when the output has cell
+  ids, also for several label files and <code>--column</code>. A column with no cell id
+  is matched by position, with a <code>UserWarning</code> when it holds text.
+  Numbers, such as R's row numbers, are matched by
+  position unless they are exactly the cell ids. A first column with no
+  header whose numbers restart at 0, as <code>pd.concat(...).to_csv(path)</code>
+  writes, is read as an index. The same numbers out of order raise
+  <code>ValueError</code>.</li>
+<li>For <code>batch=</code>, <code>labels=</code> and these CSVs, ids that are missing, repeated or
+  not cells of the dataset raise <code>ValueError</code>. <code>run_all</code> raises it before any
+  method runs.</li>
+<li>The first real run fills an existing empty <code>repo_path</code> with the method
+  scripts, where 0.3.1 refused. <code>multibench fetch --scripts</code> does the same.
+  For a <code>repo_path</code> that holds other files but no method scripts, runs raise
+  <code>RuntimeError</code> and <code>scan</code> marks every row not runnable.</li>
+<li><code>multibench evaluate</code> also computes the batch metrics when <code>--batch</code> or
+  several <code>--labels</code> are given, as <code>mtb.evaluate</code> does. <code>--task</code> is
+  deprecated. Use <code>--metrics</code>.</li>
+</ul>
+<h3 id="scores-and-figures">Scores and figures<a class="headerlink" href="#scores-and-figures" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.evaluate</code> clips ASW, iASW, cLISI, ASW_batch, GC and iLISI to 0-1. A
+  value within 1e-12 of 0 or 1 is recorded as 0 or 1.</li>
+<li>Ranks and fills treat values that agree to 9 decimals as ties.</li>
+<li><code>label_order_confidence</code> stays within 0-1, because a runner-up ARI below 0
+  counts as 0. A value above 1 in an older folder reads 1.0 in <code>summary</code>.
+  The column is numeric, also when every row is blank.</li>
+<li><code>mtb.to_long</code> adds the <code>scored_with</code> column. Scores with no record of how
+  they were computed, such as a CSV read back, get <code>unknown</code> and a
+  <code>UserWarning</code>.</li>
+<li><code>mtb.plot.bubble</code> draws a column whose rows all hold one value in grey, and
+  every column of a one-method figure. The footnote and a <code>UserWarning</code> name
+  them. Ranks and Overall are unchanged.</li>
+<li>The chip key of <code>bubble</code> reads <code>? = a name the package does not know</code>.</li>
+<li><code>bubble</code> widens a family pill to fit its header, and a figure of one to
+  three metrics to fit its row labels and key. The height is unchanged.</li>
+<li><code>bubble</code>, <code>build_table</code> and <code>bar</code> warn about rows from datasets that share
+  no method, a dataset with only one method, and igraph-scored rows next to
+  stored rows of their dataset when ARI, NMI or iF1 is shown. <code>bar</code> also
+  warns about an incomplete method x dataset table, as <code>bubble</code> does.</li>
+<li><code>mtb.recommend</code> warns when <code>modalities</code> or <code>atac</code> names a modality that
+  none of the ranked datasets measured. With <code>long_df=</code>, it also warns when
+  it ranks igraph-scored rows against stored rows of their dataset on ARI,
+  NMI or iF1.</li>
+<li><code>mtb.catalog.datasets()</code> no longer has the empty columns <code>assay</code>, <code>tissue</code>,
+  <code>n_cells</code>, <code>n_batches</code> and <code>source</code>.</li>
+</ul>
+<h3 id="command-line">Command line<a class="headerlink" href="#command-line" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>multibench plot --input</code> exits with <code>1</code> when <code>--dataset</code> or <code>--methods</code>
+  removes all your rows, and warns when it removes some.</li>
+<li><code>--format json</code> writes <code>/</code> unescaped.</li>
+<li><code>scan</code> and <code>run-all --dry-run</code> add the <code>atac</code> and <code>caveat</code> columns to the
+  short table when they apply.</li>
+<li><code>run-all --assume-gpu</code> without <code>--dry-run</code> is a usage error, exit code <code>2</code>.</li>
+<li>The dry runs of <code>multibench run</code> and <code>run-all</code> print
+  <code># Dry run. Nothing was executed.</code> first. <code>run --dry-run</code> then prints its
+  notes, <code># multibench run would execute:</code> and the command.</li>
+<li><code>run-all</code> exits with <code>3</code> after saving when a method failed, or a method
+  named in <code>--methods</code> was skipped. 0.3.1 exited with <code>0</code>. A chain such as
+  <code>run-all ... &amp;&amp; plot ...</code> now stops after <code>run-all</code>. A line on stderr names
+  those methods, such as <code># 1 failed (Seurat_WNN), 1 skipped (totalVI).</code>
+  Other skipped methods go on a <code># Not run: ...</code> line and do not set <code>3</code>.</li>
+<li>The last line of the <code>No method can run</code> error repeats the data path,
+  modalities and other scan options of the call.</li>
+</ul>
+<details class="note">
+<summary>Changed messages</summary>
+<p>Many messages, warnings and printed lines were reworded. Apart from the
+download error under Downloads, the exception and warning types are the
+same. A script that matches message text may need an update.</p>
+<ul>
+<li>Messages printed by <code>multibench</code> name its commands and flags, not
+  Python calls.</li>
+<li><code>caveat</code> texts are sentences that start with the method name, such as
+  <code>totalVI needs raw counts. rna.h5 holds non-integer values.</code>
+  The <code>reason</code> column of <code>scan</code> is sentences with their own subjects,
+  such as <code>Environment scmb_r runs only on Linux, not on this computer.</code>
+  or <code>scBridge needs atac_gas.h5, and LUNG has no such file.</code></li>
+<li><code>inputs_for(..., check=True)</code> and the <code>files_reason</code> column of <code>scan</code>
+  say what the method needs and what the folder holds, such as
+  <code>SCALEX (diagonal) needs atac_gas.h5 in &lt;folder&gt;. The folder holds atac_cty.csv, atac_peak.h5, rna.h5 and rna_cty.csv.</code>
+  For MultiMAP and Seurat_v3, the text ends
+  <code>&lt;method&gt; reads both atac_peak.h5 and atac_gas.h5.</code></li>
+<li>An unknown method id gets
+  <code>Unknown method stabmap. Did you mean StabMap? mtb.list_methods() shows all methods.</code>
+  A category the method does not run on gets
+  <code>SCALEX does not run on vertical data. Its categories: diagonal.</code>
+  <code>multibench evaluate</code> adds the <code>--name</code> and <code>--labels</code> flags for your
+  own rows.</li>
+<li><code>run_all</code> with no method to run raises
+  <code>No method can run on D11 (vertical).</code> With <code>methods=</code>, the message
+  starts <code>None of the requested methods (Matilda, totalVI) can run on D11 (vertical).</code>
+  On macOS and Windows, the error lists only the rows that something
+  else also blocks.</li>
+<li>The reason for scripts not at <code>MULTIBENCH_SCRIPTS_REF</code> ends with the
+  fix, and <code>scan --strict</code> prints it in full:
+  <code>The method scripts are at 0c68f87, not deadbeef (MULTIBENCH_SCRIPTS_REF). Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and run multibench fetch --scripts.</code></li>
+<li>A vertical folder whose <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file sits under <code>atac_peak.h5</code> or
+  <code>atac_gas.h5</code> gets a reason that names the fix, such as
+  <code>MIRA reads atac.h5 for vertical. Rename atac_peak.h5 to atac.h5, or write it with category="vertical".</code>
+  When the file holds the other representation, it reads
+  <code>Matilda needs gene-activity ATAC (atac.h5), and the folder has peaks (atac_peak.h5).</code></li>
+<li>The warnings about <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> feature names give the fix, such as
+  <code>Only 0% of the ATAC feature names look like peaks such as chr1:100-200. If they are peaks, rename them to chr:start-end.</code>
+  They suggest gene activity only when the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> names are unknown, as in
+  <code>to_canonical</code>, or most <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> names are <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> gene names.</li>
+<li>A Series matched by position gets a warning that says how to check its
+  order, such as
+  <code>The labels Series is matched by position, because the embedding has no cell ids. Check that it follows the embedding rows, ...</code>
+  When <code>rescore</code> cannot find the dataset folder, the warning names the
+  folders it looked in and gives the fix,
+  <code>Pass data_path= to mtb.load_batch, or run rescore from the folder where run_all ran.</code>
+  A <code>RUN_OK_NO_LABEL_MATCH</code> record gets the same fix in its <code>note</code>.</li>
+<li>Count lines say methods when each method has one row, and rows
+  otherwise, such as <code>[scan] 13 of 14 methods have their input files.</code>
+  So does the list header of the <code>run_all</code> error.
+  <code>mtb.run_all(dry_run=True)</code> starts with <code>[run_all] Dry run:</code>. The
+  commands header of <code>run-all --dry-run</code> explains its tags, such as
+  <code>[env missing] marks a row whose environment is not installed.</code></li>
+<li>Reworded: the messages of <code>export_dataset</code>, <code>to_canonical</code>,
+  <code>inputs_for</code>, <code>params_for</code> and <code>evaluate</code>. Also the environment
+  messages, file checks, plot and scan warnings, the <code># Merged with</code> line
+  and the <code>scan</code>, <code>convert</code> and <code>env</code> help. Errors for an unknown modality
+  or <code>metrics=</code> token, a missing folder or table, or a <code>plot --input</code>
+  filter changed too.</li>
+<li><code>scan</code> with <code>modalities=["rna", "atac_peak"]</code> no longer warns that
+  scBridge is left out. scBridge reads gene activity.</li>
+<li>The barcode error for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> with no shared cells points to
+  <code>category="diagonal"</code>.</li>
+<li><code>labels='obs:cell_type'</code> on a MuData whose column is only in
+  <code>mdata['rna'].obs</code> gets <code>use labels='rna:cell_type'</code>. The <code>.h5mu</code> recipes
+  of <code>multibench layout mosaic</code> and <code>multibench convert --help</code> use
+  <code>--labels rna:cell_type</code>.</li>
+<li>The raw-count hints follow the selector you passed, such as
+  <code>adt='obsm:protein_counts'</code>.</li>
+<li>A method that needs a <abbr title="Graphics Processing Unit">GPU</abbr> on a computer without one gets
+  <code>&lt;method&gt; needs an NVIDIA GPU, and this computer has none.</code></li>
+<li>On macOS and Windows, the refusal of <code>mtb.run</code> starts with <code>Methods
+  run only on Linux</code> and names no install command. That of
+  <code>mtb.env.install</code> starts with <code>Method environments run only on
+  Linux</code>. The summary line of <code>scan</code> says
+  <code>Method environments run only on Linux.</code> and what works on this
+  computer. On Linux, it names <code>mtb.env.doctor()</code> when an environment
+  is missing.</li>
+<li>A count mismatch in <code>mtb.evaluate</code> names the argument and both counts,
+  such as <code>labels has 60 entries for 90 cells in the embedding.</code>
+  <code>multibench evaluate</code> names the flag and the file.</li>
+<li>A per-cell CSV with several columns and none chosen gets the columns
+  after the cell ids and how to choose one, such as
+  <code>The --batch file obs_sheet.csv has several columns after the cell ids: celltype, sample. Choose one with --batch-column.</code>
+  A column name that is not in the file gets the same list.</li>
+<li>Missing batch labels get
+  <code>metrics='all' needs batch labels for ASW_batch, GC and iLISI. Pass batch=&lt;vector&gt;, or metrics='clustering'.</code>
+  A batch that no chosen metric uses gets
+  <code>batch= changes nothing here, because metrics=['ARI', 'NMI'] has no batch metric. ...</code></li>
+<li><code>load_results</code> with a <code>result_path</code> that does not exist raises
+  <code>FileNotFoundError</code> naming the path. <code>load_results("mosaic")</code> starts
+  with <code>mosaic has no published tables.</code> and names <code>source='rerun'</code>.
+  <code>multibench plot --category mosaic</code> names <code>--source rerun</code>.</li>
+<li>The warning of <code>bubble</code> and <code>build_table</code> for several datasets reads
+  <code>This figure averages each method over 3 datasets, D24, D25 and D28. Its rows mix datasets.</code>
+  <code>multibench plot --input</code> with <code>--category</code> prints
+  <code># Added your 7 rows (MyMethod) to the stored diagonal table, which has 137 rows (source published).</code></li>
+<li><code>bubble</code> on your rows and stored rows under one method name says
+  <code>Your rows and the stored table both have uniPort on D28. Give your rows another name, such as uniPort_rerun, with to_long(method=...).</code>
+  <code>multibench plot</code> names <code>evaluate --name</code> instead.</li>
+<li><code>scan</code> and <code>run_all</code> name what does not match, such as
+  <code>Matilda does not run on cross data. Its categories: vertical.</code> or
+  <code>The folder data/MYCITE does not exist. data holds D11, D28 and D52. ...</code>
+  A label file of the wrong length gets
+  <code>cty.csv has 15 labels, but rna.h5 has 20 cells. Give each cell one label, in the order of the cells. ...</code></li>
+<li>An unknown method or metric in <code>bubble</code>, <code>build_table</code>, <code>bar</code> and
+  <code>multibench plot</code> gets
+  <code>Unknown method Matlida. Did you mean Matilda? The table has A and B.</code></li>
+<li>The warning of <code>export_dataset</code> for gene-activity <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> with
+  <code>category="mosaic"</code> starts with <code>Every mosaic method reads peak ATAC.</code>
+  and names the fix.</li>
+<li><code>mtb.catalog.metrics()</code> describes cLISI and iLISI as the median over
+  cells, scaled to 0-1.</li>
+<li>The note before the clustering sweep of <code>evaluate</code> names the cell
+  count, the metrics and the Leiden backend, and how to skip the sweep.</li>
+<li><code>mtb.io.read_canonical</code> of a missing path names
+  <code>mtb.config.DEFAULT.data_path</code>.</li>
+<li><code>mtb.describe_layout(category)</code> prints only that category. The
+  diagonal layout names each method on one line.</li>
+<li>A failed download of the method scripts names the offline route:
+  copy a fetched scripts folder and set <code>MULTIBENCH_REPO_PATH</code>.</li>
+<li><code>env plan</code>, <code>env install</code> and the install warning call an environment
+  without a <abbr title="Central Processing Unit">CPU</abbr> build a single build, the same archive for <abbr title="Central Processing Unit">CPU</abbr> and <abbr title="Graphics Processing Unit">GPU</abbr>
+  hosts. <code>env status</code>, <code>env doctor</code> and <code>env plan</code> show no <code>flavor=</code> for
+  it.</li>
+</ul>
+</details>
+<h3 id="downloads">Downloads<a class="headerlink" href="#downloads" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.data.fetch</code> and <code>fetch_outputs</code> raise <code>OSError</code>, naming the URL, when
+  a download fails. 0.3.1 raised the <code>urllib</code> error, now kept as <code>__cause__</code>.
+  Code that catches <code>URLError</code> must catch <code>OSError</code>.</li>
+</ul>
+<h2 id="removed-in-031">Removed in 0.3.1<a class="headerlink" href="#removed-in-031" title="Anchor link to this section">&para;</a></h2>
+<p>These calls no longer select or report anything and were removed.</p>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>What happens now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>find_methods(..., available=...)</code></td>
+<td><code>TypeError: find_methods() got an unexpected keyword argument 'available'</code></td>
+</tr>
+<tr>
+<td><code>method_info(m)["availability"]</code>, the <code>"availability"</code> key of <code>mtb.env.plan()</code> rows</td>
+<td><code>KeyError</code>. The keys are gone.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="deprecated-in-030">Deprecated in 0.3.0<a class="headerlink" href="#deprecated-in-030" title="Anchor link to this section">&para;</a></h2>
+<p>Renamed 0.2.1 spellings still work in 0.3.x with a <code>DeprecationWarning</code> and
+will be removed in 0.4. Removed ones raise an error.</p>
+<table>
+<thead>
+<tr>
+<th>0.2.1</th>
+<th>0.3.0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mtb.plan(dataset, category, ...)</code></td>
+<td><code>mtb.scan(dataset, category, ...)</code>. It returns the same frame, with the <code>command</code> column.</td>
+</tr>
+<tr>
+<td><code>mtb.plan_commands(...)</code></td>
+<td><code>mtb.scan(...)</code></td>
+</tr>
+<tr>
+<td><code>mtb.runtime_hint(m)</code></td>
+<td><code>mtb.method_info(m)["runtime"]</code></td>
+</tr>
+<tr>
+<td><code>mtb.plot.plot_bubble(...)</code></td>
+<td><code>mtb.plot.bubble(...)</code></td>
+</tr>
+<tr>
+<td><code>evaluate(..., task="clustering" / "batch" / "all")</code></td>
+<td><code>evaluate(..., metrics="clustering" / "batch" / "all")</code></td>
+</tr>
+<tr>
+<td><code>evaluate(..., family=...)</code></td>
+<td><code>evaluate(..., metrics=&lt;token&gt;)</code></td>
+</tr>
+<tr>
+<td><code>evaluate(..., only=[...])</code></td>
+<td><code>evaluate(..., metrics=[...])</code></td>
+</tr>
+<tr>
+<td><code>load_results(..., method=...)</code></td>
+<td><code>load_results(..., methods=...)</code></td>
+</tr>
+<tr>
+<td><code>load_results(..., metric=[...])</code></td>
+<td><code>load_results(..., metrics=[...])</code></td>
+</tr>
+<tr>
+<td><code>load_results(..., task=... / family=...)</code></td>
+<td><code>load_results(..., metrics=&lt;token&gt;)</code></td>
+</tr>
+<tr>
+<td><code>recommend(..., task=... / family=...)</code></td>
+<td><code>recommend(..., metrics=&lt;token&gt;)</code></td>
+</tr>
+<tr>
+<td><code>multibench evaluate --only A,B</code></td>
+<td><code>multibench evaluate --metrics A,B</code> (stderr: <code>warning: --only is deprecated. Use --metrics.</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Passing <code>metrics=</code> together with a deprecated selector raises <code>TypeError</code>:
+<code>evaluate() got metrics= together with the deprecated ['task']; pass metrics= only</code>.</p>
+<p>To find old spellings in your code, run it with
+<code>python -W error::DeprecationWarning</code>. The warnings then become errors.</p>
+<p>These spellings were removed in 0.3.0:</p>
+<table>
+<thead>
+<tr>
+<th>removed</th>
+<th>error</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mtb.command_preview(...)</code></td>
+<td><code>AttributeError</code>. Use <code>mtb.run(..., dry_run=True)</code>.</td>
+</tr>
+<tr>
+<td><code>mtb.io.from_mudata(...)</code></td>
+<td><code>AttributeError</code>. Use <code>mtb.io.export_dataset(mdata, ..., rna="rna", atac="atac", atac_kind="peak", labels="rna:celltype")</code>.</td>
+</tr>
+<tr>
+<td><code>mtb.io.write_labels(...)</code></td>
+<td><code>AttributeError</code>. <code>export_dataset</code> writes the label files. By hand, use <code>pd.Series(labels, name="x").to_csv(path, index=False)</code>.</td>
+</tr>
+<tr>
+<td><code>list_methods(task=...)</code> / <code>(runnable=...)</code></td>
+<td><code>TypeError: list_methods() only takes category since 0.3.0; task=... are find_methods filters - use find_methods(category, task=...)</code></td>
+</tr>
+<tr>
+<td><code>find_methods("vertical", "clustering")</code> (positional filters)</td>
+<td><code>TypeError: find_methods() takes from 0 to 1 positional arguments but 2 were given</code></td>
+</tr>
+<tr>
+<td><code>method_info(m, files_dir=...)</code></td>
+<td><code>TypeError: method_info() got an unexpected keyword argument 'files_dir'</code>. The catalog columns are in <code>mtb.catalog.methods()</code>.</td>
+</tr>
+<tr>
+<td><code>cite(methods=[...])</code></td>
+<td><code>TypeError: cite() got an unexpected keyword argument 'methods'</code>. Use <code>cite([...])</code> or one id per argument.</td>
+</tr>
+<tr>
+<td><code>cite([ids], "bibtex")</code></td>
+<td><code>TypeError: cite(): method ids must be strings, got list; pass one list (cite(['Matilda', 'MOFA2'])) or one id per argument</code>. <code>fmt=</code> is keyword-only.</td>
+</tr>
+<tr>
+<td><code>inputs_for(dataset, method, category)</code></td>
+<td><code>TypeError: inputs_for argument order is (dataset, category, method) since 0.3.0; you passed (dataset, method, category)</code></td>
+</tr>
+<tr>
+<td><code>labels_for(dataset, method, category)</code></td>
+<td><code>TypeError: labels_for argument order is (dataset, category, method) since 0.3.0; you passed (dataset, method, category)</code></td>
+</tr>
+<tr>
+<td><code>labels_for(dataset, "&lt;data_path&gt;")</code></td>
+<td><code>TypeError: labels_for: pass data_path= by keyword; the 2nd positional argument is category since 0.3.0 (order: (dataset, category, method))</code></td>
+</tr>
+<tr>
+<td><code>inputs_for(..., ["rna", "adt"])</code> (positional modalities)</td>
+<td><code>TypeError: inputs_for() takes 3 positional arguments but 4 were given</code></td>
+</tr>
+<tr>
+<td><code>scan(dataset, category, data_path)</code> (positional)</td>
+<td><code>TypeError: scan() takes from 1 to 2 positional arguments but 3 were given</code></td>
+</tr>
+<tr>
+<td><code>run(method, category, "clustering", ...)</code> (positional task)</td>
+<td><code>TypeError: run() takes 2 positional arguments but 3 positional arguments (and 2 keyword-only arguments) were given</code></td>
+</tr>
+<tr>
+<td><code>run_all(dataset, category)</code> without <code>out_dir</code></td>
+<td><code>TypeError: run_all() needs out_dir= for a real run (dry_run=True returns the scan frame without one)</code></td>
+</tr>
+<tr>
+<td><code>BatchResult.rescore(only=...)</code></td>
+<td><code>TypeError: BatchResult.rescore() got an unexpected keyword argument 'only'</code>. Use <code>metrics=</code>.</td>
+</tr>
+<tr>
+<td><code>evaluate(output, category, ...)</code> (positional category)</td>
+<td><code>TypeError: evaluate() got multiple values for argument 'labels'</code>. <code>labels</code> is the second positional argument, and the rest are keyword-only.</td>
+</tr>
+<tr>
+<td><code>evaluate(..., slow_metrics=True)</code></td>
+<td><code>TypeError: evaluate() got slow_metrics=, removed in 0.3.0: pass metrics=[...] without cLISI/iLISI (kBET is computed only when it is named in that list)</code></td>
+</tr>
+<tr>
+<td><code>evaluate(..., column="x")</code></td>
+<td><code>TypeError: evaluate() got column=, removed in 0.3.0: pass the Series/column itself as labels= / batch= / clustering=</code></td>
+</tr>
+<tr>
+<td><code>evaluate(..., metric_set="scib")</code></td>
+<td><code>TypeError: evaluate() got metric_set=, removed in 0.3.0: only the scIB metric set exists - drop the argument</code></td>
+</tr>
+<tr>
+<td><code>to_long(df, method, dataset, category)</code> (positional)</td>
+<td><code>TypeError: to_long() takes 1 positional argument but 4 were given</code></td>
+</tr>
+<tr>
+<td><code>to_long(..., needs_labels=True)</code></td>
+<td><code>TypeError: to_long() got an unexpected keyword argument 'needs_labels'</code>. Add the column to the frame.</td>
+</tr>
+<tr>
+<td><code>load_results(category, "clustering")</code> (positional)</td>
+<td><code>TypeError: load_results() takes from 0 to 1 positional arguments but 2 were given</code></td>
+</tr>
+<tr>
+<td><code>load_results(..., metric_set="scib")</code></td>
+<td><code>TypeError: load_results() got metric_set=, removed in 0.3.0: only the scIB metric set exists - drop the argument</code></td>
+</tr>
+<tr>
+<td><code>available_datasets(..., metric_set=... / clustering=...)</code></td>
+<td><code>TypeError: available_datasets() got an unexpected keyword argument 'metric_set'</code> (likewise <code>'clustering'</code>)</td>
+</tr>
+<tr>
+<td><code>mtb.config.category_folder</code> / <code>metric_set_dir</code>, <code>mtb.plot.render</code> / <code>FamilyBlock</code>, <code>mtb.env.group_for</code> and the other <code>mtb.env</code> helpers</td>
+<td>Still importable, but internal: out of <code>__all__</code> and hidden from <code>dir()</code>.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../citation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Citation">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Citation
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/PYangLab" target="_blank" rel="noopener" title="PYangLab on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "navigation.path", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "toc.follow", "search.highlight", "content.code.copy", "content.code.annotate", "content.code.select", "content.tabs.link", "announce.dismiss", "header.autohide", "navigation.footer"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+      
+        <script src="../javascripts/animations.js"></script>
+      
+        <script src="../javascripts/ui-tweaks.js"></script>
+      
+        <script src="../javascripts/mermaid-init.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

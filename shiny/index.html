@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Benchmark 36 single-cell multimodal integration methods with scIB metrics, behind one Python API.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1484,6 +1484,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1612,8 +1640,8 @@
 
 
 <h1 id="interactive-explorer-shiny">Interactive explorer (Shiny)<a class="headerlink" href="#interactive-explorer-shiny" title="Anchor link to this section">&para;</a></h1>
-<p>A hosted Shiny dashboard for browsing the full benchmark results across every
-method and dataset, without writing code.</p>
+<p>The Shiny explorer is a hosted dashboard. It shows the full benchmark results
+for every method and dataset, without writing code.</p>
 <p><a href="https://shiny.maths.usyd.edu.au/scMultiBench/" class="md-button md-button--primary" target="_blank" rel="noopener">Open the Shiny explorer ↗</a></p>
 <h2 id="what-you-can-explore">What you can explore<a class="headerlink" href="#what-you-can-explore" title="Anchor link to this section">&para;</a></h2>
 <div class="grid cards">
@@ -1632,19 +1660,15 @@ and overall rankings.</p>
 <p>Overlap and rank correlation of the features each method selects.</p>
 </li>
 <li>
-<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.5 9A1.5 1.5 0 0 0 7 7.5 1.5 1.5 0 0 0 5.5 6 1.5 1.5 0 0 0 4 7.5 1.5 1.5 0 0 0 5.5 9m11.91 2.58c.36.36.59.86.59 1.42 0 .55-.22 1.05-.59 1.41l-5 5a1.996 1.996 0 0 1-2.83 0l-6.99-6.99C2.22 12.05 2 11.55 2 11V6c0-1.11.89-2 2-2h5c.55 0 1.05.22 1.41.58zm-3.87-5.87 1-1 6.87 6.87c.37.36.59.87.59 1.42s-.22 1.05-.58 1.41l-5.38 5.38-1-1L20.75 13z"/></svg></span> <strong>Classification</strong></p>
-<p>Cell-type classification accuracy on each integrated embedding.</p>
-</li>
-<li>
-<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a7 7 0 0 1-7-7 7 7 0 0 1 7-7 7 7 0 0 1 7 7 7 7 0 0 1-7 7m7.03-12.61 1.42-1.42c-.45-.51-.9-.97-1.41-1.41L17.62 6c-1.55-1.26-3.5-2-5.62-2a9 9 0 0 0-9 9 9 9 0 0 0 9 9c5 0 9-4.03 9-9 0-2.12-.74-4.07-1.97-5.61M11 14h2V8h-2m4-7H9v2h6z"/></svg></span> <strong>Time &amp; memory</strong></p>
+<p><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a7 7 0 0 1-7-7 7 7 0 0 1 7-7 7 7 0 0 1 7 7 7 7 0 0 1-7 7m7.03-12.61 1.42-1.42c-.45-.51-.9-.97-1.41-1.41L17.62 6c-1.55-1.26-3.5-2-5.62-2a9 9 0 0 0-9 9 9 9 0 0 0 9 9c5 0 9-4.03 9-9 0-2.12-.74-4.07-1.97-5.61M11 14h2V8h-2m4-7H9v2h6z"/></svg></span> <strong>Time and memory</strong></p>
 <p>Runtime and peak memory per method.</p>
 </li>
 </ul>
 </div>
 <h2 id="in-python">In Python<a class="headerlink" href="#in-python" title="Anchor link to this section">&para;</a></h2>
-<p><code>mtb.load_results</code> reads the stored tables that ship with the package (a few
-datasets per category), and <code>mtb.plot.bubble</code> draws them. See
-<a href="../tutorials/plot/">Load and plot results</a>.</p>
+<p><code>mtb.load_results</code> reads the stored tables that ship with the package. They
+cover the demo datasets only. <code>mtb.plot.bubble</code> draws them, as
+<a href="../tutorials/plot/">Load and plot results</a> shows.</p>
 
 
 

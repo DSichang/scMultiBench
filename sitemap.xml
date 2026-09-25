@@ -2,114 +2,118 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://dsichang.github.io/scMultiBench/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/api/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
+    </url>
+    <url>
+         <loc>https://dsichang.github.io/scMultiBench/changes/</loc>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/citation/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/faq/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/installation/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/overview/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/quickstart/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/shiny/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/catalog/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/compare/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/config/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/data/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/discover/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/env/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/inputs/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/io/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/plot/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/run/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/reference/score/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/cross/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/diagonal/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/discover/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/end_to_end/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/evaluate/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/plot/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/run/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/vertical/</loc>
-         <lastmod>2026-09-21</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
 </urlset>
