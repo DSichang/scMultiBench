@@ -18,8 +18,7 @@
 - The ``env plan`` and ``env install`` descriptions are short sentences
   (the option help of ``scan`` and ``convert``: tests/test_study_r8_other.py);
   'preflight' is gone.
-- tools/gen_tut.py picks the label-order example also without the method
-  scripts, and fails loudly when no method fits.
+- scan names a missing scripts checkout in the ``caveat`` column.
 """
 import importlib.util
 import inspect
@@ -315,44 +314,11 @@ def test_preflight_is_gone_from_what_users_read():
     assert not [t for t in texts if "preflight" in t.lower()]
 
 
-# ============================================================ gen_tut
-def _gen_tut():
-    spec = importlib.util.spec_from_file_location("gen_tut", ROOT / "tools" / "gen_tut.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def _label_example(cells):
-    src = "\n".join(c.source for c in cells)
-    return re.findall(r'print\("(\w+):", list\(mtb\.labels_for', src)
-
-
-@pytest.fixture(scope="module")
-def gen():
-    return _gen_tut()
-
-
-def test_the_label_order_example_ignores_a_missing_scripts_checkout(gen, monkeypatch,
-                                                                   tmp_path):
+# ============================================================ scripts checkout
+def test_scan_names_a_missing_scripts_checkout_in_the_caveat(monkeypatch, tmp_path):
     monkeypatch.setattr(R, "_repo_root_no_fetch", lambda: tmp_path / "no_scripts")
     plan = mtb.scan("D28", "diagonal", methods=["uniPort"], verbose=False)
     assert plan.loc[0, "caveat"].startswith(R.SCRIPTS_NOT_HERE)
-    cells = gen.build_tutorial("diagonal", gen.SCEN["diagonal"])
-    assert _label_example(cells) == ["uniPort"]
-
-
-def test_the_label_order_example_fails_loudly_when_no_method_fits(gen, monkeypatch):
-    real = mtb.scan
-
-    def every_row_has_a_caveat(*args, **kw):
-        df = real(*args, **kw)
-        if kw.get("methods") is not None:
-            df = df.assign(caveat="The method needs something else.")
-        return df
-    monkeypatch.setattr(mtb, "scan", every_row_has_a_caveat)
-    with pytest.raises(SystemExit, match="pick the label-order example by hand"):
-        gen.build_tutorial("diagonal", gen.SCEN["diagonal"])
 
 
 # ============================================================ Changes page

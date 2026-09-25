@@ -7,10 +7,9 @@ follow the same rule. Code and code comments are left as they are.
 
 R8-04 makes ``scan`` and ``run_all`` raise ``ValueError`` when ``methods=``
 names a method with no variant in the category, where they used to drop it.
-The run cells of the category tutorials pass a fixed method list to both,
-and the end-to-end notebook passes ``find_methods``' result to ``scan``. The
-guards below check those lists against the live package, so a list that
-would now raise fails here instead of in a Run all.
+The run cells of the category tutorials pass a fixed method list to
+``run_all``. The guard below checks that list against the live package, so a
+list that would now raise fails here instead of in a Run all.
 """
 import ast
 import importlib.util
@@ -83,63 +82,35 @@ def test_printed_lines_hold_no_semicolon(name):
 
 
 def test_split_sentences_keep_their_facts():
-    """The sentences split at the ';' keep both halves (and the pinned
-    phrases of earlier rounds)."""
+    """The sentences split at the ';' keep both halves."""
     for cat in CATS:
         md = "\n".join(src for kind, src in _cells(f"tutorial_{cat}") if kind == "markdown")
-        assert "Circle size shows the rank within a column. Bigger is better." in md
-        assert ("Give raw counts for every modality, as in the demo data. The methods "
-                "normalise the data themselves.") in md
-        assert "ARI can fall slightly below 0. About 0 means a random clustering." in md
-        assert (f"`multibench env plan --category {cat}` lists the size of each.") in md
-        assert ("run it on a GPU machine. On a computer without one, "
-                "`mtb.scan(..., assume_gpu=True)` checks everything else") in md
+        assert "Circle size shows the rank within a column, and bigger is better." in md
     cross = _cells("tutorial_cross")[0][1]
     assert ("Every cross method here reads RNA and ADT. For several 10x Multiome samples, "
             "use the vertical tutorial.") in cross
     mosaic = "\n".join(src for _, src in _cells("tutorial_mosaic"))
     assert ("writes one batch per call. Number the batches to match a pattern that "
-            "`describe_layout` lists.") in mosaic
-    e2e = "\n".join(src for _, src in _cells("tutorial_end_to_end"))
-    assert "| mosaic | several batches that share only some modalities |" in e2e
-    assert "`DegenerateRerunWarning`. Leave it out when ranking." in e2e
-    assert "uniPort on D28 puts ATAC before RNA. `labels_for` with the method returns both orders." in e2e
+            "`mtb.describe_layout(\"mosaic\")` lists") in mosaic
 
 
 # ------------------------------------------ R8-04 guards: the named methods
 @pytest.mark.parametrize("cat", CATS)
 def test_run_cells_name_only_methods_with_a_variant_on_their_dataset(cat):
-    """Both run cells pass the tutorial's method list to scan and run_all:
-    section 2 on the run dataset, section 3 on a subsample of own_src. Since
-    R8-04 a listed method with no variant there raises ValueError, so every
-    listed method must get a row."""
+    """The run cell passes the tutorial's method list to run_all on its
+    dataset. Since R8-04 a listed method with no variant there raises
+    ValueError, so every listed method must get a row."""
     import multibench as mtb
     s = GEN.SCEN[cat]
-    trio = s["own_trio"]
-    for ds in {s["live_ds"] or s["ds"], s["own_src"]}:
-        if not (mtb.config.DEFAULT.data_path / ds).is_dir():
-            pytest.skip(f"{ds} is not on disk")
-        sc = _quiet(mtb.scan, ds, cat, methods=trio, verbose=False)
-        assert set(sc.method) == set(trio), (cat, ds)
+    methods = s["methods"]
+    code = "\n".join(src for kind, src in _cells(f"tutorial_{cat}") if kind == "code")
+    assert f"METHODS = {json.dumps(methods)}" in code
+    ds = s["ds"]
+    if not (mtb.config.DEFAULT.data_path / ds).is_dir():
+        pytest.skip(f"{ds} is not on disk")
+    sc = _quiet(mtb.scan, ds, cat, methods=methods, verbose=False)
+    assert set(sc.method) == set(methods), (cat, ds)
     # the check the guard protects against: an off-category name raises
     other = next(m for m in mtb.list_methods() if cat not in mtb.method_info(m)["categories"])
     with pytest.raises(ValueError, match=rf"{re.escape(other)} does not run on {cat} data"):
-        _quiet(mtb.scan, s["own_src"], cat, methods=trio + [other], verbose=False)
-
-
-def test_end_to_end_scenario_lists_raise_nothing_in_scan():
-    """The end-to-end method-count cell passes find_methods' result for each
-    category to scan without modalities=. Every method it names has a
-    variant in the category, so scan returns a row for each of them."""
-    import multibench as mtb
-    src = next(s for kind, s in _cells("tutorial_end_to_end")
-               if kind == "code" and "SCENARIOS = {" in s)
-    ns = {}
-    exec(src.split("\nfor cat, s in SCENARIOS.items():", 1)[0], ns)
-    assert set(ns["SCENARIOS"]) == set(CATS)
-    for cat, s in ns["SCENARIOS"].items():
-        if not (mtb.config.DEFAULT.data_path / s["dataset"]).is_dir():
-            continue
-        got = mtb.find_methods(category=cat, modalities=[m.rstrip("123") for m in s["modalities"]])
-        sc = _quiet(mtb.scan, s["dataset"], cat, methods=got, verbose=False)
-        assert set(sc.method) == set(got), cat
+        _quiet(mtb.scan, ds, cat, methods=methods + [other], verbose=False)

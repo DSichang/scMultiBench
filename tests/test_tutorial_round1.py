@@ -104,14 +104,12 @@ def test_no_trailing_code_comment_runs_past_80_columns(name):
 # ------------------------------------------- facts that decide a correct result
 @pytest.mark.parametrize("cat", CATS)
 def test_correctness_facts_are_visible(cat):
-    """Raw counts (section 3) and 'methods run only on Linux' (section 1) are in
+    """Raw counts (section 5) and 'Methods run on Linux' (the title) are in
     the visible text, not only in a collapsed block."""
-    md = [src for kind, src in _cells(f"tutorial_{cat}") if kind == "markdown"]
-    install = next(s for s in md if s.startswith("## 1. Install"))
-    assert "Methods run only on Linux" in _visible(install)
-    assert "On macOS and Windows every cell still runs" in _visible(install)
-    own = next(s for s in md if s.startswith("## 3. Your own data"))
-    assert "Give raw counts for every modality" in _visible(own)
+    cells = _cells(f"tutorial_{cat}")
+    assert "Methods run on Linux." in _visible(cells[0][1])
+    own = next(s for kind, s in cells if kind == "markdown" and s.startswith("## 5. Your own data"))
+    assert re.search(r"Your data needs raw [A-Za-z ]*counts", _visible(own)), own
 
 
 def test_diagonal_title_names_the_atac_form_of_each_method():
@@ -133,7 +131,7 @@ def test_mosaic_and_cross_titles_say_what_the_methods_read():
     assert "Every cross method here reads RNA and ADT" in cross
 
 
-# ------------------------------------------------ own-data demos (section 3)
+# ------------------------------------------------ own-data demos (section 5)
 EXPECTED_FILES = {
     "vertical": ["adt.h5", "cty.csv", "rna.h5"],
     "diagonal": ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"],
@@ -144,23 +142,26 @@ EXPECTED_FILES = {
 }
 
 
-def _export_cell(cat):
-    return next(src for kind, src in _cells(f"tutorial_{cat}")
-                if kind == "code" and "mtb.io.export_dataset(" in src)
+def _own_data_cells(cat):
+    """Section 5's code: the cell that builds the demo data, and the export
+    calls of the cell that then runs run_all on the folder."""
+    code = [src for kind, src in _cells(f"tutorial_{cat}") if kind == "code"]
+    i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(" in src)
+    export = code[i].split("\n\nmine = mtb.run_all(")[0]
+    assert "run_all" not in export, code[i]
+    return code[i - 1], export
 
 
 @pytest.mark.parametrize("cat", CATS)
-def test_own_data_demo_writes_the_folder_with_export_dataset(cat, tmp_path, monkeypatch):
+def test_own_data_demo_writes_the_folder_with_export_dataset(cat, root, tmp_path, monkeypatch):
     """Each demo writes its folder through export_dataset alone - diagonal
     with category='diagonal', mosaic one call per batch with batch_index= -
     with no hand-written file, no multibench warning, and a folder that scan
-    reads for the methods of that data shape."""
-    import tempfile
+    reads for the tutorial's methods."""
     import multibench as mtb
     import pandas as pd
-    src = _export_cell(cat)
-    tree = ast.parse(src)
-    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)]
+    data, export = _own_data_cells(cat)
+    calls = [n for n in ast.walk(ast.parse(export)) if isinstance(n, ast.Call)]
     names = {ast.unparse(n.func) for n in calls}
     assert "mtb.io.to_canonical" not in names and not any(n.endswith("to_csv") for n in names), \
         f"{cat}: the demo writes files by hand instead of through export_dataset"
@@ -170,19 +171,26 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(cat, tmp_path, monk
         assert len(exports) == 1 and kws[0]["category"] == "'diagonal'" and "atac" in kws[0]
     if cat == "mosaic":
         assert [k.get("batch_index") for k in kws] == ["1", "2", "3"]
-    counter = iter(range(100))
-    monkeypatch.setattr(tempfile, "mkdtemp", lambda: str(tmp_path / f"t{next(counter)}"))
-    ns = {"mtb": mtb, "CATEGORY": cat, "pd": pd}
+    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
+    monkeypatch.chdir(tmp_path)
+    ns = {"mtb": mtb, "pd": pd}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        exec(compile(data, f"tutorial_{cat}", "exec"), ns)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        exec(compile(src, f"tutorial_{cat}", "exec"), ns)
+        exec(compile(export, f"tutorial_{cat}", "exec"), ns)
     ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
             or issubclass(w.category, UserWarning)]
     assert not ours, f"{cat}: the demo warns: {ours}"
-    sc = ns["sc"]
-    folder = next(p for p in tmp_path.rglob("*") if p.is_dir() and p.name.startswith("MY"))
+    own = GEN.OWN_NAME[cat]
+    folder = tmp_path / "mydata" / own
     assert sorted(f.name for f in folder.iterdir()) == EXPECTED_FILES[cat]
-    ok = set(sc[sc.files_ok].method)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        frame = mtb.scan(own, cat, data_path=tmp_path / "mydata", verbose=False)
+    ok = set(frame[frame.files_ok].method)
+    assert set(GEN.SCEN[cat]["methods"]) <= ok
     if cat == "vertical":
         assert ok == set(mtb.find_methods("vertical", modalities=["rna", "adt"]))
     elif cat == "diagonal":
@@ -190,7 +198,7 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(cat, tmp_path, monk
     elif cat == "mosaic":
         assert ok == {"StabMap", "scMoMaT"}
     else:
-        assert ok == set(sc.method) and len(ok) >= 7
+        assert ok == set(frame.method) and len(ok) >= 7
 
 
 # ------------------------------------------------------------- the generator
@@ -209,17 +217,3 @@ def test_generator_gives_stable_cell_ids():
         expected = [c["id"] for c in GEN._notebook([nbf.v4.new_raw_cell("") for _ in range(n)],
                                                     name).cells]
         assert [c["id"] for c in nb["cells"]] == expected, f"{name}: regenerate with tools/gen_tut.py"
-
-
-# ------------------------------------------------- end-to-end, section 8 counts
-def test_end_to_end_diagonal_count_covers_every_atac_form():
-    """Section 8 counts the diagonal methods whose files resolve on D28 with
-    the base token 'atac', which matches every ATAC form; 'atac_gas' would
-    now keep only the methods that read gene activity."""
-    import multibench as mtb
-    src = next(s for k, s in _cells("tutorial_end_to_end") if k == "code" and "SCENARIOS = {" in s)
-    ns = {}
-    exec(src.split("\nfor cat")[0], ns)                  # the SCENARIOS dict only
-    mods = ns["SCENARIOS"]["diagonal"]["modalities"]
-    got = set(mtb.find_methods("diagonal", modalities=[m.rstrip("123") for m in mods]))
-    assert got == set(mtb.list_methods("diagonal")), mods

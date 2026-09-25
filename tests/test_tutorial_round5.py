@@ -1,30 +1,18 @@
 """The tutorials after fix round 5 of the student study.
 
-Round 5 changed two things the notebooks show a reader:
-
-- R5-05: a failed download in ``mtb.data.fetch_outputs`` raises ``OSError``
-  whose message is several sentences: the URL, the HTTP status, and what to
-  do next. The replacement helpers of the run cells printed that message
-  inside parentheses, which left a three-sentence parenthetical ending in
-  ``.)``. They now print it as its own sentence after the one-line summary.
 - R5-11e: ``evaluate`` refuses a labels dict out of the default order with
   "the keys [...] are not in the default order". The tutorials said such a
-  dict "is read in the default order", which reads as if it were re-sorted.
-  They now say it must be in the default order.
+  dict "is read in the default order", which reads as if it were re-sorted;
+  no tutorial says so.
 
 R5-03 added a ``reason`` column to ``res.summary``; the Troubleshooting
 sentence on ``res.failures`` stays true, and the guard below checks both on
-the live package.
-
-Each prose test reads the committed notebooks and checks the same fact on the
-live package, so a later package change that makes the sentence untrue fails
-here too.
+the live package. (R5-05, the download error of ``fetch_outputs``, is pinned
+in tests/test_study_r5_cfg.py.)
 """
-import ast
 import importlib.util
 import json
 import re
-import urllib.error
 import warnings
 from pathlib import Path
 
@@ -63,90 +51,10 @@ def _quiet(fn, *a, **kw):
         return fn(*a, **kw)
 
 
-def _e2e_replacement():
-    """Source of the end-to-end notebook's ``def replacement``."""
-    src = next(s for kind, s in _cells(E2E) if kind == "code" and "def replacement(" in s)
-    found = [ast.unparse(n) for n in ast.walk(ast.parse(src))
-             if isinstance(n, ast.FunctionDef) and n.name == "replacement"]
-    assert len(found) == 1
-    return found[0]
-
-
-# ------------------------------------------- R5-05: the download error line
-@pytest.fixture
-def download_fails(tmp_path, monkeypatch):
-    """No stored outputs on disk, and every download answers HTTP 404."""
-    from multibench import config
-    # the module, not the function multibench.data.fetch that shadows it
-    F = importlib.import_module("multibench.data.fetch")
-
-    def _404(url):
-        raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
-    monkeypatch.setattr(F, "_download", _404)
-    monkeypatch.setattr(config.DEFAULT, "data_path", tmp_path / "data")
-    return tmp_path
-
-
-def _replacement_line(out):
-    lines = [ln for ln in out.splitlines() if ln.startswith("replacement:")]
-    assert len(lines) == 1, out
-    return lines[0]
-
-
-def test_category_replacement_prints_the_download_error_as_a_sentence(download_fails, capsys):
-    """The run cells of the four category tutorials: the stored table stands
-    in, and the OSError message follows the summary as its own sentences."""
-    import multibench as mtb
-    trio = GEN.SCEN["vertical"]["own_trio"]
-    ns = {"mtb": mtb, "CATEGORY": "vertical"}
-    exec(GEN.STORED_SWEEP_FN, ns)
-    exec(GEN.REPLACEMENT_FN, ns)
-    res = _quiet(ns["replacement"], "D11", trio, stored=("D11", trio))
-    assert isinstance(res, mtb.BatchResult) and set(res.summary.status) == {"STORED"}
-    line = _replacement_line(capsys.readouterr().out)
-    assert line.startswith(
-        "replacement: the package's stored metric table. OSError from fetch_outputs: "
-        "Could not download the stored outputs of D11 from https://"), line
-    assert "(HTTP 404)" in line
-    # the package's message ends the line; no parenthesis wraps it
-    dest = download_fails / "data" / "outputs" / "D11"
-    assert line.endswith(f"unpack it into {dest}, so that "
-                         f"{dest / 'batch_result.json'} exists."), line
-    assert not line.endswith(")"), line
-
-
-def test_end_to_end_replacement_prints_the_download_error_as_a_sentence(download_fails, capsys):
-    import h5py
-    import multibench as mtb
-    ns = {"mtb": mtb, "Path": Path, "h5py": h5py}
-    exec(_e2e_replacement(), ns)
-    assert _quiet(ns["replacement"], "D11", "Matilda") is None
-    line = _replacement_line(capsys.readouterr().out)
-    assert line.startswith(
-        "replacement: the package's stored scores for Matilda. OSError from fetch_outputs: "
-        "Could not download the stored outputs of D11 from https://"), line
-    assert line.endswith("batch_result.json exists."), line
-
-
-@pytest.mark.parametrize("src", [GEN.REPLACEMENT_FN, "E2E"], ids=["category", "end_to_end"])
-def test_the_replacement_line_wraps_no_exception_in_parentheses(src):
-    src = _e2e_replacement() if src == "E2E" else src
-    printed = [ast.unparse(n) for n in ast.walk(ast.parse(src))
-               if isinstance(n, ast.Call) and ast.unparse(n.func) == "print"
-               and "type(e).__name__" in ast.unparse(n)]
-    assert len(printed) == 1
-    assert "({type(e).__name__}" not in printed[0] and "{e})" not in printed[0], printed[0]
-
-
 # ------------------------------------- R5-11e: a dict in the default order
-DICT_SENTENCE = "A dict you build or reorder yourself must be in the default order"
-
-
 @pytest.mark.parametrize("name", MULTI_FILE + [E2E])
-def test_the_label_dict_sentence_says_the_default_order_is_required(name):
-    md = _markdown(name)
-    assert DICT_SENTENCE in md
-    assert "is read in the default order" not in md
+def test_no_tutorial_says_a_label_dict_is_read_in_the_default_order(name):
+    assert "is read in the default order" not in _markdown(name)
 
 
 def _two_files(tmp_path):
@@ -187,7 +95,7 @@ def test_a_named_skipped_method_has_its_reason_in_summary_and_failures(tmp_path,
     from multibench.engine import envs, registry
     if not (config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
-    trio = GEN.SCEN["vertical"]["own_trio"]
+    trio = GEN.SCEN["vertical"]["methods"]
     missing = envs.group_for(trio[-1])
     every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})

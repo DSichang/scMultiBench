@@ -3,7 +3,7 @@
 Round 4 changed what the notebooks tell a reader in five places:
 
 - R4-01: naming a method in ``methods=`` no longer runs it on the other ATAC
-  representation, so the section-3 rule on ``runnable`` now holds for the
+  representation, so the ATAC form section 5 names holds for the
   named-method calls the run cells make.
 - R4-04: ``run_all`` records a blocked method as ``SKIPPED``; the reason is in
   ``res.failures`` for a method that ``methods=`` named, which every tutorial
@@ -12,7 +12,7 @@ Round 4 changed what the notebooks tell a reader in five places:
   runtime does not get a smaller build of every environment.
 - R4-13: a dry run's printed command alone fails in a job script when the
   method reads files that ``mtb.run`` writes first; and the batch advice
-  names ``run_all(batch=...)`` next to ``evaluate(batch=...)``.
+  names ``run_all(batch=...)``, as the package's error does.
 
 Each prose test reads the committed notebooks and checks the same fact on the
 live package, so a later package change that makes the sentence untrue fails
@@ -66,8 +66,7 @@ def _quiet(fn, *a, **kw):
 
 
 # ----------------------------------------------------------- R4-04: SKIPPED
-SKIP_SENTENCE = ("`res.failures` says why a run failed or a method you named was "
-                 "skipped.")
+SKIP_SENTENCE = "`res.failures` lists each method that failed or was skipped."
 
 
 @pytest.mark.parametrize("name", TUTORIALS)
@@ -79,14 +78,13 @@ def test_troubleshooting_says_where_the_reason_of_a_skipped_method_is(name):
     md = next(src for kind, src in _cells(name)
               if kind == "markdown" and src.startswith("## Troubleshooting"))
     assert SKIP_SENTENCE in _visible(md), md
-    assert "`scan`'s `reason` column says why a method is not runnable." in _visible(md)
     assert "When a run fails, `res.failures` holds the error." not in md
 
 
 def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
         tmp_path, monkeypatch):
     """The sentence on the live package: the vertical tutorial's run of its
-    three methods on D11, with one environment missing, lists that method as
+    methods on D11, with one environment missing, lists that method as
     SKIPPED in ``res.failures`` and gives the install command as the reason."""
     import multibench as mtb
     from multibench import config
@@ -94,7 +92,7 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
     from multibench.engine import envs, registry
     if not (config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
-    trio = GEN.SCEN["vertical"]["own_trio"]
+    trio = GEN.SCEN["vertical"]["methods"]
     missing = envs.group_for(trio[-1])
     every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})
@@ -116,29 +114,37 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
 
 
 # ------------------------------------------------- R4-08: single-build envs
-CPU_RUNTIME = "On a CPU runtime, training methods are much slower."
+CPU_BUILDS = "CPU builds of the environments are installed"
 
 
-@pytest.mark.parametrize("name", TUTORIALS)
+def _methods(name):
+    cat = name.removeprefix("tutorial_")
+    return ["Matilda"] if cat == "end_to_end" else GEN.SCEN[cat]["methods"]
+
+
+@pytest.mark.parametrize("name", TUTORIALS + ["tutorial_end_to_end"])
 def test_the_colab_note_does_not_promise_a_cpu_build_of_every_environment(name):
-    """The flag cell states the download size on a CPU host and on a GPU
-    host; the Colab note keeps only the run-time consequence."""
-    md = _markdown(name)
-    assert CPU_RUNTIME in md
-    assert "CPU builds are installed" not in md
-    flag = next(src for kind, src in _cells(name)
-                if kind == "code" and src.lstrip().startswith("# False:"))
-    assert "to download on a CPU host" in flag and "on a GPU host" in flag
+    """The Colab note may say a CPU runtime gets the CPU builds only when
+    every environment the notebook installs has one."""
+    import multibench as mtb
+    install = next(src for kind, src in _cells(name)
+                   if kind == "markdown" and src.startswith("## 1. Install"))
+    rows = _quiet(mtb.env.install, _methods(name), flavor="cpu")
+    single = sorted(r["env"] for r in rows if r["flavor"] != "cpu")
+    if single:
+        assert CPU_BUILDS not in install, (
+            f"{name}: {', '.join(single)} has no CPU build, and the note says a CPU "
+            f"runtime gets one")
 
 
 def test_some_tutorial_environment_has_a_single_build():
-    """Why the note no longer says a CPU runtime gets smaller CPU builds: a
-    tutorial installs an environment whose CPU plan takes the one archive it
-    has (scmb_r)."""
+    """Why the Colab note must not say a CPU runtime gets a smaller build of
+    every environment: a tutorial installs an environment whose CPU plan
+    takes the one archive it has (scmb_r)."""
     import multibench as mtb
     single = set()
     for cat, s in GEN.SCEN.items():
-        rows = mtb.env.install(s["own_trio"], category=cat, flavor="cpu")
+        rows = mtb.env.install(s["methods"], category=cat, flavor="cpu")
         single |= {r["env"] for r in rows if r["flavor"] != "cpu"}
     assert single, "every tutorial env has a CPU build: the plain sentence would do"
 
@@ -149,15 +155,15 @@ def test_troubleshooting_does_not_hand_out_the_dry_run_command_to_run_alone(name
     md = _markdown(name)
     assert "prints the command to run there" not in md
     row = next(line for line in md.splitlines()
-               if line.startswith("| `env_ok` False on macOS or Windows |"))
-    assert row.endswith("| methods run only on Linux: run the same calls there |"), row
+               if line.startswith("| `env.install` refuses on macOS or Windows |"))
+    assert row.endswith("| methods run only on Linux: use Colab or a Linux machine |"), row
 
 
 def test_end_to_end_does_not_say_the_printed_command_runs_on_its_own():
     md = _markdown("tutorial_end_to_end")
     assert "prepare the command on a laptop and run it on Linux" not in md
-    assert ("It works on any computer, so you can check a call on a laptop before "
-            "you run it on Linux.") in md
+    assert ("`mtb.run(..., dry_run=True)` prints the command without running it. "
+            "It works on any computer.") in md
 
 
 def test_a_dry_run_command_alone_can_fail():
@@ -172,16 +178,16 @@ def test_a_dry_run_command_alone_can_fail():
 
 # ---------------------------------------------- R4-13 / R4-02: batch advice
 BATCH_ADVICE = ("Keep several samples in one folder, without `batch=`. To score the "
-                "batch mixing, pass the batch column to `run_all(batch=...)` or "
-                "`evaluate(batch=...)`.")
+                "batch mixing, pass the batch column to `run_all(batch=...)`.")
 
 
-def test_vertical_export_note_names_both_batch_calls():
+def test_vertical_export_note_names_the_batch_call():
     assert BATCH_ADVICE in _markdown("tutorial_vertical")
 
 
 def test_the_package_gives_the_same_batch_advice(tmp_path):
-    """export_dataset(batch=) on a vertical dataset names the same two calls."""
+    """export_dataset(batch=) on a vertical dataset names run_all(batch=...),
+    and evaluate(batch=...) next to it."""
     import anndata as ad
     import multibench as mtb
     rng = np.random.default_rng(0)
@@ -198,9 +204,9 @@ def test_the_package_gives_the_same_batch_advice(tmp_path):
 # ------------------------------------------------ R4-01: named methods
 def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
         tmp_path, monkeypatch):
-    """The run cells pass ``methods=`` to scan and run_all. On a D46-like
-    folder whose ATAC holds gene activity, the mosaic methods stay not
-    runnable when named, and run_all's plan agrees."""
+    """The run cells pass ``methods=`` to run_all. On a D46-like folder whose
+    ATAC holds gene activity, the mosaic methods stay not runnable when
+    named, in scan and in run_all's plan."""
     import anndata as ad
     import multibench as mtb
     from multibench import workflow as W
@@ -226,7 +232,7 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     _quiet(mtb.io.export_dataset, b2, folder, atac="obsm:gas", atac_kind="gene_activity",
            batch_index=2, **kw)
     _quiet(mtb.io.export_dataset, b3, folder, batch_index=3, **kw)
-    trio = GEN.SCEN["mosaic"]["own_trio"]
+    trio = GEN.SCEN["mosaic"]["methods"]
     sc = _quiet(mtb.scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False).set_index("method")
     plan = _quiet(mtb.run_all, "MYMOSAIC", "mosaic", tmp_path / "out", methods=trio,
@@ -237,12 +243,10 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
             assert r.files_ok and r.env_ok and not r.runnable, (m, r.reason)
             assert r.reason.startswith(f"{m} needs peak ATAC, and atac2.h5 holds gene "
                                        "activity"), r.reason
-    assert GEN.runnable_sentence("mosaic") in _visible(_markdown("tutorial_mosaic"))
+    assert "give ATAC as peaks" in _visible(_markdown("tutorial_mosaic"))
 
 
 # ------------------------------------------------ no internal names
 @pytest.mark.parametrize("name", TUTORIALS)
-def test_the_coverage_cell_names_no_registry(name):
-    code = _code(name)
-    assert "registry" not in code
-    assert 'print(f"  {m}: not in this package")' in code
+def test_the_code_names_no_registry(name):
+    assert "registry" not in _code(name)

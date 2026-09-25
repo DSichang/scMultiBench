@@ -47,54 +47,44 @@ def test_readme_and_pyproject_share_one_paper_title_and_doi():
 
 
 def test_notebook_install_cells_identical():
-    """ONE canonical install path: the pip wheel (>=0.3 ships the stored
-    tables); no notebook clones the repository or installs editable."""
+    """ONE canonical install path: the pip wheel, from the shared install
+    cell; no notebook clones the repository or installs editable."""
     gen = _load_gen_tut()
-    install = [c.strip() for c in gen.INSTALL_CELLS]
-    assert len(install) == 1
-    assert 'multibench-sc>=0.3' in install[0]
-    seen = 0
+    install = gen.INSTALL_CELL.strip()
+    assert "multibench-sc" in install
     for nb in NOTEBOOKS:
         cells = _code_cells(nb)
         for c in cells:
             assert "--no-deps" not in c, f"{nb.name}: --no-deps install breaks evaluate()"
             assert "requires the conda environments" not in c, nb.name
-            assert "git clone" not in c and "pip -q install -e" not in c, \
+            assert "git clone" not in c and " -e " not in c, \
                 f"{nb.name}: the tutorials install the wheel, never a clone"
-        pip_cells = [c for c in cells if "pip -q install" in c or "pip install" in c]
-        if not pip_cells:
-            continue                     # executed on the host; no install cell
-        seen += 1
-        stripped = [c.strip() for c in cells]
-        for cell in install:
-            assert cell in stripped, f"{nb.name}: install cell differs from gen_tut.INSTALL_CELLS"
-    assert seen >= 5                     # four tutorials + colab quickstart
+        pip_cells = [c.strip() for c in cells if "pip install" in c]
+        assert pip_cells == [install], f"{nb.name}: install cell differs from gen_tut.INSTALL_CELL"
 
 
-def test_env_install_cell_is_opt_in_after_pip_and_needs_no_conda():
-    """The environment install is an opt-in for running methods: one cell
-    per tutorial, after the pip cell, introduced by a markdown cell that says
-    so, guarded by the linux check, calling ``mtb.env.install(..., packed=True,
-    dry_run=False)`` - the packed archives need no conda binary, so no
-    notebook provisions conda (condacolab) any more; the quickstart, which
-    runs no method, has no install of environments at all."""
+def test_env_install_cell_follows_pip_and_needs_no_conda():
+    """One environment install per tutorial, after the pip cell, with the
+    packed archives (the default), which need no conda binary, so no notebook
+    provisions conda (condacolab); the quickstart, which runs no method,
+    installs no environment."""
     gen = _load_gen_tut()
-    pip = gen.INSTALL_CELLS[0].strip()
+    pip = gen.INSTALL_CELL.strip()
     for cat in gen.SCEN:
         nb = json.loads((ROOT / "notebooks" / f"tutorial_{cat}.ipynb").read_text())
-        cells = nb["cells"]
-        src = ["".join(c["source"]).strip() for c in cells]
+        src = ["".join(c["source"]).strip() for c in nb["cells"]]
         env_cells = [i for i, c in enumerate(src) if "mtb.env.install(" in c and "dry_run=False" in c]
         assert len(env_cells) == 1, f"tutorial_{cat}: exactly one env-install cell"
         i_pip, i_env = src.index(pip), env_cells[0]
         assert i_env > i_pip, f"tutorial_{cat}: the env cell must come after the pip cell"
-        assert cells[i_env - 1]["cell_type"] == "markdown"
-        assert "only if you will run methods" in src[i_env - 1].lower(), f"tutorial_{cat}"
-        assert "sys.platform" in src[i_env], f"tutorial_{cat}: env-install cell must be guarded by a linux check"
-        assert "packed=True" in src[i_env]
+        assert "packed=False" not in src[i_env] and "conda=" not in src[i_env]
+        section = next(c for c in src if c.startswith("## 2. Download the data and the environments"))
+        assert "with no conda needed" in section and "mtb.config.DEFAULT.envs_dir" in section
         assert "condacolab" not in "\n".join(src).lower(), f"tutorial_{cat}: no condacolab anywhere"
         assert "multibench env install" not in "\n".join(_code_cells(ROOT / "notebooks" / f"tutorial_{cat}.ipynb")), \
             f"tutorial_{cat}: the notebook installs through the Python API, not a shell line"
+    import multibench as mtb
+    assert inspect.signature(mtb.env.install).parameters["packed"].default is True
     quick = json.loads((ROOT / "notebooks" / "colab_quickstart.ipynb").read_text())
     quick_text = "\n".join("".join(c["source"]) for c in quick["cells"])
     assert "condacolab" not in quick_text.lower() and "dry_run=False" not in quick_text
@@ -166,14 +156,23 @@ def test_collapsed_blocks_render_as_markdown():
 
 
 def test_tutorials_use_the_public_api_not_raw_csv_reads():
+    """Stored scores come from load_results and matrices from read_canonical.
+    The one read_csv the tutorials keep reads a dataset's label file into a
+    demo AnnData for the own-data section."""
     gen = _load_gen_tut()
     for cat, s in gen.SCEN.items():
-        src = "\n".join(c.source for c in gen.build_tutorial(cat, s) if c.cell_type == "code")
-        assert "mtb.load_results(" in src
-        assert "mtb.labels_for(" in src
-        assert "mtb.cite(" in src
-        assert 'source="rerun"' in src
-        assert "read_csv(RESULTS" not in src
+        cells = gen.build_tutorial(cat, s)
+        src = "\n".join(c.source for c in cells if c.cell_type == "code")
+        md = "\n".join(c.source for c in cells if c.cell_type == "markdown")
+        assert "mtb.load_results(" in src and 'source="rerun"' in src
+        assert "mtb.cite(" in md
+        reads = re.findall(r"read_csv\(([^)]*)\)", src)
+        assert reads, cat
+        for arg in reads:
+            assert re.fullmatch(r'd / f?"\w*cty\{?\w*\}?\.csv"', arg), (cat, arg)
+        assert f'd = mtb.config.DEFAULT.data_path / "{s["ds"]}"' in src
+        assert "mtb.io.read_canonical(" in src and "h5py" not in src
+        assert "read_csv(RESULTS" not in src and "results/" not in src
         assert "from multibench.engine import registry" not in src
 
 
@@ -382,8 +381,8 @@ def test_printed_examples_match_the_live_package(capsys):
 @pytest.mark.parametrize("path", _docs_md_files(), ids=lambda p: p.name)
 def test_docs_pages_carry_the_colab_speed_round(path):
     """The docs site (when reachable) documents the Colab speed round: the
-    installation page's Colab section (no conda bootstrap, the INSTALL_ENVS
-    flag, the measured sizes, the stand-in), the reference entries for
+    installation page's Colab section (no conda bootstrap; its sizes are
+    pinned in tests/test_tutorial_straight_path.py), the reference entries for
     data.fetch_outputs / load_batch / Config, the env-variable table,
     MULTIBENCH_RUN_MODE / env_prefix in the overview, and run.md's account of
     prefix mode. The facts those entries used to spell out by hand (the
@@ -400,11 +399,10 @@ def test_docs_pages_carry_the_colab_speed_round(path):
     text = path.read_text()
     if path.name == "installation.md":
         assert "### Google Colab" in text
-        assert "INSTALL_ENVS = False" in text and "INSTALL_ENVS = True" in text
-        assert "stored outputs for the dataset" in text and "stored metric table" in text, \
-            "the stand-in and its offline fallback"
-        assert "`INSTALL_ENVS = True` needs Colab or a Linux host" in text
-        assert "cross 3.0 GB" in text and "vertical 6.2 GB" in text, "measured archive totals per tutorial"
+        colab = " ".join(text.split("### Google Colab", 1)[1].split("\n### ", 1)[0].split())
+        assert ("Each notebook then installs the environments of the methods it runs and "
+                "runs them, with no conda needed.") in colab
+        assert "INSTALL_ENVS" not in text
         assert "No conda binary is needed for the packed path" in text
         assert "MULTIBENCH_ENVS_DIR" in text and "~/.cache/multibench/envs" in text
         assert ("`RuntimeError: Conda is not installed on this computer. Environment "

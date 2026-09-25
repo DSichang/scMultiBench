@@ -4,9 +4,10 @@ R3-02 changed what ``runnable`` means. In a category with ATAC methods,
 ``scan`` marks a variant whose ATAC file holds the other form not runnable,
 even when ``files_ok`` and ``env_ok`` pass, and ``run_all`` skips it. Since
 R4-01 this holds also when ``methods=`` names the method
-(tests/test_tutorial_round4.py checks the named-method calls). Section 3 of each generated tutorial states the rule ``runnable``
-follows: these tests pin that sentence on the committed notebooks and check it
-against the live package on folders that hold the other ATAC form.
+(tests/test_tutorial_round4.py checks the named-method calls). Section 5 of
+each generated tutorial says which ATAC form the reader's data needs: these
+tests pin that sentence on the committed notebooks and check the rule on the
+live package, on folders that hold the other ATAC form.
 """
 import importlib.util
 import json
@@ -28,16 +29,15 @@ def _load_gen_tut():
 
 GEN = _load_gen_tut()
 CATS = list(GEN.SCEN)
-SCAN_PARAGRAPH = "`scan` checks each method variant."
-ATAC_RULE = ("A variant is `runnable` only when both pass and its ATAC file holds the "
-             "form the method reads. `reason` says what failed.")
+OWN_DATA = "## 5. Your own data"
+FORM_WORDS = {"gene_activity": "gene-activity", "peak": "peaks"}
 
 
 def _markdown(name, start):
     nb = json.loads((ROOT / "notebooks" / f"{name}.ipynb").read_text())
     hits = ["".join(c["source"]) for c in nb["cells"]
             if c["cell_type"] == "markdown" and "".join(c["source"]).startswith(start)]
-    assert len(hits) == 1, f"{name}: one section-3 scan paragraph"
+    assert len(hits) == 1, f"{name}: one {start!r} cell"
     return hits[0]
 
 
@@ -46,19 +46,20 @@ def _visible(md):
 
 
 @pytest.mark.parametrize("cat", CATS)
-def test_section_3_states_the_atac_form_rule_where_the_category_reads_atac(cat):
-    """Visible, in the paragraph above the scan of the user's folder: a row
-    whose ATAC file holds the other form is not runnable although both checks
-    pass. Cross reads no ATAC, so its sentence names the two checks only."""
+def test_section_5_states_the_atac_form_where_the_category_reads_atac(cat):
+    """Visible, above the own-data demo: the ATAC form the tutorial's methods
+    read, or, when its demo has no ATAC, the call that says it. Cross reads
+    no ATAC."""
     import multibench as mtb
-    md = _visible(_markdown(f"tutorial_{cat}", SCAN_PARAGRAPH))
-    if mtb.find_methods(cat, modalities=["atac"]):
-        assert ATAC_RULE in md, md
-        assert "only when both pass, and" not in md
-    else:
+    md = _visible(_markdown(f"tutorial_{cat}", OWN_DATA))
+    form = GEN.SCEN[cat]["atac"]
+    if not mtb.find_methods(cat, modalities=["atac"]):
         assert "ATAC" not in md, md
-        assert "A variant is `runnable` only when both pass, and `reason` says what failed." in md
-    assert GEN.runnable_sentence(cat) in md
+    elif form is None:
+        assert 'mtb.method_info(m)["atac"]' in md, md
+    else:
+        assert {mtb.method_info(m)["atac"] for m in GEN.SCEN[cat]["methods"]} == {form}
+        assert FORM_WORDS[form] in md, md
 
 
 def test_the_atac_categories_are_the_three_that_read_atac():
@@ -136,7 +137,7 @@ def test_the_sentence_holds_for_a_diagonal_folder_with_peaks_as_gene_activity(
         mtb.io.export_dataset(rna, tmp_path / "MYDIAG", atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal")
     df = _scan("MYDIAG", "diagonal", tmp_path)
-    for m in GEN.SCEN["diagonal"]["own_trio"]:
+    for m in GEN.SCEN["diagonal"]["methods"]:
         r = df.loc[m]
         assert r.files_ok and r.env_ok and not r.runnable, m
         assert r.reason.startswith(f"{m} needs gene-activity ATAC, and atac_gas.h5 holds "

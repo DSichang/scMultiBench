@@ -159,21 +159,28 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
 
 
 def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch):
-    """The own-data cell of the vertical tutorial exports raw counts, so
+    """The own-data cells of the vertical tutorial export raw counts, so
     export_dataset's raw-count warning and scan's caveat stay silent (L01)."""
     import json
-    import tempfile
     import warnings
     nb = json.loads((root / "notebooks" / "tutorial_vertical.ipynb").read_text())
-    cell = next("".join(c["source"]) for c in nb["cells"]
-                if c["cell_type"] == "code" and "export_dataset(demo" in "".join(c["source"]))
-    monkeypatch.setattr(tempfile, "mkdtemp", lambda: str(tmp_path))
-    ns = {"mtb": mtb, "CATEGORY": "vertical", "pd": pd}
+    code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+    i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(adata" in src)
+    export = code[i].split("\n\nmine = mtb.run_all(")[0]
+    assert "run_all" not in export
+    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
+    monkeypatch.chdir(tmp_path)
+    ns = {"mtb": mtb, "pd": pd}
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        exec(compile(cell, "tutorial_vertical", "exec"), ns)
+        exec(compile(code[i - 1], "tutorial_vertical", "exec"), ns)
+        exec(compile(export, "tutorial_vertical", "exec"), ns)
     assert not [w for w in seen if "whole numbers" in str(w.message)]
-    assert not ns["sc"]["caveat"].str.contains("non-integer").any()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sc = mtb.scan("MYCITE", "vertical", data_path=tmp_path / "mydata", verbose=False)
+    assert sc["files_ok"].any()
+    assert not sc["caveat"].str.contains("non-integer").any()
 
 
 def test_scan_checks_label_rows_for_a_folder_fed_method(tmp_path):

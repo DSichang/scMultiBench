@@ -5,8 +5,8 @@ Round 7 reworded package messages that the notebooks quote or point to:
 - R7-11: the matrix-orientation ValueError no longer says "which is cells x
   features". It reads "<method> reads rna.h5 of <dataset>, which stores
   matrix/data as cells x features, shape (...)". The Troubleshooting table of
-  each category tutorial quoted the old words as the symptom to look for; it
-  now quotes "matrix/data as cells x features".
+  each category tutorial quotes "matrix/data as cells x features" as the
+  symptom to look for.
 - R7-03: for MultiMAP and Seurat_v3, which read atac_peak.h5 and atac_gas.h5,
   the file check no longer points to ``method_info(m)["atac"]``, which lists
   them under peak. The diagonal tutorial's first cell names these two as
@@ -95,7 +95,8 @@ def _transposed_folder(root, name="MYCITE", n_cells=120):
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
     """The symptom a reader searches for is in the error that inputs_for,
-    scan's reason column and run raise for a transposed matrix."""
+    scan's reason column and run raise for a transposed matrix, and the call
+    the fix column names writes a folder that passes the check."""
     import multibench as mtb
     symptom, fix = _trouble_row(name, "transposed")
     quoted = re.fullmatch(r"`(?:\.\.\. )?(.+?)`", symptom)
@@ -110,8 +111,11 @@ def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
                  modalities=["rna", "adt"], verbose=False).iloc[0]
     assert not row["files_ok"]
     assert words in row["reason"], row["reason"]
-    # the fix column names the calls the error itself offers
-    assert "`mtb.io.to_canonical`" in fix and "to_canonical" in str(e.value)
+    assert "`mtb.io.export_dataset`" in fix
+    mtb.io.export_dataset(_demo(n=120), tmp_path / "FIXED", rna="X", adt="obsm:protein",
+                          labels="obs:celltype")
+    mtb.inputs_for("FIXED", "vertical", "Matilda", modalities=["rna", "adt"],
+                   data_path=tmp_path, check=True)
 
 
 # ---------------------------------- R7-03: which ATAC files a method needs
@@ -130,12 +134,6 @@ def test_diagonal_title_points_to_the_call_that_lists_the_files_each_method_need
     assert set(need_both.split(":", 1)[1].strip().split(", ")) == set(both)
 
 
-def test_diagonal_section_3_prints_the_layout_the_title_points_to():
-    code = [src for kind, src in _cells("tutorial_diagonal") if kind == "code"]
-    assert "print(mtb.describe_layout(CATEGORY))" in code
-    assert '"diagonal"' in next(src for src in code if src.startswith("%matplotlib"))
-
-
 # ---------------------- R7-09: export texts the tutorials describe (guards)
 def _demo(n=60, counts=True):
     import anndata as ad
@@ -152,16 +150,13 @@ def _demo(n=60, counts=True):
 
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_the_overwrite_sentences_match_the_live_error(name, tmp_path):
-    """Troubleshooting and the export details say a second export raises
-    FileExistsError and ``overwrite=True`` replaces the files."""
+    """The export details say that without ``overwrite=True`` a second export
+    raises FileExistsError, and that ``overwrite=True`` replaces the files."""
     import multibench as mtb
-    symptom, fix = _trouble_row(name, "overwrite=True")
-    assert symptom == "`FileExistsError` from `export_dataset`"
-    assert "already holds" in fix
-    label = GEN.EXPORT_DETAIL_LABEL[name.removeprefix("tutorial_")]
     export = [src for kind, src in _cells(name) if kind == "markdown"
-              and f"<summary>{label}</summary>" in src]
+              and "<summary>Details: export</summary>" in src]
     assert len(export) == 1 and GEN.OVERWRITE_NOTE in export[0]
+    assert "raises `FileExistsError`" in GEN.OVERWRITE_NOTE
     kw = dict(rna="X", adt="obsm:protein", labels="obs:celltype")
     folder = mtb.io.export_dataset(_demo(), tmp_path / "MYCITE", **kw)
     with pytest.raises(FileExistsError) as e:
@@ -189,23 +184,21 @@ def test_the_raw_counts_row_matches_the_live_warning(name, tmp_path):
 # ---------------------------- R7-10: the environment reason (guard)
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, monkeypatch):
-    """Troubleshooting: "run the `multibench env install ...` command in
-    `env_reason`"; section 5: "`env_reason` gives the install command"."""
+    """Section 2 names the terminal command that installs the tutorial's
+    environments; ``env_reason`` gives the same command for a missing one."""
     import multibench as mtb
     from multibench import workflow as W
     from multibench.engine import runner as R
-    symptom, fix = _trouble_row(name, "`env_reason`")
-    assert symptom == "`env_ok` False on Linux"
-    assert "`multibench env install ...`" in fix
-    ref = _markdown(name, "## 5. Reference")
-    assert "`env_reason` gives the install command" in ref
+    cat = name.removeprefix("tutorial_")
+    methods = GEN.SCEN[cat]["methods"]
+    md = _markdown(name, "## 2. Download the data and the environments")
+    assert f"`multibench env install --methods {','.join(methods)} --packed --run`" in md
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    cat = name.removeprefix("tutorial_")
-    m = GEN.SCEN[cat]["own_trio"][0]
-    ds = GEN.SCEN[cat]["live_ds"] or GEN.SCEN[cat]["ds"]
+    ds = GEN.SCEN[cat]["ds"]
     if not (mtb.config.DEFAULT.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
-    row = _quiet(mtb.scan, ds, cat, methods=[m], verbose=False).iloc[0]
-    assert not row["env_ok"]
-    assert f"multibench env install --methods {m} --packed --run" in row["env_reason"]
+    for m in methods:
+        row = _quiet(mtb.scan, ds, cat, methods=[m], verbose=False).iloc[0]
+        assert not row["env_ok"]
+        assert f"multibench env install --methods {m} --packed --run" in row["env_reason"]
