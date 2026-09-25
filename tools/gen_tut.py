@@ -156,8 +156,8 @@ INSTALL_CELL = """import numpy, pandas
 %pip install -q multibench-sc numpy=={numpy.__version__} pandas=={pandas.__version__}"""
 
 COLAB_GPU_NOTE = ("On Colab, choose a GPU runtime before you run the notebook: Runtime -> "
-                  "Change runtime type -> T4 GPU. On a CPU runtime the smaller CPU builds "
-                  "of the environments are installed, and training methods run slower.")
+                  "Change runtime type -> T4 GPU. On a CPU runtime, an environment that has a "
+                  "smaller CPU build gets that build, and training methods run slower.")
 
 SCEN = {
  "vertical": dict(
