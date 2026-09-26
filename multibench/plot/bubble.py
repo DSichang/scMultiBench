@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import functools
 import numpy as np
 import pandas as pd
 
@@ -997,10 +998,31 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     return fig
 
 
+@functools.cache
+def _figure_class():
+    """A matplotlib ``Figure`` that shows itself in a notebook.
+
+    The figure is built without pyplot, so it is never shown twice. Without
+    ``%matplotlib inline`` a notebook would then print only
+    ``<Figure size ...>``; ``_repr_png_`` gives it the image. When the inline
+    backend is active, its own printer is used and the image appears once.
+    """
+    from matplotlib.figure import Figure
+
+    class BubbleFigure(Figure):
+        def _repr_png_(self):
+            import io
+            buf = io.BytesIO()
+            self.savefig(buf, format="png", bbox_inches="tight", dpi=110)
+            return buf.getvalue()
+
+    return BubbleFigure
+
+
 def _draw(tbl, cmap, title, show_language, gaps):
     """The body of :func:`render`; ``gaps`` widens the space between families
     (one data-unit amount per pair of neighbouring families)."""
-    from matplotlib.figure import Figure
+    Figure = _figure_class()
     from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
     from matplotlib import cm, colors
 
