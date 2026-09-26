@@ -1921,27 +1921,20 @@ and copy them. Then set <code>MULTIBENCH_REPO_PATH</code> to the copy, or pass
 <code>repo_path=</code>.</p>
 </details>
 <h3 id="google-colab">Google Colab<a class="headerlink" href="#google-colab" title="Anchor link to this section">&para;</a></h3>
-<p>The category tutorials open in Colab from their badge and run on the free
-<abbr title="Central Processing Unit">CPU</abbr> runtime. The default is <code>INSTALL_ENVS = False</code>: nothing is downloaded,
-and the method cells use stored outputs. <code>INSTALL_ENVS = True</code> installs the
-environments and runs the methods.</p>
+<p>The tutorials open in Colab from their badge. Choose a <abbr title="Graphics Processing Unit">GPU</abbr> runtime first:
+Runtime -&gt; Change runtime type -&gt; T4 <abbr title="Graphics Processing Unit">GPU</abbr>. Each notebook then installs the
+environments of the methods it runs and runs them, with no conda needed.</p>
 <details class="note">
 <summary>Details</summary>
-<p>With the default, every cell runs with Run all. The run cells load the
-benchmark's stored outputs for the dataset, so <code>evaluate</code> scores real
-embeddings. Offline, the package's stored metric table is used instead,
-and a printed line says so.</p>
-<p><code>INSTALL_ENVS = True</code> needs Colab or a Linux host. On macOS the
-environment install refuses. On Colab, choose a <abbr title="Graphics Processing Unit">GPU</abbr> runtime before you
-set the flag: Runtime -&gt; Change runtime type -&gt; T4 <abbr title="Graphics Processing Unit">GPU</abbr>. On a <abbr title="Central Processing Unit">CPU</abbr> runtime
-the <abbr title="Central Processing Unit">CPU</abbr> builds are installed, and training methods run much slower.</p>
-<p>Each tutorial downloads the environments of the methods it runs. The
-first size is with <code>--flavor gpu</code>, the second with <code>--flavor cpu</code>:</p>
+<p>On a <abbr title="Central Processing Unit">CPU</abbr> runtime, an environment that has a smaller <abbr title="Central Processing Unit">CPU</abbr> build gets that
+build, and training methods run slower.</p>
+<p>The environments each tutorial downloads, with a <abbr title="Graphics Processing Unit">GPU</abbr> and without one:</p>
 <ul>
-<li>vertical 6.2 GB, 1.5 GB: Matilda, sciPENN and scMM</li>
-<li>diagonal 5.1 GB, 1.6 GB: online_iNMF, iNMF and scJoint</li>
+<li>vertical 5.1 GB, 1.1 GB: Matilda and sciPENN</li>
+<li>diagonal 0.9 GB: iNMF and online_iNMF</li>
 <li>mosaic 5.5 GB, 1.8 GB: StabMap and scMoMaT</li>
-<li>cross 3.0 GB, 1.4 GB: UINMF, sciPENN and StabMap</li>
+<li>cross 3.0 GB, 1.4 GB: StabMap and sciPENN</li>
+<li>end-to-end 3.0 GB, 0.6 GB: Matilda</li>
 </ul>
 </details>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>

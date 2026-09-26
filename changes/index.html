@@ -1480,6 +1480,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-033" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.3
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-032" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1675,6 +1686,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-033" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.3
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#new-in-032" class="md-nav__link">
@@ -1907,6 +1929,20 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-033">New in 0.3.3<a class="headerlink" href="#new-in-033" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>Method environments download faster. The environments over 2 GiB now
+  come from the GitHub release in parts, instead of from Zenodo.</li>
+<li><code>mtb.env.install</code> prints its progress while it downloads, one line per
+  tenth. A dropped or stalled connection resumes where it stopped.</li>
+<li>cLISI and iLISI now compute on Colab and other Linux hosts with an older
+  glibc. The LISI helper of scib is rebuilt there on first use.</li>
+<li>The method scripts are fetched without git's per-file progress lines.</li>
+<li><code>res.plot()</code> and <code>mtb.plot.bubble</code> show their figure in a notebook without
+  <code>%matplotlib inline</code>.</li>
+<li>The tutorials install the environments and run the methods, on the demo
+  data and on data written from an AnnData.</li>
+</ul>
 <h2 id="new-in-032">New in 0.3.2<a class="headerlink" href="#new-in-032" title="Anchor link to this section">&para;</a></h2>
 <h3 id="commands-and-flags">Commands and flags<a class="headerlink" href="#commands-and-flags" title="Anchor link to this section">&para;</a></h3>
 <ul>
