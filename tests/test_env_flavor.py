@@ -27,6 +27,7 @@ from multibench import cli
 from multibench.engine import envs
 from tests.test_prefix_mode import (_tiny_archive, envs_dir, make_prefix,  # noqa: F401 - fixtures
                                     no_conda)
+from _serve import serve_archives
 
 ROOT = Path(__file__).resolve().parents[1]
 CPU_ENVS = ["env_sciPENN", "matilda", "scmb_scjoint", "scmb_torch", "scmb_scmm2"]
@@ -172,7 +173,7 @@ def test_archive_for_every_flavour(fake_tables, monkeypatch):
 # ---------------------------------------------------------------- install_packed
 def _fetch(monkeypatch, tgz):
     fetched = []
-    monkeypatch.setattr(urllib.request, "urlretrieve",
+    serve_archives(monkeypatch,
                         lambda url: (fetched.append(url), (str(tgz), None))[1])
     return fetched
 
@@ -254,7 +255,7 @@ def test_install_packed_gpu_never_warns(envs_dir, tmp_path, monkeypatch, fake_ta
 def test_install_packed_invalid_flavor_before_anything(envs_dir, monkeypatch):
     monkeypatch.setattr(envs, "host_platform_problem",
                         lambda: pytest.fail("platform checked before the flavour"))
-    monkeypatch.setattr(urllib.request, "urlretrieve", lambda url: pytest.fail("downloaded"))
+    serve_archives(monkeypatch, lambda url: pytest.fail("downloaded"))
     with pytest.raises(ValueError) as e:
         envs.install_packed("matilda", flavor="cuda")
     assert str(e.value) == "flavor='cuda': choose one of 'auto', 'cpu', 'gpu'"
@@ -272,7 +273,7 @@ def test_install_packed_failed_unpack_leaves_no_flavor_record(envs_dir, tmp_path
 def test_install_packed_existing_prefix_skips_the_download_whatever_the_flavor(
         envs_dir, monkeypatch, fake_tables):
     make_prefix(envs_dir, "matilda")
-    monkeypatch.setattr(urllib.request, "urlretrieve", lambda url: pytest.fail("downloaded"))
+    serve_archives(monkeypatch, lambda url: pytest.fail("downloaded"))
     assert envs.install_packed("matilda", flavor="cpu") is True
     assert envs.installed_flavor("matilda") is None     # built elsewhere: no record
 

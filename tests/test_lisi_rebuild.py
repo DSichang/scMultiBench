@@ -111,12 +111,21 @@ def test_no_compiler_or_no_source_is_explained(tmp_path, monkeypatch):
     assert "knn_graph.cpp is not shipped" in mscib._lisi_helper_problem()
 
 
-def test_loader_failure_is_not_rebuilt(tmp_path, monkeypatch):
-    """Only a binary that cannot be EXECUTED triggers the rebuild; a binary
-    that starts and dies (glibc mismatch, silent crash) keeps the verbatim
-    verdict and never invokes the compiler."""
+def test_loader_failure_is_rebuilt(tmp_path, monkeypatch):
+    """A binary the loader rejects (scib 1.1.7 needs glibc 2.38; Colab's
+    Ubuntu 22.04 has 2.35) is rebuilt against this system's libraries."""
+    exe = _fake_scib(tmp_path, monkeypatch,
+                     exe_bytes=b"#!/bin/sh\n>&2 echo 'GLIBC_2.38 not found'\nexit 127\n")
+    log = _fake_compiler(tmp_path, monkeypatch)
+    assert mscib._lisi_helper_problem() is None
+    assert log.read_text().strip().splitlines() == [
+        f"-std=c++11 -O3 -o {exe} {exe.parent / 'knn_graph.cpp'}"]
+
+
+def test_a_rebuild_that_does_not_help_reports_the_new_problem(tmp_path, monkeypatch):
     exe = _fake_scib(tmp_path, monkeypatch,
                      exe_bytes=b"#!/bin/sh\n>&2 echo 'GLIBCXX_3.4.29 not found'\nexit 127\n")
-    log = _fake_compiler(tmp_path, monkeypatch)
-    assert "GLIBCXX_3.4.29 not found" in mscib._lisi_helper_problem()
-    assert not log.exists()
+    log = _fake_compiler(tmp_path, monkeypatch, succeed=False)
+    problem = mscib._lisi_helper_problem()
+    assert "GLIBCXX_3.4.29 not found" in problem and "rebuilding from source failed" in problem
+    assert log.exists()

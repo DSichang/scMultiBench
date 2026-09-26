@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 from multibench.engine import envs, registry
+from _serve import serve_archives
 
 ROOT = Path(__file__).resolve().parents[1]
 DARWIN = "method environments are linux-64 conda envs (packed archives + lockfiles); this host is darwin/arm64"
@@ -66,7 +67,7 @@ def test_create_all_run_passes_on_linux(on_linux, monkeypatch):
 
 def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch, tmp_path):
     import urllib.request
-    monkeypatch.setattr(urllib.request, "urlretrieve",
+    serve_archives(monkeypatch,
                         lambda *a, **k: pytest.fail("download started on a non-Linux host"))
     with pytest.raises(RuntimeError, match="run only on Linux"):
         envs.install_packed("scmb_r")
@@ -82,7 +83,7 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
         reached.append(url)
         raise urllib.error.HTTPError(url, 404, "nope", {}, None)
     import urllib.error
-    monkeypatch.setattr(urllib.request, "urlretrieve", _retrieve)
+    serve_archives(monkeypatch, _retrieve)
     assert envs.install_packed("scmb_r", force=True, envs_dir=tmp_path / "no-envs") is False
     assert reached and reached[0].endswith("scmb_r.tar.gz")
 

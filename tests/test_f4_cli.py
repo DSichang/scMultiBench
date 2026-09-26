@@ -30,6 +30,7 @@ from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, runner
 from tests.test_f3_cli import _clear_env_caches, _h5, _rendered_help, _sub, _WRITER, N
+from _serve import serve_archives
 
 pytest.importorskip("scib")
 
@@ -389,14 +390,14 @@ def test_single_build_install_warns_in_its_own_words_and_unpacks_as_single(
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     tgz = _tiny_archive(tmp_path / "a.tar.gz")
-    monkeypatch.setattr(urllib.request, "urlretrieve", lambda url: (str(tgz), None))
+    serve_archives(monkeypatch, lambda url: (str(tgz), None))
     with pytest.warns(UserWarning) as rec:
         assert envs.install_packed("scmb_r", envs_dir=tmp_path / "envs") is True
     assert [str(r.message) for r in rec] == [
         "scmb_r has a single build (the same archive for CPU and GPU hosts); "
         "installing it (0.9 GB)"]
     out = capsys.readouterr().out
-    assert "[env] unpacking prebuilt scmb_r (single build) -> " in out
+    assert "[env] downloading scmb_r (single build) 0.9 GB ..." in out
     assert "gpu build" not in out.lower()
 
 

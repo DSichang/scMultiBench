@@ -637,7 +637,8 @@ def ensure_repo(path=None, ref=None):
     _sh.rmtree(part, ignore_errors=True)
     try:
         if ref is None:
-            subprocess.run(["git", "clone", "--depth", "1", SCRIPTS_URL, str(part)],
+            # -q: in a notebook, git's per-file progress fills the cell
+            subprocess.run(["git", "clone", "-q", "--depth", "1", SCRIPTS_URL, str(part)],
                            check=True)
         else:
             # clone --branch takes branches and tags only; fetch also takes a commit

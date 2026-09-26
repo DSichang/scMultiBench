@@ -114,12 +114,13 @@ def _lisi_helper_problem() -> str | None:
     libstdc++ ahead of the system one, a foreign architecture) is invisible that
     way. Probing the binary once turns it into one message naming the cause.
 
-    When the binary cannot be executed at all (``Exec format error`` - scib
-    ships a Linux x86-64 executable, so this is every macOS install), a C++
-    compiler is on PATH (``g++`` / ``c++`` / ``clang++``) and scib ships
-    ``knn_graph.cpp`` next to it, the helper is rebuilt in place once with
-    scib's own build line and probed again; cLISI/iLISI then compute instead
-    of recording NaN. If the rebuild fails, the original problem is returned
+    When the binary does not start - it cannot be executed at all (``Exec
+    format error``: scib ships a Linux x86-64 executable, so every macOS
+    install), or the loader rejects it (scib 1.1.7 is linked against glibc
+    2.38; Colab's Ubuntu 22.04 has 2.35) - a C++ compiler is on PATH
+    (``g++`` / ``c++`` / ``clang++``) and scib ships ``knn_graph.cpp`` next
+    to it, the helper is rebuilt in place once with scib's own build line
+    and probed again; cLISI/iLISI then compute instead of recording NaN. If the rebuild fails, the original problem is returned
     with the compiler's error appended, and the caller's warning still
     prints the ``g++`` line for a manual fix.
 
@@ -137,8 +138,8 @@ def _lisi_helper_problem() -> str | None:
     if not exe.is_file():
         return f"{exe} is missing from the scib installation"
     problem = _probe_lisi_binary(exe)
-    if problem is None or "cannot be executed" not in problem:
-        return problem
+    if problem is None:
+        return None
     cpp = kg / "knn_graph.cpp"
     cxx = _find_cxx()
     if not cpp.is_file():
