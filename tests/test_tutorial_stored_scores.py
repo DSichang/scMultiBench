@@ -76,8 +76,13 @@ def test_stored_scores_section_states_the_measured_counts(cat):
     md = " ".join(md.split())
     cov = mtb.results_coverage(cat)
     if ds != s["ds"]:
+        # a tutorial-size subset: its own scores are never stored
         assert cov[cov.dataset == s["ds"]].empty
-        assert f"There are no stored scores for `{s['ds']}`." in md
+        if cat == "mosaic":
+            assert f"There are no stored scores for `{s['ds']}` or `D46`." in md
+        else:
+            assert (f"The stored scores are for the full `{ds}`, the benchmark dataset "
+                    f"`{s['ds']}` is drawn from.") in md
     cov = cov[cov.dataset == ds]
     rerun = _quiet(mtb.load_results, cat, dataset=ds, source="rerun")
     assert f"stored scores for {rerun.method.nunique()} methods on `{ds}`" in md

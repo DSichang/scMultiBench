@@ -168,28 +168,30 @@ SCEN = {
           "2,864 cells, and then on data in your own format."),
  ),
  "diagonal": dict(
-   ds="D28", methods=["iNMF", "online_iNMF"], atac="gene_activity",
+   ds="D28mini", methods=["iNMF", "online_iNMF"], atac="gene_activity", stored_ds="D28",
    blurb=("Diagonal integration combines RNA and ATAC measured in different cells, "
           "with no pairing between them. If your RNA and ATAC come from the same "
           "cells, as in 10x Multiome, use the vertical tutorial. This tutorial runs "
-          "{methods} on `D28`, with 6,408 RNA cells and 4,606 ATAC cells, and then on "
-          "data in your own format."),
+          "{methods} on `D28mini`, 1,500 RNA and 1,500 ATAC cells drawn from the "
+          "benchmark dataset `D28`, then on data in your own format."),
  ),
  "mosaic": dict(
-   ds="D46", methods=["StabMap", "scMoMaT"], atac="peak", stored_ds="D45",
+   ds="D46mini", methods=["StabMap", "scMoMaT"], atac="peak", stored_ds="D45",
    blurb=("Mosaic integration combines batches that share only some modalities. "
           "For example, a paired RNA + ATAC batch can link an RNA-only batch and an "
           "ATAC-only batch. Each method accepts one batch pattern, and every mosaic "
-          "method reads ATAC as peaks. This tutorial runs {methods} on `D46`, with "
-          "21,416 cells in three batches: RNA + ADT, RNA + ATAC, and RNA only."),
+          "method reads ATAC as peaks. This tutorial runs {methods} on `D46mini`: "
+          "3,000 cells drawn at random from the benchmark dataset `D46`, in three "
+          "batches of RNA + ADT, RNA + ATAC, and RNA only."),
  ),
  "cross": dict(
-   ds="D52", methods=["StabMap", "sciPENN"], atac=None,
+   ds="D52mini", methods=["StabMap", "sciPENN"], atac=None, stored_ds="D52",
    blurb=("Cross integration combines batches that all measure the same "
           "modalities. The task is to remove batch effects and keep the biological "
           "structure. Every cross method here reads RNA and ADT. For several 10x "
           "Multiome samples, use the vertical tutorial. This tutorial runs {methods} "
-          "on `D52`, with 23,478 cells in three batches."),
+          "on `D52mini`: 3,000 cells in three batches, drawn at random from the "
+          "benchmark dataset `D52`."),
  ),
 }
 
@@ -217,9 +219,9 @@ OWN_INTRO = {
 }
 OWN_STANDIN = {
  "vertical": "Here an AnnData made from 60% of `D11`'s cells takes the place of your data:",
- "diagonal": "Here 60% of `D28`'s RNA cells and 60% of its ATAC cells take the place of your data:",
- "mosaic": "Here the first 1,500 cells of each `D46` batch take the place of your data:",
- "cross": "Here one AnnData with 30% of `D52`'s cells and a batch column takes the place of your data:",
+ "diagonal": "Here 60% of `D28mini`'s RNA cells and 60% of its ATAC cells take the place of your data:",
+ "mosaic": "Here the first 600 cells of each `D46mini` batch take the place of your data:",
+ "cross": "Here one AnnData with 60% of `D52mini`'s cells and a batch column takes the place of your data:",
 }
 OWN_DATA = {
  "vertical": """import scanpy as sc
@@ -232,7 +234,7 @@ adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
 adata""",
  "diagonal": """import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D28"
+d = mtb.config.DEFAULT.data_path / "D28mini"
 rna = mtb.io.read_canonical(d / "rna.h5")
 rna.obs["celltype"] = pd.read_csv(d / "rna_cty.csv")["x"].values
 atac = mtb.io.read_canonical(d / "atac_gas.h5")
@@ -240,8 +242,8 @@ atac.obs["celltype"] = pd.read_csv(d / "atac_cty.csv")["x"].values
 rna = sc.pp.subsample(rna, fraction=0.6, random_state=0, copy=True)
 atac = sc.pp.subsample(atac, fraction=0.6, random_state=0, copy=True)
 rna, atac""",
- "mosaic": """d = mtb.config.DEFAULT.data_path / "D46"
-n = 1500
+ "mosaic": """d = mtb.config.DEFAULT.data_path / "D46mini"
+n = 600
 rna = [mtb.io.read_canonical(d / f"rna{b}.h5")[:n] for b in (1, 2, 3)]
 labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]
 adt1 = mtb.io.read_canonical(d / "adt1.h5")[:n]
@@ -249,7 +251,7 @@ atac2 = mtb.io.read_canonical(d / "atac2.h5")[:n]""",
  "cross": """import anndata as ad
 import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D52"
+d = mtb.config.DEFAULT.data_path / "D52mini"
 batches = []
 for b in (1, 2, 3):
     a = mtb.io.read_canonical(d / f"rna{b}.h5")
@@ -257,7 +259,7 @@ for b in (1, 2, 3):
     a.obs["celltype"] = pd.read_csv(d / f"cty{b}.csv")["x"].values
     batches.append(a)
 adata = ad.concat(batches, label="batch", keys=["1", "2", "3"], index_unique="-")
-adata = sc.pp.subsample(adata, fraction=0.3, random_state=0, copy=True)
+adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
 adata""",
 }
 OWN_EXPORT = {
@@ -449,9 +451,12 @@ mine.summary''')
     n_pub, n_rerun = stored_method_counts(cat, sds)
     where = f"`{sds}`"
     stored_notes = []
-    if sds != ds:
-        stored_notes.append(f"There are no stored scores for `{ds}`. `{sds}` is a larger "
-                            f"mosaic dataset with another batch pattern.")
+    if cat == "mosaic":
+        stored_notes.append(f"There are no stored scores for `{ds}` or `D46`. `{sds}` is a "
+                            f"larger mosaic dataset with another batch pattern.")
+    elif sds != ds:
+        stored_notes.append(f"The stored scores are for the full `{sds}`, the benchmark "
+                            f"dataset `{ds}` is drawn from.")
     stored_notes.append(
         f"`source=\"rerun\"` reads the package's own runs of the methods. "
         + (f"`source=\"published\"`, the default, reads the published scIB tables, which "
