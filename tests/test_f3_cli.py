@@ -124,7 +124,7 @@ def standin(tmp_path, monkeypatch):
 
 def _clear_env_caches():
     """Drop the per-process env probes, so the stand-in prefix is seen (and forgotten)."""
-    for fn in (W._installed_envs, config._conda_envs_dir, envs._conda_prefixes):
+    for fn in (config._conda_envs_dir, envs._conda_prefixes):
         fn.cache_clear()
 
 

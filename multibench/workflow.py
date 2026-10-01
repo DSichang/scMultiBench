@@ -520,9 +520,13 @@ def _data_dir_usable(variant, ds_dir) -> tuple[bool, str]:
 
 
 
-@functools.lru_cache(maxsize=1)
 def _installed_envs() -> frozenset:
-    """Conda envs present on this machine (cached; see mtb.env.doctor())."""
+    """Envs present on this machine, read on every call (see mtb.env.doctor()).
+
+    Not cached: an env installed after a first scan() in the same session
+    must count at once. The conda listing underneath is cached and cleared
+    by the installs, so a call is a directory listing.
+    """
     try:
         return frozenset(envs.installed_envs())
     except Exception:      # never let an env probe break discovery
