@@ -264,6 +264,7 @@ methods:
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+        params: {nbatch: 1}    # one batch, as in the RNA + ADT variant; the default nbatch=2 fails with a dimension mismatch
       - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
         entrypoint: tools_scripts/scMDC/main_scMDC.py
         language: python
