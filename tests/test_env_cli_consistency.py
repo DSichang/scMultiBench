@@ -163,6 +163,10 @@ def test_missing_helper_module_blocks_the_script_gate(tmp_path, monkeypatch):
     script.write_text("from logger import *")
     monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path)
     v = SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py", helpers=["logger.py"])
+    # the package ships MIRA's logger.py, so the real check passes without the file
+    assert workflow._missing_script(v, method="MIRA") == ""
+    # a helper the package does not ship (MIRA's logger.py is shipped since 0.3.4)
+    monkeypatch.setattr("multibench.engine.runner.shipped_helper", lambda m, h: None)
     why = workflow._missing_script(v, method="MIRA")
     # user wording (L17): what is missing and where it goes, no host jargon
     assert "MIRA's script imports logger.py" in why
@@ -182,6 +186,8 @@ def test_scan_reports_the_mira_helper_when_the_checkout_lacks_it(tmp_path, monke
     script.parent.mkdir(parents=True)
     script.write_text("from logger import *")
     monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path)
+    # a helper the package does not ship (MIRA's logger.py is shipped since 0.3.4)
+    monkeypatch.setattr("multibench.engine.runner.shipped_helper", lambda m, h: None)
     row = mtb.scan("D11", "vertical", methods=["MIRA"]).iloc[0]
     assert not row["files_ok"] and "logger.py" in row["files_reason"]
     assert "logger.py" in row["reason"]

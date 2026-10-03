@@ -332,7 +332,7 @@ def test_glue_d28_caveat_names_the_rename_call(tmp_path):
     # R3-04: mtb.run rewrites D28's chr_start_end names for GLUE, so the
     # caveat has no peak-name clause and does not name the dataset
     r = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
-    assert r["caveat"].startswith("GLUE needs the GENCODE v43 human annotation")
+    assert r["caveat"].startswith("GLUE reads the GENCODE v43 human annotation")
     assert "peak names" not in r["caveat"] and "D28" not in r["caveat"]
     assert ";" not in r["caveat"] and "D27" not in r["caveat"]
     # the named call writes the spelling GLUE needs

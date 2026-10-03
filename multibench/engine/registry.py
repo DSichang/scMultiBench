@@ -72,6 +72,7 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         normalize_peaks=d.get("normalize_peaks", []),
         extra_outputs=[OutputSpec(**o) for o in d.get("extra_outputs", [])],
         helpers=list(d.get("helpers", []) or []),
+        downloads=list(d.get("downloads", []) or []),
     )
     # labels_for orders label files by this; a declaration the variant cannot
     # honour must fail here, not hand evaluate() a wrong order later

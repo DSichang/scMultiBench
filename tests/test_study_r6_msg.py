@@ -146,8 +146,8 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
                   data_path=_lung_ids(tmp_path / "a"), verbose=False).iloc[0]
     assert glue["caveat"].startswith(
         "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
-        "example peak_0. Rename them to chr:start-end. GLUE needs the GENCODE v43 human "
-        "annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in "
+        "example peak_0. Rename them to chr:start-end. GLUE reads the GENCODE v43 human "
+        "annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
         "<repo_path>/tools_scripts/GLUE/. "
         f"{SCRIPTS_NOTE}{pinned}. The first real run clones PYangLab/scMultiBench with "
         "git. On a host without network, run multibench fetch --scripts first. GLUE reads "

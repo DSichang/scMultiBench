@@ -949,8 +949,10 @@ def download_archive(urls: list[str], target: Path, *, label: str,
     import time
     import urllib.error
     import urllib.request
-    step = total // 10 if total else 500_000_000
-    size = f" {_gb(total)}" if total else ""
+    step = max(total // 10, 1) if total else 500_000_000
+    # MB below a gigabyte, so a 53 MB file does not read "0.1 GB"
+    fmt = _gb if (total or 0) >= 1e9 else (lambda n: f"{n / 1e6:.0f} MB")
+    size = f" {fmt(total)}" if total else ""
     print(f"[env] downloading {label}{size} ...", flush=True)
     done, mark, t0 = 0, step, time.monotonic()
     with open(target, "wb") as out:
@@ -972,7 +974,7 @@ def download_archive(urls: list[str], target: Path, *, label: str,
                             done += len(chunk)
                             if done >= mark:
                                 rate = done / max(time.monotonic() - t0, 1e-3) / 1e6
-                                print(f"[env]   {_gb(done)}" + (f" of {_gb(total)}" if total else "")
+                                print(f"[env]   {fmt(done)}" + (f" of {fmt(total)}" if total else "")
                                       + f" ({rate:.0f} MB/s)", flush=True)
                                 while mark <= done:
                                     mark += step

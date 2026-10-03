@@ -261,7 +261,8 @@ class Variant:
     driver: str | None = None          # package-relative R/py wrapper that source()s the (unmodified) upstream entrypoint then calls its function; see engine/drivers/
     normalize_peaks: list = field(default_factory=list)  # roles whose .h5 ATAC peak names get normalized to chr:start-end before the run
     extra_outputs: list[OutputSpec] = field(default_factory=list)
-    helpers: list = field(default_factory=list)     # local modules the entrypoint imports from its own dir that upstream does not ship (MIRA's logger.py); scan reports the script blocked when one is absent
+    helpers: list = field(default_factory=list)     # local modules the entrypoint imports from its own dir that upstream does not ship (MIRA's logger.py); copied from engine/helpers/<method>/ before a run, else scan reports the script blocked
+    downloads: list = field(default_factory=list)   # [{file, url}]: files the script reads from its own dir that the first run downloads (GLUE's GENCODE annotation)
 
     def matches(self, category: str, modalities: set[str]) -> bool:
         return (self.when.get("category") == category

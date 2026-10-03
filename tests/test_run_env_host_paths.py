@@ -93,22 +93,19 @@ def _child_env(monkeypatch, tmp_path, method: str, run_env: dict) -> dict:
     return seen["env"]
 
 
-def test_the_registry_path_values_pass_unchanged_where_the_paths_exist(tmp_path):
-    found = _path_valued()
-    # A new path-valued run_env key is dropped wherever its path is missing
-    # (a directory the tool would create, say) - add it here only if intended.
-    path_keys = {k for _, _, env in found for k, x in env.items() if _is_paths(x)}
-    assert path_keys == {"LD_PRELOAD", "RETICULATE_PYTHON"}, path_keys
-    for m, v, env in found:
-        env = _rerooted(env, tmp_path)
-        assert runner._host_run_env(env) == {k: str(x) for k, x in env.items()}, m
+def test_the_registry_holds_no_host_paths():
+    """The LD_PRELOAD / RETICULATE_PYTHON values named files of the benchmark
+    host, so every check there passed with files a student's machine lacks.
+    Without them the R methods and MOFA2 run from their own environments
+    (verified in a conda-free run of the packed environments)."""
+    assert _path_valued() == []
 
 
 def test_where_the_paths_exist_the_child_env_is_the_old_one(monkeypatch, tmp_path):
     monkeypatch.delenv("LD_PRELOAD", raising=False)
     monkeypatch.delenv("RETICULATE_PYTHON", raising=False)
-    env = _rerooted(registry.get("MOFA2").variants[0].run_env, tmp_path)
-    assert set(env) == {"LD_PRELOAD", "RETICULATE_PYTHON"}
+    env = _rerooted({"LD_PRELOAD": "/opt/lib/libstdc++.so.6",
+                     "RETICULATE_PYTHON": "/opt/env/bin/python"}, tmp_path)
     assert _child_env(monkeypatch, tmp_path, "MOFA2", env) == _old_merge(env)
 
 

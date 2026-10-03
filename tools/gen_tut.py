@@ -172,8 +172,8 @@ SCEN = {
    blurb=("Diagonal integration combines RNA and ATAC measured in different cells, "
           "with no pairing between them. If your RNA and ATAC come from the same "
           "cells, as in 10x Multiome, use the vertical tutorial. This tutorial runs "
-          "{methods} on `D28mini`, 1,500 RNA and 1,500 ATAC cells drawn from the "
-          "benchmark dataset `D28`, then on data in your own format."),
+          "{methods} on `D28mini`, the benchmark dataset `D28` with fewer genes and "
+          "peaks, then on data in your own format."),
  ),
  "mosaic": dict(
    ds="D46mini", methods=["StabMap", "scMoMaT"], atac="peak", stored_ds="D45",
@@ -181,7 +181,7 @@ SCEN = {
           "For example, a paired RNA + ATAC batch can link an RNA-only batch and an "
           "ATAC-only batch. Each method accepts one batch pattern, and every mosaic "
           "method reads ATAC as peaks. This tutorial runs {methods} on `D46mini`: "
-          "3,000 cells drawn at random from the benchmark dataset `D46`, in three "
+          "1,800 cells drawn at random from the benchmark dataset `D46`, in three "
           "batches of RNA + ADT, RNA + ATAC, and RNA only."),
  ),
  "cross": dict(
@@ -220,7 +220,7 @@ OWN_INTRO = {
 OWN_STANDIN = {
  "vertical": "Here an AnnData made from 60% of `D11`'s cells takes the place of your data:",
  "diagonal": "Here 60% of `D28mini`'s RNA cells and 60% of its ATAC cells take the place of your data:",
- "mosaic": "Here the first 600 cells of each `D46mini` batch take the place of your data:",
+ "mosaic": "Here the first 300 cells of each `D46mini` batch take the place of your data:",
  "cross": "Here one AnnData with 60% of `D52mini`'s cells and a batch column takes the place of your data:",
 }
 OWN_DATA = {
@@ -243,7 +243,7 @@ rna = sc.pp.subsample(rna, fraction=0.6, random_state=0, copy=True)
 atac = sc.pp.subsample(atac, fraction=0.6, random_state=0, copy=True)
 rna, atac""",
  "mosaic": """d = mtb.config.DEFAULT.data_path / "D46mini"
-n = 600
+n = 300
 rna = [mtb.io.read_canonical(d / f"rna{b}.h5")[:n] for b in (1, 2, 3)]
 labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]
 adt1 = mtb.io.read_canonical(d / "adt1.h5")[:n]

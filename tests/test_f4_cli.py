@@ -397,7 +397,7 @@ def test_single_build_install_warns_in_its_own_words_and_unpacks_as_single(
         "scmb_r has a single build (the same archive for CPU and GPU hosts); "
         "installing it (0.9 GB)"]
     out = capsys.readouterr().out
-    assert "[env] downloading scmb_r (single build) 0.9 GB ..." in out
+    assert "[env] downloading scmb_r (single build) 900 MB ..." in out
     assert "gpu build" not in out.lower()
 
 

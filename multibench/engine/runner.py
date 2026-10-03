@@ -347,6 +347,56 @@ def missing_script_fix(repo) -> str:
 SCRIPTS_NOT_HERE = "The method scripts are not in "
 
 
+#: Files the package ships for upstream scripts that import them from their own
+#: directory (``engine/helpers/<method>/<file>``); see :func:`provide_script_files`.
+HELPERS_DIR = Path(__file__).resolve().parent / "helpers"
+
+
+def shipped_helper(method: str, name: str) -> Path | None:
+    """The package's copy of helper ``name`` for ``method``, or ``None``."""
+    p = HELPERS_DIR / method / name
+    return p if p.is_file() else None
+
+
+def provide_script_files(spec, variant, repo: Path) -> None:
+    """Put the files a method's script reads from its own directory in place.
+
+    - a helper module the public repository does not ship (``variant.helpers``,
+      MIRA's ``logger.py``) is copied from the package when it is missing;
+    - a downloadable file (``variant.downloads``, GLUE's GENCODE annotation)
+      is downloaded once when it is missing, with a progress line per tenth.
+
+    A file already there is left alone, so a user's own copy wins.
+    """
+    import shutil as _shutil
+    import urllib.request
+
+    folder = repo / Path(variant.entrypoint).parent
+    for name in getattr(variant, "helpers", None) or []:
+        src = shipped_helper(spec.id, name)
+        if src is not None and not (folder / name).exists():
+            _shutil.copyfile(src, folder / name)
+    for item in getattr(variant, "downloads", None) or []:
+        dest = folder / item["file"]
+        if dest.exists():
+            continue
+        from .envs import download_archive
+        part = dest.with_name(dest.name + ".partial")
+        try:
+            size = None
+            try:
+                with urllib.request.urlopen(urllib.request.Request(item["url"], method="HEAD"),
+                                            timeout=60) as r:
+                    size = int(r.headers.get("Content-Length") or 0) or None
+            except OSError:
+                pass
+            download_archive([item["url"]], part, label=f"{item['file']} for {spec.id}",
+                             total=size)
+            part.rename(dest)
+        finally:
+            part.unlink(missing_ok=True)
+
+
 def script_notes(spec, variant, repo: Path) -> list[str]:
     """Setup facts a preview must show before the real run fails on them.
 
@@ -365,7 +415,8 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
     notes = []
     ep = Path(variant.entrypoint)
     helpers = getattr(variant, "helpers", None) or []
-    done = bool(helpers) and all((repo / ep).parent.joinpath(h).exists() for h in helpers)
+    done = bool(helpers) and all((repo / ep).parent.joinpath(h).exists()
+                                 or shipped_helper(spec.id, h) for h in helpers)
     if spec.setup_hint and not done:
         notes.append(spec.setup_hint)
     if not (repo / ep).exists():
@@ -1019,6 +1070,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # every input-format check before anything is written or fetched
     plan = _plan_inputs(variant, inputs, inputs_dir, convert=convert, real=True)
     repo = _fetch_scripts(repo_path)
+    if not dry_run:
+        provide_script_files(spec, variant, repo)
     workdir.mkdir(parents=True, exist_ok=True)
     # inputs/ holds the canonical copies of a file-role method; a data_dir
     # method (scBridge) gets none.

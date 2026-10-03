@@ -64,7 +64,7 @@ def test_parts_are_joined_in_order(monkeypatch, tmp_path, capsys):
     assert n == 5000
     assert (tmp_path / "x").read_bytes() == b"A" * 3000 + b"B" * 2000
     out = capsys.readouterr().out
-    assert out.startswith("[env] downloading demo 0.0 GB ...\n")
+    assert out.startswith("[env] downloading demo 0 MB ...\n")
 
 
 def test_progress_is_printed_per_tenth(monkeypatch, tmp_path, capsys):
@@ -73,7 +73,7 @@ def test_progress_is_printed_per_tenth(monkeypatch, tmp_path, capsys):
     envs.download_archive(["https://u/big"], tmp_path / "x", label="big", total=len(data))
     lines = [ln for ln in capsys.readouterr().out.splitlines() if " of " in ln]
     assert len(lines) == 10
-    assert lines[-1].startswith("[env]   0.0 GB of 0.0 GB (")
+    assert lines[-1].startswith("[env]   10 MB of 10 MB (")
 
 
 def test_a_dropped_connection_resumes_with_a_range(monkeypatch, tmp_path, capsys):
@@ -123,3 +123,16 @@ def test_install_packed_joins_parts_and_leaves_no_download(monkeypatch, tmp_path
 def test_the_plan_shows_the_first_part(monkeypatch):
     assert envs._first_url(["h/a.001", "h/a.002"]) == "h/a.001"
     assert envs._first_url("h/a.tar.gz") == "h/a.tar.gz"
+
+
+def test_a_tiny_total_does_not_hang(monkeypatch, tmp_path):
+    _serve(monkeypatch, {"https://u/t": b"abcd"})
+    assert envs.download_archive(["https://u/t"], tmp_path / "x", label="t", total=4) == 4
+
+
+def test_a_small_file_reads_in_megabytes(monkeypatch, tmp_path, capsys):
+    data = b"x" * 53_000_000
+    _serve(monkeypatch, {"https://u/s": data})
+    envs.download_archive(["https://u/s"], tmp_path / "x", label="s", total=len(data))
+    out = capsys.readouterr().out
+    assert out.startswith("[env] downloading s 53 MB ...") and "of 53 MB" in out

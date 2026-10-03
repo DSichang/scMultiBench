@@ -75,7 +75,6 @@ methods:
         entrypoint: tools_scripts/Seurat_v5/main_Seurat_v5.Rmd
         language: R
         run_env:
-          LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6
           R_FUTURE_GLOBALS_MAXSIZE: "2147483648"
         args:
           - {role: rna}
@@ -366,14 +365,14 @@ methods:
     tasks: [clustering]
     atac: peak
     status: verified
-    # main_MIRA.py needs a local logger.py that upstream does not ship - hence
-    # env_specs' `blocked-script` tag and the `helpers` line below, which makes
-    # scan say so instead of failing at import.
-    setup_hint: "MIRA needs a logger.py next to main_MIRA.py in <repo_path>/tools_scripts/MIRA/: the script imports it, and the public scMultiBench repository does not include it. The environment (scmb_mira) builds normally."
+    # main_MIRA.py imports a local logger.py that upstream does not ship and
+    # uses nothing from it: the `helpers` line copies the empty stand-in in
+    # engine/helpers/MIRA/ next to the script before a run.
+    setup_hint: "MIRA imports a logger.py from its script folder, and the public scMultiBench repository does not include it. multibench puts an empty one next to main_MIRA.py before the first run, because the script uses nothing from it."
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py
-        helpers: [logger.py]          # local module the script imports; not in the public repo
+        helpers: [logger.py]          # copied from engine/helpers/MIRA/ before a run
         language: python
         args:
           - {role: rna, flag: "--rna", repeat: true}
@@ -598,7 +597,7 @@ methods:
     tasks: [batch, clustering]
     atac: peak
     status: verified
-    setup_hint: "GLUE needs the GENCODE v43 human annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in <repo_path>/tools_scripts/GLUE/. The wrapper runs the human script only, so mouse data is not supported through multibench."
+    setup_hint: "GLUE reads the GENCODE v43 human annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from <repo_path>/tools_scripts/GLUE/. The first run downloads it from ftp.ebi.ac.uk; on a host without network, put the file there. The wrapper runs the human script only, so mouse data is not supported through multibench."
     variants:
       # GLUE_human.py l.103-106 splits the peak names on ':' or '-' and casts
       # parts 2 and 3 to int, so chr_start_end names (D28's) fail at start ->
@@ -608,6 +607,8 @@ methods:
         language: python
         cwd_at_script: true
         normalize_peaks: [atac_peak]
+        downloads:
+          - {file: gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_43/gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz"}
         args:
           - {role: rna, flag: "--path1"}
           - {role: atac_peak, flag: "--path2"}
@@ -740,7 +741,6 @@ methods:
         entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
         language: R
         driver: engine/drivers/run_stabmap.R
-        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
         args:
           - {role: rna1, flag: "--rna"}
           - {role: rna2, flag: "--rna"}
@@ -763,7 +763,6 @@ methods:
         entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
         language: R
         driver: engine/drivers/run_stabmap.R
-        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
         args:
           # one slot per batch, in batch order; "=None" marks a batch that
           # lacks the modality. StabMap indexes these by batch, so a collapsed
@@ -832,7 +831,6 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: online_iNMF
     language: R
     gpu_use: not used   # R; no CUDA call in the script
@@ -848,7 +846,6 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
   - id: Conos
     language: R
     gpu_use: not used   # R; no CUDA call in the script
@@ -878,9 +875,6 @@ methods:
         entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
         language: R
         cwd_at_script: true
-        run_env:
-          RETICULATE_PYTHON: /media/disk2/Sichang/.conda/envs/mofa_env_gpu/bin/python
-          LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6
         args:
           - {role: rna}
           - {role: adt}
@@ -902,7 +896,6 @@ methods:
       - when: {category: diagonal, modalities: [rna, atac_peak, atac_gas]}
         entrypoint: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd
         language: R
-        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
         normalize_peaks: [atac_peak]
         args:
           - {role: rna}
@@ -933,10 +926,11 @@ methods:
         extra_outputs:
           - {kind: graph, file: idx.h5, dataset: data}
         cwd_at_script: true
-        run_env: {LD_PRELOAD: /media/disk2/Sichang/.conda/envs/env_sciPENN/lib/libstdc++.so.6}
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/Seurat_v4/main_Seurat_v4.Rmd
         language: R
+        # sources util.R from the working directory, like the RNA + ADT variant
+        cwd_at_script: true
         args:
           - {role: rna}
           - {role: adt, const: "NULL"}

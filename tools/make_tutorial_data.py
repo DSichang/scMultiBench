@@ -2,12 +2,15 @@
 
 usage: python tools/make_tutorial_data.py <data_path> <out_dir>
 
-Each is a seeded random subset of a benchmark dataset, small enough that a
-tutorial runs its two methods twice and scores them in 10-15 minutes on a
-Colab runtime (2 vCPUs). Files with the same cell count are the same cells
-(a batch's RNA, ADT and labels; D28's two ATAC files), so every modality
-file stays aligned with its label file. Peak matrices keep the peaks open
-in the most sampled cells, at most MAX_PEAKS. Only the canonical inputs are
+Each is a smaller copy of a benchmark dataset, so that a tutorial runs its
+methods twice and scores them in 10-15 minutes on a Colab runtime (2 vCPUs),
+and every method that accepts the dataset runs on it. D46mini and D52mini
+keep a seeded random subset of the cells. D28mini keeps every cell, because
+online_iNMF fails on fewer than about 5,000 cells, and fewer features
+instead: the most variable genes of the RNA (the gene-activity file keeps the
+same genes) and the most open peaks. Files with the same cell count are the
+same cells (a batch's RNA, ADT and labels; D28's two ATAC files), so every
+modality file stays aligned with its label file. Only the canonical inputs are
 written (``*.h5`` and ``*cty*.csv``); other files in a benchmark folder are
 outputs of earlier runs. Each output folder is also written as
 ``<name>.tar.gz`` for the data-v1 release.
@@ -21,9 +24,11 @@ import numpy as np
 import pandas as pd
 
 SEED = 0
-MAX_PEAKS = 20_000
-# dataset -> (mini name, cells kept per group of files with the same cell count)
-PLAN = {"D28": ("D28mini", 1500), "D46": ("D46mini", 1000), "D52": ("D52mini", 1000)}
+# dataset -> (mini name, cells kept per group of files with the same cell count
+# (None: all), genes kept (None: all), peaks kept)
+PLAN = {"D28": ("D28mini", None, 3000, 10_000),
+        "D46": ("D46mini", 600, None, 20_000),
+        "D52": ("D52mini", 1000, None, 20_000)}
 
 
 def _n_cells(path: Path) -> int:
@@ -38,13 +43,31 @@ def _is_peaks(path: Path) -> bool:
                                      and "gas" not in path.stem)
 
 
-def _copy_h5(src: Path, dst: Path, cells: np.ndarray) -> tuple[int, int]:
+def _top_genes(rna: Path, cells: np.ndarray, n: int) -> np.ndarray:
+    """Names of the ``n`` most variable genes of an RNA file (scanpy, Seurat flavour)."""
+    import anndata as ad
+    import scanpy as sc
+    with h5py.File(rna) as f:
+        a = ad.AnnData(np.asarray(f["matrix/data"][:, cells]).T)
+        a.var_names = [x.decode() for x in f["matrix/features"][()]]
+    sc.pp.normalize_total(a, target_sum=1e4)
+    sc.pp.log1p(a)
+    sc.pp.highly_variable_genes(a, n_top_genes=n, flavor="seurat")
+    return np.array(a.var_names[a.var["highly_variable"].values])
+
+
+def _copy_h5(src: Path, dst: Path, cells: np.ndarray, *, genes=None,
+             max_peaks: int = 20_000) -> tuple[int, int]:
     with h5py.File(src) as f:
         data = f["matrix/data"][:, cells]
         feats = np.arange(data.shape[0])
-        if _is_peaks(src) and data.shape[0] > MAX_PEAKS:
+        if _is_peaks(src) and data.shape[0] > max_peaks:
             open_in = (data > 0).sum(axis=1)
-            feats = np.sort(np.argsort(-open_in, kind="stable")[:MAX_PEAKS])
+            feats = np.sort(np.argsort(-open_in, kind="stable")[:max_peaks])
+            data = data[feats]
+        elif genes is not None and not _is_peaks(src) and "adt" not in src.stem:
+            names = np.array([x.decode() for x in f["matrix/features"][()]])
+            feats = np.flatnonzero(np.isin(names, genes))
             data = data[feats]
         with h5py.File(dst, "w") as g:
             m = g.create_group("matrix")
@@ -59,13 +82,18 @@ def _copy_h5(src: Path, dst: Path, cells: np.ndarray) -> tuple[int, int]:
     return data.shape
 
 
-def make(src: Path, dst: Path, per_group: int) -> None:
+def make(src: Path, dst: Path, per_group, n_genes=None, max_peaks: int = 20_000) -> None:
     rng = np.random.default_rng(SEED)
     files = sorted(p for p in src.iterdir() if p.suffix == ".h5" or
                    (p.suffix == ".csv" and "cty" in p.stem))
     counts = {p: _n_cells(p) for p in files}
-    keep = {n: np.sort(rng.choice(n, size=min(per_group, n), replace=False))
+    keep = {n: (np.arange(n) if per_group is None else
+                np.sort(rng.choice(n, size=min(per_group, n), replace=False)))
             for n in sorted(set(counts.values()))}
+    genes = None
+    if n_genes:
+        rna = next(p for p in files if p.stem.startswith("rna") and p.suffix == ".h5")
+        genes = _top_genes(rna, keep[counts[rna]], n_genes)
     dst.mkdir(parents=True, exist_ok=False)
     for p in files:
         cells = keep[counts[p]]
@@ -73,15 +101,15 @@ def make(src: Path, dst: Path, per_group: int) -> None:
             pd.read_csv(p).iloc[cells].to_csv(dst / p.name, index=False)
             print(f"  {p.name}: {len(cells)} of {counts[p]} cells")
         else:
-            shape = _copy_h5(p, dst / p.name, cells)
+            shape = _copy_h5(p, dst / p.name, cells, genes=genes, max_peaks=max_peaks)
             print(f"  {p.name}: {shape[1]} of {counts[p]} cells, {shape[0]} features")
 
 
 def main(argv):
     data_path, out = Path(argv[1]), Path(argv[2])
-    for ds, (name, per_group) in PLAN.items():
+    for ds, (name, per_group, n_genes, max_peaks) in PLAN.items():
         print(name, "from", ds)
-        make(data_path / ds, out / name, per_group)
+        make(data_path / ds, out / name, per_group, n_genes, max_peaks)
         with tarfile.open(out / f"{name}.tar.gz", "w:gz") as t:
             t.add(out / name, arcname=name)
         print(f"  -> {out / name}.tar.gz {(out / f'{name}.tar.gz').stat().st_size / 1e6:.0f} MB")

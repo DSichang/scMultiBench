@@ -69,7 +69,7 @@ def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, m
                           data_path=tmp_path, evaluate=False)
     assert row["runnable"] and "GLUE reads inputs/atac_peak_normpeaks.h5" in row["caveat"]
     kept = res.summary["caveat"].iloc[0]
-    assert kept.startswith("GLUE needs the GENCODE v43 human annotation")
+    assert kept.startswith("GLUE reads the GENCODE v43 human annotation")
     assert "reads inputs/" not in kept and "normpeaks" not in kept
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())
     assert blob["records"][0]["caveat"] == kept

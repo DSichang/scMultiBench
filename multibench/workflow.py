@@ -568,7 +568,8 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                 return (f"method script {ep} is missing from the reference checkout at "
                         f"{root}: " + _runner.missing_script_fix(root))
             gone = [h for h in (getattr(variant, "helpers", None) or [])
-                    if not (root / ep).parent.joinpath(h).exists()]
+                    if not (root / ep).parent.joinpath(h).exists()
+                    and not (method and _runner.shipped_helper(method, h))]
             if gone:
                 who = config.hint(
                     (f"mtb.method_info({method!r})" if method else "method_info(m)")

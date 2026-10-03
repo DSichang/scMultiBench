@@ -132,8 +132,8 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
     df = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False)
     r = df.iloc[0]
     assert r["files_ok"]
-    assert ("GLUE needs the GENCODE v43 human annotation "
-            "(gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz) in "
+    assert ("GLUE reads the GENCODE v43 human annotation "
+            "(gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
             "<repo_path>/tools_scripts/GLUE/.") in r["caveat"]
     assert "mouse" not in r["caveat"]                   # first sentence only
     # a method without a hint gets no setup note
@@ -145,7 +145,7 @@ def test_dry_run_prints_the_setup_hint_to_stderr_once(capsys):
     inp = mtb.inputs_for("D28", "diagonal", "GLUE")
     argv = mtb.run("GLUE", "diagonal", inputs=inp, out_dir="/tmp/unused/GLUE", dry_run=True)
     err = capsys.readouterr().err
-    assert err.count("# GLUE needs the GENCODE v43 human annotation") == 1
+    assert err.count("# GLUE reads the GENCODE v43 human annotation") == 1
     assert isinstance(argv, list)
     # scan previews every row without printing
     mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False)
@@ -513,12 +513,15 @@ def test_cli_table_clips_reasons_at_a_word_boundary():
 
 
 def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkeypatch):
-    """MIRA's hint is about its logger.py; with the file there it is moot."""
+    """MIRA's hint is about its logger.py; with the file there, or shipped by
+    the package, it is moot."""
     script = tmp_path / "tools_scripts" / "MIRA" / "main_MIRA.py"
     script.parent.mkdir(parents=True)
     script.write_text("from logger import *")
     spec = registry.get("MIRA")
     v = spec.variants[0]
-    assert runner.script_notes(spec, v, tmp_path)[0].startswith("MIRA needs a logger.py")
+    assert runner.script_notes(spec, v, tmp_path) == []          # shipped helper
+    monkeypatch.setattr(runner, "shipped_helper", lambda m, h: None)
+    assert runner.script_notes(spec, v, tmp_path)[0].startswith("MIRA imports a logger.py")
     (script.parent / "logger.py").write_text("")
     assert runner.script_notes(spec, v, tmp_path) == []

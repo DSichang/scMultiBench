@@ -90,7 +90,7 @@ def test_run_dry_run_header_notes_then_command(tmp_path, capsys):
                         "shows what the folder holds.")
     assert lines[-1] == "# multibench run would execute:"
     setup = [ln for ln in lines if "GENCODE" in ln]
-    assert setup and setup[0].startswith("# GLUE needs the GENCODE v43 human annotation")
+    assert setup and setup[0].startswith("# GLUE reads the GENCODE v43 human annotation")
     assert not [ln for ln in lines if "setup:" in ln]
 
 
