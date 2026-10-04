@@ -57,3 +57,16 @@ def test_scan_does_not_block_mira_for_its_helper():
     from multibench import workflow
     spec, v = _variant("MIRA")
     assert "logger.py" not in workflow._missing_script(v, method="MIRA")
+
+
+def test_size_hints_start_with_the_method_and_reach_the_notes():
+    """A method that fails on a small dataset says what it needs in scan's caveat."""
+    seen = 0
+    for m in registry.list_methods():
+        spec = registry.get(m)
+        for v in spec.variants:
+            if v.size_hint:
+                seen += 1
+                assert v.size_hint.startswith(f"{m} "), v.size_hint
+                assert v.size_hint in runner.script_notes(spec, v, Path("/nonexistent"))
+    assert seen >= 6

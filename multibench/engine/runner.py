@@ -419,6 +419,8 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
                                  or shipped_helper(spec.id, h) for h in helpers)
     if spec.setup_hint and not done:
         notes.append(spec.setup_hint)
+    if getattr(variant, "size_hint", ""):
+        notes.append(variant.size_hint)
     if not (repo / ep).exists():
         if (repo / "tools_scripts").is_dir():
             fix = missing_script_fix(repo)

@@ -520,8 +520,9 @@ def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkey
     script.write_text("from logger import *")
     spec = registry.get("MIRA")
     v = spec.variants[0]
-    assert runner.script_notes(spec, v, tmp_path) == []          # shipped helper
+    # shipped helper: no setup note, only what MIRA needs from the data's size
+    assert runner.script_notes(spec, v, tmp_path) == [v.size_hint]
     monkeypatch.setattr(runner, "shipped_helper", lambda m, h: None)
     assert runner.script_notes(spec, v, tmp_path)[0].startswith("MIRA imports a logger.py")
     (script.parent / "logger.py").write_text("")
-    assert runner.script_notes(spec, v, tmp_path) == []
+    assert runner.script_notes(spec, v, tmp_path) == [v.size_hint]

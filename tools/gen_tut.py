@@ -172,8 +172,8 @@ SCEN = {
    blurb=("Diagonal integration combines RNA and ATAC measured in different cells, "
           "with no pairing between them. If your RNA and ATAC come from the same "
           "cells, as in 10x Multiome, use the vertical tutorial. This tutorial runs "
-          "{methods} on `D28mini`, the benchmark dataset `D28` with fewer genes and "
-          "peaks, then on data in your own format."),
+          "{methods} on `D28mini`, 3,000 RNA and 3,000 ATAC cells of the benchmark "
+          "dataset `D28`, then on data in your own format."),
  ),
  "mosaic": dict(
    ds="D46mini", methods=["StabMap", "scMoMaT"], atac="peak", stored_ds="D45",
@@ -208,7 +208,7 @@ OWN_INTRO = {
  "diagonal": ("Your data needs raw RNA counts and ATAC as two AnnData objects, with a "
               "cell type for each cell. `mtb.io.export_dataset` writes them as a dataset "
               "folder, and `run_all` runs on that folder. iNMF and online_iNMF read ATAC "
-              "as gene-activity scores."),
+              "as gene-activity scores, and online_iNMF needs about 5,000 cells in total."),
  "mosaic": ("Your data needs raw counts, with one AnnData per batch and a cell type for "
             "each cell. `mtb.io.export_dataset` with `batch_index=` writes one batch per "
             "call. Number the batches to match a pattern that "
@@ -219,7 +219,7 @@ OWN_INTRO = {
 }
 OWN_STANDIN = {
  "vertical": "Here an AnnData made from 60% of `D11`'s cells takes the place of your data:",
- "diagonal": "Here 60% of `D28mini`'s RNA cells and 60% of its ATAC cells take the place of your data:",
+ "diagonal": "Here 90% of `D28mini`'s RNA cells and 90% of its ATAC cells take the place of your data:",
  "mosaic": "Here the first 300 cells of each `D46mini` batch take the place of your data:",
  "cross": "Here one AnnData with 60% of `D52mini`'s cells and a batch column takes the place of your data:",
 }
@@ -239,8 +239,8 @@ rna = mtb.io.read_canonical(d / "rna.h5")
 rna.obs["celltype"] = pd.read_csv(d / "rna_cty.csv")["x"].values
 atac = mtb.io.read_canonical(d / "atac_gas.h5")
 atac.obs["celltype"] = pd.read_csv(d / "atac_cty.csv")["x"].values
-rna = sc.pp.subsample(rna, fraction=0.6, random_state=0, copy=True)
-atac = sc.pp.subsample(atac, fraction=0.6, random_state=0, copy=True)
+rna = sc.pp.subsample(rna, fraction=0.9, random_state=0, copy=True)
+atac = sc.pp.subsample(atac, fraction=0.9, random_state=0, copy=True)
 rna, atac""",
  "mosaic": """d = mtb.config.DEFAULT.data_path / "D46mini"
 n = 300
@@ -280,6 +280,18 @@ mtb.io.export_dataset(rna[2], out, labels=labels[2],
  "cross": """mtb.io.export_dataset(adata, "mydata/MYCROSS", rna="X", adt="obsm:protein",
                       labels="obs:celltype", batch="obs:batch", category="cross",
                       overwrite=True)""",
+}
+# The small dataset to try the methods on that the tutorial's own dataset does
+# not fit; every method ran on the one named here.
+OTHER_DATA = {
+ "vertical": ("- To try an RNA + ATAC method, fetch `D27mini` (ATAC as peaks) or "
+              "`D27mini_gas` (ATAC as gene activity) with `mtb.data.fetch`."),
+ "diagonal": ("- Seurat_v5 needs RNA and ATAC from the same cells: "
+              "`mtb.data.fetch(\"D27mini_paired\")` has them. Every diagonal method "
+              "runs on it."),
+ "mosaic": ("- Cobolt, MultiVI, Multigrate and SMILE accept another batch pattern: "
+            "`mtb.data.fetch(\"D45mini\")` has it."),
+ "cross": "- Every cross method runs on `D52mini`.",
 }
 OWN_NAME = {"vertical": "MYCITE", "diagonal": "MYDIAG", "mosaic": "MYMOSAIC", "cross": "MYCROSS"}
 OVERWRITE_NOTE = ("`overwrite=True` replaces the files of an earlier run of this cell. "
@@ -496,6 +508,7 @@ mtb.plot.bubble(long)''')
     siblings = [c for c in SCEN if c != cat]
     md(f"""## Next steps
 
+{OTHER_DATA[cat]}
 - `mtb.cite(METHODS)` returns the citations for the benchmark and the methods you ran.
 - The other tutorials: {", ".join(f"[{c}]({SITE}tutorials/{c}/)" for c in siblings)}.
 - The guides: [run]({SITE}tutorials/run/), [evaluate]({SITE}tutorials/evaluate/), [plot]({SITE}tutorials/plot/) and [discover methods]({SITE}tutorials/discover/).

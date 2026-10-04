@@ -23,6 +23,7 @@ methods:
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_adt.py
+        size_hint: "Multigrate needs several thousand cells for a mosaic run. It failed on 3,000 and ran on 6,000."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -34,6 +35,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_atac.py
+        size_hint: "Multigrate needs several thousand cells for a mosaic run. It failed on 3,000 and ran on 6,000."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -192,6 +194,7 @@ methods:
       # Forced to CPU, as for scMSI (scMM does the same with its own --no_cuda flag).
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/scMVP/main_scMVP.py
+        size_hint: "scMVP drops every peak open in more than 10% of the cells and fails when none is left."
         language: python
         run_env:
           CUDA_VISIBLE_DEVICES: ""
@@ -373,6 +376,7 @@ methods:
     variants:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py
+        size_hint: "MIRA needs about 2,000 genes and several thousand cells. It failed on 1,000 genes and on 1,500 cells."
         helpers: [logger.py]          # copied from engine/helpers/MIRA/ before a run
         language: python
         args:
@@ -473,6 +477,7 @@ methods:
     variants:
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/VIPCCA/main_VIPCCA.py
+        size_hint: "VIPCCA selects 2,000 variable genes itself and fails on a dataset with fewer genes."
         language: python
         args:
           - {role: rna, flag: "--path1"}
@@ -841,6 +846,7 @@ methods:
     variants:
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/online iNMF/main_online_iNMF.Rmd
+        size_hint: "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
         language: R
         args:
           - {role: rna}

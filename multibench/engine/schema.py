@@ -262,6 +262,7 @@ class Variant:
     normalize_peaks: list = field(default_factory=list)  # roles whose .h5 ATAC peak names get normalized to chr:start-end before the run
     extra_outputs: list[OutputSpec] = field(default_factory=list)
     helpers: list = field(default_factory=list)     # local modules the entrypoint imports from its own dir that upstream does not ship (MIRA's logger.py); copied from engine/helpers/<method>/ before a run, else scan reports the script blocked
+    size_hint: str = ""                # what the method needs from the data's size, when a small dataset fails (scan shows it as a caveat); starts with the method name
     downloads: list = field(default_factory=list)   # [{file, url}]: files the script reads from its own dir that the first run downloads (GLUE's GENCODE annotation)
 
     def matches(self, category: str, modalities: set[str]) -> bool:
