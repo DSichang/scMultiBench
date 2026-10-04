@@ -10,7 +10,11 @@ smallest at which no method failed:
 
 - online_iNMF needs about 5,000 cells in total (D28mini: 3,000 + 3,000);
 - Multigrate's mosaic variant needs about 6,000 (D45mini: 2,000 per batch);
-- MIRA needs about 2,000 genes and 5,000 cells (D27mini).
+- MIRA needs about 2,000 genes, VIPCCA selects 2,000 variable genes itself
+  and Conos' variance fit fails on 1,000, so the RNA + ATAC datasets keep
+  2,500 genes; the mosaic and cross datasets run on 1,000;
+- scMVP drops every peak open in more than 10% of the cells, so half of the
+  peaks kept are the most open ones and half the most open below that limit.
 
 Files with the same cell count are the same cells (a batch's RNA, ADT and
 labels; D28's two ATAC files), so every modality file stays aligned with its
@@ -37,16 +41,16 @@ SEED = 0
 # name -> source dataset, cells per group of files with the same cell count,
 # genes kept, peaks kept, and for D27 the {output file: source file} map
 PLAN = {
-    "D28mini": dict(src="D28", cells=3000, genes=1000, peaks=5000),
+    "D28mini": dict(src="D28", cells=3000, genes=2500, peaks=5000),
     "D45mini": dict(src="D45", cells=2000, genes=1000, peaks=5000),
     "D46mini": dict(src="D46", cells=600, genes=1000, peaks=5000),
     "D52mini": dict(src="D52", cells=1000, genes=1000, peaks=5000),
-    "D27mini": dict(src="D27", cells=5000, genes=2000, peaks=5000,
+    "D27mini": dict(src="D27", cells=5000, genes=2500, peaks=5000,
                     files={"rna.h5": "rna.h5", "atac.h5": "peak.h5", "cty.csv": "rna_cty.csv"}),
     "D27mini_gas": dict(src="D27", cells=2000, genes=1000, peaks=5000,
                         files={"rna.h5": "rna.h5", "atac.h5": "atac_gas.h5",
                                "cty.csv": "rna_cty.csv"}),
-    "D27mini_paired": dict(src="D27", cells=2000, genes=1000, peaks=5000,
+    "D27mini_paired": dict(src="D27", cells=3000, genes=2500, peaks=5000,
                            files={"rna.h5": "rna.h5", "atac_peak.h5": "peak.h5",
                                   "atac_gas.h5": "atac_gas.h5", "rna_cty.csv": "rna_cty.csv",
                                   "atac_cty.csv": "peak_cty.csv"}),
@@ -94,16 +98,22 @@ def _top_genes(rna: Path, cells: np.ndarray, n: int, among=None) -> np.ndarray:
 
 
 def _top_peaks(files: dict, n: int) -> np.ndarray:
-    """Names of the ``n`` peaks open in the most cells, summed over the peak
-    files (``{path: cells}``), which must list the same peaks."""
+    """Names of ``n`` peaks, in the files' order: the ``n // 2`` open in the
+    most cells, then the most open ones among the peaks open in at most 10%
+    of the cells. Counted over the peak files (``{path: cells}``), which must
+    list the same peaks."""
     paths = list(files)
     names = _names(paths[0])
-    open_in = np.zeros(len(names))
+    open_in, total = np.zeros(len(names)), 0
     for p, cells in files.items():
         assert np.array_equal(_names(p), names), f"{p.name}: another peak list"
         with h5py.File(p) as f:
             open_in += (f["matrix/data"][:, cells] > 0).sum(axis=1)
-    return names[np.sort(np.argsort(-open_in, kind="stable")[:n])]
+        total += len(cells)
+    order = np.argsort(-open_in, kind="stable")
+    top = order[: n // 2]
+    rare = [i for i in order if open_in[i] <= 0.1 * total and i not in set(top)][: n - len(top)]
+    return names[np.sort(np.concatenate([top, np.array(rare, dtype=int)]))]
 
 
 def _copy_h5(src: Path, dst: Path, cells: np.ndarray, keep=None) -> tuple:
