@@ -13,7 +13,7 @@ import pytest
 
 import multibench as mtb
 from multibench import cli, workflow
-from multibench.engine import envs, registry
+from multibench.engine import runner, envs, registry
 
 
 @pytest.fixture(autouse=True)
@@ -141,10 +141,13 @@ def test_env_mark_and_status_rows_carry_has_lock():
 
 
 # ----------------------------------------------------------------- MIRA: the truth
-def test_mira_block_is_declared_where_every_surface_reads_it():
+def test_mira_is_no_longer_blocked_and_says_what_the_package_supplies():
+    """The package ships the logger.py MIRA's script imports, so no method is
+    tagged blocked-script; the tag stays in the vocabulary for a future one."""
     spec = registry.get("MIRA")
-    assert spec.env_spec["difficulty"] == "blocked-script"
+    assert spec.env_spec["difficulty"] == "verified" and spec.env_spec["verified_working"]
     assert spec.variants[0].helpers == ["logger.py"]
+    assert runner.shipped_helper("MIRA", "logger.py") is not None
     info = mtb.method_info("MIRA", verbose=True)
     assert "logger.py" in info["setup_hint"]
     assert "setup_hint" in envs.DIFFICULTY["blocked-script"]

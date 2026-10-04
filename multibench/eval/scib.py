@@ -262,6 +262,21 @@ def _resolve_flavor(flavor) -> str:
     return flavor
 
 
+def _neighbors(adata, rep: str) -> None:
+    """``sc.pp.neighbors`` on ``adata.obsm[rep]``.
+
+    scanpy edits the kNN matrix in place, and on some embeddings (the 2-D
+    UMAP of a graph method) scipy answers with a ``SparseEfficiencyWarning``
+    per call. It says nothing about the result, so only that warning is
+    silenced here.
+    """
+    import scanpy as sc
+    from scipy.sparse import SparseEfficiencyWarning
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SparseEfficiencyWarning)
+        sc.pp.neighbors(adata, use_rep=rep)
+
+
 def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
     """One Leiden clustering, on the backend ``flavor`` names.
 
@@ -350,7 +365,7 @@ def leiden_sweep(emb, *, flavor=None):
     import anndata as ad      # lazily, as in _build_adata
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
-    sc.pp.neighbors(adata, use_rep="X_emb")
+    _neighbors(adata, "X_emb")
     adata.uns["leiden_flavor"] = flavor
     keys = []
     for res in get_resolutions(n=10, max=2):
@@ -393,7 +408,7 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
         _owned = False
     else:
         flavor = _resolve_flavor(flavor)
-        sc.pp.neighbors(adata, use_rep=embed)
+        _neighbors(adata, embed)
         resolutions = get_resolutions(n=10, max=2)
         keys = []
         for res in resolutions:
@@ -506,7 +521,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             raise ValueError(count_error(what, len(np.asarray(values)), n))
 
     adata = _build_adata(emb, celltype, cluster, batch)
-    sc.pp.neighbors(adata, use_rep="X_emb")
+    _neighbors(adata, "X_emb")
 
     # Without a precomputed clustering, ARI/NMI score the scIB optimal-
     # resolution Leiden assignment derived from the embedding below; this is

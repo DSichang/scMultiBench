@@ -316,9 +316,9 @@ def test_env_status_legend_explains_every_tag_on_stderr(monkeypatch, capsys):
     cap = capsys.readouterr()
     assert rc == 0
     assert len(cap.out.strip().splitlines()) == 3            # rows only on stdout
-    assert "old-scvi" in cap.out and "blocked-script" in cap.out and " R" in cap.out
+    assert "old-scvi" in cap.out and "verified" in cap.out and " R" in cap.out
     assert cap.err.startswith("# legend:")
-    for tag in ("old-scvi", "blocked-script", "R"):
+    for tag in ("old-scvi", "verified", "R"):
         assert f"{tag} = {envs.DIFFICULTY[tag]}" in cap.err
     assert "verified_working" in cap.err
     epilog = _env_sub("status").epilog

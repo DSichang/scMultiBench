@@ -68,8 +68,7 @@ methods:
     # and scan's files_ok fail when the two files hold different cells.
     setup_hint: "Seurat_v5 uses your RNA and ATAC files as its paired bridge, so both must hold the same cells. Unpaired data cannot run through the package."
     variants:
-      # Bridge integration. LD_PRELOAD supplies the R CXXABI (else "namespace load
-      # failed for Seurat"). sctransform exports ~520 MiB of globals to `future`
+      # Bridge integration. sctransform exports ~520 MiB of globals to `future`
       # workers, over the 500 MiB default, so R_FUTURE_GLOBALS_MAXSIZE is raised
       # (`future` reads it at load). D27's peak ids are already chr:start-end, so
       # no normalize_peaks.
@@ -875,8 +874,7 @@ methods:
     status: verified
     variants:
       # The Rmd sources util.R -> cwd_at_script. run_mofa(use_basilisk=FALSE) reaches
-      # mofapy2 through reticulate, so RETICULATE_PYTHON must point at a Python with
-      # mofapy2 installed. LD_PRELOAD supplies the R CXXABI. Arguments are positional:
+      # mofapy2 through reticulate; the env's own Python has it. Arguments are positional:
       # <rna...> <adt...> <batch_num> <num = number of modalities> <save_path>.
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
@@ -897,8 +895,8 @@ methods:
     status: verified
     variants:
       # Transfer-anchor integration. Needs Seurat 4.3 + SeuratObject 4.1.x (v5
-      # objects break RunCCA), hence its own env; LD_PRELOAD supplies the CXXABI
-      # Rtsne needs. Signac's CreateChromatinAssay needs chr:start-end peak ids ->
+      # objects break RunCCA), hence its own env. Signac's CreateChromatinAssay
+      # needs chr:start-end peak ids ->
       # normalize_peaks rewrites the atac_peak names.
       - when: {category: diagonal, modalities: [rna, atac_peak, atac_gas]}
         entrypoint: tools_scripts/Seurat_v3/main_Seurat_v3.Rmd

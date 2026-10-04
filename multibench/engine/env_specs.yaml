@@ -266,9 +266,9 @@ MIRA:
   - leidenalg
   pip_git: []
   package_source: 'PyPI: mira-multiome (imported as mira); installs torch and pyro-ppl. The PyPI package named mira is an unrelated project.'
-  difficulty: blocked-script
-  verified_working: false
-  caveats: 'The environment builds, but main_MIRA.py does `from logger import *` and tools_scripts/MIRA/ contains no logger.py, so the script fails at import until one is supplied. numpy<2: mira-multiome requires torch<=2.0, which is built against numpy 1.x. --acc defaults to gpu; pass --acc cpu to train without one.'
+  difficulty: verified
+  verified_working: true
+  caveats: 'main_MIRA.py does `from logger import *` and tools_scripts/MIRA/ contains no logger.py; multibench copies an empty one there before a run (the script uses nothing from it). numpy<2: mira-multiome requires torch<=2.0, which is built against numpy 1.x. --acc defaults to gpu; pass --acc cpu to train without one.'
 Concerto:
   python_version: '3.8'
   conda_channels:

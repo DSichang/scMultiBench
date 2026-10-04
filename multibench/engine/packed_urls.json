@@ -72,10 +72,7 @@
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scvi.tar.gz.002"
   ],
   "scmb_seurat4b": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_seurat4b.tar.gz",
-  "scmb_seurat5": [
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_seurat5.tar.gz.001",
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_seurat5.tar.gz.002"
-  ],
+  "scmb_seurat5": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_seurat5.tar.gz",
   "scmb_torch": [
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_torch.tar.gz.001",
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_torch.tar.gz.002",
