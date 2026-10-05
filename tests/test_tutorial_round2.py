@@ -5,8 +5,8 @@ grey and warns, and igraph-scored rows next to the stored tables warn (M02,
 M03); labels_for returns only the label files of the batches a variant
 reads, and scan says so in ``caveat`` (M31); Seurat_v5 needs RNA and ATAC
 from the same cells (M15). These tests pin what the notebooks say and do
-about each, on the committed notebooks (the generated four and the
-hand-maintained end-to-end tutorial).
+about each, on the committed notebooks (the generated task tutorials and
+the hand-maintained end-to-end tutorial).
 """
 import ast
 import importlib.util
@@ -29,7 +29,9 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
+KEYS = list(GEN.TASKS)
+TUTORIALS = [f"tutorial_{k}" for k in KEYS]
+EVERY = [f"tutorial_{k}_all" for k in KEYS]        # every method of a task
 E2E = "tutorial_end_to_end"
 
 
@@ -58,7 +60,7 @@ def test_export_dataset_takes_every_keyword_the_notebooks_pass():
     import multibench as mtb
     params = set(inspect.signature(mtb.io.export_dataset).parameters)
     passed = set()
-    for name in [f"tutorial_{c}" for c in CATS] + [E2E, "colab_quickstart"]:
+    for name in TUTORIALS + EVERY + [E2E, "colab_quickstart"]:
         for src in _code(name):
             tree = ast.parse(TransformerManager().transform_cell(src))
             for node in ast.walk(tree):
@@ -69,11 +71,11 @@ def test_export_dataset_takes_every_keyword_the_notebooks_pass():
 
 
 # ------------------------------------------------------- generated tutorials
-@pytest.mark.parametrize("cat", CATS)
-def test_plot_details_say_constant_columns_are_grey(cat):
+@pytest.mark.parametrize("name", TUTORIALS)
+def test_plot_details_say_constant_columns_are_grey(name):
     """M02: a column whose rows all hold one value is drawn grey and named in
     the footnote; the Plot section says so, in the words the figure uses."""
-    md = _markdown(f"tutorial_{cat}", "## 4. Plot")
+    md = _markdown(name, "## 4. Plot")
     assert "A column whose rows all hold the same value is drawn grey" in md
     bubble = importlib.import_module("multibench.plot.bubble")      # the module, not the function
     assert bubble._constant_note(["A"], {}).startswith("Grey fill")
@@ -93,7 +95,7 @@ def test_diagonal_tutorial_states_seurat_v5_cells():
     """M15: Seurat_v5 needs RNA and ATAC from the same cells, a visible fact
     next to the ATAC forms."""
     import multibench as mtb
-    title = _visible(_cells("tutorial_diagonal")[0][1])
+    title = _visible(_cells("tutorial_diagonal_rna_atac")[0][1])
     assert "Seurat_v5 also needs RNA and ATAC from the same cells." in title
     assert "same cells" in mtb.method_info("Seurat_v5")["setup_hint"]
 

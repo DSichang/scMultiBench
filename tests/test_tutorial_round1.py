@@ -5,8 +5,9 @@ and per-batch mosaic folders itself, find_methods selects by the ATAC form a
 method reads), and the prose contract was revised: facts that decide a
 correct result are visible, the Details blocks carry plain paragraphs, and
 the vocabulary is plain ('replacement' / 'stored outputs', not 'stand-in').
-These tests pin both, on the committed notebooks (the generated four plus the
-quickstart, and the hand-maintained end-to-end tutorial).
+These tests pin both, on the committed notebooks: the generated ones (one
+tutorial per integration task, the run of every method of each task, and the
+quickstart) and the hand-maintained end-to-end tutorial.
 """
 import ast
 import importlib.util
@@ -30,8 +31,11 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
-ALL = [f"tutorial_{c}" for c in CATS] + ["colab_quickstart", "tutorial_end_to_end"]
+KEYS = list(GEN.TASKS)
+TUTORIALS = [f"tutorial_{k}" for k in KEYS]
+EVERY = [f"tutorial_{k}_all" for k in KEYS]        # every method of a task
+GENERATED = TUTORIALS + EVERY + ["colab_quickstart"]
+ALL = GENERATED + ["tutorial_end_to_end"]
 
 
 def _cells(name):
@@ -102,11 +106,11 @@ def test_no_trailing_code_comment_runs_past_80_columns(name):
 
 
 # ------------------------------------------- facts that decide a correct result
-@pytest.mark.parametrize("cat", CATS)
-def test_correctness_facts_are_visible(cat):
+@pytest.mark.parametrize("key", KEYS)
+def test_correctness_facts_are_visible(key):
     """Raw counts (section 5) and 'Methods run on Linux' (the title) are in
     the visible text, not only in a collapsed block."""
-    cells = _cells(f"tutorial_{cat}")
+    cells = _cells(f"tutorial_{key}")
     assert "Methods run on Linux." in _visible(cells[0][1])
     own = next(s for kind, s in cells if kind == "markdown" and s.startswith("## 5. Your own data"))
     assert re.search(r"Your data needs raw [A-Za-z ]*counts", _visible(own)), own
@@ -116,7 +120,7 @@ def test_diagonal_title_names_the_atac_form_of_each_method():
     """Which ATAC form a diagonal method reads is visible in the first cell,
     read from the registry: every peak-reading method is named there."""
     import multibench as mtb
-    title = _visible(_cells("tutorial_diagonal")[0][1])
+    title = _visible(_cells("tutorial_diagonal_rna_atac")[0][1])
     # the lookup call: describe_layout lists each method under the ATAC files
     # it needs (round 7; method_info(m)["atac"] lists MultiMAP under peak)
     assert "gene-activity scores" in title and 'mtb.describe_layout("diagonal")' in title
@@ -125,79 +129,94 @@ def test_diagonal_title_names_the_atac_form_of_each_method():
 
 
 def test_mosaic_and_cross_titles_say_what_the_methods_read():
-    mosaic = _visible(_cells("tutorial_mosaic")[0][1])
-    assert "every mosaic method reads ATAC as peaks" in mosaic
-    cross = _visible(_cells("tutorial_cross")[0][1])
+    for key in ("mosaic_rna_atac", "mosaic_rna_adt_atac"):
+        title = _visible(_cells(f"tutorial_{key}")[0][1])
+        assert "every mosaic method reads ATAC as peaks" in title, key
+    # the RNA + ADT pattern holds no ATAC, and its title does not bring it up
+    assert "ATAC" not in _visible(_cells("tutorial_mosaic_rna_adt")[0][1])
+    cross = _visible(_cells("tutorial_cross_rna_adt")[0][1])
     assert "Every cross method here reads RNA and ADT" in cross
 
 
 # ------------------------------------------------ own-data demos (section 5)
+MOSAIC_LABELS = ["cty1.csv", "cty2.csv", "cty3.csv"]
 EXPECTED_FILES = {
-    "vertical": ["adt.h5", "cty.csv", "rna.h5"],
-    "diagonal": ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"],
-    "mosaic": ["adt1.h5", "atac2.h5", "cty1.csv", "cty2.csv", "cty3.csv",
-               "rna1.h5", "rna2.h5", "rna3.h5"],
-    "cross": ["adt1.h5", "adt2.h5", "adt3.h5", "cty1.csv", "cty2.csv", "cty3.csv",
-              "rna1.h5", "rna2.h5", "rna3.h5"],
+    "vertical_rna_adt": ["adt.h5", "cty.csv", "rna.h5"],
+    "vertical_rna_atac": ["atac.h5", "atac_peak.h5", "cty.csv", "rna.h5"],
+    "vertical_rna_adt_atac": ["adt.h5", "atac.h5", "atac_peak.h5", "cty.csv", "rna.h5"],
+    "diagonal_rna_atac": ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"],
+    "mosaic_rna_atac": ["atac2.h5", "atac3.h5", *MOSAIC_LABELS, "rna1.h5", "rna2.h5"],
+    "mosaic_rna_adt_atac": ["adt1.h5", "atac2.h5", *MOSAIC_LABELS,
+                            "rna1.h5", "rna2.h5", "rna3.h5"],
+    "mosaic_rna_adt": ["adt2.h5", "adt3.h5", *MOSAIC_LABELS, "rna1.h5", "rna2.h5"],
+    "cross_rna_adt": ["adt1.h5", "adt2.h5", "adt3.h5", *MOSAIC_LABELS,
+                      "rna1.h5", "rna2.h5", "rna3.h5"],
 }
 
 
-def _own_data_cells(cat):
-    """Section 5's code: the cell that builds the demo data, and the export
-    calls of the cell that then runs run_all on the folder."""
-    code = [src for kind, src in _cells(f"tutorial_{cat}") if kind == "code"]
+def _own_data_cells(key):
+    """Section 5's code: the cell that builds the demo data and the cell of
+    export calls after it. ``run_all`` on the folder has its own cell."""
+    code = [src for kind, src in _cells(f"tutorial_{key}") if kind == "code"]
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(" in src)
-    export = code[i].split("\n\nmine = mtb.run_all(")[0]
-    assert "run_all" not in export, code[i]
-    return code[i - 1], export
+    assert "run_all" not in code[i], code[i]
+    assert code[i + 1].startswith(f'mine = mtb.run_all("{GEN.OWN[key]["name"]}"'), code[i + 1]
+    return code[i - 1], code[i]
 
 
-@pytest.mark.parametrize("cat", CATS)
-def test_own_data_demo_writes_the_folder_with_export_dataset(cat, root, tmp_path, monkeypatch):
+@pytest.mark.parametrize("key", KEYS)
+def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monkeypatch):
     """Each demo writes its folder through export_dataset alone - diagonal
     with category='diagonal', mosaic one call per batch with batch_index= -
-    with no hand-written file, no multibench warning, and a folder that scan
-    reads for the tutorial's methods."""
+    with no hand-written file, no multibench warning, and a folder on which
+    scan finds the input files of the tutorial's methods."""
     import multibench as mtb
     import pandas as pd
-    data, export = _own_data_cells(cat)
+    t = GEN.TASKS[key]
+    cat = t["cat"]
+    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+        pytest.skip(f"{t['ds']} is not on disk")
+    data, export = _own_data_cells(key)
     calls = [n for n in ast.walk(ast.parse(export)) if isinstance(n, ast.Call)]
     names = {ast.unparse(n.func) for n in calls}
     assert "mtb.io.to_canonical" not in names and not any(n.endswith("to_csv") for n in names), \
-        f"{cat}: the demo writes files by hand instead of through export_dataset"
+        f"{key}: the demo writes files by hand instead of through export_dataset"
     exports = [n for n in calls if ast.unparse(n.func) == "mtb.io.export_dataset"]
     kws = [{k.arg: ast.unparse(k.value) for k in n.keywords} for n in exports]
     if cat == "diagonal":
         assert len(exports) == 1 and kws[0]["category"] == "'diagonal'" and "atac" in kws[0]
     if cat == "mosaic":
         assert [k.get("batch_index") for k in kws] == ["1", "2", "3"]
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        exec(compile(data, f"tutorial_{cat}", "exec"), ns)
+        exec(compile(data, f"tutorial_{key}", "exec"), ns)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        exec(compile(export, f"tutorial_{cat}", "exec"), ns)
+        exec(compile(export, f"tutorial_{key}", "exec"), ns)
     ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
             or issubclass(w.category, UserWarning)]
-    assert not ours, f"{cat}: the demo warns: {ours}"
-    own = GEN.OWN_NAME[cat]
+    assert not ours, f"{key}: the demo warns: {ours}"
+    own = GEN.OWN[key]["name"]
     folder = tmp_path / "mydata" / own
-    assert sorted(f.name for f in folder.iterdir()) == EXPECTED_FILES[cat]
+    assert sorted(f.name for f in folder.iterdir()) == EXPECTED_FILES[key]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         frame = mtb.scan(own, cat, data_path=tmp_path / "mydata", verbose=False)
     ok = set(frame[frame.files_ok].method)
-    assert set(GEN.SCEN[cat]["methods"]) <= ok
-    if cat == "vertical":
-        assert ok == set(mtb.find_methods("vertical", modalities=["rna", "adt"]))
-    elif cat == "diagonal":
-        assert ok == set(mtb.find_methods("diagonal", atac="gene_activity"))
-    elif cat == "mosaic":
-        assert ok == {"StabMap", "scMoMaT"}
+    assert set(t["methods"]) <= ok
+    everyone = set(GEN.task_methods(key))
+    if key == "vertical_rna_adt_atac":
+        # RNA, ADT and ATAC of the same cells also hold the files of the two
+        # smaller vertical tasks
+        assert everyone <= ok
+    elif key == "diagonal_rna_atac":
+        # the folder holds gene activity only: the peak readers lack a file
+        assert ok == set(mtb.find_methods("diagonal", atac="gene_activity")) < everyone
     else:
+        assert ok == everyone
+    if cat == "cross":
         assert ok == set(frame.method) and len(ok) >= 7
 
 
@@ -211,7 +230,7 @@ def test_generator_gives_stable_cell_ids():
     again = [c["id"] for c in GEN._notebook([nbf.v4.new_markdown_cell("c"),
                                              nbf.v4.new_code_cell("d")], "tutorial_x").cells]
     assert first == again and len(set(first)) == 2
-    for name in [f"tutorial_{c}" for c in CATS] + ["colab_quickstart"]:
+    for name in GENERATED:
         nb = json.loads((ROOT / "notebooks" / f"{name}.ipynb").read_text())
         n = len(nb["cells"])
         expected = [c["id"] for c in GEN._notebook([nbf.v4.new_raw_cell("") for _ in range(n)],

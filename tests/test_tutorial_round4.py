@@ -38,8 +38,9 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
-TUTORIALS = [f"tutorial_{c}" for c in CATS]
+KEYS = list(GEN.TASKS)
+TUTORIALS = [f"tutorial_{k}" for k in KEYS]
+EVERY = [f"tutorial_{k}_all" for k in KEYS]        # every method of a task
 
 
 def _cells(name):
@@ -92,7 +93,7 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
     from multibench.engine import envs, registry
     if not (config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
-    trio = GEN.SCEN["vertical"]["methods"]
+    trio = GEN.TASKS["vertical_rna_adt"]["methods"]
     missing = envs.group_for(trio[-1])
     every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})
@@ -118,11 +119,15 @@ CPU_BUILDS = "CPU builds of the environments are installed"
 
 
 def _methods(name):
-    cat = name.removeprefix("tutorial_")
-    return ["Matilda"] if cat == "end_to_end" else GEN.SCEN[cat]["methods"]
+    key = name.removeprefix("tutorial_")
+    if key == "end_to_end":
+        return ["Matilda"]
+    if key.endswith("_all"):
+        return GEN.task_methods(key.removesuffix("_all"))
+    return GEN.TASKS[key]["methods"]
 
 
-@pytest.mark.parametrize("name", TUTORIALS + ["tutorial_end_to_end"])
+@pytest.mark.parametrize("name", TUTORIALS + EVERY + ["tutorial_end_to_end"])
 def test_the_colab_note_does_not_promise_a_cpu_build_of_every_environment(name):
     """The Colab note may say a CPU runtime gets the CPU builds only when
     every environment the notebook installs has one."""
@@ -143,8 +148,8 @@ def test_some_tutorial_environment_has_a_single_build():
     takes the one archive it has (scmb_r)."""
     import multibench as mtb
     single = set()
-    for cat, s in GEN.SCEN.items():
-        rows = mtb.env.install(s["methods"], category=cat, flavor="cpu")
+    for t in GEN.TASKS.values():
+        rows = mtb.env.install(t["methods"], category=t["cat"], flavor="cpu")
         single |= {r["env"] for r in rows if r["flavor"] != "cpu"}
     assert single, "every tutorial env has a CPU build: the plain sentence would do"
 
@@ -182,7 +187,7 @@ BATCH_ADVICE = ("Keep several samples in one folder, without `batch=`. To score 
 
 
 def test_vertical_export_note_names_the_batch_call():
-    assert BATCH_ADVICE in _markdown("tutorial_vertical")
+    assert BATCH_ADVICE in _markdown("tutorial_vertical_rna_adt")
 
 
 def test_the_package_gives_the_same_batch_advice(tmp_path):
@@ -232,7 +237,8 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     _quiet(mtb.io.export_dataset, b2, folder, atac="obsm:gas", atac_kind="gene_activity",
            batch_index=2, **kw)
     _quiet(mtb.io.export_dataset, b3, folder, batch_index=3, **kw)
-    trio = GEN.SCEN["mosaic"]["methods"]
+    # D46's pattern: the RNA + ADT + ATAC mosaic task
+    trio = GEN.TASKS["mosaic_rna_adt_atac"]["methods"]
     sc = _quiet(mtb.scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False).set_index("method")
     plan = _quiet(mtb.run_all, "MYMOSAIC", "mosaic", tmp_path / "out", methods=trio,
@@ -243,10 +249,10 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
             assert r.files_ok and r.env_ok and not r.runnable, (m, r.reason)
             assert r.reason.startswith(f"{m} needs peak ATAC, and atac2.h5 holds gene "
                                        "activity"), r.reason
-    assert "give ATAC as peaks" in _visible(_markdown("tutorial_mosaic"))
+    assert "Give ATAC as peaks." in _visible(_markdown("tutorial_mosaic_rna_adt_atac"))
 
 
 # ------------------------------------------------ no internal names
-@pytest.mark.parametrize("name", TUTORIALS)
+@pytest.mark.parametrize("name", TUTORIALS + EVERY)
 def test_the_code_names_no_registry(name):
     assert "registry" not in _code(name)

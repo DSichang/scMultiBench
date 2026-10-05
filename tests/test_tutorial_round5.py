@@ -32,8 +32,7 @@ def _load_gen_tut():
 
 GEN = _load_gen_tut()
 E2E = "tutorial_end_to_end"
-# the tutorials whose dataset has several label files (vertical has one, cty)
-MULTI_FILE = [f"tutorial_{c}" for c in GEN.SCEN if c != "vertical"]
+GENERATED = [f"tutorial_{k}{suffix}" for k in GEN.TASKS for suffix in ("", "_all")]
 
 
 def _cells(name):
@@ -52,7 +51,7 @@ def _quiet(fn, *a, **kw):
 
 
 # ------------------------------------- R5-11e: a dict in the default order
-@pytest.mark.parametrize("name", MULTI_FILE + [E2E])
+@pytest.mark.parametrize("name", GENERATED + [E2E])
 def test_no_tutorial_says_a_label_dict_is_read_in_the_default_order(name):
     assert "is read in the default order" not in _markdown(name)
 
@@ -95,7 +94,7 @@ def test_a_named_skipped_method_has_its_reason_in_summary_and_failures(tmp_path,
     from multibench.engine import envs, registry
     if not (config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
-    trio = GEN.SCEN["vertical"]["methods"]
+    trio = GEN.TASKS["vertical_rna_adt"]["methods"]
     missing = envs.group_for(trio[-1])
     every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})

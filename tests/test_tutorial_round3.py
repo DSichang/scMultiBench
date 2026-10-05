@@ -28,9 +28,10 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
+KEYS = list(GEN.TASKS)
 OWN_DATA = "## 5. Your own data"
-FORM_WORDS = {"gene_activity": "gene-activity", "peak": "peaks"}
+# "peak": the three-modality tutorial says "an ATAC peak matrix", the others "peaks"
+FORM_WORDS = {"gene_activity": "gene-activity", "peak": "peak"}
 
 
 def _markdown(name, start):
@@ -45,26 +46,39 @@ def _visible(md):
     return re.sub(r"<details>.*?</details>", "", md, flags=re.S)
 
 
-@pytest.mark.parametrize("cat", CATS)
-def test_section_5_states_the_atac_form_where_the_category_reads_atac(cat):
-    """Visible, above the own-data demo: the ATAC form the tutorial's methods
-    read, or, when its demo has no ATAC, the call that says it. Cross reads
-    no ATAC."""
+def _reads_atac(key):
+    """Whether the task's default methods read an ATAC file in this task."""
     import multibench as mtb
-    md = _visible(_markdown(f"tutorial_{cat}", OWN_DATA))
-    form = GEN.SCEN[cat]["atac"]
-    if not mtb.find_methods(cat, modalities=["atac"]):
+    t = GEN.TASKS[key]
+    want = None if t["variants"] is None else [set(v) for v in t["variants"]]
+    return any(v["category"] == t["cat"] and (want is None or set(v["modalities"]) in want)
+               and any(mod.startswith("atac") for mod in v["modalities"])
+               for m in t["methods"] for v in mtb.method_info(m)["supports"])
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_section_5_states_the_atac_form_where_the_task_reads_atac(key):
+    """Visible, above the own-data demo: the ATAC form the tutorial's methods
+    read. A task without ATAC does not bring it up."""
+    import multibench as mtb
+    md = _visible(_markdown(f"tutorial_{key}", OWN_DATA))
+    if not _reads_atac(key):
         assert "ATAC" not in md, md
-    elif form is None:
-        assert 'mtb.method_info(m)["atac"]' in md, md
-    else:
-        assert {mtb.method_info(m)["atac"] for m in GEN.SCEN[cat]["methods"]} == {form}
-        assert FORM_WORDS[form] in md, md
+        return
+    forms = {mtb.method_info(m)["atac"] for m in GEN.TASKS[key]["methods"]}
+    assert len(forms) == 1, (key, forms)
+    assert "ATAC" in md and FORM_WORDS[forms.pop()] in md, md
+
+
+def test_the_tasks_that_read_atac_are_the_ones_labelled_so():
+    assert {k for k in KEYS if _reads_atac(k)} == \
+        {k for k, t in GEN.TASKS.items() if "ATAC" in t["label"]}
 
 
 def test_the_atac_categories_are_the_three_that_read_atac():
     import multibench as mtb
-    assert {c for c in CATS if mtb.find_methods(c, modalities=["atac"])} == \
+    cats = {t["cat"] for t in GEN.TASKS.values()}
+    assert {c for c in cats if mtb.find_methods(c, modalities=["atac"])} == \
         {"vertical", "diagonal", "mosaic"}
 
 
@@ -137,7 +151,7 @@ def test_the_sentence_holds_for_a_diagonal_folder_with_peaks_as_gene_activity(
         mtb.io.export_dataset(rna, tmp_path / "MYDIAG", atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal")
     df = _scan("MYDIAG", "diagonal", tmp_path)
-    for m in GEN.SCEN["diagonal"]["methods"]:
+    for m in GEN.TASKS["diagonal_rna_atac"]["methods"]:
         r = df.loc[m]
         assert r.files_ok and r.env_ok and not r.runnable, m
         assert r.reason.startswith(f"{m} needs gene-activity ATAC, and atac_gas.h5 holds "

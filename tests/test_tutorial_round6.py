@@ -22,34 +22,36 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
+KEYS = list(GEN.TASKS)
 
 
-@pytest.mark.parametrize("cat", CATS)
-def test_scan_prints_one_count_line_on_the_tutorial_dataset(cat, capsys):
+@pytest.mark.parametrize("key", KEYS)
+def test_scan_prints_one_count_line_on_the_tutorial_dataset(key, capsys):
     import multibench as mtb
-    ds = GEN.SCEN[cat]["ds"]
-    if not (mtb.config.DEFAULT.data_path / ds).is_dir():
-        pytest.skip(f"{ds} is not on disk")
+    t = GEN.TASKS[key]
+    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+        pytest.skip(f"{t['ds']} is not on disk")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        mtb.scan(ds, cat)
+        mtb.scan(t["ds"], t["cat"])
     scan_out = capsys.readouterr().out.strip().splitlines()
     assert len(scan_out) == 1 and scan_out[0].startswith("[scan] "), scan_out
 
 
-@pytest.mark.parametrize("cat,noun", [("vertical", "rows"), ("diagonal", "methods"),
-                                      ("mosaic", "rows"), ("cross", "methods")])
-def test_scan_count_line_noun_on_the_tutorial_datasets(cat, noun, capsys):
-    """The package fact the change follows (R6-12 h): D28 and D52 have one row
-    per method, D11 and D46 have methods with several rows."""
+@pytest.mark.parametrize("key", KEYS)
+def test_scan_count_line_noun_on_the_tutorial_datasets(key, capsys):
+    """The package fact the change follows (R6-12 h): the line says
+    ``methods`` when each method has one row, and ``rows`` otherwise. The
+    diagonal and cross categories have one variant per method, the vertical
+    and mosaic ones have methods with several."""
     import multibench as mtb
-    ds = GEN.SCEN[cat]["ds"]
-    if not (mtb.config.DEFAULT.data_path / ds).is_dir():
-        pytest.skip(f"{ds} is not on disk")
+    t = GEN.TASKS[key]
+    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+        pytest.skip(f"{t['ds']} is not on disk")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        frame = mtb.scan(ds, cat)
+        frame = mtb.scan(t["ds"], t["cat"])
+    noun = "methods" if t["cat"] in ("diagonal", "cross") else "rows"
     line = capsys.readouterr().out.strip()
     assert line.startswith(f"[scan] {int(frame.files_ok.sum())} of {len(frame)} {noun} "), line
     assert frame.method.is_unique == (noun == "methods")

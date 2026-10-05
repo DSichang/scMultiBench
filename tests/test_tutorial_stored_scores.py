@@ -1,6 +1,7 @@
 """The stored scores the tutorials draw, checked against the live package.
 
-Section 6 of each category tutorial reads the package's stored re-run scores;
+Section 6 of a task tutorial whose task has stored scores reads the package's
+stored re-run scores;
 ``notebooks/results`` holds a second copy of the same tables. These tests pin
 the counts and the error the section states, the ``source=`` every
 ``load_results`` call names, and the agreement of the two copies.
@@ -30,8 +31,13 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
-NOTEBOOKS = [f"tutorial_{c}" for c in CATS] + ["tutorial_end_to_end", "colab_quickstart"]
+KEYS = list(GEN.TASKS)
+# the tasks whose tutorial has a stored-scores section
+STORED = [k for k in KEYS if GEN.TASKS[k].get("stored_ds")]
+GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")]
+NOTEBOOKS = GENERATED + ["tutorial_end_to_end", "colab_quickstart"]
+# the notebooks that draw stored scores
+DRAWING = [f"tutorial_{k}" for k in STORED] + ["tutorial_end_to_end", "colab_quickstart"]
 
 
 def _cells(name):
@@ -62,27 +68,41 @@ def test_every_load_results_call_names_its_source(name):
                 n += 1
                 assert any(k.arg == "source" for k in node.keywords), \
                     f"{name}: load_results without source=: {ast.unparse(node)[:80]}"
-    assert n >= 1, name
+    assert (n >= 1) == (name in DRAWING), name
 
 
-@pytest.mark.parametrize("cat", CATS)
-def test_stored_scores_section_states_the_measured_counts(cat):
+def test_the_stored_scores_section_follows_the_task():
+    """A tutorial has the section only when its task names a stored dataset,
+    and the four benchmark datasets with stored scores each have one."""
+    for key in KEYS:
+        heads = [src.splitlines()[0] for kind, src in _cells(f"tutorial_{key}")
+                 if kind == "markdown" and "Stored scores" in src.splitlines()[0]]
+        assert heads == (["## 6. Stored scores"] if key in STORED else []), key
+    assert sorted(GEN.TASKS[k]["stored_ds"] for k in STORED) == ["D11", "D28", "D45", "D52"]
+
+
+@pytest.mark.parametrize("key", STORED)
+def test_stored_scores_section_states_the_measured_counts(key):
     """The method counts of section 6 are those load_results gives, and the
     sentence on source="published" holds on the live package."""
-    s = GEN.SCEN[cat]
-    ds = s.get("stored_ds", s["ds"])
-    md = next(src for kind, src in _cells(f"tutorial_{cat}")
+    t = GEN.TASKS[key]
+    cat, ds, shown = t["cat"], t["stored_ds"], t["ds"]
+    cells = _cells(f"tutorial_{key}")
+    md = next(src for kind, src in cells
               if kind == "markdown" and src.startswith("## 6. Stored scores"))
     md = " ".join(md.split())
+    code = "\n".join(src for kind, src in cells if kind == "code")
+    assert f'mtb.load_results("{cat}", dataset="{ds}", source="rerun")' in code
     cov = mtb.results_coverage(cat)
-    if ds != s["ds"]:
+    if ds != shown:
         # a tutorial-size subset: its own scores are never stored
-        assert cov[cov.dataset == s["ds"]].empty
-        if cat == "mosaic":
-            assert f"There are no stored scores for `{s['ds']}` or `D46`." in md
-        else:
+        assert cov[cov.dataset == shown].empty
+        if ds in shown:
             assert (f"The stored scores are for the full `{ds}`, the benchmark dataset "
-                    f"`{s['ds']}` is drawn from.") in md
+                    f"`{shown}` is drawn from.") in md
+        else:
+            assert (f"There are no stored scores for `{shown}`. `{ds}` is another "
+                    f"benchmark dataset of the same task.") in md
     cov = cov[cov.dataset == ds]
     rerun = _quiet(mtb.load_results, cat, dataset=ds, source="rerun")
     assert f"stored scores for {rerun.method.nunique()} methods on `{ds}`" in md
@@ -94,7 +114,8 @@ def test_stored_scores_section_states_the_measured_counts(cat):
     else:
         with pytest.raises(FileNotFoundError):
             _quiet(mtb.load_results, cat, dataset=ds)
-        assert '`source="published"`, the default, raises `FileNotFoundError`' in md
+        assert (f"There is no published scIB table for {cat}, so `source=\"published\"`, "
+                f"the default, raises `FileNotFoundError`.") in md
 
 
 @pytest.mark.parametrize("ds", ["D11", "D28", "D45", "D52"])

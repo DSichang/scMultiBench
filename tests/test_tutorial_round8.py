@@ -7,7 +7,7 @@ follow the same rule. Code and code comments are left as they are.
 
 R8-04 makes ``scan`` and ``run_all`` raise ``ValueError`` when ``methods=``
 names a method with no variant in the category, where they used to drop it.
-The run cells of the category tutorials pass a fixed method list to
+The run cells of the task tutorials pass a fixed method list to
 ``run_all``. The guard below checks that list against the live package, so a
 list that would now raise fails here instead of in a Run all.
 """
@@ -31,8 +31,9 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
-NOTEBOOKS = [f"tutorial_{c}" for c in CATS] + ["colab_quickstart", "tutorial_end_to_end"]
+KEYS = list(GEN.TASKS)
+GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")]
+NOTEBOOKS = GENERATED + ["colab_quickstart", "tutorial_end_to_end"]
 
 
 def _cells(name):
@@ -83,34 +84,52 @@ def test_printed_lines_hold_no_semicolon(name):
 
 def test_split_sentences_keep_their_facts():
     """The sentences split at the ';' keep both halves."""
-    for cat in CATS:
-        md = "\n".join(src for kind, src in _cells(f"tutorial_{cat}") if kind == "markdown")
-        assert "Circle size shows the rank within a column, and bigger is better." in md
-    cross = _cells("tutorial_cross")[0][1]
-    assert ("Every cross method here reads RNA and ADT. For several 10x Multiome samples, "
-            "use the vertical tutorial.") in cross
-    mosaic = "\n".join(src for _, src in _cells("tutorial_mosaic"))
-    assert ("writes one batch per call. Number the batches to match a pattern that "
-            "`mtb.describe_layout(\"mosaic\")` lists") in mosaic
+    for name in GENERATED:
+        md = "\n".join(src for kind, src in _cells(name) if kind == "markdown")
+        assert "Circle size shows the rank within a column, and bigger is better." in md, name
+    for key in KEYS:
+        if GEN.TASKS[key]["cat"] != "mosaic":
+            continue
+        md = "\n".join(src for kind, src in _cells(f"tutorial_{key}") if kind == "markdown")
+        assert "writes one batch per call. Number the batches as below: " in md, key
+        assert "`mtb.describe_layout(\"mosaic\")` lists the batch patterns" in md, key
 
 
 # ------------------------------------------ R8-04 guards: the named methods
-@pytest.mark.parametrize("cat", CATS)
-def test_run_cells_name_only_methods_with_a_variant_on_their_dataset(cat):
-    """The run cell passes the tutorial's method list to run_all on its
+def _method_list(name):
+    """The list a notebook assigns to ``METHODS``."""
+    found = []
+    for kind, src in _cells(name):
+        if kind != "code" or "METHODS = " not in src:
+            continue
+        ipy = pytest.importorskip("IPython.core.inputtransformer2")
+        for node in ast.walk(ast.parse(ipy.TransformerManager().transform_cell(src))):
+            if isinstance(node, ast.Assign) and ast.unparse(node.targets[0]) == "METHODS":
+                found.append(ast.literal_eval(node.value))
+    assert len(found) == 1, name
+    return found[0]
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_run_cells_name_only_methods_with_a_variant_on_their_dataset(key):
+    """The run cell passes the notebook's method list to run_all on its
     dataset. Since R8-04 a listed method with no variant there raises
-    ValueError, so every listed method must get a row."""
+    ValueError, so every listed method must get a row. The tutorial lists its
+    default methods, and the ``_all`` notebook every method of the task."""
     import multibench as mtb
-    s = GEN.SCEN[cat]
-    methods = s["methods"]
-    code = "\n".join(src for kind, src in _cells(f"tutorial_{cat}") if kind == "code")
-    assert f"METHODS = {json.dumps(methods)}" in code
-    ds = s["ds"]
+    t = GEN.TASKS[key]
+    cat, ds = t["cat"], t["ds"]
+    lists = {f"tutorial_{key}": t["methods"], f"tutorial_{key}_all": GEN.task_methods(key)}
+    for name, methods in lists.items():
+        assert _method_list(name) == methods, name
+    assert set(t["methods"]) <= set(GEN.task_methods(key))
     if not (mtb.config.DEFAULT.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
-    sc = _quiet(mtb.scan, ds, cat, methods=methods, verbose=False)
-    assert set(sc.method) == set(methods), (cat, ds)
+    for name, methods in lists.items():
+        sc = _quiet(mtb.scan, ds, cat, methods=methods, verbose=False)
+        assert set(sc.method) == set(methods), (name, ds)
     # the check the guard protects against: an off-category name raises
+    methods = t["methods"]
     other = next(m for m in mtb.list_methods() if cat not in mtb.method_info(m)["categories"])
     with pytest.raises(ValueError, match=rf"{re.escape(other)} does not run on {cat} data"):
         _quiet(mtb.scan, ds, cat, methods=methods + [other], verbose=False)

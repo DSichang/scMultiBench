@@ -28,6 +28,17 @@ def _load_gen_tut():
     return mod
 
 
+def _generated(gen):
+    """``{notebook name: builder}`` for every notebook tools/gen_tut.py
+    writes: per task the tutorial and the run of every method, and the
+    quickstart."""
+    out = {"colab_quickstart": gen.build_colab_quickstart}
+    for key in gen.TASKS:
+        out[f"tutorial_{key}"] = lambda key=key: gen.build_tutorial(key)
+        out[f"tutorial_{key}_all"] = lambda key=key: gen.build_all_methods(key)
+    return out
+
+
 def _code_cells(path):
     nb = json.loads(path.read_text())
     return ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
@@ -64,25 +75,30 @@ def test_notebook_install_cells_identical():
 
 
 def test_env_install_cell_follows_pip_and_needs_no_conda():
-    """One environment install per tutorial, after the pip cell, with the
+    """One environment install per notebook that runs methods (each task's
+    tutorial and its run of every method), after the pip cell, with the
     packed archives (the default), which need no conda binary, so no notebook
     provisions conda (condacolab); the quickstart, which runs no method,
     installs no environment."""
     gen = _load_gen_tut()
     pip = gen.INSTALL_CELL.strip()
-    for cat in gen.SCEN:
-        nb = json.loads((ROOT / "notebooks" / f"tutorial_{cat}.ipynb").read_text())
+    for name in _generated(gen):
+        if name == "colab_quickstart":
+            continue
+        path = ROOT / "notebooks" / f"{name}.ipynb"
+        nb = json.loads(path.read_text())
         src = ["".join(c["source"]).strip() for c in nb["cells"]]
         env_cells = [i for i, c in enumerate(src) if "mtb.env.install(" in c and "dry_run=False" in c]
-        assert len(env_cells) == 1, f"tutorial_{cat}: exactly one env-install cell"
+        assert len(env_cells) == 1, f"{name}: exactly one env-install cell"
         i_pip, i_env = src.index(pip), env_cells[0]
-        assert i_env > i_pip, f"tutorial_{cat}: the env cell must come after the pip cell"
+        assert i_env > i_pip, f"{name}: the env cell must come after the pip cell"
         assert "packed=False" not in src[i_env] and "conda=" not in src[i_env]
         section = next(c for c in src if c.startswith("## 2. Download the data and the environments"))
-        assert "with no conda needed" in section and "mtb.config.DEFAULT.envs_dir" in section
-        assert "condacolab" not in "\n".join(src).lower(), f"tutorial_{cat}: no condacolab anywhere"
-        assert "multibench env install" not in "\n".join(_code_cells(ROOT / "notebooks" / f"tutorial_{cat}.ipynb")), \
-            f"tutorial_{cat}: the notebook installs through the Python API, not a shell line"
+        if not name.endswith("_all"):          # the tutorial explains the step
+            assert "with no conda needed" in section and "mtb.config.DEFAULT.envs_dir" in section
+        assert "condacolab" not in "\n".join(src).lower(), f"{name}: no condacolab anywhere"
+        assert "multibench env install" not in "\n".join(_code_cells(path)), \
+            f"{name}: the notebook installs through the Python API, not a shell line"
     import multibench as mtb
     assert inspect.signature(mtb.env.install).parameters["packed"].default is True
     quick = json.loads((ROOT / "notebooks" / "colab_quickstart.ipynb").read_text())
@@ -124,12 +140,10 @@ def test_gen_tut_output_matches_committed_notebooks(tmp_path, monkeypatch):
     """Regenerating must reproduce the committed notebooks' code cells (no hand edits)."""
     gen = _load_gen_tut()
     import nbformat
-    for cat, s in gen.SCEN.items():
-        cells = [c.source for c in gen.build_tutorial(cat, s) if c.cell_type == "code"]
-        committed = _code_cells(ROOT / "notebooks" / f"tutorial_{cat}.ipynb")
-        assert cells == committed, f"tutorial_{cat}.ipynb is not gen_tut output - regenerate"
-    cells = [c.source for c in gen.build_colab_quickstart() if c.cell_type == "code"]
-    assert cells == _code_cells(ROOT / "notebooks" / "colab_quickstart.ipynb")
+    for name, build in _generated(gen).items():
+        cells = [c.source for c in build() if c.cell_type == "code"]
+        committed = _code_cells(ROOT / "notebooks" / f"{name}.ipynb")
+        assert cells == committed, f"{name}.ipynb is not gen_tut output - regenerate"
 
 
 def test_collapsed_blocks_render_as_markdown():
@@ -139,7 +153,7 @@ def test_collapsed_blocks_render_as_markdown():
     inner markdown as literal text (``**Label.**``, ``- item``)."""
     gen = _load_gen_tut()
     n = 0
-    for name in [f"tutorial_{cat}" for cat in gen.SCEN] + ["colab_quickstart"]:
+    for name in _generated(gen):
         nb = json.loads((ROOT / "notebooks" / f"{name}.ipynb").read_text())
         for c in nb["cells"]:
             src = "".join(c["source"])
@@ -160,16 +174,18 @@ def test_tutorials_use_the_public_api_not_raw_csv_reads():
     The one read_csv the tutorials keep reads a dataset's label file into a
     demo AnnData for the own-data section."""
     gen = _load_gen_tut()
-    for cat, s in gen.SCEN.items():
-        cells = gen.build_tutorial(cat, s)
+    for key, s in gen.TASKS.items():
+        cells = gen.build_tutorial(key)
         src = "\n".join(c.source for c in cells if c.cell_type == "code")
         md = "\n".join(c.source for c in cells if c.cell_type == "markdown")
-        assert "mtb.load_results(" in src and 'source="rerun"' in src
+        # stored scores are drawn only where the task has a stored dataset
+        assert ("mtb.load_results(" in src) == bool(s.get("stored_ds")), key
+        assert src.count("mtb.load_results(") == src.count('source="rerun"'), key
         assert "mtb.cite(" in md
         reads = re.findall(r"read_csv\(([^)]*)\)", src)
-        assert reads, cat
+        assert reads, key
         for arg in reads:
-            assert re.fullmatch(r'd / f?"\w*cty\{?\w*\}?\.csv"', arg), (cat, arg)
+            assert re.fullmatch(r'd / f?"\w*cty\{?\w*\}?\.csv"', arg), (key, arg)
         assert f'd = mtb.config.DEFAULT.data_path / "{s["ds"]}"' in src
         assert "mtb.io.read_canonical(" in src and "h5py" not in src
         assert "read_csv(RESULTS" not in src and "results/" not in src
@@ -802,10 +818,14 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     gate = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gate)
     # every published copy has a package notebook to be compared with
+    # and the site publishes them all: per task the tutorial and the run of
+    # every method its "Every method of this task" section links, and the
+    # end-to-end tutorial
     copies = sorted((_docs_root() / "tutorials").glob("*.ipynb"))
-    assert len(copies) == 5
     for copy in copies:
         assert (ROOT / "notebooks" / f"tutorial_{copy.name}").is_file(), copy.name
+    assert [c.stem for c in copies] == sorted(
+        [k + s for k in _load_gen_tut().TASKS for s in ("", "_all")] + ["end_to_end"])
     cells = [("markdown", "# Title\n\nprose"), ("code", "import multibench as mtb\nmtb.scan('D11')")]
     pkg, site = tmp_path / "pkg" / "notebooks", tmp_path / "docs" / "tutorials"
     _write_nb(pkg / "tutorial_a.ipynb", cells, executed=False)

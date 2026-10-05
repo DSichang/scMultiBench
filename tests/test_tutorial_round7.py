@@ -40,8 +40,8 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-CATS = list(GEN.SCEN)
-TUTORIALS = [f"tutorial_{c}" for c in CATS]
+KEYS = list(GEN.TASKS)
+TUTORIALS = [f"tutorial_{k}" for k in KEYS]
 
 
 def _cells(name):
@@ -121,7 +121,7 @@ def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
 # ---------------------------------- R7-03: which ATAC files a method needs
 def test_diagonal_title_points_to_the_call_that_lists_the_files_each_method_needs():
     import multibench as mtb
-    title = _visible(_cells("tutorial_diagonal")[0][1])
+    title = _visible(_cells("tutorial_diagonal_rna_atac")[0][1])
     _, _, both = GEN.atac_forms("diagonal")
     assert f"{GEN.and_list(both)} need both." in title
     # method_info names one form and lists the both-file methods under peak,
@@ -189,13 +189,13 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     import multibench as mtb
     from multibench import workflow as W
     from multibench.engine import runner as R
-    cat = name.removeprefix("tutorial_")
-    methods = GEN.SCEN[cat]["methods"]
+    t = GEN.TASKS[name.removeprefix("tutorial_")]
+    cat, methods = t["cat"], t["methods"]
     md = _markdown(name, "## 2. Download the data and the environments")
     assert f"`multibench env install --methods {','.join(methods)} --packed --run`" in md
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    ds = GEN.SCEN[cat]["ds"]
+    ds = t["ds"]
     if not (mtb.config.DEFAULT.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
     for m in methods:

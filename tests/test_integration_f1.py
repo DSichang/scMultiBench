@@ -159,22 +159,22 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
 
 
 def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch):
-    """The own-data cells of the vertical tutorial export raw counts, so
+    """The own-data cells of the vertical RNA + ADT tutorial export raw counts, so
     export_dataset's raw-count warning and scan's caveat stay silent (L01)."""
     import json
     import warnings
-    nb = json.loads((root / "notebooks" / "tutorial_vertical.ipynb").read_text())
+    nb = json.loads((root / "notebooks" / "tutorial_vertical_rna_adt.ipynb").read_text())
     code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(adata" in src)
-    export = code[i].split("\n\nmine = mtb.run_all(")[0]
-    assert "run_all" not in export
+    export = code[i]                       # run_all on the folder has its own cell
+    assert "run_all" not in export and code[i + 1].startswith('mine = mtb.run_all("MYCITE"')
     monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        exec(compile(code[i - 1], "tutorial_vertical", "exec"), ns)
-        exec(compile(export, "tutorial_vertical", "exec"), ns)
+        exec(compile(code[i - 1], "tutorial_vertical_rna_adt", "exec"), ns)
+        exec(compile(export, "tutorial_vertical_rna_adt", "exec"), ns)
     assert not [w for w in seen if "whole numbers" in str(w.message)]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

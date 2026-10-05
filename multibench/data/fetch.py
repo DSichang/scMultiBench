@@ -41,11 +41,10 @@ RELEASE_URL = "https://github.com/DSichang/scMultiBench/releases/download/data-v
 # datasets published as release assets, with approximate download sizes
 AVAILABLE = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB",
              "D46": "97 MB", "D52": "179 MB",
-             # small copies for the tutorials and for trying any method
-             # (tools/make_tutorial_data.py)
-             "D28mini": "14 MB", "D45mini": "11 MB", "D46mini": "2 MB",
-             "D52mini": "2 MB", "D27mini": "15 MB", "D27mini_gas": "2 MB",
-             "D27mini_paired": "15 MB"}
+             # one small dataset per integration task (tools/make_tutorial_data.py)
+             "D27mini_vertical": "24 MB", "D22mini": "8 MB", "D27mini": "15 MB",
+             "D45mini": "11 MB", "D46mini": "2 MB", "D38mini": "2 MB",
+             "D52mini": "2 MB"}
 
 #: ``{dataset: url}`` of the benchmark host's ``run_all`` output trees
 #: (``mtb.data.fetch_outputs``); ships in the wheel next to ``packed_urls.json``
