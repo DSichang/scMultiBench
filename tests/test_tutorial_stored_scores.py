@@ -34,7 +34,8 @@ GEN = _load_gen_tut()
 KEYS = list(GEN.TASKS)
 # the tasks whose tutorial has a stored-scores section
 STORED = [k for k in KEYS if GEN.TASKS[k].get("stored_ds")]
-GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")]
+GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")
+             if not suffix or GEN.has_all(k)]
 NOTEBOOKS = GENERATED + ["tutorial_end_to_end", "colab_quickstart"]
 # the notebooks that draw stored scores
 DRAWING = [f"tutorial_{k}" for k in STORED] + ["tutorial_end_to_end", "colab_quickstart"]

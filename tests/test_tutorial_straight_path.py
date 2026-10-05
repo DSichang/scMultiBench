@@ -32,7 +32,8 @@ def _load_gen_tut():
 GEN = _load_gen_tut()
 KEYS = list(GEN.TASKS)
 TUTORIALS = [f"tutorial_{k}" for k in KEYS]
-EVERY = [f"tutorial_{k}_all" for k in KEYS]        # every method of a task
+ALL_KEYS = [k for k in KEYS if GEN.has_all(k)]   # tasks with more methods than the defaults
+EVERY = [f"tutorial_{k}_all" for k in KEYS if GEN.has_all(k)]        # every method of a task
 RUNNING = TUTORIALS + EVERY + ["tutorial_end_to_end"]
 ALL = RUNNING + ["colab_quickstart"]
 CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
@@ -120,7 +121,7 @@ def test_task_tutorial_installs_and_runs(key):
     assert code.index("mtb.env.install") < code.index("mtb.run_all")
 
 
-@pytest.mark.parametrize("key", KEYS)
+@pytest.mark.parametrize("key", ALL_KEYS)
 def test_all_methods_notebook_installs_and_runs_every_method(key):
     """The ``_all`` notebook: install, ``run_all`` and plot for every method
     of the task, on the task's dataset."""
@@ -157,12 +158,18 @@ def test_every_method_section_lists_the_task_and_links_the_all_page(key):
     md = cells[i][1]
     everyone = GEN.task_methods(key)
     n = len(everyone)
-    assert (f"{n} method{'s have' if n > 1 else ' has'} a variant for {t['cat']} "
-            f"{t['label']}: {GEN.and_list(everyone)}. Each runs on `{t['ds']}`.") in md
-    assert "set `METHODS` to that list in section 2" in md
-    assert f"That downloads {GEN.env_size_text(methods=everyone)}." in md
-    assert f"]({GEN.SITE}tutorials/{key}_all/)" in md
-    assert (ROOT / "notebooks" / f"tutorial_{key}_all.ipynb").is_file()
+    if GEN.has_all(key):
+        assert (f"{n} method{'s have' if n > 1 else ' has'} a variant for {t['cat']} "
+                f"{t['label']}: {GEN.and_list(everyone)}. Each runs on `{t['ds']}`.") in md
+        assert "set `METHODS` to that list in section 2" in md
+        assert f"That downloads {GEN.env_size_text(methods=everyone)}." in md
+        assert f"]({GEN.SITE}tutorials/{key}_all/)" in md
+    else:
+        # the tutorial already runs every method: no second notebook, no link
+        assert everyone == sorted(t["methods"])
+        assert f"with a variant for {t['cat']} {t['label']}, so this tutorial runs every method" in md
+        assert "_all" not in md
+    assert (ROOT / "notebooks" / f"tutorial_{key}_all.ipynb").is_file() == GEN.has_all(key)
     # markdown only: the next cell is Troubleshooting, not code
     assert cells[i + 1][0] == "markdown" and cells[i + 1][1].startswith("## Troubleshooting")
     assert cells[i + 2][1].startswith("## Next steps")
@@ -213,7 +220,7 @@ def test_title_links_its_own_colab_notebook(name):
     assert f"{GEN.COLAB}{name}.ipynb" in _cells(name)[0][1]
 
 
-@pytest.mark.parametrize("key", KEYS)
+@pytest.mark.parametrize("key", ALL_KEYS)
 def test_all_methods_title_names_the_methods_and_links_the_tutorial(key):
     """The ``_all`` title links the tutorial that explains the steps, and
     states the environments' size from the dry-run plans."""
@@ -310,7 +317,8 @@ def test_notebooks_match_the_generator(tmp_path, monkeypatch):
     built = {"colab_quickstart": GEN.build_colab_quickstart}
     for key in KEYS:
         built[f"tutorial_{key}"] = lambda key=key: GEN.build_tutorial(key)
-        built[f"tutorial_{key}_all"] = lambda key=key: GEN.build_all_methods(key)
+        if GEN.has_all(key):
+            built[f"tutorial_{key}_all"] = lambda key=key: GEN.build_all_methods(key)
     for name, build in built.items():
         fresh = nbf.writes(GEN._notebook(build(), name))
         assert fresh.strip() == (ROOT / "notebooks" / f"{name}.ipynb").read_text().strip(), name

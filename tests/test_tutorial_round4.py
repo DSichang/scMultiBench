@@ -40,7 +40,7 @@ def _load_gen_tut():
 GEN = _load_gen_tut()
 KEYS = list(GEN.TASKS)
 TUTORIALS = [f"tutorial_{k}" for k in KEYS]
-EVERY = [f"tutorial_{k}_all" for k in KEYS]        # every method of a task
+EVERY = [f"tutorial_{k}_all" for k in KEYS if GEN.has_all(k)]        # every method of a task
 
 
 def _cells(name):

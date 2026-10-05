@@ -35,7 +35,8 @@ def _generated(gen):
     out = {"colab_quickstart": gen.build_colab_quickstart}
     for key in gen.TASKS:
         out[f"tutorial_{key}"] = lambda key=key: gen.build_tutorial(key)
-        out[f"tutorial_{key}_all"] = lambda key=key: gen.build_all_methods(key)
+        if gen.has_all(key):
+            out[f"tutorial_{key}_all"] = lambda key=key: gen.build_all_methods(key)
     return out
 
 
@@ -825,7 +826,8 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     for copy in copies:
         assert (ROOT / "notebooks" / f"tutorial_{copy.name}").is_file(), copy.name
     assert [c.stem for c in copies] == sorted(
-        [k + s for k in _load_gen_tut().TASKS for s in ("", "_all")] + ["end_to_end"])
+        [k + s for k in _load_gen_tut().TASKS for s in ("", "_all")
+         if not s or _load_gen_tut().has_all(k)] + ["end_to_end"])
     cells = [("markdown", "# Title\n\nprose"), ("code", "import multibench as mtb\nmtb.scan('D11')")]
     pkg, site = tmp_path / "pkg" / "notebooks", tmp_path / "docs" / "tutorials"
     _write_nb(pkg / "tutorial_a.ipynb", cells, executed=False)
@@ -1036,3 +1038,15 @@ def test_each_guide_warning_appears_once_on_the_site():
                          ("only warns, and such a method gives a wrong result", "tutorials/run.md")):
         found = {page: text.count(phrase) for page, text in flat.items() if phrase in text}
         assert found == {home: 1}, (phrase, found)
+
+
+def test_the_site_shows_the_every_method_switch_where_that_page_exists():
+    """overrides/main.html names the tasks that have an ``_all`` page; a task
+    whose tutorial already runs every method must not link one."""
+    if not os.environ.get("SCMULTIBENCH_DOCS"):
+        pytest.skip("SCMULTIBENCH_DOCS not set")
+    import ast
+    gen = _load_gen_tut()
+    html = (_docs_root().parent / "overrides" / "main.html").read_text()
+    listed = ast.literal_eval(re.search(r"set with_all = (\[.*?\])", html, re.S).group(1))
+    assert sorted(listed) == sorted(k for k in gen.TASKS if gen.has_all(k))

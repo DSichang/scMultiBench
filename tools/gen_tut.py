@@ -645,11 +645,16 @@ mtb.plot.bubble(long)''')
         n_sec += 1
 
     # ------------------------------------------------------------ every method
-    md(f"""## {n_sec}. Every method of this task
+    if has_all(key):
+        md(f"""## {n_sec}. Every method of this task
 
 {len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for {t['cat']} {t['label']}: {and_list(everyone)}. Each runs on `{ds}`. To run them all, set `METHODS` to that list in section 2 and run the notebook again. That downloads {env_size_text(methods=everyone)}.
 
 [Every method on `{ds}`]({SITE}tutorials/{key}_all/) shows that run.""")
+    else:
+        md(f"""## {n_sec}. Every method of this task
+
+{and_list(everyone)} {'are the only methods' if len(everyone) > 1 else 'is the only method'} with a variant for {t['cat']} {t['label']}, so this tutorial runs every method of the task.""")
 
     # -------------------------------------------------------- troubleshooting
     md("""## Troubleshooting
@@ -675,6 +680,12 @@ mtb.plot.bubble(long)''')
 - The guides: [run]({SITE}tutorials/run/), [evaluate]({SITE}tutorials/evaluate/), [plot]({SITE}tutorials/plot/) and [discover methods]({SITE}tutorials/discover/).
 - The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has the full benchmark's rankings, with no install needed.""")
     return C
+
+
+def has_all(key):
+    """Whether the task has methods beyond the tutorial's defaults, and so a
+    notebook that runs every method."""
+    return set(task_methods(key)) != set(TASKS[key]["methods"])
 
 
 def graph_methods(key):
@@ -798,8 +809,10 @@ mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
 
 if __name__ == "__main__":
     for key in TASKS:
-        for name, cells in ((f"tutorial_{key}", build_tutorial(key)),
-                            (f"tutorial_{key}_all", build_all_methods(key))):
+        books = [(f"tutorial_{key}", build_tutorial(key))]
+        if has_all(key):
+            books.append((f"tutorial_{key}_all", build_all_methods(key)))
+        for name, cells in books:
             path = os.path.join(OUT, f"{name}.ipynb")
             nbf.write(_notebook(cells, name), path)
             print(f"wrote {path} {len(cells)} cells")

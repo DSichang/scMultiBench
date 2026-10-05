@@ -32,7 +32,8 @@ def _load_gen_tut():
 
 GEN = _load_gen_tut()
 KEYS = list(GEN.TASKS)
-GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")]
+GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")
+             if not suffix or GEN.has_all(k)]
 NOTEBOOKS = GENERATED + ["colab_quickstart", "tutorial_end_to_end"]
 
 
@@ -119,7 +120,9 @@ def test_run_cells_name_only_methods_with_a_variant_on_their_dataset(key):
     import multibench as mtb
     t = GEN.TASKS[key]
     cat, ds = t["cat"], t["ds"]
-    lists = {f"tutorial_{key}": t["methods"], f"tutorial_{key}_all": GEN.task_methods(key)}
+    lists = {f"tutorial_{key}": t["methods"]}
+    if GEN.has_all(key):
+        lists[f"tutorial_{key}_all"] = GEN.task_methods(key)
     for name, methods in lists.items():
         assert _method_list(name) == methods, name
     assert set(t["methods"]) <= set(GEN.task_methods(key))

@@ -32,7 +32,8 @@ def _load_gen_tut():
 
 GEN = _load_gen_tut()
 E2E = "tutorial_end_to_end"
-GENERATED = [f"tutorial_{k}{suffix}" for k in GEN.TASKS for suffix in ("", "_all")]
+GENERATED = [f"tutorial_{k}{suffix}" for k in GEN.TASKS for suffix in ("", "_all")
+             if not suffix or GEN.has_all(k)]
 
 
 def _cells(name):

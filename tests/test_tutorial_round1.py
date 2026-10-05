@@ -33,7 +33,7 @@ def _load_gen_tut():
 GEN = _load_gen_tut()
 KEYS = list(GEN.TASKS)
 TUTORIALS = [f"tutorial_{k}" for k in KEYS]
-EVERY = [f"tutorial_{k}_all" for k in KEYS]        # every method of a task
+EVERY = [f"tutorial_{k}_all" for k in KEYS if GEN.has_all(k)]        # every method of a task
 GENERATED = TUTORIALS + EVERY + ["colab_quickstart"]
 ALL = GENERATED + ["tutorial_end_to_end"]
 
