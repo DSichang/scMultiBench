@@ -2,32 +2,41 @@
 
 usage: python tools/make_tutorial_data.py <benchmark data dir> <out_dir>
 
-Each is a smaller copy of a benchmark dataset: a seeded random subset of the
-cells, the most variable genes of the RNA and the most open ATAC peaks, so
-that a tutorial runs in 10-15 minutes on a Colab runtime (2 vCPUs) and every
-method that accepts the dataset's layout runs on it. The sizes are the
-smallest at which no method failed:
+One dataset per integration task, and every method of the task runs on it:
 
-- online_iNMF needs about 5,000 cells in total (D28mini: 3,000 + 3,000);
-- Multigrate's mosaic variant needs about 6,000 (D45mini: 2,000 per batch);
-- MIRA needs about 2,000 genes, VIPCCA selects 2,000 variable genes itself
-  and Conos' variance fit fails on 1,000, so the RNA + ATAC datasets keep
-  2,500 genes; the mosaic and cross datasets run on 1,000;
+    vertical   RNA + ADT          D11 (the benchmark dataset itself, 2,864 cells)
+    vertical   RNA + ATAC         D27mini_vertical
+    vertical   RNA + ADT + ATAC   D22mini
+    diagonal   RNA + ATAC         D27mini
+    mosaic     RNA + ATAC         D45mini
+    mosaic     RNA + ADT + ATAC   D46mini
+    mosaic     RNA + ADT          D38mini
+    cross      RNA + ADT          D52mini
+
+Each mini is a smaller copy of a benchmark dataset: a seeded random subset of
+the cells, the most variable genes of the RNA and a set of ATAC peaks, so that
+a tutorial runs in 10-15 minutes on a Colab runtime (2 vCPUs). The sizes are
+the smallest at which no method of the task failed:
+
+- online_iNMF needs about 5,000 cells in total (D27mini: 3,000 + 3,000);
+- Multigrate's mosaic runs need about 6,000 (D45mini: 2,000 per batch);
+- MIRA needs about 2,000 genes and 5,000 cells, VIPCCA selects 2,000 variable
+  genes itself and Conos' variance fit fails on 1,000, so the RNA + ATAC
+  datasets keep 2,500 genes; the others run on 1,000;
 - scMVP drops every peak open in more than 10% of the cells, so half of the
   peaks kept are the most open ones and half the most open below that limit.
 
-Files with the same cell count are the same cells (a batch's RNA, ADT and
-labels; D28's two ATAC files), so every modality file stays aligned with its
-label file. One gene set serves every RNA and gene-activity file of a
-dataset, and one peak set every peak file, so batches keep the same features.
-ADT is never reduced. Only the canonical inputs are written (``*.h5`` and
-``*cty*.csv``). Each folder is also written as ``<name>.tar.gz`` for the
-data-v1 release.
+D27 holds RNA, ATAC peaks and gene activity of the same cells. D27mini_vertical
+carries both ATAC files, so the methods that read peaks and those that read
+gene activity run on the one dataset; D27mini is its diagonal layout, whose
+paired cells Seurat_v5 needs as its bridge.
 
-D27 holds RNA, ATAC peaks and gene activity of the same cells; three datasets
-come from it: D27mini (vertical, RNA + peaks), D27mini_gas (vertical, RNA +
-gene activity) and D27mini_paired (diagonal layout with paired cells, which
-Seurat_v5 needs as its bridge).
+Files with the same cell count are the same cells (a batch's RNA, ADT and
+labels), so every modality file stays aligned with its label file. One gene
+list (in the RNA's order) serves every RNA and gene-activity file of a
+dataset, and one peak list every peak file. ADT is never reduced. Only the
+canonical inputs are written. Each folder is also written as
+``<name>.tar.gz`` for the data-v1 release.
 """
 import sys
 import tarfile
@@ -41,19 +50,27 @@ SEED = 0
 # name -> source dataset, cells per group of files with the same cell count,
 # genes kept, peaks kept, and for D27 the {output file: source file} map
 PLAN = {
-    "D28mini": dict(src="D28", cells=3000, genes=2500, peaks=5000),
+    # vertical
+    "D27mini_vertical": dict(src="D27", cells=5000, genes=2500, peaks=5000,
+                             files={"rna.h5": "rna.h5", "atac_peak.h5": "peak.h5",
+                                    "atac_gas.h5": "atac_gas.h5", "cty.csv": "rna_cty.csv"}),
+    "D22mini": dict(src="D22", cells=3000, genes=1000, peaks=5000,
+                    files={"rna.h5": "rna.h5", "adt.h5": "adt.h5", "atac.h5": "atac.h5",
+                           "cty.csv": "cty.csv"}),
+    # diagonal
+    "D27mini": dict(src="D27", cells=3000, genes=2500, peaks=5000,
+                    files={"rna.h5": "rna.h5", "atac_peak.h5": "peak.h5",
+                           "atac_gas.h5": "atac_gas.h5", "rna_cty.csv": "rna_cty.csv",
+                           "atac_cty.csv": "peak_cty.csv"}),
+    # mosaic
     "D45mini": dict(src="D45", cells=2000, genes=1000, peaks=5000),
     "D46mini": dict(src="D46", cells=600, genes=1000, peaks=5000),
+    "D38mini": dict(src="D38", cells=2000, genes=1000, peaks=5000,
+                    files={"rna1.h5": "rna1.h5", "rna2.h5": "rna2.h5", "adt2.h5": "adt2.h5",
+                           "adt3.h5": "adt3.h5", "cty1.csv": "cty1.csv", "cty2.csv": "cty2.csv",
+                           "cty3.csv": "cty3.csv"}),
+    # cross
     "D52mini": dict(src="D52", cells=1000, genes=1000, peaks=5000),
-    "D27mini": dict(src="D27", cells=5000, genes=2500, peaks=5000,
-                    files={"rna.h5": "rna.h5", "atac.h5": "peak.h5", "cty.csv": "rna_cty.csv"}),
-    "D27mini_gas": dict(src="D27", cells=2000, genes=1000, peaks=5000,
-                        files={"rna.h5": "rna.h5", "atac.h5": "atac_gas.h5",
-                               "cty.csv": "rna_cty.csv"}),
-    "D27mini_paired": dict(src="D27", cells=3000, genes=2500, peaks=5000,
-                           files={"rna.h5": "rna.h5", "atac_peak.h5": "peak.h5",
-                                  "atac_gas.h5": "atac_gas.h5", "rna_cty.csv": "rna_cty.csv",
-                                  "atac_cty.csv": "peak_cty.csv"}),
 }
 
 

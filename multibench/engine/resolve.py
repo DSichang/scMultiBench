@@ -143,6 +143,30 @@ def _resolve_data_dir(ds_dir: Path) -> str:
     return os.path.join(str(proc if proc.is_dir() else ds_dir), "")
 
 
+def _vertical_atac_by_form(variant, ds_dir: Path, method: str) -> Path | None:
+    """The ATAC file of a vertical folder that holds both forms, or ``None``.
+
+    A vertical folder usually has one ``atac.h5``, peaks or gene activity. A
+    folder with ``atac_peak.h5`` and ``atac_gas.h5`` (the same cells) serves
+    every RNA + ATAC method: each reads the form ``method_info(m)["atac"]``
+    names, whatever its role is called. A folder with ``atac_cty.csv`` is a
+    diagonal one, whose ATAC cells differ from the RNA cells, and is left out.
+    """
+    if variant.when.get("category") != "vertical":
+        return None
+    peak, gas = ds_dir / "atac_peak.h5", ds_dir / "atac_gas.h5"
+    if not (peak.is_file() and gas.is_file()):
+        return None
+    if (ds_dir / "atac_cty.csv").exists():
+        # a diagonal folder: its ATAC cells are not the RNA cells
+        return None
+    try:
+        form = registry.get(method).atac
+    except Exception:  # noqa: BLE001 - an unknown method keeps the role's own file
+        return None
+    return {"peak": peak, "gene_activity": gas}.get(form)
+
+
 def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
     """``{role: path}`` for every input role of ``variant`` in ``ds_dir``
     (best effort: a missing file resolves to its canonical name)."""
@@ -156,6 +180,9 @@ def _resolve_variant_inputs(variant, ds_dir: Path, method: str) -> dict:
              if r and not str(r).startswith("=")
              and r not in ("out_dir", "data_dir")]
     out = {role: str(_resolve_role(ds_dir, role)) for role in roles}
+    both = _vertical_atac_by_form(variant, ds_dir, method)
+    if both is not None:
+        out.update({role: str(both) for role in roles if role in ("atac", "atac_gas")})
     # A `data_dir` role resolves to a directory, not a file.
     if variant.takes_data_dir:
         out["data_dir"] = _resolve_data_dir(ds_dir)
