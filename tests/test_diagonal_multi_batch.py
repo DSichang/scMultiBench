@@ -259,3 +259,135 @@ def test_the_file_table_lists_the_per_batch_label_files():
     text = mtb.describe_layout()
     assert "rna_cty1.csv, atac_cty1.csv ... - the same per batch (diagonal" in text
     assert "rna_cty1.csv" not in mtb.describe_layout("cross")
+
+
+# ---------------------------------------------------------------------- export
+def _adata(n, feats, prefix, seed=0):
+    import anndata as ad
+    rng = np.random.default_rng(seed)
+    a = ad.AnnData(X=rng.poisson(2.0, size=(n, len(feats))).astype(float))
+    a.var_names = feats
+    a.obs_names = [f"{prefix}_{k}" for k in range(n)]
+    a.obs["celltype"] = (["A", "B", "C"] * n)[:n]
+    return a
+
+
+def _export_batches(out, kind="gene_activity", **kw):
+    genes = [f"g{i}" for i in range(30)]
+    feats = genes if kind == "gene_activity" else \
+        [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        for i, (n_rna, n_atac) in enumerate(zip(RNA_CELLS, ATAC_CELLS), start=1):
+            mtb.io.export_dataset(_adata(n_rna, genes, f"r{i}"), out,
+                                  atac=_adata(n_atac, feats, f"a{i}", seed=i),
+                                  atac_kind=kind, labels="obs:celltype",
+                                  category="diagonal", batch_index=i, **kw)
+    return [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
+
+
+@pytest.mark.parametrize("kind,role,readers", [
+    ("gene_activity", "atac_gas", GAS_METHODS), ("peak", "atac_peak", ("GLUE",))])
+def test_export_writes_one_diagonal_batch_per_call(tmp_path, no_envs, kind, role, readers):
+    """``batch_index=N`` with ``category='diagonal'``: ``rna<N>.h5``, the ATAC
+    file of the kind, ``rna_cty<N>.csv`` and ``atac_cty<N>.csv``. The folder
+    of three calls is the layout the several-batch diagonal methods read."""
+    out = tmp_path / "MINE"
+    assert _export_batches(out, kind) == []
+    names = sorted(p.name for p in out.iterdir())
+    assert names == sorted(f"{stem}{i}.{ext}" for i in (1, 2, 3) for stem, ext in (
+        ("rna", "h5"), (role, "h5"), ("rna_cty", "csv"), ("atac_cty", "csv")))
+    for i, (n_rna, n_atac) in enumerate(zip(RNA_CELLS, ATAC_CELLS), start=1):
+        assert len(pd.read_csv(out / f"rna_cty{i}.csv")) == n_rna
+        assert len(pd.read_csv(out / f"atac_cty{i}.csv")) == n_atac
+        with h5py.File(out / f"{role}{i}.h5") as f:
+            assert f["matrix/barcodes"].shape == (n_atac,)
+    assert list(mtb.labels_for("MINE", data_path=tmp_path)) == ORDER
+    sc = mtb.scan("MINE", "diagonal", data_path=tmp_path, verbose=False)
+    assert set(sc[sc.files_ok].method) == set(readers)
+    several = sc[sc.files_ok].modalities.str.contains(f"{role}3")
+    assert bool(several.all())
+    for m in readers:
+        assert list(mtb.labels_for("MINE", "diagonal", m, data_path=tmp_path)) == ORDER
+
+
+def test_export_of_a_diagonal_batch_keeps_the_other_batches_and_refuses_to_replace(tmp_path):
+    out = tmp_path / "MINE"
+    _export_batches(out)
+    with pytest.raises(FileExistsError) as e:
+        _export_batches(out)
+    assert "rna1.h5" in str(e.value) and "rna_cty1.csv" in str(e.value)
+    assert "rna2.h5" not in str(e.value)        # the first call stopped before any write
+    _export_batches(out, overwrite=True)
+    assert len(list(out.iterdir())) == 12
+
+
+def test_export_of_one_diagonal_modality_per_call_numbers_its_label_file(tmp_path):
+    """A call that writes one modality writes only that modality's files."""
+    genes = [f"g{i}" for i in range(30)]
+    out = tmp_path / "MINE"
+    mtb.io.export_dataset(_adata(9, genes, "r2"), out, labels="obs:celltype",
+                          category="diagonal", batch_index=2)
+    assert sorted(p.name for p in out.iterdir()) == ["rna2.h5", "rna_cty2.csv"]
+    mtb.io.export_dataset(_adata(7, genes, "a2"), out, rna=None, atac="X",
+                          atac_kind="gene_activity", labels="obs:celltype",
+                          category="diagonal", batch_index=2)
+    assert sorted(p.name for p in out.iterdir()) == [
+        "atac_cty2.csv", "atac_gas2.h5", "rna2.h5", "rna_cty2.csv"]
+    assert len(pd.read_csv(out / "atac_cty2.csv")) == 7
+
+
+def test_single_batch_diagonal_export_is_unchanged(tmp_path):
+    genes = [f"g{i}" for i in range(30)]
+    out = tmp_path / "ONE"
+    mtb.io.export_dataset(_adata(9, genes, "r"), out, atac=_adata(7, genes, "a"),
+                          atac_kind="gene_activity", labels="obs:celltype",
+                          category="diagonal")
+    assert sorted(p.name for p in out.iterdir()) == [
+        "atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"]
+
+
+def test_diagonal_export_still_refuses_a_batch_column_and_a_bad_batch_index(tmp_path):
+    """``batch=`` splits paired cells by a column, which diagonal data does
+    not have; ``batch_index=`` still needs a category that reads numbered
+    files, and the message names diagonal among them."""
+    genes = [f"g{i}" for i in range(30)]
+    rna = _adata(9, genes, "r")
+    rna.obs["batch"] = ["x", "y", "z"] * 3
+    with pytest.raises(ValueError, match="writes per-batch files"):
+        mtb.io.export_dataset(rna, tmp_path / "B", labels="obs:celltype",
+                              batch="obs:batch", category="diagonal")
+    with pytest.raises(ValueError, match="must be a positive integer"):
+        mtb.io.export_dataset(rna, tmp_path / "B", labels="obs:celltype",
+                              batch_index=0, category="diagonal")
+    for category in (None, "vertical"):
+        with pytest.raises(ValueError) as e:
+            mtb.io.export_dataset(rna, tmp_path / "B", labels="obs:celltype",
+                                  batch_index=1, category=category)
+        msg = str(e.value)
+        assert "only mosaic and cross methods read, and the diagonal methods that take " \
+               "several batches" in msg
+        assert "category='mosaic', category='cross' or category='diagonal'" in msg
+    assert not (tmp_path / "B").exists()
+
+
+def test_convert_passes_a_diagonal_batch_index_through(tmp_path, monkeypatch, capsys):
+    from pathlib import Path
+    from multibench import cli
+    from multibench.engine import ingest
+    seen = {}
+    monkeypatch.setattr(ingest, "_to_anndata", lambda src: "ADATA")
+
+    def fake_export(data, out, **kw):
+        seen.update(kw)
+        Path(out).mkdir(parents=True, exist_ok=True)
+        return Path(out)
+    monkeypatch.setattr(ingest, "export_dataset", fake_export)
+    rc = cli.main(["convert", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X",
+                   "--category", "diagonal", "--batch-index", "2"])
+    assert rc == 0 and seen["batch_index"] == 2 and seen["category"] == "diagonal"
+    with pytest.raises(SystemExit) as e:
+        cli.main(["convert", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X",
+                  "--category", "vertical", "--batch-index", "2"])
+    err = capsys.readouterr().err
+    assert e.value.code == 2 and "--category diagonal for data in several batches" in err

@@ -237,19 +237,22 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     _quiet(mtb.io.export_dataset, b2, folder, atac="obsm:gas", atac_kind="gene_activity",
            batch_index=2, **kw)
     _quiet(mtb.io.export_dataset, b3, folder, batch_index=3, **kw)
-    # D46's pattern: the RNA + ADT + ATAC mosaic task
-    trio = GEN.TASKS["mosaic_rna_adt_atac"]["methods"]
+    # D46's pattern: the mosaic task whose batches all hold RNA
+    task = GEN.TASKS["mosaic_shared"]
+    trio, mods = task["methods"], "+".join(task["variants"][0])
     sc = _quiet(mtb.scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
-                verbose=False).set_index("method")
+                verbose=False)
     plan = _quiet(mtb.run_all, "MYMOSAIC", "mosaic", tmp_path / "out", methods=trio,
-                  data_path=tmp_path, dry_run=True, verbose=False).set_index("method")
+                  data_path=tmp_path, dry_run=True, verbose=False)
     for df in (sc, plan):
+        # a method has one row per mosaic pattern: the row of this pattern
+        df = df[df.modalities == mods].set_index("method")
         for m in trio:
             r = df.loc[m]
             assert r.files_ok and r.env_ok and not r.runnable, (m, r.reason)
             assert r.reason.startswith(f"{m} needs peak ATAC, and atac2.h5 holds gene "
                                        "activity"), r.reason
-    assert "Give ATAC as peaks." in _visible(_markdown("tutorial_mosaic_rna_adt_atac"))
+    assert "Give ATAC as peaks." in _visible(_markdown("tutorial_mosaic_shared"))
 
 
 # ------------------------------------------------ no internal names

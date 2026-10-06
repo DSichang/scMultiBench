@@ -611,9 +611,10 @@ def _cmd_convert(args) -> int:
                 _usage_error(args, "--batch and --batch-index are mutually exclusive: "
                              "--batch splits one file by a column, --batch-index "
                              "writes the whole file as one batch")
-            if category not in ("mosaic", "cross"):
+            if category not in ("mosaic", "cross", "diagonal"):
                 _usage_error(args, "--batch-index needs --category mosaic or --category "
-                             "cross (the categories that read numbered batch files)")
+                             "cross (the categories that read numbered batch files), or "
+                             "--category diagonal for data in several batches")
             if batch_index < 1:
                 _usage_error(args, f"--batch-index counts from 1, got {batch_index}")
             extra["batch_index"] = batch_index
@@ -2300,6 +2301,8 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--batch-index", dest="batch_index", type=int, metavar="N",
                     help="mode 2, --category mosaic or cross: write the whole file "
                          "as batch N: rna<N>.h5, adt<N>.h5, atac<N>.h5 and cty<N>.csv. "
+                         "With --category diagonal: rna<N>.h5, atac_gas<N>.h5 or "
+                         "atac_peak<N>.h5, rna_cty<N>.csv and atac_cty<N>.csv. "
                          "One call per batch file. Python: batch_index=N")
     pc.add_argument("--overwrite", action="store_true",
                     help="mode 2: replace files already in OUT (default: refuse and "

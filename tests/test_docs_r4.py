@@ -136,8 +136,8 @@ def test_step1_details_carry_the_donor_counts():
     details = _step1_all().split("```", 1)[1]           # after the first code block
     assert (f"For CITE-seq donors, the `vertical` category has {n_v} RNA + ADT methods "
             "and the stored table D11.") in details
-    assert (f"The `cross` category has {n_c} methods, which integrate the donors as "
-            "batches, and the stored table D52.") in details
+    assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors "
+            "as batches, and the stored table D52.") in details
     assert "The cross methods read batches 1-3. UINMF reads only the first two." in details
 
 

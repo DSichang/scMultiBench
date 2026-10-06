@@ -128,14 +128,44 @@ def test_diagonal_title_names_the_atac_form_of_each_method():
         assert m in title, f"diagonal title does not name {m}, which reads peaks"
 
 
+def _holds_atac(key):
+    return any(r.startswith("atac") for v in GEN.TASKS[key]["variants"] for r in v)
+
+
+def test_diagonal_title_of_several_batches_names_the_atac_form_of_each_method():
+    """The several-batch diagonal title says which of its methods read gene
+    activity and which read peaks, from the modalities of their variants."""
+    title = _visible(_cells("tutorial_diagonal_multi")[0][1])
+    gas = sorted({m for m, v in GEN.task_variants("diagonal_multi")
+                  if "atac_gas1" in v.when["modalities"]})
+    peak = sorted({m for m, v in GEN.task_variants("diagonal_multi")
+                   if "atac_peak1" in v.when["modalities"]})
+    assert gas and peak and sorted(gas + peak) == GEN.task_methods("diagonal_multi")
+    assert f"{GEN.and_list(gas)} read ATAC as gene-activity scores" in title
+    assert f"{GEN.and_list(peak)} reads the peak matrix." in title
+
+
 def test_mosaic_and_cross_titles_say_what_the_methods_read():
-    for key in ("mosaic_rna_atac", "mosaic_rna_adt_atac"):
+    mosaic = [k for k, t in GEN.TASKS.items() if t["cat"] == "mosaic"]
+    assert len(mosaic) == 4
+    for key in mosaic:
         title = _visible(_cells(f"tutorial_{key}")[0][1])
-        assert "every mosaic method reads ATAC as peaks" in title, key
-    # the RNA + ADT pattern holds no ATAC, and its title does not bring it up
-    assert "ATAC" not in _visible(_cells("tutorial_mosaic_rna_adt")[0][1])
-    cross = _visible(_cells("tutorial_cross_rna_adt")[0][1])
-    assert "Every cross method here reads RNA and ADT" in cross
+        # a pattern without ATAC does not bring it up
+        assert ("every mosaic method reads ATAC as peaks" in title) == _holds_atac(key), key
+        assert ("ATAC" in title) == _holds_atac(key), key
+    assert not _holds_atac("mosaic_rna_adt")
+    # the cross category has a task per set of modalities: each title names
+    # what every batch holds (before the article's tasks, every cross method
+    # read RNA and ADT and the one title said so)
+    holds = {"cross_rna_adt": "batches that each hold RNA and ADT.",
+             "cross_rna_atac": "batches that each hold RNA and ATAC peaks.",
+             "cross_adt_atac": "batches that each hold ADT and ATAC peaks, with no RNA.",
+             "cross_rna_adt_atac": "batches that each hold RNA, ADT and ATAC peaks."}
+    assert set(holds) == {k for k, t in GEN.TASKS.items() if t["cat"] == "cross"}
+    for key, sentence in holds.items():
+        title = _visible(_cells(f"tutorial_{key}")[0][1])
+        assert sentence in title, key
+        assert ("ATAC" in title) == _holds_atac(key), key
 
 
 # ------------------------------------------------ own-data demos (section 5)
@@ -145,12 +175,26 @@ EXPECTED_FILES = {
     "vertical_rna_atac": ["atac.h5", "atac_peak.h5", "cty.csv", "rna.h5"],
     "vertical_rna_adt_atac": ["adt.h5", "atac.h5", "atac_peak.h5", "cty.csv", "rna.h5"],
     "diagonal_rna_atac": ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"],
+    "diagonal_multi": [*(f"atac_cty{i}.csv" for i in (1, 2, 3)),
+                       *(f"atac_gas{i}.h5" for i in (1, 2, 3)),
+                       *(f"rna{i}.h5" for i in (1, 2, 3)),
+                       *(f"rna_cty{i}.csv" for i in (1, 2, 3))],
     "mosaic_rna_atac": ["atac2.h5", "atac3.h5", *MOSAIC_LABELS, "rna1.h5", "rna2.h5"],
-    "mosaic_rna_adt_atac": ["adt1.h5", "atac2.h5", *MOSAIC_LABELS,
-                            "rna1.h5", "rna2.h5", "rna3.h5"],
+    "mosaic_shared": ["adt1.h5", "atac2.h5", *MOSAIC_LABELS,
+                      "rna1.h5", "rna2.h5", "rna3.h5"],
+    "mosaic_unshared": ["adt1.h5", "adt3.h5", "atac2.h5", *MOSAIC_LABELS,
+                        "rna1.h5", "rna2.h5"],
     "mosaic_rna_adt": ["adt2.h5", "adt3.h5", *MOSAIC_LABELS, "rna1.h5", "rna2.h5"],
     "cross_rna_adt": ["adt1.h5", "adt2.h5", "adt3.h5", *MOSAIC_LABELS,
                       "rna1.h5", "rna2.h5", "rna3.h5"],
+    # a cross export names its peak files atac_peak<i>.h5, which the cross
+    # methods read as their atac<i> input
+    "cross_rna_atac": ["atac_peak1.h5", "atac_peak2.h5", "atac_peak3.h5", *MOSAIC_LABELS,
+                       "rna1.h5", "rna2.h5", "rna3.h5"],
+    "cross_adt_atac": ["adt1.h5", "adt2.h5", "atac_peak1.h5", "atac_peak2.h5",
+                       "cty1.csv", "cty2.csv"],
+    "cross_rna_adt_atac": ["adt1.h5", "adt2.h5", "atac_peak1.h5", "atac_peak2.h5",
+                           "cty1.csv", "cty2.csv", "rna1.h5", "rna2.h5"],
 }
 
 
@@ -167,7 +211,8 @@ def _own_data_cells(key):
 @pytest.mark.parametrize("key", KEYS)
 def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monkeypatch):
     """Each demo writes its folder through export_dataset alone - diagonal
-    with category='diagonal', mosaic one call per batch with batch_index= -
+    with category='diagonal' (several batches: one call per batch with
+    batch_index=), mosaic one call per batch with batch_index= -
     with no hand-written file, no multibench warning, and a folder on which
     scan finds the input files of the tutorial's methods."""
     import multibench as mtb
@@ -185,6 +230,8 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monk
     kws = [{k.arg: ast.unparse(k.value) for k in n.keywords} for n in exports]
     if cat == "diagonal":
         assert len(exports) == 1 and kws[0]["category"] == "'diagonal'" and "atac" in kws[0]
+        # several batches: the one call sits in a loop over the batch number
+        assert ("batch_index" in kws[0]) == (key == "diagonal_multi")
     if cat == "mosaic":
         assert [k.get("batch_index") for k in kws] == ["1", "2", "3"]
     monkeypatch.chdir(tmp_path)
@@ -211,13 +258,18 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monk
         # RNA, ADT and ATAC of the same cells also hold the files of the two
         # smaller vertical tasks
         assert everyone <= ok
+    elif key == "cross_rna_adt_atac":
+        # two batches with RNA, ADT and ATAC also hold the files of UINMF's
+        # two-batch variants of the smaller cross tasks
+        assert ok == everyone | {"UINMF"}
     elif key == "diagonal_rna_atac":
         # the folder holds gene activity only: the peak readers lack a file
         assert ok == set(mtb.find_methods("diagonal", atac="gene_activity")) < everyone
+    elif key == "diagonal_multi":
+        gas = {m for m, v in GEN.task_variants(key) if "atac_gas1" in v.when["modalities"]}
+        assert ok == gas < everyone
     else:
         assert ok == everyone
-    if cat == "cross":
-        assert ok == set(frame.method) and len(ok) >= 7
 
 
 # ------------------------------------------------------------- the generator

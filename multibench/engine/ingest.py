@@ -1218,7 +1218,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         are needed when it has none.
     batch_index : int or None
         Write the whole object as batch ``N`` (``rna<N>.h5``, ``cty<N>.csv``);
-        mosaic or cross, one call per batch file.
+        mosaic, cross or diagonal in several batches, one call per batch.
     overwrite : bool
         ``True`` = replace files already in ``dataset_dir``; ``False`` = raise
         before writing anything.
@@ -1328,6 +1328,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     object's own ``.obs`` into ``rna_cty.csv`` and ``atac_cty.csv``. A call
     that writes one modality writes only that modality's label file.
 
+    Diagonal data in several batches is one call per batch with
+    ``batch_index=N``: ``rna<N>.h5``, ``atac_gas<N>.h5`` or
+    ``atac_peak<N>.h5``, ``rna_cty<N>.csv`` and ``atac_cty<N>.csv``.
+
     For a MuData, ``labels='<col>'`` or ``'<mod>:<col>'`` reads ``<col>``
     from each modality's own ``.obs`` (``mdata['rna'].obs`` for the RNA
     cells, ``mdata['atac'].obs`` for the ATAC cells). When the two columns
@@ -1399,7 +1403,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     - ``batch`` with ``category='vertical'`` or ``'diagonal'``, or together
       with ``batch_index``;
     - ``batch_index`` that is not a positive integer, or without
-      ``category='mosaic'`` / ``'cross'``;
+      ``category='mosaic'`` / ``'cross'`` / ``'diagonal'``;
     - ``category='diagonal'`` with labels but no matrix, or with a plain
       label sequence for both RNA and ATAC.
 
@@ -1567,7 +1571,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             if role == "atac_peak" and category is None:
                 plan.append((out / f"atac{suf}.h5", "link", path))
         for side, vec in lab.items():
-            name = (f"{side}_cty.csv" if diagonal else f"cty{suf}.csv")
+            name = (f"{side}_cty{suf}.csv" if diagonal else f"cty{suf}.csv")
             plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask]))
     existing = [pth.name for pth, _, _ in plan if pth.exists() or pth.is_symlink()]
     if existing and not overwrite:
@@ -1607,11 +1611,12 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
                 or batch_index < 1:
             raise ValueError(f"batch_index= must be a positive integer (1 writes rna1.h5), "
                              f"got {batch_index!r}")
-        if category not in ("mosaic", "cross"):
+        if category not in ("mosaic", "cross", "diagonal"):
             raise ValueError(
                 f"batch_index= writes numbered files (rna{batch_index}.h5, ...), which only "
-                f"mosaic and cross methods read: pass category='mosaic' or category='cross' "
-                f"(got category={category!r})")
+                f"mosaic and cross methods read, and the diagonal methods that take "
+                f"several batches: pass category='mosaic', category='cross' or "
+                f"category='diagonal' (got category={category!r})")
     if batch is not None and category in ("vertical", "diagonal"):
         from .resolve import _one_file_advice
         raise ValueError(

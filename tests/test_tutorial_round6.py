@@ -41,9 +41,10 @@ def test_scan_prints_one_count_line_on_the_tutorial_dataset(key, capsys):
 @pytest.mark.parametrize("key", KEYS)
 def test_scan_count_line_noun_on_the_tutorial_datasets(key, capsys):
     """The package fact the change follows (R6-12 h): the line says
-    ``methods`` when each method has one row, and ``rows`` otherwise. The
-    diagonal and cross categories have one variant per method, the vertical
-    and mosaic ones have methods with several."""
+    ``methods`` when each method has one row, and ``rows`` otherwise. Since
+    the article's tasks, each of the four categories has methods with several
+    variants (before: all but diagonal and cross), so every line says
+    ``rows``."""
     import multibench as mtb
     t = GEN.TASKS[key]
     if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
@@ -51,7 +52,6 @@ def test_scan_count_line_noun_on_the_tutorial_datasets(key, capsys):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         frame = mtb.scan(t["ds"], t["cat"])
-    noun = "methods" if t["cat"] in ("diagonal", "cross") else "rows"
     line = capsys.readouterr().out.strip()
-    assert line.startswith(f"[scan] {int(frame.files_ok.sum())} of {len(frame)} {noun} "), line
-    assert frame.method.is_unique == (noun == "methods")
+    assert line.startswith(f"[scan] {int(frame.files_ok.sum())} of {len(frame)} rows "), line
+    assert not frame.method.is_unique

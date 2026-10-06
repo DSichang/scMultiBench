@@ -87,7 +87,10 @@ def test_step1_names_both_routes_for_citeseq_donors():
     assert "CITE-seq donors: use `vertical` in the same way." in step1
     assert "The `cross` category also fits three donors, one file each" in step1
     assert f"the `vertical` category has {n_v} RNA + ADT methods and the stored table D11" in whole
-    assert f"The `cross` category has {n_c} methods, which integrate the donors as batches" in whole
+    # cross has tasks without RNA + ADT since the article's 13 tasks: the
+    # sentence counts the methods that read the CITE-seq donors
+    assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors as "
+            "batches") in whole
 
 
 @needs_docs

@@ -50,8 +50,8 @@ def _reads_atac(key):
     """Whether the task's default methods read an ATAC file in this task."""
     import multibench as mtb
     t = GEN.TASKS[key]
-    want = None if t["variants"] is None else [set(v) for v in t["variants"]]
-    return any(v["category"] == t["cat"] and (want is None or set(v["modalities"]) in want)
+    want = [set(v) for v in t["variants"]]
+    return any(v["category"] == t["cat"] and set(v["modalities"]) in want
                and any(mod.startswith("atac") for mod in v["modalities"])
                for m in t["methods"] for v in mtb.method_info(m)["supports"])
 
@@ -71,15 +71,22 @@ def test_section_5_states_the_atac_form_where_the_task_reads_atac(key):
 
 
 def test_the_tasks_that_read_atac_are_the_ones_labelled_so():
+    """The article names two mosaic tasks by their pattern ("Mixed, with /
+    without shared modality"); both hold an RNA + ATAC batch. Every other
+    task that reads ATAC says so in its label."""
+    mixed = {k for k, t in GEN.TASKS.items() if t["label"].startswith("Mixed, ")}
+    assert mixed == {"mosaic_shared", "mosaic_unshared"}
     assert {k for k in KEYS if _reads_atac(k)} == \
-        {k for k, t in GEN.TASKS.items() if "ATAC" in t["label"]}
+        {k for k, t in GEN.TASKS.items() if "ATAC" in t["label"]} | mixed
 
 
-def test_the_atac_categories_are_the_three_that_read_atac():
+def test_every_category_has_methods_that_read_atac():
+    """Since the article's tasks, cross has RNA + ATAC and ADT + ATAC tasks,
+    so all four categories read ATAC (before: all but cross)."""
     import multibench as mtb
     cats = {t["cat"] for t in GEN.TASKS.values()}
     assert {c for c in cats if mtb.find_methods(c, modalities=["atac"])} == \
-        {"vertical", "diagonal", "mosaic"}
+        {"vertical", "diagonal", "mosaic", "cross"}
 
 
 @pytest.fixture
@@ -100,11 +107,15 @@ def _batch(rng, n, feats):
     return a
 
 
-def _scan(name, cat, root):
+def _scan(name, cat, root, modalities):
+    """The rows of one modality set (a method has one row per variant)."""
     import multibench as mtb
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return mtb.scan(name, cat, data_path=root, verbose=False).set_index("method")
+        df = mtb.scan(name, cat, data_path=root, verbose=False)
+    df = df[df.modalities == "+".join(modalities)].set_index("method")
+    assert df.index.is_unique
+    return df
 
 
 def test_the_sentence_holds_for_a_mosaic_folder_with_gene_activity(tmp_path, every_env_and_a_gpu):
@@ -128,7 +139,7 @@ def test_the_sentence_holds_for_a_mosaic_folder_with_gene_activity(tmp_path, eve
         mtb.io.export_dataset(b2, folder, atac="obsm:gas", atac_kind="gene_activity",
                               batch_index=2, **kw)
         mtb.io.export_dataset(b3, folder, batch_index=3, **kw)
-    df = _scan("MYMOSAIC", "mosaic", tmp_path)
+    df = _scan("MYMOSAIC", "mosaic", tmp_path, GEN.TASKS["mosaic_shared"]["variants"][0])
     for m in ("StabMap", "scMoMaT"):
         r = df.loc[m]
         assert r.files_ok and r.env_ok and not r.runnable, m
@@ -150,7 +161,7 @@ def test_the_sentence_holds_for_a_diagonal_folder_with_peaks_as_gene_activity(
         warnings.simplefilter("ignore")
         mtb.io.export_dataset(rna, tmp_path / "MYDIAG", atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal")
-    df = _scan("MYDIAG", "diagonal", tmp_path)
+    df = _scan("MYDIAG", "diagonal", tmp_path, ["rna", "atac_gas"])
     for m in GEN.TASKS["diagonal_rna_atac"]["methods"]:
         r = df.loc[m]
         assert r.files_ok and r.env_ok and not r.runnable, m
