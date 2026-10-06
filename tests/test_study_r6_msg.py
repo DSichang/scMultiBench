@@ -167,7 +167,7 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
                                       "job runs on a GPU node. ")
 
 
-def test_the_atac_caveats_start_with_the_method(tmp_path, pinned):
+def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
     sc = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda", "scMVP"],
                 modalities=["rna", "atac"], data_path=_mu_peak(tmp_path),
                 verbose=False, allow_atac_mismatch=True).set_index("method")
@@ -181,13 +181,19 @@ def test_the_atac_caveats_start_with_the_method(tmp_path, pinned):
         "activity, or pass allow_atac_mismatch=True to run Matilda anyway.")
 
 
-def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys):
-    """run_all's log, both dry runs and run's warning print the caveat alone."""
+def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys,
+                                            gas_matilda):
+    """run_all's log, both dry runs and run's warning print the caveat alone.
+    UINMF's two-batch variant is named: on D52's three batches the folder
+    picks its three-batch one, which skips nothing."""
     data = root / "data"
-    _quiet(mtb.run_all, "D52", "cross", methods=["UINMF"], data_path=data, dry_run=True)
+    two = ["rna1", "rna2", "adt1", "adt2"]
+    _quiet(mtb.run_all, "D52", "cross", methods=["UINMF"], modalities=two, data_path=data,
+           dry_run=True)
     out = capsys.readouterr().out
     assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
     rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--methods", "UINMF",
+                         "--modalities", ",".join(two),
                          "--data-path", str(data), "--dry-run"], capsys)
     assert rc == 0 and "# UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in err
 
@@ -195,7 +201,7 @@ def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch,
         raise RuntimeError("stub: not run in tests")
     monkeypatch.setattr(W, "_run", fake_run)
     _quiet(mtb.run_all, "D52", "cross", tmp_path / "out", methods=["UINMF"],
-           data_path=data, evaluate=False)
+           modalities=two, data_path=data, evaluate=False)
     log = capsys.readouterr().out
     assert "[run_all]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in log
     # run's own warning
@@ -225,25 +231,30 @@ def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
             "--strict"]
     rc, _, err = _cli(base, capsys)
     assert rc == 1
+    n = len(list(W._variant_rows("diagonal")))     # 14 methods, four with a second row
+    assert n == 18
     assert err.startswith(
-        "error: --strict: 0 of 14 rows are runnable. Rows with missing input files: 13. "
-        "Rows whose peak names the method cannot read: 1. Rows whose method scripts are "
-        "not fetched: 14. The reason column says why.\n"), err
+        f"error: --strict: 0 of {n} rows are runnable. Rows with missing input files: "
+        f"{n - 1}. Rows whose peak names the method cannot read: 1. Rows whose method "
+        f"scripts are not fetched: {n}. The reason column says why.\n"), err
     rc, _, err = _cli(base + ["--methods", "GLUE,Seurat_v3,MultiMAP,scBridge"], capsys)
     assert rc == 1
     assert err.startswith(
-        "error: --strict: 0 of 4 rows are runnable. Rows with missing input files: 3. Rows "
+        # five rows: GLUE has a second one, for several batches
+        "error: --strict: 0 of 5 rows are runnable. Rows with missing input files: 4. Rows "
         "whose peak names the method cannot read: 1. Rows whose method scripts are not "
-        "fetched: 4. No runnable row for GLUE, Seurat_v3, MultiMAP, scBridge:\n"), err
+        "fetched: 5. No runnable row for GLUE, Seurat_v3, MultiMAP, scBridge:\n"), err
     assert ("  GLUE: GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
             "names, for example peak_0. Rename them to chr:start-end, or pass "
             "--allow-atac-mismatch to run GLUE anyway.\n") in err
     assert "  scBridge: scBridge needs atac_gas.h5, and LUNG_ids has no such file.\n" in err
     rc, _, err = _cli(["scan", "D52", "--category", "cross", "--data-path",
                        str(root / "data"), "--methods", "UINMF,StabMap", "--strict"], capsys)
+    # UINMF has six cross rows and StabMap four; D52 holds the files of three
     assert rc == 1 and err.startswith(
-        "error: --strict: 0 of 2 rows are runnable. Rows whose method scripts are not "
-        "fetched: 2. No runnable row for UINMF, StabMap:\n"), err
+        "error: --strict: 0 of 10 rows are runnable. Rows with missing input files: 7. "
+        "Rows whose method scripts are not fetched: 10. No runnable row for UINMF, "
+        "StabMap:\n"), err
 
 
 def test_strict_passes_on_the_uinmf_folder_with_the_scripts(root, monkeypatch, capsys):
@@ -357,18 +368,32 @@ def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
     rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
                          "--out-dir", str(tmp_path)], capsys)
     assert rc == 0
-    assert re.search(r"^# Commands of the 13 methods whose input files are in place\. "
-                     r"\[env missing\] marks a method whose environment is not installed\. "
+    # four diagonal methods have a second row, for several batches: the lines count rows
+    assert re.search(r"^# Commands of the 13 rows whose input files are in place\. "
+                     r"\[env missing\] marks a row whose environment is not installed\. "
                      r"\[use multibench run\] marks a command that reads a file multibench "
                      r"run writes first\.$", out, re.M), out
-    # D28 has one row per method: the count line counts methods
-    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 14 methods can run on D28 "
+    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 18 rows can run on D28 "
+                    r"\(diagonal\)\.", err), err
+    # methods with one diagonal row each: the lines count methods
+    rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
+                         "--methods", "SCALEX,Portal,uniPort",
+                         "--out-dir", str(tmp_path)], capsys)
+    assert rc == 0
+    assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
+                     r"\[env missing\] marks a method whose environment is not installed\. ",
+                     out, re.M), out
+    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 3 methods can run on D28 "
                     r"\(diagonal\)\.", err), err
 
 
 def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    df = mtb.scan("D28", "diagonal")
+    # the diagonal methods with one row (four have a second, for several batches)
+    rows = [s.id for s, *_ in W._variant_rows("diagonal")]
+    single = [m for m in dict.fromkeys(rows) if rows.count(m) == 1]
+    assert len(single) == 10
+    df = mtb.scan("D28", "diagonal", methods=single)
     assert df["method"].is_unique
     out = capsys.readouterr().out
     assert out.startswith(f"[scan] {int(df['files_ok'].sum())} of {len(df)} methods have "
@@ -377,8 +402,12 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     d11 = mtb.scan("D11", "vertical")
     assert not d11["method"].is_unique
     assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
+    mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True,
+                methods=["sciPENN", "totalVI", "Concerto"])
+    assert "[run_all] Dry run: 0 of 3 requested methods can run on D52 (cross)." in \
+        capsys.readouterr().out
     mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True)
-    assert "[run_all] Dry run: 0 of 8 requested methods can run on D52 (cross)." in \
+    assert "[run_all] Dry run: 0 of 30 requested rows can run on D52 (cross)." in \
         capsys.readouterr().out
 
 

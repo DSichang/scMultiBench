@@ -1347,8 +1347,9 @@ def recommend(
 
     - Only methods this package runs for the category are ranked - the set
       ``mtb.list_methods(category=...)`` lists. Other package methods in
-      the table (MOFA2 or Multigrate in a cross table) are dropped before
-      the within-dataset ranks are taken, and named in the warning and in
+      the table (a vertical method such as scMSI in a cross table) are
+      dropped before the within-dataset ranks are taken, and named in the
+      warning and in
       ``attrs["dropped_methods"]``. A method the package does not know (your
       own method in ``long_df``) is kept.
     - A dataset holding fewer than ``min_methods`` methods is dropped. The
@@ -1464,8 +1465,8 @@ def recommend(
 
     from ..engine.registry import list_methods
 
-    # A registry method not listed for the category (MOFA2 / Multigrate in a
-    # cross table) is dropped before the per-dataset ranks are taken, so it
+    # A registry method not listed for the category (scMSI in a cross table)
+    # is dropped before the per-dataset ranks are taken, so it
     # cannot shape the other methods' ranks; a name the registry does not
     # know (the user's own method) is kept.
     listed = set(list_methods(category=category))

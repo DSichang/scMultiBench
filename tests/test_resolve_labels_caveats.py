@@ -133,7 +133,9 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     assert resolve._preflight_caveats(got3, atac="peak") == []
 
 
-def test_near_miss_vertical_atac_names_the_peak_file(tmp_path):
+def test_near_miss_vertical_atac_names_the_peak_file(tmp_path, gas_matilda):
+    # for a vertical method that reads gene activity (`gas_matilda`): the real
+    # Matilda reads peaks and is told to rename atac_peak.h5
     d = tmp_path / "MM"; d.mkdir()
     _h5(d / "rna.h5", 30, 50)
     _h5(d / "atac_peak.h5", 40, 50, feats=PEAKS)

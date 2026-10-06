@@ -87,7 +87,7 @@ def test_a_two_file_method_gets_no_representation_caveat(data):
 @pytest.mark.parametrize("ds,cat,method,mods,msg", [
     ("D28", "diagonal", "GLUE", ["rna", "gas"], "GLUE reads peaks; modalities name gene activity"),
     ("D28", "diagonal", "SCALEX", ["rna", "peak"], "SCALEX reads gene activity; modalities name peaks"),
-    ("D11", "vertical", "Matilda", ["rna", "peak"], "Matilda reads gene activity; modalities name peaks"),
+    ("D11", "vertical", "Matilda", ["rna", "gas"], "Matilda reads peaks; modalities name gene activity"),
     ("D28", "diagonal", "GLUE", BOTH, "GLUE reads peaks; modalities name peaks and gene activity"),
 ])
 def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods, msg):
@@ -107,7 +107,7 @@ def test_inputs_for_keeps_a_variants_own_roles_and_matching_tokens(data):
     assert "atac_gas" in mtb.inputs_for("D11", "vertical", "moETM",
                                         modalities=["rna", "peak"], data_path=data)
     assert "atac" in mtb.inputs_for("D11", "vertical", "Matilda",
-                                    modalities=["rna", "gas"], data_path=data)
+                                    modalities=["rna", "peak"], data_path=data)
     assert "atac_gas" in mtb.inputs_for("D28", "diagonal", "SCALEX",
                                         modalities=["rna", "atac"], data_path=data)
 
@@ -167,7 +167,9 @@ def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
             "command alone fails in a job script.") in row["caveat"]
     # GLUE reads a renamed peak copy as well (R3-04); a command that reads
     # only the dataset's own files has no such note
-    assert "inputs/atac_peak_normpeaks.h5" in sc.set_index("method").loc["GLUE", "caveat"]
+    # (GLUE's other diagonal row, for several batches, lacks its files here)
+    glue = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
+    assert "inputs/atac_peak_normpeaks.h5" in glue
     assert "reads inputs/" not in sc.set_index("method").loc["MultiMAP", "caveat"]
     # the dry run prints the same note
     inp = mtb.inputs_for("D28", "diagonal", "Seurat_v3", data_path=data)
@@ -193,14 +195,24 @@ def test_leiden_flavor_help_names_both_stored_tables(cmd, capsys):
     assert "backend of the published tables" not in text
 
 
-# ------------------------------------------------------------------ L11 cross is RNA+ADT
-def test_cross_is_described_as_rna_and_adt(capsys):
+# ------------------------------------------- L11 cross: every batch, the same modalities
+def test_cross_is_described_as_batches_with_the_same_modalities(capsys):
+    """Cross was RNA + ADT only. The registry now holds cross variants for
+    RNA + ATAC, ADT + ATAC and all three, so the description names what they
+    share: every batch measures the same modalities. "All modalities" stays
+    wrong (a cross dataset may hold two of the three)."""
+    from multibench.engine import registry
+    sets = {frozenset(registry.base_modality(r) for r in v.when["modalities"])
+            for s in registry.load() for v in s.variants if v.when.get("category") == "cross"}
+    assert sets == {frozenset(x) for x in (("rna", "adt"), ("rna", "atac"), ("adt", "atac"),
+                                           ("rna", "adt", "atac"))}
     text = mtb.list_categories()["cross"]
-    assert "each measured with RNA and ADT" in text and "all modalities" not in text
+    assert "Several batches that all measure the same modalities" in text
+    assert "each measured with RNA and ADT" not in text and "all modalities" not in text
     with pytest.raises(SystemExit):
         cli.main(["scan", "--help"])
     help_text = " ".join(capsys.readouterr().out.split())
-    assert "cross (several batches, each with RNA and ADT)" in help_text
+    assert "cross (several batches, each with the same modalities)" in help_text
     assert "several batches with all modalities" not in help_text
 
 

@@ -363,7 +363,8 @@ def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
     out = capsys.readouterr().out
     assert rc == 0 and "(set with --param KEY=VALUE)" in out
     assert "run(params" not in out and "mtb.params_for" not in out
-    rc = cli.main(["run-all", "D52", "--category", "cross", "--methods", "UINMF",
+    # sciPENN has one cross row, so the header speaks of methods (UINMF has six rows)
+    rc = cli.main(["run-all", "D52", "--category", "cross", "--methods", "sciPENN",
                    "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0
@@ -404,7 +405,7 @@ def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
                if re.search(r"\)\s*\(", a.help)]
     assert doubled == []
     assert _help(["params"], "--category").endswith(
-        "each with RNA and ADT). Only that category's variants.")
+        "each with the same modalities). Only that category's variants.")
     assert _help(["list"], "--task") == (
         "task within the category: clustering, batch or dimension_reduction. "
         "mtb.list_tasks() lists them. The same filter as mtb.find_methods(task=).")

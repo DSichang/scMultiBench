@@ -162,7 +162,11 @@ def test_a_gem_well_suffix_alone_is_the_same_cells(tmp_path):
 
 def test_d28_scans_as_before(root):
     df = mtb.scan("D28", "diagonal", data_path=root / "data", verbose=False)
-    blocked = df[~df.files_ok]
+    # the rows for several RNA and ATAC batches read numbered files D28 lacks
+    several = df.modalities.str.contains(r"\d")
+    assert sorted(df[several].method) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
+    assert not df[several].files_ok.any()
+    blocked = df[~df.files_ok & ~several]
     assert blocked.method.tolist() == ["Seurat_v5"], blocked[["method", "files_reason"]]
 
 
@@ -306,7 +310,7 @@ def test_unitednet_reason_names_atac_first_then_cty(tmp_path):
     d.mkdir()
     _h5(d / "rna.h5", GENES, [f"c{i}" for i in range(30)])
     row = _row("RNAONLY", "vertical", "UnitedNet", tmp_path)
-    assert row["reason"].startswith("UnitedNet needs gene-activity ATAC (atac.h5), which is "
+    assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which is "
                                     "not in the folder. cty.csv is missing.")
 
 
@@ -324,7 +328,8 @@ def test_every_caveat_leads_with_its_warning():
         assert text.startswith("{method} " + head), text
 
 
-def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeypatch):
+def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeypatch,
+                                                       gas_matilda):
     monkeypatch.setattr(workflow, "_installed_envs", lambda: frozenset())
     cells = [f"c{i}" for i in range(30)]
     d = tmp_path / "MYMULTIOME"
@@ -342,9 +347,16 @@ def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeyp
 
 
 # --- M31: a variant that reads fewer batches than the folder holds ------------
+TWO_BATCHES = ["rna1", "rna2", "adt1", "adt2"]        # UINMF's two-batch cross variant
+
+
 def test_labels_for_uinmf_returns_the_batches_it_reads(root):
+    """UINMF has a cross variant for two batches and one for three. D52 holds
+    three, so the three-batch variant is the one the folder picks."""
     assert list(mtb.labels_for("D52", "cross", "UINMF", data_path=root / "data")) == \
-        ["cty1", "cty2"]
+        ["cty1", "cty2", "cty3"]
+    assert list(mtb.labels_for("D52", "cross", "UINMF", modalities=TWO_BATCHES,
+                               data_path=root / "data")) == ["cty1", "cty2"]
     assert list(mtb.labels_for("D52", "cross", "StabMap", data_path=root / "data")) == \
         ["cty3", "cty1", "cty2"]
     assert list(mtb.labels_for("D52", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
@@ -352,18 +364,26 @@ def test_labels_for_uinmf_returns_the_batches_it_reads(root):
 
 def test_scan_caveat_names_the_unused_batch(root):
     df = mtb.scan("D52", "cross", data_path=root / "data", verbose=False)
-    by = df.set_index("method")["caveat"]
-    assert by["UINMF"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used.")
-    others = [m for m in by.index if m != "UINMF"]
-    assert not any("reads batches" in by[m] for m in others)
+    df = df[df.files_ok]
+    by = df.set_index(["method", "modalities"])["caveat"]
+    assert by[("UINMF", "+".join(TWO_BATCHES))].startswith(
+        "UINMF reads batches 1-2 of 3. Batch 3 is not used.")
+    others = [k for k in by.index if k != ("UINMF", "+".join(TWO_BATCHES))]
+    assert ("UINMF", "rna1+rna2+rna3+adt1+adt2+adt3") in others
+    assert not any("reads batches" in by[k] for k in others)
 
 
 def test_dry_run_prints_the_unused_batch(root, capsys):
+    mtb.run_all("D52", "cross", methods=["UINMF"], modalities=TWO_BATCHES,
+                data_path=root / "data", dry_run=True)
+    out = capsys.readouterr().out
+    assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
+    # without modalities= the three-batch row runs, and the caveat of the
+    # two-batch row inside it is not printed
     mtb.run_all("D52", "cross", methods=["UINMF", "StabMap"], data_path=root / "data",
                 dry_run=True)
     out = capsys.readouterr().out
-    assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
-    assert "StabMap reads batches" not in out
+    assert "reads batches" not in out
 
 
 # --- M36: read_canonical after pip install ------------------------------------
@@ -386,11 +406,15 @@ def test_read_canonical_example_builds_the_path_from_data_path():
 
 def test_cli_dry_run_prints_the_unused_batch(root, capsys, tmp_path):
     rc = cli.main(["run-all", "D52", "--category", "cross", "--data-path", str(root / "data"),
-                   "--dry-run", "--out-dir", str(tmp_path / "out")])
+                   "--dry-run", "--out-dir", str(tmp_path / "out"),
+                   "--modalities", ",".join(TWO_BATCHES)])
     assert rc == 0
     err = capsys.readouterr().err
     assert "# UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in err
-    assert "StabMap reads batches" not in err
+    # the whole category: UINMF's three-batch row runs, so nothing is unused
+    rc = cli.main(["run-all", "D52", "--category", "cross", "--data-path", str(root / "data"),
+                   "--dry-run", "--out-dir", str(tmp_path / "out")])
+    assert rc == 0 and "reads batches" not in capsys.readouterr().err
 
 
 def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
@@ -402,7 +426,7 @@ def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
         raise RuntimeError("stub: not run in tests")
     monkeypatch.setattr(workflow, "_run", fake_run)
     mtb.run_all("D52", "cross", tmp_path / "out", methods=["UINMF"],
-                data_path=root / "data", evaluate=False)
+                modalities=TWO_BATCHES, data_path=root / "data", evaluate=False)
     assert ("[run_all]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n"
             in capsys.readouterr().out)
 

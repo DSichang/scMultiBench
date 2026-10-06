@@ -124,7 +124,10 @@ class _Res:
 def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
     root = _gasmos(tmp_path)
     df = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
-                data_path=root, verbose=False).set_index("method")
+                data_path=root, verbose=False)
+    # each method's row for the folder's batch pattern; its other three lack files
+    assert len(df) == 8 and df["files_ok"].sum() == 2
+    df = df[df["files_ok"]].set_index("method")
     for m in ("StabMap", "scMoMaT"):
         assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
         assert df.loc[m, "reason"] == (
@@ -132,7 +135,8 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
             f"peaks, or pass allow_atac_mismatch=True to run {m} anyway."), df.loc[m, "reason"]
     ok = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False, allow_atac_mismatch=True)
-    assert ok["runnable"].all() and ok["reason"].eq("").all()
+    ok = ok[ok["files_ok"]]
+    assert len(ok) == 2 and ok["runnable"].all() and ok["reason"].eq("").all()
     assert all(c.startswith(f"{m} {GP_CAV}")
                for m, c in zip(ok["method"], ok["caveat"])), ok["caveat"].tolist()
 
@@ -155,11 +159,14 @@ def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned,
     cap = capsys.readouterr()
     assert rc == 0, cap.err
     df = pd.read_csv(__import__("io").StringIO(cap.out))
+    df = df[df["files_ok"]]                    # the two rows the folder has the files of
+    assert len(df) == 2
     assert all(c.startswith(f"{m} {GP_CAV}")
                for m, c in zip(df["method"], df["caveat"])), df["caveat"].tolist()
 
 
-def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinned, capsys):
+def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinned, capsys,
+                                                                  gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     plan = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
                   modalities=["rna", "atac"], data_path=root, dry_run=True, verbose=False)
@@ -177,7 +184,8 @@ def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinn
 
 
 def test_real_run_all_with_the_override_runs_and_keeps_the_caveat(tmp_path, pinned,
-                                                                  monkeypatch, capsys):
+                                                                  monkeypatch, capsys,
+                                                                  gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     calls = []
 
@@ -204,7 +212,9 @@ def test_named_glue_with_peak_0_names_is_blocked(tmp_path, pinned):
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
     peak_methods = discover.find_methods("diagonal", atac="peak")
     df = _quiet(mtb.scan, "LUNG_ids", "diagonal", methods=peak_methods, data_path=root,
-                verbose=False).set_index("method")
+                verbose=False)
+    df = df[df["files_ok"]].set_index("method")     # not GLUE's row for several batches
+    assert df.index.is_unique
     assert not df.loc["GLUE", "runnable"] and df.loc["GLUE", "files_ok"]
     assert df.loc["GLUE", "reason"] == (
         "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
@@ -221,7 +231,8 @@ def test_is_wrong_atac_reads_the_override_not_the_prose():
     assert list(W._is_wrong_atac(s)) == [True, False, False]
 
 
-def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys):
+def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
+                                              gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     inp = mtb.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
                          data_path=root)
@@ -438,7 +449,10 @@ def _skip_setup(monkeypatch, tmp_path):
     return calls
 
 
-def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, capsys):
+def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, capsys,
+                                                       as_gene_activity):
+    # UnitedNet stands for a method that needs a GPU and reads the other ATAC form
+    as_gene_activity("UnitedNet")
     calls = _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out",
@@ -504,8 +518,9 @@ def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
     log = capsys.readouterr().out
     assert [r["status"] for r in res.records] == ["RUN_OK"]
     assert res.failures.empty
-    assert ("[run_all] 1 more row needs files this folder does not have. mtb.scan shows "
-            "it.") in log
+    # Multigrate's three other mosaic rows are for patterns D45 does not hold
+    assert ("[run_all] 3 more rows need files this folder does not have. mtb.scan shows "
+            "them.") in log
     assert "skipping Multigrate" not in log
 
 

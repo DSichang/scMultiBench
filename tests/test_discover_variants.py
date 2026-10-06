@@ -30,23 +30,58 @@ def test_scmomat_is_unsupervised_in_its_vertical_variants():
 
 
 def test_category_and_modalities_must_hold_on_one_variant():
-    # Multigrate: vertical is rna+adt only; rna+atac exists only as a mosaic variant
-    assert "Multigrate" not in discover.find_methods(category="vertical", modalities=["rna", "atac"])
+    # Multigrate has rna+adt and rna+atac variants in vertical and in mosaic
+    assert "Multigrate" in discover.find_methods(category="vertical", modalities=["rna", "atac"])
     assert "Multigrate" in discover.find_methods(category="vertical", modalities=["rna", "adt"])
     assert "Multigrate" in discover.find_methods(category="mosaic", modalities=["rna", "atac"])
+    # sciPENN reads RNA + ADT in both of its categories and no ATAC in either
+    assert "sciPENN" not in discover.find_methods(category="vertical", modalities=["rna", "atac"])
     # every id returned for a (category, modalities) pair has a variant inputs_for can select
-    for m in discover.find_methods(category="vertical", modalities=["rna", "atac"]):
-        sup = discover.method_info(m)["supports"]
-        assert any(s["category"] == "vertical"
-                   and {"rna", "atac"} <= {registry.base_modality(x) for x in s["modalities"]}
-                   for s in sup), m
+    for cat in ("vertical", "mosaic", "cross"):
+        for mods in (["rna", "atac"], ["rna", "adt"], ["adt", "atac"], ["rna", "adt", "atac"]):
+            want = sorted(
+                m for m in discover.list_methods()
+                if any(s["category"] == cat
+                       and set(mods) <= {registry.base_modality(x) for x in s["modalities"]}
+                       for s in discover.method_info(m)["supports"]))
+            assert sorted(discover.find_methods(category=cat, modalities=mods)) == want, (cat, mods)
 
 
 def test_atac_filter_is_judged_on_variants_that_consume_atac():
-    # Multigrate declares atac: peak for its mosaic rna+atac variant only
-    assert "Multigrate" not in discover.find_methods(category="vertical", atac="peak")
+    assert "Multigrate" in discover.find_methods(category="vertical", atac="peak")
     assert "Multigrate" in discover.find_methods(category="mosaic", atac="peak")
-    assert "Matilda" in discover.find_methods(category="vertical", atac="gene_activity")
+    assert "Matilda" in discover.find_methods(category="vertical", atac="peak")
+    # a method that declares an ATAC form matches only where a variant reads ATAC
+    for cat in ("vertical", "diagonal", "mosaic", "cross"):
+        for m in discover.find_methods(category=cat, atac="peak"):
+            assert any(s["category"] == cat
+                       and any(registry.base_modality(x) == "atac" for x in s["modalities"])
+                       for s in discover.method_info(m)["supports"]) or m == "scBridge", (cat, m)
+
+
+def test_the_two_per_variant_rules_on_a_synthetic_spec(monkeypatch):
+    """No method of the registry has ATAC in one category only any more, so
+    the two rules above are pinned on a spec that does: vertical rna+adt,
+    mosaic rna+atac, ``atac: peak``."""
+    from multibench.engine.schema import ArgSpec, MethodSpec, OutputSpec, Variant
+
+    def var(cat, mods):
+        return Variant(when={"category": cat, "modalities": mods},
+                       entrypoint="tools_scripts/X/main.py", language="python",
+                       args=[ArgSpec(role=r, flag=f"--{r}") for r in mods],
+                       output=OutputSpec(kind="embedding", file="e.h5"))
+    spec = MethodSpec(id="Fake", language="python", categories=["vertical", "mosaic"],
+                      tasks=["clustering"], atac="peak", status="declared",
+                      variants=[var("vertical", ["rna", "adt"]),
+                                var("mosaic", ["rna1", "rna2", "atac2", "atac3"])])
+    monkeypatch.setattr(registry, "load", lambda: [spec])
+    monkeypatch.setattr(registry, "check_category", lambda c: c)
+    monkeypatch.setattr(registry, "check_task", lambda t: t)
+    assert discover.find_methods(category="vertical", modalities=["rna", "atac"]) == []
+    assert discover.find_methods(category="vertical", modalities=["rna", "adt"]) == ["Fake"]
+    assert discover.find_methods(category="mosaic", modalities=["rna", "atac"]) == ["Fake"]
+    assert discover.find_methods(category="vertical", atac="peak") == []
+    assert discover.find_methods(category="mosaic", atac="peak") == ["Fake"]
 
 
 def test_per_variant_semantics_on_a_synthetic_spec(monkeypatch):

@@ -200,15 +200,16 @@ def test_recommend_unscored_methods_line_is_plain(result_dir):
     assert "Try source" not in msg
 
 
-def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree):
+def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_foreign):
+    layout_tree = layout_tree_foreign
     _, msg = _recommend("diagonal", source="both", result_path=result_dir)
     assert ("Some methods have scores on only part of the datasets: Seurat_v5 3 of 4, "
             "GLUE 3 of 4. Check the coverage column before reading the order.") in msg
     _no_log_joins(msg)
     _, msg = _recommend("cross", result_path=layout_tree)
-    assert ("scMoMaT and UINMF have scores only on datasets left out of the ranking, "
-            "so they are listed last.") in msg
-    assert ("MOFA2 and Multigrate have scores in the published table, but this package "
+    assert ("scMoMaT has scores only on datasets left out of the ranking, "
+            "so it is listed last.") in msg
+    assert ("scMSI and Seurat_WNN have scores in the published table, but this package "
             "does not run them for cross, so they are left out of the ranking. "
             "mtb.list_methods(category='cross') does not list them.") in msg
     assert "A min-max score over one method is always 1.0." in msg
@@ -283,7 +284,8 @@ def test_prepared_file_note_names_the_method(root):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sc = mtb.scan("D28", "diagonal", data_path=root / "data", verbose=False)
-    cav = sc.set_index("method").loc["GLUE", "caveat"]
+    # GLUE's one-batch row; its several-batch row lacks its files in D28
+    cav = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
     assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
             "first, so start GLUE with mtb.run or mtb.run_all. The printed command alone "
             "fails in a job script.") in cav
@@ -310,9 +312,13 @@ def test_batch_advice_names_run_all_and_evaluate(monkeypatch):
                   "batch column to run_all(batch=...) or evaluate(batch=...). For RNA+ADT "
                   "batches, use category=\"cross\".")
     monkeypatch.setattr(config, "_CLI", True)
+    several = resolve._several_batch_diagonal_methods()
+    assert sorted(several) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
     assert resolve._one_file_advice("diagonal") == (
         "Diagonal methods read one rna.h5 and one ATAC file. Convert without --batch "
-        "and pass the batch column to run-all --batch or evaluate --batch.")
+        "and pass the batch column to run-all --batch or evaluate --batch. "
+        f"{resolve._and_list(several)} also read several RNA and ATAC batches, written "
+        "one batch per call with --batch-index.")
 
 
 def test_batch_with_atac_warning_names_run_all():

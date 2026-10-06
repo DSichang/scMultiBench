@@ -94,8 +94,10 @@ def _vertical_peaks(root, name="MU_PEAK", n=60):
 # ---------------------------------------------------------- wrong peak names block
 def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path, pinned):
     root = _diagonal(tmp_path, "LUNG_ga", [f"GENE{i}" for i in range(60)])
-    sc = _quiet(mtb.scan, "LUNG_ga", "diagonal", data_path=root,
-                verbose=False).set_index("method")
+    sc = _quiet(mtb.scan, "LUNG_ga", "diagonal", data_path=root, verbose=False)
+    # the rows whose files the folder holds: GLUE's row for several batches has none
+    sc = sc[sc["files_ok"]].set_index("method")
+    assert sc.index.is_unique
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         assert not sc.loc[m, "runnable"] and sc.loc[m, "files_ok"], m
         assert sc.loc[m, "reason"].endswith(
@@ -106,8 +108,9 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
     # R4-01: naming the method keeps it blocked; allow_atac_mismatch runs it
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
-                       verbose=False).iloc[0]
-        assert not named["runnable"], m
+                       verbose=False)
+        assert not named["runnable"].any(), m
+        assert named["files_ok"].sum() == 1, m
         allowed = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
                          verbose=False, allow_atac_mismatch=True).iloc[0]
         assert allowed["runnable"] and allowed["reason"] == "", m
@@ -164,10 +167,16 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
             "through its atac_gas input. Pass modalities=['rna', 'atac_peak'] or "
             "['rna', 'atac']."), str(e.value)
         assert "method_info(m)['supports']" not in str(e.value)
-    with pytest.raises(ValueError, match=r"Matilda reads gene activity\. Pass "
-                                         r"modalities=\['rna', 'atac_gas'\] or "
+    with pytest.raises(ValueError, match=r"Matilda reads peaks\. Pass "
+                                         r"modalities=\['rna', 'atac_peak'\] or "
                                          r"\['rna', 'atac'\]\.$"):
         _quiet(mtb.scan, "D11", "vertical", methods=["Matilda"],
+               modalities=["rna", "atac_gas"], verbose=False)
+    # the other direction, on a diagonal method that reads gene activity
+    with pytest.raises(ValueError, match=r"SCALEX reads gene activity\. Pass "
+                                         r"modalities=\['rna', 'atac_gas'\] or "
+                                         r"\['rna', 'atac'\]\.$"):
+        _quiet(mtb.scan, "D28", "diagonal", methods=["SCALEX"],
                modalities=["rna", "atac_peak"], verbose=False)
     # the command line keeps the message and gives its own spelling
     for sub in ("scan", "run-all"):
@@ -220,7 +229,8 @@ def test_dry_run_prints_the_scripts_note_once_and_no_start_notes(pinned, capsys)
     assert not re.search(r"^# \w+ The method scripts are not in", err, re.M)
 
 
-def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, capsys):
+def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, capsys,
+                                                          gas_matilda):
     root = _vertical_peaks(tmp_path)
     _quiet(mtb.run_all, "MU_PEAK", "vertical", modalities=["rna", "atac"],
            data_path=root, dry_run=True)
@@ -364,21 +374,35 @@ PINNED = {
             "sciPENN|vertical|rna+adt", "totalVI|vertical|rna+adt"],
     # R3-02: moETM, scMM and iPOLNG read peaks; D28's atac_gas.h5 holds gene
     # activity, so their vertical rna+atac_gas rows are no longer runnable
+    # scMDC reads peaks too (as the benchmark ran it), so its row joined them
     "D28": ["Conos|diagonal|rna+atac_gas", "GLUE|diagonal|rna+atac_peak",
             "MultiMAP|diagonal|rna+atac_peak+atac_gas", "Portal|diagonal|rna+atac_gas",
             "SCALEX|diagonal|rna+atac_gas", "Seurat_v3|diagonal|rna+atac_peak+atac_gas",
             "VIPCCA|diagonal|rna+atac_gas", "iNMF|diagonal|rna+atac_gas",
             "online_iNMF|diagonal|rna+atac_gas", "scBridge|diagonal|(data_dir)",
-            "scJoint|diagonal|rna+atac_gas", "scMDC|vertical|rna+atac_gas",
+            "scJoint|diagonal|rna+atac_gas",
             "sciCAN|diagonal|rna+atac_gas", "uniPort|diagonal|rna+atac_gas"],
+    # the variants of the article's 13 tasks: every method of the task of
+    # each dataset, in mosaic and cross
     "D45": ["Cobolt|mosaic|rna1+rna2+atac2+atac3", "MultiVI|mosaic|rna1+atac3+rna2+atac2",
-            "Multigrate|mosaic|rna1+rna2+atac2+atac3", "SMILE|mosaic|rna2+atac2+rna1+atac3"],
-    "D46": ["StabMap|mosaic|rna1+rna2+rna3+adt1+atac2",
+            "Multigrate|mosaic|rna1+rna2+atac2+atac3", "SMILE|mosaic|rna2+atac2+rna1+atac3",
+            "StabMap|mosaic|rna1+rna2+atac2+atac3", "scMoMaT|mosaic|rna1+rna2+atac2+atac3"],
+    "D46": ["Multigrate|mosaic|rna1+rna2+rna3+adt1+atac2",
+            "StabMap|mosaic|rna1+rna2+rna3+adt1+atac2",
+            "UINMF|mosaic|rna1+rna2+rna3+adt1+atac2",
             "scMoMaT|mosaic|rna1+rna2+rna3+adt1+atac2"],
+    # D52's files also fit the mosaic pattern RNA | RNA + ADT | ADT, and both
+    # of UINMF's cross variants (two and three batches)
     "D52": ["Concerto|cross|rna1+rna2+rna3+adt1+adt2+adt3",
+            "MOFA2|cross|rna1+rna2+rna3+adt1+adt2+adt3",
+            "Multigrate|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "Multigrate|mosaic|rna1+rna2+adt2+adt3",
             "StabMap|cross|rna1+rna2+rna3+adt1+adt2+adt3",
-            "UINMF|cross|rna1+rna2+adt1+adt2", "scMDC|cross|rna1+rna2+rna3+adt1+adt2+adt3",
+            "StabMap|mosaic|rna1+rna2+adt2+adt3",
+            "UINMF|cross|rna1+rna2+adt1+adt2",
+            "UINMF|cross|rna1+rna2+rna3+adt1+adt2+adt3",
+            "scMoMaT|mosaic|rna1+rna2+adt2+adt3",
+            "scMDC|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "scMM|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "scMoMaT|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "sciPENN|cross|rna1+rna2+rna3+adt1+adt2+adt3",
@@ -392,7 +416,7 @@ def test_demo_datasets_keep_their_pinned_runnable_rows(dataset, pinned):
     got = sorted(f"{r.method}|{r.category}|{r.modalities}" for r in df[df.runnable].itertuples())
     assert got == sorted(PINNED[dataset])
     blocked = df[W._is_wrong_atac(df["reason"])]
-    want = ({"iPOLNG", "moETM", "scMM"} if dataset == "D28" else set())
+    want = ({"iPOLNG", "moETM", "scMM", "scMDC"} if dataset == "D28" else set())
     assert set(blocked["method"]) == want
     assert set(blocked["category"]) <= {"vertical"}
 
@@ -496,18 +520,25 @@ def test_pages_state_the_donor_count_cross_reads():
     reads = {}
     for line in layout:
         pattern, methods = line.split(":", 1)
+        if "atac" in pattern:                 # the page is about RNA + ADT donors
+            continue
         top = max(int(n) for n in re.findall(r"(?:batch )?(\d+) =", pattern))
         for m in re.sub(r"\(demo \w+\)", "", methods).split(","):
-            reads[m.strip()] = top
-    assert reads.pop("UINMF") == 2 and set(reads.values()) == {3}
+            reads.setdefault(m.strip(), set()).add(top)
+    # UINMF has a variant for two batches and one for three
+    assert reads.pop("UINMF") == {2, 3} and set(map(frozenset, reads.values())) == {
+        frozenset({3})}
     # R4-16 moved the counts from the visible bullet to the Step 1 Details block
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
-    assert f"The `cross` category has {len(reads) + 1} methods, which integrate the donors" in step1
-    assert "The cross methods read batches 1-3. UINMF reads only the first two." in step1
+    assert (f"The `cross` category has {len(reads) + 1} RNA + ADT methods, which integrate "
+            f"the donors") in step1
+    assert ("These methods read batches 1-3. UINMF also has a variant for two "
+            "batches.") in step1
+    assert "UINMF reads only the first two" not in step1
     assert "also fits three donors, one file each" in step1
     run = _flat("tutorials/run.md")
-    assert ('category="cross") ``` The cross methods read batches 1-3. '
-            '`describe_layout("cross")` lists them.') in run
+    assert ('category="cross") ``` The cross methods for RNA + ADT read batches 1-3. '
+            '`describe_layout("cross")` lists every batch pattern.') in run
 
 
 @needs_docs

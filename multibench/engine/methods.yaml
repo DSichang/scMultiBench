@@ -23,7 +23,7 @@ methods:
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_adt.py
-        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -35,7 +35,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_atac.py
-        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -120,7 +120,7 @@ methods:
       - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_rna_adt_atac_d46.py
         helpers: [main_Multigrate_rna_adt_atac_d46.py]
-        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -135,7 +135,7 @@ methods:
       - when: {category: mosaic, modalities: [rna1, rna2, adt1, adt3, atac2]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_rna_adt_atac_d49.py
         helpers: [main_Multigrate_rna_adt_atac_d49.py]
-        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
         language: python
         args:
           - {role: rna1, flag: "--path1"}

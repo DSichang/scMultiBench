@@ -50,17 +50,27 @@ def _numbered(root, name, cells=(40, 50, 60), short=None):
     return d
 
 
+def _rna_adt_rows(df):
+    """The cross rows that read RNA + ADT, the files ``_numbered`` writes:
+    one row per method of that layout, and UINMF's two-batch row. The rows
+    that read ATAC lack their files in such a folder."""
+    rows = df[~df["modalities"].str.contains("atac") & (df["modalities"] != "(data_dir)")]
+    assert not df.drop(index=rows.index)["files_ok"].any()
+    assert len(rows) == 11 and rows["method"].nunique() == 10
+    return rows
+
+
 def test_intact_numbered_layout_passes(tmp_path, no_envs):
     _numbered(tmp_path, "GOOD")
     df = mtb.scan("GOOD", "cross", data_path=tmp_path)
-    rows = df[df["modalities"] != "(data_dir)"]
+    rows = _rna_adt_rows(df)
     assert len(rows) > 0 and rows["files_ok"].all(), rows[["method", "files_reason"]]
 
 
 def test_truncated_cty_of_one_batch_blocks_every_cross_method(tmp_path, no_envs):
     _numbered(tmp_path, "BADLAB", short=(2, 5))
     df = mtb.scan("BADLAB", "cross", data_path=tmp_path)
-    rows = df[df["modalities"] != "(data_dir)"]
+    rows = _rna_adt_rows(df)
     assert len(rows) > 0 and not rows["files_ok"].any()
     for _, r in rows.iterrows():
         why = r["files_reason"]
@@ -73,7 +83,7 @@ def test_truncated_cty_of_one_batch_blocks_every_cross_method(tmp_path, no_envs)
 def test_only_the_broken_batch_is_named(tmp_path, no_envs):
     _numbered(tmp_path, "BAD3", short=(3, 1))
     df = mtb.scan("BAD3", "cross", data_path=tmp_path)
-    why = df[df["modalities"] != "(data_dir)"].iloc[0]["files_reason"]
+    why = _rna_adt_rows(df).iloc[0]["files_reason"]
     assert "cty3.csv has 59 labels" in why and "batch 3" in why
     assert "cty1.csv" not in why and "cty2.csv" not in why
 
@@ -81,7 +91,7 @@ def test_only_the_broken_batch_is_named(tmp_path, no_envs):
 def test_extra_label_rows_are_caught_too(tmp_path, no_envs):
     _numbered(tmp_path, "LONG", short=(1, -4))          # 4 rows too MANY
     df = mtb.scan("LONG", "cross", data_path=tmp_path)
-    why = df[df["modalities"] != "(data_dir)"].iloc[0]["files_reason"]
+    why = _rna_adt_rows(df).iloc[0]["files_reason"]
     assert "cty1.csv has 44 labels" in why and "rna1.h5 has 40 cells" in why
 
 
@@ -91,7 +101,7 @@ def test_missing_cty_file_is_not_a_length_problem(tmp_path, no_envs):
     for i in (1, 2, 3):
         (d / f"cty{i}.csv").unlink()
     df = mtb.scan("NOCTY", "cross", data_path=tmp_path)
-    rows = df[df["modalities"] != "(data_dir)"]
+    rows = _rna_adt_rows(df)
     assert rows["files_ok"].all()
 
 
@@ -125,7 +135,7 @@ def test_reference_d52_copy_with_five_rows_cut(tmp_path, no_envs):
     lines = (src / "cty1.csv").read_text().splitlines()
     (bad / "cty1.csv").write_text("\n".join(lines[:-5]) + "\n")
     df = mtb.scan("BADLAB", "cross", data_path=tmp_path)
-    rows = df[df["modalities"] != "(data_dir)"]
+    rows = _rna_adt_rows(df)
     assert len(rows) >= 8 and not rows["files_ok"].any()
     assert rows["files_reason"].str.contains(r"cty1\.csv has \d+ labels, but rna1\.h5 has \d+ cells").all()
     assert rows["files_reason"].str.contains("batch 1").all()

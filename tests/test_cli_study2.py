@@ -67,12 +67,13 @@ def test_cli_params_fixed_in_script_and_knobs_for_untunable_method(capsys):
 def test_cli_params_formats(capsys):
     rc = cli.main(["params", "Matilda", "--format", "json"])
     rows = json.loads(capsys.readouterr().out)
-    assert rc == 0 and len(rows) == 2
+    n = len(multibench.method_info("Matilda")["supports"])      # one row per variant
+    assert rc == 0 and len(rows) == n == 3
     assert set(rows[0]) >= {"method", "variant", "tunable", "effective", "fixed_in_script"}
     rc = cli.main(["params", "Matilda", "--format", "csv"])
     out = capsys.readouterr().out
     assert rc == 0 and out.splitlines()[0] == "variant,key,type,default,effective"
-    assert out.count("\n") == 21           # header + 2 variants x 10 keys
+    assert out.count("\n") == 1 + n * 10   # header + 3 variants x 10 keys
 
 
 def test_cli_params_errors(capsys):

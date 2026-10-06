@@ -257,7 +257,7 @@ def test_run_all_raises_before_anything_runs(no_envs, labmos, capsys):
 def test_a_selection_with_every_method_present_is_unchanged(no_envs, labmos):
     one = mtb.scan("LABMOS", "mosaic", data_path="data", methods=["StabMap"],
                    verbose=False)
-    assert list(one["method"]) == ["StabMap"]
+    assert set(one["method"]) == {"StabMap"} and len(one) == 4     # its four mosaic rows
     every = mtb.scan("LABMOS", "mosaic", data_path="data", verbose=False)
     assert {"StabMap", "scMoMaT"} <= set(every["method"])
 
@@ -362,10 +362,13 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
     lines = msg.splitlines()
     assert lines[0] == ("None of the requested methods (Matilda, totalVI) can run on "
                         "MYDATA (vertical).")
-    assert lines[2] == "1 of 3 requested rows is also blocked by something else:"
-    assert lines[3] == ("  Matilda (rna+atac): Matilda needs gene-activity ATAC (atac.h5), "
+    # Matilda's two rows that read ATAC; its rna+adt row and totalVI's lack nothing
+    assert lines[2] == "2 of 4 requested rows are also blocked by something else:"
+    assert lines[3] == ("  Matilda (rna+atac): Matilda needs peak ATAC (atac.h5), "
                         "which is not in the folder.")
-    assert lines[4].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
+    assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
+                        "which is not in the folder.")
+    assert lines[5].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
                                "methods=['Matilda', 'totalVI']) shows these rows.")
     assert "not on this computer" not in msg
 

@@ -335,9 +335,9 @@ def cross(tmp_path, monkeypatch):
     return tmp_path / "data"
 
 
-def _cross_run(data, tmp, method):
+def _cross_run(data, tmp, method, **kw):
     return _quiet(mtb.run_all, "MYCROSS", "cross", tmp / method, data_path=data,
-                  methods=[method], verbose=False)
+                  methods=[method], verbose=False, **kw)
 
 
 def _count_sweeps(monkeypatch, fail=False):
@@ -399,7 +399,8 @@ def test_a_stored_order_that_no_longer_fits_is_ranked_again(cross, tmp_path, mon
 
 
 def test_rescore_does_not_warn_about_its_own_file_of_origin_batch(cross, tmp_path):
-    res = _cross_run(cross, tmp_path, "UINMF")
+    # UINMF's two-batch variant: a run that reads two of the folder's three batches
+    res = _cross_run(cross, tmp_path, "UINMF", modalities=["rna1", "rna2", "adt1", "adt2"])
     rec = res.results[0]
     assert len(rec["label_order_candidates"]) == 2 and rec["n_batches"] == 2
     with warnings.catch_warnings():

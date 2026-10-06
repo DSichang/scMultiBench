@@ -53,7 +53,8 @@ def test_strict_with_allow_atac_mismatch_still_needs_fetched_scripts(tmp_path, m
         warnings.simplefilter("ignore")
         rc = cli.main(argv)
     err = capsys.readouterr().err
-    assert rc == 1 and "Rows whose method scripts are not fetched: 2." in err, err
+    # each of the two has four mosaic rows; the folder holds the files of one
+    assert rc == 1 and "Rows whose method scripts are not fetched: 8." in err, err
     assert err.rstrip().endswith("Run multibench fetch --scripts first."), err
     monkeypatch.setattr(config, "scripts_present", lambda cfg=None: True)
     with warnings.catch_warnings():

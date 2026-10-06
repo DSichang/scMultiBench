@@ -19,7 +19,10 @@ CATS = ("vertical", "diagonal", "mosaic", "cross")
 def test_one_category_prints_only_that_category(cat):
     txt = mtb.describe_layout(cat)
     n = len(txt.splitlines())
-    assert 15 <= n <= 30, n                                # was about 65 lines
+    # was about 65 lines; mosaic and cross print one line per batch pattern of
+    # the registry (4 and 6) on top of the lines every category has
+    assert 15 <= n <= 30 + (len(W.batch_patterns(cat)) - 3 if cat in ("mosaic", "cross")
+                            else 0), n
     others = [c for c in CATS if c != cat]
     assert f"\n{cat}: " in txt
     assert not any(f"\n{c}: " in txt for c in others)
@@ -31,10 +34,25 @@ def test_one_category_prints_only_that_category(cat):
     assert "mtb.scan checks the files and the environment for each method" in txt
 
 
-@pytest.mark.parametrize("cat", ["vertical", "diagonal"])
-def test_numbered_files_only_for_batch_categories(cat):
-    assert "batch column" not in mtb.describe_layout(cat)
-    assert "rna1" not in mtb.describe_layout(cat)
+def test_numbered_files_only_where_methods_read_them():
+    """Vertical has no numbered files. Diagonal names them in one sentence,
+    with the methods that read several RNA and several ATAC batches."""
+    from multibench.engine import registry
+    vert, diag = mtb.describe_layout("vertical"), mtb.describe_layout("diagonal")
+    assert "batch column" not in vert and "batch column" not in diag
+    assert "rna1" not in vert
+    several = [s.id for s in registry.load()
+               if any(v.when.get("category") == "diagonal"
+                      and any(r[-1].isdigit() for r in v.when.get("modalities") or [])
+                      for v in s.variants)]
+    assert sorted(several) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
+    lines = diag.splitlines()
+    i = next(i for i, ln in enumerate(lines) if "rna1.h5" in ln)
+    assert lines[i].startswith("For several RNA and several ATAC batches, number the files")
+    assert "atac_gas1.h5" in lines[i] and "atac_peak1.h5" in lines[i + 1]
+    assert "rna_cty1.csv, atac_cty1.csv" in lines[i + 1]
+    assert lines[i + 2].strip() == ", ".join(several)
+    assert diag.count("rna1") == 1
 
 
 @pytest.mark.parametrize("cat", ["mosaic", "cross"])
@@ -51,7 +69,12 @@ def test_one_peak_file_name_per_category():
     assert "Older names still read: peak.h5 for peaks, and atac.h5 for gene activity." in diag
     vert = mtb.describe_layout("vertical")
     assert not re.search(r"(?<![\w_])peak\.h5", vert) and "atac_peak.h5" not in vert
-    assert "atac.h5 holds peaks or gene activity" in vert
+    # every vertical method that reads ATAC reads peaks; with a gene-activity
+    # method in the registry the text lists the methods of each form instead
+    assert mtb.find_methods("vertical", atac="gene_activity") == []
+    assert ("atac.h5 holds peaks, not gene activity: every vertical method that reads "
+            "ATAC needs peaks.") in vert
+    assert "need peaks:" not in vert and "need gene activity:" not in vert
 
 
 def test_mosaic_lists_every_registry_pattern_with_methods_and_demo():

@@ -229,7 +229,9 @@ def test_the_student_gate_on_a_mosaic_dataset(host, monkeypatch, capsys):
             "--strict", "--assume-gpu"]
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
-    assert "Rows whose method scripts are not fetched: 2." in err
+    # each of the two has four mosaic rows, and D46 holds the files of one
+    assert "0 of 8 rows are runnable. Rows with missing input files: 6." in err
+    assert "Rows whose method scripts are not fetched: 8." in err
     assert "Run multibench fetch --scripts first." in err
 
 

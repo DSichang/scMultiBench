@@ -97,7 +97,10 @@ def _vertical(root, name, atac_feats, n=60, adt=False):
 def test_peak_ids_leave_multimap_runnable_and_block_glue_and_seurat_v3(tmp_path, pinned):
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
     sc = _quiet(mtb.scan, "LUNG_ids", "diagonal", data_path=root, verbose=False,
-                methods=discover.find_methods("diagonal", atac="peak")).set_index("method")
+                methods=discover.find_methods("diagonal", atac="peak"))
+    # the rows whose files the folder holds: GLUE's row for several batches has none
+    sc = sc[sc["files_ok"]].set_index("method")
+    assert sc.index.is_unique
     assert sc.loc["MultiMAP", "runnable"], sc.loc["MultiMAP", "reason"]
     assert sc.loc["MultiMAP", "reason"] == ""
     assert sc.loc["MultiMAP", "caveat"].startswith(
@@ -112,9 +115,11 @@ def test_peak_ids_leave_multimap_runnable_and_block_glue_and_seurat_v3(tmp_path,
                                               "to chr:start-end"), sc.loc[m, "reason"]
 
 
-def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned):
+def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned,
+                                                                gas_matilda):
     """atac.h5 names that are neither chr:start-end nor the RNA's genes: the
-    peak methods run with a caveat, and so do the gene-activity methods."""
+    peak methods run with a caveat, and so does a gene-activity method
+    (``gas_matilda``: the real Matilda reads peaks)."""
     root = _vertical(tmp_path, "MYMO_ids", [f"peak_{i}" for i in range(40)])
     sc = _quiet(mtb.scan, "MYMO_ids", "vertical", methods=["scMVP", "Matilda"],
                 modalities=["rna", "atac"], data_path=root, verbose=False).set_index("method")
@@ -156,7 +161,10 @@ def test_names_are_genes_needs_a_file_to_compare_with(tmp_path):
 
 # ------------------------------------------------- the override ends the reason
 def test_the_override_is_the_last_clause_of_a_gpu_blocked_row(tmp_path, pinned,
-                                                              monkeypatch):
+                                                              monkeypatch, as_gene_activity):
+    # a method that needs a GPU and is given the other ATAC form. UnitedNet
+    # reads peaks; it is set to gene activity here to meet both conditions
+    as_gene_activity("UnitedNet")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     row = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["UnitedNet"],
@@ -172,7 +180,7 @@ class _Stop(RuntimeError):
 
 
 def test_run_all_with_the_override_does_not_warn_again(tmp_path, pinned, monkeypatch,
-                                                      capsys):
+                                                      capsys, gas_matilda):
     """The caveat is in the log and the record; the runner's warning is not repeated."""
     def stop(spec, params):
         raise _Stop("stand-in env: stop before the method starts")
@@ -285,14 +293,15 @@ def test_run_all_raises_names_the_batch_series_error():
 
 # ------------------------------------------- --strict reads the row on the disk
 def test_strict_line_of_a_named_method_reads_the_row_with_its_files(tmp_path, pinned,
-                                                                    capsys):
+                                                                    capsys, gas_matilda):
     root = _vertical(tmp_path, "MYMO2", PEAKS)          # Multiome: no adt.h5
     rc = _quiet(cli.main, ["scan", "MYMO2", "--category", "vertical", "--data-path",
                            str(root), "--methods", "Matilda", "--strict"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert err.startswith("error: --strict: 0 of 2 rows are runnable. Rows with missing "
-                          "input files: 1. Rows with the wrong ATAC kind: 1."), err
+    # Matilda's three vertical rows: the two that read ADT lack adt.h5
+    assert err.startswith("error: --strict: 0 of 3 rows are runnable. Rows with missing "
+                          "input files: 2. Rows with the wrong ATAC kind: 1."), err
     assert re.search(r"^  Matilda: Matilda needs gene-activity ATAC, and atac\.h5 holds "
                      r"peaks\. Export the ATAC as gene activity, or pass "
                      r"--allow-atac-mismatch to run Matilda anyway\.$", err, re.M), err

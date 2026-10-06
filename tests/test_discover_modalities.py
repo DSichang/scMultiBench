@@ -53,12 +53,12 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
     msg = str(e.value)
     assert ("Pass the category and modalities of one, for example "
             "params_for('Matilda', 'vertical', ['rna', 'adt']).") in msg
-    assert "vertical:rna+adt and vertical:rna+atac" in msg
+    assert "vertical:rna+adt, vertical:rna+atac and vertical:rna+adt+atac" in msg
     with pytest.raises(ValueError) as e:
         mtb.params_for("Matilda", "vertical")
     assert ("Pass the modalities too, for example "
             "params_for('Matilda', 'vertical', ['rna', 'adt']).") in str(e.value)
-    assert "Matilda has 2 vertical variants, rna+adt and rna+atac." in str(e.value)
+    assert "Matilda has 3 vertical variants, rna+adt, rna+atac and rna+adt+atac." in str(e.value)
     # 'atac' selects the atac_gas variant; unknown category stays KeyError
     assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
     assert mtb.params_for("scMM", modalities=["rna", "atac"])["variant"] == "vertical:rna+atac_gas"

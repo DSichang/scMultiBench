@@ -150,7 +150,8 @@ def test_diagonal_export_writes_unpaired_rna_and_atac(tmp_path):
     assert pd.read_csv(d / "rna_cty.csv")["x"].tolist() == rna.obs["cell_type"].tolist()
     assert pd.read_csv(d / "atac_cty.csv")["x"].tolist() == atac.obs["cell_type"].tolist()
     sc = mtb.scan("LUNG", "diagonal", data_path=tmp_path)
-    assert sc.loc[sc["method"] == "GLUE", "files_ok"].item()
+    glue = sc[(sc["method"] == "GLUE") & (sc["modalities"] == "rna+atac_peak")]
+    assert glue["files_ok"].item()
     # gene activity goes to atac_gas.h5
     g = _atac(90)
     g.var_names = [f"G{i}" for i in range(len(PEAKS))]
@@ -272,7 +273,8 @@ def test_batch_index_writes_the_d46_pattern_and_scan_finds_it(tmp_path):
         "rna1.h5", "rna2.h5", "rna3.h5"]
     assert _n_cells(tmp_path / "LAB" / "rna2.h5") == 80
     sc = mtb.scan("LAB", "mosaic", data_path=tmp_path)
-    ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])]
+    ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])
+            & (sc["modalities"] == "rna1+rna2+rna3+adt1+atac2")]     # the D46 pattern
     assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()
     # a loop cannot mix batches: the same index again refuses
     with pytest.raises(FileExistsError, match="rna3.h5"):
@@ -308,7 +310,8 @@ def test_mosaic_batch_split_writes_atac_i(tmp_path, capsys):
     assert not any(n.startswith("atac_peak") for n in names)
     # the folder holds the D46 pattern (rna1-3, adt1, atac2): scan finds it
     sc = mtb.scan("MOS", "mosaic", data_path=tmp_path)
-    ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])]
+    ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])
+            & (sc["modalities"] == "rna1+rna2+rna3+adt1+atac2")]     # the D46 pattern
     assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()
     with pytest.warns(UserWarning, match="Every mosaic method reads peak ATAC"):
         ingest.export_dataset(m, tmp_path / "G", rna=None, atac="obsm:peaks",

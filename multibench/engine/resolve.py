@@ -94,7 +94,11 @@ def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False)
     advice = _batch_column_advice()
     advice = advice[:1].upper() + advice[1:] + "."
     if category == "diagonal":
-        return "Diagonal methods read one rna.h5 and one ATAC file. " + advice
+        several = _several_batch_diagonal_methods()
+        also = (f" {_and_list(several)} also read several RNA and ATAC batches, written "
+                "one batch per call with "
+                + config.hint("batch_index=", "--batch-index") + "." if several else "")
+        return "Diagonal methods read one rna.h5 and one ATAC file. " + advice + also
     cross = config.hint('category="cross"', "--category cross")
     return (f"{category.capitalize()} methods read one {stem}.h5. " + advice
             + (f" For RNA+ADT batches, use {cross}." if has_adt else ""))
@@ -130,6 +134,15 @@ def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | Non
             + _one_file_advice(category, stem=ex,
                                has_adt="adt" in numbered
                                and not any(b.startswith("atac") for b in numbered)))
+
+
+def _several_batch_diagonal_methods() -> list[str]:
+    """The methods with a diagonal variant of numbered roles (several RNA and
+    several ATAC batches), in registry order."""
+    return [spec.id for spec in registry.load()
+            if any(v.when.get("category") == "diagonal"
+                   and _variant_batches(v.when.get("modalities") or [])
+                   for v in spec.variants)]
 
 
 def _per_batch_diagonal_methods(ds_dir: Path) -> list[str]:
@@ -1555,6 +1568,32 @@ def _variant_label_rank(stems: list[str], variant) -> dict[str, tuple] | None:
     return rank
 
 
+_NUMBERED_LABEL_RE = re.compile(r"(?:(?:rna|atac)_)?cty(\d+)")
+
+
+def _agreed_label_order(spec, category: str, stems: list[str]) -> list[str] | None:
+    """The label order of a folder that does not settle the variant, when the
+    variants that could have read it agree on one; ``None`` when they differ.
+
+    The candidates are the ``category`` variants that read exactly the
+    batches the label files are numbered for. A folder with ``cty1.csv``,
+    ``cty2.csv`` and ``cty3.csv`` and no data files fits both three-batch
+    cross variants of StabMap, and both start with the reference batch.
+    """
+    batches = {int(m.group(1)) for st in stems if (m := _NUMBERED_LABEL_RE.fullmatch(st))}
+    orders = set()
+    for v in spec.variants:
+        if v.when.get("category") != category:
+            continue
+        roles = {r for a in v.args for r in (getattr(a, "roles", None) or [a.role]) if r}
+        if _variant_batches(roles) != batches:
+            continue
+        rank = _variant_label_rank(stems, v)
+        orders.add(tuple(stems) if rank is None
+                   else tuple(sorted(stems, key=lambda st: rank[st])))
+    return list(orders.pop()) if len(orders) == 1 else None
+
+
 class LabelFiles(dict):
     """The ``{stem: path}`` dict :func:`labels_for` returns.
 
@@ -1653,8 +1692,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
 
     One exception: with ``category`` and ``method``, a variant that reads
     fewer numbered batches than the folder holds gets only the label files
-    of its batches. UINMF's cross variant reads batches 1 and 2, so on
-    ``D52`` the dict holds ``cty1`` and ``cty2``.
+    of its batches. UINMF's two-batch cross variant, chosen with
+    ``modalities=["rna1", "rna2", "adt1", "adt2"]``, reads batches 1 and 2,
+    so on ``D52`` the dict holds ``cty1`` and ``cty2``.
 
     An older paired folder may hold ``rna_cty.csv`` instead of ``cty.csv``.
     With ``category`` and ``method``, a variant that reads ``cty`` gets that
@@ -1679,17 +1719,20 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     inputs, unless the method's cell order differs. uniPort and Seurat_v5
     put their ATAC cells before their RNA cells.
 
-    StabMap uses a fixed reference batch: batch 3 in cross, batch 1 in
-    mosaic (``method_info('StabMap')['supports'][i]['reference_batch']``).
+    StabMap uses a fixed reference batch for each layout: in cross the last
+    batch (batch 3 of three, batch 2 of two), in mosaic batch 1 or batch 2
+    (``method_info('StabMap')['supports'][i]['reference_batch']``).
     Its cell order starts with that batch (``cty3, cty1, cty2`` on ``D52``).
     Number the donor you want as reference accordingly.
 
     The variant is chosen as ``mtb.inputs_for`` does: by ``modalities=``, else
     the category's only variant or the one whose files the folder holds (of
-    nested ones, the one with the most modalities). If
-    the choice stays ambiguous, or no label file pairs with the variant's
-    roles, the default order is used; ``labels_for`` does not raise
-    ``mtb.AmbiguousVariantError``.
+    nested ones, the one with the most modalities). If the choice stays
+    ambiguous, as in a folder that holds label files and no data files, the
+    order is the one that every variant reading the folder's batches gives
+    (StabMap's reference batch first), and the default order when they
+    differ. When no label file pairs with the variant's roles, the default
+    order is used. ``labels_for`` does not raise ``mtb.AmbiguousVariantError``.
 
     **Passing it to evaluate.** The dict is a ``dict`` subclass that remembers
     its order, so ``mtb.evaluate(labels=...)`` takes it as is. A copy
@@ -1762,7 +1805,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         try:
             cand = select_variant(spec, category, mods, ds_dir=ds_dir)
         except AmbiguousVariantError:
-            cand = None                 # still ambiguous: canonical order
+            # still ambiguous: the order its candidate variants agree on,
+            # else the canonical order
+            cand = None
+            stems = _agreed_label_order(spec, category, stems) or stems
         if cand is not None:
             roles = {r for a in cand.args
                      for r in (getattr(a, "roles", None) or [a.role]) if r}
@@ -1777,7 +1823,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
             used = _variant_batches(roles)
             if used:
                 stems = [st for st in stems
-                         if not (m := re.fullmatch(r"(?:(?:rna|atac)_)?cty(\d+)", st))
+                         if not (m := _NUMBERED_LABEL_RE.fullmatch(st))
                          or int(m.group(1)) in used]
             rank = _variant_label_rank(stems, cand)
             if rank is not None:

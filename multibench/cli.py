@@ -1221,7 +1221,7 @@ def _run_all_command(args, stack) -> int:
         if wrong_ref:
             print(f"# {wrong_ref}", file=sys.stderr)
         # the caveats of the rows the sweep would run: the compact table clips them
-        scripts, lines = _dry_run_notes(df)
+        scripts, lines = _dry_run_notes(df, _csv_list(args.modalities))
         if scripts:
             print(f"# {scripts}", file=sys.stderr)
         for _m, cav in lines:              # each caveat starts with its method
@@ -2030,7 +2030,7 @@ def _status_epilog() -> str:
 _CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
-                  "modality) or cross (several batches, each with RNA and ADT).")
+                  "modality) or cross (several batches, each with the same modalities).")
 _TASK_HELP = ("task within the category: clustering, batch or dimension_reduction. "
               "mtb.list_tasks() lists them.")
 _METHODS_HELP = "comma-separated method ids, as printed by multibench list"

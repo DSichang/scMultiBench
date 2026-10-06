@@ -173,8 +173,10 @@ def _mu_tc(root):
     return d
 
 
-def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path):
+def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, gas_matilda):
     _mu_tc(tmp_path)
+    # the real Matilda reads peaks and gets scMVP's advice; `gas_matilda`
+    # stands for a vertical method that reads gene activity
     df = mtb.scan("MU_TC", "vertical", data_path=tmp_path, verbose=False)
     df = df.set_index(["method", "modalities"])
     peak = df.loc[("scMVP", "rna+atac"), "reason"]

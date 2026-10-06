@@ -38,7 +38,8 @@ def test_modality_types_mapping():
     from multibench.discover import _modality_types
     assert _modality_types(registry.get("SCALEX")) == {"rna", "atac"}
     assert _modality_types(registry.get("Cobolt")) == {"rna", "atac"}
-    assert _modality_types(registry.get("UINMF")) == {"rna", "adt"}
+    assert _modality_types(registry.get("totalVI")) == {"rna", "adt"}
+    assert _modality_types(registry.get("UINMF")) == {"rna", "adt", "atac"}
 
 
 def test_find_methods_modalities_rna_adt():
@@ -155,11 +156,14 @@ def test_method_info_needs_labels_matches_inputs_for(root):
 
 def test_find_methods_atac_vertical_nonempty():
     peaks = discover.find_methods(category="vertical", atac="peak")
-    for m in ("moETM", "scMM", "MIRA", "scMVP", "Seurat_WNN"):
+    # Matilda, scMDC and UnitedNet read peaks, as the benchmark ran them
+    for m in ("moETM", "scMM", "MIRA", "scMVP", "Seurat_WNN", "Matilda", "scMDC", "UnitedNet"):
         assert m in peaks, m
     gas = discover.find_methods(atac="gene_activity")
-    for m in ("SCALEX", "scJoint", "Matilda"):
+    for m in ("SCALEX", "scJoint", "iNMF"):
         assert m in gas, m
+    # every method that reads gene activity is a diagonal method
+    assert discover.find_methods(category="vertical", atac="gene_activity") == []
     assert set(peaks).isdisjoint(gas)
     # alias spellings map onto the same answer
     assert discover.find_methods(atac="peaks") == discover.find_methods(atac="peak")

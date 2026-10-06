@@ -90,11 +90,20 @@ def test_scan_modality_order_does_not_matter():
 
 
 def test_scan_numbered_and_base_tokens_on_mosaic():
+    """Base tokens keep every mosaic row with RNA, ADT and ATAC: the two
+    mixed batch patterns. Numbered tokens keep the rows of one pattern."""
     base = mtb.scan("D46", "mosaic", modalities=["rna", "adt", "atac"], verbose=False)
-    assert set(base["method"]) == {"StabMap", "scMoMaT"}
-    exact = mtb.scan("D46", "mosaic", modalities=["rna1", "rna2", "rna3", "adt1", "atac2"],
-                     verbose=False)
-    assert _rows(exact) == _rows(base)
+    shared = "rna1+rna2+rna3+adt1+atac2"            # the pattern D46 holds
+    unshared = "rna1+rna2+adt1+adt3+atac2"
+    assert set(base["modalities"]) == {shared, unshared}
+    assert set(base.loc[base["modalities"] == shared, "method"]) == {
+        "StabMap", "scMoMaT", "Multigrate", "UINMF"}
+    assert set(base.loc[base["modalities"] == unshared, "method"]) == {
+        "StabMap", "scMoMaT", "Multigrate"}
+    assert base.loc[base["modalities"] == shared, "files_ok"].all()
+    assert not base.loc[base["modalities"] == unshared, "files_ok"].any()
+    exact = mtb.scan("D46", "mosaic", modalities=shared.split("+"), verbose=False)
+    assert _rows(exact) == _rows(base[base["modalities"] == shared])
 
 
 def test_scan_unknown_modality_token_raises_with_the_vocabulary():

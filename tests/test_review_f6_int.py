@@ -217,7 +217,13 @@ def test_the_run_all_line_for_rows_without_files_is_sentences(monkeypatch, tmp_p
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(W, "_run", lambda **kw: _Res(np.zeros((1, 2))))
     monkeypatch.setattr(config, "_CLI", True)
+    # Multigrate has four mosaic rows, and D45 holds the files of one
     _quiet(mtb.run_all, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
+           evaluate=False)
+    assert ("[run_all] 3 more rows need files this folder does not have. multibench "
+            "scan shows them.") in capsys.readouterr().out
+    # scMDC has two cross rows (RNA + ADT, RNA + ATAC), and D52 holds RNA + ADT
+    _quiet(mtb.run_all, "D52", "cross", tmp_path / "out2", methods=["scMDC"],
            evaluate=False)
     assert ("[run_all] 1 more row needs files this folder does not have. multibench "
             "scan shows it.") in capsys.readouterr().out
@@ -248,11 +254,14 @@ def test_scan_count_line_for_one_method_without_files(tmp_path, pinned, capsys):
 
 def test_the_no_variant_and_missing_folder_errors_are_sentences(tmp_path):
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.scan, "D11", "vertical", methods=["Matilda"],
+        # (Matilda has a variant for the three modalities; VIMCCA has none)
+        _quiet(mtb.scan, "D11", "vertical", methods=["VIMCCA"],
                modalities=["rna", "atac", "adt"], verbose=False)
-    assert str(e.value) == ("Matilda does not read rna+atac+adt in vertical data. "
-                            "mtb.method_info('Matilda')['supports'] lists what Matilda "
+    assert str(e.value) == ("VIMCCA does not read rna+atac+adt in vertical data. "
+                            "mtb.method_info('VIMCCA')['supports'] lists what VIMCCA "
                             "reads.")
+    assert ["rna", "adt", "atac"] in [s["modalities"]
+                                      for s in mtb.method_info("Matilda")["supports"]]
     (tmp_path / "D11").mkdir()
     (tmp_path / "D28").mkdir()
     with pytest.raises(FileNotFoundError) as e:
@@ -332,11 +341,24 @@ def test_the_overlay_error_names_several_methods(tmp_path, monkeypatch, capsys):
 
 def test_the_dry_run_commands_header_counts_methods(monkeypatch, capsys):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run"], capsys)
+    # three methods with one cross row each: the header counts methods
+    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run", "--methods",
+                         "sciPENN,totalVI,Concerto"], capsys)
     assert rc == 0
+    assert "0 of 3 methods can run on D52 (cross)." in err
     assert "A method whose input files are missing has no command." in err
-    assert re.search(r"^# Commands of the \d+ methods whose input files are in place\. "
+    assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
                      r"\[env missing\] marks a method whose environment", out, re.M), out
+    # the whole category: several methods have more than one row, so it counts rows
+    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run"], capsys)
+    n = len(list(W._variant_rows("cross")))
+    assert rc == 0 and f"0 of {n} rows can run on D52 (cross)." in err
+    assert "A row whose input files are missing has no command." in err
+    assert re.search(r"^# Commands of the \d+ rows whose input files are in place\. "
+                     r"\[env missing\] marks a row whose environment", out, re.M), out
+    # UINMF's two-batch row is inside its three-batch row, which is the one
+    # that runs: the caveat of the row left out is not printed
+    assert "UINMF reads batches 1-2 of 3" not in err
 
 
 @needs_git
@@ -347,7 +369,9 @@ def test_strict_without_methods_prints_the_scripts_ref_fix(wrong_ref, capsys):
     ref = (f"The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). "
            f"Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and "
            f"run multibench fetch --scripts.")
-    assert "Rows whose scripts are not at MULTIBENCH_SCRIPTS_REF: 8." in err, err
+    n = len(list(W._variant_rows("cross")))                # every cross row
+    assert n == 30
+    assert f"Rows whose scripts are not at MULTIBENCH_SCRIPTS_REF: {n}." in err, err
     assert f"The reason column says why.\n{ref}\n" in err, err
 
 

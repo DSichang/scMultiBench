@@ -5,8 +5,10 @@ The tasks are the 13 of the benchmark article: three vertical, two diagonal,
 four mosaic and four cross. A task is named by its modality sets
 (``variants``), and a method belongs to the task when the registry gives it a
 variant with exactly one of those sets. Every variant of the four categories
-belongs to one task. ``not_wrapped`` names the methods the article evaluates
-on a task and the package does not run.
+belongs to one task. Where a method has two variants in a task (UINMF on two
+and on three batches), ``run_all`` runs the larger one on the task's dataset.
+``not_wrapped`` names the methods the article evaluates on a task and the
+package does not run.
 
 Each tutorial is one straight path, run top to bottom on Linux or Colab:
 install the package, download the data and the method environments, run the
@@ -17,14 +19,14 @@ that cannot work on the reader's computer fails with the package's own error:
 the environment install refuses off Linux.
 
 Every method of a task runs on the task's one dataset. The defaults are two
-methods of the task (one where it has one) that are fast, need no GPU, read
-every batch and run without ``allow_atac_mismatch``, with small environments.
-``check_task`` refuses a default that reads only some batches or that the
-ATAC check blocks. ``run_all`` gets ``modalities=`` where the dataset also
-holds the files of another variant of a listed method, and the every-method
-notebook gets ``allow_atac_mismatch=True`` where the check blocks a method
-(``run_args``). Every size quoted comes from the dry-run plans at generation
-time, never a hand-written figure.
+methods of the task (one where it has one) that are fast and need no GPU,
+with the smallest environments. ``run_all`` gets the dataset, the category,
+the methods and the output folder, and no other argument: where the dataset
+also holds the files of a smaller variant of a method, ``run_all`` runs the
+variant with the most modalities. ``check_task`` stops the generation when
+that call would not run every method of the task once, on the task's variant
+and on every batch. Every size quoted comes from the dry-run plans at
+generation time, never a hand-written figure.
 
 Prose has two layers. Visible: 1-3 short sentences per section - what the
 step does and what the reader must do or decide - then the code. A fact
@@ -70,6 +72,16 @@ def stored_method_counts(cat, dataset):
     cov = cov[cov.dataset == dataset]
     return (cov[cov.source == "published"].method.nunique(),
             cov[cov.source.str.startswith("rerun")].method.nunique())
+
+
+def stored_on_fewer_batches(dataset):
+    """The methods whose stored scores for ``dataset`` come from a run on
+    fewer batches than the others', from the ``label_order`` column of the
+    stored summary (UINMF on ``D52``: its two-batch variant)."""
+    import pandas as pd
+    df = pd.read_csv(os.path.join(OUT, "results", f"summary_{dataset}.csv"))
+    n = df.label_order.str.count(r"\+") + 1
+    return sorted(df.method[n < n.max()]), int(n.min()), int(n.max())
 
 
 def _gb(rows):
@@ -162,10 +174,12 @@ COLAB_GPU_NOTE = ("On Colab, choose a GPU runtime before you run the notebook: R
 # One notebook per integration task, and one dataset per task: every method of
 # the task runs on it (tools/make_tutorial_data.py). The keys, their order and
 # the labels follow the benchmark article. `variants` are the modality sets of
-# the task's method variants; `methods` are the two the notebook runs by
-# default (one when the task has a single method); `stored_ds` is the dataset
-# whose stored scores the last section draws; `not_wrapped` are the methods
-# the article evaluates on the task and the package does not run.
+# the task's method variants (the cross tasks with three batches also hold
+# UINMF's two-batch sets, which belong to no other task); `methods` are the
+# two the notebook runs by default (one when the task has a single method);
+# `stored_ds` is the dataset whose stored scores the last section draws;
+# `not_wrapped` are the methods the article evaluates on the task and the
+# package does not run.
 def _three(*roles):
     """The roles of three batches: ``rna1, rna2, rna3, adt1, ...``."""
     return [f"{r}{i}" for r in roles for i in (1, 2, 3)]
@@ -191,14 +205,12 @@ TASKS = {
    blurb=("Vertical integration combines modalities measured in the same cells. "
           "This tutorial is for RNA and ATAC, as in 10x Multiome. It runs {methods} "
           "on `D27mini_vertical`, 5,000 cells of the benchmark dataset `D27`, and "
-          "then on data in your own format. Each method reads ATAC as peaks or as "
-          "gene-activity scores: `mtb.method_info(m)[\"atac\"]` says which. The "
-          "dataset holds both."),
+          "then on data in your own format. Every method of this task reads ATAC as "
+          "a peak matrix."),
  ),
  "vertical_rna_adt_atac": dict(
    cat="vertical", label="RNA + ADT + ATAC", ds="D22mini",
-   variants=[["rna", "adt", "atac"]], methods=["MOFA2", "scMoMaT"],
-   not_wrapped=["UINMF"],
+   variants=[["rna", "adt", "atac"]], methods=["Matilda", "UINMF"],
    blurb=("Vertical integration combines modalities measured in the same cells. "
           "This tutorial is for RNA, surface protein and ATAC from the same cells. "
           "It runs {methods} on `D22mini`, 3,000 cells of the benchmark dataset "
@@ -243,20 +255,18 @@ TASKS = {
  ),
  "mosaic_shared": dict(
    cat="mosaic", label="Mixed, with shared modality", ds="D46mini",
-   variants=[["rna1", "rna2", "rna3", "adt1", "atac2"]], methods=["StabMap", "scMoMaT"],
-   not_wrapped=["UINMF", "Multigrate"],
+   variants=[["rna1", "rna2", "rna3", "adt1", "atac2"]], methods=["StabMap", "UINMF"],
    blurb=(_MOSAIC + ", and every mosaic method reads ATAC as peaks. This tutorial "
           "is for an RNA + ADT batch, an RNA + ATAC batch and an RNA batch, so "
-          "every batch holds RNA. It runs {methods} on `D46mini`, 1,800 cells of "
+          "every batch holds RNA. It runs {methods} on `D46mini`, 4,500 cells of "
           "the benchmark dataset `D46`, and then on data in your own format."),
  ),
  "mosaic_unshared": dict(
    cat="mosaic", label="Mixed, without shared modality", ds="D49mini",
    variants=[["rna1", "rna2", "adt1", "adt3", "atac2"]], methods=["StabMap", "scMoMaT"],
-   not_wrapped=["Multigrate"],
    blurb=(_MOSAIC + ", and every mosaic method reads ATAC as peaks. This tutorial "
           "is for an RNA + ADT batch, an RNA + ATAC batch and an ADT batch, so no "
-          "modality is in every batch. It runs {methods} on `D49mini`, 3,900 cells "
+          "modality is in every batch. It runs {methods} on `D49mini`, 4,500 cells "
           "of the benchmark dataset `D49`, and then on data in your own format."),
  ),
  "cross_rna_adt": dict(
@@ -287,26 +297,12 @@ TASKS = {
  "cross_rna_adt_atac": dict(
    cat="cross", label="Multiple RNA + ADT + ATAC", ds="D59mini",
    variants=[["rna1", "rna2", "adt1", "adt2", "atac1", "atac2"]],
-   methods=["StabMap", "scMoMaT"], not_wrapped=["UINMF"],
+   methods=["StabMap", "UINMF"],
    blurb=(_CROSS + "This tutorial is for batches that each hold RNA, ADT and "
           "ATAC peaks. It runs {methods} on `D59mini`, 3,000 cells in two batches "
           "of the benchmark dataset `D59`, and then on data in your own format."),
  ),
 }
-
-# The tasks whose `run_all` names the modalities, and the sentence that says
-# why: the dataset also holds the files of smaller variants of the methods.
-# The cross tasks with RNA + ADT and RNA + ATAC name none, because UINMF's
-# two-batch variant runs there next to the three-batch variants.
-MODALITIES_NOTE = {
- "vertical_rna_adt_atac": ("`modalities=` names the files the methods read. The methods "
-                           "also have RNA + ADT and RNA + ATAC variants, and the folder "
-                           "holds the files of those too."),
- "cross_rna_adt_atac": ("`modalities=` names the files the methods read. The methods "
-                        "also have an ADT + ATAC variant, and the folder holds the files "
-                        "of that too."),
-}
-
 
 def task_variants(key):
     """``(method, variant)`` for every registry variant of the task: a variant
@@ -324,95 +320,80 @@ def task_methods(key):
     return sorted({m for m, _ in task_variants(key)})
 
 
-_ATAC_BLOCKED = {}
+def run_variants(key):
+    """``{method: modalities}`` of the variant each method of the task runs on
+    the task's dataset, as the ``modalities`` column of ``scan`` spells it. A
+    method with two variants in the task runs the one with more files."""
+    best = {}
+    for m, v in task_variants(key):
+        mods = v.when.get("modalities") or []
+        if m not in best or len(mods) > len(best[m]):
+            best[m] = mods
+    return {m: "+".join(mods) or "(data_dir)" for m, mods in best.items()}
 
 
-def atac_blocked(key):
-    """The methods of the task that the ATAC check stops on the task's
-    dataset: the registry lists them as reading gene activity and the file
-    holds peaks. ``run_all`` runs them with ``allow_atac_mismatch=True``."""
+def would_run(key, methods, dataset=None, **where):
+    """The rows ``run_all`` runs for ``methods`` with the notebook's
+    arguments, on a computer that has every environment: the rows with their
+    input files that nothing but the environment blocks, less the rows inside
+    a larger one of the same method."""
+    import warnings
     import multibench as mtb
-    if key not in _ATAC_BLOCKED:
-        t = TASKS[key]
-        kw = {"modalities": t["variants"][0]} if key in MODALITIES_NOTE else {}
-        sc = mtb.scan(t["ds"], t["cat"], methods=task_methods(key), verbose=False, **kw)
-        sc = sc[sc.files_ok]
-        free = set(sc[~sc.reason.str.contains("allow_atac_mismatch")].method)
-        _ATAC_BLOCKED[key] = sorted(set(sc.method) - free)
-    return _ATAC_BLOCKED[key]
-
-
-def run_args(key, every=False):
-    """Extra ``run_all`` arguments of the task: the modalities
-    (``MODALITIES_NOTE``) and, in the notebook that runs every method,
-    ``allow_atac_mismatch=True`` where the ATAC check stops a method."""
-    args = {}
-    if key in MODALITIES_NOTE:
-        args["modalities"] = TASKS[key]["variants"][0]
-    if every and atac_blocked(key):
-        args["allow_atac_mismatch"] = True
-    return args
-
-
-def run_kwargs(key, every=False, indent=18):
-    """``run_args`` as the text that follows ``out_dir=...`` in the call, one
-    argument per line."""
-    pad = ",\n" + " " * indent
-    return "".join(f"{pad}{k}={json.dumps(v) if k == 'modalities' else v}"
-                   for k, v in run_args(key, every).items())
+    from multibench import workflow
+    t = TASKS[key]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plan = mtb.run_all(dataset or t["ds"], t["cat"], methods=methods, dry_run=True,
+                           verbose=False, assume_gpu=True, **where)
+    other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
+    rows = plan[[bool(f) and o == "" for f, o in zip(plan.files_ok, other)]]
+    return rows.drop(index=workflow._nested_rows(rows)[0])
 
 
 def check_task(key):
-    """Stop when a default method reads only some batches of the dataset, has
-    no variant of the task, or runs only with ``allow_atac_mismatch=True``."""
+    """Stop when the notebooks' ``run_all`` call would not run every method
+    of the task once, on the task's variant, or when a method reads only some
+    batches of the dataset."""
     import multibench as mtb
     t = TASKS[key]
-    n = len(mtb.labels_for(t["ds"]))
+    everyone = task_methods(key)
     for m in t["methods"]:
-        if len(mtb.labels_for(t["ds"], t["cat"], m)) < n:
-            raise SystemExit(f"{m} reads only some batches of {t['ds']}: pick another method")
-        if m not in task_methods(key):
+        if m not in everyone:
             raise SystemExit(f"{m} has no variant of {key}")
-        if m in atac_blocked(key):
-            raise SystemExit(f"{m} needs allow_atac_mismatch on {t['ds']}: pick another method")
+    rows = would_run(key, everyone)
+    ran = sorted(zip(rows.method, rows.modalities))
+    if ran != sorted(run_variants(key).items()):
+        raise SystemExit(f"{key}: run_all on {t['ds']} would run {ran}, not one row per "
+                         f"method of the task: change the dataset or name the modalities")
+    n = len(mtb.labels_for(t["ds"]))
+    for m in everyone:
+        if len(mtb.labels_for(t["ds"], t["cat"], m)) < n:
+            raise SystemExit(f"{m} reads only some batches of {t['ds']}: reword the notebooks")
+    # the vertical, mosaic and cross texts say that ATAC is a peak matrix
+    gas = mtb.find_methods(t["cat"], atac="gene_activity")
+    if t["cat"] != "diagonal" and gas:
+        raise SystemExit(f"{and_list(gas)} read gene activity in {t['cat']}: reword the "
+                         f"{t['cat']} blurbs and own-data sections")
+
+
+def labels_for_ds(key, method="UINMF"):
+    """The label files ``method`` reads on the task's dataset."""
+    import multibench as mtb
+    return list(mtb.labels_for(TASKS[key]["ds"], TASKS[key]["cat"], method))
 
 
 def not_wrapped_sentence(key):
-    """One sentence on the methods the article evaluates on the task and the
-    package does not run, or "" when there is none."""
+    """One sentence on the method the article evaluates on the task and the
+    package does not run there, or "" when there is none. The wording is for
+    Conos, whose script the package runs on one RNA and one ATAC file."""
     names = TASKS[key].get("not_wrapped", [])
     if not names:
         return ""
-    if len(names) == 1:
-        return (f"The article also evaluates {names[0]} on this task. Its published "
-                "script does not take this layout, so the package does not run it.")
-    return (f"The article also evaluates {and_list(names)} on this task. Their published "
-            "scripts do not take this layout, so the package does not run them.")
-
-
-def two_batch_sentence(key):
-    """One sentence on a method of the task that reads two of the dataset's
-    batches (UINMF on the cross datasets with three), or ""."""
-    import multibench as mtb
-    t = TASKS[key]
-    n = len(mtb.labels_for(t["ds"]))
-    short = [m for m in task_methods(key) if len(mtb.labels_for(t["ds"], t["cat"], m)) < n]
-    if not short:
-        return ""
-    if short != ["UINMF"] or len(mtb.labels_for(t["ds"], t["cat"], "UINMF")) != 2:
-        raise SystemExit(f"{key}: {short} read only some batches: reword two_batch_sentence")
-    return "UINMF's script takes two batches, so it reads batches 1 and 2."
-
-
-def mismatch_sentence(key):
-    """Why the every-method run passes ``allow_atac_mismatch=True``, or ""."""
-    names = atac_blocked(key)
-    if not names:
-        return ""
-    ds = TASKS[key]["ds"]
-    return (f"`allow_atac_mismatch=True` lets {and_list(names)} run. The package lists "
-            f"{'it' if len(names) == 1 else 'them'} as reading gene-activity ATAC, and "
-            f"`{ds}` holds peaks, as in the benchmark.")
+    if names != ["Conos"]:
+        raise SystemExit(f"{key}: not_wrapped is {names}: reword not_wrapped_sentence")
+    return ("The article also evaluates Conos on this task. Its published script reads a "
+            "third input file in another format, so the package does not run it on more "
+            "than two files.")
 
 
 def diagonal_multi_sentence(key):
@@ -460,8 +441,8 @@ adata''',
    name="MYMULTIOME",
    intro=("Your data needs raw RNA counts, an ATAC matrix of the same cells and a "
           "cell type for each cell. `mtb.io.export_dataset` writes them as a dataset "
-          "folder, and `run_all` runs on that folder. scMM and VIMCCA read ATAC as "
-          "peaks, so the folder holds peaks."),
+          "folder, and `run_all` runs on that folder. Every method of this task reads "
+          "ATAC as peaks, so the folder holds peaks."),
    standin=("Here 60% of `D27mini_vertical`'s cells, as an RNA and a peak AnnData, "
             "take the place of your data:"),
    data='''import scanpy as sc
@@ -484,10 +465,7 @@ rna, atac''',
           "```",
           "A cellranger-arc AnnData read with `gex_only=False` holds genes and peaks in "
           "one `X`. A feature filter splits them: `rna=\"X[feature_types=Gene Expression]\"` "
-          "and `atac=\"X[feature_types=Peaks]\"`.",
-          "For a method that reads gene activity, export that matrix with "
-          "`atac_kind=\"gene_activity\"`. A folder with both `atac_peak.h5` and "
-          "`atac_gas.h5` serves every RNA + ATAC method."],
+          "and `atac=\"X[feature_types=Peaks]\"`."],
  ),
  "vertical_rna_adt_atac": dict(
    name="MYTRI",
@@ -626,9 +604,9 @@ mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak", labels=l
           "each cell. `mtb.io.export_dataset` with `batch_index=` writes one batch per "
           "call. Number the batches as below: RNA + ADT, then RNA + ATAC, then RNA. "
           "Give ATAC as peaks."),
-   standin="Here the first 300 cells of each `D46mini` batch take the place of your data:",
+   standin="Here the first 1,000 cells of each `D46mini` batch take the place of your data:",
    data='''d = mtb.config.DEFAULT.data_path / "D46mini"
-n = 300
+n = 1000
 rna = [mtb.io.read_canonical(d / f"rna{b}.h5")[:n] for b in (1, 2, 3)]
 labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]
 adt1 = mtb.io.read_canonical(d / "adt1.h5")[:n]
@@ -837,7 +815,6 @@ def build_tutorial(key):
     cat, ds, methods = t["cat"], t["ds"], t["methods"]
     names = and_list(methods)
     everyone = task_methods(key)
-    extra = run_kwargs(key)
 
     # ------------------------------------------------------------------ title
     title = _title(key) + "\n\n" + t["blurb"].format(methods=names)
@@ -883,8 +860,6 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
     if "scMoMaT" in methods:
         run_notes.append("scMoMaT writes a graph instead of an embedding. `run_all` scores "
                          "its UMAP, and its status reads `CHAIN_OK_GRAPH_METHOD`.")
-    if key in MODALITIES_NOTE:
-        run_notes.append(MODALITIES_NOTE[key])
     run_notes += [
         "`res.failures` says why a method failed. `params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
@@ -898,7 +873,7 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
 
 """ + details(*run_notes))
     code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
-                  out_dir="out/{ds}"{extra})
+                  out_dir="out/{ds}")
 res.summary''')
 
     # ------------------------------------------------------------------- plot
@@ -927,7 +902,7 @@ res.summary''')
        "Write the folder, then run the same methods on it:")
     code(own["export"])
     code(f'''mine = mtb.run_all("{own['name']}", "{cat}", methods=METHODS, data_path="mydata",
-                   out_dir="out/{own['name']}"{run_kwargs(key, indent=19)})
+                   out_dir="out/{own['name']}")
 mine.summary''')
     code("mine.plot()")
 
@@ -950,6 +925,15 @@ mine.summary''')
                if n_pub else
                f"There is no published scIB table for {cat}, so `source=\"published\"`, "
                f"the default, raises `FileNotFoundError`."))
+        fewer, n_few, n_all = stored_on_fewer_batches(sds)
+        if fewer:
+            if fewer != ["UINMF"] or (n_few, n_all) != (2, 3) or len(labels_for_ds(key)) != 3:
+                raise SystemExit(f"{key}: stored scores of {fewer} read {n_few} of {n_all} "
+                                 f"batches: reword the stored-scores note")
+            stored_notes.append(
+                f"The stored scores of UINMF are from its two-batch variant, which read "
+                f"batches 1 and 2 of `{sds}`. `run_all` on `{ds}` runs its three-batch "
+                f"variant.")
         stored_notes.append(
             "The stored scores used the `leidenalg` backend for Leiden clustering, and "
             "`run_all` uses `igraph` by default. The two backends can move ARI by up to "
@@ -965,17 +949,14 @@ mtb.plot.bubble(long)''')
         n_sec += 1
 
     # ------------------------------------------------------------ every method
-    more = " ".join(x for x in (two_batch_sentence(key), not_wrapped_sentence(key)) if x)
+    more = not_wrapped_sentence(key)
     more = "\n\n" + more if more else ""
     if has_all(key):
-        blocked = atac_blocked(key)
-        flag = (f" {and_list(blocked)} run{'s' if len(blocked) == 1 else ''} only with one "
-                f"more `run_all` argument, which that page shows." if blocked else "")
         md(f"""## {n_sec}. Every method of this task
 
 {len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for {t['cat']} {t['label']}: {and_list(everyone)}. Each runs on `{ds}`. To run them all, set `METHODS` to that list in section 2 and run the notebook again. That downloads {env_size_text(methods=everyone)}.{more}
 
-[Every method on `{ds}`]({SITE}tutorials/{key}_all/) shows that run.{flag}""")
+[Every method on `{ds}`]({SITE}tutorials/{key}_all/) shows that run.""")
     else:
         md(f"""## {n_sec}. Every method of this task
 
@@ -1028,7 +1009,6 @@ def build_all_methods(key):
     t = TASKS[key]
     cat, ds = t["cat"], t["ds"]
     everyone = task_methods(key)
-    extra = run_kwargs(key, every=True)
     md(_title(key, ", every method") + f"""
 
 This notebook runs every method that has a variant for {cat} {t['label']} on `{ds}`: {and_list(everyone)}. The [tutorial]({SITE}tutorials/{key}/) explains each step and runs {and_list(t['methods'])} only.
@@ -1059,12 +1039,9 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
                 f"{'its row has' if len(graphs) == 1 else 'their rows have'} the status "
                 "`RUN_OK_NO_EMBEDDING` and no scores, and the figure leaves "
                 f"{'it' if len(graphs) == 1 else 'them'} out.")
-    for sentence in (mismatch_sentence(key), two_batch_sentence(key)):
-        if sentence:
-            note += "\n\n" + sentence
     md(f"## 3. Run the method{'s' if len(everyone) > 1 else ''}" + note)
     code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
-                  out_dir="out/{ds}_all"{extra})
+                  out_dir="out/{ds}_all")
 res.summary''')
     md("## 4. Plot\n\n" + PLOT_TEXT)
     code("res.plot()")

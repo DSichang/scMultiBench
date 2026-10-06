@@ -5,12 +5,14 @@ mentioned where a user can see them - API return values, CLI help, and every
 text file the package ships (docstrings, YAML, CSV, drivers). This file pins
 that on the live objects, on the shipped files and on the docs surfaces
 (notebooks, SETUP.md, the notebook generator, and the site's source when it is
-reachable), with three exceptions that are spelled out below and fail loudly
+reachable), with four exceptions that are spelled out below and fail loudly
 when they go stale:
 
 - frozen lockfile pins of real envs (``engine/env_locks/*.yml``), by package name;
 - an upstream API keyword in a driver (Matilda's own ``task()`` argument);
-- a paper title, which is a citation fact (``engine/references.yaml``).
+- a paper title, which is a citation fact (``engine/references.yaml``);
+- calls of base R's ``paste()`` function in the benchmark's own R scripts that
+  the package ships unedited (``engine/helpers/UINMF/*.Rmd``).
 
 Everything else that matches FORBIDDEN is a finding: reword it, do not add an
 exception for it.
@@ -36,7 +38,7 @@ FORBIDDEN = re.compile(r"(?i)classif|imput|registration|spatial|\bGPSA\b|\bPASTE
 #: the tasks methods declare; ``find_methods(task=)`` accepts exactly these
 TASKS = ["batch", "clustering", "dimension_reduction"]
 
-# ---- the three exceptions ---------------------------------------------------
+# ---- the four exceptions ----------------------------------------------------
 #: lockfile pins (``- name==version`` / ``- name=version``) that freeze a real
 #: env's contents; exempt by package name only, and only in env_locks/*.yml
 LOCK_PINS = {"gpsa", "paste-bio", "paste2", "spatial-eggplant"}
@@ -56,6 +58,18 @@ CITATION_TITLES = {
     "sciPENN": "A multi-use deep learning method for CITE-seq and single-cell RNA-seq "
                "data integration with cell surface protein prediction and imputation",
 }
+
+
+#: the benchmark's own R scripts, shipped as the benchmark ran them. They call
+#: base R's ``paste(...)`` to build a shell command and a file name; only that
+#: call, in lower case and followed by its bracket, is exempt, and only there.
+R_SCRIPTS_CALLING_PASTE = [
+    "engine/helpers/UINMF/main_UINMF_cross_2modality_3batch.Rmd",
+    "engine/helpers/UINMF/main_UINMF_cross_3modality_2batch.Rmd",
+    "engine/helpers/UINMF/main_UINMF_cross_3modality_3batch_d46_d47.Rmd",
+    "engine/helpers/UINMF/main_UINMF_vertical_3modality.Rmd",
+]
+_R_PASTE_CALL = re.compile(r"(?<![A-Za-z0-9_.])paste\(")
 
 
 def _hits(text):
@@ -160,6 +174,8 @@ def _exempt(rel, text):
         text = text.replace(keyword, "<upstream keyword>")
     if rel == "engine/references.yaml":
         text = _strip_titles(text)
+    if rel in R_SCRIPTS_CALLING_PASTE:
+        text = _R_PASTE_CALL.sub("<base R call>(", text)
     return text
 
 
@@ -232,6 +248,10 @@ def test_exceptions_are_still_needed():
             if pin and _hits(pin.group("name")):
                 pinned.add(pin.group("name").lower())
     assert pinned == LOCK_PINS
+    for rel in R_SCRIPTS_CALLING_PASTE:
+        assert _R_PASTE_CALL.search((PKG / rel).read_text()), rel
+    # the exemption is the function call alone: the name as a word still counts
+    assert _hits(_R_PASTE_CALL.sub("<base R call>(", 'x <- paste("a"); # PASTE')) == ["PASTE"]
 
 
 def test_every_output_kind_a_variant_declares_loads(tmp_path):

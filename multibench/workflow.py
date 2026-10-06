@@ -154,9 +154,9 @@ CATEGORIES = {
                 "(e.g. an RNA experiment and a separate ATAC experiment).",
     "mosaic":   "Several batches where only some share a modality. A paired batch "
                 "bridges the others.",
-    "cross":    "Several batches, each measured with RNA and ADT, for example one "
-                "CITE-seq assay from several donors. The task is removing batch "
-                "effects.",
+    "cross":    "Several batches that all measure the same modalities, for example "
+                "one CITE-seq assay (RNA+ADT) from several donors. The task is "
+                "removing batch effects.",
 }
 
 #: Modality role -> the file the loader looks for in <data_path>/<dataset>/.
@@ -365,8 +365,11 @@ def _atac_lines(category: str) -> list[str]:
     if not peak and not gas:
         return []
     out = []
-    if category == "vertical":
+    if category == "vertical" and gas:
         out.append("atac.h5 holds peaks or gene activity. Each method needs one of them:")
+    elif category == "vertical":
+        out.append("atac.h5 holds peaks, not gene activity: every vertical method that "
+                   "reads ATAC needs peaks.")
     elif category == "diagonal":
         out.append("Give atac_peak.h5, atac_gas.h5 or both. Each method needs one of "
                    "them, or both:")
@@ -383,7 +386,7 @@ def _atac_lines(category: str) -> list[str]:
     else:
         out.append(f"atac<i>.h5 holds peaks: every {category} method that reads ATAC "
                    f"needs peaks.")
-    if category in ("vertical", "diagonal") or gas:
+    if category == "diagonal" or gas:
         if peak:
             out.append(f"  need peaks:            {', '.join(peak)}")
         if gas:
@@ -474,6 +477,7 @@ def _layout_block(category: str, *, full: bool) -> list[str]:
         demo = _demo_for(["rna", "adt"])
         files = ["  rna.h5 + adt.h5    CITE-seq" + (f" (demo {demo})" if demo else ""),
                  "  rna.h5 + atac.h5   multiome",
+                 "  rna.h5 + adt.h5 + atac.h5   all three from the same cells",
                  "  cty.csv            cell-type labels, one per cell"]
     elif category == "diagonal":
         demo = _demo_for(["rna", "atac_peak", "atac_gas"])
@@ -504,6 +508,14 @@ def _layout_block(category: str, *, full: bool) -> list[str]:
             lines.append(f"  batch {desc}: {', '.join(ids)}"
                          + (f" (demo {demo})" if demo else ""))
         lines += _batch_recipe(category, patterns)
+    if category == "diagonal":
+        several = _resolve._several_batch_diagonal_methods()
+        if several:
+            lines += ["For several RNA and several ATAC batches, number the files: "
+                      "rna1.h5, atac_gas1.h5 or",
+                      "atac_peak1.h5, rna_cty1.csv, atac_cty1.csv, then 2, 3 ... These "
+                      "methods read them:",
+                      f"  {', '.join(several)}"]
     lines += _atac_lines(category)
     return lines
 
@@ -694,7 +706,7 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
 
     Built from the resolved paths, not from the exception text, so no path
     is ever cut. An ATAC file leads with what the method needs and what the
-    folder holds instead: ``UnitedNet needs gene-activity ATAC (atac_gas.h5),
+    folder holds instead: ``SCALEX needs gene-activity ATAC (atac_gas.h5),
     and the folder has peaks (atac_peak.h5).`` Other files follow as
     ``adt.h5 is missing.``, then the per-batch hint of ``inputs_for`` when
     the folder holds ``rna1.h5, rna2.h5, ...`` for a vertical or diagonal
@@ -908,25 +920,31 @@ def _scripts_ref_note() -> str | None:
     return _join_sentences([note]) if note else None
 
 
-def _dry_run_notes(plan: "pd.DataFrame") -> tuple:
+def _dry_run_notes(plan: "pd.DataFrame", modalities=None) -> tuple:
     """What a dry run prints under its count line: ``(scripts_note, [(method, caveat)])``.
 
     ``scripts_note`` is the note that the method scripts are not on this
     machine yet, once, or ``None``. The list holds the caveat of each row
     the sweep would run - runnable, or blocked only by its env - without the
     notes on starting the method (:func:`_run_caveat`); rows with nothing
-    left are not listed.
+    left are not listed. Without ``modalities``, a row inside a larger one of
+    the same method is not run (:func:`_nested_rows`), so its caveat is left
+    out: UINMF's two-batch row says it skips batch 3, and on three batches
+    the three-batch row is the one that runs.
     """
     scripts = None
     lines = []
-    for _, r in plan.iterrows():
+    left_out = set()
+    if modalities is None and len(plan):
+        left_out = set(_nested_rows(plan[[_would_run(r) for _, r in plan.iterrows()]])[0])
+    for i_row, r in plan.iterrows():
         text = str(r.get("caveat") or "")
         i = text.find(_START_NOTES[0])
         if scripts is None and i >= 0:
             j = _runner._prepared_at(text[i:])
             scripts = text[i:][:j].rstrip() if j >= 0 else text[i:]
         cav = _run_caveat(text)
-        if _would_run(r) and cav:
+        if _would_run(r) and cav and i_row not in left_out:
             lines.append((r["method"], cav))
     return scripts, lines
 
@@ -1255,7 +1273,7 @@ def scan(dataset: str, category: str | None = None, *,
     **Reason columns.** ``reason`` joins the non-empty reasons as sentences
     and is empty only when the row is runnable. It is the short form. A
     missing ATAC file leads with what the method needs and what the folder
-    holds (``UnitedNet needs gene-activity ATAC (atac_gas.h5), and the folder
+    holds (``SCALEX needs gene-activity ATAC (atac_gas.h5), and the folder
     has peaks (atac_peak.h5).``). Other missing files read ``adt.h5 is
     missing.``
 
@@ -3720,7 +3738,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             if wrong_ref:
                 print(f"[run_all] {wrong_ref}", flush=True)
             # the caveats of the rows the sweep would run: the compact views clip them
-            scripts, lines = _dry_run_notes(plan_df)
+            scripts, lines = _dry_run_notes(plan_df, modalities)
             if scripts:
                 print(f"[run_all] {scripts}", flush=True)
             for _m, cav in lines:          # each caveat starts with its method

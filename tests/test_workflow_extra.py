@@ -177,7 +177,14 @@ def test_describe_layout_is_category_specific():
 
 # --- handover: registry-generated describe_layout lists, validated tokens -------
 
-def test_describe_layout_atac_lists_come_from_registry():
+def test_describe_layout_atac_lists_come_from_registry(monkeypatch):
+    from multibench.engine import registry
+    # vertical: no method reads gene activity, so one sentence replaces the lists
+    assert mtb.find_methods("vertical", atac="gene_activity") == []
+    assert "need gene activity:" not in mtb.describe_layout("vertical")
+    assert "every vertical method that reads ATAC needs peaks." in mtb.describe_layout("vertical")
+    # ... and the lists come back with the first method that does
+    monkeypatch.setattr(registry.get("Matilda"), "atac", "gene_activity")
     for cat in ("vertical", "diagonal"):
         txt = mtb.describe_layout(cat)
         gas_line = next(l for l in txt.splitlines() if "need gene activity:" in l)

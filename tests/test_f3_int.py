@@ -77,7 +77,7 @@ def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, m
     assert f"[run_all]   {kept}\n" in capsys.readouterr().out
 
 
-def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch):
+def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch, gas_matilda):
     """Under a mismatched ref a wrong-kind row names both problems, and run_all
     still refuses before any method starts."""
     d = tmp_path / "MU_PEAK"

@@ -118,7 +118,13 @@ def test_needs_labels_per_variant_scMoMaT():
     by_cat = {}
     for v in spec.variants:
         by_cat.setdefault(v.when["category"], set()).add(v.needs_labels)
-    assert by_cat["mosaic"] == {True}
+    # of its four mosaic variants only the one of the RNA + ADT | RNA + ATAC |
+    # RNA layout takes the label files
+    mosaic = {tuple(v.when["modalities"]): v.needs_labels for v in spec.variants
+              if v.when["category"] == "mosaic"}
+    assert len(mosaic) == 4
+    assert [m for m, needs in mosaic.items() if needs] == [
+        ("rna1", "rna2", "rna3", "adt1", "atac2")]
     assert by_cat["vertical"] == {False}
     assert by_cat["cross"] == {False}
 

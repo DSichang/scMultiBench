@@ -82,13 +82,18 @@ def test_plot_details_say_constant_columns_are_grey(name):
     assert bubble._constant_note(["A", "B"], {"iLISI": 0.0}).startswith("Grey fill: all rows equal in iLISI")
 
 
-def test_uinmf_reads_two_of_d52s_three_batches():
-    """M31: UINMF's cross variant reads batches 1-2 of D52's three;
-    labels_for and scan's caveat say so."""
+def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_skips():
+    """M31: UINMF has a three-batch cross variant, which the folder rule
+    picks on D52's three batches. Its two-batch variant reads batches 1-2;
+    labels_for and the caveat of that scan row say so."""
     import multibench as mtb
-    assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2"]
+    two = ["rna1", "rna2", "adt1", "adt2"]
+    assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2", "cty3"]
+    assert list(mtb.labels_for("D52", "cross", "UINMF", modalities=two)) == ["cty1", "cty2"]
     sc = mtb.scan("D52", "cross", methods=["UINMF"], verbose=False)
-    assert sc.caveat.iloc[0] == "UINMF reads batches 1-2 of 3. Batch 3 is not used."
+    sc = sc[sc.files_ok].set_index("modalities")
+    assert sc.at["+".join(two), "caveat"] == "UINMF reads batches 1-2 of 3. Batch 3 is not used."
+    assert not sc.at["rna1+rna2+rna3+adt1+adt2+adt3", "caveat"]
 
 
 def test_diagonal_tutorial_states_seurat_v5_cells():

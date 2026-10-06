@@ -18,12 +18,15 @@ def test_categories_derived_from_variants():
         assert set(registry.list_methods(category=c)) == want
         assert set(discover.find_methods(category=c)) == want
         assert {r[0].id for r in workflow._variant_rows(c)} == want
-    # the three that had diverged
-    assert "Multigrate" not in mtb.list_methods(category="cross")
+    # the three that had diverged: Multigrate has cross variants since the
+    # article's 13 tasks were registered, totalVI and sciPENN no mosaic one
+    assert "Multigrate" in mtb.list_methods(category="cross")
     for m in ("totalVI", "sciPENN"):
         assert m not in mtb.list_methods(category="mosaic")
-    assert len(mtb.list_methods(category="cross")) == 8
-    assert mtb.method_info("Multigrate")["categories"] == ["mosaic", "vertical"]
+    assert sorted(mtb.list_methods(category="cross")) == [
+        "Concerto", "MOFA2", "Multigrate", "StabMap", "UINMF", "UnitedNet", "scMDC", "scMM",
+        "scMoMaT", "sciPENN", "totalVI"]
+    assert mtb.method_info("Multigrate")["categories"] == ["mosaic", "vertical", "cross"]
 
 
 def test_methods_yaml_has_no_hand_categories_key():

@@ -192,9 +192,11 @@ def test_dry_run_keeps_the_frame_and_names_the_row_that_runs(tmp_path, all_envs,
     assert "[run_all] VIMCCA runs on" not in out       # its two rows are not nested
 
 
-def test_a_blocked_larger_row_leaves_the_smaller_one_running(tmp_path, all_envs, monkeypatch):
-    """Matilda reads gene activity: on peaks its ATAC rows are blocked, and
-    the sweep runs the largest row that can run."""
+def test_a_blocked_larger_row_leaves_the_smaller_one_running(tmp_path, all_envs, monkeypatch,
+                                                             gas_matilda):
+    """A method that reads gene activity (``gas_matilda``; the real Matilda
+    reads peaks): on peaks its ATAC rows are blocked, and the sweep runs the
+    largest row that can run."""
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
@@ -223,11 +225,33 @@ def _cross(root, name="B3", batches=3):
     return d
 
 
-def test_uinmf_still_resolves_to_its_two_batch_variant(tmp_path):
+def test_uinmf_resolves_to_the_variant_of_the_folders_batch_count(tmp_path):
+    """UINMF has a cross variant for two batches and one for three. The
+    two-batch files are part of the three-batch ones, so a folder with three
+    batches picks the three-batch variant."""
     _cross(tmp_path)
     got = mtb.inputs_for("B3", "cross", "UINMF", data_path=tmp_path)
-    assert list(got) == ["rna1", "rna2", "adt1", "adt2"]
-    assert list(mtb.labels_for("B3", "cross", "UINMF", data_path=tmp_path)) == ["cty1", "cty2"]
+    assert list(got) == ["rna1", "rna2", "rna3", "adt1", "adt2", "adt3"]
+    assert list(mtb.labels_for("B3", "cross", "UINMF", data_path=tmp_path)) == [
+        "cty1", "cty2", "cty3"]
+    two = ["rna1", "rna2", "adt1", "adt2"]
+    assert list(mtb.inputs_for("B3", "cross", "UINMF", modalities=two,
+                               data_path=tmp_path)) == two
+    _cross(tmp_path, "B2", batches=2)
+    assert list(mtb.inputs_for("B2", "cross", "UINMF", data_path=tmp_path)) == two
+    assert list(mtb.labels_for("B2", "cross", "UINMF", data_path=tmp_path)) == ["cty1", "cty2"]
+
+
+def test_run_all_runs_uinmf_once_on_three_batches(tmp_path, all_envs, monkeypatch, capsys):
+    _cross(tmp_path)
+    calls = []
+    monkeypatch.setattr(W, "_run", _fake_run(calls, n_cells=36))
+    res = mtb.run_all("B3", "cross", methods=["UINMF"], data_path=tmp_path,
+                      out_dir=str(tmp_path / "out"), evaluate=False)
+    assert calls == [("UINMF", ["adt1", "adt2", "adt3", "rna1", "rna2", "rna3"])]
+    assert list(res.summary["method"]) == ["UINMF"]
+    assert ("[run_all] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
+            "rna1+rna2+adt1+adt2, whose files are part of it.") in capsys.readouterr().out
 
 
 # -------------------------------------------------------------------- demo folders
@@ -246,10 +270,10 @@ def test_d22mini_resolves_its_three_modality_variants():
         mtb.inputs_for("D22mini", "vertical", "VIMCCA", data_path=data)
 
 
-def test_d52mini_uinmf_reads_batches_1_and_2():
+def test_d52mini_uinmf_reads_every_batch():
     data = _demo("D52mini")
     assert list(mtb.inputs_for("D52mini", "cross", "UINMF", data_path=data)) == [
-        "rna1", "rna2", "adt1", "adt2"]
+        "rna1", "rna2", "rna3", "adt1", "adt2", "adt3"]
 
 
 @pytest.mark.parametrize("dataset, category", [

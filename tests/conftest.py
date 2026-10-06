@@ -72,9 +72,46 @@ _D53 = {
     "scMDC": _clustering(0.80, 0.98),
     "scMM": _clustering(0.70, 0.97),
     "Concerto": _clustering(0.60, 0.96),
-    "MOFA2": _clustering(0.50, 0.95),          # not a cross method of the package
-    "Multigrate": _clustering(0.40, 0.94),     # not a cross method of the package
+    "MOFA2": _clustering(0.50, 0.95),
+    "Multigrate": _clustering(0.40, 0.94),
 }
+
+
+@pytest.fixture
+def as_gene_activity(monkeypatch):
+    """``as_gene_activity(method)`` registers ``method`` as reading gene
+    activity for the test (see ``gas_matilda``) and returns its name."""
+    from multibench.engine import registry
+
+    def set_form(method):
+        monkeypatch.setattr(registry.get(method), "atac", "gene_activity")
+        return method
+    return set_form
+
+
+@pytest.fixture
+def gas_matilda(monkeypatch):
+    """Matilda with its ATAC form set back to gene activity, for the test.
+
+    Matilda, scMDC and UnitedNet are registered as reading peaks, so no
+    method outside diagonal reads gene activity any more. The package still
+    checks the ATAC form of every method against the file it is given, in
+    both directions. The tests of the gene-activity direction in a vertical
+    folder keep running on this stand-in; their messages are not what the
+    package says about the real Matilda."""
+    from multibench.engine import registry
+    monkeypatch.setattr(registry.get("Matilda"), "atac", "gene_activity")
+    return "Matilda"
+
+
+@pytest.fixture
+def layout_tree_foreign(layout_tree):
+    """``layout_tree`` with scores of two methods the registry does not list
+    for cross (scMSI and Seurat_WNN, both vertical only) in cross D53."""
+    cross = layout_tree / "scib_metric" / "cross integration"
+    _metric_csv(cross / "D53" / "scMSI" / "metric.csv", **_clustering(0.50, 0.95))
+    _metric_csv(cross / "D53" / "Seurat_WNN" / "metric.csv", **_clustering(0.40, 0.94))
+    return layout_tree
 
 
 @pytest.fixture
@@ -84,8 +121,7 @@ def layout_tree(tmp_path):
     level down in a run-configuration folder (D53 ``MOFA2/8000HVG``, D56
     ``MOFA2/filtered3`` + ``MOFA2/kmeans``, D57 ``MOFA2/filtered5``), raw
     ``kbet/`` folders,
-    method folders without a metric table (D53 StabMap/totalVI), methods the
-    registry does not list for cross (MOFA2, Multigrate), a
+    method folders without a metric table (D53 StabMap/totalVI), a
     ``<method>_louvain`` variant directory (vertical D3 ``Concerto_louvain``)
     and two simulated ids whose natural and lexicographic orders differ
     (diagonal SD7, SD10). No ``rerun/`` sweeps."""

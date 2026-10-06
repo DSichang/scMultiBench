@@ -138,7 +138,8 @@ def test_step1_details_carry_the_donor_counts():
             "and the stored table D11.") in details
     assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors "
             "as batches, and the stored table D52.") in details
-    assert "The cross methods read batches 1-3. UINMF reads only the first two." in details
+    assert ("These methods read batches 1-3. UINMF also has a variant for two "
+            "batches.") in details
 
 
 # ---- R4-17: job.sh says what exit 3 means ---------------------------------
@@ -155,17 +156,23 @@ def test_job_script_names_exit_code_3_above_run_all(capsys):
     assert "Exit code 3" in " ".join(capsys.readouterr().out.split())
 
 
-# ---- R4-18: the ATAC override and one figure for two Multiome folders ------
+# ---- R4-18: the ATAC override; one Multiome folder serves every method ------
 @needs_docs
-def test_run_guide_names_the_atac_override_and_one_dataset_name():
+def test_run_guide_names_the_atac_override_and_needs_one_multiome_folder():
     """The layer-1 sentence stays true after R4-01 (a named method is skipped
-    too); the Details give the override and the one-figure recipe."""
+    too); the Details give the override. The recipe that drew the results of
+    a peak folder and a gene-activity folder as one dataset is gone: Matilda,
+    scMDC and UnitedNet read peaks, so one Multiome folder serves every
+    vertical RNA + ATAC method."""
     run = _read("tutorials/run.md")
     assert "also when `methods=` names it" in _flat("tutorials/run.md")
     assert "also when `methods=` names it" in " ".join(_visible(run).split())
     assert "allow_atac_mismatch=True" in run and "--allow-atac-mismatch" in run
     assert "To run a method that is skipped for its ATAC file, pass" in run
-    assert '.assign(dataset="MYMULTIOME")' in run
+    assert mtb.find_methods("vertical", atac="gene_activity") == []
+    assert "Every vertical method that reads ATAC reads peaks." in _flat("tutorials/run.md")
+    assert "gene-activity folder" not in run and "second folder" not in _flat("tutorials/run.md")
+    assert '.assign(dataset="MYMULTIOME")' not in run
     # the page's override is a real keyword of both calls
     import inspect
     for fn in (mtb.scan, mtb.run_all):

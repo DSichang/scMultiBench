@@ -10,6 +10,13 @@ printed only the unused-batch note and kept no caveat in the records.
 
 The env probe is pinned (every env installed, a GPU present) so the verdicts
 hold on any host; ``_run`` is faked in the real-run tests.
+
+Matilda, scMDC and UnitedNet were the vertical methods that read gene
+activity. They are registered as reading peaks now, as the benchmark ran
+them, and no vertical method reads gene activity. The package still checks
+both directions, so every test of this file runs with the three set back to
+gene activity (``three_methods_read_gene_activity``). The messages pinned
+here are what the package says about such a method, not about the real three.
 """
 import inspect
 import json
@@ -32,8 +39,18 @@ GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:star
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
 GENES = [f"GENE{i}" for i in range(40)]
-GAS_METHODS = {"Matilda", "scMDC", "UnitedNet"}
-PEAK_METHODS = {"MIRA", "Seurat_WNN", "VIMCCA", "iPOLNG", "moETM", "scMM", "scMVP"}
+GAS_METHODS = {"Matilda", "scMDC", "UnitedNet"}       # stand-ins: see the module docstring
+# the other vertical methods with an RNA + ATAC variant, which read peaks
+PEAK_METHODS = {"MIRA", "Seurat_WNN", "VIMCCA", "iPOLNG", "moETM", "scMM", "scMVP",
+                "MOFA2", "Multigrate", "UINMF", "scMoMaT"}
+
+
+@pytest.fixture(autouse=True)
+def three_methods_read_gene_activity(monkeypatch):
+    assert discover.find_methods("vertical", atac="gene_activity") == []    # the registry
+    for m in GAS_METHODS:
+        assert registry.get(m).atac == "peak", m
+        monkeypatch.setattr(registry.get(m), "atac", "gene_activity")
 
 
 @pytest.fixture(autouse=True)

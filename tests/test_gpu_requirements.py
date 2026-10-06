@@ -162,13 +162,16 @@ def test_cpu_params_keys_are_accepted_params_of_every_variant():
     for m, cp in CPU_SWITCH.items():
         for v in registry.get(m).variants:
             assert set(cp) <= set(v.tunable) | set(v.params), (m, v.when)
-    assert "use_cuda" in mtb.params_for("scJoint")["tunable"]
+    assert "use_cuda" in mtb.params_for("scJoint", "diagonal", ["rna", "atac_gas"])["tunable"]
     assert "device" in mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
     # the cross variant runs the SAME script as the vertical ones: it inherits
     # their tunables (params.yaml has no entry for it)
     cross = registry.get("scMDC").select("cross", {"rna1", "rna2", "rna3", "adt1", "adt2", "adt3"})
     assert cross.tunable == registry.get("scMDC").select("vertical", {"rna", "adt"}).tunable
-    assert "device" in mtb.params_for("scMDC", "cross")["tunable"]
+    # scMDC has two cross variants (RNA + ADT, RNA + ATAC), both on that script
+    for second in ("adt", "atac"):
+        mods = [f"{r}{i}" for r in ("rna", second) for i in (1, 2, 3)]
+        assert "device" in mtb.params_for("scMDC", "cross", mods)["tunable"]
 
 
 # ------------------------------------------------------------ schema validation

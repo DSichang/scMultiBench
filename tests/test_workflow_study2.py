@@ -66,7 +66,7 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert "--packed --run" in r["reason"]                    # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
     # the meaning first for ATAC (L31); D11's cty.csv is UnitedNet's label file (M21)
-    assert row["reason"].startswith("UnitedNet needs gene-activity ATAC (atac.h5), which is "
+    assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which is "
                                     "not in the folder. ")
     assert "cty" not in row["reason"]
 

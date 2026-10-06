@@ -136,38 +136,38 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     from multibench.data.results import recommend
     with pytest.warns(UserWarning, match="fewer than 2 methods") as rec:
         r = recommend("cross", result_path=layout_tree)
-    # the layout tree's cross part has ONE rankable method with a metric table
-    # in every dataset but D53 (six methods, four of them wired for cross). D57
-    # holds UINMF + MOFA2's nested filtered5/metric.csv, but MOFA2 is not a
-    # cross method of this package (list_methods('cross') does not list it),
-    # so once its rows are dropped D57 is a singleton too. The singleton
-    # datasets must be dropped, so scMoMaT (D52/D58/D59 alone) and UINMF (D57
-    # alone) cannot score 1.0 on the strength of singleton min-max
-    assert (r.n_datasets_total == 1).all()       # only D53 holds >= 2 rankable methods
-    # scMoMaT / UINMF have rows only in the dropped singleton datasets: they
-    # are LISTED (wired for cross) but unscored, and the warning says why
+    # the layout tree's cross part has ONE method with a metric table in every
+    # dataset but D53 (six methods) and D57 (UINMF and MOFA2's nested
+    # filtered5/metric.csv). The singleton datasets must be dropped, so
+    # scMoMaT (D52/D58/D59 alone), Concerto (D54) and MOFA2 (D56) cannot score
+    # 1.0 on the strength of singleton min-max
+    assert (r.n_datasets_total == 2).all()       # D53 and D57 hold >= 2 methods
+    assert set(r.datasets.str.split(", ").explode()) - {""} == {"D53", "D57"}
+    # scMoMaT has rows only in the dropped singleton datasets: it is LISTED
+    # (wired for cross) but unscored, and the warning says why
     smt = r[r.method == "scMoMaT"].iloc[0]
     assert pd.isna(smt.grand_score) and smt.n_datasets == 0 and smt.coverage == 0.0
-    assert {"scMoMaT", "UINMF"} <= set(r.attrs["not_scored"])
-    assert ("scMoMaT and UINMF have scores only on datasets left out of the "
-            "ranking, so they are listed last.") in str(rec[0].message)
+    assert "scMoMaT" in r.attrs["not_scored"]
+    assert ("scMoMaT has scores only on datasets left out of the "
+            "ranking, so it is listed last.") in str(rec[0].message)
     # a 1.0 is now only ever the best of >= 2 methods on a kept dataset
-    # (sciPENN on D53), never a singleton artefact: every scored method sits
-    # in a dataset that holds another method
-    assert "UINMF" in set(r.method) and "MOFA2" not in set(r.method)
+    # (sciPENN on D53, UINMF over MOFA2 on D57), never a singleton artefact:
+    # every scored method sits in a dataset that holds another method
+    assert {"UINMF", "MOFA2"} <= set(r.method)
     assert (r[r.grand_score == 1.0].n_datasets == 1).all()
+    assert r.set_index("method").at["MOFA2", "datasets"] == "D53, D57"     # not D56
     msg = str(rec[0].message)
-    # D56's only published table is MOFA2's (dropped): it has no rankable rows
-    # at all, so it is neither ranked nor listed as a singleton
-    assert "D52" in msg and "D57" in msg and "D56" not in msg and "is always 1.0" in msg
+    # D56's only published table is MOFA2's: a singleton, left out and named
+    assert "Datasets D52, D54, D56, D58 and D59 have fewer than 2 methods" in msg
+    assert "D57" not in msg.splitlines()[1] and "is always 1.0" in msg
     # ONE warning, one line per finding, the dropped-datasets line first
     assert len([w for w in rec if issubclass(w.category, UserWarning)
                 and "recommend(" in str(w.message)]) == 1
     assert msg.splitlines()[1].strip().startswith(
-        "- Datasets D52, D54, D57, D58 and D59 have fewer than 2 methods and are left "
+        "- Datasets D52, D54, D56, D58 and D59 have fewer than 2 methods and are left "
         "out of the ranking.")
     with pytest.raises(ValueError, match=r"No cross dataset has 50 or more methods\. D52 "
-                                         r"has 1, D53 has 4") as e:
+                                         r"has 1, D53 has 6") as e:
         recommend("cross", min_methods=50, result_path=layout_tree)
     assert "pass source=" not in str(e.value)       # that tree has no other source
 
@@ -287,38 +287,43 @@ def test_recommend_attrs_are_the_documented_keys(result_dir, layout_tree):
     assert all(f'``"{k}"``' in doc for k in keys)
 
 
-def test_recommend_scores_only_methods_the_registry_lists_for_the_category(result_dir, layout_tree):
-    """recommend('cross') used to rank MOFA2 and Multigrate (rows in the
-    published cross table) although list_methods('cross') does not list them
-    - and their rows shaped every other method's within-dataset rank."""
+def test_recommend_scores_only_methods_the_registry_lists_for_the_category(
+        result_dir, layout_tree_foreign):
+    """recommend('cross') ranks only the methods list_methods('cross') lists.
+    Rows of another registry method in the cross table (here scMSI and
+    Seurat_WNN, vertical methods) used to be ranked, and shaped every other
+    method's within-dataset rank."""
+    layout_tree = layout_tree_foreign
     r, msg = _rec("cross", result_path=layout_tree)
     listed = set(mtb.list_methods(category="cross"))
     assert set(r.method) <= listed
-    assert not ({"MOFA2", "Multigrate"} & set(r.method))
-    assert r.attrs["dropped_methods"] == ["MOFA2", "Multigrate"]
-    assert ("MOFA2 and Multigrate have scores in the published table, but this "
+    assert not ({"scMSI", "Seurat_WNN"} & set(r.method))
+    assert r.attrs["dropped_methods"] == ["scMSI", "Seurat_WNN"]
+    assert ("scMSI and Seurat_WNN have scores in the published table, but this "
             "package does not run them for cross, so they are left out of the "
             "ranking.") in msg
     assert "mtb.list_methods(category='cross') does not list them" in msg
+    # MOFA2 and Multigrate are cross methods of the package and are ranked
+    assert {"MOFA2", "Multigrate"} <= set(r.method[r.grand_score.notna()])
     # the dropped-datasets line stays first; the drop line follows it
     lines = [ln.strip() for ln in msg.splitlines()[1:]]
     assert lines[0].startswith("- Datasets ") and "left out of the ranking" in lines[0]
-    assert lines[1].startswith("- MOFA2 and Multigrate have scores in")
+    assert lines[1].startswith("- scMSI and Seurat_WNN have scores in")
     # the same rule on a user frame: registry methods foreign to the category
     # are dropped and named ("long_df frame"), an unknown name (yours) is kept
     long = mtb.load_results("cross", dataset="D53", result_path=layout_tree)
     mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]),
                        method="MyMethod", dataset="D53", category="cross")
     r2, msg2 = _rec("cross", long_df=pd.concat([long, mine]))
-    assert "MyMethod" in set(r2.method) and "MOFA2" not in set(r2.method)
-    assert ("MOFA2 and Multigrate have scores in the long_df frame, but this package "
+    assert "MyMethod" in set(r2.method) and "scMSI" not in set(r2.method)
+    assert ("scMSI and Seurat_WNN have scores in the long_df frame, but this package "
             "does not run them for cross") in msg2
     # a category where every stored method is listed: nothing dropped, no line
     r3, msg3 = _rec("vertical", result_path=result_dir)
     assert r3.attrs["dropped_methods"] == [] and "does not run" not in msg3
     # nothing rankable left -> ValueError naming the culprits
-    with pytest.raises(ValueError, match=r"every row in long_df belongs to a method this package does not run for cross \(MOFA2"):
-        mtb.recommend("cross", long_df=long[long.method == "MOFA2"])
+    with pytest.raises(ValueError, match=r"every row in long_df belongs to a method this package does not run for cross \(scMSI"):
+        mtb.recommend("cross", long_df=long[long.method == "scMSI"])
 
 
 def test_recommend_methods_keyword(layout_tree):
