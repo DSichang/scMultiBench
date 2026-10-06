@@ -24,7 +24,10 @@ a tutorial runs in 10-15 minutes on a Colab runtime (2 vCPUs). The sizes are
 the smallest at which no method of the task failed:
 
 - online_iNMF needs about 5,000 cells in total (D27mini: 3,000 + 3,000);
-- Multigrate's mosaic runs need about 6,000 (D45mini: 2,000 per batch);
+- Multigrate's mosaic runs need about 1,300 cells in every batch: it holds a
+  tenth of the cells out for validation and draws 128 of them per batch, so a
+  smaller batch leaves no validation step and training stops with an error
+  (D38mini and D45mini: 2,000 per batch; D46mini and D49mini: 1,500);
 - MIRA needs about 2,000 genes and 5,000 cells, VIPCCA selects 2,000 variable
   genes itself and Conos' variance fit fails on 1,000, so the RNA + ATAC
   datasets keep 2,500 genes; the others run on 1,000;
@@ -76,12 +79,12 @@ PLAN = {
                     barcodes_from={f"atac_gas{i}.h5": f"atac_peak{i}.h5" for i in (1, 2, 3)}),
     # mosaic
     "D45mini": dict(src="D45", cells=2000, genes=1000, peaks=5000),
-    "D46mini": dict(src="D46", cells=600, genes=1000, peaks=5000),
+    "D46mini": dict(src="D46", cells=1500, genes=1000, peaks=5000),
     "D38mini": dict(src="D38", cells=2000, genes=1000, peaks=5000,
                     files={"rna1.h5": "rna1.h5", "rna2.h5": "rna2.h5", "adt2.h5": "adt2.h5",
                            "adt3.h5": "adt3.h5", "cty1.csv": "cty1.csv", "cty2.csv": "cty2.csv",
                            "cty3.csv": "cty3.csv"}),
-    "D49mini": dict(src="D49", cells=1300, genes=1000, peaks=5000),
+    "D49mini": dict(src="D49", cells=1500, genes=1000, peaks=5000),
     # cross
     "D52mini": dict(src="D52", cells=1000, genes=1000, peaks=5000),
     "D56mini": dict(src="D56", cells=1500, genes=1000, peaks=5000,

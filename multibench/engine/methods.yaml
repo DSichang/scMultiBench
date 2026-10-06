@@ -23,7 +23,7 @@ methods:
     variants:
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_adt.py
-        size_hint: "Multigrate needs several thousand cells for a mosaic run. It failed on 3,000 and ran on 6,000."
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -35,7 +35,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_atac.py
-        size_hint: "Multigrate needs several thousand cells for a mosaic run. It failed on 3,000 and ran on 6,000."
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -112,6 +112,38 @@ methods:
           - {roles: [atac1, atac2], flag: "--path3"}
           - {role: out_dir, flag: "--save_path"}
         params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      # Scripts of the benchmark's own runs that the public repository does not hold.
+      # The package ships them (engine/helpers/Multigrate/) and copies them next to the
+      # public scripts before a run.
+      # rna1 + adt1 | rna2 + atac2 | rna3 (D46, D47)
+      - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_rna_adt_atac_d46.py
+        helpers: [main_Multigrate_rna_adt_atac_d46.py]
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
+        language: python
+        args:
+          - {role: rna1, flag: "--path1"}
+          - {role: rna2, flag: "--path2"}
+          - {role: rna3, flag: "--path3"}
+          - {role: adt1, flag: "--path4"}
+          - {role: atac2, flag: "--path5"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      # rna1 + adt1 | rna2 + atac2 | adt3 (D49). The shipped copy adds the three
+      # imports its seed lines need.
+      - when: {category: mosaic, modalities: [rna1, rna2, adt1, adt3, atac2]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_rna_adt_atac_d49.py
+        helpers: [main_Multigrate_rna_adt_atac_d49.py]
+        size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch; with fewer, training stops with an error about reconstruction_loss_validation."
+        language: python
+        args:
+          - {role: rna1, flag: "--path1"}
+          - {role: rna2, flag: "--path2"}
+          - {role: adt1, flag: "--path3"}
+          - {role: adt3, flag: "--path4"}
+          - {role: atac2, flag: "--path5"}
+          - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
 
 
@@ -312,7 +344,9 @@ methods:
     language: python
     tasks: [batch, clustering]
     # atac: upstream scMDC (ZINB on both views) was designed for gene-level ATAC; tools/atac_audit.py NEEDS_GENE_ACTIVITY
-    atac: gene_activity
+    # the benchmark runs this method on peak matrices: its RNA + ATAC datasets (D12-D22,
+    # D56) hold peaks only, and the script takes any feature matrix
+    atac: peak
     status: verified
     # CPU switch: main_scMDC.py:58 `--device` defaults to 'cuda' and :171/:191/:199
     # call `.to(args.device)` unconditionally (scMDC_batch.py:164 gates only its
@@ -581,7 +615,9 @@ methods:
     language: python
     gpu_use: used when present   # the driver passes device='auto'
     tasks: [clustering, dimension_reduction]
-    atac: gene_activity
+    # the benchmark runs this method on peak matrices: its RNA + ATAC datasets (D12-D22,
+    # D56) hold peaks only, and the script takes any feature matrix
+    atac: peak
     status: verified
     variants:
       # --- CITE-seq (rna + adt) ---
@@ -902,7 +938,9 @@ methods:
     requires_gpu: true
     gpu_evidence: tools_scripts/UnitedNet/main_UnitedNet.py:32
     # atac: not in tools/atac_audit.py; inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
-    atac: gene_activity
+    # the benchmark runs this method on peak matrices: its RNA + ATAC datasets (D12-D22,
+    # D56) hold peaks only, and the script takes any feature matrix
+    atac: peak
     status: verified
     variants:
       # Supervised paired RNA + ATAC integration (matched cells + labels).
@@ -1127,17 +1165,10 @@ methods:
           - {role: adt2}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
-      # No mosaic variant, for two independent reasons:
-      #  1. main_UINMF_cross.Rmd takes the second batch's unshared features from
-      #     the first batch's Seurat object (`adt2_top2000 <- VariableFeatures(se1)`).
-      #     That is harmless when both unshared blocks are the same modality (the
-      #     cross case), but when batch 2's unshared block is ATAC the ADT names
-      #     are absent from the peak matrix: "Not all features passed are found in
-      #     dataset rna1". Upstream scripts are not edited, so it stays.
-      #  2. The script takes exactly two batches, each with RNA plus its own
-      #     unshared block; a mosaic run needs >=2 batches sharing one unshared
-      #     modality plus >=1 batch lacking it, a layout no benchmark dataset has.
-      # A variant would make scan() report it runnable and then fail every run.
+      # main_UINMF_cross.Rmd takes two batches and indexes batch 2's second
+      # modality by batch 1's features, so it cannot run a layout whose batches
+      # hold different second modalities. The mosaic variant below uses the
+      # benchmark's own script for that layout.
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/UINMF/main_UINMF_vertical.Rmd
         language: R
@@ -1156,13 +1187,81 @@ methods:
           - {role: atac2}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      # No RNA: peaks in the script's shared slots and ADT in the second-modality
+      # slots, the order of the benchmark's last run of this layout (D58).
       - when: {category: cross, modalities: [adt1, adt2, atac1, atac2]}
         entrypoint: tools_scripts/UINMF/main_UINMF_cross.Rmd
         language: R
         args:
+          - {role: atac1}
+          - {role: atac2}
+          - {role: adt1}
+          - {role: adt2}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      # Scripts of the benchmark's own runs that the public repository does not hold.
+      # The package ships them (engine/helpers/UINMF/) and copies them next to the
+      # public scripts before a run.
+      - when: {category: vertical, modalities: [rna, adt, atac]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_vertical_3modality.Rmd
+        helpers: [main_UINMF_vertical_3modality.Rmd]
+        language: R
+        args:
+          - {role: rna}
+          - {role: adt}
+          - {role: atac}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross_2modality_3batch.Rmd
+        helpers: [main_UINMF_cross_2modality_3batch.Rmd]
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {role: adt1}
+          - {role: adt2}
+          - {role: adt3}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      # peaks in the script's second-modality slots, as the benchmark's RNA + ATAC runs
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross_2modality_3batch.Rmd
+        helpers: [main_UINMF_cross_2modality_3batch.Rmd]
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {role: atac1}
+          - {role: atac2}
+          - {role: atac3}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross_3modality_2batch.Rmd
+        helpers: [main_UINMF_cross_3modality_2batch.Rmd]
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
           - {role: adt1}
           - {role: adt2}
           - {role: atac1}
+          - {role: atac2}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      # rna1 + adt1 | rna2 + atac2 | rna3 (D46, D47)
+      - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross_3modality_3batch_d46_d47.Rmd
+        helpers: [main_UINMF_cross_3modality_3batch_d46_d47.Rmd]
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {role: adt1}
           - {role: atac2}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}

@@ -421,8 +421,11 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
         notes.append(spec.setup_hint)
     if getattr(variant, "size_hint", ""):
         notes.append(variant.size_hint)
+    shipped = ep.name in helpers and shipped_helper(spec.id, ep.name)    # copied in before the run
     if not (repo / ep).exists():
-        if (repo / "tools_scripts").is_dir():
+        if (repo / "tools_scripts").is_dir() and shipped:
+            pass
+        elif (repo / "tools_scripts").is_dir():
             fix = missing_script_fix(repo)
             notes.append(f"{spec.id}'s script {ep} is not in the checkout at {repo}. "
                          f"{fix[:1].upper()}{fix[1:]}.")

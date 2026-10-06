@@ -567,7 +567,10 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     repo = _P(config.DEFAULT.repo_path)
     for root in (repo, _P(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
-            if not (root / ep).exists():
+            # a script the package ships is copied in before the run
+            shipped = (method and ep.name in (getattr(variant, "helpers", None) or [])
+                       and _runner.shipped_helper(method, ep.name))
+            if not (root / ep).exists() and not shipped:
                 return (f"method script {ep} is missing from the reference checkout at "
                         f"{root}: " + _runner.missing_script_fix(root))
             gone = [h for h in (getattr(variant, "helpers", None) or [])
