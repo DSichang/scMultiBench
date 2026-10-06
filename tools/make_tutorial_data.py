@@ -70,7 +70,10 @@ PLAN = {
     "D37mini": dict(src="D37", cells=1000, genes=2500, peaks=5000,
                     files={f"{m}{i}.{e}": f"{m}{i}.{e}" for i in (1, 2, 3)
                            for m, e in (("rna", "h5"), ("atac_peak", "h5"), ("atac_gas", "h5"),
-                                        ("rna_cty", "csv"), ("atac_cty", "csv"))}),
+                                        ("rna_cty", "csv"), ("atac_cty", "csv"))},
+                    # D37's gene-activity files name the cells otherwise than its
+                    # peak files, in the same order (checked in make)
+                    barcodes_from={f"atac_gas{i}.h5": f"atac_peak{i}.h5" for i in (1, 2, 3)}),
     # mosaic
     "D45mini": dict(src="D45", cells=2000, genes=1000, peaks=5000),
     "D46mini": dict(src="D46", cells=600, genes=1000, peaks=5000),
@@ -179,7 +182,26 @@ def _copy_h5(src: Path, dst: Path, cells: np.ndarray, keep=None) -> tuple:
     return data.shape
 
 
-def make(src: Path, dst: Path, cells, genes=None, peaks=None, files=None) -> None:
+def _same_cell_order(a: Path, b: Path) -> bool:
+    """Whether two files of one assay list the same cells in the same order,
+    judged by the counts per cell: their correlation is near 1 in the same
+    order (0.99 on D37) and near 0 in any other."""
+    with h5py.File(a) as f, h5py.File(b) as g:
+        x, y = f["matrix/data"][()].sum(axis=0), g["matrix/data"][()].sum(axis=0)
+    return len(x) == len(y) and np.corrcoef(x, y)[0, 1] > 0.9
+
+
+def _take_barcodes(dst: Path, src: Path) -> None:
+    """Write the cell names of ``src`` into ``dst``."""
+    with h5py.File(src) as f, h5py.File(dst, "r+") as g:
+        for name in ("matrix/barcodes", "matrix/.data_dimnames/1"):
+            if name in f and name in g:
+                del g[name]
+                g.create_dataset(name, data=f[name][()], compression="gzip")
+
+
+def make(src: Path, dst: Path, cells, genes=None, peaks=None, files=None,
+         barcodes_from=None) -> None:
     rng = np.random.default_rng(SEED)
     if files is None:
         files = {p.name: p.name for p in sorted(src.iterdir())
@@ -213,6 +235,10 @@ def make(src: Path, dst: Path, cells, genes=None, peaks=None, files=None) -> Non
             which = {"rna": gene_set, "gas": gene_set, "peak": peak_set, "adt": None}[_kind(p)]
             shape = _copy_h5(p, dst / out, c, which)
             print(f"  {out}: {shape[1]} of {counts[out]} cells, {shape[0]} features")
+    for out, other in (barcodes_from or {}).items():
+        assert _same_cell_order(pairs[out], pairs[other]), f"{out}: not the cells of {other}"
+        _take_barcodes(dst / out, dst / other)
+        print(f"  {out}: cell names of {other}")
 
 
 def main(argv):
@@ -226,7 +252,7 @@ def main(argv):
             continue
         print(name, "from", spec["src"])
         make(data_path / spec["src"], out / name, spec["cells"], spec["genes"],
-             spec["peaks"], spec.get("files"))
+             spec["peaks"], spec.get("files"), spec.get("barcodes_from"))
         with tarfile.open(out / f"{name}.tar.gz", "w:gz") as t:
             t.add(out / name, arcname=name)
         print(f"  -> {name}.tar.gz {(out / f'{name}.tar.gz').stat().st_size / 1e6:.0f} MB")
