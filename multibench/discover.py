@@ -681,8 +681,10 @@ def params_for(method: str, category: str | None = None,
     **Dataset tie-break.** When the selection is still ambiguous, ``dataset``
     picks the one variant whose input files are all present in
     ``<data_path>/<dataset>``: ``params_for('Matilda', dataset='D11')`` is the
-    rna+adt variant. A folder that settles nothing changes nothing, and the
-    ambiguity error is raised as usual.
+    rna+adt variant. When the folder holds the files of several variants of
+    one category and their modality sets are nested, the one with the most
+    modalities is picked, as ``mtb.inputs_for`` does. A folder that settles
+    nothing changes nothing, and the ambiguity error is raised as usual.
 
     **Modality spellings.** ``protein`` is accepted for ``adt``, and ``atac``
     for either ATAC representation role (``atac_gas`` / ``atac_peak``).
@@ -716,10 +718,13 @@ def params_for(method: str, category: str | None = None,
         ds_dir = Path(os.path.abspath(os.fspath(root))) / dataset
 
     def _by_folder(cands):
-        """The single candidate the dataset folder satisfies, else None."""
+        """The single candidate the dataset folder satisfies, else None. Of
+        nested ones it is the one with the most modalities, as in
+        ``inputs_for`` (``_resolve._drop_nested``)."""
         if ds_dir is None or not ds_dir.is_dir():
             return None
-        ok = [x for x in cands if _resolve._variant_satisfiable(x, ds_dir, s.id)]
+        ok = _resolve._drop_nested(
+            [x for x in cands if _resolve._variant_satisfiable(x, ds_dir, s.id)])
         return ok[0] if len(ok) == 1 else None
 
     if category is None and modalities is None:

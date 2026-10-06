@@ -73,10 +73,14 @@ def test_params_for_dataset_disambiguates_by_folder(tmp_path):
     r = mtb.params_for("Matilda", dataset="D11", data_path=tmp_path)
     assert r["variant"] == "vertical:rna+adt"
     assert mtb.params_for("Matilda", "vertical", dataset="D11", data_path=tmp_path)["variant"] == "vertical:rna+adt"
-    # both variants satisfiable -> still ambiguous
+    # every variant satisfiable, and rna+adt and rna+atac are inside
+    # rna+adt+atac: the largest one
     (d / "atac.h5").write_text("")
+    assert mtb.params_for("Matilda", dataset="D11",
+                          data_path=tmp_path)["variant"] == "vertical:rna+adt+atac"
+    # two satisfiable variants that are not nested -> still ambiguous
     with pytest.raises(ValueError, match="Pass the category and modalities of one"):
-        mtb.params_for("Matilda", dataset="D11", data_path=tmp_path)
+        mtb.params_for("VIMCCA", dataset="D11", data_path=tmp_path)
     # missing folder settles nothing
     with pytest.raises(ValueError):
         mtb.params_for("Matilda", dataset="D99", data_path=tmp_path)

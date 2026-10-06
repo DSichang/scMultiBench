@@ -1,6 +1,6 @@
 """Write the small demo datasets the tutorials and method checks run on.
 
-usage: python tools/make_tutorial_data.py <benchmark data dir> <out_dir>
+usage: python tools/make_tutorial_data.py <benchmark data dir> <out_dir> [name ...]
 
 One dataset per integration task, and every method of the task runs on it:
 
@@ -10,6 +10,11 @@ One dataset per integration task, and every method of the task runs on it:
     diagonal   RNA + ATAC         D27mini
     mosaic     RNA + ATAC         D45mini
     mosaic     RNA + ADT + ATAC   D46mini
+    diagonal   multiple RNA, multiple ATAC      D37mini
+    mosaic     mixed, no shared modality        D49mini
+    cross      multiple RNA + ATAC              D56mini
+    cross      multiple ADT + ATAC              D58mini
+    cross      multiple RNA + ADT + ATAC        D59mini
     mosaic     RNA + ADT          D38mini
     cross      RNA + ADT          D52mini
 
@@ -62,6 +67,10 @@ PLAN = {
                     files={"rna.h5": "rna.h5", "atac_peak.h5": "peak.h5",
                            "atac_gas.h5": "atac_gas.h5", "rna_cty.csv": "rna_cty.csv",
                            "atac_cty.csv": "peak_cty.csv"}),
+    "D37mini": dict(src="D37", cells=1000, genes=2500, peaks=5000,
+                    files={f"{m}{i}.{e}": f"{m}{i}.{e}" for i in (1, 2, 3)
+                           for m, e in (("rna", "h5"), ("atac_peak", "h5"), ("atac_gas", "h5"),
+                                        ("rna_cty", "csv"), ("atac_cty", "csv"))}),
     # mosaic
     "D45mini": dict(src="D45", cells=2000, genes=1000, peaks=5000),
     "D46mini": dict(src="D46", cells=600, genes=1000, peaks=5000),
@@ -69,8 +78,19 @@ PLAN = {
                     files={"rna1.h5": "rna1.h5", "rna2.h5": "rna2.h5", "adt2.h5": "adt2.h5",
                            "adt3.h5": "adt3.h5", "cty1.csv": "cty1.csv", "cty2.csv": "cty2.csv",
                            "cty3.csv": "cty3.csv"}),
+    "D49mini": dict(src="D49", cells=1300, genes=1000, peaks=5000),
     # cross
     "D52mini": dict(src="D52", cells=1000, genes=1000, peaks=5000),
+    "D56mini": dict(src="D56", cells=1500, genes=1000, peaks=5000,
+                    files={f"{m}{i}.{e}": f"{m}{i}.{e}" for i in (1, 2, 3)
+                           for m, e in (("rna", "h5"), ("atac", "h5"), ("cty", "csv"))}),
+    "D58mini": dict(src="D58", cells=1500, genes=1000, peaks=5000,
+                    files={"adt1.h5": "adt1.h5", "adt2.h5": "adt2.h5", "atac1.h5": "peak1.h5",
+                           "atac2.h5": "peak2.h5", "cty1.csv": "cty1.csv", "cty2.csv": "cty2.csv"}),
+    "D59mini": dict(src="D59", cells=1500, genes=1000, peaks=5000,
+                    files={"rna1.h5": "rna1.h5", "rna2.h5": "rna2.h5", "adt1.h5": "adt1.h5",
+                           "adt2.h5": "adt2.h5", "atac1.h5": "peak1.h5", "atac2.h5": "peak2.h5",
+                           "cty1.csv": "cty1.csv", "cty2.csv": "cty2.csv"}),
 }
 
 
@@ -117,15 +137,19 @@ def _top_genes(rna: Path, cells: np.ndarray, n: int, among=None) -> np.ndarray:
 def _top_peaks(files: dict, n: int) -> np.ndarray:
     """Names of ``n`` peaks, in the files' order: the ``n // 2`` open in the
     most cells, then the most open ones among the peaks open in at most 10%
-    of the cells. Counted over the peak files (``{path: cells}``), which must
-    list the same peaks."""
+    of the cells. Counted over the peak files (``{path: cells}``), among the
+    peaks that every file lists."""
     paths = list(files)
     names = _names(paths[0])
+    for p in paths[1:]:                 # D37's batches differ in a few peaks
+        names = names[np.isin(names, _names(p))]
     open_in, total = np.zeros(len(names)), 0
     for p, cells in files.items():
-        assert np.array_equal(_names(p), names), f"{p.name}: another peak list"
+        own = _names(p)
+        at = {name: i for i, name in enumerate(own)}
+        rows = np.array([at[name] for name in names])
         with h5py.File(p) as f:
-            open_in += (f["matrix/data"][:, cells] > 0).sum(axis=1)
+            open_in += (f["matrix/data"][:, cells][rows] > 0).sum(axis=1)
         total += len(cells)
     order = np.argsort(-open_in, kind="stable")
     top = order[: n // 2]
@@ -193,7 +217,10 @@ def make(src: Path, dst: Path, cells, genes=None, peaks=None, files=None) -> Non
 
 def main(argv):
     data_path, out = Path(argv[1]), Path(argv[2])
+    only = set(argv[3:])                # dataset names; none: all
     for name, spec in PLAN.items():
+        if only and name not in only:
+            continue
         if not (data_path / spec["src"]).is_dir():
             print(name, "skipped:", spec["src"], "is not in", data_path)
             continue

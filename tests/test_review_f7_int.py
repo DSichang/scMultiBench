@@ -272,10 +272,11 @@ def test_several_variants_errors_are_sentences(tmp_path, monkeypatch):
     msgs = []
     for cli_mode in (False, True):
         monkeypatch.setattr(config, "_CLI", cli_mode)
+        # two variants that are not nested; Matilda's are inside its rna+adt+atac
         with pytest.raises(mtb.AmbiguousVariantError) as e:
-            mtb.inputs_for("AMB", "vertical", "Matilda", data_path=tmp_path)
+            mtb.inputs_for("AMB", "vertical", "VIMCCA", data_path=tmp_path)
         msgs.append(str(e.value))
-    assert msgs[0] == (f"Matilda has 2 vertical variants, rna+adt and rna+atac. The folder "
+    assert msgs[0] == (f"VIMCCA has 2 vertical variants, rna+adt and rna+atac. The folder "
                        f"{d} has every input file of both. Pass modalities=['rna', 'adt'] "
                        f"or modalities=['rna', 'atac'].")
     assert msgs[1].endswith("Pass --modalities rna,adt or --modalities rna,atac.")

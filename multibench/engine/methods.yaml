@@ -54,6 +54,66 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         params: {epochs: 200, bs: 256, lr: 0.001}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      # The paired script takes --path1 rna, --path2 adt, --path3 atac, each with
+      # one file per batch; an absent modality is an absent flag. Its own examples
+      # cover vertical and cross runs (main_Multigrate_paired_integration.py:25-30).
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: atac, flag: "--path3", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, adt, atac]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: adt, flag: "--path2", repeat: true}
+          - {role: atac, flag: "--path3", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [adt1, adt2, adt3], flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [atac1, atac2, atac3], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {roles: [adt1, adt2], flag: "--path2"}
+          - {roles: [atac1, atac2], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
+        language: python
+        args:
+          - {roles: [rna1, rna2], flag: "--path1"}
+          - {roles: [adt1, adt2], flag: "--path2"}
+          - {roles: [atac1, atac2], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 200, bs: 256, lr: 0.001}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
 
   - id: Seurat_v5
     language: R
@@ -237,6 +297,17 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         params: {model: rna_protein, no_cuda: true}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      # upstream trains on the first batch and encodes the others (main_scMM.py:175-179)
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/scMM/main_scMM.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [atac1, atac2, atac3], flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {model: rna_atac, no_cuda: true}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: scMDC
     language: python
     tasks: [batch, clustering]
@@ -276,6 +347,16 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         params: {nbatch: 3}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/scMDC/main_scMDC.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [atac1, atac2, atac3], flag: "--path2"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {nbatch: 3}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: scMoMaT
     language: python
     gpu_use: used when present   # main_scMoMaT.py:78 falls back on torch.cuda.is_available()
@@ -335,6 +416,91 @@ methods:
         extra_outputs:
           - {kind: graph, file: knn_dists.h5, dataset: data}
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {role: rna, flag: "--path1", repeat: true}
+          - {role: atac, flag: "--path3", repeat: true}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      # rna1 | rna2 + adt2 | adt3: upstream's own mosaic example (main_scMoMaT.py:29)
+      - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, "=None"], flag: "--path1"}
+          - {roles: ["=None", adt2, adt3], flag: "--path2"}
+          - {roles: ["=None", "=None", "=None"], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      # rna1 | rna2 + atac2 | atac3
+      - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, "=None"], flag: "--path1"}
+          - {roles: ["=None", "=None", "=None"], flag: "--path2"}
+          - {roles: ["=None", atac2, atac3], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      # rna1 + adt1 | rna2 + atac2 | adt3: no modality is in every batch
+      - when: {category: mosaic, modalities: [rna1, rna2, adt1, adt3, atac2]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, "=None"], flag: "--path1"}
+          - {roles: [adt1, "=None", adt3], flag: "--path2"}
+          - {roles: ["=None", atac2, "=None"], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [atac1, atac2, atac3], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [adt1, adt2], flag: "--path2"}
+          - {roles: [atac1, atac2], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
+        language: python
+        args:
+          - {roles: [rna1, rna2], flag: "--path1"}
+          - {roles: [adt1, adt2], flag: "--path2"}
+          - {roles: [atac1, atac2], flag: "--path3"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: graph, file: knn_indices.h5, dataset: data}
+        extra_outputs:
+          - {kind: graph, file: knn_dists.h5, dataset: data}
+          - {kind: embedding, file: umap_embedding.h5, dataset: data}
+
   - id: moETM
     language: python
     tasks: [clustering]
@@ -446,6 +612,22 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
         extra_outputs:
           - {kind: labels, file: predict.csv}
+      # --- TEA-seq (rna + adt + atac) ---
+      - when: {category: vertical, modalities: [rna, adt, atac]}
+        entrypoint: tools_scripts/Matilda/main_matilda_train.py
+        driver: engine/drivers/run_matilda.py
+        language: python
+        args:
+          - {role: rna, flag: "--rna"}
+          - {role: adt, flag: "--adt"}
+          - {role: atac, flag: "--atac"}
+          - {role: cty, flag: "--cty"}
+          - {role: out_dir, flag: "--save_path"}
+        params: {epochs: 30, seed: 1, device: auto}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+        extra_outputs:
+          - {kind: labels, file: predict.csv}
+
   - id: VIMCCA
     language: python
     tasks: [clustering]
@@ -597,6 +779,20 @@ methods:
           - {role: rna_cty, flag: "--cty_path1"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      # Several RNA and ATAC batches: one RNA label file per RNA file. Output: the
+      # RNA files in order, then the ATAC files (main_scJoint.py:150-175).
+      - when: {category: diagonal, modalities: [rna1, rna2, rna3, atac_gas1, atac_gas2, atac_gas3]}
+        entrypoint: tools_scripts/scJoint/main_scJoint.py
+        language: python
+        cwd_at_script: true
+        pty: true
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--path1"}
+          - {roles: [atac_gas1, atac_gas2, atac_gas3], flag: "--path2"}
+          - {roles: [rna_cty1, rna_cty2, rna_cty3], flag: "--cty_path1"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: GLUE
     language: python
     tasks: [batch, clustering]
@@ -619,6 +815,25 @@ methods:
           - {role: atac_peak, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      # Three RNA and three ATAC batches, fixed by the script
+      # (GLUE_human_multibatch.py:86-108). Output: the RNA batches, then the ATAC batches.
+      - when: {category: diagonal, modalities: [rna1, rna2, rna3, atac_peak1, atac_peak2, atac_peak3]}
+        entrypoint: tools_scripts/GLUE/GLUE_human_multibatch.py
+        language: python
+        cwd_at_script: true
+        normalize_peaks: [atac_peak1, atac_peak2, atac_peak3]
+        downloads:
+          - {file: gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_43/gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz"}
+        args:
+          - {role: rna1, flag: "--path1"}
+          - {role: rna2, flag: "--path2"}
+          - {role: rna3, flag: "--path3"}
+          - {role: atac_peak1, flag: "--path4"}
+          - {role: atac_peak2, flag: "--path5"}
+          - {role: atac_peak3, flag: "--path6"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: MultiMAP
     language: python
     gpu_use: not used   # UMAP-based, no CUDA call; it only shares the torch env
@@ -710,6 +925,22 @@ methods:
         output: {kind: embedding, file: embedding1.h5, dataset: data}
         extra_outputs:
           - {kind: labels, file: predict1.csv}
+      # Several batches: train and test on the same files, as in the vertical variant.
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/UnitedNet/main_UnitedNet.py
+        language: python
+        cwd_at_script: true
+        args:
+          - {roles: [rna1, rna2, rna3], flag: "--train_path1"}
+          - {roles: [atac1, atac2, atac3], flag: "--train_path2"}
+          - {roles: [cty1, cty2, cty3], flag: "--train_cty_path"}
+          - {roles: [rna1, rna2, rna3], flag: "--test_path1"}
+          - {roles: [atac1, atac2, atac3], flag: "--test_path2"}
+          - {role: out_dir, flag: "--save_path"}
+        output: {kind: embedding, file: embedding1.h5, dataset: data}
+        extra_outputs:
+          - {kind: labels, file: predict1.csv}
+
   - id: iPOLNG
     # GPU: main_iPOLNG.py:12 picks the default tensor type with an
     # is_available() fallback, but :41 then casts both inputs with
@@ -785,10 +1016,97 @@ methods:
           - {role: reference, flag: "--reference", const: data1}
         # reference batch first, as in the cross variant (D46: cty1, cty2, cty3)
         output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+      - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        args:
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {roles: ["=None"], flag: "--rna"}
+          - {roles: ["=None"], flag: "--adt"}
+          - {role: adt2, flag: "--adt"}
+          - {role: adt3, flag: "--adt"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data2}
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+      - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        args:
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {roles: ["=None"], flag: "--rna"}
+          - {roles: ["=None"], flag: "--atac"}
+          - {role: atac2, flag: "--atac"}
+          - {role: atac3, flag: "--atac"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data2}
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+      - when: {category: mosaic, modalities: [rna1, rna2, adt1, adt3, atac2]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        args:
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {roles: ["=None"], flag: "--rna"}
+          - {role: adt1, flag: "--adt"}
+          - {roles: ["=None"], flag: "--adt"}
+          - {role: adt3, flag: "--adt"}
+          - {roles: ["=None"], flag: "--atac"}
+          - {role: atac2, flag: "--atac"}
+          - {roles: ["=None"], flag: "--atac"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data1}
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        args:
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {role: rna3, flag: "--rna"}
+          - {role: atac1, flag: "--atac"}
+          - {role: atac2, flag: "--atac"}
+          - {role: atac3, flag: "--atac"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data3}
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+      - when: {category: cross, modalities: [adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        args:
+          - {role: adt1, flag: "--adt"}
+          - {role: adt2, flag: "--adt"}
+          - {role: atac1, flag: "--atac"}
+          - {role: atac2, flag: "--atac"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data2}
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+      - when: {category: cross, modalities: [rna1, rna2, adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/StabMap/main_StabMap.Rmd
+        language: R
+        driver: engine/drivers/run_stabmap.R
+        args:
+          - {role: rna1, flag: "--rna"}
+          - {role: rna2, flag: "--rna"}
+          - {role: adt1, flag: "--adt"}
+          - {role: adt2, flag: "--adt"}
+          - {role: atac1, flag: "--atac"}
+          - {role: atac2, flag: "--atac"}
+          - {role: out_dir, flag: "--save_path"}
+          - {role: reference, flag: "--reference", const: data2}
+        output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: reference_first}
+
   - id: UINMF
     language: R
     gpu_use: not used   # R; no CUDA call in the script
     tasks: [batch, clustering]
+    atac: peak
     status: verified
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
@@ -820,6 +1138,35 @@ methods:
       #     unshared block; a mosaic run needs >=2 batches sharing one unshared
       #     modality plus >=1 batch lacking it, a layout no benchmark dataset has.
       # A variant would make scan() report it runnable and then fail every run.
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_vertical.Rmd
+        language: R
+        args:
+          - {role: rna}
+          - {role: atac}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, atac1, atac2]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross.Rmd
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: atac1}
+          - {role: atac2}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/UINMF/main_UINMF_cross.Rmd
+        language: R
+        args:
+          - {role: adt1}
+          - {role: adt2}
+          - {role: atac1}
+          - {role: atac2}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
 
   - id: iNMF
     language: R
@@ -836,6 +1183,19 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: diagonal, modalities: [rna1, rna2, rna3, atac_gas1, atac_gas2, atac_gas3]}
+        entrypoint: tools_scripts/iNMF/main_iNMF.Rmd
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {role: atac_gas1}
+          - {role: atac_gas2}
+          - {role: atac_gas3}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: online_iNMF
     language: R
     gpu_use: not used   # R; no CUDA call in the script
@@ -852,6 +1212,19 @@ methods:
           - {role: atac_gas}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: diagonal, modalities: [rna1, rna2, rna3, atac_gas1, atac_gas2, atac_gas3]}
+        entrypoint: tools_scripts/online iNMF/main_online_iNMF.Rmd
+        language: R
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {role: atac_gas1}
+          - {role: atac_gas2}
+          - {role: atac_gas3}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: Conos
     language: R
     gpu_use: not used   # R; no CUDA call in the script
@@ -871,6 +1244,7 @@ methods:
     language: R
     gpu_use: used when present   # main_MOFA2.Rmd:38 sets gpu_mode TRUE; the env has cupy
     tasks: [clustering]
+    atac: peak
     status: verified
     variants:
       # The Rmd sources util.R -> cwd_at_script. run_mofa(use_basilisk=FALSE) reaches
@@ -887,6 +1261,91 @@ methods:
           - {role: num, const: "2"}
           - {role: out_dir}
         output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, atac]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        args:
+          - {role: rna}
+          - {roles: ["=NULL"]}
+          - {role: atac}
+          - {role: batch_num, const: "1"}
+          - {role: num, const: "3"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: vertical, modalities: [rna, adt, atac]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        args:
+          - {role: rna}
+          - {role: adt}
+          - {role: atac}
+          - {role: batch_num, const: "1"}
+          - {role: num, const: "3"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {role: adt1}
+          - {role: adt2}
+          - {role: adt3}
+          - {role: batch_num, const: "3"}
+          - {role: num, const: "2"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: rna3}
+          - {roles: ["=NULL", "=NULL", "=NULL"]}
+          - {role: atac1}
+          - {role: atac2}
+          - {role: atac3}
+          - {role: batch_num, const: "3"}
+          - {role: num, const: "3"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        args:
+          - {roles: ["=NULL", "=NULL"]}
+          - {role: adt1}
+          - {role: adt2}
+          - {role: atac1}
+          - {role: atac2}
+          - {role: batch_num, const: "2"}
+          - {role: num, const: "3"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+      - when: {category: cross, modalities: [rna1, rna2, adt1, adt2, atac1, atac2]}
+        entrypoint: tools_scripts/MOFA2/main_MOFA2.Rmd
+        language: R
+        cwd_at_script: true
+        args:
+          - {role: rna1}
+          - {role: rna2}
+          - {role: adt1}
+          - {role: adt2}
+          - {role: atac1}
+          - {role: atac2}
+          - {role: batch_num, const: "2"}
+          - {role: num, const: "3"}
+          - {role: out_dir}
+        output: {kind: embedding, file: embedding.h5, dataset: data}
+
   - id: Seurat_v3
     language: R
     gpu_use: not used   # R; no CUDA call in the script

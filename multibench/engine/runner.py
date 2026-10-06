@@ -536,7 +536,9 @@ def _cell_group_roles(variant) -> list[list[str]]:
     order the output stacks the groups (``Variant.stacked_roles``).
 
     Vertical inputs share one set of cells. Diagonal inputs hold one set per
-    base modality (``atac_peak`` and ``atac_gas`` are the same ATAC cells).
+    base modality (``atac_peak`` and ``atac_gas`` are the same ATAC cells),
+    and one per file when the roles are numbered: ``rna1``, ``rna2`` and
+    ``atac_gas1`` are three sets of cells.
     Mosaic and cross inputs hold one set per batch (``rna1`` + ``adt1``).
     """
     category = variant.when.get("category")
@@ -545,7 +547,7 @@ def _cell_group_roles(variant) -> list[list[str]]:
         if category == "vertical":
             key = "cells"
         elif category == "diagonal":
-            key = base_modality(r)
+            key = (base_modality(r), _batch_of(r))
         else:
             key = _batch_of(r) if _batch_of(r) is not None else r
         groups.setdefault(key, []).append(r)

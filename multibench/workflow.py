@@ -171,6 +171,9 @@ ROLES = {
     "cty":       "cty.csv        - cell-type labels, one per cell (vertical)",
     "rna_cty / atac_cty":
                  "rna_cty.csv, atac_cty.csv - one label file per modality (diagonal)",
+    "rna_cty1/atac_cty1":
+                 "rna_cty1.csv, atac_cty1.csv ... - the same per batch (diagonal, several "
+                 "batches)",
     "cty1/cty2 ...":
                  "cty1.csv, cty2.csv ... - one label file per batch (mosaic, cross)",
 }
@@ -1614,6 +1617,16 @@ def _label_candidates(dataset, n, data_path=None):
     for a, b in itertools.product(rna, ata):
         cands += [([a, b], np.concatenate([ctys[a], ctys[b]])),
                   ([b, a], np.concatenate([ctys[b], ctys[a]]))]
+    # diagonal data in several batches (rna_cty<i>.csv, atac_cty<i>.csv): every
+    # such variant stacks the RNA files in number order, then the ATAC files.
+    # The ATAC files first is the alternative, as for one batch. Each file
+    # counts as one batch below: three RNA and three ATAC files are six batches.
+    per_batch = [sorted((k for k in ctys if re.fullmatch(rf"{side}_cty\d+\.csv", k)),
+                        key=lambda k: _resolve._label_sort_key(Path(k).stem))
+                 for side in ("rna", "atac")]
+    if all(per_batch) and sum(map(len, per_batch)) > 2:
+        for order in (per_batch[0] + per_batch[1], per_batch[1] + per_batch[0]):
+            cands.append((order, np.concatenate([ctys[k] for k in order])))
     nums = sorted(k for k in ctys if k.startswith("cty") and any(c.isdigit() for c in k))
     if len(nums) > 1:
         # Only orderings whose total length equals n survive the filter below,
@@ -2913,19 +2926,20 @@ def _batch_segments(dataset, data_path, batch) -> dict | None:
 
 def _label_data_files(label: Path) -> list[Path]:
     """The data files whose barcodes are the cells of one label file:
-    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC files."""
+    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC
+    files; ``atac_cty2.csv`` -> the ATAC files of batch 2."""
     stem = label.stem
     digits = stem[len(stem.rstrip("0123456789")):]
     base = stem[:len(stem) - len(digits)]
     if base == "cty":
-        stems = [f"{b}{digits}" for b in ("rna", "adt", "atac", "atac_peak", "atac_gas")]
+        stems = ["rna", "adt", "atac", "atac_peak", "atac_gas"]
     elif base in ("rna_cty", "adt_cty"):
         stems = [base[:-4]]
     elif base in ("atac_cty", "peak_cty"):
         stems = ["atac_peak", "atac_gas", "atac", "peak"]
     else:
         stems = []
-    return [label.parent / f"{s}.h5" for s in stems]
+    return [label.parent / f"{s}{digits}.h5" for s in stems]
 
 
 def _dataset_folder(dataset, data_path) -> Path:
@@ -3190,6 +3204,32 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
              "multibench_version": version,
              "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
             for m, r in first.items()]
+
+
+def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
+    """The rows of ``plan`` that a sweep without ``modalities=`` leaves out,
+    and one sentence per method that says so.
+
+    A method with several rows whose modalities are nested (scMoMaT on a
+    folder with RNA, ADT and ATAC: ``rna+adt``, ``rna+atac``,
+    ``rna+adt+atac``) runs the row with the most modalities, the variant
+    ``inputs_for`` picks for the folder (``_resolve._drop_nested``). Rows
+    that are not nested all stay. ``plan`` holds the rows that can run.
+    """
+    drop, notes = [], []
+    for method, rows in plan.groupby("method", sort=False):
+        sets = {i: set(str(mods).split("+")) for i, mods in rows["modalities"].items()}
+        inside = [i for i, a in sets.items() if any(a < b for b in sets.values())]
+        if not inside:
+            continue
+        drop += inside
+        kept = [rows.at[i, "modalities"] for i in sets if i not in inside]
+        left = [rows.at[i, "modalities"] for i in inside]
+        notes.append(f"{method} runs on {_resolve._and_list(kept)}, not on "
+                     f"{_resolve._and_list(left)}, whose files are part of it. Pass "
+                     + config.hint("modalities=", "--modalities")
+                     + " to run a smaller combination.")
+    return drop, notes
 
 
 def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
@@ -3476,6 +3516,13 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     will run. ``len(plan)`` also counts blocked rows.
     ``multibench run-all --dry-run --format csv`` writes the same frame.
 
+    **Several rows of one method.** Without ``modalities``, a method whose
+    runnable rows are nested runs once, on the row with the most modalities:
+    on a folder with ``rna.h5``, ``adt.h5`` and ``atac.h5``, scMoMaT runs
+    ``rna+adt+atac``, not ``rna+adt`` or ``rna+atac``. The log names the rows
+    left out, and so does a dry run, whose frame keeps them. Pass
+    ``modalities=`` to run a smaller combination.
+
     **Before the sweep.** Every attempted row passed both ``mtb.scan`` checks
     (input files and conda env, plus a GPU where the script needs one), so a
     missing env is reported before any method starts (``multibench env
@@ -3675,6 +3722,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                 print(f"[run_all] {scripts}", flush=True)
             for _m, cav in lines:          # each caveat starts with its method
                 print(f"[run_all] {cav}", flush=True)
+            if modalities is None:
+                # the frame keeps every row; the run leaves the nested ones out
+                for note in _nested_rows(plan_df[plan_df["runnable"]])[1]:
+                    print(f"[run_all] {note}", flush=True)
             if batch_vec is not None:
                 bad = _batch_length_problem(plan_df, batch_vec, dataset, category,
                                             data_path)
@@ -3692,6 +3743,13 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             dataset, category, blocked, methods, data_path=data_path,
             modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
             assume_gpu=assume_gpu, others=others))
+    if modalities is None:
+        # several runnable rows of one method that are nested: the largest runs
+        nested, nested_notes = _nested_rows(plan_df)
+        plan_df = plan_df.drop(index=nested)
+        if verbose:
+            for note in nested_notes:
+                print(f"[run_all] {note}", flush=True)
 
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
     # saved in out_dir so that rescore can reuse it

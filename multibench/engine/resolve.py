@@ -9,8 +9,8 @@ from pathlib import Path
 
 from .. import config
 from . import registry
-from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, base_modality,
-                     is_label_role)
+from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
+                     base_modality, is_label_role)
 
 # A few variant roles name a modality *representation* whose on-disk filename
 # differs from the role token (e.g. the diagonal ATAC roles). Candidate bases
@@ -109,7 +109,9 @@ def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | Non
 
     Fires when, for one of ``stems`` (default: the modality stems),
     ``<stem>1.h5`` and ``<stem>2.h5`` exist but ``<stem>.h5`` does not - what
-    ``export_dataset(batch=...)`` writes. ``None`` otherwise.
+    ``export_dataset(batch=...)`` writes. ``None`` otherwise, and for a
+    diagonal folder that some method reads per batch
+    (:func:`_per_batch_diagonal_methods`).
     """
     if category not in ("vertical", "diagonal") or not Path(ds_dir).is_dir():
         return None
@@ -120,11 +122,25 @@ def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | Non
     hit = [b for b in numbered if stems is None or b in stems]
     if not hit:
         return None
+    if category == "diagonal" and _per_batch_diagonal_methods(ds_dir):
+        # the layout of the diagonal variants that read several batches
+        return None
     ex = hit[0]
     return (f"This folder holds per-batch files ({ex}1.h5, {ex}2.h5, ...). "
             + _one_file_advice(category, stem=ex,
                                has_adt="adt" in numbered
                                and not any(b.startswith("atac") for b in numbered)))
+
+
+def _per_batch_diagonal_methods(ds_dir: Path) -> list[str]:
+    """The methods with a diagonal variant of numbered roles (``rna1``,
+    ``atac_gas1`` ...: several RNA and several ATAC batches) whose input
+    files are all in ``ds_dir``, in registry order."""
+    return [spec.id for spec in registry.load()
+            if any(v.when.get("category") == "diagonal"
+                   and _variant_batches(v.when.get("modalities") or [])
+                   and _variant_satisfiable(v, Path(ds_dir), spec.id)
+                   for v in spec.variants)]
 
 
 def _resolve_data_dir(ds_dir: Path) -> str:
@@ -217,8 +233,10 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         tokens first, then ``atac`` standing for ``atac_gas`` / ``atac_peak``.
     ds_dir : keyword-only; the dataset folder. When ``modalities`` is None and
         several variants exist for ``category``, the one whose input files are
-        all present in this folder is chosen; None (or a folder that settles
-        nothing) leaves the choice ambiguous.
+        all present in this folder is chosen. When the folder has the files
+        of several and their role sets are nested, the one with the most
+        roles is chosen (:func:`_drop_nested`). None (or a folder that
+        settles nothing) leaves the choice ambiguous.
 
     Returns
     -------
@@ -247,8 +265,9 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
     folder_note = ""
     if ds_dir is not None and Path(ds_dir).is_dir():
         ok = [v for v in candidates if _variant_satisfiable(v, Path(ds_dir), spec.id)]
-        if len(ok) == 1:
-            return ok[0]
+        largest = _drop_nested(ok)
+        if len(largest) == 1:
+            return largest[0]
         if ok:
             which = ("both" if len(ok) == len(candidates) == 2 else
                      _and_list("+".join(v.when.get("modalities", [])) for v in ok))
@@ -259,6 +278,20 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
             folder_note = (f" None of them has every input file in {ds_dir}. {holds}")
     raise AmbiguousVariantError(_ambiguous_message(spec.id, category, candidates,
                                                    folder_note))
+
+
+def _drop_nested(variants) -> list:
+    """``variants`` without those whose role set is a strict subset of
+    another's in the same category.
+
+    The tie-break of a folder that has every input file of several variants
+    of one method: scMoMaT's ``rna+adt`` and ``rna+atac`` are inside its
+    ``rna+adt+atac``, so a folder with all three files runs the last.
+    Variants that are not nested (``rna+adt`` and ``rna+atac`` alone) all stay.
+    """
+    keys = [(v.when.get("category"), set(v.when.get("modalities") or [])) for v in variants]
+    return [v for v, (cat, mods) in zip(variants, keys)
+            if not any(cat == c and mods < m for c, m in keys)]
 
 
 def _ambiguous_message(method: str, category: str, candidates, folder_note="") -> str:
@@ -476,9 +509,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
     Without ``modalities``, a category with one variant uses it. With several,
     the dataset folder decides: the variant whose input files are all present
     is used (Matilda on a ``rna.h5 + adt.h5`` folder is its rna+adt variant).
-    When none or several qualify, ``mtb.AmbiguousVariantError`` (a
-    ``ValueError``) lists the modality sets and the folder contents and asks
-    for ``modalities=``.
+    When several qualify and their modality sets are nested, the one with the
+    most modalities is used: a folder with ``rna.h5``, ``adt.h5`` and
+    ``atac.h5`` gives scMoMaT's rna+adt+atac variant, not its rna+adt one.
+    Pass ``modalities=`` for a smaller one. When none qualifies, or several
+    that are not nested, ``mtb.AmbiguousVariantError`` (a ``ValueError``)
+    lists the modality sets and the folder contents and asks for
+    ``modalities=``.
 
     **Modality tokens.** ``method_info(m)['supports']`` lists each variant's
     tokens.
@@ -517,6 +554,13 @@ def inputs_for(dataset: str, category: str, method: str, *,
     ``rna2.h5`` is per batch: vertical and diagonal roles stay unresolved,
     and the error says to export without ``batch=``.
 
+    Diagonal data in several batches: a few diagonal methods (see
+    ``method_info(m)['supports']``) read ``rna<i>.h5`` with ``atac_gas<i>.h5``
+    or ``atac_peak<i>.h5``, labelled by ``rna_cty<i>.csv`` and
+    ``atac_cty<i>.csv``. On a folder that holds every file of such a variant
+    the other diagonal methods find no ``rna.h5``, and no error suggests
+    another export.
+
     A ``data_dir`` role (scBridge) resolves to the first of
     ``<dataset>/processed/`` and the dataset folder that holds a ``.h5ad``
     file; when neither does, to ``processed/`` if that folder exists, else to
@@ -547,8 +591,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
     - label length: ``ValueError`` when a label CSV has a different number of
       rows than the modality file it labels, including the numbered
       ``cty<i>.csv`` of a cross/mosaic batch and the diagonal ``rna_cty.csv``
-      / ``atac_cty.csv`` (read by every evaluation, even when the method
-      does not take them);
+      / ``atac_cty.csv``, or ``rna_cty<i>.csv`` / ``atac_cty<i>.csv`` (read
+      by every evaluation, even when the method does not take them);
     - ``data_dir`` content: ``FileNotFoundError`` when a file scBridge names
       inside ``data_dir`` (``rna.h5``, ``atac_gas.h5``, the two label CSVs) is
       absent;
@@ -558,7 +602,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
     - ATAC cell order (diagonal): ``ValueError`` when the ``atac_gas.h5`` a
       method reads holds other cells than ``atac_peak.h5``, or lists them in
       another order. ``atac_cty.csv`` follows ``atac_peak.h5``. Barcodes that
-      differ only in a ``-1`` / ``-2`` suffix count as the same cell.
+      differ only in a ``-1`` / ``-2`` suffix count as the same cell. The
+      same holds per batch for ``atac_gas<i>.h5`` and ``atac_peak<i>.h5``.
 
     **Dataset name case.** A spelling that differs from the folder only in
     case (``'d52'`` for ``D52`` on a case-insensitive filesystem) is replaced
@@ -800,6 +845,9 @@ def _label_partners(label_role: str, roles) -> list[str]:
     * ``cty<N>`` (one label file per batch) -> the roles numbered ``<N>``;
     * ``rna_cty`` / ``atac_cty`` / ``peak_cty`` -> the roles of that base
       modality (``atac_cty`` covers ``atac``, ``atac_gas`` and ``atac_peak``);
+    * ``rna_cty<N>`` / ``atac_cty<N>`` (diagonal data in several batches) ->
+      the roles of that base modality numbered ``<N>`` (``atac_cty2`` covers
+      ``atac_gas2`` and ``atac_peak2``);
     * anything else (``source_cty`` ...) -> nothing (no safe pairing).
     """
     mods = [r for r in roles if not is_label_role(r) and r != "data_dir"]
@@ -808,23 +856,33 @@ def _label_partners(label_role: str, roles) -> list[str]:
     digits = "".join(ch for ch in label_role if ch.isdigit())
     if label_role.startswith("cty") and digits:
         return [r for r in mods if r.endswith(digits)]
-    if label_role.endswith("_cty"):
-        prefix = label_role[:-4]
+    m = _MODALITY_LABEL_RE.match(label_role)
+    if m:
+        prefix, number = m.groups()
         base = {"peak": "atac"}.get(prefix, prefix)
-        return [r for r in mods if base_modality(r) == base and not r[-1:].isdigit()]
+        batch = int(number) if number else None
+        return [r for r in mods if base_modality(r) == base and _batch_of(r) == batch]
     return []
 
 
 _BATCH_DIGITS_RE = re.compile(r"(\d+)$")
+#: label stems named after the modality they label: ``rna_cty``, ``atac_cty``,
+#: ``peak_cty``, and per batch ``rna_cty2``, ``atac_cty2``
+_MODALITY_LABEL_RE = re.compile(r"^(.+)_cty(\d*)$")
 
 
-def _batch_label_file(role: str, path) -> tuple[str, Path] | None:
+def _batch_label_file(role: str, path, category: str | None = None) -> tuple[str, Path] | None:
     """``(batch_index, <dir>/cty<i>.csv)`` for a numbered modality role, else ``None``.
 
     Cross and mosaic datasets label each batch in ``cty<i>.csv`` next to
     ``rna<i>.h5`` / ``adt<i>.h5`` / ``atac<i>.h5``. No cross method takes
     that file as an input role - only the evaluator reads it - so the
     role-driven pairing never sees it; the sibling is looked up on disk.
+
+    With ``category="diagonal"`` the RNA and ATAC cells of a batch differ, so
+    the file is named after the modality: ``rna_cty<i>.csv`` next to
+    ``rna<i>.h5``, ``atac_cty<i>.csv`` next to ``atac_gas<i>.h5`` /
+    ``atac_peak<i>.h5``.
     """
     if is_label_role(role) or role == "data_dir":
         return None
@@ -834,6 +892,8 @@ def _batch_label_file(role: str, path) -> tuple[str, Path] | None:
     p = Path(path)
     if p.suffix != ".h5":
         return None
+    if category == "diagonal":
+        return m.group(1), p.parent / f"{base_modality(role)}_cty{m.group(1)}.csv"
     return m.group(1), p.parent / f"cty{m.group(1)}.csv"
 
 
@@ -852,13 +912,15 @@ def _check_label_lengths(method, dataset, category, resolved):
     method reads, although none of them lists ``cty<i>`` as an input role.
     Without this a truncated ``cty1.csv`` passes :func:`multibench.scan` with
     ``files_ok=True`` and only fails inside ``evaluate`` after the run.
+    Diagonal data in several batches is checked the same way, against
+    ``rna_cty<i>.csv`` / ``atac_cty<i>.csv`` (:func:`_batch_label_file`).
     """
     for role, path in resolved.items():
-        pair = _batch_label_file(role, path)
+        pair = _batch_label_file(role, path, category)
         if pair is None:
             continue
         batch, lab = pair
-        if f"cty{batch}" in resolved:      # an input role: the loop below checks it
+        if lab.stem in resolved:           # an input role: the loop below checks it
             continue
         q = Path(path)
         if not lab.is_file() or not q.is_file():
@@ -902,7 +964,9 @@ def _check_label_lengths(method, dataset, category, resolved):
 def _check_diagonal_label_files(method, dataset, resolved):
     """Diagonal: ``rna_cty.csv`` / ``atac_cty.csv`` next to the modality files
     must have one row per cell of ``rna.h5`` / the ATAC file, also when the
-    variant does not read them (every evaluation does)."""
+    variant does not read them (every evaluation does). Numbered roles are
+    left to :func:`_check_label_lengths`, which pairs ``rna<i>.h5`` with
+    ``rna_cty<i>.csv`` through :func:`_batch_label_file`."""
     for role, path in resolved.items():
         if is_label_role(role) or role == "data_dir" or role[-1:].isdigit():
             continue
@@ -1223,40 +1287,48 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
     cell when the suffix-free names stay unique (D28's two ATAC files end in
     ``-1`` and ``-2``). Non-unique barcodes, or a file that is not a readable
     canonical ``.h5``, are left alone.
+
+    Diagonal data in several batches: each ``atac_gas<i>`` role is checked
+    against the ``atac_peak<i>`` file, which ``atac_cty<i>.csv`` labels.
     """
     from .ingest import _cell_order
 
-    gas = resolved.get("atac_gas")
-    if not gas:
-        return
-    gas = Path(gas)
-    given = resolved.get("atac_peak")
-    if given and Path(given).is_file():
-        peak = Path(given)
-    else:
-        peak = next((gas.parent / n for n in ("atac_peak.h5", "peak.h5")
-                     if (gas.parent / n).is_file()), None)
-    if peak is None or peak.resolve() == gas.resolve():
-        return
-    a, b = _barcodes_of(gas), _barcodes_of(peak)
-    if a is None or b is None:
-        return
-    kind, _ = _cell_order(a, b)
-    if kind == "other":
-        raise ValueError(GAS_OTHER_CELLS_REASON.format(
-            method=method, dataset=dataset, gas=gas.name, peak=peak.name, n_gas=len(a),
-            n_peak=len(b), shared=len(set(a) & set(b))))
-    if kind == "order":
-        raise ValueError(GAS_OTHER_ORDER_REASON.format(
-            method=method, dataset=dataset, gas=gas.name, peak=peak.name,
-            write=config.hint("mtb.io.to_canonical(..., modality='gas')",
-                              "multibench convert SRC DIR --modality gas")))
+    for role, gas in resolved.items():
+        digits = role[len("atac_gas"):]
+        if not role.startswith("atac_gas") or (digits and not digits.isdigit()) or not gas:
+            continue
+        gas = Path(gas)
+        given = resolved.get(f"atac_peak{digits}")
+        if given and Path(given).is_file():
+            peak = Path(given)
+        else:
+            peak = next((gas.parent / n for n in (f"atac_peak{digits}.h5", f"peak{digits}.h5")
+                         if (gas.parent / n).is_file()), None)
+        if peak is None or peak.resolve() == gas.resolve():
+            continue
+        a, b = _barcodes_of(gas), _barcodes_of(peak)
+        if a is None or b is None:
+            continue
+        kind, _ = _cell_order(a, b)
+        if kind == "other":
+            raise ValueError(GAS_OTHER_CELLS_REASON.format(
+                method=method, dataset=dataset, gas=gas.name, peak=peak.name, n_gas=len(a),
+                n_peak=len(b), shared=len(set(a) & set(b))))
+        if kind == "order":
+            # the template names the label file of the unnumbered layout
+            raise ValueError(GAS_OTHER_ORDER_REASON.format(
+                method=method, dataset=dataset, gas=gas.name, peak=peak.name,
+                write=config.hint("mtb.io.to_canonical(..., modality='gas')",
+                                  "multibench convert SRC DIR --modality gas")
+            ).replace("atac_cty.csv", f"atac_cty{digits}.csv"))
 
 
-#: file names that carry a batch number: ``rna2.h5``, ``atac_peak3.h5``, ``cty1.csv``
-_BATCH_FILE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas)(\d+)\.h5$|^cty(\d+)\.csv$")
+#: file names that carry a batch number: ``rna2.h5``, ``atac_peak3.h5``,
+#: ``cty1.csv``, and the diagonal ``rna_cty2.csv`` / ``atac_cty2.csv``
+_BATCH_FILE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas)(\d+)\.h5$"
+                            r"|^(?:rna_|atac_)?cty(\d+)\.csv$")
 #: role tokens that carry a batch number
-_BATCH_ROLE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas|cty)(\d+)$")
+_BATCH_ROLE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas|cty|rna_cty|atac_cty)(\d+)$")
 
 
 def _variant_batches(roles) -> set[int]:
@@ -1446,7 +1518,10 @@ def _label_sort_key(stem: str):
        (``peak_cty`` is treated as atac) - the order in which most diagonal /
        vertical methods stack their cells in the embedding (RNA cells first,
        then ATAC cells; uniPort and Seurat_v5 declare the reverse, see
-       ``Variant.stacked_roles``);
+       ``Variant.stacked_roles``). ``<modality>_cty<N>`` (diagonal data in
+       several batches) sorts by modality, then by number: ``rna_cty1,
+       rna_cty2, rna_cty3, atac_cty1, atac_cty2, atac_cty3``, the order in
+       which every such variant stacks its cells;
     4. anything else (``source_cty`` ...) alphabetically, last.
     """
     if stem == "cty":
@@ -1454,9 +1529,11 @@ def _label_sort_key(stem: str):
     digits = "".join(ch for ch in stem if ch.isdigit())
     if stem.startswith("cty") and digits and stem == f"cty{digits}":
         return (1, int(digits), "")
-    if stem.endswith("_cty"):
-        base = {"peak": "atac"}.get(stem[:-4], base_modality(stem[:-4]))
-        return (2, _LABEL_MODALITY_ORDER.get(base, 9), stem)
+    m = _MODALITY_LABEL_RE.match(stem)
+    if m:
+        prefix, number = m.groups()
+        base = {"peak": "atac"}.get(prefix, base_modality(prefix))
+        return (2, _LABEL_MODALITY_ORDER.get(base, 9), int(number or 0), stem)
     return (3, 0, stem)
 
 
@@ -1591,7 +1668,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
        order);
     3. modality-named files in the canonical modality order **rna, adt, atac**
        (``peak_cty`` counts as atac) - the diagonal methods other than uniPort
-       and Seurat_v5 emit the RNA cells first, then the ATAC cells;
+       and Seurat_v5 emit the RNA cells first, then the ATAC cells. Diagonal
+       data in several batches follows the same rule, by number within a
+       modality: ``rna_cty1, rna_cty2, rna_cty3, atac_cty1, atac_cty2,
+       atac_cty3``;
     4. any other ``*cty*`` file, alphabetically, last.
 
     **Per-method order.** With ``category`` and ``method``, each file goes
@@ -1605,7 +1685,8 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     Number the donor you want as reference accordingly.
 
     The variant is chosen as ``mtb.inputs_for`` does: by ``modalities=``, else
-    the category's only variant or the one whose files the folder holds. If
+    the category's only variant or the one whose files the folder holds (of
+    nested ones, the one with the most modalities). If
     the choice stays ambiguous, or no label file pairs with the variant's
     roles, the default order is used; ``labels_for`` does not raise
     ``mtb.AmbiguousVariantError``.
@@ -1627,6 +1708,15 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     With such a ``category``, ``check=None`` warns and ``check=True`` raises.
     Export without ``batch=`` and pass the batch column to
     ``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``.
+
+    **Diagonal data in several batches.** A folder with ``rna<i>.h5``,
+    ``atac_gas<i>.h5`` or ``atac_peak<i>.h5``, ``rna_cty<i>.csv`` and
+    ``atac_cty<i>.csv`` is what a few diagonal methods read
+    (``method_info(m)['supports']``), so it raises no per-batch warning. Each
+    label file is one batch for the batch metrics, as for every list of
+    label files: three RNA and three ATAC files give six batches. Pass
+    ``batch=`` to ``mtb.evaluate`` or ``mtb.run_all`` for another grouping,
+    such as RNA against ATAC.
 
     **Paths and names.** Paths are absolute. A dataset spelling that differs
     from the folder only in case (``'d52'`` for ``D52``) is replaced by the
@@ -1687,7 +1777,8 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
             used = _variant_batches(roles)
             if used:
                 stems = [st for st in stems
-                         if not re.fullmatch(r"cty\d+", st) or int(st[3:]) in used]
+                         if not (m := re.fullmatch(r"(?:(?:rna|atac)_)?cty(\d+)", st))
+                         or int(m.group(1)) in used]
             rank = _variant_label_rank(stems, cand)
             if rank is not None:
                 stems = sorted(stems, key=lambda st: rank[st])

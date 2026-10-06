@@ -66,16 +66,20 @@ def test_folder_disambiguates_multi_variant_method(tmp_path):
 
 
 def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
-    # both Matilda variants satisfiable -> still ambiguous, ValueError (and KeyError for old callers)
+    # both VIMCCA variants satisfiable and not nested -> still ambiguous,
+    # ValueError (and KeyError for old callers)
     _touch(tmp_path / "D11", ["rna.h5", "adt.h5", "atac.h5", "cty.csv"])
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path)
+        mtb.inputs_for("D11", "vertical", "VIMCCA", data_path=tmp_path)
     msg = str(e.value)
     assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
-    assert msg.startswith("Matilda has 2 vertical variants, rna+adt and rna+atac.")
+    assert msg.startswith("VIMCCA has 2 vertical variants, rna+adt and rna+atac.")
     assert f"The folder {tmp_path / 'D11'} has every input file of both." in msg
     assert msg.endswith("Pass modalities=['rna', 'adt'] or modalities=['rna', 'atac'].")
     assert not msg.startswith('"')          # plain message, no KeyError quoting
+    # Matilda's rna+adt and rna+atac are inside its rna+adt+atac: the largest one
+    assert set(mtb.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path)) == {
+        "rna", "adt", "atac", "cty"}
     # a folder with the files of neither: what it holds
     _touch(tmp_path / "D12", ["rna.h5", "cty.csv"])
     with pytest.raises(ValueError) as e:
@@ -84,7 +88,7 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
             f"and rna.h5.") in str(e.value)
     # nothing on disk -> same error, no folder note
     with pytest.raises(ValueError, match=r"variants, rna\+adt and rna\+atac\. Pass modalities="):
-        mtb.inputs_for("D99", "vertical", "Matilda", data_path=tmp_path)
+        mtb.inputs_for("D99", "vertical", "VIMCCA", data_path=tmp_path)
 
 
 def test_labels_for_validates_method_and_returns_absolute(tmp_path, monkeypatch):
