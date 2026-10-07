@@ -85,15 +85,7 @@
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/cross_adt_atac_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/cross_rna_adt/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/cross_rna_adt_all/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
@@ -101,15 +93,7 @@
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/cross_rna_adt_atac_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/cross_rna_atac/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/cross_rna_atac_all/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
@@ -117,15 +101,7 @@
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/diagonal_multi_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/diagonal_rna_atac/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/diagonal_rna_atac_all/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
@@ -145,15 +121,7 @@
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic_rna_adt_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic_rna_atac/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic_rna_atac_all/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
@@ -161,15 +129,7 @@
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic_shared_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic_unshared/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/mosaic_unshared_all/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
@@ -185,23 +145,11 @@
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/vertical_rna_adt_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/vertical_rna_adt_atac/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
     <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/vertical_rna_adt_atac_all/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
          <loc>https://dsichang.github.io/scMultiBench/tutorials/vertical_rna_atac/</loc>
-         <lastmod>2026-10-07</lastmod>
-    </url>
-    <url>
-         <loc>https://dsichang.github.io/scMultiBench/tutorials/vertical_rna_atac_all/</loc>
          <lastmod>2026-10-07</lastmod>
     </url>
 </urlset>

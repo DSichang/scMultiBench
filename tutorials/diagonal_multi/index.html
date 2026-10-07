@@ -51,7 +51,7 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
-    /* task tabs of a tutorial category, and the tutorial / every-method switch */
+    /* task tabs of a tutorial category */
     /* The labels are the article's task names. The strip wraps to more rows
        when they do not fit one, and a label wider than the strip wraps
        inside its tab, so the page never scrolls sideways. The right margin
@@ -65,11 +65,6 @@
     }
     .md-typeset nav.task-tabs a:hover { color: var(--brand-600) !important; background: color-mix(in srgb, var(--brand-600) 6%, transparent); }
     .md-typeset nav.task-tabs a.active, .md-typeset nav.task-tabs a.active:visited { color: var(--brand-600) !important; border-bottom-color: var(--brand-600); background: color-mix(in srgb, var(--brand-600) 10%, transparent); }
-    /* tutorial / every method: a small segmented switch */
-    .md-typeset nav.task-tabs--sub { display: inline-flex; flex-wrap: nowrap; gap: 0; margin: 0 0 0.9rem 0; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 0.4rem; overflow: hidden; }
-    .md-typeset nav.task-tabs--sub a, .md-typeset nav.task-tabs--sub a:visited { font-size: 0.7rem; padding: 0.25rem 0.8rem; border: 0; border-radius: 0; margin: 0; }
-    .md-typeset nav.task-tabs--sub a + a { border-left: 1px solid var(--md-default-fg-color--lighter); }
-    .md-typeset nav.task-tabs--sub a.active, .md-typeset nav.task-tabs--sub a.active:visited { background: var(--brand-600); color: #fff !important; }
   </style>
 
     
@@ -2332,9 +2327,6 @@
   
   
   
-  
-  
-  
     <a class="colab-button colab-button--task" href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_diagonal_multi.ipynb"
        target="_blank" rel="noopener" title="Open this notebook in Google Colab">
       <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab">
@@ -2346,12 +2338,6 @@
         <a href="../../tutorials/diagonal_multi/" class="active" aria-current="page">[multiple RNA, multiple ATAC]</a>
       
     </nav>
-    
-    <nav class="task-tabs task-tabs--sub" aria-label="tutorial or every method">
-      <a href="../../tutorials/diagonal_multi/" class="active" aria-current="page">Tutorial</a>
-      <a href="../../tutorials/diagonal_multi_all/">Every method</a>
-    </nav>
-    
   
   
                   
@@ -3986,9 +3972,40 @@ mine.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6-every-method-of-this-task">6. Every method of this task<a class="anchor-link" href="#6-every-method-of-this-task">¶</a></h2><p>4 methods have a variant for diagonal [multiple RNA, multiple ATAC]: GLUE, iNMF, online_iNMF and scJoint. Each runs on <code>D37mini</code>. To run them all, set <code>METHODS</code> to that list in section 2 and run the notebook again. That downloads 3 envs, 4.8 GB to download on a CPU host, 8.4 GB on a GPU host.</p>
+<h2 id="6-every-method-of-this-task">6. Every method of this task<a class="anchor-link" href="#6-every-method-of-this-task">¶</a></h2><p>4 methods have a variant for diagonal [multiple RNA, multiple ATAC]. Each ran on <code>D37mini</code> in the package's own check, on a server with a GPU:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Result</th>
+<th>Seconds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GLUE</td>
+<td>scored</td>
+<td>567</td>
+</tr>
+<tr>
+<td>iNMF</td>
+<td>scored</td>
+<td>16</td>
+</tr>
+<tr>
+<td>online_iNMF</td>
+<td>scored</td>
+<td>8</td>
+</tr>
+<tr>
+<td>scJoint</td>
+<td>scored</td>
+<td>43</td>
+</tr>
+</tbody>
+</table>
+<p>To run them all, set <code>METHODS</code> to these names in section 2 and run the notebook again. That downloads 3 envs, 4.8 GB to download on a CPU host, 8.4 GB on a GPU host. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_diagonal_multi_all.ipynb">This notebook</a> does the same in Colab.</p>
 <p>The article also evaluates Conos on this task. Its published script reads a third input file in another format, so the package does not run it on more than two files.</p>
-<p><a href="https://dsichang.github.io/scMultiBench/tutorials/diagonal_multi_all/">Every method on <code>D37mini</code></a> shows that run.</p>
 </div>
 </div>
 </div>

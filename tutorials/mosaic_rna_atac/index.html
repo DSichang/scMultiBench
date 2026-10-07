@@ -51,7 +51,7 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
-    /* task tabs of a tutorial category, and the tutorial / every-method switch */
+    /* task tabs of a tutorial category */
     /* The labels are the article's task names. The strip wraps to more rows
        when they do not fit one, and a label wider than the strip wraps
        inside its tab, so the page never scrolls sideways. The right margin
@@ -65,11 +65,6 @@
     }
     .md-typeset nav.task-tabs a:hover { color: var(--brand-600) !important; background: color-mix(in srgb, var(--brand-600) 6%, transparent); }
     .md-typeset nav.task-tabs a.active, .md-typeset nav.task-tabs a.active:visited { color: var(--brand-600) !important; border-bottom-color: var(--brand-600); background: color-mix(in srgb, var(--brand-600) 10%, transparent); }
-    /* tutorial / every method: a small segmented switch */
-    .md-typeset nav.task-tabs--sub { display: inline-flex; flex-wrap: nowrap; gap: 0; margin: 0 0 0.9rem 0; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 0.4rem; overflow: hidden; }
-    .md-typeset nav.task-tabs--sub a, .md-typeset nav.task-tabs--sub a:visited { font-size: 0.7rem; padding: 0.25rem 0.8rem; border: 0; border-radius: 0; margin: 0; }
-    .md-typeset nav.task-tabs--sub a + a { border-left: 1px solid var(--md-default-fg-color--lighter); }
-    .md-typeset nav.task-tabs--sub a.active, .md-typeset nav.task-tabs--sub a.active:visited { background: var(--brand-600); color: #fff !important; }
   </style>
 
     
@@ -2354,9 +2349,6 @@
   
   
   
-  
-  
-  
     <a class="colab-button colab-button--task" href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_rna_atac.ipynb"
        target="_blank" rel="noopener" title="Open this notebook in Google Colab">
       <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab">
@@ -2372,12 +2364,6 @@
         <a href="../../tutorials/mosaic_unshared/">Mixed, without shared modality</a>
       
     </nav>
-    
-    <nav class="task-tabs task-tabs--sub" aria-label="tutorial or every method">
-      <a href="../../tutorials/mosaic_rna_atac/" class="active" aria-current="page">Tutorial</a>
-      <a href="../../tutorials/mosaic_rna_atac_all/">Every method</a>
-    </nav>
-    
   
   
                   
@@ -4152,8 +4138,49 @@ mtb.plot.bubble(long)</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="7-every-method-of-this-task">7. Every method of this task<a class="anchor-link" href="#7-every-method-of-this-task">¶</a></h2><p>6 methods have a variant for mosaic [RNA, RNA + ATAC, ATAC]: Cobolt, MultiVI, Multigrate, SMILE, StabMap and scMoMaT. Each runs on <code>D45mini</code>. To run them all, set <code>METHODS</code> to that list in section 2 and run the notebook again. That downloads 6 envs, 15.6 GB to download on a CPU host, 20.8 GB on a GPU host.</p>
-<p><a href="https://dsichang.github.io/scMultiBench/tutorials/mosaic_rna_atac_all/">Every method on <code>D45mini</code></a> shows that run.</p>
+<h2 id="7-every-method-of-this-task">7. Every method of this task<a class="anchor-link" href="#7-every-method-of-this-task">¶</a></h2><p>6 methods have a variant for mosaic [RNA, RNA + ATAC, ATAC]. Each ran on <code>D45mini</code> in the package's own check, on a server with a GPU:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Result</th>
+<th>Seconds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cobolt</td>
+<td>scored</td>
+<td>119</td>
+</tr>
+<tr>
+<td>MultiVI</td>
+<td>scored</td>
+<td>292</td>
+</tr>
+<tr>
+<td>Multigrate</td>
+<td>scored</td>
+<td>106</td>
+</tr>
+<tr>
+<td>SMILE</td>
+<td>scored</td>
+<td>48</td>
+</tr>
+<tr>
+<td>StabMap</td>
+<td>scored</td>
+<td>14</td>
+</tr>
+<tr>
+<td>scMoMaT</td>
+<td>scored on the UMAP it writes</td>
+<td>92</td>
+</tr>
+</tbody>
+</table>
+<p>To run them all, set <code>METHODS</code> to these names in section 2 and run the notebook again. That downloads 6 envs, 15.6 GB to download on a CPU host, 20.8 GB on a GPU host. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_rna_atac_all.ipynb">This notebook</a> does the same in Colab.</p>
 </div>
 </div>
 </div>
