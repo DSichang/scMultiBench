@@ -818,16 +818,13 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location("deploy_gate", repo / "hooks" / "deploy_gate.py")
     gate = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gate)
-    # every published copy has a package notebook to be compared with
-    # and the site publishes them all: per task the tutorial and the run of
-    # every method its "Every method of this task" section links, and the
-    # end-to-end tutorial
+    # every published copy has a package notebook to be compared with, and
+    # the site publishes one page per task and the end-to-end tutorial
     copies = sorted((_docs_root() / "tutorials").glob("*.ipynb"))
     for copy in copies:
         assert (ROOT / "notebooks" / f"tutorial_{copy.name}").is_file(), copy.name
     assert [c.stem for c in copies] == sorted(
-        [k + s for k in _load_gen_tut().TASKS for s in ("", "_all")
-         if not s or _load_gen_tut().has_all(k)] + ["end_to_end"])
+        list(_load_gen_tut().TASKS) + ["end_to_end"])
     cells = [("markdown", "# Title\n\nprose"), ("code", "import multibench as mtb\nmtb.scan('D11')")]
     pkg, site = tmp_path / "pkg" / "notebooks", tmp_path / "docs" / "tutorials"
     _write_nb(pkg / "tutorial_a.ipynb", cells, executed=False)
@@ -1040,13 +1037,15 @@ def test_each_guide_warning_appears_once_on_the_site():
         assert found == {home: 1}, (phrase, found)
 
 
-def test_the_site_shows_the_every_method_switch_where_that_page_exists():
-    """overrides/main.html names the tasks that have an ``_all`` page; a task
-    whose tutorial already runs every method must not link one."""
+def test_the_site_has_no_every_method_pages():
+    """The run of every method is a section of each tutorial; the site has no
+    second page per task, and the old addresses redirect to the tutorial."""
     if not os.environ.get("SCMULTIBENCH_DOCS"):
         pytest.skip("SCMULTIBENCH_DOCS not set")
-    import ast
     gen = _load_gen_tut()
-    html = (_docs_root().parent / "overrides" / "main.html").read_text()
-    listed = ast.literal_eval(re.search(r"set with_all = (\[.*?\])", html, re.S).group(1))
-    assert sorted(listed) == sorted(k for k in gen.TASKS if gen.has_all(k))
+    root = _docs_root().parent
+    assert not list((_docs_root() / "tutorials").glob("*_all.ipynb"))
+    assert "_all/" not in (root / "overrides" / "main.html").read_text()
+    yml = (root / "mkdocs.yml").read_text()
+    for key in gen.TASKS:
+        assert f"tutorials/{key}_all.md: {gen.SITE}tutorials/{key}/" in yml, key

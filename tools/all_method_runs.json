@@ -1,0 +1,408 @@
+{
+ "cross_adt_atac": {
+  "MOFA2": [
+   "CHAIN_OK",
+   29
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   42
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   12
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   22
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   107
+  ]
+ },
+ "cross_rna_adt": {
+  "Concerto": [
+   "CHAIN_OK",
+   33
+  ],
+  "MOFA2": [
+   "CHAIN_OK",
+   16
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   41
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   10
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   19
+  ],
+  "scMDC": [
+   "CHAIN_OK",
+   53
+  ],
+  "scMM": [
+   "CHAIN_OK",
+   13
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   148
+  ],
+  "sciPENN": [
+   "CHAIN_OK",
+   9
+  ],
+  "totalVI": [
+   "CHAIN_OK",
+   71
+  ]
+ },
+ "cross_rna_adt_atac": {
+  "MOFA2": [
+   "CHAIN_OK",
+   42
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   43
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   13
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   26
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   113
+  ]
+ },
+ "cross_rna_atac": {
+  "MOFA2": [
+   "CHAIN_OK",
+   58
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   57
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   14
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   31
+  ],
+  "UnitedNet": [
+   "CHAIN_OK",
+   68
+  ],
+  "scMDC": [
+   "CHAIN_OK",
+   90
+  ],
+  "scMM": [
+   "CHAIN_OK",
+   25
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   144
+  ]
+ },
+ "diagonal_multi": {
+  "GLUE": [
+   "CHAIN_OK",
+   567
+  ],
+  "iNMF": [
+   "CHAIN_OK",
+   16
+  ],
+  "online_iNMF": [
+   "CHAIN_OK",
+   8
+  ],
+  "scJoint": [
+   "CHAIN_OK",
+   43
+  ]
+ },
+ "diagonal_rna_atac": {
+  "Conos": [
+   "CHAIN_OK",
+   42
+  ],
+  "GLUE": [
+   "CHAIN_OK",
+   340
+  ],
+  "MultiMAP": [
+   "CHAIN_OK",
+   23
+  ],
+  "Portal": [
+   "CHAIN_OK",
+   44
+  ],
+  "SCALEX": [
+   "CHAIN_OK",
+   261
+  ],
+  "Seurat_v3": [
+   "CHAIN_OK",
+   51
+  ],
+  "Seurat_v5": [
+   "CHAIN_OK",
+   357
+  ],
+  "VIPCCA": [
+   "CHAIN_OK",
+   10
+  ],
+  "iNMF": [
+   "CHAIN_OK",
+   18
+  ],
+  "online_iNMF": [
+   "CHAIN_OK",
+   8
+  ],
+  "scBridge": [
+   "CHAIN_OK",
+   26
+  ],
+  "scJoint": [
+   "CHAIN_OK",
+   28
+  ],
+  "sciCAN": [
+   "CHAIN_OK",
+   84
+  ],
+  "uniPort": [
+   "CHAIN_OK",
+   463
+  ]
+ },
+ "mosaic_rna_adt": {
+  "Multigrate": [
+   "CHAIN_OK",
+   101
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   11
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   126
+  ]
+ },
+ "mosaic_rna_atac": {
+  "Cobolt": [
+   "CHAIN_OK",
+   119
+  ],
+  "MultiVI": [
+   "CHAIN_OK",
+   292
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   106
+  ],
+  "SMILE": [
+   "CHAIN_OK",
+   48
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   14
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   92
+  ]
+ },
+ "mosaic_shared": {
+  "Multigrate": [
+   "CHAIN_OK",
+   103
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   12
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   24
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   128
+  ]
+ },
+ "mosaic_unshared": {
+  "Multigrate": [
+   "CHAIN_OK",
+   109
+  ],
+  "StabMap": [
+   "CHAIN_OK",
+   11
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   104
+  ]
+ },
+ "vertical_rna_adt": {
+  "Concerto": [
+   "CHAIN_OK",
+   210
+  ],
+  "MOFA2": [
+   "CHAIN_OK",
+   45
+  ],
+  "Matilda": [
+   "CHAIN_OK",
+   17
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   42
+  ],
+  "Seurat_WNN": [
+   "RUN_OK_NO_EMBEDDING",
+   17
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   18
+  ],
+  "VIMCCA": [
+   "CHAIN_OK",
+   17
+  ],
+  "moETM": [
+   "CHAIN_OK",
+   9
+  ],
+  "scMDC": [
+   "CHAIN_OK",
+   70
+  ],
+  "scMM": [
+   "CHAIN_OK",
+   32
+  ],
+  "scMSI": [
+   "CHAIN_OK",
+   537
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   59
+  ],
+  "sciPENN": [
+   "CHAIN_OK",
+   9
+  ],
+  "totalVI": [
+   "CHAIN_OK",
+   59
+  ]
+ },
+ "vertical_rna_adt_atac": {
+  "MOFA2": [
+   "CHAIN_OK",
+   40
+  ],
+  "Matilda": [
+   "CHAIN_OK",
+   16
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   48
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   20
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   64
+  ]
+ },
+ "vertical_rna_atac": {
+  "MIRA": [
+   "RUN_OK_NO_EMBEDDING",
+   243
+  ],
+  "MOFA2": [
+   "CHAIN_OK",
+   92
+  ],
+  "Matilda": [
+   "CHAIN_OK",
+   22
+  ],
+  "Multigrate": [
+   "CHAIN_OK",
+   78
+  ],
+  "Seurat_WNN": [
+   "RUN_OK_NO_EMBEDDING",
+   294
+  ],
+  "UINMF": [
+   "CHAIN_OK",
+   33
+  ],
+  "UnitedNet": [
+   "CHAIN_OK",
+   87
+  ],
+  "VIMCCA": [
+   "CHAIN_OK",
+   20
+  ],
+  "iPOLNG": [
+   "CHAIN_OK",
+   120
+  ],
+  "moETM": [
+   "CHAIN_OK",
+   13
+  ],
+  "scMDC": [
+   "CHAIN_OK",
+   128
+  ],
+  "scMM": [
+   "CHAIN_OK",
+   58
+  ],
+  "scMVP": [
+   "CHAIN_OK",
+   80
+  ],
+  "scMoMaT": [
+   "CHAIN_OK_GRAPH_METHOD",
+   67
+  ]
+ }
+}

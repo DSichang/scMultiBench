@@ -951,16 +951,15 @@ mtb.plot.bubble(long)''')
     # ------------------------------------------------------------ every method
     more = not_wrapped_sentence(key)
     more = "\n\n" + more if more else ""
-    if has_all(key):
-        md(f"""## {n_sec}. Every method of this task
+    colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) does the same in Colab."
+                 if has_all(key) else "")
+    md(f"""## {n_sec}. Every method of this task
 
-{len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for {t['cat']} {t['label']}: {and_list(everyone)}. Each runs on `{ds}`. To run them all, set `METHODS` to that list in section 2 and run the notebook again. That downloads {env_size_text(methods=everyone)}.{more}
+{len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for {t['cat']} {t['label']}. Each ran on `{ds}` in the package's own check, on a server with a GPU:
 
-[Every method on `{ds}`]({SITE}tutorials/{key}_all/) shows that run.""")
-    else:
-        md(f"""## {n_sec}. Every method of this task
+{runs_table(key)}
 
-{and_list(everyone)} {'are the only methods' if len(everyone) > 1 else 'is the only method'} with a variant for {t['cat']} {t['label']}, so this tutorial runs every method of the task.{more}""")
+To run them all, set `METHODS` to these names in section 2 and run the notebook again. That downloads {env_size_text(methods=everyone)}.{colab_all}{more}""")
 
     # -------------------------------------------------------- troubleshooting
     md("""## Troubleshooting
@@ -992,6 +991,29 @@ def has_all(key):
     """Whether the task has methods beyond the tutorial's defaults, and so a
     notebook that runs every method."""
     return set(task_methods(key)) != set(TASKS[key]["methods"])
+
+
+#: what a run status means to a reader
+RUN_WORDS = {"CHAIN_OK": "scored",
+             "CHAIN_OK_GRAPH_METHOD": "scored on the UMAP it writes",
+             "RUN_OK_NO_EMBEDDING": "ran, graph output not scored"}
+
+
+def runs_table(key):
+    """The run of every method of the task on its dataset, as a table: status
+    and seconds, read from ``tools/all_method_runs.json`` (the package's check
+    of the every-method notebooks on the benchmark host). No scores."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "all_method_runs.json")) as f:
+        runs = json.load(f)[key]
+    everyone = task_methods(key)
+    if sorted(runs) != everyone:
+        raise SystemExit(f"all_method_runs.json[{key}] lists {sorted(runs)}, the task has {everyone}")
+    rows = ["| Method | Result | Seconds |", "|---|---|---|"]
+    for m in everyone:
+        status, sec = runs[m]
+        rows.append(f"| {m} | {RUN_WORDS[status]} | {sec} |")
+    return "\n".join(rows)
 
 
 def graph_methods(key):

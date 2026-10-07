@@ -361,8 +361,8 @@ def test_every_method_reads_every_batch(key):
 
 @pytest.mark.parametrize("key", KEYS)
 def test_every_method_section_lists_the_task_and_links_the_all_page(key):
-    """Markdown only: the section names every method of the task, says to set
-    METHODS, and links the page that shows that run."""
+    """Markdown only: the section shows the run of every method of the task as
+    a table, says to set METHODS, and links the notebook that runs them all."""
     t = GEN.TASKS[key]
     cells = _cells(f"tutorial_{key}")
     i = next(i for i, (kind, src) in enumerate(cells)
@@ -370,17 +370,18 @@ def test_every_method_section_lists_the_task_and_links_the_all_page(key):
     md = cells[i][1]
     everyone = GEN.task_methods(key)
     n = len(everyone)
-    if GEN.has_all(key):
-        assert (f"{n} method{'s have' if n > 1 else ' has'} a variant for {t['cat']} "
-                f"{t['label']}: {GEN.and_list(everyone)}. Each runs on `{t['ds']}`.") in md
-        assert "set `METHODS` to that list in section 2" in md
-        assert f"That downloads {GEN.env_size_text(methods=everyone)}." in md
-        assert f"]({GEN.SITE}tutorials/{key}_all/)" in md
-    else:
-        # the tutorial already runs every method: no second notebook, no link
-        assert everyone == sorted(t["methods"])
-        assert f"with a variant for {t['cat']} {t['label']}, so this tutorial runs every method" in md
-        assert "_all" not in md
+    assert (f"{n} method{'s have' if n > 1 else ' has'} a variant for {t['cat']} "
+            f"{t['label']}. Each ran on `{t['ds']}` in the package's own check") in md
+    # one table row per method: what the run gave and its seconds, no scores
+    rows = [line for line in md.split("\n") if line.startswith("| ") and "Method" not in line]
+    assert [r.split("|")[1].strip() for r in rows] == everyone
+    assert all(r.split("|")[2].strip() in GEN.RUN_WORDS.values() for r in rows)
+    assert all(r.split("|")[3].strip().isdigit() for r in rows)
+    assert "set `METHODS` to these names in section 2" in md
+    assert f"That downloads {GEN.env_size_text(methods=everyone)}." in md
+    # the site has no every-method page: the link opens the notebook in Colab
+    assert f"{GEN.SITE}tutorials/{key}_all" not in md
+    assert (f"]({GEN.COLAB}tutorial_{key}_all.ipynb)" in md) == GEN.has_all(key)
     assert (ROOT / "notebooks" / f"tutorial_{key}_all.ipynb").is_file() == GEN.has_all(key)
     # markdown only: the next cell is Troubleshooting, not code
     assert cells[i + 1][0] == "markdown" and cells[i + 1][1].startswith("## Troubleshooting")
@@ -579,6 +580,7 @@ def test_visible_text_stays_short():
             visible = re.sub(r"<details>.*?</details>", "", src, flags=re.S)
             visible = re.sub(r"```.*?```", "", visible, flags=re.S)
             visible = re.sub(r"^#.*$", "", visible, flags=re.M)
+            visible = re.sub(r"^\|.*$", "", visible, flags=re.M)      # table rows are data
             visible = re.sub(r"\]\(https?://[^)]+\)", "]", visible)
             words = len(re.findall(r"[A-Za-z0-9_']+", visible))
             # the diagonal title carries the ATAC-form sentence, the longest cell
