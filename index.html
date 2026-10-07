@@ -54,20 +54,20 @@
        when they do not fit one, and a label wider than the strip wraps
        inside its tab, so the page never scrolls sideways. The right margin
        keeps the tabs clear of the Colab badge (9.1rem wide). */
-    .md-typeset nav.task-tabs { display: flex; flex-wrap: wrap; gap: 0.2rem; margin: 0 9.6rem 0.5rem 0; border-bottom: 1px solid var(--md-default-fg-color--lightest); }
-    .md-typeset nav.task-tabs a { padding: 0.35rem 0.8rem; font-size: 0.75rem; font-weight: 500; color: var(--md-default-fg-color--light); border-bottom: 3px solid transparent; margin-bottom: -1px; text-decoration: none; }
-    /* phone width: on a task page the Colab badge sits above the strip
-       instead of beside it */
-    @media screen and (max-width: 44.984375em) {
-      .md-typeset a.colab-button--task { position: static; display: block; margin: 0 0 0.4rem; }
+    .md-typeset nav.task-tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0 9.6rem 0.6rem 0; border-bottom: 1px solid var(--md-default-fg-color--lightest); }
+    /* one weight for every tab: a bold active tab would be wider and move its neighbours */
+    .md-typeset nav.task-tabs a, .md-typeset nav.task-tabs a:visited { padding: 0.4rem 0.85rem; font-size: 0.75rem; font-weight: 600; color: var(--md-default-fg-color--light) !important; border-bottom: 3px solid transparent; border-radius: 0.3rem 0.3rem 0 0; margin-bottom: -1px; text-decoration: none !important; transition: none; }
+    @media screen and (max-width: 44.9375em) {
       .md-typeset nav.task-tabs { margin-right: 0; }
-      .md-typeset nav.task-tabs a { padding: 0.35rem 0.55rem; }
+      .md-typeset nav.task-tabs a { padding: 0.4rem 0.55rem; }
     }
-    .md-typeset nav.task-tabs a:hover { color: var(--md-accent-fg-color); }
-    .md-typeset nav.task-tabs a.active { color: var(--md-default-fg-color); font-weight: 700; border-bottom-color: var(--md-accent-fg-color); }
-    .md-typeset nav.task-tabs--sub { margin-right: 0; border-bottom: 0; margin-bottom: 0.8rem; }
-    .md-typeset nav.task-tabs--sub a { font-weight: 500; font-size: 0.7rem; padding: 0.2rem 0.7rem; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 1rem; margin-bottom: 0; }
-    .md-typeset nav.task-tabs--sub a.active { background: var(--md-default-fg-color); color: var(--md-default-bg-color); border-color: var(--md-default-fg-color); font-weight: 600; }
+    .md-typeset nav.task-tabs a:hover { color: var(--brand-600) !important; background: color-mix(in srgb, var(--brand-600) 6%, transparent); }
+    .md-typeset nav.task-tabs a.active, .md-typeset nav.task-tabs a.active:visited { color: var(--brand-600) !important; border-bottom-color: var(--brand-600); background: color-mix(in srgb, var(--brand-600) 10%, transparent); }
+    /* tutorial / every method: a small segmented switch */
+    .md-typeset nav.task-tabs--sub { display: inline-flex; flex-wrap: nowrap; gap: 0; margin: 0 0 0.9rem 0; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 0.4rem; overflow: hidden; }
+    .md-typeset nav.task-tabs--sub a, .md-typeset nav.task-tabs--sub a:visited { font-size: 0.7rem; padding: 0.25rem 0.8rem; border: 0; border-radius: 0; margin: 0; }
+    .md-typeset nav.task-tabs--sub a + a { border-left: 1px solid var(--md-default-fg-color--lighter); }
+    .md-typeset nav.task-tabs--sub a.active, .md-typeset nav.task-tabs--sub a.active:visited { background: var(--brand-600); color: #fff !important; }
   </style>
 
     
