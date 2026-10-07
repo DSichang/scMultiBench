@@ -51,6 +51,25 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+    /* task tabs of a tutorial category, and the tutorial / every-method switch */
+    /* The labels are the article's task names. The strip wraps to more rows
+       when they do not fit one, and a label wider than the strip wraps
+       inside its tab, so the page never scrolls sideways. The right margin
+       keeps the tabs clear of the Colab badge (9.1rem wide). */
+    .md-typeset nav.task-tabs { display: flex; flex-wrap: wrap; gap: 0.2rem; margin: 0 9.6rem 0.5rem 0; border-bottom: 1px solid var(--md-default-fg-color--lightest); }
+    .md-typeset nav.task-tabs a { padding: 0.35rem 0.8rem; font-size: 0.75rem; font-weight: 500; color: var(--md-default-fg-color--light); border-bottom: 3px solid transparent; margin-bottom: -1px; text-decoration: none; }
+    /* phone width: on a task page the Colab badge sits above the strip
+       instead of beside it */
+    @media screen and (max-width: 44.984375em) {
+      .md-typeset a.colab-button--task { position: static; display: block; margin: 0 0 0.4rem; }
+      .md-typeset nav.task-tabs { margin-right: 0; }
+      .md-typeset nav.task-tabs a { padding: 0.35rem 0.55rem; }
+    }
+    .md-typeset nav.task-tabs a:hover { color: var(--md-accent-fg-color); }
+    .md-typeset nav.task-tabs a.active { color: var(--md-default-fg-color); font-weight: 700; border-bottom-color: var(--md-accent-fg-color); }
+    .md-typeset nav.task-tabs--sub { margin-right: 0; border-bottom: 0; margin-bottom: 0.8rem; }
+    .md-typeset nav.task-tabs--sub a { font-weight: 500; font-size: 0.7rem; padding: 0.2rem 0.7rem; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 1rem; margin-bottom: 0; }
+    .md-typeset nav.task-tabs--sub a.active { background: var(--md-default-fg-color); color: var(--md-default-bg-color); border-color: var(--md-default-fg-color); font-weight: 600; }
   </style>
 
     
@@ -277,8 +296,15 @@
   
     
     
+      
+  
+  
+  
+  
+    
+    
       <li class="md-tabs__item">
-        <a href="../vertical/" class="md-tabs__link">
+        <a href="../vertical_rna_adt/" class="md-tabs__link">
           
   
   
@@ -286,6 +312,9 @@
 
         </a>
       </li>
+    
+  
+
     
   
 
@@ -897,9 +926,25 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../vertical/" class="md-nav__link">
+    
+    
+    
+    
+      
+      
         
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -913,6 +958,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vertical_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -926,8 +1007,88 @@
   
   
     <li class="md-nav__item">
-      <a href="../diagonal/" class="md-nav__link">
+      <a href="../vertical_rna_atac/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vertical_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -941,6 +1102,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diagonal integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagonal_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, ATAC]
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -954,8 +1151,60 @@
   
   
     <li class="md-nav__item">
-      <a href="../mosaic/" class="md-nav__link">
+      <a href="../diagonal_multi/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [multiple RNA, multiple ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -969,6 +1218,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mosaic integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ADT, ADT]
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -982,8 +1267,116 @@
   
   
     <li class="md-nav__item">
-      <a href="../cross/" class="md-nav__link">
+      <a href="../mosaic_rna_atac/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ATAC, ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_shared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, with shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_unshared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, without shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -997,7 +1390,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cross integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1740,6 +2261,15 @@
               
               <article class="md-content__inner md-typeset">
                 
+  
+  
+  
+  
+  
+  
+  
+  
+  
   
   
   

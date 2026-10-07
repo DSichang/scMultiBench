@@ -49,6 +49,25 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+    /* task tabs of a tutorial category, and the tutorial / every-method switch */
+    /* The labels are the article's task names. The strip wraps to more rows
+       when they do not fit one, and a label wider than the strip wraps
+       inside its tab, so the page never scrolls sideways. The right margin
+       keeps the tabs clear of the Colab badge (9.1rem wide). */
+    .md-typeset nav.task-tabs { display: flex; flex-wrap: wrap; gap: 0.2rem; margin: 0 9.6rem 0.5rem 0; border-bottom: 1px solid var(--md-default-fg-color--lightest); }
+    .md-typeset nav.task-tabs a { padding: 0.35rem 0.8rem; font-size: 0.75rem; font-weight: 500; color: var(--md-default-fg-color--light); border-bottom: 3px solid transparent; margin-bottom: -1px; text-decoration: none; }
+    /* phone width: on a task page the Colab badge sits above the strip
+       instead of beside it */
+    @media screen and (max-width: 44.984375em) {
+      .md-typeset a.colab-button--task { position: static; display: block; margin: 0 0 0.4rem; }
+      .md-typeset nav.task-tabs { margin-right: 0; }
+      .md-typeset nav.task-tabs a { padding: 0.35rem 0.55rem; }
+    }
+    .md-typeset nav.task-tabs a:hover { color: var(--md-accent-fg-color); }
+    .md-typeset nav.task-tabs a.active { color: var(--md-default-fg-color); font-weight: 700; border-bottom-color: var(--md-accent-fg-color); }
+    .md-typeset nav.task-tabs--sub { margin-right: 0; border-bottom: 0; margin-bottom: 0.8rem; }
+    .md-typeset nav.task-tabs--sub a { font-weight: 500; font-size: 0.7rem; padding: 0.2rem 0.7rem; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 1rem; margin-bottom: 0; }
+    .md-typeset nav.task-tabs--sub a.active { background: var(--md-default-fg-color); color: var(--md-default-bg-color); border-color: var(--md-default-fg-color); font-weight: 600; }
   </style>
 
     
@@ -273,8 +292,15 @@
   
     
     
+      
+  
+  
+  
+  
+    
+    
       <li class="md-tabs__item">
-        <a href="../tutorials/vertical/" class="md-tabs__link">
+        <a href="../tutorials/vertical_rna_adt/" class="md-tabs__link">
           
   
   
@@ -282,6 +308,9 @@
 
         </a>
       </li>
+    
+  
+
     
   
 
@@ -765,9 +794,25 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../tutorials/vertical/" class="md-nav__link">
+    
+    
+    
+    
+      
+      
         
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -781,6 +826,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/vertical_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -794,8 +875,88 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/diagonal/" class="md-nav__link">
+      <a href="../tutorials/vertical_rna_atac/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/vertical_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -809,6 +970,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diagonal integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/diagonal_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, ATAC]
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -822,8 +1019,60 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/mosaic/" class="md-nav__link">
+      <a href="../tutorials/diagonal_multi/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [multiple RNA, multiple ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -837,6 +1086,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mosaic integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/mosaic_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ADT, ADT]
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -850,8 +1135,116 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/cross/" class="md-nav__link">
+      <a href="../tutorials/mosaic_rna_atac/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ATAC, ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/mosaic_shared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, with shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/mosaic_unshared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, without shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -865,7 +1258,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cross integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cross_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cross_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cross_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cross_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1480,6 +2001,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-034" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.4
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-033" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1686,6 +2218,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-034" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.4
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#new-in-033" class="md-nav__link">
@@ -1918,6 +2461,15 @@
   
   
   
+  
+  
+  
+  
+  
+  
+  
+  
+  
                   
 
 
@@ -1929,6 +2481,54 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-034">New in 0.3.4<a class="headerlink" href="#new-in-034" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>One tutorial per integration task, for the 13 tasks of the benchmark
+  article: three vertical, two diagonal, four mosaic and four cross. Each
+  tutorial runs two methods on one small dataset that every method of the
+  task runs on, and then on data in your own format. Each task also has an
+  "Every method" notebook.</li>
+<li>The methods have variants for the tasks that were missing: vertical
+  <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> for more methods, diagonal data in several
+  <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> batches, the mosaic patterns [<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>],
+  [<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>] and mixed without a shared modality, and cross
+  <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.
+  <code>mtb.method_info(m)["supports"]</code> lists the variants of a method. The
+  package runs every method that the article evaluates on a task, except
+  Conos on diagonal data in several batches.</li>
+<li>The package ships six scripts of the benchmark's own runs, for layouts the
+  public scMultiBench repository has no script for: Multigrate on the two
+  mixed mosaic patterns, and UINMF on <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> (vertical, cross and
+  the mixed mosaic pattern with a shared modality) and on three cross
+  batches. <code>run</code> copies them next to the public scripts before it starts.</li>
+<li>UINMF reads three cross batches of <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>. It keeps its
+  two-batch variants. On a folder with three batches, such as D52,
+  <code>inputs_for</code> and <code>labels_for</code> now give all three; <code>modalities=</code> selects
+  the two-batch variant.</li>
+<li>Matilda, scMDC and UnitedNet are listed as reading <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peaks, as the
+  benchmark ran them: <code>mtb.method_info(m)["atac"]</code> is <code>"peak"</code>. <code>scan</code> and
+  <code>run_all</code> no longer skip them on a peak matrix, and skip them on gene
+  activity instead. Every vertical, mosaic and cross method that reads <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
+  now reads peaks.</li>
+<li>Twelve small datasets for these tutorials: <code>mtb.data.fetchable()</code> lists
+  them. A tutorial's two methods run in minutes.</li>
+<li>A folder that holds the files of several variants of one method runs the
+  variant with the most modalities, when the others are part of it. A folder
+  with <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> runs the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> variant. <code>modalities=</code>
+  selects a smaller one.</li>
+<li>Diagonal data can come in several batches: <code>rna&lt;i&gt;.h5</code> with
+  <code>atac_gas&lt;i&gt;.h5</code> or <code>atac_peak&lt;i&gt;.h5</code>, and the labels in <code>rna_cty&lt;i&gt;.csv</code>
+  and <code>atac_cty&lt;i&gt;.csv</code>. <code>mtb.io.export_dataset</code> writes one batch per call
+  with <code>category="diagonal"</code> and <code>batch_index=</code>.</li>
+<li>A vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> folder can hold both <code>atac_peak.h5</code> and
+  <code>atac_gas.h5</code>. Each method then reads the form it takes.</li>
+<li>A method that needs a minimum number of cells or genes says so before it
+  runs.</li>
+<li>An environment installed during a session counts at once, without a
+  restart.</li>
+<li>The Seurat 5 environment is rebuilt with R 4.4 and is 0.8 GB, down from
+  2.3 GB.</li>
+</ul>
 <h2 id="new-in-033">New in 0.3.3<a class="headerlink" href="#new-in-033" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>Method environments download faster. The environments over 2 GiB now

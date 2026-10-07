@@ -51,6 +51,25 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+    /* task tabs of a tutorial category, and the tutorial / every-method switch */
+    /* The labels are the article's task names. The strip wraps to more rows
+       when they do not fit one, and a label wider than the strip wraps
+       inside its tab, so the page never scrolls sideways. The right margin
+       keeps the tabs clear of the Colab badge (9.1rem wide). */
+    .md-typeset nav.task-tabs { display: flex; flex-wrap: wrap; gap: 0.2rem; margin: 0 9.6rem 0.5rem 0; border-bottom: 1px solid var(--md-default-fg-color--lightest); }
+    .md-typeset nav.task-tabs a { padding: 0.35rem 0.8rem; font-size: 0.75rem; font-weight: 500; color: var(--md-default-fg-color--light); border-bottom: 3px solid transparent; margin-bottom: -1px; text-decoration: none; }
+    /* phone width: on a task page the Colab badge sits above the strip
+       instead of beside it */
+    @media screen and (max-width: 44.984375em) {
+      .md-typeset a.colab-button--task { position: static; display: block; margin: 0 0 0.4rem; }
+      .md-typeset nav.task-tabs { margin-right: 0; }
+      .md-typeset nav.task-tabs a { padding: 0.35rem 0.55rem; }
+    }
+    .md-typeset nav.task-tabs a:hover { color: var(--md-accent-fg-color); }
+    .md-typeset nav.task-tabs a.active { color: var(--md-default-fg-color); font-weight: 700; border-bottom-color: var(--md-accent-fg-color); }
+    .md-typeset nav.task-tabs--sub { margin-right: 0; border-bottom: 0; margin-bottom: 0.8rem; }
+    .md-typeset nav.task-tabs--sub a { font-weight: 500; font-size: 0.7rem; padding: 0.2rem 0.7rem; border: 1px solid var(--md-default-fg-color--lighter); border-radius: 1rem; margin-bottom: 0; }
+    .md-typeset nav.task-tabs--sub a.active { background: var(--md-default-fg-color); color: var(--md-default-bg-color); border-color: var(--md-default-fg-color); font-weight: 600; }
   </style>
 
     
@@ -275,8 +294,15 @@
   
     
     
+      
+  
+  
+  
+  
+    
+    
       <li class="md-tabs__item">
-        <a href="../../tutorials/vertical/" class="md-tabs__link">
+        <a href="../../tutorials/vertical_rna_adt/" class="md-tabs__link">
           
   
   
@@ -284,6 +310,9 @@
 
         </a>
       </li>
+    
+  
+
     
   
 
@@ -767,9 +796,25 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../tutorials/vertical/" class="md-nav__link">
+    
+    
+    
+    
+      
+      
         
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -783,6 +828,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/vertical_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -796,8 +877,88 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/diagonal/" class="md-nav__link">
+      <a href="../../tutorials/vertical_rna_atac/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/vertical_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -811,6 +972,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diagonal integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/diagonal_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, ATAC]
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -824,8 +1021,60 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/mosaic/" class="md-nav__link">
+      <a href="../../tutorials/diagonal_multi/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [multiple RNA, multiple ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -839,6 +1088,42 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mosaic integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/mosaic_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ADT, ADT]
+  
+
+    
+  </span>
+  
+  
+
       </a>
     </li>
   
@@ -852,8 +1137,116 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorials/cross/" class="md-nav__link">
+      <a href="../../tutorials/mosaic_rna_atac/" class="md-nav__link">
         
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ATAC, ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/mosaic_shared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, with shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/mosaic_unshared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, without shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -867,7 +1260,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cross integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/cross_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/cross_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/cross_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/cross_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1632,6 +2153,15 @@
   
   
   
+  
+  
+  
+  
+  
+  
+  
+  
+  
                   
 
 
@@ -1987,9 +2517,13 @@ match what the method reads (<code>method_info(m)['atac']</code>): SCALEX with
 <p>Without <code>modalities</code>, a category with one variant uses it. With several,
 the dataset folder decides: the variant whose input files are all present
 is used (Matilda on a <code>rna.h5 + adt.h5</code> folder is its rna+adt variant).
-When none or several qualify, <code>mtb.AmbiguousVariantError</code> (a
-<code>ValueError</code>) lists the modality sets and the folder contents and asks
-for <code>modalities=</code>.</p>
+When several qualify and their modality sets are nested, the one with the
+most modalities is used: a folder with <code>rna.h5</code>, <code>adt.h5</code> and
+<code>atac.h5</code> gives scMoMaT's rna+adt+atac variant, not its rna+adt one.
+Pass <code>modalities=</code> for a smaller one. When none qualifies, or several
+that are not nested, <code>mtb.AmbiguousVariantError</code> (a <code>ValueError</code>)
+lists the modality sets and the folder contents and asks for
+<code>modalities=</code>.</p>
 <p><strong>Modality tokens.</strong> <code>method_info(m)['supports']</code> lists each variant's
 tokens.</p>
 <ul>
@@ -2021,6 +2555,12 @@ activity, are accepted as older names, and so is <code>atac_peak&lt;i&gt;.h5</co
 the folder holds no <code>rna2.h5</code>. A folder with <code>rna1.h5</code> and
 <code>rna2.h5</code> is per batch: vertical and diagonal roles stay unresolved,
 and the error says to export without <code>batch=</code>.</p>
+<p>Diagonal data in several batches: a few diagonal methods (see
+<code>method_info(m)['supports']</code>) read <code>rna&lt;i&gt;.h5</code> with <code>atac_gas&lt;i&gt;.h5</code>
+or <code>atac_peak&lt;i&gt;.h5</code>, labelled by <code>rna_cty&lt;i&gt;.csv</code> and
+<code>atac_cty&lt;i&gt;.csv</code>. On a folder that holds every file of such a variant
+the other diagonal methods find no <code>rna.h5</code>, and no error suggests
+another export.</p>
 <p>A <code>data_dir</code> role (scBridge) resolves to the first of
 <code>&lt;dataset&gt;/processed/</code> and the dataset folder that holds a <code>.h5ad</code>
 file; when neither does, to <code>processed/</code> if that folder exists, else to
@@ -2048,8 +2588,8 @@ reports per row as <code>files_ok</code> / <code>files_reason</code>:</p>
 <li>label length: <code>ValueError</code> when a label CSV has a different number of
   rows than the modality file it labels, including the numbered
   <code>cty&lt;i&gt;.csv</code> of a cross/mosaic batch and the diagonal <code>rna_cty.csv</code>
-  / <code>atac_cty.csv</code> (read by every evaluation, even when the method
-  does not take them);</li>
+  / <code>atac_cty.csv</code>, or <code>rna_cty&lt;i&gt;.csv</code> / <code>atac_cty&lt;i&gt;.csv</code> (read
+  by every evaluation, even when the method does not take them);</li>
 <li><code>data_dir</code> content: <code>FileNotFoundError</code> when a file scBridge names
   inside <code>data_dir</code> (<code>rna.h5</code>, <code>atac_gas.h5</code>, the two label CSVs) is
   absent;</li>
@@ -2059,7 +2599,8 @@ reports per row as <code>files_ok</code> / <code>files_reason</code>:</p>
 <li><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cell order (diagonal): <code>ValueError</code> when the <code>atac_gas.h5</code> a
   method reads holds other cells than <code>atac_peak.h5</code>, or lists them in
   another order. <code>atac_cty.csv</code> follows <code>atac_peak.h5</code>. Barcodes that
-  differ only in a <code>-1</code> / <code>-2</code> suffix count as the same cell.</li>
+  differ only in a <code>-1</code> / <code>-2</code> suffix count as the same cell. The
+  same holds per batch for <code>atac_gas&lt;i&gt;.h5</code> and <code>atac_peak&lt;i&gt;.h5</code>.</li>
 </ul>
 <p><strong>Dataset name case.</strong> A spelling that differs from the folder only in
 case (<code>'d52'</code> for <code>D52</code> on a case-insensitive filesystem) is replaced
@@ -2386,8 +2927,9 @@ the flat dataset folder, under dataset-specific names (<code>cty.csv</code>,
 tool-specific <code>*_scjoint*</code> reformats.</p>
 <p>One exception: with <code>category</code> and <code>method</code>, a variant that reads
 fewer numbered batches than the folder holds gets only the label files
-of its batches. UINMF's cross variant reads batches 1 and 2, so on
-<code>D52</code> the dict holds <code>cty1</code> and <code>cty2</code>.</p>
+of its batches. UINMF's two-batch cross variant, chosen with
+<code>modalities=["rna1", "rna2", "adt1", "adt2"]</code>, reads batches 1 and 2,
+so on <code>D52</code> the dict holds <code>cty1</code> and <code>cty2</code>.</p>
 <p>An older paired folder may hold <code>rna_cty.csv</code> instead of <code>cty.csv</code>.
 With <code>category</code> and <code>method</code>, a variant that reads <code>cty</code> gets that
 file under the key <code>cty</code>, as <code>mtb.inputs_for</code> returns it.</p>
@@ -2399,22 +2941,29 @@ not alphabetical:</p>
    order);</li>
 <li>modality-named files in the canonical modality order <strong>rna, adt, atac</strong>
    (<code>peak_cty</code> counts as atac) - the diagonal methods other than uniPort
-   and Seurat_v5 emit the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells first, then the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells;</li>
+   and Seurat_v5 emit the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells first, then the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells. Diagonal
+   data in several batches follows the same rule, by number within a
+   modality: <code>rna_cty1, rna_cty2, rna_cty3, atac_cty1, atac_cty2,
+   atac_cty3</code>;</li>
 <li>any other <code>*cty*</code> file, alphabetically, last.</li>
 </ol>
 <p><strong>Per-method order.</strong> With <code>category</code> and <code>method</code>, each file goes
 where the cells it labels sit in that variant's output: the order of its
 inputs, unless the method's cell order differs. uniPort and Seurat_v5
 put their <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells before their <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells.</p>
-<p>StabMap uses a fixed reference batch: batch 3 in cross, batch 1 in
-mosaic (<code>method_info('StabMap')['supports'][i]['reference_batch']</code>).
+<p>StabMap uses a fixed reference batch for each layout: in cross the last
+batch (batch 3 of three, batch 2 of two), in mosaic batch 1 or batch 2
+(<code>method_info('StabMap')['supports'][i]['reference_batch']</code>).
 Its cell order starts with that batch (<code>cty3, cty1, cty2</code> on <code>D52</code>).
 Number the donor you want as reference accordingly.</p>
 <p>The variant is chosen as <code>mtb.inputs_for</code> does: by <code>modalities=</code>, else
-the category's only variant or the one whose files the folder holds. If
-the choice stays ambiguous, or no label file pairs with the variant's
-roles, the default order is used; <code>labels_for</code> does not raise
-<code>mtb.AmbiguousVariantError</code>.</p>
+the category's only variant or the one whose files the folder holds (of
+nested ones, the one with the most modalities). If the choice stays
+ambiguous, as in a folder that holds label files and no data files, the
+order is the one that every variant reading the folder's batches gives
+(StabMap's reference batch first), and the default order when they
+differ. When no label file pairs with the variant's roles, the default
+order is used. <code>labels_for</code> does not raise <code>mtb.AmbiguousVariantError</code>.</p>
 <p><strong>Passing it to evaluate.</strong> The dict is a <code>dict</code> subclass that remembers
 its order, so <code>mtb.evaluate(labels=...)</code> takes it as is. A copy
 (<code>dict(d)</code>) or a dict whose keys were reordered goes in as is only in
@@ -2430,6 +2979,14 @@ Vertical and diagonal methods read one <code>rna.h5</code> and one label file.
 With such a <code>category</code>, <code>check=None</code> warns and <code>check=True</code> raises.
 Export without <code>batch=</code> and pass the batch column to
 <code>mtb.run_all(batch=...)</code> or <code>mtb.evaluate(batch=...)</code>.</p>
+<p><strong>Diagonal data in several batches.</strong> A folder with <code>rna&lt;i&gt;.h5</code>,
+<code>atac_gas&lt;i&gt;.h5</code> or <code>atac_peak&lt;i&gt;.h5</code>, <code>rna_cty&lt;i&gt;.csv</code> and
+<code>atac_cty&lt;i&gt;.csv</code> is what a few diagonal methods read
+(<code>method_info(m)['supports']</code>), so it raises no per-batch warning. Each
+label file is one batch for the batch metrics, as for every list of
+label files: three <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and three <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files give six batches. Pass
+<code>batch=</code> to <code>mtb.evaluate</code> or <code>mtb.run_all</code> for another grouping,
+such as <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> against <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
 <p><strong>Paths and names.</strong> Paths are absolute. A dataset spelling that differs
 from the folder only in case (<code>'d52'</code> for <code>D52</code>) is replaced by the
 on-disk spelling, with a <code>UserWarning</code>. The positional order is
