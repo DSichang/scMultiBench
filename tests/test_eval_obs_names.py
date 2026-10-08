@@ -196,3 +196,8 @@ def test_docstring_states_the_rule():
     doc = " ".join(mtb.evaluate.__doc__.split())
     assert ("the name of an ``.obs`` column, with or without the ``obs:`` prefix "
             "(``\"celltype\"`` or ``\"obs:celltype\"``)") in doc
+    # the one rule for column names, as the other entry points word it
+    assert ("``\"obs:<column>\"`` and ``\"<column>\"`` name a column of the object you "
+            "pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and "
+            "``rescore`` are given a folder, not the object, so they take the column "
+            "itself, for example ``batch=adata.obs[\"donor\"]``.") in doc

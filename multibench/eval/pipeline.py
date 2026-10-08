@@ -893,6 +893,11 @@ def evaluate(
       column, with or without the ``obs:`` prefix (``"celltype"`` or
       ``"obs:celltype"``).
 
+    ``"obs:<column>"`` and ``"<column>"`` name a column of the object you
+    pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and
+    ``rescore`` are given a folder, not the object, so they take the column
+    itself, for example ``batch=adata.obs["donor"]``.
+
     A multi-column CSV / DataFrame raises: pass the one column
     (``df["celltype"]``) itself. ``batch`` and ``clustering`` take the same
     forms except a multi-entry dict; for ``clustering``, a path that is not
