@@ -114,6 +114,13 @@ def _read_table(src, sep):
     return pd.read_csv(src, sep=sep)
 
 
+def _read_text(src, sep):
+    """The same table as the text the file holds: nothing is read as missing
+    and no number is parsed. Messages name the word that
+    :func:`_read_table` read as missing with it; no value is taken from it."""
+    return pd.read_csv(src, sep=sep, dtype=str, na_filter=False)
+
+
 def _null_and_text(values):
     """``(null, text)`` of per-cell values: where pandas already holds a
     missing value (NaN, ``None``, ``pd.NA``), and every value as text
@@ -210,6 +217,30 @@ def _missing_rename(values) -> str:
             f"one of them is the name of a cell type, rename it.")
 
 
+def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
+    """A column of the frame ``d`` that :func:`_read_table` read from
+    ``path``, with each value it read as missing replaced by the word the
+    file holds there (``'NA'``, ``'None'``, ...).
+
+    An empty field stays NaN: it is how a CSV writes a missing value. The
+    result is for the sentences that say how a missing value is written
+    (:func:`_missing_seen`, :func:`_missing_rename`); no score is computed
+    from it.
+    """
+    vals, null = col.to_numpy(), col.isna().to_numpy()
+    if not null.any():
+        return vals
+    text = _read_text(path, _sep_for(path))
+    if text.shape != d.shape:
+        # not the same rows and columns: no word can be told from another
+        return vals
+    text = text.iloc[:, d.columns.get_loc(col.name)].str.strip()
+    named = null & text.isin(missing_words(text[null])).to_numpy()
+    out = vals.astype(object)
+    out[named] = text[named].to_numpy()
+    return out
+
+
 def _names_no_file(x) -> bool:
     """A string that is not a file and does not look like one: not an
     existing file, no label-file suffix, no path separator. ``"donor"`` and
@@ -219,7 +250,8 @@ def _names_no_file(x) -> bool:
             and "/" not in x and os.sep not in x)
 
 
-def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
+def read_labels(path: Path | str, column: str | None = None, *,
+                as_written: bool = False) -> np.ndarray:
     """Read a cell-type (or batch) label vector from a CSV/TSV with a header row.
 
     The benchmark's label files (``cty.csv``, ``rna_cty.csv``, ``cty1.csv`` ...)
@@ -249,6 +281,10 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
         CSV (``,``) or TSV (``.tsv`` -> ``\\t``) file with a header row.
     column : str, optional
         Name of the column holding the labels.
+    as_written : bool
+        ``True`` returns each value read as missing as the word the file
+        holds there (``'NA'``, not NaN), for a message that names it
+        (:func:`read_labels_ids`).
 
     Returns
     -------
@@ -262,11 +298,11 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     Callers that know the cells' ids align the file by it
     (:func:`read_labels_ids`, :func:`by_id_column`).
     """
-    return read_labels_ids(path, column)[0]
+    return read_labels_ids(path, column, as_written=as_written)[0]
 
 
 def read_labels_ids(path: Path | str, column: str | None = None, *,
-                    what: str | None = None, pick=None):
+                    what: str | None = None, pick=None, as_written: bool = False):
     """:func:`read_labels`, plus the first column it left out.
 
     Returns ``(values, first)``. ``first`` is the file's first column (a
@@ -279,6 +315,12 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     function of the Python expression that reads one column of the file as
     a Series (:func:`_series_example`), for callers that have no ``column``
     argument (default: pass ``column=``).
+
+    ``as_written`` is for a message that says how the missing values are
+    written. The reader reads ``NA``, ``None``, ``null`` and the like as
+    NaN; with ``as_written=True`` such a value comes back as the word the
+    file holds there, and an empty field stays NaN. Nothing is scored from
+    these values.
     """
     from .. import config
     path = _require_file(path, config.hint(f"{what} file", f"--{what} file")
@@ -287,6 +329,10 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     head = (config.hint(f"The {what} file {path.name}", f"The --{what} file {path.name}")
             if what else str(path))
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
+
+    def values(col):
+        return _as_written(col, d, path) if as_written else col.to_numpy()
+
     if column is not None:
         if column not in d.columns:
             kind, names = _data_columns(d)
@@ -295,16 +341,16 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
                     f"Its columns{after} are {', '.join(names)}.")
             raise ValueError(f"{head} has no column named {column!r}. {have}")
         other = first is not None and str(d.columns[0]) != str(column)
-        return d[column].to_numpy(), (first if other else None)
+        return values(d[column]), (first if other else None)
     if "x" in d.columns:
         extra = first is not None and str(d.columns[0]) != "x"
-        return d["x"].to_numpy(), (first if extra else None)
+        return values(d["x"]), (first if extra else None)
     if d.shape[1] == 1:
-        return d.iloc[:, 0].to_numpy(), None
+        return values(d.iloc[:, 0]), None
     no_header = _no_header(d.columns[0])
     if d.shape[1] == 2 and first.is_unique:
         # index/barcode column + one label column: the obs-style export
-        return d.iloc[:, -1].to_numpy(), first
+        return values(d.iloc[:, -1]), first
     # barcodes with a repeat, not a sample or batch column: an index written
     # without a header (pandas' and R's to_csv), or text that is 90% distinct
     index_like = no_header or (len(first) >= 10 and first.nunique() >= 0.9 * len(first))
@@ -316,7 +362,7 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     if d.shape[1] == 2 and no_header and _stacked_row_numbers(first):
         # the RangeIndex of each frame of pd.concat([...]).to_csv(path),
         # 0..k-1 again and again: the rows are in file order
-        return d.iloc[:, -1].to_numpy(), first
+        return values(d.iloc[:, -1]), first
     if d.shape[1] == 2 and no_header and pd.api.types.is_integer_dtype(first):
         # the same, with the rows reordered after the concat
         raise ValueError(f"{head} has row numbers that repeat out of order, so its rows "
@@ -515,7 +561,8 @@ def _is_anndata(x) -> bool:
     return hasattr(x, "obsm") and hasattr(x, "obs") and hasattr(x, "n_obs")
 
 
-def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarray:
+def as_vector(x, *, what: str = "labels", column: str | None = None,
+              as_written: bool = False) -> np.ndarray:
     """Coerce a label-like input to a 1-D numpy array of length n_cells.
 
     Accepted forms:
@@ -542,6 +589,10 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
         Name used in error messages (``'labels'``, ``'batch'``, ``'clustering'``).
     column : str, optional
         Column to take when ``x`` is a file path or a multi-column DataFrame.
+    as_written : bool
+        ``True`` reads files as :func:`read_labels_ids` does with
+        ``as_written=True``, for a message that names the missing words;
+        values that are not read from a file are not changed.
 
     Returns
     -------
@@ -549,13 +600,15 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
         1-D array. Values are returned as-is (not re-coded).
     """
     if isinstance(x, (str, Path)):
-        return np.asarray(read_labels(x, column=column))
+        return np.asarray(read_labels(x, column=column, as_written=as_written))
     if isinstance(x, dict):
         if len(x) == 1:
-            return np.asarray(read_labels(next(iter(x.values())), column=column))
+            return np.asarray(read_labels(next(iter(x.values())), column=column,
+                                          as_written=as_written))
         raise ValueError(_multi_dict_message(what, x, label_order_hint=(what == "labels")))
     if isinstance(x, (list, tuple)) and len(x) > 0 and all(_is_label_file(e) for e in x):
-        return np.concatenate([np.asarray(read_labels(p, column=column)) for p in x])
+        return np.concatenate([np.asarray(read_labels(p, column=column,
+                                                      as_written=as_written)) for p in x])
     if isinstance(x, pd.DataFrame):
         if column is not None:
             if column not in x.columns:

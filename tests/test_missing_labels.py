@@ -38,6 +38,7 @@ ASW_034 = 0.7814517904520452
 ASW_034_LABELLED = 0.7814125597558947
 
 NAN = "The missing value is written NaN."
+SEEN_NA = "The missing value is written 'NA'."
 RENAME_NA = (" A label file reads 'NA' as a missing value. If it is the name of a cell "
              "type, rename it.")
 
@@ -276,7 +277,8 @@ def test_seen_sentence_and_rename_sentence():
 # ============================================================ "error"
 def _label_forms(tmp_path):
     """``{form: (output, labels, src)}``: 30 of 300 labels missing, each way
-    of passing labels."""
+    of passing labels. A file that writes the missing labels as a word adds
+    the two sentences that name it, ``(..., seen, rename)``."""
     emb, lab = _cells()
     nan, ids = _gaps(lab), [f"cell{i}" for i in range(N)]
     one = tmp_path / "cty.csv"                      # as export writes it
@@ -287,6 +289,21 @@ def _label_forms(tmp_path):
     for path, part in zip(halves, (nan[:150], nan[150:])):
         pd.DataFrame({"x": part}).to_csv(path, index=False)
     a = _adata(emb, celltype=nan, ct_cat=pd.Categorical(nan))
+    # files whose missing labels are a word, or an empty field
+    none = tmp_path / "none" / "cty.csv"
+    none.parent.mkdir()
+    pd.DataFrame({"x": _gaps(lab, "None")}).to_csv(none, index=False)
+    empty = tmp_path / "empty.csv"
+    empty.write_text("barcode,celltype\n" + "".join(
+        f"{i},{v}\n" for i, v in zip(ids, _gaps(lab, ""))))
+    null = tmp_path / "null.tsv"                    # ids in another order than the cells
+    pd.DataFrame({"celltype": _gaps(lab, "null")}, index=ids).sample(
+        frac=1.0, random_state=5).to_csv(null, sep="\t")
+    words = [tmp_path / "w" / "cty1.csv", tmp_path / "w" / "cty2.csv"]
+    words[0].parent.mkdir()
+    for path, part in zip(words, (_gaps(lab, "NA")[:150], _gaps(lab, "N/A")[150:])):
+        pd.DataFrame({"x": part}).to_csv(path, index=False)
+    na = (SEEN_NA, RENAME_NA)
     return {
         "array": (emb, nan, ""),
         "list": (emb, list(nan), ""),
@@ -296,25 +313,112 @@ def _label_forms(tmp_path):
         "string dtype": (emb, pd.Series(_gaps(lab, pd.NA), dtype="string"), ""),
         "obs column": (a, "celltype", ""),
         "obs category column": (a, "ct_cat", ""),
-        "one-column file": (emb, str(one), " (cty.csv)"),
-        "Path": (emb, one, " (cty.csv)"),
+        "one-column file": (emb, str(one), " (cty.csv)", *na),
+        "Path": (emb, one, " (cty.csv)", *na),
         "id,label file": (a, str(two), " (obs.csv)"),
         "file list": (emb, [str(p) for p in halves], " (cty1.csv, cty2.csv)"),
         "labels_for dict": (emb, {"cty1": str(halves[0]), "cty2": str(halves[1])},
                             " (cty1.csv, cty2.csv)"),
+        "file of None": (emb, str(none), " (cty.csv)",
+                         "The missing value is written 'None'.",
+                         RENAME_NA.replace("'NA'", "'None'")),
+        "file with an empty field": (a, str(empty), " (empty.csv)"),
+        "id,label file of null": (a, null, " (null.tsv)",
+                                  "The missing value is written 'null'.",
+                                  RENAME_NA.replace("'NA'", "'null'")),
+        "file list of words": (
+            emb, [str(p) for p in words], " (cty1.csv, cty2.csv)",
+            "The missing values are written 'N/A' and 'NA'.",
+            " A label file reads 'N/A' and 'NA' as missing values. If one of them is "
+            "the name of a cell type, rename it."),
     }
 
 
 @pytest.mark.parametrize("form", [
     "array", "list", "Series", "Series by id", "Categorical", "string dtype",
     "obs column", "obs category column", "one-column file", "Path", "id,label file",
-    "file list", "labels_for dict"])
+    "file list", "labels_for dict", "file of None", "file with an empty field",
+    "id,label file of null", "file list of words"])
 def test_evaluate_raises_on_missing_labels(form, tmp_path):
-    output, labels, src = _label_forms(tmp_path)[form]
+    output, labels, src, *said = _label_forms(tmp_path)[form]
+    # NaN, and an empty field of a file, are no word: nothing to rename
+    seen, rename = said or (NAN, "")
     for kw in ({}, {"missing_labels": "error"}):
         with pytest.raises(ValueError) as e:
             mtb.evaluate(output, labels=labels, metrics=["ASW"], **kw)
-        assert str(e.value) == _e1(src), form
+        assert str(e.value) == _e1(src, seen, rename), form
+
+
+def test_a_label_file_names_the_word_it_holds_whole_message(tmp_path):
+    """A cell type called None in a CSV: the reader reads NaN, and the message
+    names the word in the file, with the sentence that says to rename it."""
+    emb, lab = _cells()
+    path = tmp_path / "cty.csv"
+    path.write_text("x\n" + "".join(f"{v}\n" for v in np.where(lab == "C", "None", lab)))
+    assert pd.isna(eio.read_labels(path)).sum() == 100
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
+    assert str(e.value) == (
+        "labels (cty.csv): 100 of the 300 cells have no label. The missing value is "
+        "written 'None'. A missing label is not a cell type, so evaluate does not score "
+        'it. Give every cell a label, or pass missing_labels="drop" to score the 200 '
+        "labelled cells only. A label file reads 'None' as a missing value. If it is "
+        "the name of a cell type, rename it.")
+
+
+def test_a_label_file_is_read_as_written_for_the_message_only(tmp_path):
+    emb, lab = _cells()
+    ids = [f"cell{i}" for i in range(N)]
+    mixed = _gaps(lab, "NA")
+    mixed[0], mixed[1], mixed[2], mixed[3] = "None", "", " ", "NA "
+    path = tmp_path / "obs.csv"
+    path.write_text("barcode,celltype\n" + "".join(
+        f'{i},"{v}"\n' for i, v in zip(ids, mixed)))            # a quoted "NA" is NA too
+    plain, first = eio.read_labels_ids(path)
+    shown, first_shown = eio.read_labels_ids(path, as_written=True)
+    assert first.equals(first_shown)
+    # the reader's values did not move: NaN for the words and the empty field
+    assert pd.isna(plain).sum() == 32 and set(plain[~pd.isna(plain)]) == {
+        "A", "B", "C", " ", "NA "}
+    # as written, the words are back and the empty field is still NaN
+    assert shown[0] == "None" and pd.isna(shown[1]) and shown[2] == " " and shown[3] == "NA "
+    assert set(shown[GAPS]) == {"NA"}
+    keep = ~pd.isna(plain)
+    assert (shown[keep] == plain[keep]).all()
+    assert (eio.missing_mask(shown) == eio.missing_mask(plain)).all()
+    assert eio.read_labels(path, as_written=True).tolist() == shown.tolist()
+    assert eio.as_vector([path, path], as_written=True).tolist() == shown.tolist() * 2
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(_adata(emb), labels=str(path), metrics=["ASW"])
+    assert str(e.value) == _e1(
+        " (obs.csv)", n=34, seen="The missing values are written NaN, '', 'NA' and 'None'.",
+        rename=(" A label file reads 'NA' and 'None' as missing values. If one of them "
+                "is the name of a cell type, rename it."))
+    # numbers stay numbers where nothing is missing, and a cluster number
+    # next to NA is named as the file writes it
+    numbers = tmp_path / "clusters.csv"
+    numbers.write_text("x\n" + "".join(f"{v}\n" for v in np.tile([1, 2, 3], 100)))
+    assert eio.read_labels(numbers, as_written=True).dtype == np.int64
+    numbers.write_text("x\n" + "".join(f"{v}\n" for v in _gaps(np.tile([1, 2, 3], 100), "NA")))
+    assert eio.read_labels(numbers).dtype == np.float64
+    assert eio._missing_seen(eio.read_labels(numbers, as_written=True)) == SEEN_NA
+
+
+def test_a_file_read_twice_for_the_message_warns_once(tmp_path):
+    """The second read, which names the words, repeats no warning of the first."""
+    emb, lab = _cells()
+    path = tmp_path / "obs.csv"
+    pd.DataFrame({"celltype": _gaps(lab, "NA")},
+                 index=[f"cell{i}" for i in range(N)]).to_csv(path)
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
+    assert str(e.value) == _e1(" (obs.csv)", SEEN_NA, RENAME_NA)
+    assert [str(w.message) for w in rec] == [
+        "The first column of obs.csv looks like cell ids, but the output has no cell "
+        "ids. The file is matched by position. Check that its rows follow the rows of "
+        "the output."]
 
 
 def test_evaluate_raises_on_missing_labels_whole_message():
@@ -432,6 +536,12 @@ def test_evaluate_raises_when_every_label_is_missing(missing_labels, tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), **kw)
     assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label, so "
+                            "there is nothing to score. The missing value is written 'NA'."
+                            + RENAME_NA)
+    path.write_text("x\n" + '""\n' * N)                         # 300 empty fields
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=str(path), **kw)
+    assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label, so "
                             "there is nothing to score. The missing value is written NaN.")
 
 
@@ -464,6 +574,47 @@ def test_the_command_line_names_its_flags(tmp_path, monkeypatch):
         "it. Give every cell a label, or pass --missing-labels drop to score the 270 "
         "labelled cells only.")
     assert "missing_labels=" not in str(e.value)
+    # no cell with a label: the same flag starts the message
+    pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
+    assert str(e.value) == (
+        "--labels (cty.csv): none of the 300 cells has a label, so there is nothing to "
+        "score. The missing value is written 'NA'." + RENAME_NA)
+
+
+def test_the_command_line_names_the_dataset_whose_label_files_it_read(tmp_path, monkeypatch):
+    """``multibench evaluate --dataset`` reads the label files of the dataset:
+    the message names them, not a --labels that was never typed."""
+    emb, lab = _cells()
+    path = tmp_path / "cty.csv"
+    pd.DataFrame({"x": _gaps(lab, "NA")}).to_csv(path, index=False)
+    monkeypatch.setattr(config, "_CLI", True)
+    token = pipeline._CLI_LABELS_FROM.set("D11")
+    try:
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
+        assert str(e.value) == (
+            "the label files of D11 (cty.csv): 30 of the 300 cells have no label. The "
+            "missing value is written 'NA'. A missing label is not a cell type, so "
+            "evaluate does not score it. Give every cell a label, or pass "
+            "--missing-labels drop to score the 270 labelled cells only." + RENAME_NA)
+        pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
+        assert str(e.value) == (
+            "the label files of D11 (cty.csv): none of the 300 cells has a label, so "
+            "there is nothing to score. The missing value is written 'NA'." + RENAME_NA)
+    finally:
+        pipeline._CLI_LABELS_FROM.reset(token)
+    # in Python the dataset of an earlier command-line call starts nothing
+    monkeypatch.setattr(config, "_CLI", False)
+    token = pipeline._CLI_LABELS_FROM.set("D11")
+    try:
+        with pytest.raises(ValueError, match=r"^labels \(cty\.csv\): none of the 300 "):
+            mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
+    finally:
+        pipeline._CLI_LABELS_FROM.reset(token)
 
 
 # ============================================================ "drop"
@@ -622,7 +773,7 @@ def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
     # without the flag, the same files stop the call
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[str(p) for p in files])
-    assert str(e.value) == _e1(" (cty1.csv, cty2.csv)", n=150)
+    assert str(e.value) == _e1(" (cty1.csv, cty2.csv)", SEEN_NA, RENAME_NA, n=150)
 
 
 # ============================================================ the reference

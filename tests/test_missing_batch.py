@@ -18,6 +18,7 @@ import pytest
 import multibench as mtb
 from multibench import config
 from multibench.eval import io as eio
+from multibench.eval import pipeline
 from tests.test_missing_labels import (GAPS, KEEP, N, _adata, _cells, _donors, _drop,
                                        _gaps, _same, _silent)
 
@@ -51,11 +52,13 @@ def test_evaluate_raises_on_a_missing_batch(fill, seen, tmp_path):
     a = _adata(emb, celltype=lab, donor=bat)
     path = tmp_path / "batch.csv"
     pd.DataFrame({"x": bat}).to_csv(path, index=False)
-    # a file holds no NaN, None or 'nan': the reader gives NaN for each of them
+    # a file holds NaN, None and '' as an empty field, which the reader gives
+    # as NaN; a word that it reads as NaN is named as the file writes it
+    in_file = seen if isinstance(fill, str) and fill else NAN
     forms = {"array": (emb, bat, "", seen), "list": (emb, list(bat), "", seen),
              "Series": (emb, pd.Series(bat), "", seen),
              "obs column": (a, "donor", "", seen), "obs: column": (a, "obs:donor", "", seen),
-             "file": (emb, str(path), " (batch.csv)", NAN)}
+             "file": (emb, str(path), " (batch.csv)", in_file)}
     for form, (output, batch, src, said) in forms.items():
         for kw in ({}, {"missing_labels": "drop"}):
             with pytest.raises(ValueError) as e:
@@ -88,6 +91,56 @@ def test_the_command_line_names_its_flag(tmp_path, monkeypatch):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=lab, batch=str(path), metrics=["ASW_batch"])
     assert str(e.value) == "--" + _bv1(" (donors.csv)")
+
+
+def test_a_batch_file_names_the_word_it_holds(tmp_path):
+    """Donors written NA or None in a file: the reader reads NaN, and the
+    message names the word, whichever way the file is matched to the cells."""
+    emb, lab = _cells()
+    ids = [f"cell{i}" for i in range(N)]
+    sheet = tmp_path / "sheet.csv"                 # ids in another order than the cells
+    pd.DataFrame({"donor": _gaps(_donors(), "None")}, index=ids).sample(
+        frac=1.0, random_state=2).to_csv(sheet)
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(_adata(emb), labels=lab, batch=sheet, metrics=["ASW_batch"])
+    assert str(e.value) == _bv1(" (sheet.csv)", "The missing value is written 'None'.")
+    halves = [tmp_path / "b1.csv", tmp_path / "b2.csv"]
+    for path, part in zip(halves, (_gaps(_donors(), "NA")[:150], _gaps(_donors())[150:])):
+        pd.DataFrame({"x": part}).to_csv(path, index=False)
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=lab, batch=[str(p) for p in halves], metrics=["ASW_batch"])
+    assert str(e.value) == _bv1(" (b1.csv, b2.csv)",
+                                "The missing values are written NaN and 'NA'.")
+    # a dict of one file, the last of the forms that name a file
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb[:150], labels=lab[:150], batch={"batch": halves[0]},
+                     metrics=["ASW_batch"])
+    assert str(e.value) == (
+        "batch (b1.csv): 15 of the 150 cells have no batch. The missing value is "
+        "written 'NA'. A missing batch is not a batch, so the batch metrics are not "
+        "computed on it. Give every cell a batch, or leave these cells out.")
+
+
+def test_the_copy_of_a_batch_column_keeps_the_words_of_the_sheet(tmp_path, monkeypatch):
+    """``--batch-column`` hands evaluate a copy of the sheet with one column.
+    The copy reads as the column does, and the message names the sheet's word."""
+    import contextlib
+    emb, lab = _cells()
+    donors = _gaps(_donors(), "None")
+    sheet = tmp_path / "sheet.csv"
+    pd.DataFrame({"barcode": [f"cell{i}" for i in range(N)], "run": np.arange(N) % 7,
+                  "sample": donors}).to_csv(sheet, index=False)
+    monkeypatch.setattr(config, "_CLI", True)
+    with contextlib.ExitStack() as stack:
+        copy = pipeline._one_column_file(sheet, "sample", stack)
+        assert pd.read_csv(copy, keep_default_na=False)["x"].tolist() == donors.tolist()
+        want, _ = eio.read_labels_ids(sheet, "sample")
+        got, first = eio.read_labels_ids(copy)
+        assert pd.Series(got).equals(pd.Series(want)) and pd.isna(got).sum() == 30
+        assert first.tolist() == [f"cell{i}" for i in range(N)]
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(_adata(emb), labels=lab, batch=copy, metrics=["ASW_batch"])
+    assert str(e.value) == "--" + _bv1(" (sheet.csv)", "The missing value is written 'None'.")
 
 
 def test_a_complete_batch_changes_nothing(tmp_path):
@@ -141,6 +194,26 @@ def test_drop_checks_the_batch_of_the_cells_it_keeps():
     assert str(e.value) == _bv1(n=4, total=270)
     # nothing was scored, so nothing says "Scored"
     assert [str(w.message) for w in rec] == []
+
+
+def test_drop_names_the_words_of_the_cells_it_keeps(tmp_path):
+    """A batch file that writes NA where the label is missing and None for
+    four labelled cells: only the word of the cells that are scored is named."""
+    emb, lab = _cells()
+    bat = _gaps(_donors(), "NA")
+    path = tmp_path / "batch.csv"
+    pd.DataFrame({"x": bat}).to_csv(path, index=False)
+    kw = dict(labels=_gaps(lab), batch=str(path), metrics=["ASW", "ASW_batch"])
+    got, said = _drop(emb, **kw)
+    assert len(said) == 1
+    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], batch=_donors()[KEEP],
+                            metrics=["ASW", "ASW_batch"]))
+    bat[np.flatnonzero(KEEP)[:4]] = "None"
+    pd.DataFrame({"x": bat}).to_csv(path, index=False)
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, missing_labels="drop", **kw)
+    assert str(e.value) == _bv1(" (batch.csv)", "The missing value is written 'None'.",
+                                n=4, total=270)
 
 
 def test_the_file_of_origin_is_not_checked(tmp_path, monkeypatch):

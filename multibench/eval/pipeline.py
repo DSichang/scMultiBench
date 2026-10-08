@@ -333,7 +333,7 @@ def _no_column_error(what: str, x: str) -> str:
             f"output with obsm=.")
 
 
-def _obs_or_vector(x, adata, *, what, column=None, ids=None):
+def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False):
     """Coerce one label-like argument to a 1-D array in the output's cell order.
 
     * a ``str`` naming an obs column of ``adata``, with or without the
@@ -349,6 +349,9 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
 
     A column name given with an output that has no obs raises
     ``FileNotFoundError`` saying so, in place of the error of a missing file.
+
+    ``as_written`` reads a file for a message that names its missing words
+    (:func:`multibench.eval.io.read_labels_ids`); the cell order is the same.
     """
     if adata is not None and isinstance(x, str):
         col = _obs_column_name(x, adata)
@@ -362,7 +365,8 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
     if _column_without_obs(x, adata):
         raise FileNotFoundError(_no_column_error(what, x))
     if isinstance(x, (str, Path)) and column is None:
-        vals, first = io.read_labels_ids(x, what=what, pick=_pick(what))
+        vals, first = io.read_labels_ids(x, what=what, pick=_pick(what),
+                                         as_written=as_written)
         unique = ids is not None and pd.Index(ids).is_unique
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=Path(x).name,
@@ -377,7 +381,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
             f"or pass an AnnData whose obs_names are the barcodes.",
             # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
             UserWarning, stacklevel=4)
-    return io.as_vector(x, what=what, column=column)
+    return io.as_vector(x, what=what, column=column, as_written=as_written)
 
 
 def _pick(what: str):
@@ -402,10 +406,11 @@ def _one_column_file(path, column: str, stack, *, what: str = "batch") -> str:
     """A copy of the per-cell file ``path`` with only ``column`` (as ``x``)
     after its first column, in a folder that ``stack`` (an ``ExitStack``)
     removes. ``multibench evaluate/run-all --batch-column`` pass it on; the
-    copy keeps the file name, so the messages name the file typed."""
+    copy keeps the file name, so the messages name the file typed, and the
+    words the file writes for a missing value, so they name those too."""
     import tempfile
     path = io._require_file(path, f"{_FLAGS[what]} file")
-    vals, first = io.read_labels_ids(path, column, what=what)
+    vals, first = io.read_labels_ids(path, column, what=what, as_written=True)
     out = Path(stack.enter_context(tempfile.TemporaryDirectory())) / path.name
     cols = {"x": vals} if first is None else {"id": first.to_numpy(), "x": vals}
     pd.DataFrame(cols).to_csv(out, index=False, sep=io._sep_for(out))
@@ -417,16 +422,18 @@ def _no_ids(ids) -> str:
             else "the output has no cell ids")
 
 
-def _stack_label_files(files, ids):
+def _stack_label_files(files, ids, as_written=False):
     """Several label files, stacked in the given order, and each row's file (1, 2, ...).
 
     When every file has a first column of cell ids, the stacked rows are
     aligned to ``ids`` by those columns, as a single file is
     (:func:`multibench.eval.io.by_id_column`); the file of origin moves with
     its rows. Otherwise the rows stay in file order, and a first column that
-    looks like cell ids gets the positional warning.
+    looks like cell ids gets the positional warning. ``as_written`` reads
+    the files for a message that names their missing words.
     """
-    read = [io.read_labels_ids(f, what="labels", pick=_pick("labels")) for f in files]
+    read = [io.read_labels_ids(f, what="labels", pick=_pick("labels"),
+                               as_written=as_written) for f in files]
     vals = np.concatenate([np.asarray(v) for v, _ in read])
     origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(read)])
     names = [Path(f).name for f in files]
@@ -515,7 +522,9 @@ _CLI_LABELS_FROM = contextvars.ContextVar("cli_labels_from", default=None)
 
 def _label_files(given) -> list:
     """The label file(s) behind an argument of evaluate(), as paths; ``[]``
-    for anything that is not a file path or a list of them."""
+    for anything that is not a file path, a list of them or a dict of one."""
+    if isinstance(given, dict) and len(given) == 1:
+        given = next(iter(given.values()))
     if isinstance(given, (str, Path)) and io._is_label_file(Path(given)) \
             and Path(given).is_file():
         return [Path(given)]
@@ -531,12 +540,34 @@ def _src(given) -> str:
     return f" ({', '.join(f.name for f in files)})" if files else ""
 
 
-def _no_label_error(ct, miss, given) -> str:
-    """evaluate()'s error for labels ``ct`` that are missing where ``miss``
-    is true: some of them, or (nothing to score) all of them."""
+def _as_written(given, adata, ids, *, what):
+    """An argument of evaluate() that names files, in cell order once more,
+    for the sentences that say how a missing value is written.
+
+    The files are read the same way, except that each word the reader read
+    as missing comes back as that word (``'NA'``, not NaN). ``None`` for
+    values passed in memory: they are shown as they are.
+    """
+    if not _label_files(given):
+        return None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")           # the first read said them
+        if what == "labels" and _is_label_path_list(given):
+            return _stack_label_files(given, ids, as_written=True)[0]
+        return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True)
+
+
+def _no_label_error(shown, miss, given) -> str:
+    """evaluate()'s error for labels that are missing where ``miss`` is
+    true: some of them, or (nothing to score) all of them. ``shown`` are the
+    labels as they are written (:func:`_as_written` for files)."""
     n, n_cells = int(miss.sum()), len(miss)
-    head = config.hint("labels", "--labels") + _src(given)
-    seen, rename = io._missing_seen(ct), io._missing_rename(ct)
+    # labels read from --dataset: name that dataset's files, not a --labels
+    # never typed
+    dataset = _CLI_LABELS_FROM.get()
+    head = config.hint("labels", f"the label files of {dataset}" if dataset
+                       else "--labels") + _src(given)
+    seen, rename = io._missing_seen(shown), io._missing_rename(shown)
     if n == n_cells:
         return (f"{head}: none of the {n_cells:,} cells has a label, so there is "
                 f"nothing to score. {seen}{rename}")
@@ -547,11 +578,13 @@ def _no_label_error(ct, miss, given) -> str:
             f"cells only.{rename}")
 
 
-def _no_batch_error(ba, miss, given) -> str:
-    """evaluate()'s error for a ``batch=`` vector with missing values."""
+def _no_batch_error(shown, miss, given) -> str:
+    """evaluate()'s error for a ``batch=`` vector that is missing where
+    ``miss`` is true. ``shown`` is the vector as it is written
+    (:func:`_as_written` for files)."""
     head = config.hint("batch", "--batch") + _src(given)
     return (f"{head}: {int(miss.sum()):,} of the {len(miss):,} cells have no batch. "
-            f"{io._missing_seen(ba)} A missing batch is not a batch, so the batch "
+            f"{io._missing_seen(shown)} A missing batch is not a batch, so the batch "
             f"metrics are not computed on it. Give every cell a batch, or leave these "
             f"cells out.")
 
@@ -1174,10 +1207,12 @@ def evaluate(
     # a missing label is not a cell type: checked here, on the labels in cell
     # order, because compute() casts them to str and "nan" becomes one more type
     miss, dropped = io.missing_mask(ct), None
+    keep = ~miss
     if miss.any():
         if missing_labels == "error" or miss.all():
-            raise ValueError(_no_label_error(ct, miss, labels))
-        keep = ~miss
+            shown = _as_written(labels, adata, ids, what="labels")
+            raise ValueError(_no_label_error(
+                ct if shown is None else shown, miss, labels))
         # the batches before and after count only when a batch metric is scored
         scored = group in {"batch", "all"}
         n_batches = _n_batches(ba) if scored else None
@@ -1189,7 +1224,9 @@ def evaluate(
         # after the drop: only the cells that are scored need a batch
         no_batch = io.missing_mask(ba)
         if no_batch.any():
-            raise ValueError(_no_batch_error(ba, no_batch, batch))
+            shown = _as_written(batch, adata, ids, what="batch")
+            raise ValueError(_no_batch_error(
+                ba if shown is None else np.asarray(shown)[keep], no_batch, batch))
     out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
                         verbose=None if verbose else False)
     # compute() already emits canonical names; canonicalise anyway, so a frame
