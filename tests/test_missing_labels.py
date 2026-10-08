@@ -110,6 +110,10 @@ MISSING_WORDS = ["NA", "NA ", " NA", "N/A", "n/a", "NULL", "null", "NaN", "nan",
                  "None", "<NA>", "#N/A", "#NA"]
 NOT_MISSING = ["na", "none", "Unknown", "-", "?", "NaT", "0", 0, 1.5, True, False,
                "B, C", 'say "x"', "two\nlines"]
+#: labels too. Python's csv writer leaves a lone carriage return bare up to
+#: 3.10, and 3.10 refuses a NUL, so the file that export writes of them
+#: (DataFrame.to_csv) depends on the Python version; the definition does not
+CR_OR_NUL = ["a\rb", "x\r\ny", "C\x00cell"]
 
 
 @pytest.mark.parametrize("value", MISSING_NOT_A_WORD, ids=repr)
@@ -130,7 +134,7 @@ def test_missing_mask_forms_words(value):
         assert eio.missing_words(values) == [value.strip()]
 
 
-@pytest.mark.parametrize("value", NOT_MISSING, ids=repr)
+@pytest.mark.parametrize("value", NOT_MISSING + CR_OR_NUL, ids=repr)
 def test_missing_mask_forms_values_that_are_labels(value):
     for box in (list, lambda v: np.array(v, dtype=object), pd.Series):
         values = box(["A", value, "B"])
@@ -174,6 +178,58 @@ def test_missing_words_agree_with_a_real_label_file(tmp_path):
     assert not read_as_missing & {"na", "none", "Unknown", "NaT", "A", "0"}
     # and the mask is exactly those rows
     assert eio.missing_mask(texts).tolist() == [t in read_as_missing for t in texts]
+
+
+def test_texts_with_a_line_break_or_a_nul_follow_the_reader(tmp_path):
+    """Whatever the reader makes of such a text in a label file (every field
+    in quotes here), the definition says the same, one answer per text."""
+    texts = CR_OR_NUL + ["two\nlines", "NA\rNA", "NA\x00x", "\x00cell", "A", "NA", "None",
+                         'say "x"', "B, C"]
+    path = tmp_path / "cty.csv"
+    with open(path, "w", newline="") as f:
+        f.write("x\n" + "".join('"' + t.replace('"', '""') + '"\n' for t in texts))
+    back = eio.read_labels(path)
+    assert len(back) == len(texts)
+    read_as_missing = {t for t, v in zip(texts, back) if pd.isna(v)}
+    assert read_as_missing == set(eio.missing_words(texts))
+    assert {"NA", "None"} <= read_as_missing and not read_as_missing & set(CR_OR_NUL)
+    assert eio.missing_mask(texts).tolist() == [t in read_as_missing for t in texts]
+
+
+def test_the_round_trip_does_not_go_through_the_csv_writer(monkeypatch):
+    """Python 3.10 and older write ``a\\rb`` as two rows (and 3.10 raises on
+    a NUL), so complete labels with such a name stopped evaluate there. The
+    definition writes its own rows, the same on every Python."""
+    def to_csv(*args, **kwargs):
+        raise AssertionError("missing_words wrote its texts with DataFrame.to_csv")
+    monkeypatch.setattr(pd.DataFrame, "to_csv", to_csv)
+    values = ["A", "a\rb", "C\x00cell", "NA", "two\nlines", 'say "x"', "B, C"]
+    assert eio.missing_words(values) == ["NA"]
+    assert eio.missing_mask(values).tolist() == [False, False, False, True, False, False,
+                                                 False]
+
+
+def test_one_row_per_text_whatever_the_text(monkeypatch):
+    """Every text is one row of the round trip: a comma, a quote, a line
+    break or a NUL inside it does not move the answers to other texts."""
+    rows = []
+    real = eio._read_table
+
+    def spy(src, sep):
+        out = real(src, sep)
+        rows.append(len(out))
+        return out
+    monkeypatch.setattr(eio, "_read_table", spy)
+    awkward = ["a\rb", "a\nb", "a\r\nb", "a\x00b", "a,b", 'a"b', '"', '""', "'", "a\tb",
+               "#a", "a\\"]
+    texts = sorted(set(awkward + ["NA", "nan", "A", "B"]))
+    assert eio.missing_words(texts) == ["NA", "nan"]
+    assert rows == [len(texts)]
+    for text in awkward:
+        assert eio.missing_mask(["NA", text, "A"]).tolist() == [True, False, False], text
+    # blanks around a word are stripped before the round trip, a carriage
+    # return among them
+    assert eio.missing_mask(["A", "\rNA\r"]).tolist() == [False, True]
 
 
 def test_the_label_reader_and_the_definition_share_one_pandas_call(tmp_path, monkeypatch):
@@ -508,6 +564,22 @@ def test_drop_without_gaps_changes_nothing():
     long = mtb.to_long(drop, method="M")
     assert set(long["scored_with"]) == {f"none/none/{mtb.__version__}"}
     assert list(long.attrs) == list(plain.attrs)
+
+
+@pytest.mark.parametrize("name", ["C\rcell", "C\r\ncell", "C\ncell", "C\x00cell"], ids=repr)
+def test_a_line_break_or_a_nul_in_a_name_changes_nothing(name):
+    """Complete labels and batches score as the released 0.3.4 scored them,
+    also on Python 3.10 and older, whose csv writer splits or refuses such a
+    name."""
+    emb, lab = _cells()
+    named = np.where(lab == "C", name, lab).astype(object)
+    for kw in ({}, {"missing_labels": "drop"}):
+        got = _silent(emb, labels=named, metrics=["ASW"], **kw)
+        assert got.loc["ASW", "Value"] == pytest.approx(ASW_034, abs=1e-9)
+    bat = _donors()
+    kw = dict(labels=lab, metrics=["ASW_batch"])
+    _same(_silent(emb, batch=np.where(bat == "d3", name, bat).astype(object), **kw),
+          _silent(emb, batch=bat, **kw))
 
 
 def test_drop_names_a_lost_batch(tmp_path):

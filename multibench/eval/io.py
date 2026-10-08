@@ -122,6 +122,14 @@ def _null_and_text(values):
     return s.isna().to_numpy(), s.astype(str).str.strip()
 
 
+def _csv_field(text: str) -> str:
+    """``text`` as one field of a CSV row: as it is, or in quotes (with its
+    own quotes doubled) when it holds a comma, a quote or a line break."""
+    if any(c in text for c in ',"\r\n'):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
+
 def missing_words(values) -> list[str]:
     """The distinct texts in ``values`` that the label reader reads as missing, sorted.
 
@@ -136,9 +144,10 @@ def missing_words(values) -> list[str]:
     uniq = sorted(set(text[text != ""].tolist()))
     if not uniq:
         return []
-    buf = _io.StringIO()
-    pd.DataFrame({"x": uniq}).to_csv(buf, index=False)
-    buf.seek(0)
+    # written here, not by DataFrame.to_csv, whose csv writer follows the
+    # Python version: up to 3.10 it leaves a lone carriage return bare, which
+    # the reader takes for the end of a row, and 3.10 refuses a NUL
+    buf = _io.StringIO("x\n" + "".join(f"{_csv_field(u)}\n" for u in uniq))
     back = _read_table(buf, ",")
     if len(back) != len(uniq):
         # one text, one row. If a reader ever splits or joins rows, the
