@@ -14,10 +14,15 @@ Three groups:
   by barcode rather than by position whenever both sides carry ids.
   ``by_id_column`` does the same for a label CSV whose first column holds
   the cell ids.
+
+``missing_mask`` / ``missing_words`` say which per-cell values count as
+missing: NaN, blank text, and text that a label file reads back as missing.
 """
 from __future__ import annotations
 
+import io as _io
 import json
+import os
 import warnings
 from pathlib import Path
 
@@ -102,6 +107,109 @@ def _sep_for(path: Path) -> str:
     return "\t" if path.suffix.lower() == ".tsv" else ","
 
 
+def _read_table(src, sep):
+    """The one pandas call of the label reader. :func:`missing_words` runs
+    the same call, so what counts as missing follows what a label file
+    reads as missing, whatever the pandas version."""
+    return pd.read_csv(src, sep=sep)
+
+
+def _null_and_text(values):
+    """``(null, text)`` of per-cell values: where pandas already holds a
+    missing value (NaN, ``None``, ``pd.NA``), and every value as text
+    without the blanks around it."""
+    s = pd.Series(np.asarray(values, dtype=object))
+    return s.isna().to_numpy(), s.astype(str).str.strip()
+
+
+def missing_words(values) -> list[str]:
+    """The distinct texts in ``values`` that the label reader reads as missing, sorted.
+
+    The texts, without the blanks around them, are written to a one-column
+    CSV in memory and read back with :func:`_read_table`: a text that comes
+    back as NaN is one a label file cannot hold as a label (``NA``,
+    ``None``, ``nan``, ``null``, ``N/A``, ... with pandas' defaults). NaN,
+    ``None``, ``pd.NA`` and blank text are missing without being words.
+    """
+    null, text = _null_and_text(values)
+    text = text[~null]
+    uniq = sorted(set(text[text != ""].tolist()))
+    if not uniq:
+        return []
+    buf = _io.StringIO()
+    pd.DataFrame({"x": uniq}).to_csv(buf, index=False)
+    buf.seek(0)
+    back = _read_table(buf, ",")
+    if len(back) != len(uniq):
+        # one text, one row. If a reader ever splits or joins rows, the
+        # answers below would belong to other texts, so give none
+        raise RuntimeError(
+            f"Cannot tell which of {len(uniq):,} distinct values a label file reads "
+            f"as missing: written to a CSV and read back, they are {len(back):,} rows.")
+    return [u for u, gone in zip(uniq, back["x"].isna().tolist()) if gone]
+
+
+def missing_mask(values) -> np.ndarray:
+    """``True`` where a per-cell value (a label, a batch) is missing.
+
+    A value is missing when pandas holds it as one (NaN, ``None``,
+    ``pd.NA``), when its text is blank, or when its text without the blanks
+    around it is one of :func:`missing_words`. Every check of per-cell
+    values uses this one definition, so a label that passes it and is
+    written to a label file is read back as a label.
+    """
+    null, text = _null_and_text(values)
+    words = missing_words(values)
+    return null | (text == "").to_numpy() | text.isin(words).to_numpy()
+
+
+def _missing_shown(words: list) -> list:
+    """At most three of the missing words, quoted, then ``N more``."""
+    return [repr(w) for w in words[:3]] + (
+        [f"{len(words) - 3} more"] if len(words) > 3 else [])
+
+
+def _and(items: list) -> str:
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _missing_seen(values) -> str:
+    """How the missing entries of ``values`` are written, as a sentence:
+    ``The missing values are written NaN and 'NA'.`` NaN stands for a value
+    pandas holds as missing and ``''`` for blank text. ``""`` when nothing
+    is missing."""
+    null, text = _null_and_text(values)
+    seen = (["NaN"] if null.any() else []) \
+        + (["''"] if ((text == "").to_numpy() & ~null).any() else []) \
+        + _missing_shown(missing_words(values))
+    if len(seen) < 2:
+        return f"The missing value is written {seen[0]}." if seen else ""
+    return f"The missing values are written {_and(seen)}."
+
+
+def _missing_rename(values) -> str:
+    """The sentence (with its leading space) for missing words that may be
+    cell types: a label file cannot hold them, so they need another name.
+    ``""`` when ``values`` holds no such word."""
+    words = missing_words(values)
+    if not words:
+        return ""
+    if len(words) == 1:
+        return (f" A label file reads {words[0]!r} as a missing value. If it is the "
+                f"name of a cell type, rename it.")
+    return (f" A label file reads {_and(_missing_shown(words))} as missing values. If "
+            f"one of them is the name of a cell type, rename it.")
+
+
+def _names_no_file(x) -> bool:
+    """A string that is not a file and does not look like one: not an
+    existing file, no label-file suffix, no path separator. ``"donor"`` and
+    ``"obs:donor"`` are such strings; ``"missing.csv"`` is not."""
+    return (isinstance(x, str) and not Path(x).is_file()
+            and Path(x).suffix.lower() not in _LABEL_FILE_SUFFIXES
+            and "/" not in x and os.sep not in x)
+
+
 def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     """Read a cell-type (or batch) label vector from a CSV/TSV with a header row.
 
@@ -166,7 +274,7 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     from .. import config
     path = _require_file(path, config.hint(f"{what} file", f"--{what} file")
                          if what else "labels file")
-    d = pd.read_csv(path, sep=_sep_for(path))
+    d = _read_table(path, _sep_for(path))
     head = (config.hint(f"The {what} file {path.name}", f"The --{what} file {path.name}")
             if what else str(path))
     first = d.iloc[:, 0] if d.shape[1] > 1 else None

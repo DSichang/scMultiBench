@@ -20,6 +20,10 @@ LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering"
 #: (and joins into ``scored_with``); evaluate() also records ``scib_version``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
 
+#: two more ``attrs`` keys, only on a frame that ``missing_labels="drop"``
+#: scored after leaving cells out: the cells scored, and the cells given
+DROP_ATTRS = ("cells_scored", "cells_total")
+
 #: ``scored_with`` of rows whose frame carries no record of how it was scored
 UNKNOWN_SCORING = "unknown"
 
@@ -47,10 +51,15 @@ def _scored_with(attrs) -> str | None:
     """``"<leiden flavor>/<clusters>/<version>"`` from evaluate()'s ``attrs``,
     e.g. ``"leidenalg/sweep/0.3.2"``; ``None`` when the frame carries none
     (a hand-made frame or a CSV read back). ``none`` fills a part that did
-    not apply (no sweep ran, no ARI/NMI)."""
+    not apply (no sweep ran, no ARI/NMI). A frame scored after cells without
+    a label were left out has a fourth part, ``"270 of 300 cells"``."""
     if not attrs or attrs.get("multibench_version") is None:
         return None
-    return "/".join(str(attrs.get(k) or "none") for k in PROVENANCE_ATTRS)
+    parts = [str(attrs.get(k) or "none") for k in PROVENANCE_ATTRS]
+    if all(attrs.get(k) is not None for k in DROP_ATTRS):
+        # no thousands separators: this is a column of a CSV
+        parts.append("{} of {} cells".format(*(attrs[k] for k in DROP_ATTRS)))
+    return "/".join(parts)
 
 
 def to_long(value_df, *, method: str, dataset: str | None = None,
@@ -133,6 +142,10 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     backend, where the clusters came from (``sweep`` or ``user``) and the
     package version; ``none`` fills a part that did not apply. The same
     three values and ``scib_version`` are in ``attrs``.
+
+    Scores of the labelled cells only (``missing_labels="drop"`` left cells
+    out) have a fourth part, such as ``"igraph/sweep/0.3.5/270 of 300
+    cells"``, and ``cells_scored`` and ``cells_total`` in ``attrs``.
 
     Any other frame, such as a hand-made one or a wide CSV read back, has no
     such record. Its rows get ``scored_with = "unknown"`` and a
@@ -232,8 +245,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
         warnings.warn(NO_SCORING_RECORD, UserWarning, stacklevel=2)
     else:
         out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
-        if "scib_version" in value_df.attrs:
-            out.attrs["scib_version"] = value_df.attrs["scib_version"]
+        for k in ("scib_version",) + DROP_ATTRS:
+            if k in value_df.attrs:
+                out.attrs[k] = value_df.attrs[k]
     return out
 
 
@@ -291,11 +305,39 @@ def _carries_ids(x) -> bool:
             and not isinstance(x.index, pd.RangeIndex))
 
 
+def _obs_column_name(x, adata) -> str | None:
+    """The obs column of ``adata`` that the string ``x`` names, or ``None``.
+
+    ``"celltype"`` and ``"obs:celltype"`` name the same column. A column
+    whose own name is ``x`` wins, so columns called ``obs:x`` or
+    ``rna:celltype`` are found under their names.
+    """
+    if x in adata.obs.columns:
+        return x
+    if x.startswith("obs:") and x[4:] in adata.obs.columns:
+        return x[4:]
+    return None
+
+
+def _column_without_obs(x, adata) -> bool:
+    """``x`` can only be the name of an obs column, and the output has no
+    obs. The command line takes files only and keeps its file errors."""
+    return adata is None and not config._CLI and io._names_no_file(x)
+
+
+def _no_column_error(what: str, x: str) -> str:
+    col = x[4:] if x.startswith("obs:") else x
+    return (f"{what}={x!r} is not a file, and the output is an array without obs "
+            f"columns, so there is no column to look up. Pass the values themselves, "
+            f"for example {what}=adata.obs[{col!r}], or pass the AnnData as the "
+            f"output with obsm=.")
+
+
 def _obs_or_vector(x, adata, *, what, column=None, ids=None):
     """Coerce one label-like argument to a 1-D array in the output's cell order.
 
-    * a ``str`` naming an obs column of ``adata`` -> that column (already in
-      the output's order);
+    * a ``str`` naming an obs column of ``adata``, with or without the
+      ``obs:`` prefix -> that column (already in the output's order);
     * a ``Series``/``DataFrame`` with a non-default index, when the output
       carries cell ids (``ids`` given) -> aligned by id via
       :func:`multibench.eval.io.align_vector` (raises on missing/extra ids);
@@ -304,15 +346,21 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None):
     * a CSV whose first column holds the output's cell ids -> aligned by
       that column (:func:`multibench.eval.io.by_id_column`);
     * anything else -> :func:`multibench.eval.io.as_vector` (positional).
+
+    A column name given with an output that has no obs raises
+    ``FileNotFoundError`` saying so, in place of the error of a missing file.
     """
     if adata is not None and isinstance(x, str):
-        if x in adata.obs.columns:
-            return np.asarray(pd.Series(adata.obs[x]).to_numpy())
+        col = _obs_column_name(x, adata)
+        if col is not None:
+            return np.asarray(pd.Series(adata.obs[col]).to_numpy())
         if not Path(x).is_file():
             raise ValueError(
                 f"{what}={x!r} is neither an obs column of the AnnData (obs "
                 f"columns: {list(map(str, adata.obs.columns))}) nor an existing "
                 f"file")
+    if _column_without_obs(x, adata):
+        raise FileNotFoundError(_no_column_error(what, x))
     if isinstance(x, (str, Path)) and column is None:
         vals, first = io.read_labels_ids(x, what=what, pick=_pick(what))
         unique = ids is not None and pd.Index(ids).is_unique
@@ -476,6 +524,65 @@ def _label_files(given) -> list:
     return []
 
 
+def _src(given) -> str:
+    """`` (cty1.csv, cty2.csv)``: the file(s) an argument of evaluate() named,
+    for the head of a message; ``""`` for values passed in memory."""
+    files = _label_files(given)
+    return f" ({', '.join(f.name for f in files)})" if files else ""
+
+
+def _no_label_error(ct, miss, given) -> str:
+    """evaluate()'s error for labels ``ct`` that are missing where ``miss``
+    is true: some of them, or (nothing to score) all of them."""
+    n, n_cells = int(miss.sum()), len(miss)
+    head = config.hint("labels", "--labels") + _src(given)
+    seen, rename = io._missing_seen(ct), io._missing_rename(ct)
+    if n == n_cells:
+        return (f"{head}: none of the {n_cells:,} cells has a label, so there is "
+                f"nothing to score. {seen}{rename}")
+    drop = config.hint('missing_labels="drop"', "--missing-labels drop")
+    return (f"{head}: {n:,} of the {n_cells:,} cells have no label. {seen} A missing "
+            f"label is not a cell type, so evaluate does not score it. Give every "
+            f"cell a label, or pass {drop} to score the {n_cells - n:,} labelled "
+            f"cells only.{rename}")
+
+
+def _no_batch_error(ba, miss, given) -> str:
+    """evaluate()'s error for a ``batch=`` vector with missing values."""
+    head = config.hint("batch", "--batch") + _src(given)
+    return (f"{head}: {int(miss.sum()):,} of the {len(miss):,} cells have no batch. "
+            f"{io._missing_seen(ba)} A missing batch is not a batch, so the batch "
+            f"metrics are not computed on it. Give every cell a batch, or leave these "
+            f"cells out.")
+
+
+def _n_batches(ba) -> int:
+    """How many batches a batch vector names. A missing value is not one."""
+    ba = np.asarray(ba)
+    return len(set(ba[~io.missing_mask(ba)].astype(str).tolist()))
+
+
+def _dropped_warning(n_scored: int, n_cells: int, batches=None) -> str:
+    """evaluate()'s warning after ``missing_labels="drop"`` left cells out.
+
+    ``batches`` is ``(b, B)`` when a batch vector was scored: the batches
+    that hold a labelled cell, of the batches given. Fewer of them changes
+    what the batch metrics measure, and the warning says so.
+    """
+    n = n_cells - n_scored
+    msg = (f"Scored the {n_scored:,} labelled cells of {n_cells:,}. {n:,} "
+           f"{'cell has' if n == 1 else 'cells have'} no label and "
+           f"{'was' if n == 1 else 'were'} left out, so the scores describe the "
+           f"labelled cells only.")
+    b, n_batches = batches or (0, 0)
+    if b == 1 < n_batches:
+        msg += (" The labelled cells are all in one batch, so the batch metrics do "
+                "not measure mixing.")
+    elif b < n_batches:
+        msg += f" The labelled cells come from {b} of the {n_batches} batches."
+    return msg
+
+
 def _batch_files(path: Path, n_cells: int) -> list:
     """``cty1.csv, cty2.csv, ...`` next to ``path`` (itself one of them), in
     number order, when their labels add up to ``n_cells``; else ``[]``."""
@@ -502,8 +609,7 @@ def _count_error(what: str, n: int, n_cells: int, given) -> str:
     they add up to the cell count).
     """
     from . import scib as escib
-    files = _label_files(given)
-    names = f" ({', '.join(f.name for f in files)})" if files else ""
+    files, names = _label_files(given), _src(given)
     dataset = _CLI_LABELS_FROM.get() if what == "labels" else None
     if dataset:
         cli = (f"the label files of {dataset}{names} hold {n:,} labels for "
@@ -694,6 +800,7 @@ def evaluate(
     obsm: str = "X_emb",
     label_order=None,
     verbose: bool = True,
+    missing_labels: str = "error",
 ) -> pd.DataFrame:
     """Compute scIB metrics for a run output (an embedding) against cell-type labels.
 
@@ -709,8 +816,8 @@ def evaluate(
         columns), or file path (Notes).
     labels
         Cell types, one per cell (required): CSV path(s), a
-        ``mtb.labels_for`` dict, a 1-D array-like, or an ``.obs`` column name
-        (forms in Notes).
+        ``mtb.labels_for`` dict, a 1-D array-like, or an ``.obs`` column
+        name, with or without the ``obs:`` prefix (forms in Notes).
     category : str, optional
         Integration category, one of ``mtb.list_categories()``; validated,
         otherwise unused (the metrics do not depend on it). Lets a call mirror
@@ -718,6 +825,7 @@ def evaluate(
     batch
         Batch labels, one per cell, in the forms ``labels`` accepts; needed
         for the batch metrics unless ``labels`` lists two or more files.
+        Every cell needs a batch.
     metrics : None, str or list of str
         ``None`` = every applicable metric except kBET; or ``"clustering"``,
         ``"batch"``, ``"all"``, or a list of codes such as ``["ARI", "NMI"]``.
@@ -734,6 +842,9 @@ def evaluate(
     verbose : bool
         ``True`` prints one stderr line when the Leiden sweep starts on more
         than 2,000 cells; ``False`` never prints.
+    missing_labels : {"error", "drop"}
+        What to do when a cell has no label. ``"error"`` raises. ``"drop"``
+        scores the labelled cells only and warns how many (Notes).
 
     Returns
     -------
@@ -746,9 +857,12 @@ def evaluate(
     ------
     ValueError
         Missing or misaligned labels, an unknown category or metric, or batch
-        metrics without batch labels.
+        metrics without batch labels. A cell without a label (unless
+        ``missing_labels="drop"``), no cell with a label, or a cell without a
+        batch in ``batch``.
     FileNotFoundError
-        An ``output`` or label path does not exist.
+        An ``output`` or label path does not exist, or a column is named
+        for an ``output`` that has no ``.obs``.
     TypeError
         An unsupported input type, or a retired keyword (Notes).
 
@@ -776,7 +890,8 @@ def evaluate(
     - a 1-D ``ndarray`` / ``Series`` / ``Categorical`` / list, or a
       single-column DataFrame;
     - when ``output`` is an AnnData or MuData, the name of an ``.obs``
-      column.
+      column, with or without the ``obs:`` prefix (``"celltype"`` or
+      ``"obs:celltype"``).
 
     A multi-column CSV / DataFrame raises: pass the one column
     (``df["celltype"]``) itself. ``batch`` and ``clustering`` take the same
@@ -794,6 +909,26 @@ def evaluate(
       ``atac``) and otherwise needs ``label_order=`` naming its keys;
     - ``label_order=list(d)`` trusts the dict's own order. A one-entry dict
       needs no ``label_order``.
+
+    **Missing labels.** A label is missing when it is NaN, ``None``,
+    ``pd.NA``, blank text, or text that a label file reads as missing:
+    ``NA``, ``None``, ``nan``, ``null``, ``N/A`` and the like, with or
+    without blanks around them. A missing label is not a cell type, so it
+    is never scored as one. A cell type that really has such a name needs
+    another name.
+
+    - ``missing_labels="error"`` raises ``ValueError``. The message says
+      how many cells have no label and how the missing values are written;
+    - ``missing_labels="drop"`` leaves those cells out of the embedding,
+      the labels, ``batch`` and ``clustering``, and scores the rest. The
+      scores equal those of a call with the labelled cells only. A
+      ``UserWarning`` gives the two cell counts, and says when the labelled
+      cells come from fewer batches;
+    - when no cell has a label, both raise.
+
+    The values of ``batch`` are missing by the same rule. A missing batch
+    always raises ``ValueError``; with ``"drop"``, only the cells that are
+    scored need a batch.
 
     **Metric selection.** ``None`` computes the clustering family (``ARI,
     NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, GC, iLISI`` when a batch
@@ -915,6 +1050,9 @@ def evaluate(
     - ``multibench_version`` and ``scib_version`` - the installed versions.
 
     ``mtb.to_long`` writes the first three to a ``scored_with`` column.
+    When ``missing_labels="drop"`` left cells out, ``attrs`` also holds
+    ``cells_scored`` and ``cells_total``, and ``scored_with`` ends with
+    them (``.../270 of 300 cells``).
 
     **Output formats.** A file path may be ``.h5`` (dataset ``data``, the
     benchmark's ``embedding.h5``), ``.h5ad`` (read as an AnnData),
@@ -925,6 +1063,9 @@ def evaluate(
 
     - missing labels, or a batch metric / family requested without batch
       labels;
+    - a cell without a label, or without a batch in ``batch``
+      (**Missing labels.**), and a ``missing_labels`` that is neither
+      ``"error"`` nor ``"drop"``;
     - an unknown category, ``metrics`` token or code;
     - a count that differs from the embedding's cells (``'labels has M
       entries for N cells in the embedding.'``), and cell-id mismatches when
@@ -936,6 +1077,8 @@ def evaluate(
     - an ``.h5`` output without dataset ``data``.
 
     ``FileNotFoundError`` names the missing path and the working directory.
+    A column name passed with an array or DataFrame ``output`` raises it
+    too: there is no ``.obs`` to look the column up in.
     ``TypeError`` covers unsupported input types (non-array ``labels``,
     ``label_order`` with non-dict ``labels``, ...).
 
@@ -952,6 +1095,9 @@ def evaluate(
 
     mtb.run_all : runs and scores every runnable method on a dataset.
     """
+    if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
+        raise ValueError(
+            f'missing_labels must be "error" or "drop", got {missing_labels!r}.')
     _validate_category(category)
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
@@ -995,7 +1141,12 @@ def evaluate(
     elif isinstance(clustering, (str, Path)) \
             and Path(clustering).suffix.lower() not in io._LABEL_FILE_SUFFIXES \
             and not (adata is not None and isinstance(clustering, str)
-                     and clustering in adata.obs.columns):
+                     and _obs_column_name(clustering, adata) is not None):
+        if _column_without_obs(clustering, adata) \
+                and Path(clustering).suffix.lower() not in {".h5", ".hdf5", ".hdf"}:
+            # "leiden" or "obs:leiden" next to an array; "clusters.h5" is the
+            # name of a file and keeps the error of a missing file
+            raise FileNotFoundError(_no_column_error("clustering", clustering))
         cl = io.read_clustering(clustering)        # the benchmark's h5 layout
     else:
         cl = _obs_or_vector(clustering, adata, what="clustering", ids=ids)
@@ -1015,6 +1166,25 @@ def evaluate(
                                 ("batch", ba, batch)):
         if values is not None and len(values) != n_cells:
             raise ValueError(_count_error(what, len(values), n_cells, given))
+    # a missing label is not a cell type: checked here, on the labels in cell
+    # order, because compute() casts them to str and "nan" becomes one more type
+    miss, dropped = io.missing_mask(ct), None
+    if miss.any():
+        if missing_labels == "error" or miss.all():
+            raise ValueError(_no_label_error(ct, miss, labels))
+        keep = ~miss
+        # the batches before and after count only when a batch metric is scored
+        scored = group in {"batch", "all"}
+        n_batches = _n_batches(ba) if scored else None
+        emb, ct, ba = emb[keep], np.asarray(ct)[keep], np.asarray(ba)[keep]
+        cl = None if cl is None else np.asarray(cl)[keep]
+        dropped = (int(keep.sum()), n_cells,
+                   (_n_batches(ba), n_batches) if scored else None)
+    if batch is not None:
+        # after the drop: only the cells that are scored need a batch
+        no_batch = io.missing_mask(ba)
+        if no_batch.any():
+            raise ValueError(_no_batch_error(ba, no_batch, batch))
     out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
                         verbose=None if verbose else False)
     # compute() already emits canonical names; canonicalise anyway, so a frame
@@ -1031,4 +1201,8 @@ def evaluate(
         # mismatch fails loudly instead of handing back a (0, 1) frame
         raise ValueError(
             f"evaluate(metrics={metrics!r}) selected no metric - nothing to return")
+    if dropped:
+        out.attrs.update(zip(DROP_ATTRS, dropped[:2]))
+        # evaluate <- its keyword wrapper <- the caller
+        warnings.warn(_dropped_warning(*dropped), UserWarning, stacklevel=3)
     return out

@@ -34,11 +34,14 @@ def _quiet(**kw):
 def test_evaluate_signature_is_the_contract():
     params = inspect.signature(evaluate).parameters
     assert list(params) == ["output", "labels", "category", "batch", "metrics",
-                            "clustering", "obsm", "label_order", "verbose"]
+                            "clustering", "obsm", "label_order", "verbose",
+                            "missing_labels"]
     assert params["labels"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
-    for name in ("category", "batch", "metrics", "clustering", "obsm", "label_order", "verbose"):
+    for name in ("category", "batch", "metrics", "clustering", "obsm", "label_order", "verbose",
+                 "missing_labels"):
         assert params[name].kind is inspect.Parameter.KEYWORD_ONLY, name
     assert params["metrics"].default is None and params["verbose"].default is True
+    assert params["missing_labels"].default == "error"
     assert "metrics" in evaluate.__doc__ and "slow_metrics" in evaluate.__doc__
 
 
