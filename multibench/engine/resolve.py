@@ -1340,6 +1340,10 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
 #: ``cty1.csv``, and the diagonal ``rna_cty2.csv`` / ``atac_cty2.csv``
 _BATCH_FILE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas)(\d+)\.h5$"
                             r"|^(?:rna_|atac_)?cty(\d+)\.csv$")
+#: the files of the dataset layout: the names of ``_BATCH_FILE_RE``, and the
+#: same names without a batch number (``rna.h5``, ``atac_gas.h5``, ``cty.csv``)
+_LAYOUT_FILE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas)(\d*)\.h5$"
+                             r"|^(?:rna_|atac_)?cty(\d*)\.csv$")
 #: role tokens that carry a batch number
 _BATCH_ROLE_RE = re.compile(r"^(?:rna|adt|atac|atac_peak|atac_gas|cty|rna_cty|atac_cty)(\d+)$")
 
