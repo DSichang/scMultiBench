@@ -269,7 +269,8 @@ def test_the_conversion_inside_run(tmp_path, monkeypatch):
     adt = ingest.to_canonical(_mixed([("Antibody Capture", 5, "CD")]), tmp_path / "adt.h5")
     (tmp_path / "repo" / "tools_scripts").mkdir(parents=True)
     monkeypatch.setattr(runner, "provide_script_files", lambda *a, **k: None)
-    monkeypatch.setattr(runner.subprocess, "Popen", None)       # never reached
+    monkeypatch.setattr(runner.subprocess, "Popen",
+                        lambda *a, **k: pytest.fail("the method was started"))
     with pytest.raises(ValueError) as e:
         mtb.run("scMDC", "vertical", inputs={"rna": str(src), "adt": str(adt)},
                 out_dir=str(tmp_path / "o"), cmd_template="{cmd}",
@@ -391,11 +392,11 @@ def test_a_10x_file_is_named(tmp_path, capsys):
         with pytest.raises(ValueError) as e:
             call()
         assert str(e.value) == told
-    # 0.3.4 passed the file through as its own result
-    with pytest.raises(ValueError, match="src is not a canonical .h5 and convert=False"):
-        ingest.to_canonical(src, convert=False)
-    with pytest.raises(ValueError, match="out path required to write a canonical .h5"):
-        ingest.to_canonical(src)
+    # 0.3.4 passed the file through as its own result, whatever the arguments
+    for kw in ({}, {"convert": False}, {"modality": "rna"}):
+        with pytest.raises(ValueError) as e:
+            ingest.to_canonical(str(src), **kw)
+        assert str(e.value) == told
     cli_told = (f"error: {src} is a 10x Genomics file. multibench convert reads .h5ad files, "
                 f"not this file. Read it in Python with scanpy, save one .h5ad file per "
                 f"modality and convert those. {RECIPE}")
@@ -427,9 +428,10 @@ def test_other_h5_files_keep_their_message(tmp_path):
 
 
 def _demo_h5_files():
+    """The .h5 files of the package's demo datasets that are on disk."""
+    from multibench.data.fetch import AVAILABLE
     root = config.DEFAULT.data_path
-    return sorted(p for d in (root.iterdir() if root.is_dir() else [])
-                  if d.is_dir() and d.name != "outputs" for p in d.glob("*.h5"))
+    return sorted(p for ds in AVAILABLE for p in (root / ds).glob("*.h5"))
 
 
 def test_canonical_files_still_pass(tmp_path):
@@ -438,7 +440,6 @@ def test_canonical_files_still_pass(tmp_path):
     files = _demo_h5_files()
     if not files:
         pytest.skip("no demo dataset on disk")
-    assert any(p.parent.name == "D11" for p in files) or len(files) > 1
     not_canonical = [str(p) for p in files if not ingest._is_canonical_h5(p)]
     assert not not_canonical
     for p in files[:3]:

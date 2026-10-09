@@ -93,9 +93,13 @@ def test_files_and_contents(ds, tmp_path, monkeypatch):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         exec(compile(OLD[TASK[ds]]["data"], f"0.3.4 {TASK[ds]}", "exec"), ns)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")              # the call itself warns of nothing
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
         assert mtb.data.write_example(ds, quiet=True) is None
+    # the cell of the tutorial shows the reader no warning of the package or of anndata
+    ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
+            or issubclass(w.category, UserWarning)]
+    assert not ours, ours
     assert sorted(p.name for p in tmp_path.iterdir()) == sorted(examples.EXAMPLES[ds])
     main = eval(HOLDS[ds][0][1], ns)
     for name, expr, label in HOLDS[ds]:

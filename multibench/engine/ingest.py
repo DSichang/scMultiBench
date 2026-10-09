@@ -235,6 +235,29 @@ def _is_canonical_h5(path: Path) -> bool:
         return False
 
 
+def _is_tenx_h5(path: Path) -> bool:
+    """A 10x Genomics feature-barcode ``.h5``: a sparse matrix, which has
+    ``matrix/indptr``."""
+    try:
+        with h5py.File(path, "r") as f:
+            return "matrix/indptr" in f
+    except OSError:
+        return False
+
+
+def _tenx_message(path) -> str:
+    """What to do with a 10x Genomics ``.h5`` instead of passing it as a
+    dataset file."""
+    recipe = 'The documentation has the steps as the recipe "A 10x .h5 file".'
+    return config.hint(
+        f"{path} is a 10x Genomics file, not a multibench dataset file. Read it with "
+        f"scanpy, sc.read_10x_h5(path, gex_only=False), split it by var['feature_types'] "
+        f"and write a dataset folder with mtb.io.export_dataset. {recipe}",
+        f"{path} is a 10x Genomics file. multibench convert reads .h5ad files, not this "
+        f"file. Read it in Python with scanpy, save one .h5ad file per modality and "
+        f"convert those. {recipe}")
+
+
 def _is_mudata(obj) -> bool:
     # Duck-typed so ``mudata`` stays an optional import.
     return hasattr(obj, "mod") and isinstance(getattr(obj, "mod", None), dict) \
@@ -263,19 +286,10 @@ def _to_anndata(src):
         try:
             with h5py.File(p, "r") as f:
                 keys = sorted(f.keys())
-                tenx = "matrix/indptr" in f
         except OSError as exc:
             raise ValueError(f"{p} is not a readable HDF5 file: {exc}") from exc
-        if tenx:
-            recipe = 'The documentation has the steps as the recipe "A 10x .h5 file".'
-            raise ValueError(config.hint(
-                f"{p} is a 10x Genomics file, not a multibench dataset file. Read it "
-                f"with scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
-                f"var['feature_types'] and write a dataset folder with "
-                f"mtb.io.export_dataset. {recipe}",
-                f"{p} is a 10x Genomics file. multibench convert reads .h5ad files, not "
-                f"this file. Read it in Python with scanpy, save one .h5ad file per "
-                f"modality and convert those. {recipe}"))
+        if _is_tenx_h5(p):
+            raise ValueError(_tenx_message(p))
         raise ValueError(
             f"{p} has no dataset 'matrix/data'; found keys {keys} - a canonical "
             f"input .h5 holds matrix/data (features x cells), matrix/features and "
@@ -786,6 +800,11 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     # and an out path: there is nothing to convert.
     if isinstance(src, (str, Path)) and _is_canonical_h5(Path(src)):
         return Path(src)
+    if isinstance(src, (str, Path)) and Path(src).suffix.lower() == ".h5" \
+            and _is_tenx_h5(Path(src)):
+        # its matrix/data made 0.3.4 pass the file through. Said before the
+        # checks of the other arguments, which would ask for an out path
+        raise ValueError(_tenx_message(Path(src)))
     if convert is False:
         raise ValueError(
             f"src is not a canonical .h5 and convert=False: {src if isinstance(src, (str, Path)) else type(src).__name__}")
