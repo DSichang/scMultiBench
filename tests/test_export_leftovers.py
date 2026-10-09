@@ -213,6 +213,33 @@ def test_the_diagonal_loop_with_fewer_batches_is_refused(tmp_path):
         f"says that the data has 2 batches. {ADVICE}")
 
 
+def test_n_batches_counts_the_batches_of_both_sides(tmp_path):
+    """A diagonal call that writes one side. n_batches is the number of
+    batches of the data, not of the side: a higher batch number on the side
+    the call does not write is named too. Up to n_batches that side is not
+    judged."""
+    f = tmp_path / "SIDE"
+    kw = dict(labels="obs:celltype", category="diagonal")
+    for b in (1, 2, 3):
+        _write(None, f, atac=_genes(_cells(70, f"A{b}", seed=10 + b)[1]),
+               atac_kind="gene_activity", batch_index=b, **kw)
+    assert len(_names(f)) == 6
+    rna, _ = _cells(80, "R1", seed=1)
+    assert _refused(rna, f, rna="X", batch_index=1, n_batches=2, **kw) == (
+        f"{f} holds files of other data that this call does not write. atac_gas3.h5 and "
+        f"atac_cty3.csv belong to batch 3, and n_batches=2 says that the data has 2 "
+        f"batches. {ADVICE}")
+    assert _refused(rna, f, rna="X", batch_index=1, n_batches=1, **kw) == (
+        f"{f} holds files of other data that this call does not write. atac_gas2.h5, "
+        f"atac_cty2.csv, atac_gas3.h5 and atac_cty3.csv belong to batches 2-3, and "
+        f"n_batches=1 says that the data has 1 batch. {ADVICE}")
+    atac_side = {n: (f / n).read_bytes() for n in _names(f)}
+    _write(rna, f, rna="X", batch_index=1, n_batches=3, **kw)
+    _write(rna, f, rna="X", batch_index=1, **kw)
+    assert _names(f) == sorted([*atac_side, "rna1.h5", "rna_cty1.csv"])
+    assert {n: (f / n).read_bytes() for n in atac_side} == atac_side
+
+
 # ----------------------------------------------------------- (b) other cells
 def test_another_dataset_into_the_same_mosaic_folder(tmp_path):
     """Batch 1 has the same file names, so it is replaced. Batch 2 leaves the
@@ -253,6 +280,45 @@ def test_labels_without_barcodes_are_judged_by_their_number(tmp_path):
         f"cells than this call writes. {ADVICE}")
     _write(None, f, rna=None, labels=list(ex.obs["celltype"]))
     assert pd.read_csv(f / "cty.csv")["x"].tolist() == list(ex.obs["celltype"])
+
+
+@pytest.mark.parametrize("how,files", [
+    ({}, "rna.h5 holds"),
+    ({"batch_index": 1, "category": "cross"}, "rna1.h5 holds"),
+    ({"batch": "donor", "category": "cross"}, "rna1.h5, rna2.h5 and rna3.h5 hold"),
+], ids=["unnumbered", "batch_index", "batch"])
+def test_a_label_series_names_its_cells(tmp_path, how, files):
+    """Labels alone as a Series indexed by barcode, with no object: the index
+    names the cells, so as many other cells are refused, as they are with an
+    object. 0.3.4 wrote their labels next to the matrix."""
+    f = tmp_path / "SERIES"
+    ex, _ = _cells(100, "EX")
+    _write(ex, f, rna="X", **{k: f"obs:{v}" if k == "batch" else v for k, v in how.items()})
+    other, _ = _cells(100, "ME", seed=1)
+    series = {k: other.obs[v] if k == "batch" else v for k, v in how.items()}
+    assert _refused(None, f, labels=other.obs["celltype"], **series) == (
+        f"{f} holds files of other data that this call does not write. {files} other cells "
+        f"than this call writes. {ADVICE}")
+    # the cells of the folder, from a Series: its labels are written
+    mine = {k: ex.obs[v] if k == "batch" else v for k, v in how.items()}
+    _write(None, f, labels=ex.obs["celltype"], **mine)
+    assert len(_names(f)) == 2 * (3 if "batch" in how else 1)
+
+
+def test_a_series_that_names_no_cell_is_judged_by_its_number(tmp_path):
+    """A Series whose index numbers its rows, or names a cell twice, has no
+    barcodes to compare: it is taken row by row, as a list is."""
+    f = tmp_path / "ROWS"
+    ex, _ = _cells(100, "EX")
+    _write(ex, f, rna="X")
+    labels = list(ex.obs["celltype"])
+    twice = pd.Series(labels, index=["one"] * 50 + ["two"] * 50)
+    for series in (pd.Series(labels), twice):
+        assert _refused(None, f, labels=series.iloc[:90]) == (
+            f"{f} holds files of other data that this call does not write. rna.h5 holds "
+            f"other cells than this call writes. {ADVICE}")
+        _write(None, f, labels=series)
+        assert pd.read_csv(f / "cty.csv")["x"].tolist() == labels
 
 
 def test_another_atac_kind_for_other_cells_is_refused(tmp_path):

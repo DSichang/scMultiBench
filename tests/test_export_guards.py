@@ -8,6 +8,8 @@
   (``eval.io.missing_mask``): what passes here is read back as a label.
 - ADT taken from ``X`` is refused only when the object holds another matrix
   that could be the protein one. An embedding (``obsm["X_umap"]``) is none.
+- A sparse ``X`` left on disk (``backed="r"``) is refused before the folder
+  is made. 0.3.4 refused it afterwards and left the folder empty.
 """
 import random
 import warnings
@@ -269,6 +271,33 @@ def test_a_refused_call_leaves_a_folder_as_it_was(tmp_path):
         with pytest.raises((ValueError, KeyError)):
             ingest.export_dataset(data, out, overwrite=True, **kw)
         assert {p.name: p.read_bytes() for p in out.iterdir()} == before, kw
+
+
+def test_a_sparse_matrix_left_on_disk_is_refused_before_the_folder_is_made(tmp_path):
+    """An object read with ``backed="r"`` keeps a sparse ``X`` on disk, which
+    is no matrix to write. 0.3.4 said so after it had made the folder, and
+    left it empty."""
+    import scipy.sparse as sp
+    a = _cite()
+    a.X = sp.csr_matrix(a.X)
+    a.write_h5ad(tmp_path / "a.h5ad")
+    a[::-1].copy().write_h5ad(tmp_path / "reversed.h5ad")
+    text = "matrix must be 2-D (cells x features), got shape ()"
+    assert _value_error(tmp_path, ad.read_h5ad(tmp_path / "a.h5ad", backed="r"), rna="X",
+                        labels="obs:ct") == text
+    # a folder that holds these cells in another order: the same refusal
+    out = ingest.export_dataset(_adt(), tmp_path / "HERE", rna=None, adt="X")
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(ad.read_h5ad(tmp_path / "reversed.h5ad", backed="r"), out,
+                              rna="X", labels="obs:ct")
+    assert str(e.value) == text
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+    # read into memory, it is written, in the order of the folder
+    ingest.export_dataset(ad.read_h5ad(tmp_path / "reversed.h5ad"), out, rna="X",
+                          labels="obs:ct")
+    assert ingest.read_canonical(out / "rna.h5", sparse=False).obs_names.tolist() \
+        == list(a.obs_names)
 
 
 # ------------------------------------------------------------ ADT taken from X

@@ -189,3 +189,86 @@ def test_a_sparse_matrix_is_reordered_too(tmp_path, capsys):
     assert capsys.readouterr().err == _note("rna.h5", "adt.h5", f)
     assert _bars(f / "rna.h5") == list(a.obs_names)
     assert np.array_equal(_matrix(f / "rna.h5").X, a.X)
+
+
+def test_a_label_series_without_an_object_follows_the_matrix(tmp_path, capsys):
+    """Labels alone as a Series indexed by barcode, with no object: the index
+    names the cells, so the rows follow the matrix as they do with an
+    object. 0.3.4 wrote them in the order of the Series."""
+    a = _cells()
+    f = tmp_path / "SERIES"
+    ingest.export_dataset(a, f, rna="X")
+    capsys.readouterr()
+    later = _shuffled(a)
+    ingest.export_dataset(None, f, labels=later.obs["celltype"])
+    assert capsys.readouterr().err == _note("cty.csv", "rna.h5", f)
+    assert _labels(f / "cty.csv") == [f"type_of_{b}" for b in _bars(f / "rna.h5")]
+    # per batch, the batch column a Series in an order of its own
+    g = tmp_path / "SERIES_BATCH"
+    ingest.export_dataset(a, g, rna="X", batch="obs:donor", category="cross")
+    capsys.readouterr()
+    ingest.export_dataset(None, g, labels=later.obs["celltype"],
+                          batch=_shuffled(a, seed=5).obs["donor"], category="cross")
+    assert capsys.readouterr().err == "".join(
+        _note(f"cty{b}.csv", f"rna{b}.h5", g) for b in (1, 2, 3))
+    for b in (1, 2, 3):
+        bars = _bars(g / f"rna{b}.h5")
+        assert bars == [x for x, d in zip(a.obs_names, a.obs["donor"]) if d == f"d{b - 1}"]
+        assert _labels(g / f"cty{b}.csv") == [f"type_of_{x}" for x in bars]
+    # the same order: nothing to say
+    ingest.export_dataset(None, f, labels=a.obs["celltype"], overwrite=True)
+    assert capsys.readouterr().err == ""
+    assert _labels(f / "cty.csv") == list(a.obs["celltype"])
+
+
+def _atac_of(a, kind, seed=3):
+    """The ATAC of the cells of ``a`` as an object in an order of its own."""
+    rng = np.random.default_rng(seed)
+    t = ad.AnnData(rng.poisson(1.0, (a.n_obs, 20)).astype(float), obs=a.obs.copy())
+    t.var_names = ([f"chr1:{i * 1000}-{i * 1000 + 500}" for i in range(20)] if kind == "peak"
+                   else list(a.var_names))
+    return _shuffled(t, seed=seed)
+
+
+@pytest.mark.parametrize("kind,name", [("peak", "atac_peak.h5"),
+                                       ("gene_activity", "atac_gas.h5")])
+def test_a_paired_export_after_a_diagonal_one_in_two_orders(tmp_path, capsys, kind, name):
+    """A diagonal export keeps the row order of each object. With the same
+    cells on both sides in two orders, the folder then holds them in two
+    orders, and a paired call has no order to follow. 0.3.4 wrote the paired
+    files in the order of ``rna.h5`` next to the ATAC file in the other
+    order, and the vertical methods that take ``atac_gas.h5`` when it is
+    there read it row by row with ``rna.h5``. The paired files first, then
+    the diagonal ones: one order."""
+    a = _cells()
+    atac = _atac_of(a, kind)
+    assert list(atac.obs_names) != list(a.obs_names)
+    f = tmp_path / "DIAGONAL_FIRST"
+    kw = dict(rna="X", atac=atac, atac_kind=kind, labels="obs:celltype")
+    ingest.export_dataset(a, f, category="diagonal", **kw)
+    assert _bars(f / "rna.h5") == list(a.obs_names)
+    assert _bars(f / name) == list(atac.obs_names)
+    before = {p.name: p.read_bytes() for p in f.iterdir()}
+    for paired in (dict(kw, category="vertical"), dict(rna="X"),
+                   dict(rna=None, adt="obsm:protein"), dict(rna=None, labels="obs:celltype")):
+        with pytest.raises(ValueError) as e:
+            ingest.export_dataset(a, f, overwrite=True, **paired)
+        assert str(e.value) == (
+            f"rna.h5 and {name} of {f} hold the same cells in different orders, so a row "
+            f"of one is not the cell of the same row of the other. Export this data again "
+            f"in one call, into a new folder.")
+        assert {p.name: p.read_bytes() for p in f.iterdir()} == before
+    assert capsys.readouterr().err == ""
+    # the other way round, each call follows the files of the one before
+    g = tmp_path / "PAIRED_FIRST"
+    ingest.export_dataset(a, g, category="vertical", **kw)
+    assert capsys.readouterr().err == ""
+    ingest.export_dataset(a, g, category="diagonal", overwrite=True, **kw)
+    assert capsys.readouterr().err == _note(f"{name} and atac_cty.csv", "atac.h5", g)
+    ingest.export_dataset(a, g, category="vertical", overwrite=True, **kw)
+    assert capsys.readouterr().err == ""
+    for mat in ("rna.h5", "atac.h5", name):
+        assert _bars(g / mat) == list(a.obs_names)
+    for cty in ("cty.csv", "rna_cty.csv", "atac_cty.csv"):
+        assert _labels(g / cty) == list(a.obs["celltype"])
+    assert np.array_equal(_matrix(g / name).X, atac[list(a.obs_names)].X)

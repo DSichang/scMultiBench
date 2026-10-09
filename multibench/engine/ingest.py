@@ -1491,7 +1491,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     **Master cell order.** Every modality is re-indexed by barcode to one
     order: ``data.obs_names``, or the first modality's ``obs_names`` when
-    ``data`` is not given.
+    ``data`` is not given. A call that writes labels only and is given no
+    object takes its cells from the index of the ``labels`` / ``batch``
+    Series.
 
     - the same barcodes in another order are reordered;
     - a barcode set that differs raises ``ValueError`` naming the strays;
@@ -1513,6 +1515,12 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     as ``atac_peak.h5`` or ``atac_gas.h5``. ``labels`` is read from each
     object's own ``.obs`` into ``rna_cty.csv`` and ``atac_cty.csv``. A call
     that writes one modality writes only that modality's label file.
+
+    Each side keeps the row order of its own object. When ``rna`` and
+    ``atac`` hold the same cells in two orders, a later paired export of
+    these cells into the same folder (``category='vertical'``, or no
+    ``category``) raises ``ValueError``: write the paired files first, or
+    use another folder.
 
     Diagonal data in several batches is one call per batch with
     ``batch_index=N``: ``rna<N>.h5``, ``atac_gas<N>.h5`` or
@@ -1703,8 +1711,12 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         masters[side] = m
         sides[side] = [(role, _align_cells(a, master=m, master_name=mname, role=what), kw, what, src)
                        for role, a, kw, what, src in mats]
-    if not masters and master is not None:
-        masters["rna"] = master         # labels only
+    if not masters:                     # labels only
+        if master is None:
+            # no object names the cells: a Series indexed by barcode does
+            master = _series_cells(labels, batch)
+        if master is not None:
+            masters["rna"] = master
     if any(len(m) == 0 for m in masters.values()):
         raise ValueError(_NO_CELLS)
 
@@ -1779,6 +1791,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     for suf, mask in groups:
         for side, role, X, feats, bars, what in prepared:
             sub = X if mask is None else X[mask]
+            if np.ndim(sub) != 2:
+                # a sparse X left on disk (backed): _write_canonical refuses
+                # it, but only after the folder is made
+                raise ValueError(f"matrix must be 2-D (cells x features), got shape "
+                                 f"{np.asarray(sub).shape}")
             sub_bars = bars if mask is None else [bars[i] for i in mask]
             path = out / _export_filename(role, suf, category)
             plan.append((path, "matrix", (sub, feats, sub_bars), (side, suf)))
@@ -1976,7 +1993,9 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
     plain ``cty*.csv``; in a ``batch_index`` call the files without a batch
     number and those of other batch numbers (up to ``n_batches``); a
     numbered label file when the call writes no numbered file; a label file
-    that cannot be read.
+    that cannot be read. ``n_batches`` counts the batches of the data, so a
+    batch number above it is a leftover under (a) on either side of a
+    diagonal call.
     """
     other_batch, other_cells, other_count = [], [], []
     if not out.is_dir():
@@ -2174,6 +2193,24 @@ def _names_of(spec):
     if hasattr(spec, "index") and hasattr(spec, "columns"):
         return [str(x) for x in spec.index]
     return None
+
+
+def _series_cells(*specs):
+    """Cell barcodes of a call that writes labels only and is given no object:
+    the index of the first ``labels`` / ``batch`` Series that has one, else
+    ``None``.
+
+    A plain ``RangeIndex`` numbers the rows and names no cell, and an index
+    that is not unique cannot be matched by name: with either, the call is
+    taken row by row, as a list is, and judged by its number of cells.
+    """
+    import pandas as pd
+
+    named = [[str(x) for x in s.index] for s in specs
+             if isinstance(s, pd.Series) and not isinstance(s.index, pd.RangeIndex)]
+    if not named or any(len(set(names)) != len(names) for names in named):
+        return None
+    return named[0]
 
 
 def _first_master(data, specs, *, diagonal):
