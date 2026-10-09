@@ -415,6 +415,37 @@ def test_cli_wording(tmp_path, capsys):
     assert _snapshot(out) == before
 
 
+def test_cli_wording_of_n_batches(tmp_path, monkeypatch):
+    """The option --n-batches comes with the command line's other new options.
+    What export_dataset says while a command runs is fixed here."""
+    from multibench import config
+    f = tmp_path / "INDEX"
+    kw = dict(rna="X", labels="obs:celltype", category="cross")
+    for b in (1, 2, 3):
+        _write(_cells(60, f"EX{b}", seed=b)[0], f, batch_index=b, **kw)
+    me, _ = _cells(60, "ME", seed=9)
+    monkeypatch.setattr(config, "_CLI", True)
+    assert _refused(me, f, batch_index=1, n_batches=2, **kw) == (
+        f"{f} holds files of other data that this command does not write. rna3.h5 and "
+        f"cty3.csv belong to batch 3, and --n-batches 2 says that the data has 2 batches. A "
+        f"method would read them as part of this dataset. Convert into a new folder, and use "
+        f"that folder name in scan and run-all too. To keep this folder, delete these files "
+        f"and run convert again.")
+    g = tmp_path / "ARGS"
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(me, g, n_batches=2, rna="X", category="cross")
+    assert str(e.value) == (
+        "--n-batches goes with --batch-index. It says how many batches the commands with "
+        "--batch-index write in total. With --batch, the column gives the number.")
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(me, g, batch_index=3, n_batches=2, rna="X", category="cross")
+    assert str(e.value) == "--batch-index 3 is larger than --n-batches 2."
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(me, g, batch_index=1, n_batches=0, rna="X", category="cross")
+    assert str(e.value) == "--n-batches must be a positive integer, got 0"
+    assert not g.exists()
+
+
 # ------------------------------------------------------------------ the names
 def test_the_rule_uses_the_resolver_names():
     """Every name export_dataset writes is a layout name, and for a name with

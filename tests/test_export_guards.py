@@ -239,6 +239,38 @@ def test_the_check_and_the_reader_agree_on_random_labels(tmp_path):
     assert refused > 50 and written > 50
 
 
+# ------------------------------------------------- a refusal writes nothing
+def test_a_refused_call_leaves_a_folder_as_it_was(tmp_path):
+    """Every check runs before the first write: a call that is refused for
+    what it was given leaves each file of an existing folder byte for byte."""
+    a = _cite()
+    out = ingest.export_dataset(a, tmp_path / "HERE", rna="X", labels="obs:ct")
+    (out / "notes.txt").write_text("mine\n")
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    gaps, words, mixed, prot = _cite(), _cite(), _cite(), _cite()
+    gaps.obs["donor"] = ["d1", None] * 30
+    words.obs["ct"] = ["T", "NA"] * 30
+    mixed.var["feature_types"] = ["Gene Expression"] * 10 + ["Peaks"] * 10
+    prot.obsm["protein"] = np.ones((60, 3))
+    refused = [
+        (a[:0].copy(), dict(rna="X")),
+        (gaps, dict(rna="X", batch="obs:donor", category="cross")),
+        (words, dict(rna="X", labels="obs:ct")),
+        (mixed, dict(rna="X")),
+        (prot, dict(rna=None, adt="X")),
+        (a, dict(rna="X", labels="nope")),
+        (a, dict(rna="X", labels="annotation.csv")),
+        (a, dict(rna="X", labels="obs:nope")),
+        (a, dict(rna="X", n_batches=2)),
+        (a, dict(rna="X", batch_index=3, n_batches=2, category="cross")),
+        (a, dict(rna="layer:nope")),
+    ]
+    for data, kw in refused:
+        with pytest.raises((ValueError, KeyError)):
+            ingest.export_dataset(data, out, overwrite=True, **kw)
+        assert {p.name: p.read_bytes() for p in out.iterdir()} == before, kw
+
+
 # ------------------------------------------------------------ ADT taken from X
 def test_adt_in_x_with_an_embedding(tmp_path):
     """A processed ADT file carries its embeddings. The four tutorials that

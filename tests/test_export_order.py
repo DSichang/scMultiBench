@@ -153,10 +153,16 @@ def test_batch_column_orders_each_batch(tmp_path, capsys):
     ingest.export_dataset(_shuffled(a), f, rna=None, labels="obs:celltype", **kw)
     assert capsys.readouterr().err == "".join(
         _note(f"cty{b}.csv", f"rna{b}.h5", f) for b in (1, 2, 3))
+    # a matrix too: each batch of the ADT follows the RNA of its batch
+    ingest.export_dataset(_shuffled(a, seed=5), f, rna=None, adt="obsm:protein", **kw)
+    assert capsys.readouterr().err == "".join(
+        _note(f"adt{b}.h5", f"rna{b}.h5", f) for b in (1, 2, 3))
     for b in (1, 2, 3):
         bars = _bars(f / f"rna{b}.h5")
         assert bars == [x for x, d in zip(a.obs_names, a.obs["donor"]) if d == f"d{b - 1}"]
         assert _labels(f / f"cty{b}.csv") == [f"type_of_{x}" for x in bars]
+        assert _bars(f / f"adt{b}.h5") == bars
+        assert np.array_equal(_matrix(f / f"adt{b}.h5").X, a.obsm["protein"].loc[bars].to_numpy())
 
 
 def test_other_cells_have_no_order_to_follow(tmp_path, capsys):
