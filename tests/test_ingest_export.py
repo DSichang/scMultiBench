@@ -78,15 +78,25 @@ def test_export_dataset_selectors_and_errors(tmp_path):
         ingest.export_dataset(a, tmp_path / "E", rna="mod:rna")
     with pytest.raises(KeyError, match="column 'nope' not in obs"):
         ingest.export_dataset(a, tmp_path / "E", rna="X", labels="obs:nope")
-    with pytest.raises(ValueError, match="use 'obs:<col>'"):
-        ingest.export_dataset(a, tmp_path / "E", rna="X", labels="ct")
+    # a column is named with or without the obs: prefix
+    bare = ingest.export_dataset(a, tmp_path / "BARE", rna="X", labels="ct")
+    prefixed = ingest.export_dataset(a, tmp_path / "PREFIXED", rna="X", labels="obs:ct")
+    assert pd.read_csv(bare / "cty.csv")["x"].tolist() \
+        == pd.read_csv(prefixed / "cty.csv")["x"].tolist() == a.obs["ct"].astype(str).tolist()
+    with pytest.raises(ValueError, match="is not a column of data.obs"):
+        ingest.export_dataset(a, tmp_path / "E", rna="X", labels="nope")
     with pytest.raises(ValueError, match="nothing to export"):
         ingest.export_dataset(a, tmp_path / "E", rna=None)
     with pytest.raises(ValueError, match="atac_kind= given without atac="):
         ingest.export_dataset(a, tmp_path / "E", atac_kind="peak")
     # adt='X' when obsm keys exist is the classic silent mistake -> refused
-    with pytest.raises(ValueError, match="adt requested but obsm= not given"):
+    with pytest.raises(ValueError) as e:
         ingest.export_dataset(a, tmp_path / "E", rna=None, adt="X")
+    assert str(e.value) == (
+        "adt='X' takes X of this object, and the object also holds the obsm key 'protein'. "
+        "If one of them is the protein matrix, pass adt='obsm:<key>'. If X is the protein "
+        "matrix, delete it first, for example del adata.obsm['protein'].")
+    assert not (tmp_path / "E").exists()
 
 
 def test_export_dataset_atac_kinds(tmp_path):

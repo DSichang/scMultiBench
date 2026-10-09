@@ -224,9 +224,13 @@ def _atac_filename(modality: str, category: str | None) -> str:
 
 
 def _is_canonical_h5(path: Path) -> bool:
+    """``matrix/data`` is there as a 2-D dataset. A 10x Genomics ``.h5`` also
+    has a ``matrix/data``: the 1-D values of a sparse matrix, next to
+    ``matrix/indptr``."""
     try:
         with h5py.File(path, "r") as f:
-            return "matrix/data" in f
+            d = f.get("matrix/data")
+            return isinstance(d, h5py.Dataset) and d.ndim == 2
     except (OSError, KeyError):
         return False
 
@@ -259,8 +263,19 @@ def _to_anndata(src):
         try:
             with h5py.File(p, "r") as f:
                 keys = sorted(f.keys())
+                tenx = "matrix/indptr" in f
         except OSError as exc:
             raise ValueError(f"{p} is not a readable HDF5 file: {exc}") from exc
+        if tenx:
+            recipe = 'The documentation has the steps as the recipe "A 10x .h5 file".'
+            raise ValueError(config.hint(
+                f"{p} is a 10x Genomics file, not a multibench dataset file. Read it "
+                f"with scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
+                f"var['feature_types'] and write a dataset folder with "
+                f"mtb.io.export_dataset. {recipe}",
+                f"{p} is a 10x Genomics file. multibench convert reads .h5ad files, not "
+                f"this file. Read it in Python with scanpy, save one .h5ad file per "
+                f"modality and convert those. {recipe}"))
         raise ValueError(
             f"{p} has no dataset 'matrix/data'; found keys {keys} - a canonical "
             f"input .h5 holds matrix/data (features x cells), matrix/features and "
@@ -326,8 +341,80 @@ def _no_names_message(what: str, source: str, n_feat: int, fix: str) -> str:
             f"feature_0 to feature_{n_feat - 1}. {fix}")
 
 
+def _shown(spec) -> str:
+    """How a message shows the value of an argument: a selector as it was
+    written, an object by its type."""
+    return repr(spec) if isinstance(spec, str) else type(spec).__name__
+
+
+#: the name a 10x Genomics file gives the features of each modality in
+#: ``var['feature_types']``
+_TENX_TYPE = {"rna": "Gene Expression", "adt": "Antibody Capture", "atac": "Peaks"}   # wording only
+
+
+def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
+    """``ValueError`` when the matrix of ``adata`` holds features of more than
+    one type (``var['feature_types']``, as in a 10x Genomics file read with
+    ``gex_only=False``): written as it is, genes and peaks would be one file.
+
+    The values that occur are counted, not the categories of the column, so
+    a filtered view passes. ``arg`` is the keyword the user wrote (``'rna'``)
+    and ``spec`` the selector, ``None`` for an object; ``to_canonical`` has
+    neither and gives the modality as ``role``. They only word the message.
+    """
+    var = getattr(adata, "var", None)
+    if var is None or "feature_types" not in var.columns:
+        return
+    counts = var["feature_types"].astype(str).value_counts()
+    if len(counts) < 2:
+        return
+    from .resolve import _and_list
+    types = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    listed = [f"{n:,} {t!r}" for t, n in types[:4]] \
+        + ([f"{len(types) - 4} more"] if len(types) > 4 else [])
+    head = (f"{int(counts.sum()):,} features of {len(types)} types: {_and_list(listed)} "
+            f"(var['feature_types']). One file holds one modality.")
+    family = str(arg or role or "").split("_")[0]
+    family = family if family in _TENX_TYPE else None
+    example = _TENX_TYPE.get(family)
+    if example not in counts.index or role == "atac_gas":
+        example = None                          # a 10x file has no gene-activity type
+    kind = f"{family.upper()} features" if family else "features of one modality"
+    subset = "adata[:, adata.var['feature_types'] == " + repr(example or "<type>") + "]"
+    obj = "adata" if arg is None or spec is not None else arg
+    way_out = config.hint(
+        f"If all of them are {kind}, delete the column from the object first, for "
+        f"example del {obj}.var['feature_types'].",
+        f"If all of them are {kind}, delete the var column feature_types in Python and "
+        f"save the file again.")
+    if arg is None:                             # to_canonical, and what mtb.run converts
+        flags = f'--{family or "rna"} "X[feature_types={example or "<type>"}]"'
+        if family == "atac":                    # --atac does not go without its kind
+            flags += " --atac-kind " + ("gene_activity" if role == "atac_gas" else "peak")
+        how = "for example" if example else "as"
+        raise ValueError(f"The matrix holds {head} " + config.hint(
+            f"Pass the features of one type, {how} {subset}, or use "
+            f"mtb.io.export_dataset, whose selectors take a filter such as "
+            f"'X[feature_types={example or '<type>'}]'. {way_out}",
+            f"Write the dataset folder instead, {how} multibench convert SRC OUT {flags}."))
+    if spec is not None and _split_var_filter(spec)[1] is None:
+        filtered = f"{spec}[feature_types={example or '<type>'}]"
+        filtered = config.hint(f"{arg}='{filtered}'", f'--{arg} "{filtered}"')
+        add = (f"Add a filter, for example {filtered}." if example else
+               f"Add a filter that names the type holding the {kind}, as {filtered}.")
+        raise ValueError(config.hint(f"{arg}={spec!r}", f"--{arg} {spec}")
+                         + f" selects {head} {add} {way_out}")
+    shown = repr(spec) if spec is not None else type(adata).__name__
+    raise ValueError(
+        config.hint(f"{arg}={shown}", f"--{arg} {spec}") + f" holds {head} " + config.hint(
+            f"Pass the features of one type, {'for example' if example else 'as'} "
+            f"{arg}={subset}. {way_out}",
+            f"A selector takes one filter. Keep the features of one type in the file "
+            f"first. In Python: {subset}.write_h5ad(\"one_type.h5ad\")."))
+
+
 def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
-                 names_arg=None):
+                 names_arg=None, arg=None, spec=None, role=None):
     """Return ``(X, feature_names)`` for the requested slot of ``adata``.
 
     ``obsm`` matrices carry no var axis in AnnData, so feature names come from
@@ -338,6 +425,10 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
     in every downstream readout. ``what`` labels the warning (``'adt'``);
     ``names_arg`` is the caller's keyword that takes the names
     (``'adt_names'``, ``'feature_names'``), offered first in Python.
+
+    ``X`` and a layer follow the var axis, which must hold one feature type
+    (:func:`_check_one_feature_type`; ``arg``, ``spec`` and ``role`` word its
+    message, and ``role`` is ``what`` unless given).
     """
     if layer is not None and obsm is not None:
         raise ValueError("pass at most one of layer= / obsm=")
@@ -369,6 +460,7 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             warnings.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
                           UserWarning, stacklevel=3)
         return X, names
+    _check_one_feature_type(adata, arg=arg, spec=spec, role=role or what)
     if layer is not None:
         if layer not in adata.layers:
             raise KeyError(f"layer {layer!r} not found; available: {list(adata.layers)}")
@@ -381,6 +473,22 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             raise ValueError(f"{len(names)} feature names for {X.shape[1]} features")
         return X, names
     return X, [str(v) for v in adata.var_names]
+
+
+def _adt_obsm_keys(adata) -> list:
+    """The ``obsm`` keys that can hold a protein matrix: the ones that do not
+    start with ``X_``, where scanpy keeps embeddings (``X_pca``, ``X_umap``)."""
+    return [k for k in getattr(adata, "obsm", {}) if not str(k).startswith("X_")]
+
+
+def _layout_family(name: str) -> str | None:
+    """``'rna'``, ``'adt'`` or ``'atac'`` for a matrix file name of the
+    dataset layout (``rna2.h5``, ``atac_peak.h5``), else ``None``."""
+    from .resolve import _LAYOUT_FILE_RE
+    m = _LAYOUT_FILE_RE.match(name)
+    if not m or m.group(1) is None:
+        return None
+    return "atac" if name.startswith("atac") else name[:3]
 
 
 def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
@@ -541,7 +649,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     FileNotFoundError
         ``src`` is a path that does not exist.
     ValueError
-        Invalid or conflicting arguments, or a non-canonical ``.h5`` (full list in Notes).
+        Invalid or conflicting arguments, a non-canonical ``.h5``, or features of several types (full list in Notes).
     KeyError
         ``layer``, ``obsm`` or ``mod`` names an entry the object does not have.
     ImportError
@@ -585,7 +693,9 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     **ADT matrices.** With ``modality='adt'`` on an AnnData that has
     ``obsm`` keys, ``obsm=`` or ``layer=`` must say where the protein matrix
     is; otherwise ``adata.X`` (usually the RNA) would be written as
-    ``adt.h5``, so it raises. ``layer`` and ``obsm`` are mutually exclusive.
+    ``adt.h5``, so it raises. Keys that start with ``X_`` (``X_pca``,
+    ``X_umap``) hold embeddings and do not count. ``layer`` and ``obsm`` are
+    mutually exclusive.
     The feature names of an ``obsm`` matrix come from the first of:
 
     1. ``feature_names``;
@@ -627,6 +737,13 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     (log-normalised data); ``layer='counts'`` usually holds the counts, and
     for an ADT matrix taken with ``obsm=``, another ``obsm`` key.
 
+    **One feature type.** One file holds one modality. When
+    ``var['feature_types']`` of the object names several types, as in a 10x
+    Genomics file read with ``gex_only=False``, ``X`` or a layer would be
+    written with genes and peaks together, so it raises. Pass the features
+    of one type, or use ``mtb.io.export_dataset``, whose selectors take a
+    filter.
+
     **Streaming.** Sparse matrices (CSR/CSC, in memory or inside an
     ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
     at a time, without densifying the whole matrix. The defaults (gzip,
@@ -647,11 +764,13 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     - ``convert=False`` on a non-canonical input;
     - an ``.h5`` without ``matrix/data`` (the message lists the keys it does
       hold - a top-level ``data`` dataset is a method output, not an input);
+    - a 10x Genomics ``.h5`` file;
     - an unsupported suffix;
     - ``mod`` missing for a MuData, or given for anything else;
     - ``layer`` and ``obsm`` together;
     - ``modality='adt'`` on an AnnData with ``obsm`` keys but no ``obsm=`` /
       ``layer=``;
+    - ``X`` or a layer with several values in ``var['feature_types']``;
     - a feature-name or barcode count that does not match the matrix.
 
     The ``FileNotFoundError`` message names the path and the current
@@ -694,15 +813,18 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     elif mod is not None:
         raise ValueError("mod= only applies to MuData input")
 
-    if modality == "adt" and obsm is None and layer is None and len(adata.obsm):
+    if modality == "adt" and obsm is None and layer is None and _adt_obsm_keys(adata):
         raise ValueError(
             f"adt requested but obsm= not given; found obsm keys {list(adata.obsm)} - "
             "pass obsm='<key>' (or layer=) to select the protein matrix, otherwise "
             "adata.X (usually the RNA) would be written as adt.h5")
 
+    # without modality=, the file name says which features the matrix should
+    # hold (mtb.run converts an input to inputs/<role>.h5)
     X, feats = _pick_matrix(adata, layer=layer, obsm=obsm,
                             feature_names=feature_names, what=modality,
-                            names_arg="feature_names")
+                            names_arg="feature_names",
+                            role=modality or _layout_family(out.name))
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
@@ -879,13 +1001,20 @@ def _write_labels(labels, path: Path | str) -> Path:
     pathlib.Path
         ``path``.
     """
-    import pandas as pd
+    from ..eval import io as eio
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     vals = np.asarray(labels)
     if vals.ndim != 1:
         raise ValueError(f"labels must be 1-D, got shape {vals.shape}")
-    pd.DataFrame({"x": [str(v) for v in vals]}).to_csv(path, index=False)
+    # The rows DataFrame.to_csv writes, written here: its csv writer follows
+    # the Python version, and up to 3.10 it leaves a lone carriage return
+    # bare, which the reader takes for the end of a row. An empty label is
+    # written "", because the reader skips an empty line.
+    rows = [eio._csv_field(str(v)) or '""' for v in vals]
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(os.linesep.join(["x", *rows]) + os.linesep)
     return path
 
 
@@ -956,7 +1085,8 @@ def _select_obs(data, spec, *, what):
     ``'obs:<col>'`` reads ``data.obs`` (a MuData's global ``.obs``);
     ``'mod:<name>.obs:<col>'`` reads ``mdata[name].obs``; for a MuData,
     ``'<name>:<col>'`` reads ``mdata[name].obs``, then muon's prefixed copy
-    ``mdata.obs['<name>:<col>']``.
+    ``mdata.obs['<name>:<col>']``. A name without a prefix is a column of
+    ``data.obs``, as ``'obs:<col>'`` is.
     """
     if not isinstance(spec, str) or not spec:
         raise ValueError(f"{what}= must be 'obs:<col>' or 'mod:<name>.obs:<col>', got {spec!r}")
@@ -999,7 +1129,32 @@ def _select_obs(data, spec, *, what):
                 msg += (f". The global mdata.obs has {col!r}: pass "
                         + config.hint(f"{what}='obs:{col}'", f"--{what} obs:{col}"))
             raise KeyError(msg)
-    raise ValueError(f"{what}={spec!r}: use 'obs:<col>' (or 'mod:<name>.obs:<col>')")
+    if spec in data.obs.columns:
+        return data.obs[spec]
+    if _is_file_name(spec):
+        raise ValueError(_file_name_message(spec, what))
+    raise ValueError(
+        config.hint(f"{what}={spec!r}", f"--{what} {spec}") + " is not a column of "
+        + config.hint("mdata.obs" if mu else "data.obs", "the obs of SRC")
+        + f". Its columns are {list(data.obs.columns)}. Name a column, as "
+        + config.hint(f"{what}='obs:<col>' or {what}='<col>', or pass the values as a "
+                      f"Series indexed by barcode.", f"--{what} obs:<col>."))
+
+
+def _is_file_name(spec: str) -> bool:
+    """A ``labels`` / ``batch`` string that names a table, not a column."""
+    return Path(spec).suffix.lower() in (".csv", ".tsv", ".txt") or Path(spec).is_file()
+
+
+def _file_name_message(spec: str, what: str) -> str:
+    """``labels`` / ``batch`` take a column of the data: what to do with a file."""
+    name = "celltype" if what == "labels" else "batch"
+    return config.hint(
+        f"{what}={spec!r} is a file name, and {what}= takes a column of the data. Read "
+        f"the file and add the column first, for example adata.obs[{name!r}] = "
+        f"pd.read_csv({spec!r}, index_col=0)['<column>'], then pass {what}='obs:{name}'.",
+        f"--{what} {spec} is a file name, and --{what} takes a column of SRC, as "
+        f"obs:<col>. Add the column to the .h5ad file first.")
 
 
 def _link_or_copy(src: Path, dst: Path):
@@ -1172,7 +1327,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    category: str | None = None,
                    adt_names: list | None = None,
                    batch_index: int | None = None,
-                   overwrite: bool = False) -> Path:
+                   overwrite: bool = False,
+                   n_batches: int | None = None) -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
     Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
@@ -1200,12 +1356,13 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         What ``atac`` holds: ``'peak'`` or ``'gene_activity'``; decides the
         ATAC filename.
     labels : str, Series, sequence or None
-        Cell-type labels: ``'obs:<col>'`` (a MuData's global ``.obs``),
-        ``'<mod>:<col>'`` (``mdata[mod].obs``), a Series indexed by barcode, or
-        a sequence.
+        Cell-type labels: a column, named ``'obs:<col>'`` or ``'<col>'`` (a
+        MuData's global ``.obs``), ``'<mod>:<col>'`` (``mdata[mod].obs``), a
+        Series indexed by barcode, or a sequence.
     batch : str, Series, sequence or None
         Batch per cell, same forms as ``labels``; splits the files per batch
-        (``rna1.h5``, ``rna2.h5``, ...) for mosaic or cross.
+        (``rna1.h5``, ``rna2.h5``, ...) for mosaic or cross. Every cell
+        needs a batch.
     dtype : str
         Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
     compression : str or None
@@ -1222,6 +1379,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     overwrite : bool
         ``True`` = replace files already in ``dataset_dir``; ``False`` = raise
         before writing anything.
+    n_batches : int or None
+        With ``batch_index``: how many batches the calls write in total.
+        Files of a higher batch number in ``dataset_dir`` are refused.
 
     Returns
     -------
@@ -1235,7 +1395,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     KeyError
         A selector names a ``mod``, ``obsm``, ``layer``, ``obs`` or ``var`` column that is absent.
     FileExistsError
-        A file this call would write exists and ``overwrite`` is ``False``.
+        A file this call would write exists and ``overwrite`` is ``False``, or the folder holds files of other data.
 
     Warns
     -----
@@ -1290,6 +1450,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                           labels="obs:celltype", category="vertical")
     ```
 
+    Without a filter on such data, ``export_dataset`` raises ``ValueError``.
+
     **Raw counts.** Methods normalise the data themselves; give raw counts. A
     ``UserWarning`` says when sampled RNA, ADT or peak values are not whole
     numbers (log-normalised data). ``rna='layer:counts'`` usually selects the
@@ -1302,6 +1464,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ``labels`` / ``batch`` read ``'obs:<col>'`` from the global ``mdata.obs``.
     ``'<mod>:<col>'`` reads ``mdata[mod].obs``, then muon's copy
     ``mdata.obs['<mod>:<col>']``; ``'mod:<mod>.obs:<col>'`` works too.
+
+    **Column names.** ``"obs:<column>"`` and ``"<column>"`` name a column of
+    the object you pass. ``export_dataset`` and ``evaluate`` take both.
+    ``run_all`` and ``rescore`` are given a folder, not the object, so they
+    take the column itself, for example ``batch=adata.obs["donor"]``.
 
     **Master cell order.** Every modality is re-indexed by barcode to one
     order: ``data.obs_names``, or the first modality's ``obs_names`` when
@@ -1341,8 +1508,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     and numbered files are written: ``rna1.h5``, ``rna2.h5`` ...,
     ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52). Only
     cross and mosaic methods read numbered files. For a vertical folder,
-    export without ``batch`` and pass the batch column to
-    ``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``.
+    export without ``batch`` and pass the batch column itself, such as
+    ``adata.obs["donor"]``, to ``mtb.run_all(batch=...)`` or
+    ``mtb.evaluate(batch=...)``.
 
     ``batch_index=N`` writes the whole object as batch ``N``. A mosaic
     delivery of one file per batch (the D46 pattern: CITE-seq, Multiome,
@@ -1358,7 +1526,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     ```
 
     ``mtb.describe_layout('mosaic')`` lists the batch patterns the methods
-    read.
+    read. ``n_batches=3`` in these calls says that the data has three
+    batches: a file of batch 4 in the folder is then refused (*Existing
+    files*).
 
     **ATAC filenames.** Vertical methods read ``atac.h5``;
     ``method_info(m)['atac']`` says whether it must hold peaks or gene
@@ -1383,7 +1553,13 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     **Existing files.** Every check runs before ``dataset_dir`` is created;
     a failed call writes nothing. When a file the call would write already
     exists, ``FileExistsError`` lists it; pass ``overwrite=True`` to replace
-    it. Other files in the folder are kept.
+    it. A call also raises ``FileExistsError`` when the folder holds files of
+    other data that it does not write: files with other cells, files of
+    other batch numbers after ``batch=``, and with ``batch_index=`` files of
+    a batch number above ``n_batches``. ``overwrite=True`` does not remove
+    them. Files that are not part of the dataset layout are never touched. A
+    file written for cells that the folder already holds follows the cell
+    order of the files in the folder.
 
     **Errors.** ``ValueError`` is raised for:
 
@@ -1392,18 +1568,30 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     - an unknown ``category``;
     - a selector string with ``data=None``, a malformed selector, or a
       feature filter that matches nothing;
+    - ``X`` or a layer with several values in ``var['feature_types']`` and
+      no filter that keeps one;
+    - ``adt`` taking ``X`` of an object that also holds an ``obsm`` matrix
+      under a key that does not start with ``X_``;
+    - data with 0 cells;
     - a bare array whose cell order cannot be checked (no barcodes anywhere)
       or with the wrong row count;
     - a modality whose barcodes differ from the master order (the message
       names the strays);
     - a ``labels`` / ``batch`` Series missing cells, or a sequence of the
       wrong length;
-    - a label that is missing (NaN, None or ``''``): ``mtb.evaluate`` would
-      score it as one more cell type;
+    - ``labels`` / ``batch`` naming a file or a column the object does not
+      have;
+    - a label that is missing (NaN, None, ``''`` or text that a label file
+      reads as missing, such as ``'NA'``): ``mtb.evaluate`` does not score a
+      missing label;
+    - a batch that is missing, by the same definition;
     - ``batch`` with ``category='vertical'`` or ``'diagonal'``, or together
       with ``batch_index``;
     - ``batch_index`` that is not a positive integer, or without
       ``category='mosaic'`` / ``'cross'`` / ``'diagonal'``;
+    - ``n_batches`` without ``batch_index``, not a positive integer, or
+      smaller than ``batch_index``;
+    - cells that the folder already holds in two different row orders;
     - ``category='diagonal'`` with labels but no matrix, or with a plain
       label sequence for both RNA and ATAC.
 
@@ -1433,6 +1621,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
         rna = None                      # no data to select from: no RNA
+    given = {"rna": rna, "adt": adt, "atac": atac}      # as written, for messages
     if _is_mudata(data):
         # a bare modality name selects mdata.mod[name].X; full
         # 'mod:<name>[...]' selectors pass through
@@ -1446,7 +1635,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise ValueError("atac_kind= given without atac=")
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
-    _check_batch_args(batch, batch_index, category, adt=adt, atac=atac)
+    _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)
     diagonal = category == "diagonal"
     if diagonal and labels is not None and rna is None and adt is None and atac is None:
         raise ValueError(
@@ -1497,6 +1686,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                        for role, a, kw, what, src in mats]
     if not masters and master is not None:
         masters["rna"] = master         # labels only
+    if any(len(m) == 0 for m in masters.values()):
+        raise ValueError(_NO_CELLS)
 
     # --- labels: one vector per side (diagonal) or one for the paired cells
     lab = {}
@@ -1508,6 +1699,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             vec = _as_obs_vector(data, labels, what="labels", master=m)
             if m is not None and len(vec) != len(m):
                 raise ValueError(f"labels has {len(vec)} entries for {len(m)} cells")
+            if len(vec) == 0:
+                raise ValueError(_NO_CELLS)     # labels alone, and none of them
             _check_labels_complete(
                 vec, spec=labels, where=f"the cells ({_labels_where(data, labels)})",
                 advice="give every cell a label, or subset the data to the labelled cells "
@@ -1520,6 +1713,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         bvals = _as_obs_vector(data, batch, what="batch", master=m)
         if m is not None and len(bvals) != len(m):
             raise ValueError(f"batch has {len(bvals)} entries for {len(m)} cells")
+        _check_batch_complete(bvals, spec=batch)
         keys = sorted(set(bvals.tolist()), key=lambda v: str(v))
         groups = [(str(i + 1), np.flatnonzero(bvals == k)) for i, k in enumerate(keys)]
     elif batch_index is not None:
@@ -1531,15 +1725,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     prepared = []                       # (side, role, X, feats, bars, what)
     for side, mats in sides.items():
         for role, a, kw, what, src in mats:
-            if role == "adt" and not kw and len(getattr(a, "obsm", {})):
-                raise ValueError(
-                    f"adt requested but obsm= not given; found obsm keys {list(a.obsm)} - "
-                    "pass obsm='<key>' (or layer=) to select the protein matrix, otherwise "
-                    "adata.X (usually the RNA) would be written as adt.h5")
+            if role == "adt" and not kw and _adt_obsm_keys(a):
+                raise ValueError(_adt_in_x_message(given["adt"], _adt_obsm_keys(a)))
             X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"),
                                     feature_names=adt_names if role == "adt" else None,
                                     what=role,
-                                    names_arg="adt_names" if role == "adt" else None)
+                                    names_arg="adt_names" if role == "adt" else None,
+                                    arg=what, spec=given[what]
+                                    if isinstance(given[what], str) else None)
             if role in ("atac_peak", "atac_gas"):
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
@@ -1560,34 +1753,55 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 _warn_not_counts(X, what, hint, stacklevel=2)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
-    # --- the files this call writes
-    plan = []                           # (path, kind, payload)
+    # --- the files this call writes, each with its unit: the side and the
+    # batch number ('' without one) whose cells it holds
+    plan = []                           # (path, kind, payload, unit)
+    units = {}                          # unit -> (barcodes or None, number of cells)
     for suf, mask in groups:
         for side, role, X, feats, bars, what in prepared:
             sub = X if mask is None else X[mask]
             sub_bars = bars if mask is None else [bars[i] for i in mask]
             path = out / _export_filename(role, suf, category)
-            plan.append((path, "matrix", (sub, feats, sub_bars)))
+            plan.append((path, "matrix", (sub, feats, sub_bars), (side, suf)))
             if role == "atac_peak" and category is None:
-                plan.append((out / f"atac{suf}.h5", "link", path))
+                plan.append((out / f"atac{suf}.h5", "link", path, (side, suf)))
         for side, vec in lab.items():
             name = (f"{side}_cty{suf}.csv" if diagonal else f"cty{suf}.csv")
-            plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask]))
-    existing = [pth.name for pth, _, _ in plan if pth.exists() or pth.is_symlink()]
+            plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask],
+                         (side, suf)))
+        for side in dict.fromkeys(list(masters) + list(lab)):
+            m = masters.get(side)
+            if m is None:               # labels alone, without barcodes
+                units[(side, suf)] = (None, len(lab[side]) if mask is None else len(mask))
+            else:
+                units[(side, suf)] = (m if mask is None else [m[i] for i in mask],
+                                      len(m) if mask is None else len(mask))
+    existing = [pth.name for pth, _, _, _ in plan if pth.exists() or pth.is_symlink()]
+    found = _leftovers(out, {pth.name for pth, _, _, _ in plan}, units, diagonal=diagonal,
+                       by_column=batch is not None, batch_index=batch_index,
+                       n_batches=n_batches)
+    if any(found):
+        raise FileExistsError(_leftover_message(
+            out, found, written=[int(suf) for suf, _ in groups if suf],
+            n_batches=n_batches, replace=bool(existing) and not overwrite))
     if existing and not overwrite:
         from .resolve import _and_list
         raise FileExistsError(
             f"{out} already holds {_and_list(existing)}. Pass "
             f"{config.hint('overwrite=True', '--overwrite')} to replace "
             f"{'it' if len(existing) == 1 else 'them'}.")
-    for pth, kind, payload in plan:
+    # --- cells that the folder already holds keep the row order of its files
+    follow = _row_order(out, units, diagonal=diagonal)
+    plan = [(pth, kind, _in_order(kind, payload, follow[unit][0]) if unit in follow
+             else payload, unit) for pth, kind, payload, unit in plan]
+    for pth, kind, payload, _ in plan:
         if kind == "matrix":
             sub, feats, sub_bars = payload
             if getattr(sub, "ndim", 0) == 2:
                 _warn_dense_size(pth, sub.shape[1], sub.shape[0], dtype)
 
     out.mkdir(parents=True, exist_ok=True)
-    for pth, kind, payload in plan:
+    for pth, kind, payload, _ in plan:
         if pth.exists() or pth.is_symlink():
             pth.unlink()                # also breaks an old hard link
         if kind == "matrix":
@@ -1598,11 +1812,295 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             _link_or_copy(payload, pth)
         else:
             _write_labels(payload, pth)
+    if follow:
+        import sys
+
+        from .resolve import _and_list
+        for unit, (_, ref) in follow.items():
+            files = [pth.name for pth, _, _, u in plan if u == unit]
+            print(f"export_dataset: wrote the rows of {_and_list(files)} in the cell order "
+                  f"of {ref}, which the files of {out} follow.", file=sys.stderr, flush=True)
     return out
 
 
-def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
-    """Refuse the batch / batch_index combinations no method can read."""
+#: Z1: nothing to write
+_NO_CELLS = ("The data holds 0 cells, so there is nothing to write. If you kept the cells "
+             "that have a label, no cell had one: check that the barcodes of the label "
+             "table are spelled as the cell names of the data (obs_names) are, for example "
+             "with the same -1 ending.")
+
+
+def _check_batch_complete(vals, *, spec) -> None:
+    """Refuse a batch vector with missing values (``eval.io.missing_mask``, the
+    definition the labels follow): such cells would be left out, or the text
+    ``'nan'`` would become a batch of its own."""
+    from ..eval import io as eio
+
+    miss = eio.missing_mask(vals)
+    if miss.any():
+        raise ValueError(
+            config.hint(f"batch={_shown(spec)}", f"--batch {spec}")
+            + f": {int(miss.sum()):,} of the {len(vals):,} cells have no batch. "
+            f"{eio._missing_seen(vals)} Give every cell a batch, or leave these cells out "
+            f"first.")
+
+
+def _adt_in_x_message(spec, keys) -> str:
+    """A1: ``adt`` takes ``X`` of an object that also holds ``obsm`` matrices
+    (:func:`_adt_obsm_keys`), one of which may be the protein matrix."""
+    from .resolve import _and_list
+    one = len(keys) == 1
+    return (config.hint(f"adt={_shown(spec)}", f"--adt {spec}")
+            + f" takes X of this object, and the object also holds the obsm "
+            f"{'key' if one else 'keys'} {_and_list([repr(k) for k in keys])}. If one of "
+            f"them is the protein matrix, pass "
+            + config.hint("adt='obsm:<key>'", "--adt obsm:<key>")
+            + ". If X is the protein matrix, delete "
+            + config.hint(f"{'it' if one else 'them'} first, for example del "
+                          f"adata.obsm[{keys[0]!r}].",
+                          "the obsm entries in Python and save the file again."))
+
+
+#: file stems of the dataset layout, in the order messages list them
+_LAYOUT_STEMS = ("rna", "adt", "atac", "atac_peak", "atac_gas", "cty", "rna_cty", "atac_cty")
+
+
+def _layout_unit(name: str, diagonal: bool):
+    """``(side, batch number, is a matrix)`` of a file of the dataset layout,
+    else ``None``.
+
+    The files of one unit - a side and a batch number - hold the same cells.
+    The batch number is the digits of the name, ``''`` without any. Paired
+    data has one side, ``'rna'``. A diagonal call has two: ``rna*``, ``adt*``
+    and ``rna_cty*`` are the RNA side, ``atac*`` and ``atac_cty*`` the ATAC
+    side, and a plain ``cty*.csv`` has none (``None``).
+    """
+    from .resolve import _LAYOUT_FILE_RE
+    m = _LAYOUT_FILE_RE.match(name)
+    if not m:
+        return None
+    matrix = m.group(1) is not None
+    suf = m.group(1) if matrix else m.group(2)
+    if not diagonal:
+        return "rna", suf, matrix
+    if matrix or "_cty" in name:
+        return ("atac" if name.startswith("atac") else "rna"), suf, matrix
+    return None, suf, matrix
+
+
+def _layout_order(name: str):
+    """Sort key of a layout file name: by batch number, then by
+    :data:`_LAYOUT_STEMS`."""
+    stem = name.rsplit(".", 1)[0]
+    digits = stem[len(stem.rstrip("0123456789")):]
+    return int(digits or 0), _LAYOUT_STEMS.index(stem[:len(stem) - len(digits)])
+
+
+def _holds_other_cells(names, mine) -> bool:
+    """True when barcodes ``names`` hold a cell that is not among ``mine``.
+
+    Compared as :func:`_cell_order` compares: a trailing ``-<n>`` suffix does
+    not count when the suffix-free names stay unique on both sides.
+    Non-unique barcodes cannot be judged and give ``False``.
+    """
+    names, mine = [str(x) for x in names], [str(x) for x in mine]
+    judged = False
+    for key in (None, _BARCODE_SUFFIX_RE):
+        a = names if key is None else [key.sub("", x) for x in names]
+        b = mine if key is None else [key.sub("", x) for x in mine]
+        if len(set(a)) != len(a) or len(set(b)) != len(b):
+            continue
+        judged = True
+        if set(a) <= set(b):
+            return False
+    return judged
+
+
+def _folder_readers():
+    """The resolver's readers of a matrix file's barcodes and of a label
+    file's row count, with nothing remembered.
+
+    The resolver keeps what it read by path and modification time, and a
+    file written twice within one tick of the file system's clock keeps its
+    time. The rules of :func:`export_dataset` judge the folder as it is now.
+    """
+    from . import resolve
+    resolve._sniff_barcode_list.cache_clear()
+    resolve._count_label_rows.cache_clear()
+    return (resolve._barcodes_of,
+            lambda p: resolve._count_label_rows(str(p), p.stat().st_mtime_ns))
+
+
+def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n_batches):
+    """The layout files of ``out`` that hold other data than this call writes,
+    as three lists of names: ``(other batches, other cells, other label counts)``.
+
+    ``planned`` are the names the call writes and ``units`` the cells of each
+    unit it writes (:func:`_layout_unit`). A method reads every file of the
+    layout as part of the dataset, so a file the call does not write is a
+    leftover when one of these holds:
+
+    (a) it has a batch number, its unit is not written, and the call splits
+        by a batch column (``by_column``: the column gives the whole set of
+        batches), or it is a ``batch_index`` call with ``n_batches`` and the
+        number is above ``n_batches``;
+    (b) it is a matrix of a unit the call writes, with other cells;
+    (c) it is a label file of a unit the call writes, with another number of
+        rows than the unit has cells;
+    (d) it is a matrix of another unit, the call is not a ``batch_index``
+        call, and it holds a cell the call does not write on that side;
+    (e) it is a label file without a batch number, the call splits by a batch
+        column, and its rows are not as many as the cells of the call.
+
+    Not judged: a matrix without barcodes or with barcodes that are not
+    unique; in a diagonal call the files of the side it does not write and a
+    plain ``cty*.csv``; in a ``batch_index`` call the files without a batch
+    number and those of other batch numbers (up to ``n_batches``); a
+    numbered label file when the call writes no numbered file; a label file
+    that cannot be read.
+    """
+    other_batch, other_cells, other_count = [], [], []
+    if not out.is_dir():
+        return other_batch, other_cells, other_count
+    barcodes_of, n_rows = _folder_readers()
+    side_cells, side_n = {}, {}         # what the call writes on a side, over its units
+    for (side, _), (bars, n) in units.items():
+        side_n[side] = side_n.get(side, 0) + n
+        if bars is not None:
+            side_cells.setdefault(side, []).extend(bars)
+    for p in sorted(out.iterdir(), key=lambda p: p.name):
+        unit = _layout_unit(p.name, diagonal)
+        if unit is None or unit[0] is None or p.name in planned or not p.is_file():
+            continue
+        side, suf, matrix = unit
+        if (side, suf) in units:                        # (b), (c)
+            bars, n = units[(side, suf)]
+            if matrix:
+                old = barcodes_of(p)
+                if old is None:
+                    continue
+                if (len(old) != n) if bars is None else (_cell_order(old, bars)[0] == "other"):
+                    other_cells.append(p.name)
+            elif n_rows(p) not in (None, n):
+                other_count.append(p.name)
+        elif suf and by_column:                         # (a)
+            other_batch.append(p.name)
+        elif batch_index is not None:                   # (a), or a file of the build
+            if suf and n_batches is not None and int(suf) > n_batches:
+                other_batch.append(p.name)
+        elif matrix:                                    # (d)
+            old = barcodes_of(p)
+            if old is not None and side in side_cells \
+                    and _holds_other_cells(old, side_cells[side]):
+                other_cells.append(p.name)
+        elif not suf and by_column and side in side_n:  # (e)
+            if n_rows(p) not in (None, side_n[side]):
+                other_count.append(p.name)
+    return other_batch, other_cells, other_count
+
+
+def _leftover_message(out: Path, found, *, written, n_batches, replace: bool) -> str:
+    """L1: the leftovers of :func:`_leftovers`, why each kind is one, and what
+    to do. ``written`` are the batch numbers of the call; ``replace`` adds
+    that the files of the call are there too and ``overwrite`` is not set."""
+    from .resolve import _and_list, _span
+
+    def names(files):
+        files = sorted(files, key=_layout_order)
+        return _and_list(files[:6] + ([f"{len(files) - 6} more"] if len(files) > 6 else []))
+
+    def batches(nums):
+        return f"{'batch' if len(nums) == 1 else 'batches'} {_span(nums)}"
+
+    other_batch, other_cells, other_count = found
+    call = config.hint("this call", "this command")
+    text = [f"{out} holds files of other data that {call} does not write."]
+    if other_batch:
+        theirs = sorted({_layout_order(f)[0] for f in other_batch})
+        if n_batches is not None:
+            said = (config.hint(f"n_batches={n_batches}", f"--n-batches {n_batches}")
+                    + f" says that the data has {n_batches} "
+                    f"{'batch' if n_batches == 1 else 'batches'}")
+        else:
+            said = f"{call} writes {batches(written)}"
+        text.append(f"{names(other_batch)} {'belongs' if len(other_batch) == 1 else 'belong'} "
+                    f"to {batches(theirs)}, and {said}.")
+    if other_cells:
+        text.append(f"{names(other_cells)} {'holds' if len(other_cells) == 1 else 'hold'} "
+                    f"other cells than {call} writes.")
+    if other_count:
+        text.append(f"{names(other_count)} {'has' if len(other_count) == 1 else 'have'} "
+                    f"another number of labels than {call} has cells.")
+    text.append("A method would read them as part of this dataset. " + config.hint(
+        "Export to a new folder, and use that folder name in scan and run_all too. To keep "
+        "this folder, delete these files and run the export again.",
+        "Convert into a new folder, and use that folder name in scan and run-all too. To "
+        "keep this folder, delete these files and run convert again."))
+    if replace:
+        text.append(f"The files {call} writes are there too, so also pass "
+                    f"{config.hint('overwrite=True', '--overwrite')}.")
+    return " ".join(text)
+
+
+def _row_order(out: Path, units, *, diagonal) -> dict:
+    """``{unit: (index, reference file name)}`` for the units of this call
+    whose cells the folder holds in another row order.
+
+    The reference of a unit is a matrix file of that unit in ``out`` with
+    unique barcodes that are the cells of the unit; a file the call replaces
+    counts too. ``index`` puts the rows of the call in the reference's order
+    (:func:`_cell_order`). A label file has no barcodes, so rows written in
+    the order of the object would label other cells than the same rows of
+    the matrix next to it, and nothing could tell afterwards.
+
+    ``ValueError`` when two references of a unit disagree about the order.
+    """
+    follow = {}
+    if not out.is_dir():
+        return follow
+    barcodes_of, _ = _folder_readers()
+    held = {}                           # unit -> [(file name, barcodes)]
+    for p in sorted(out.iterdir(), key=lambda p: p.name):
+        unit = _layout_unit(p.name, diagonal)
+        if unit is None or not unit[2] or unit[:2] not in units or not p.is_file():
+            continue
+        bars, old = units[unit[:2]][0], barcodes_of(p)
+        if bars is not None and old is not None \
+                and _cell_order(bars, old)[0] in ("same", "order"):
+            held.setdefault(unit[:2], []).append((p.name, old))
+    for unit, refs in held.items():
+        refs.sort(key=lambda r: _layout_order(r[0]))
+        ref, first = refs[0]
+        for name, bars in refs[1:]:
+            if _cell_order(bars, first)[0] != "same":
+                raise ValueError(
+                    f"{ref} and {name} of {out} hold the same cells in different orders, "
+                    f"so a row of one is not the cell of the same row of the other. "
+                    + config.hint("Export this data again in one call, into a new folder.",
+                                  "Convert this data again in one command, into a new "
+                                  "folder."))
+        kind, idx = _cell_order(units[unit][0], first)
+        if kind == "order":
+            follow[unit] = (idx, ref)
+    return follow
+
+
+def _in_order(kind: str, payload, idx):
+    """The payload of one planned file with its rows taken in ``idx`` order."""
+    import scipy.sparse as sp
+
+    if kind == "matrix":
+        sub, feats, sub_bars = payload
+        sub = sub.tocsr()[idx] if sp.issparse(sub) else np.asarray(sub)[idx]
+        return sub, feats, [sub_bars[i] for i in idx]
+    if kind == "labels":
+        return np.asarray(payload)[idx]
+    return payload                      # a link follows the file it links to
+
+
+def _check_batch_args(batch, batch_index, category, *, adt, atac, n_batches=None) -> None:
+    """Refuse the batch / batch_index combinations no method can read, and an
+    ``n_batches`` that does not go with ``batch_index``."""
     if batch is not None and batch_index is not None:
         raise ValueError("pass batch= or batch_index=, not both: batch= splits the object "
                          "by a column, batch_index= writes the whole object as one batch")
@@ -1617,6 +2115,25 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
                 f"mosaic and cross methods read, and the diagonal methods that take "
                 f"several batches: pass category='mosaic', category='cross' or "
                 f"category='diagonal' (got category={category!r})")
+    if n_batches is not None:
+        if batch_index is None:
+            raise ValueError(config.hint(
+                "n_batches= goes with batch_index=. It says how many batches the calls "
+                "with batch_index= write in total. With batch=, the column gives the "
+                "number.",
+                "--n-batches goes with --batch-index. It says how many batches the "
+                "commands with --batch-index write in total. With --batch, the column "
+                "gives the number."))
+        if isinstance(n_batches, bool) or not isinstance(n_batches, (int, np.integer)) \
+                or n_batches < 1:
+            raise ValueError(config.hint("n_batches=", "--n-batches")
+                             + f" must be a positive integer, got {n_batches!r}")
+        if batch_index > n_batches:
+            raise ValueError(
+                config.hint(f"batch_index={batch_index} is larger than "
+                            f"n_batches={n_batches}.",
+                            f"--batch-index {batch_index} is larger than "
+                            f"--n-batches {n_batches}."))
     if batch is not None and category in ("vertical", "diagonal"):
         from .resolve import _one_file_advice
         raise ValueError(
@@ -1666,9 +2183,9 @@ def _source_name(data, spec, what) -> str:
 def _diagonal_labels(data, spec, sides) -> dict:
     """``{side: labels}`` for a diagonal export: each side's labels from its
     own cells. ``'obs:<col>'`` reads each object's own ``.obs`` (a MuData's
-    global ``.obs`` when a modality lacks the column); for a MuData,
-    ``'<mod>:<col>'`` and a bare ``'<col>'`` read ``<col>`` from each
-    modality's own ``.obs``."""
+    global ``.obs`` when a modality lacks the column), and so does a bare
+    ``'<col>'``; for a MuData, ``'<mod>:<col>'`` and a bare ``'<col>'`` read
+    ``<col>`` from each modality's own ``.obs``."""
     import pandas as pd
 
     present = [side for side in ("rna", "atac") if sides[side]]
@@ -1688,6 +2205,11 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 col_each = col
             elif not sep:
                 col_each = spec
+        elif not mu and not spec.startswith("mod:"):
+            col_each = spec                 # '<col>' names the column as 'obs:<col>' does
+            if _is_file_name(spec) and not any(spec in sides[side][0][1].obs.columns
+                                               for side in present):
+                raise ValueError(_file_name_message(spec, "labels"))
     out = {}
     for side in present:
         role, a, kw, what, src = sides[side][0]
@@ -1703,7 +2225,10 @@ def _diagonal_labels(data, spec, sides) -> dict:
             else:
                 raise KeyError(
                     f"labels={spec!r}: column {col_each!r} not in obs of the "
-                    f"{side.upper()} object ({src}); available: {list(a.obs.columns)}")
+                    f"{side.upper()} object ({src}); available: {list(a.obs.columns)}"
+                    f" Without cell types for the {side.upper()} cells, leave "
+                    + config.hint("labels= out and run with evaluate=False.",
+                                  "--labels out and run with --no-evaluate."))
         elif isinstance(spec, str):
             ser = _select_obs(data, spec, what="labels")
         else:
@@ -1739,22 +2264,30 @@ def _diagonal_label_advice(data, spec, sides) -> str:
 
 
 def _n_missing_labels(vals) -> int:
-    """How many entries of a label vector are NaN, None or an empty string."""
-    import pandas as pd
+    """How many entries of a label vector are missing: NaN, None, an empty
+    string, or text that a label file reads as missing (``eval.io.missing_mask``)."""
+    from ..eval import io as eio
 
-    s = pd.Series(np.asarray(vals, dtype=object))
-    return int((s.isna() | (s.astype(str).str.strip() == "")).sum())
+    return int(eio.missing_mask(vals).sum())
 
 
 def _check_labels_complete(vals, *, spec, where: str, advice: str) -> None:
-    """Refuse a label vector with missing values: evaluate would score them as
-    one more cell type."""
+    """Refuse a label vector with missing values: mtb.evaluate does not score
+    a missing label, and the label file would hold one for every such cell."""
+    from ..eval import io as eio
+
     n = _n_missing_labels(vals)
     if n:
-        shown = repr(spec) if isinstance(spec, str) else type(spec).__name__
+        words = eio.missing_words(vals)
+        forms, rename = "NaN, None or ''", ""
+        if words:
+            forms = ("NaN, None, '' or text that a label file reads as missing: "
+                     + eio._and(eio._missing_shown(words)))
+            rename = (f". If {repr(words[0]) if len(words) == 1 else 'one of them'} is the "
+                      f"name of a cell type, rename it")
         raise ValueError(
-            f"labels={shown}: {n} of the {len(vals)} labels for {where} are missing "
-            f"(NaN, None or ''); {advice}")
+            f"labels={_shown(spec)}: {n} of the {len(vals)} labels for {where} are missing "
+            f"({forms}); {advice}{rename}")
 
 
 def _labels_where(data, spec) -> str:
@@ -1767,7 +2300,8 @@ def _labels_where(data, spec) -> str:
     if spec.startswith("mod:"):
         return f"mdata[{spec[4:].partition('.')[0]!r}].obs"
     if mu:
-        return f"mdata[{spec.partition(':')[0]!r}].obs"
+        name, sep, _ = spec.partition(":")
+        return f"mdata[{name!r}].obs" if sep and name in data.mod else "mdata.obs"
     return "data.obs"
 
 
@@ -1783,9 +2317,14 @@ def _select_object(obj, spec: str, *, what: str):
     ``.obs``): what the CLI's ``--atac-from`` passes on as ``atac=``."""
     import anndata as ad
 
+    user_spec = spec
     if _is_mudata(obj):
         spec = _mudata_selector(obj, spec)
     a, kw = _select(obj, spec, what=what)
+    if "obsm" not in kw:
+        # 'X' never reaches _pick_matrix, and the selector the user wrote is
+        # known only here
+        _check_one_feature_type(a, arg=what, spec=user_spec)
     if not kw:
         return a
     X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"), what=what)
