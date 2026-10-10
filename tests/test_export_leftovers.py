@@ -321,6 +321,97 @@ def test_a_series_that_names_no_cell_is_judged_by_its_number(tmp_path):
         assert pd.read_csv(f / "cty.csv")["x"].tolist() == labels
 
 
+@pytest.mark.parametrize("how,files", [
+    ({}, "rna.h5 holds"),
+    ({"batch_index": 1, "category": "cross"}, "rna1.h5 holds"),
+    ({"batch": "donor", "category": "cross"}, "rna1.h5, rna2.h5 and rna3.h5 hold"),
+], ids=["unnumbered", "batch_index", "batch"])
+def test_the_row_numbers_of_a_filtered_table_name_no_cell(tmp_path, how, files):
+    """A column of a filtered table keeps the row numbers of the table as its
+    index: integers, and no ``RangeIndex``. Next to a matrix with barcodes
+    they name no cell. The column is taken row by row, as 0.3.4 took it, and
+    the matrix of the folder is not a file of other cells."""
+    f = tmp_path / "TABLE"
+    ex, _ = _cells(100, "EX")
+    _write(ex, f, rna="X", **{k: f"obs:{v}" if k == "batch" else v for k, v in how.items()})
+    matrices = _snapshot(f)
+    table = pd.DataFrame({"barcode": ex.obs_names, "celltype": ex.obs["celltype"].to_numpy(),
+                          "donor": ex.obs["donor"].to_numpy(), "keep": True})
+    table = pd.concat([table.assign(keep=False), table], ignore_index=True)
+    kept = table[table["keep"]]                 # the cells, in rows 100 to 199 of the table
+    assert not isinstance(kept.index, pd.RangeIndex) and list(kept.index[:2]) == [100, 101]
+    _write(None, f, labels=kept["celltype"],
+           **{k: kept[v] if k == "batch" else v for k, v in how.items()})
+    assert {n: (f / n).read_bytes() for n in matrices} == matrices
+    for name in matrices:
+        of_file = ex[list(resolve._barcodes_of(f / name))].obs["celltype"]
+        assert pd.read_csv(f / name.replace("rna", "cty").replace(".h5", ".csv"))["x"].tolist() \
+            == list(of_file)
+    # fewer rows than the matrix has cells: other cells, by their number
+    before = _snapshot(f)
+    assert _refused(None, f, labels=kept["celltype"].iloc[:90],
+                    **{k: kept[v].iloc[:90] if k == "batch" else v for k, v in how.items()}) == (
+        f"{f} holds files of other data that this call does not write. {files} other cells "
+        f"than this call writes. {ADVICE}")
+    # given the object, the column is matched to its barcodes, as before
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(ex, f, rna=None, labels=kept["celltype"], overwrite=True)
+    assert str(e.value) == (
+        "labels= Series index does not match the cell barcodes: 100 of 100 cells have no "
+        "entry (['EX0000-1', 'EX0001-1', 'EX0002-1', 'EX0003-1', 'EX0004-1']...); index it "
+        "by obs_names (or pass a plain list in cell order)")
+    assert _snapshot(f) == before
+
+
+@pytest.mark.parametrize("index", [
+    np.arange(100, 200), np.arange(100, 200).astype(object), np.arange(100, 200) + 0.5],
+    ids=["integers", "integers held as objects", "floats"])
+def test_an_index_of_numbers_is_row_numbers(tmp_path, index):
+    """Whatever type holds the numbers. Next to a batch column that is
+    indexed by barcode, the rows of the labels are the rows of that column."""
+    f = tmp_path / "KINDS"
+    ex, _ = _cells(100, "EX")
+    _write(ex, f, rna="X")
+    labels = pd.Series(ex.obs["celltype"].to_numpy(), index=index)
+    assert not isinstance(labels.index, pd.RangeIndex)
+    _write(None, f, labels=labels)
+    assert pd.read_csv(f / "cty.csv")["x"].tolist() == list(ex.obs["celltype"])
+    g = tmp_path / "KINDS_BATCH"
+    _write(ex, g, rna="X", batch="obs:donor", category="cross")
+    _write(None, g, labels=labels, batch=ex.obs["donor"], category="cross")
+    for b in (1, 2, 3):
+        assert pd.read_csv(g / f"cty{b}.csv")["x"].tolist() \
+            == list(ex.obs["celltype"][ex.obs["donor"] == f"d{b - 1}"])
+
+
+def test_integers_that_name_cells_of_the_folder_are_barcodes(tmp_path):
+    """Cells named by numbers (``'0'``, ``'3'``, ``'6'``, ...). An index of
+    integers that names one of them is compared by name, as an index of text
+    is: as many labels for partly other cells are refused."""
+    f = tmp_path / "NUMBERS"
+    ex, _ = _cells(100, "EX")
+    ex.obs_names = [str(3 * i) for i in range(100)]
+    _write(ex, f, rna="X")
+    labels = ex.obs["celltype"].to_numpy()
+    partly = pd.Series(labels, index=[3 * i for i in range(99)] + [1000])
+    assert partly.index.inferred_type == "integer"
+    assert _refused(None, f, labels=partly) == (
+        f"{f} holds files of other data that this call does not write. rna.h5 holds other "
+        f"cells than this call writes. {ADVICE}")
+    # integers that name none of them are row numbers
+    _write(None, f, labels=pd.Series(labels, index=[1000 + i for i in range(100)]))
+    assert pd.read_csv(f / "cty.csv")["x"].tolist() == list(labels)
+    # all of them, with the 10x ending on the barcodes of the folder
+    g = tmp_path / "ENDING"
+    ex.obs_names = [f"{3 * i}-1" for i in range(100)]
+    _write(ex, g, rna="X")
+    assert _refused(None, g, labels=partly) == (
+        f"{g} holds files of other data that this call does not write. rna.h5 holds other "
+        f"cells than this call writes. {ADVICE}")
+    _write(None, g, labels=pd.Series(labels, index=[3 * i for i in range(100)]))
+    assert pd.read_csv(g / "cty.csv")["x"].tolist() == list(labels)
+
+
 def test_another_atac_kind_for_other_cells_is_refused(tmp_path):
     """Peaks without a category are atac_peak.h5 and atac.h5. Gene activity
     for other cells would leave both next to the new atac_gas.h5."""

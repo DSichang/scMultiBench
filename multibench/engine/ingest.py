@@ -1493,7 +1493,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     order: ``data.obs_names``, or the first modality's ``obs_names`` when
     ``data`` is not given. A call that writes labels only and is given no
     object takes its cells from the index of the ``labels`` / ``batch``
-    Series.
+    Series. An index of numbers that names no cell of the folder is taken
+    as row numbers: the values are written row by row, as a list is.
 
     - the same barcodes in another order are reordered;
     - a barcode set that differs raises ``ValueError`` naming the strays;
@@ -1714,6 +1715,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     if not masters:                     # labels only
         if master is None:
             # no object names the cells: a Series indexed by barcode does
+            labels, batch = (_rows_numbered(out, x) for x in (labels, batch))
             master = _series_cells(labels, batch)
         if master is not None:
             masters["rna"] = master
@@ -2211,6 +2213,50 @@ def _series_cells(*specs):
     if not named or any(len(set(names)) != len(names) for names in named):
         return None
     return named[0]
+
+
+#: what pandas calls an index of numbers (``Index.inferred_type``)
+_NUMBER_INDEX = ("integer", "floating", "mixed-integer-float")
+
+
+def _rows_numbered(out: Path, spec):
+    """``labels`` / ``batch`` as a call that is given no object takes it: a
+    Series whose index is numbers that name no cell of ``out`` gets a plain
+    ``RangeIndex``; anything else is returned as it is.
+
+    A column of a filtered table keeps the row numbers of the table as its
+    index. They are no barcodes, so the values are taken row by row, as
+    those of a list are, and the matrix of ``out`` is not held to be a file
+    of other cells. Numbers that a matrix of ``out`` has a cell for (an
+    object without barcodes names its cells ``'0'``, ``'1'``, ...) are the
+    names of cells and stay.
+    """
+    import pandas as pd
+
+    if isinstance(spec, pd.Series) and not isinstance(spec.index, pd.RangeIndex) \
+            and spec.index.inferred_type in _NUMBER_INDEX \
+            and not _holds_a_cell(out, spec.index):
+        return spec.reset_index(drop=True)
+    return spec
+
+
+def _holds_a_cell(out: Path, names) -> bool:
+    """True when a matrix file of the layout in ``out`` holds a cell that one
+    of ``names`` names, with or without the trailing ``-<n>`` of its
+    barcode."""
+    if not out.is_dir():
+        return False
+    barcodes_of, _ = _folder_readers()
+    names = {str(x) for x in names}
+    for p in sorted(out.iterdir(), key=lambda p: p.name):
+        unit = _layout_unit(p.name, False)
+        if unit is None or not unit[2] or not p.is_file():
+            continue
+        old = barcodes_of(p) or ()
+        if not names.isdisjoint(old) \
+                or not names.isdisjoint(_BARCODE_SUFFIX_RE.sub("", b) for b in old):
+            return True
+    return False
 
 
 def _first_master(data, specs, *, diagonal):
