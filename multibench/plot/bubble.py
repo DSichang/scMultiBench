@@ -987,14 +987,18 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     summary panels (no error bars).
     No rank numbers are drawn - marker size carries the rank.
     """
+    import matplotlib.style
     gaps = [0.0] * max(len(tbl.blocks) - 1, 0)
-    for _ in range(4):
-        fig = _draw(tbl, cmap, title, show_language, gaps)
-        short = _fit_pills(fig, fig.axes[0])
-        if not any(s > 1e-6 for s in short):
-            break
-        # two widened pills would touch: more room between those families
-        gaps = [g + s for g, s in zip(gaps, short)]
+    # matplotlib's own defaults, whatever the session's rcParams are:
+    # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
+    with matplotlib.style.context("default"):
+        for _ in range(4):
+            fig = _draw(tbl, cmap, title, show_language, gaps)
+            short = _fit_pills(fig, fig.axes[0])
+            if not any(s > 1e-6 for s in short):
+                break
+            # two widened pills would touch: more room between those families
+            gaps = [g + s for g, s in zip(gaps, short)]
     return fig
 
 
@@ -1116,8 +1120,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
         all-tied column) is 0.85.
         """
         n = colvals.notna().sum()
-        r = colvals.rank(ascending=True, method="max") / max(int(n), 1)
-        rad = 0.85 * np.sqrt(r.to_numpy(dtype=float))
+        r = style.rank_max(colvals.to_numpy()) / max(int(n), 1)
+        rad = 0.85 * np.sqrt(r)
         return pd.Series(np.maximum(rad, 0.12), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------

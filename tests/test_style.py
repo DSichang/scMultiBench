@@ -13,6 +13,18 @@ def test_minmax_constant_column_returns_ones():
     assert np.allclose(out, [1.0, 1.0, 1.0])
 
 
+def test_minmax_constant_column_keeps_its_missing_values():
+    out = style.minmax(np.array([np.nan, 0.5, 0.5]))
+    assert np.isnan(out[0]) and list(out[1:]) == [1.0, 1.0]
+
+
+def test_a_method_without_scores_has_no_overall():
+    # M1 has no metric here; the one scored method must not lend it its 1.0
+    mat = pd.DataFrame({"GC": [0.7, np.nan], "iLISI": [0.2, np.nan]}, index=["M0", "M1"])
+    out = style.compute_overall(mat)
+    assert out["M0"] == 1.0 and np.isnan(out["M1"])
+
+
 def test_rank_ties_max():
     # values 0.1,0.1,0.9 -> ranks (tie at max) 2,2,3
     r = style.rank_max(np.array([0.1, 0.1, 0.9]))

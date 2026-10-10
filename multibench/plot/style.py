@@ -23,7 +23,7 @@ def _tie_round(x) -> np.ndarray:
 
 
 def minmax(x: np.ndarray) -> np.ndarray:
-    """Scale to [0,1]; constant or all-NaN -> all ones (matches R behaviour).
+    """Scale to [0,1]; a constant vector -> ones (as in R); NaN stays NaN.
 
     Values are compared after rounding to :data:`TIE_DECIMALS` places, so a
     column that differs only by floating-point noise counts as constant.
@@ -34,7 +34,7 @@ def minmax(x: np.ndarray) -> np.ndarray:
     lo = np.nanmin(x) if np.isfinite(x).any() else np.nan
     hi = np.nanmax(x) if np.isfinite(x).any() else np.nan
     if not np.isfinite(lo) or lo == hi:
-        return np.ones_like(x)
+        return np.where(np.isnan(x), np.nan, 1.0)
     return (x - lo) / (hi - lo)
 
 

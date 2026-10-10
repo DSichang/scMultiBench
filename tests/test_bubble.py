@@ -495,3 +495,18 @@ def test_radius_uses_methods_scored_in_the_column():
     best = max(c.radius for c in circles)
     assert best == pytest.approx(0.5 * 0.85 * 0.9)
     assert "methods scored in that column" in bubble.__doc__
+
+
+def test_circles_of_values_tied_by_rounding_have_one_size():
+    # tbl.ranks counts 0.0 and 2.2e-16 as a tie; the circle sizes must agree
+    import importlib
+    from matplotlib.patches import Circle
+    B = importlib.import_module("multibench.plot.bubble")
+    rows = [dict(metric=k, value=v, method=m, dataset="D1")
+            for m, ari, il in (("A", .5, 0.0), ("B", .6, 2.2e-16), ("C", .7, 4.4e-16))
+            for k, v in (("ARI", ari), ("iLISI", il))]
+    tbl = B.build_table(pd.DataFrame(rows))
+    x_ilisi = max(c.center[0] for c in B.render(tbl).axes[0].patches if isinstance(c, Circle))
+    radii = {round(c.radius, 6) for c in B.render(tbl).axes[0].patches
+             if isinstance(c, Circle) and c.center[0] == x_ilisi}
+    assert len(radii) == 1
