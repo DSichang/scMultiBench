@@ -110,8 +110,6 @@ def mean_rank_matrix(parts: dict) -> pd.DataFrame:
     datasets that have it.
     """
     mats = list(parts.values())
-    if not mats:
-        raise ValueError("no per-dataset rank matrices to average")
     idx = mats[0].index
     for q in mats[1:]:
         idx = idx.union(q.index)

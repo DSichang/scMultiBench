@@ -8,7 +8,7 @@ import pandas as pd
 
 from . import style
 from .. import config as _config
-from .style import compute_overall, minmax, rank_max
+from .style import compute_overall, minmax
 
 # scIB metric families, so a summary can be split the way the benchmark reports
 # it. They must agree with the groups eval.scib.compute() emits

@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 
 from . import style
-from .bar import BATCH_METRICS, CLUSTERING_METRICS
 from .. import _compat
 from .. import config as _config
 
@@ -195,18 +194,6 @@ class BubbleTable:
             no value for that metric.
         """
         return pd.concat([b.ranks for b in self.blocks], axis=1)
-
-
-def _pivot(df: pd.DataFrame, aggregate: str) -> pd.DataFrame:
-    """method x metric matrix: raw means (``"dataset"``) or the mean of the
-    within-dataset max-ranks (``"summary"``; absent method or n/a cell =
-    rank 0, each metric averaged over the datasets that computed it). The
-    summary math lives in :mod:`multibench.plot.style` and is shared with
-    ``plot.bar``."""
-    if aggregate == "summary":
-        return style.mean_rank_matrix(style.per_dataset_ranks(df))
-    return df.pivot_table(index="method", columns="metric", values="value",
-                          aggfunc="mean")
 
 
 def _unknown_names(unknown, available, kind: str) -> str:

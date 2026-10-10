@@ -20,7 +20,7 @@ from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS
 # function now (help()/inspect.signature show its real parameters); the old
 # attribute paths stay as attributes on the function until 0.4.
 for _n in ("build_table", "render", "plot_bubble", "BubbleTable", "FamilyBlock",
-           "FAMILIES", "NA_MARK", "_resolve", "_pivot"):
+           "FAMILIES", "NA_MARK", "_resolve"):
     setattr(bubble, _n, getattr(_bubble_module, _n))
 bubble.style = style
 bubble.__module__ = "multibench.plot"
