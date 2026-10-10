@@ -412,6 +412,33 @@ def test_integers_that_name_cells_of_the_folder_are_barcodes(tmp_path):
     assert pd.read_csv(g / "cty.csv")["x"].tolist() == list(labels)
 
 
+def test_cells_without_unique_barcodes_are_judged_by_their_number(tmp_path):
+    """One barcode twice: the cells of the call cannot be compared by name.
+    Another number of cells than a matrix of the folder holds is still other
+    cells. 0.3.4 and the rule by name alone wrote their labels next to it."""
+    f = tmp_path / "TWICE"
+    ex, _ = _cells(100, "EX")
+    _write(ex, f, rna="X", adt="obsm:protein")
+
+    def twice(a):
+        a = a.copy()
+        a.obs_names = [a.obs_names[0]] + list(a.obs_names[:-1])
+        assert not a.obs_names.is_unique
+        return a
+
+    other = twice(_cells(90, "ME", seed=1)[0])
+    assert _refused(other, f, rna=None, labels="obs:celltype") == (
+        f"{f} holds files of other data that this call does not write. rna.h5 and adt.h5 "
+        f"hold other cells than this call writes. {ADVICE}")
+    # a matrix of these cells: the other matrix of the folder is named
+    assert _refused(other, f, rna=None, adt="obsm:protein") == (
+        f"{f} holds files of other data that this call does not write. rna.h5 holds other "
+        f"cells than this call writes. {ADVICE}")
+    # as many cells: neither names nor number tell them from the cells of the folder
+    _write(twice(ex), f, rna=None, labels="obs:celltype")
+    assert _names(f) == ["adt.h5", "cty.csv", "rna.h5"]
+
+
 def test_another_atac_kind_for_other_cells_is_refused(tmp_path):
     """Peaks without a category are atac_peak.h5 and atac.h5. Gene activity
     for other cells would leave both next to the new atac_gas.h5."""

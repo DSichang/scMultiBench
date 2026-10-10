@@ -1982,7 +1982,9 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
         by a batch column (``by_column``: the column gives the whole set of
         batches), or it is a ``batch_index`` call with ``n_batches`` and the
         number is above ``n_batches``;
-    (b) it is a matrix of a unit the call writes, with other cells;
+    (b) it is a matrix of a unit the call writes, with other cells. A unit
+        of the call without barcodes, or with barcodes that are not unique,
+        has no names to compare: another number of cells is other cells;
     (c) it is a label file of a unit the call writes, with another number of
         rows than the unit has cells;
     (d) it is a matrix of another unit, the call is not a ``batch_index``
@@ -2019,7 +2021,8 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
                 old = barcodes_of(p)
                 if old is None:
                     continue
-                if (len(old) != n) if bars is None else (_cell_order(old, bars)[0] == "other"):
+                named = bars is not None and len(set(bars)) == len(bars)
+                if (_cell_order(old, bars)[0] == "other") if named else (len(old) != n):
                     other_cells.append(p.name)
             elif n_rows(p) not in (None, n):
                 other_count.append(p.name)
