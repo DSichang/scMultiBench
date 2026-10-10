@@ -10,7 +10,6 @@ def test_table_records_the_frame_category():
     df = mtb.load_results("vertical", dataset="D11", source="rerun")
     tbl = B.build_table(df)
     assert tbl.category == "vertical"
-    assert B._single_category(tbl) == "vertical"
 
 
 def test_badge_follows_the_variants_of_the_category():

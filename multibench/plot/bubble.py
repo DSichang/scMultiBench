@@ -452,11 +452,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     from ..data import catalog
 
     need = {"method", "metric", "value"}
-    have = set(getattr(long_df, "columns", []))
+    have = set(long_df.columns)
     if not need.issubset(have):
         missing = sorted(need - have)
         hint = ""
-        if "Value" in have or getattr(long_df, "index", None) is not None and getattr(long_df.index, "name", None) == "metric":
+        if "Value" in have or long_df.index.name == "metric":
             hint = (" This looks like evaluate()'s output - convert it "
                     "with mtb.to_long(df, method=..., dataset=..., "
                     "category=...) first.")
@@ -588,10 +588,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
             cols = [m for m in fam_metrics if m in raw_all.columns]
         if not cols:
             continue
-        raw = raw_all[cols]
-        if raw.notna().sum().sum() == 0:
-            continue
-        blocks.append(_block(label, cmap, raw))
+        blocks.append(_block(label, cmap, raw_all[cols]))
     # anything not in a known family still gets shown, neutrally coloured
     if metrics is not None:
         leftover = [c for c in metrics if c not in known and c in raw_all.columns]
@@ -709,7 +706,7 @@ def _na_report(blocks, parts, aggregate: str) -> list:
     """
     lines = []
     if aggregate == "summary":
-        for ds, mat in (parts or {}).items():
+        for ds, mat in parts.items():
             for m in mat.index:
                 na = [c for c in mat.columns if pd.isna(mat.loc[m, c])]
                 if na:
@@ -751,7 +748,7 @@ def _na_missing(blocks, parts, aggregate: str) -> list:
     for m in blocks[0].raw.index:
         if aggregate == "summary":
             per_ds = [(ds, _sorted(c for c in mat.columns if pd.isna(mat.loc[m, c])))
-                      for ds, mat in (parts or {}).items() if m in mat.index]
+                      for ds, mat in parts.items() if m in mat.index]
             per_ds = [(ds, codes) for ds, codes in per_ds if codes]
             if per_ds:
                 out.append((m, per_ds, []))
@@ -894,29 +891,20 @@ def _frame_needs_labels(df) -> dict:
 
 
 def _method_language(name):
+    """``"python"`` or ``"r"``; None for a name the registry does not know."""
+    from ..engine import registry
     try:
-        from ..engine import registry
-        return (registry.get(name).language or "python").lower()
-    except Exception:
+        return registry.get(name).language.lower()
+    except KeyError:
         return None
 
 
 def _frame_category(long_df) -> str | None:
     """The one category a long frame holds, else None (mixed or absent)."""
-    try:
-        cats = long_df["category"].dropna().unique()
-        return str(cats[0]) if len(cats) == 1 else None
-    except Exception:
+    if "category" not in long_df.columns:
         return None
-
-
-def _single_category(tbl) -> str | None:
-    """The one category a table was built from, or None when mixed/unknown.
-
-    Recorded on the table at build time: ``tbl.raw`` is the pivoted
-    method x metric matrix and carries no category column.
-    """
-    return getattr(tbl, "category", None)
+    cats = long_df["category"].dropna().unique()
+    return str(cats[0]) if len(cats) == 1 else None
 
 
 def _method_needs_labels(name, category=None) -> bool:
@@ -926,17 +914,13 @@ def _method_needs_labels(name, category=None) -> bool:
     on a single-category figure follows the variants of that category; without
     a category it falls back to 'any'.
     """
+    from ..engine import registry
     try:
-        from ..engine import registry
         spec = registry.get(name)
-        variants = getattr(spec, "variants", None) or []
-        if category and variants:
-            vs = [v for v in variants if v.when.get("category") == category]
-            if vs:
-                return any(v.needs_labels for v in vs)
-        return bool(spec.needs_labels)
-    except Exception:
+    except KeyError:               # a method of the user's own
         return False
+    vs = [v for v in spec.variants if v.when["category"] == category]
+    return any(v.needs_labels for v in vs) if vs else spec.needs_labels
 
 
 def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
@@ -1086,8 +1070,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
                     fontsize=6.4, fontweight="bold", color="white")
             # an explicit needs_labels column beats the registry (the only
             # way to badge a method the registry does not know)
-            ov = (getattr(tbl, "needs_labels", None) or {}).get(m)
-            if ov if ov is not None else _method_needs_labels(m, _single_category(tbl)):
+            ov = (tbl.needs_labels or {}).get(m)
+            if ov if ov is not None else _method_needs_labels(m, tbl.category):
                 # supervised: the method consumed cell-type labels, so its
                 # clustering scores are not comparable with unsupervised rows
                 ax.add_patch(Circle((-0.38, y), 0.20, facecolor="#b8860b",
@@ -1107,7 +1091,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
         all-tied column) is 0.85.
         """
         n = colvals.notna().sum()
-        r = style.rank_max(colvals.to_numpy()) / max(int(n), 1)
+        r = style.rank_max(colvals.to_numpy()) / n
         rad = 0.85 * np.sqrt(r)
         return pd.Series(np.maximum(rad, 0.12), index=colvals.index)
 
@@ -1134,26 +1118,21 @@ def _draw(tbl, cmap, title, show_language, gaps):
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                _floor = min(0.30, 1.2 / max(n_rows, 1))
+                _floor = min(0.30, 1.2 / n_rows)
                 L = 1.24 * max(_floor, float(length[i]))
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
                                        facecolor=_fill(mp, float(v), fi in flat_overall),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
 
         elif tbl.aggregate == "summary":
-            vals, normv = b.raw[name], b.norm[name]
+            normv = b.norm[name]
+            # a summary table has no empty cell: a missing score is rank 0
             for i, m in enumerate(methods):
-                v = vals.loc[m]
-                if pd.isna(v):
-                    ax.text(x + 0.5, n_rows - i - 0.5, NA_MARK, color="#999999",
-                            ha="center", va="center", fontsize=7, zorder=3)
-                    n_na += 1
-                    continue
                 y0 = n_rows - i - 1
                 # Adaptive floor: with n methods the shortest bar is at least
                 # ~1.2/n of the column (capped at 0.30) - visible in a small
                 # comparison, indistinguishable from the paper's look at scale.
-                _floor = min(0.30, 1.2 / max(n_rows, 1))
+                _floor = min(0.30, 1.2 / n_rows)
                 L = 0.95 * max(_floor, float(normv.loc[m]))
                 ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), L, ROW_H - 0.32,
                                        facecolor=_fill(mp, float(normv.loc[m]),
@@ -1236,7 +1215,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     # ---- how the rows were ordered (so bubble and bar can be reconciled) ---
     y_bottom = -2.9 if tbl.aggregate != "summary" else -1.8
     if tbl.aggregate == "summary":
-        basis = getattr(tbl, "overall_basis", "rank")
+        basis = tbl.overall_basis
         what = ("each method's mean rank over datasets and metrics, scaled 0-1"
                 if basis == "rank" else
                 "the mean of each method's per-dataset Overall")
@@ -1254,8 +1233,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     if n_na:
         y_text -= 0.45
         ax.text(-0.9, y_text, f"{NA_MARK} = n/a (metric not computed for that method"
-                + ("; Overall averages the metrics the method has)"
-                   if tbl.aggregate != "summary" else "; rank 0 in that dataset)"),
+                "; Overall averages the metrics the method has)",
                 fontsize=6.4, ha="left", va="center", color="#666666")
     if show_language:
         # the chips left of the row labels are otherwise unexplained on paper
@@ -1266,8 +1244,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
 
     # ---- row labels: add a dataset cue when one figure mixes datasets -----
     labels = list(methods)
-    md = getattr(tbl, "method_datasets", None) or {}
-    if tbl.aggregate == "dataset" and len(getattr(tbl, "datasets", ())) > 1 and md:
+    md = tbl.method_datasets or {}
+    if tbl.aggregate == "dataset" and len(tbl.datasets) > 1 and md:
         labels = []
         for m in methods:
             ds = md.get(m, [])

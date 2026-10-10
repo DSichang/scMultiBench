@@ -359,7 +359,7 @@ def test_badges_unknown_and_supervised(monkeypatch):
     from multibench.engine import registry
 
     class _Spec:
-        language = "python"; needs_labels = True
+        language = "python"; needs_labels = True; variants = []
     monkeypatch.setattr(registry, "get", lambda name: _Spec())
     fig = bubble.render(bubble.build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]

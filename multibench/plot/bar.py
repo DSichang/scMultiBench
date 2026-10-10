@@ -136,7 +136,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     from ..data import catalog
 
     need = {"method", "metric", "value"}
-    have = set(getattr(long_df, "columns", []))
+    have = set(long_df.columns)
     if not need.issubset(have):
         raise ValueError(
             f"bar() needs a long table with columns ['method', 'metric', "
