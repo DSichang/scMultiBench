@@ -463,9 +463,10 @@ def _held(files, holds="holds"):
     return ("A method would read them as part of this dataset. This call writes labels only, "
             f"and {files} in the folder {holds} their cells. If the files above are the other "
             "side or the other batches of the same dataset, keep them, and add the labels "
-            "with the export call that wrote the folder (its category= and batch_index=) and "
-            "labels=. Otherwise export to a new folder, and use that folder name in scan and "
-            "run_all too, or delete these files and run the export again.")
+            "with the export call that wrote the folder (its category= and batch_index=), "
+            "labels= and overwrite=True. Otherwise export to a new folder, and use that "
+            "folder name in scan and run_all too, or delete these files and run the export "
+            "again.")
 
 
 def test_a_labels_only_call_on_a_diagonal_folder_names_the_call_that_wrote_it(tmp_path):
@@ -493,7 +494,14 @@ def test_a_labels_only_call_on_a_diagonal_folder_names_the_call_that_wrote_it(tm
         "category='diagonal' names the label file after the modality it labels "
         "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
     assert _snapshot(f) == before
-    # the call that wrote the folder, and labels=: both label files
+    # the call that wrote the folder writes its matrix files again: without
+    # overwrite=True, which the message names, it is refused once more
+    with pytest.raises(FileExistsError) as e:
+        ingest.export_dataset(rna, f, labels="obs:celltype", **wrote)
+    assert str(e.value) == (f"{f} already holds rna.h5 and atac_gas.h5. Pass overwrite=True "
+                            f"to replace them.")
+    assert _snapshot(f) == before
+    # the call that wrote the folder, labels= and overwrite=True: both label files
     cells = {n: resolve._barcodes_of(f / n) for n in _names(f)}
     _write(rna, f, labels="obs:celltype", **wrote)
     assert _names(f) == ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"]
@@ -706,9 +714,9 @@ def test_cli_wording_of_labels_alone_on_a_diagonal_folder(tmp_path, capsys):
         f"part of this dataset. This command writes labels only, and rna.h5 in the folder "
         f"holds their cells. If the files above are the other side or the other batches of "
         f"the same dataset, keep them, and add the labels with the convert command that wrote "
-        f"the folder (its --category and --batch-index) and --labels. Otherwise convert into "
-        f"a new folder, and use that folder name in scan and run-all too, or delete these "
-        f"files and run convert again.")
+        f"the folder (its --category and --batch-index), --labels and --overwrite. Otherwise "
+        f"convert into a new folder, and use that folder name in scan and run-all too, or "
+        f"delete these files and run convert again.")
     for word in ("labels=", "category=", "batch_index=", "this call", "run_all", "export"):
         assert word not in err, word
     assert _snapshot(out) == before

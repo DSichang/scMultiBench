@@ -150,14 +150,42 @@ def test_a_matrix_without_features_is_refused(tmp_path):
     assert ingest.read_canonical(one / "adt.h5").shape == (60, 1)
 
 
+def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_path):
+    """A bare array and an array in obsm have no feature names, and with 0
+    columns there is none to make up. The warning said that the file names
+    them feature_0 to feature_-1, and then the call was refused."""
+    rna = _cite()
+    rna.obsm["protein"] = np.zeros((60, 0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert _value_error(tmp_path, rna, rna="X", adt=np.zeros((60, 0))) \
+            == NO_FEATURES.format(what="adt ") + WHY
+        assert _value_error(tmp_path, rna, rna="X", adt="obsm:protein") \
+            == NO_FEATURES.format(what="adt ") + WHY
+        with pytest.raises(ValueError) as e:
+            ingest.to_canonical(rna, tmp_path / "OUT" / "adt.h5", modality="adt", obsm="protein")
+        assert str(e.value) == NO_FEATURES.format(what="") + WHY
+    assert not (tmp_path / "OUT").exists()
+    # with columns to name, the warning is the one of before
+    rna.obsm["protein"] = np.ones((60, 2))
+    for n, adt in enumerate(("obsm:protein", np.ones((60, 2)))):
+        with pytest.warns(UserWarning, match=r"The file names them feature_0 to feature_1\. "):
+            two = ingest.export_dataset(rna, tmp_path / f"TWO{n}", rna="X", adt=adt)
+        assert list(ingest.read_canonical(two / "adt.h5").var_names) == ["feature_0", "feature_1"]
+
+
 def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
-    """The command line reads files: it names no Python argument, and says
-    where to look."""
+    """The command line reads files: it names no argument of export_dataset.
+    The file it was given was saved after the split and holds no feature
+    type to count, so the text sends the reader to the data before the split."""
     rna, none = _split_without_peaks()
     rna.write_h5ad(tmp_path / "rna.h5ad")
     none.write_h5ad(tmp_path / "none.h5ad")
-    look = ("Check which feature types the file holds, in Python with "
-            "adata.var['feature_types'].value_counts().")
+    assert ad.read_h5ad(tmp_path / "none.h5ad").var["feature_types"].value_counts().sum() == 0
+    look = ("If the data came from sc.read_10x_h5, read the 10x file again with "
+            "gex_only=False: without it scanpy returns the genes alone. If it was split by "
+            "var['feature_types'] before it was saved, compare the type name in the split "
+            "with adata.var['feature_types'].value_counts() before the split.")
     src, out = str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT")
     for argv, what in (
             (["convert", str(tmp_path / "none.h5ad"), out, "--rna", "X"], "rna "),

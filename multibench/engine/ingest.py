@@ -474,8 +474,9 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             store = f"store {slot} as a DataFrame, or put the names in {uns}"
             fix = (f"Pass {names_arg}=, {store}." if names_arg and not config._CLI
                    else f"{store[:1].upper()}{store[1:]}.")
-            warnings.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
-                          UserWarning, stacklevel=3)
+            if n_feat:                  # 0 features have no names, and are refused
+                warnings.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
+                              UserWarning, stacklevel=3)
         return X, names
     _check_one_feature_type(adata, arg=arg, spec=spec, role=role or what)
     if layer is not None:
@@ -1249,8 +1250,9 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
             named = f"give {what}= as a DataFrame or AnnData with named features"
             fix = (f"Pass adt_names=, or {named}." if what == "adt"
                    else f"{named[:1].upper()}{named[1:]}.")
-            warnings.warn(_no_names_message(what, "array", n_feat, fix),
-                          UserWarning, stacklevel=3)
+            if n_feat:                  # 0 features have no names, and are refused
+                warnings.warn(_no_names_message(what, "array", n_feat, fix),
+                              UserWarning, stacklevel=3)
             feature_names = [f"feature_{i}" for i in range(n_feat)]
         a.var_names = [str(x) for x in feature_names]
         return a, {}
@@ -1896,15 +1898,20 @@ def _no_features_message(n_cells: int, what: str | None = None) -> str:
     """Z2: a selected matrix without a feature, which would be written as a
     file of barcodes alone. ``what`` is the modality argument (``'atac'``);
     ``to_canonical`` has none. A 10x Genomics file read without
-    ``gex_only=False`` gives such a matrix when it is split by feature type."""
+    ``gex_only=False`` gives such a matrix when it is split by feature type.
+    The command line reads a file that was saved after the split, which holds
+    no feature type to look at: its text sends the reader to the data before
+    the split."""
     return (f"The {what + ' ' if what else ''}matrix holds 0 features for {n_cells:,} cells, "
             f"so there is nothing to write. " + config.hint(
                 "If the data came from sc.read_10x_h5, read the file with gex_only=False: "
                 "without it scanpy returns the genes alone. If you split it by "
                 "var['feature_types'], compare the type name in the split with "
                 "adata.var['feature_types'].value_counts().",
-                "Check which feature types the file holds, in Python with "
-                "adata.var['feature_types'].value_counts()."))
+                "If the data came from sc.read_10x_h5, read the 10x file again with "
+                "gex_only=False: without it scanpy returns the genes alone. If it was split "
+                "by var['feature_types'] before it was saved, compare the type name in the "
+                "split with adata.var['feature_types'].value_counts() before the split."))
 
 
 def _check_batch_complete(vals, *, spec) -> None:
@@ -2145,13 +2152,15 @@ def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
             f"{'holds' if len(held) == 1 else 'hold'} their cells. If the files above are the "
             f"other side or the other batches of the same dataset, keep them, and add the "
             f"labels with " + config.hint(
-                "the export call that wrote the folder (its category= and batch_index=) and "
-                "labels=. Otherwise export to a new folder, and use that folder name in scan "
-                "and run_all too, or delete these files and run the export again.",
+                # that call writes the matrix files again, which are there
+                "the export call that wrote the folder (its category= and batch_index=), "
+                "labels= and overwrite=True. Otherwise export to a new folder, and use that "
+                "folder name in scan and run_all too, or delete these files and run the "
+                "export again.",
                 "the convert command that wrote the folder (its --category and "
-                "--batch-index) and --labels. Otherwise convert into a new folder, and use "
-                "that folder name in scan and run-all too, or delete these files and run "
-                "convert again."))
+                "--batch-index), --labels and --overwrite. Otherwise convert into a new "
+                "folder, and use that folder name in scan and run-all too, or delete these "
+                "files and run convert again."))
     else:
         text.append("A method would read them as part of this dataset. " + config.hint(
             "Export to a new folder, and use that folder name in scan and run_all too. To "
@@ -2396,7 +2405,8 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 raise ValueError(_file_name_message(spec, "labels"))
             name, _, col = spec.partition(":")
             if name and col and spec not in columns:
-                raise ValueError(_mod_prefix_message(spec, col if col in columns else None))
+                each = all(col in sides[side][0][1].obs.columns for side in present)
+                raise ValueError(_mod_prefix_message(spec, col if each else None))
     out = {}
     for side in present:
         role, a, kw, what, src = sides[side][0]
@@ -2446,15 +2456,17 @@ def _no_cell_types_advice(side: str) -> str:
 
 
 def _mod_prefix_message(spec: str, col: str | None) -> str:
-    """``labels='<mod>:<col>'`` for a diagonal export of AnnData objects, which
-    have no modalities. ``col`` is the part after the colon when it is a
-    column of one of the objects, else ``None``."""
+    """``labels='<mod>:<col>'`` for a diagonal export of data that is not a
+    MuData and so has no modalities: AnnData objects, DataFrames, a ``.csv``.
+    The message says what the data is not, which holds for each of them.
+    ``col`` is the part after the colon when it is a column of every object,
+    so that ``'obs:<col>'`` is read, else ``None``."""
     return config.hint(
         f"labels={spec!r}: '<mod>:<col>' names a column of one modality of a MuData, and "
-        f"this data is an AnnData. "
+        f"this data is not a MuData. "
         + (f"Write labels='obs:{col}'." if col else "Name the column, as labels='obs:<col>'."),
         f"--labels {spec}: <mod>:<col> names a column of one modality of a .h5mu file, and "
-        f"SRC is an .h5ad file. "
+        f"SRC is not one. "
         + (f"Write --labels obs:{col}." if col else "Name the column, as --labels obs:<col>."))
 
 
@@ -2483,7 +2495,7 @@ def _check_labels_complete(vals, *, spec, where: str, advice: str,
                            when_none: str = "") -> None:
     """Refuse a label vector with missing values: mtb.evaluate does not score
     a missing label, and the label file would hold one for every such cell.
-    ``when_none`` is a sentence that follows ``advice`` when no cell has a
+    ``when_none`` is a sentence that closes the message when no cell has a
     label."""
     from ..eval import io as eio
 
@@ -2497,8 +2509,8 @@ def _check_labels_complete(vals, *, spec, where: str, advice: str,
             rename = (f". If {repr(words[0]) if len(words) == 1 else 'one of them'} is the "
                       f"name of a cell type, rename it")
         if when_none and n == len(vals):
-            # the sentence brings its own full stop
-            advice, rename = f"{advice}. {when_none}", rename[1:]
+            # the sentence brings its own full stop, and closes the message
+            advice, rename = f"{advice}{rename}. {when_none}", ""
         raise ValueError(
             f"labels={_shown(spec)}: {n} of the {len(vals)} labels for {where} are missing "
             f"({forms}); {advice}{rename}")

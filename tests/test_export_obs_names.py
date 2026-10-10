@@ -202,9 +202,9 @@ def test_a_diagonal_side_with_an_empty_column_gets_the_way_out(tmp_path, monkeyp
     atac.obs["celltype"] = "NA"
     assert _value_error(tmp_path, rna, labels="celltype", **kw) == (
         f"labels='celltype': 70 of the 70 labels for the ATAC cells (atac) are missing (NaN, "
-        f"None, '' or text that a label file reads as missing: 'NA'); {each}. Without cell "
-        f"types for the ATAC cells, leave labels= out and run with evaluate=False. If 'NA' is "
-        f"the name of a cell type, rename it")
+        f"None, '' or text that a label file reads as missing: 'NA'); {each}. If 'NA' is the "
+        f"name of a cell type, rename it. Without cell types for the ATAC cells, leave "
+        f"labels= out and run with evaluate=False.")
     # some cells of the side have a label: the text of before
     atac.obs["celltype"] = ["T"] * 65 + [np.nan] * 5
     assert _value_error(tmp_path, rna, labels="obs:celltype", **kw) == (
@@ -225,12 +225,22 @@ def test_a_modality_prefix_on_an_anndata_names_the_obs_spelling(tmp_path, capsys
     about the spelling, and so does this."""
     rna, atac = _cells(60, "r"), _cells(40, "a", seed=1)
     kw = dict(rna="X", atac=atac, atac_kind="gene_activity", category="diagonal")
-    head = ("'<mod>:<col>' names a column of one modality of a MuData, and this data is an "
-            "AnnData.")
+    head = ("'<mod>:<col>' names a column of one modality of a MuData, and this data is not "
+            "a MuData.")
     assert _value_error(tmp_path, rna, labels="rna:celltype", **kw) == (
         f"labels='rna:celltype': {head} Write labels='obs:celltype'.")
     assert _value_error(tmp_path, rna, labels="atac:nope", **kw) == (
         f"labels='atac:nope': {head} Name the column, as labels='obs:<col>'.")
+    # a column of one side alone: 'obs:celltype' would not be read for the other
+    bare = atac.copy()
+    del bare.obs["celltype"]
+    assert _value_error(tmp_path, rna, labels="rna:celltype", **{**kw, "atac": bare}) == (
+        f"labels='rna:celltype': {head} Name the column, as labels='obs:<col>'.")
+    # DataFrames are not AnnData objects, and have no obs
+    frames = [pd.DataFrame(a.X, index=a.obs_names, columns=a.var_names) for a in (rna, atac)]
+    assert _value_error(tmp_path, None, labels="rna:celltype",
+                        **{**kw, "rna": frames[0], "atac": frames[1]}) == (
+        f"labels='rna:celltype': {head} Name the column, as labels='obs:<col>'.")
     # what the message says to write is read
     out = ingest.export_dataset(rna, tmp_path / "OBS", labels="obs:celltype", **kw)
     assert sorted(_files(out)) == ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"]
@@ -248,14 +258,19 @@ def test_a_modality_prefix_on_an_anndata_names_the_obs_spelling(tmp_path, capsys
     argv = ["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT"), "--rna", "X",
             "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind", "gene_activity",
             "--category", "diagonal", "--labels"]
-    cli_head = ("<mod>:<col> names a column of one modality of a .h5mu file, and SRC is an "
-                ".h5ad file.")
+    cli_head = "<mod>:<col> names a column of one modality of a .h5mu file, and SRC is not one."
     rc, line = _cli_error(argv + ["rna:celltype"], capsys)
     assert rc == 1 and line == (
         f"error: --labels rna:celltype: {cli_head} Write --labels obs:celltype.")
     rc, line = _cli_error(argv + ["rna:nope"], capsys)
     assert rc == 1 and line == (
         f"error: --labels rna:nope: {cli_head} Name the column, as --labels obs:<col>.")
+    # SRC as a .csv file: it is no .h5ad file, and it has no obs column to read
+    frames[0].to_csv(tmp_path / "rna.csv")
+    rc, line = _cli_error(["convert", str(tmp_path / "rna.csv")] + argv[2:] + ["rna:celltype"],
+                          capsys)
+    assert rc == 1 and line == (
+        f"error: --labels rna:celltype: {cli_head} Name the column, as --labels obs:<col>.")
     assert not (tmp_path / "OUT").exists()
 
 
