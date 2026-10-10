@@ -1,5 +1,18 @@
-"""scIB metric computation (clustering + batch), ported from upstream
-``evaluation_pipelines/scib_metrics/scib_metrics.py``."""
+"""scIB metric computation (clustering + batch), after upstream
+``evaluation_pipelines/scib_metrics/scib_metrics.py``.
+
+The scib calls are the script's, with three differences in what they score:
+
+- ARI and NMI score the Leiden resolution with the best NMI of a
+  10-resolution sweep unless a clustering is passed; the script reads a
+  SINFONIA clustering with as many clusters as cell types;
+- ASW and iASW are silhouettes of the cell-type labels (scIB's definition);
+  the script passes ``label_key="cluster"``;
+- the script's ``ARI_batch`` and ``NMI_batch`` are not computed.
+
+On the benchmark's demo embedding (28,574 cells) that is ARI 0.618 against
+0.512, NMI 0.731 against 0.697, ASW 0.570 against 0.614.
+"""
 from __future__ import annotations
 
 import contextlib
@@ -236,8 +249,7 @@ def _resolve_flavor(flavor) -> str:
     configured default, downgraded to ``"leidenalg"`` when this scanpy cannot
     run the igraph backend.
 
-    ``None`` reads ``config.DEFAULT.leiden_flavor`` (``"igraph"`` when the
-    field is absent, e.g. an older ``Config``). Anything outside
+    ``None`` reads ``config.DEFAULT.leiden_flavor``. Anything outside
     :data:`LEIDEN_FLAVORS` raises rather than silently running the slow
     backend under a misspelt name. ``"igraph"`` on a scanpy older than 1.10
     (or without the igraph package) falls back to ``"leidenalg"`` with one
@@ -246,7 +258,7 @@ def _resolve_flavor(flavor) -> str:
     global _fallback_warned
     if flavor is None:
         from .. import config
-        flavor = getattr(config.DEFAULT, "leiden_flavor", "igraph")
+        flavor = config.DEFAULT.leiden_flavor
     if flavor not in LEIDEN_FLAVORS:
         raise ValueError(
             f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
@@ -358,7 +370,6 @@ def leiden_sweep(emb, *, flavor=None):
     ValueError
         ``flavor`` is neither ``"igraph"`` nor ``"leidenalg"``.
     """
-    import scanpy as sc
     from scib.metrics.clustering import get_resolutions
 
     flavor = _resolve_flavor(flavor)
@@ -391,7 +402,6 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
     all resolutions - the same quantity scib's per-label optimisation returns.
     ``tests/test_eval_isolated_f1.py`` pins this to scib's own result.
     """
-    import scanpy as sc
     from sklearn.metrics import f1_score
     from scib.metrics.clustering import get_resolutions
     from scib.metrics.isolated_labels import get_isolated_labels
