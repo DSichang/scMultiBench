@@ -1462,12 +1462,12 @@ def scan(dataset: str, category: str | None = None, *,
     plus a reason; ``runnable`` needs both:
 
     - ``files_ok`` / ``files_reason`` - the method's script is present, the
-      input files resolve on disk, are dataset files with features and cells
-      (not a 10x Genomics ``.h5`` under the name of one) and are oriented
-      features x cells, every label CSV has one row per cell of the modality
-      it labels, and a ``data_dir`` method (scBridge) finds the files it
-      names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must hold the same
-      cells. A diagonal ``atac_gas.h5`` must list the cells of
+      input files resolve on disk and are oriented features x cells, no
+      matrix file is a 10x Genomics ``.h5`` under the name of a dataset file
+      or holds 0 features or 0 cells, every label CSV has one row per cell
+      of the modality it labels, and a ``data_dir`` method (scBridge) finds
+      the files it names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must
+      hold the same cells. A diagonal ``atac_gas.h5`` must list the cells of
       ``atac_peak.h5`` in its order.
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command

@@ -80,12 +80,19 @@ def test_file_without_dimnames_is_not_rejected(tmp_path):
     _resolve_it(tmp_path, "NODIMS")    # must not raise
 
 
-# --- a file that is no dataset file, or holds no matrix, under the name of one
+# --- a 10x file, or a matrix without features or cells, under a dataset file name
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
-TENX = ("{} is a 10x Genomics file, not a multibench dataset file. Read it with scanpy, "
+#: what the folder check says of a 10x file after its subject ("<method> reads
+#: rna.h5 of <dataset>, which", in the reason column "rna.h5"): in Python, and
+#: on the command line
+TENX = ("is a 10x Genomics file, not a multibench dataset file. Read it with scanpy, "
         "sc.read_10x_h5(path, gex_only=False), split it by var['feature_types'] and write "
         "a dataset folder with mtb.io.export_dataset. The documentation has the steps as "
         'the recipe "A 10x .h5 file".')
+TENX_CLI = ("is a 10x Genomics file, not a multibench dataset file. Read it in Python "
+            "with scanpy, save one .h5ad file per modality and convert those with "
+            "multibench convert. The documentation has the steps as the recipe "
+            '"A 10x .h5 file".')
 PEAKS = [f"chr1:{i * 1000 + 1}-{i * 1000 + 500}" for i in range(70)]
 
 
@@ -140,34 +147,68 @@ def test_a_10x_file_under_a_dataset_name_fails_the_file_check(
     shutil.copy(_tenx(tmp_path / "filtered_feature_bc_matrix.h5", second), d / "rna.h5")
     shutil.copy(tmp_path / "filtered_feature_bc_matrix.h5", d / other)
     kw = dict(methods=methods, data_path=tmp_path)
-    short, full = TENX.format("rna.h5"), "ValueError: " + TENX.format(d / "rna.h5")
+    short = f"rna.h5 {TENX}"
+    full = [f"ValueError: {m} reads rna.h5 of TENX, which {TENX}" for m in methods]
     df = mtb.scan("TENX", "vertical", verbose=False, **kw)
     assert list(df["method"]) == methods and not df["files_ok"].any()
     assert list(df["reason"]) == [short, short]
-    assert list(df["files_reason"]) == [full, full]
+    assert list(df["files_reason"]) == full
     plan = mtb.run_all("TENX", "vertical", out_dir=tmp_path / "out", dry_run=True, **kw)
     assert not plan["files_ok"].any() and not plan["runnable"].any()
     assert list(plan["reason"]) == [short, short]
-    assert list(plan["files_reason"]) == [full, full]
+    assert list(plan["files_reason"]) == full
     mtb.scan("TENX", "vertical", per_method=True, **kw)
     for m in methods:
         with pytest.raises(ValueError) as e:
             mtb.inputs_for("TENX", "vertical", m, data_path=tmp_path, check=True)
-        assert str(e.value) == TENX.format(d / "rna.h5")
+        assert str(e.value) == f"{m} reads rna.h5 of TENX, which {TENX}"
         got = mtb.inputs_for("TENX", "vertical", m, data_path=tmp_path, check=False)
         assert sorted(set(got.values())) == sorted([str(d / other), str(d / "rna.h5")])
     printed = capsys.readouterr()
     assert f"[scan] {methods[0]}: {short}\n" in printed.out
     assert "Accessing a group" not in printed.out + printed.err
     assert not (tmp_path / "out").exists()
-    # on the command line: the sentence of multibench convert for this file
+    # the way out is the one that to_canonical and mtb.run give for the file itself
+    assert ingest._tenx_message("f.h5") == f"f.h5 {TENX}"
+    # on the command line: the same fact, then the command that writes a folder.
+    # The user ran scan, so it is not the sentence about what convert reads
     with pytest.MonkeyPatch.context() as m:
         m.setattr(config, "_CLI", True)
         df = mtb.scan("TENX", "vertical", verbose=False, **kw)
-    assert df["reason"][0] == (
-        "rna.h5 is a 10x Genomics file. multibench convert reads .h5ad files, not this "
-        "file. Read it in Python with scanpy, save one .h5ad file per modality and convert "
-        'those. The documentation has the steps as the recipe "A 10x .h5 file".')
+    assert list(df["reason"]) == [f"rna.h5 {TENX_CLI}"] * 2
+    assert list(df["files_reason"]) == [
+        f"ValueError: {m} reads rna.h5 of TENX, which {TENX_CLI}" for m in methods]
+
+
+def test_the_reason_starts_with_the_file_when_the_data_path_has_a_space(
+        ready, tmp_path, capsys):
+    """The reason column cuts a path to its file name, and takes a path to
+    end at white space: a sentence that led with the full path began
+    "My Data/TENX/rna.h5 is a 10x Genomics file"."""
+    base = tmp_path / "My Data"
+    (base / "TENX").mkdir(parents=True)
+    _tenx(base / "TENX" / "rna.h5", ("Antibody Capture", [f"AB{i}" for i in range(8)]))
+    shutil.copy(base / "TENX" / "rna.h5", base / "TENX" / "adt.h5")
+    (base / "ZERO").mkdir()
+    _matrix(base / "ZERO" / "rna.h5", [], 100)
+    _matrix(base / "ZERO" / "adt.h5", [f"AB{i}" for i in range(8)], 100)
+    zero = "rna.h5 holds 0 features. Write the folder again with mtb.io.export_dataset."
+    for name, short in (("TENX", f"rna.h5 {TENX}"), ("ZERO", zero)):
+        kw = dict(methods=["totalVI"], data_path=base)
+        df = mtb.scan(name, "vertical", verbose=False, **kw)
+        assert list(df["reason"]) == [short]
+        assert "My Data" not in df["files_reason"][0]
+        pm = mtb.scan(name, "vertical", per_method=True, **kw)
+        assert list(pm["reason"]) == [short]
+        assert capsys.readouterr().out.splitlines()[-1] == f"[scan] totalVI: {short}"
+        with pytest.raises(ValueError) as e:
+            mtb.run_all(name, "vertical", out_dir=tmp_path / "out", **kw)
+        assert f"  totalVI (rna+adt): {short}\n" in str(e.value)
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(config, "_CLI", True)
+        df = mtb.scan("TENX", "vertical", verbose=False, methods=["totalVI"], data_path=base)
+    assert list(df["reason"]) == [f"rna.h5 {TENX_CLI}"]
+    assert not (tmp_path / "out").exists()
 
 
 def test_the_files_a_folder_method_names_are_checked_too(tmp_path):
@@ -183,7 +224,7 @@ def test_the_files_a_folder_method_names_are_checked_too(tmp_path):
         return mtb.inputs_for("DIAG", "diagonal", "scBridge", data_path=tmp_path, check=True)
     with pytest.raises(ValueError) as e:
         check()
-    assert str(e.value) == TENX.format(d / "rna.h5")
+    assert str(e.value) == f"scBridge reads rna.h5 of DIAG, which {TENX}"
     _matrix(d / "rna.h5", [], 100)
     with pytest.raises(ValueError) as e:
         check()
@@ -215,6 +256,19 @@ def test_dataset_files_keep_passing_the_file_check(ready, tmp_path):
     assert ingest.to_canonical(tmp_path / "GOOD" / "rna.h5") == tmp_path / "GOOD" / "rna.h5"
     df = mtb.scan("GOOD", "vertical", **kw)
     assert df["files_ok"].all() and list(df["reason"]) == ["", ""]
+
+
+def test_scan_and_inputs_for_describe_the_check_of_matrix_files_alike():
+    """What the check tests, and no more: another file that is not a dataset
+    file (an .h5ad copied to rna.h5) passes it and is refused by mtb.run, so
+    neither docstring says that the input files "are dataset files"."""
+    scan_doc = " ".join(mtb.scan.__doc__.split())
+    inputs_doc = " ".join(mtb.inputs_for.__doc__.split())
+    assert ("no matrix file is a 10x Genomics ``.h5`` under the name of a dataset file or "
+            "holds 0 features or 0 cells,") in scan_doc
+    assert ("``ValueError`` when a matrix file is a 10x Genomics ``.h5`` under the name of "
+            "a dataset file, or holds 0 features or 0 cells;") in inputs_doc
+    assert "are dataset files" not in scan_doc + inputs_doc
 
 
 def test_a_matrix_file_without_features_fails_the_file_check(ready, tmp_path, capsys,

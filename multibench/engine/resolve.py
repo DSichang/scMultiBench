@@ -799,23 +799,38 @@ def _sniff_h5(path: str, mtime_ns: int):
 
 
 def _check_matrix_files(method, dataset, resolved):
-    """Reject a file that is no dataset file, or holds no matrix, under the
-    name of one.
+    """Reject a 10x Genomics file, and a matrix without features or cells,
+    under the name of a dataset file. Any other file that is not a dataset
+    file (an ``.h5ad`` copied to ``rna.h5``) passes this check; ``mtb.run``
+    refuses it.
 
     A 10x Genomics ``.h5`` copied to ``rna.h5`` has ``matrix/data``,
     ``matrix/features`` and ``matrix/barcodes`` too, so the folder looks
     complete; ``mtb.run`` refuses the file. It is tested as ``to_canonical``
-    tests it: a file with a 2-D ``matrix/data`` passes. A matrix with 0
-    features (0.3.4 wrote one for an object that was split so that no feature
-    was left) or 0 cells gives a method nothing to read.
+    tests it: a file with a 2-D ``matrix/data`` passes. The sentence is the
+    folder check's own, in the form of the other content checks: the one
+    ``to_canonical`` raises (``ingest._tenx_message``) leads with the full
+    path and, on the command line, speaks of ``multibench convert``, which
+    the user of ``scan`` did not run. A matrix with 0 features (0.3.4 wrote
+    one for an object that was split so that no feature was left) or 0 cells
+    gives a method nothing to read.
     """
-    from .ingest import _is_canonical_h5, _is_tenx_h5, _tenx_message
+    from .ingest import _is_canonical_h5, _is_tenx_h5
     for path in dict.fromkeys(resolved.values()):
         p = Path(path)
         if p.suffix != ".h5" or not p.is_file():
             continue
         if not _is_canonical_h5(p) and _is_tenx_h5(p):
-            raise ValueError(_tenx_message(p))
+            way = config.hint(
+                "Read it with scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
+                "var['feature_types'] and write a dataset folder with "
+                "mtb.io.export_dataset.",
+                "Read it in Python with scanpy, save one .h5ad file per modality and "
+                "convert those with multibench convert.")
+            raise ValueError(
+                f"{method} reads {p.name} of {dataset}, which is a 10x Genomics file, "
+                f"not a multibench dataset file. {way} The documentation has the steps "
+                f'as the recipe "A 10x .h5 file".')
         sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
         if sniff is not None and 0 in sniff[1:]:
             again = config.hint("mtb.io.export_dataset", "multibench convert")
