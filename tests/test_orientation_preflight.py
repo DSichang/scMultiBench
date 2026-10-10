@@ -164,6 +164,17 @@ def test_a_10x_file_under_a_dataset_name_fails_the_file_check(
         assert str(e.value) == f"{m} reads rna.h5 of TENX, which {TENX}"
         got = mtb.inputs_for("TENX", "vertical", m, data_path=tmp_path, check=False)
         assert sorted(set(got.values())) == sorted([str(d / other), str(d / "rna.h5")])
+    # without a category and as diagonal, scan looks into an ATAC file under
+    # another name than the one a method reads: on the RNA + ATAC folder 0.3.4
+    # raised h5py's TypeError there, for the whole call
+    for cat in (None, "diagonal"):
+        df = mtb.scan("TENX", cat, data_path=tmp_path)
+        assert len(df) and not df["files_ok"].any()
+        assert not (df["reason"] + df["files_reason"]).str.contains("Accessing a group").any()
+    plan = mtb.run_all("TENX", "diagonal", out_dir=tmp_path / "out", dry_run=True,
+                       data_path=tmp_path)
+    assert len(plan) and not plan["runnable"].any()
+    mtb.scan("TENX", "diagonal", per_method=True, data_path=tmp_path)
     printed = capsys.readouterr()
     assert f"[scan] {methods[0]}: {short}\n" in printed.out
     assert "Accessing a group" not in printed.out + printed.err
@@ -178,6 +189,42 @@ def test_a_10x_file_under_a_dataset_name_fails_the_file_check(
     assert list(df["reason"]) == [f"rna.h5 {TENX_CLI}"] * 2
     assert list(df["files_reason"]) == [
         f"ValueError: {m} reads rna.h5 of TENX, which {TENX_CLI}" for m in methods]
+
+
+def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
+        ready, tmp_path, capsys):
+    """A 10x file under atac.h5 next to a real rna.h5 and adt.h5. 0.3.4 raised
+    "Accessing a group is done with bytes or str, not <class 'slice'>" for
+    scan without a category, although the RNA + ADT rows have their files."""
+    d = tmp_path / "STRAY"
+    d.mkdir()
+    _matrix(d / "rna.h5", [f"G{i}" for i in range(50)], 100)
+    _matrix(d / "adt.h5", [f"AB{i}" for i in range(8)], 100)
+    _tenx(d / "atac.h5", ("Peaks", PEAKS))
+    df = mtb.scan("STRAY", verbose=False, data_path=tmp_path)
+    ok = df[df["files_ok"]]
+    assert "totalVI" in set(ok["method"]) and set(ok["modalities"]) == {"rna+adt"}
+    # diagonal: a peak method does not find atac_peak.h5 and is told what is
+    # there, a gene-activity method reads atac.h5
+    kw = dict(methods=["SCALEX", "Seurat_v5"], data_path=tmp_path)
+    df = mtb.scan("STRAY", "diagonal", verbose=False, **kw)
+    assert list(df["method"]) == ["SCALEX", "Seurat_v5"]
+    reasons = [f"atac.h5 {TENX}",
+               "Seurat_v5 needs peak ATAC (atac_peak.h5), and the folder has ATAC (atac.h5)."]
+    assert list(df["reason"]) == reasons
+    plan = mtb.run_all("STRAY", "diagonal", out_dir=tmp_path / "out", dry_run=True, **kw)
+    assert list(plan["reason"]) == reasons and not plan["runnable"].any()
+    pm = mtb.scan("STRAY", "diagonal", per_method=True, **kw)
+    assert list(pm["reason"]) == reasons
+    printed = capsys.readouterr()
+    assert "Accessing a group" not in printed.out + printed.err
+    assert not (tmp_path / "out").exists()
+    # the two readers of feature names give no names for the group
+    # matrix/features of a 10x file
+    path = d / "atac.h5"
+    assert _resolve._sniff_features(str(path), path.stat().st_mtime_ns) == ()
+    assert _resolve._all_features(str(path), path.stat().st_mtime_ns) == ()
+    assert _resolve._peak_fraction_of(path) is None
 
 
 def test_the_reason_starts_with_the_file_when_the_data_path_has_a_space(

@@ -813,7 +813,9 @@ def _check_matrix_files(method, dataset, resolved):
     path and, on the command line, speaks of ``multibench convert``, which
     the user of ``scan`` did not run. A matrix with 0 features (0.3.4 wrote
     one for an object that was split so that no feature was left) or 0 cells
-    gives a method nothing to read.
+    gives a method nothing to read. The two are counted from
+    ``matrix/features`` and ``matrix/barcodes`` (``_sniff_h5``): a file
+    without these lists is not counted, as in the orientation check.
     """
     from .ingest import _is_canonical_h5, _is_tenx_h5
     for path in dict.fromkeys(resolved.values()):
@@ -875,14 +877,19 @@ def _check_orientation(method, dataset, category, resolved):
 
 @functools.lru_cache(maxsize=512)
 def _sniff_features(path: str, mtime_ns: int, n: int = 50) -> tuple:
-    """First ``n`` feature names of a canonical .h5 (cached by mtime), or ()."""
+    """First ``n`` feature names of a canonical .h5 (cached by mtime), or ().
+
+    A 10x Genomics ``.h5`` keeps ``matrix/features`` as a group (``id``,
+    ``name``, ``feature_type``), not as the list of names: it gives ``()``.
+    """
     import h5py
 
     try:
         with h5py.File(path, "r") as f:
-            if "matrix/features" not in f:
+            feats = f.get("matrix/features")
+            if not isinstance(feats, h5py.Dataset):
                 return ()
-            raw = f["matrix/features"][:n]
+            raw = feats[:n]
     except OSError:
         return ()
     return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
@@ -1193,14 +1200,16 @@ def _peak_fraction_of(path: Path) -> float | None:
 
 @functools.lru_cache(maxsize=64)
 def _all_features(path: str, mtime_ns: int) -> tuple:
-    """Every feature name of a canonical .h5 (cached by mtime), or ()."""
+    """Every feature name of a canonical .h5 (cached by mtime), or (); ``()``
+    also for the ``matrix/features`` group of a 10x Genomics ``.h5``."""
     import h5py
 
     try:
         with h5py.File(path, "r") as f:
-            if "matrix/features" not in f:
+            feats = f.get("matrix/features")
+            if not isinstance(feats, h5py.Dataset):
                 return ()
-            raw = f["matrix/features"][:]
+            raw = feats[:]
     except OSError:
         return ()
     return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)

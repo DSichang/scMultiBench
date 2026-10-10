@@ -1171,19 +1171,22 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
     and that a role of some variant of ``category`` (``None``: of any)
     resolves to.
 
-    The resolver decides (``_resolve._resolve_role``), so an older name such
-    as ``peak.h5`` counts and no second list of file names exists. Every
+    The resolver decides (``_resolve._resolve_variant_inputs``, the paths
+    ``inputs_for`` returns), so an older name such as ``peak.h5`` counts, a
+    vertical folder with ``atac_peak.h5`` and ``atac_gas.h5`` gives the one
+    each method reads, and no second list of file names exists. Every
     variant is asked, not only the rows of one scan: what a folder holds does
     not depend on the methods a caller names.
     """
+    from .engine.schema import is_label_role
     files = {}
-    for role in dict.fromkeys(r for *_, mods in _variant_rows(category) for r in mods):
-        fam = _family(role)
-        if fam not in _FAMILIES:
-            continue
-        p = _resolve._resolve_role(ds_dir, role)
-        if p.name not in files and p.exists():
-            files[p.name] = fam
+    for spec, v, *_ in _variant_rows(category):
+        for role, path in _resolve._resolve_variant_inputs(v, ds_dir, spec.id).items():
+            fam, p = _family(role), Path(path)
+            if fam not in _FAMILIES or is_label_role(role):
+                continue
+            if p.name not in files and p.exists():
+                files[p.name] = fam
     return files
 
 

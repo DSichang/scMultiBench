@@ -258,6 +258,27 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     pm, line = first("BOTH", "vertical", methods=["Seurat_WNN", "totalVI"])
     assert line == ("[scan] 2 of 2 methods have their input files in BOTH. 2 of 2 can run "
                     "on this computer. BOTH holds RNA and ADT.")
+    # a vertical folder with both ATAC forms: every vertical method reads
+    # atac_peak.h5, so a 10x file under atac_gas.h5 takes no ATAC from it
+    bars = [f"c{i}" for i in range(60)]
+    (tmp_path / "GAS").mkdir()
+    _h5(tmp_path / "GAS" / "rna.h5", GENES[:30], bars)
+    _h5(tmp_path / "GAS" / "atac_peak.h5", PEAKS, bars)
+    _tenx(tmp_path / "GAS" / "atac_gas.h5")
+    got = mtb.inputs_for("GAS", "vertical", "scMM", data_path=tmp_path, check=True)
+    assert got == {"rna": str(tmp_path / "GAS" / "rna.h5"),
+                   "atac_gas": str(tmp_path / "GAS" / "atac_peak.h5")}
+    pm, line = first("GAS", "vertical", methods=["VIMCCA", "scMM"])
+    assert line == ("[scan] 2 of 2 methods have their input files in GAS. 2 of 2 can run "
+                    "on this computer. GAS holds RNA and ATAC.")
+    assert pm.attrs["held"] == ["rna", "atac"] and pm["runnable"].all()
+    # as diagonal a gene-activity method reads atac_gas.h5, and the file is named
+    pm, line = first("GAS", "diagonal", methods=["SCALEX", "Seurat_v5"])
+    assert line == ("[scan] 1 of 2 methods has its input files in GAS. 1 of 2 can run on "
+                    "this computer. GAS holds RNA and ATAC. atac_gas.h5 is a 10x Genomics "
+                    "file under the name of a dataset file.")
+    assert list(pm["method"]) == ["Seurat_v5", "SCALEX"]
+    assert list(pm["runnable"]) == [True, False]
 
 
 def test_files_of_another_layout_are_not_called_no_file(linux, tmp_path, capsys):
