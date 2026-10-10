@@ -1241,7 +1241,11 @@ def test_changes_page_lists_0_3_5():
             "without cells, and it wrote the text `nan` as a batch of its own.",
             "The exit codes of `scan --strict` are unchanged.",
             "In `export_dataset`: a `labels=` or `batch=` value that names no column, ADT read "
-            "from `X` next to an `obsm` matrix, and `batch=` in a vertical or diagonal export."):
+            "from `X` next to an `obsm` matrix, and `batch=` in a vertical or diagonal export.",
+            "0.3.4 wrote a file without features, for example the ATAC part of a 10x file "
+            "read without `gex_only=False`.",
+            "0.3.4 reported a folder of 10x files named `rna.h5` and `adt.h5`, and a file "
+            "with 0 features, as present."):
         assert said in changed, said
     for said in (
             # missing labels: evaluate, run_all, export
@@ -1262,11 +1266,15 @@ def test_changes_page_lists_0_3_5():
             "A file written for cells that the folder already holds follows the cell order "
             "of the files in the folder, and a line on stderr says so.",
             "Data with 0 cells raises `ValueError`. 0.3.4 wrote files without a cell.",
+            "A matrix with 0 features raises `ValueError` in `export_dataset` and "
+            "`to_canonical`.",
             # several feature types, and the 10x file
             "This applies to an AnnData and to an `.h5ad` file, in `export_dataset`, "
             "`to_canonical`, `multibench convert` and the conversion that `mtb.run` does.",
+            "The dry run of `mtb.run` applies the check as the run does.",
             "A 10x Genomics `.h5` file raises `ValueError` in `to_canonical`, "
             "`multibench convert` and `mtb.run`.",
+            "`mtb.io.read_canonical` names such a file too.",
             # ADT read from X
             "0.3.4 raised `ValueError` for any `obsm` entry, so such a file could not be "
             "exported.",
@@ -1279,8 +1287,14 @@ def test_changes_page_lists_0_3_5():
             "and `not_held` of the table say that rows were left out.",
             "a named method that is skipped gets a `skipping` line for its listed variants "
             "only.",
+            # the folder check: a 10x file, and a matrix without features or cells
+            "`scan`, `run_all` and `inputs_for(check=True)` report a 10x Genomics `.h5` file "
+            "under a dataset file name, and a matrix file with 0 features or 0 cells, as a "
+            "file problem: `files_ok` is false and the reason names the file.",
             # reworded errors, and the folder names of the tutorials
             "Some errors have a new text and the same exception class.",
+            "In `evaluate`: the count error for the label files of one diagonal side, and for "
+            "a folder without label files.",
             "Ten tutorials write the folder of their section \"Your own data\" under a new "
             "name, one name per tutorial."):
         assert said in changed, said
@@ -1292,6 +1306,8 @@ def test_changes_page_lists_0_3_5():
             "export writes your cells next to cells of the example, and no error says so.",
             "Diagonal data with cell types for one side only cannot be scored through "
             "`run_all`.",
+            "`mtb.evaluate(..., missing_labels=\"drop\")` scores the labelled side alone "
+            "there, which does not compare methods.",
             "A label file left from other cells is found by its number of labels.",
             "`multibench run-all --dry-run` prints nothing about a label file with missing "
             "labels."):
@@ -1690,6 +1706,137 @@ def test_changes_page_names_what_an_export_does_not_look_at(tmp_path):
     assert pd.read_csv(tmp_path / "SAME" / "cty.csv").shape == (120, 1)
 
 
+@needs_docs
+def test_changes_page_names_the_files_without_features_and_the_10x_files(
+        linux_host, tmp_path, monkeypatch):
+    """What the page says about a matrix without features, about a 10x
+    Genomics file where a dataset file is read, and about the count errors
+    of ``evaluate``. Each call raises the class that the page names, and a
+    refused export writes nothing. What 0.3.4 did was run against the
+    release, not here."""
+    pytest.importorskip("anndata")
+    sc = pytest.importorskip("scanpy")
+    h5py = pytest.importorskip("h5py")
+    import shutil
+    import numpy as np
+    import multibench as mtb
+    from tests.test_docs_recipes import ANTIBODIES, GENES, PEAKS, _tenx
+    monkeypatch.chdir(tmp_path)
+    _tenx("multiome.h5", GENES, PEAKS, "atac", n_cells=40)
+
+    def quiet(fn, *args, **kw):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return fn(*args, **kw)
+
+    # a matrix with 0 features: the ATAC part of a 10x file read without gex_only=False
+    entry = _entry_0_3_5("A matrix with 0 features raises `ValueError`")
+    assert entry == (
+        "A matrix with 0 features raises `ValueError` in `export_dataset` and `to_canonical`. "
+        "0.3.4 wrote a file without features, for example the ATAC part of a 10x file read "
+        "without `gex_only=False`.")
+    genes = quiet(sc.read_10x_h5, "multiome.h5")
+    quiet(genes.var_names_make_unique)
+    kind = genes.var["feature_types"]
+    rna, atac = quiet(genes[:, kind == "Gene Expression"].copy), genes[:, kind == "Peaks"].copy()
+    assert (rna.shape, atac.shape) == ((40, len(GENES)), (40, 0))
+    with pytest.raises(ValueError, match=r"^The atac matrix holds 0 features for 40 cells, so "
+                                         r"there is nothing to write\. "):
+        quiet(mtb.io.export_dataset, rna, "mydata/EMPTY", atac=atac, atac_kind="peak")
+    with pytest.raises(ValueError, match=r"^The matrix holds 0 features for 40 cells, so "
+                                         r"there is nothing to write\. "):
+        quiet(mtb.io.to_canonical, atac, "mydata/EMPTY/", modality="atac_peak")
+    assert not Path("mydata").exists()
+
+    # a 10x file: read_canonical names it, and the dry run of mtb.run applies
+    # the check on feature types that the conversion applies
+    entry = _entry_0_3_5("A 10x Genomics `.h5` file raises `ValueError` in `to_canonical`, "
+                         "`multibench convert` and `mtb.run`.")
+    assert ("0.3.4 handed it on or copied it as a dataset file, which it is not. "
+            "`mtb.io.read_canonical` names such a file too. The recipe") in entry
+    with pytest.raises(ValueError, match=r"^multiome\.h5 is a 10x Genomics file, not a "
+                                         r"multibench dataset file\. "):
+        mtb.io.read_canonical("multiome.h5")
+    entry = _entry_0_3_5("A matrix whose `var[\"feature_types\"]` holds more than one type "
+                         "raises `ValueError`")
+    assert ("and the conversion that `mtb.run` does. The dry run of `mtb.run` applies the "
+            "check as the run does. 0.3.4 wrote genes and peaks") in entry
+    both = quiet(sc.read_10x_h5, "multiome.h5", gex_only=False)
+    with pytest.raises(ValueError, match="^The matrix holds 180 features of 2 types: ") as conv:
+        quiet(mtb.io.to_canonical, both, "mydata/BOTH/", modality="rna")
+    with pytest.raises(ValueError) as dry:
+        quiet(mtb.run, "VIMCCA", "vertical", inputs={"rna": both, "atac": both},
+              out_dir="out/dry", dry_run=True)
+    assert str(dry.value) == str(conv.value)
+    assert not Path("mydata").exists() and not Path("out").exists()
+
+    # the folder check: 10x files under the names of dataset files, and a
+    # matrix file without features or without cells
+    entry = _entry_0_3_5("`scan`, `run_all` and `inputs_for(check=True)` report a 10x Genomics "
+                         "`.h5` file under a dataset file name")
+    assert entry == (
+        "`scan`, `run_all` and `inputs_for(check=True)` report a 10x Genomics `.h5` file under "
+        "a dataset file name, and a matrix file with 0 features or 0 cells, as a file problem: "
+        "`files_ok` is false and the reason names the file. 0.3.4 reported a folder of 10x "
+        "files named `rna.h5` and `adt.h5`, and a file with 0 features, as present.")
+    _tenx("cite.h5", GENES, ANTIBODIES, "adt", n_cells=40)
+    Path("data/TENX").mkdir(parents=True)
+    for name in ("rna.h5", "adt.h5"):
+        shutil.copy("cite.h5", f"data/TENX/{name}")
+    cells = _own_cells(60)
+    for dataset, shape in (("NOFEATURES", (0, 60)), ("NOCELLS", (8, 0))):
+        folder = mtb.io.export_dataset(cells, f"data/{dataset}", adt="obsm:protein",
+                                       labels="obs:celltype")
+        with h5py.File(folder / "adt.h5", "r+") as f:
+            for key in ("data", "features", "barcodes"):
+                del f[f"matrix/{key}"]
+            f.create_dataset("matrix/data", data=np.zeros(shape))
+            f.create_dataset("matrix/features", data=np.array(
+                [f"p{i}".encode() for i in range(shape[0])], dtype="S8"))
+            f.create_dataset("matrix/barcodes", data=np.array(
+                [c.encode() for c in cells.obs_names[:shape[1]]], dtype="S8"))
+    kw = {"methods": ["totalVI"], "data_path": "data", "verbose": False}
+    for dataset, name, what in (
+            ("TENX", "rna.h5", "is a 10x Genomics file, not a multibench dataset file."),
+            ("NOFEATURES", "adt.h5", "holds 0 features."),
+            ("NOCELLS", "adt.h5", "holds 0 cells.")):
+        problem = f"totalVI reads {name} of {dataset}, which {what} "
+        with pytest.raises(ValueError) as e:
+            mtb.inputs_for(dataset, "vertical", "totalVI", data_path="data", check=True)
+        assert str(e.value).startswith(problem), dataset
+        for table in (mtb.scan(dataset, "vertical", **kw),
+                      mtb.run_all(dataset, "vertical", out_dir=f"out/{dataset}", dry_run=True,
+                                  **kw)):
+            assert table["files_ok"].tolist() == [False], dataset
+            assert table["files_reason"].tolist() == [f"ValueError: {e.value}"], dataset
+        with pytest.raises(ValueError, match=rf"^None of the requested methods \(totalVI\) "
+                                             rf"can run on {dataset} \(vertical\)\.") as e:
+            mtb.run_all(dataset, "vertical", out_dir=f"out/{dataset}", **kw)
+        assert f"totalVI (rna+adt): {name} {what}" in str(e.value), dataset
+    assert linux_host == [] and not Path("out").exists()
+
+    # the two count errors of evaluate that have a new text: the class is
+    # the one that 0.3.4 raised
+    entry = _entry_0_3_5("Some errors have a new text and the same exception class.")
+    assert ("In `evaluate`: the count error for the label files of one diagonal side, and for "
+            "a folder without label files.") in entry
+    rna, atac = _own_cells(60), _own_cells(60, prefix="a", seed=3)
+    for dataset in ("ONESIDE", "NOLABELS"):
+        mtb.io.export_dataset(rna, f"data/{dataset}", atac=atac, atac_kind="gene_activity",
+                              category="diagonal")
+    rna.obs["celltype"].rename("x").to_csv("data/ONESIDE/rna_cty.csv", index=False)
+    emb = np.random.default_rng(0).normal(size=(120, 4))
+    for dataset, files, told in (
+            ("ONESIDE", ["rna_cty.csv"],
+             r"^labels has 60 entries for 120 cells in the embedding\. rna_cty\.csv names "
+             r"the labels of RNA cells\. "),
+            ("NOLABELS", [], r"^labels is an empty dict, so there is nothing to score\. ")):
+        labels = mtb.labels_for(dataset, "diagonal", "SCALEX", data_path="data")
+        assert [Path(f).name for f in labels.values()] == files
+        with pytest.raises(ValueError, match=told):
+            mtb.evaluate(emb, labels=labels, metrics=["ASW"], verbose=False)
+
+
 # ---- 0.3.5: the sentences added to the guides ----
 @needs_docs
 def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
@@ -1708,7 +1855,8 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
     (drop,) = re.findall(
         r"A missing label is not a cell type\. `evaluate` raises when a label is missing\. "
         r"`(missing_labels=\"\w+\")` scores the labelled cells only and says how many it "
-        r"scored\. A missing batch raises as well\.", guide)
+        r"scored\. When a whole modality or batch has no labels, these scores do not show "
+        r"where its cells are\. A missing batch raises as well\.", guide)
     adata = _own_cells(300)
     adata.obsm["X_pca"] = np.random.default_rng(0).normal(size=(300, 4))
 
@@ -1727,6 +1875,23 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
     with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\. "):
         dropped = run(dropping, gaps)
     assert dropped.equals(run(call, gaps[30:].copy())) and not dropped.equals(plain)
+    # a whole batch without labels: the scores are the same wherever its
+    # cells are, and with the batches named the warning says so
+    sides = adata.copy()
+    sides.obs["side"] = ["rna"] * 150 + ["atac"] * 150
+    sides.obs["celltype"] = sides.obs["celltype"].astype(object)
+    sides.obs.loc[sides.obs_names[150:], "celltype"] = np.nan
+    moved = sides.copy()
+    moved.obsm["X_pca"] = sides.obsm["X_pca"] + np.repeat([0.0, 100.0], 150)[:, None]
+    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\. "):
+        there = run(dropping, sides)
+    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\. "):
+        elsewhere = run(dropping, moved)
+    assert there.equals(elsewhere) and there["Value"].notna().all()
+    with pytest.warns(UserWarning, match=r" The labelled cells are all in one batch, so no "
+                                         r"score changes with where the cells of the other "
+                                         r"batches are placed"):
+        run(dropping[:-1] + ', batch="side")', sides)
     # a missing batch
     donors = adata.copy()
     donors.obs["donor"] = np.array([np.nan] * 7 + ["A"] * 143 + ["B"] * 150, dtype=object)
