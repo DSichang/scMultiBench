@@ -13,11 +13,13 @@ def test_table_records_the_frame_category():
     assert B._single_category(tbl) == "vertical"
 
 
-def test_scmomat_is_unsupervised_on_a_vertical_figure_but_supervised_in_mosaic():
-    # scMoMaT consumes labels only in its mosaic variant
-    assert B._method_needs_labels("scMoMaT", "vertical") is False
-    assert B._method_needs_labels("scMoMaT", "mosaic") is True
-    assert B._method_needs_labels("scMoMaT") is True          # any-variant fallback
+def test_badge_follows_the_variants_of_the_category():
+    # UnitedNet reads labels in vertical and cross and has no diagonal variant
+    assert B._method_needs_labels("UnitedNet", "vertical") is True
+    assert B._method_needs_labels("UnitedNet") is True         # any-variant fallback
+    # scMoMaT reads no label file: main_scMoMaT.py never uses --cty_path
+    for cat in ("vertical", "cross", "mosaic", None):
+        assert B._method_needs_labels("scMoMaT", cat) is False
 
 
 def test_mixed_category_frame_has_no_single_category():
@@ -68,17 +70,17 @@ def test_needs_labels_column_overrides_registry():
     assert tbl.needs_labels == {"MySupervised": True}
     _, texts = _render_texts(tbl)
     assert texts.count("L") == 2
-    # the override beats the registry in the other direction too: scMoMaT is
-    # supervised in mosaic, but an explicit False removes its badge
+    # the override beats the registry in the other direction too: Matilda is
+    # supervised, but an explicit False removes its badge
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    mosaic = pd.concat([mtb.to_long(w, method="scMoMaT", dataset="D45", category="mosaic"),
-                        mtb.to_long(w * 0.5, method="Cobolt", dataset="D45", category="mosaic")])
-    assert B._method_needs_labels("scMoMaT", "mosaic") is True
-    _, texts_ref = _render_texts(B.build_table(mosaic, na="skip"))
+    both = pd.concat([mtb.to_long(w, method="Matilda", dataset="D11", category="vertical"),
+                      mtb.to_long(w * 0.5, method="totalVI", dataset="D11", category="vertical")])
+    assert B._method_needs_labels("Matilda", "vertical") is True
+    _, texts_ref = _render_texts(B.build_table(both, na="skip"))
     assert texts_ref.count("L") == 1
-    off = mosaic.assign(needs_labels=mosaic.method.map({"scMoMaT": False}))
+    off = both.assign(needs_labels=both.method.map({"Matilda": False}))
     tbl2 = B.build_table(off, na="skip")
-    assert tbl2.needs_labels == {"scMoMaT": False}
+    assert tbl2.needs_labels == {"Matilda": False}
     _, texts2 = _render_texts(tbl2)
     assert texts2.count("L") == 0
 

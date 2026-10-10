@@ -935,9 +935,9 @@ def _single_category(tbl) -> str | None:
 def _method_needs_labels(name, category=None) -> bool:
     """Does this method consume cell-type labels - for ``category`` when given.
 
-    A method can be supervised in one category and not another (scMoMaT: mosaic
-    yes, vertical no), so the badge on a single-category figure must follow the
-    variants of that category; without a category it falls back to 'any'.
+    A method can be supervised in one category and not another, so the badge
+    on a single-category figure follows the variants of that category; without
+    a category it falls back to 'any'.
     """
     try:
         from ..engine import registry

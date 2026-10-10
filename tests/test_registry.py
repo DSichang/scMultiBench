@@ -105,28 +105,19 @@ def test_needs_labels_derived_from_cty_roles():
     for spec in registry.load():
         expect = any(is_label_role(r) for v in spec.variants for r in v.roles())
         assert spec.needs_labels == expect, spec.id
-    # these four took cty roles while the old hand flag said False
-    for m in ("scJoint", "Seurat_v3", "UnitedNet", "scMoMaT"):
+    # these three took cty roles while the old hand flag said False
+    for m in ("scJoint", "Seurat_v3", "UnitedNet"):
         assert registry.get(m).needs_labels, m
     assert registry.get("scBridge").needs_labels       # const cty filenames still count
     assert registry.get("Matilda").needs_labels
     assert not registry.get("SCALEX").needs_labels
 
 
-def test_needs_labels_per_variant_scMoMaT():
+def test_scMoMaT_reads_no_label_file():
+    # main_scMoMaT.py:93, the only use of --cty_path, is commented out
     spec = registry.get("scMoMaT")
-    by_cat = {}
-    for v in spec.variants:
-        by_cat.setdefault(v.when["category"], set()).add(v.needs_labels)
-    # of its four mosaic variants only the one of the RNA + ADT | RNA + ATAC |
-    # RNA layout takes the label files
-    mosaic = {tuple(v.when["modalities"]): v.needs_labels for v in spec.variants
-              if v.when["category"] == "mosaic"}
-    assert len(mosaic) == 4
-    assert [m for m, needs in mosaic.items() if needs] == [
-        ("rna1", "rna2", "rna3", "adt1", "atac2")]
-    assert by_cat["vertical"] == {False}
-    assert by_cat["cross"] == {False}
+    assert not spec.needs_labels
+    assert not any(v.needs_labels for v in spec.variants)
 
 
 def test_methods_yaml_has_no_hand_needs_labels_key():
