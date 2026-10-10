@@ -14,9 +14,10 @@ Each tutorial is one straight path, run top to bottom on Linux or Colab:
 install the package, download the data and the method environments, run the
 task's default methods with ``run_all``, plot, run the same calls on data in
 the reader's own format, and draw the benchmark's stored scores where the
-package ships them. There are no flags, fallbacks or helper functions. A step
-that cannot work on the reader's computer fails with the package's own error:
-the environment install refuses off Linux.
+package ships them. There are no flags or fallbacks. No notebook defines a
+function. The example files of section 5 come from ``mtb.data.write_example``.
+A step that cannot work on the reader's computer fails with the package's own
+error: the environment install refuses off Linux.
 
 Every method of a task runs on the task's one dataset. The defaults are two
 methods of the task (one where it has one) that are fast and need no GPU,
@@ -25,7 +26,9 @@ the methods and the output folder, and no other argument: where the dataset
 also holds the files of a smaller variant of a method, ``run_all`` runs the
 variant with the most modalities. ``check_task`` stops the generation when
 that call would not run every method of the task once, on the task's variant
-and on every batch. Every size quoted comes from the dry-run plans at
+and on every batch. It also runs the cells of section 5 in a temporary folder
+and stops when they warn, or when the folder they write lacks the input files
+of the notebook's methods. Every size quoted comes from the dry-run plans at
 generation time, never a hand-written figure.
 
 Prose has two layers. Visible: 1-3 short sentences per section - what the
@@ -42,12 +45,18 @@ The install cell pins numpy and pandas to the versions already installed.
 Colab's preinstalled stack is older than the newest scanpy and anndata need;
 without the pins pip upgrades numpy and pandas there, and the session has to
 restart. With the pins pip picks the scanpy and anndata releases that fit.
+The cell asks for the package version the notebooks were generated with or a
+later one: section 5 calls what an earlier release does not have.
 """
 import hashlib
 import json
 import os
+import re
 
 import nbformat as nbf
+
+import multibench as mtb
+from multibench.data.examples import EXAMPLES
 
 OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
@@ -163,9 +172,12 @@ def diagonal_atac_sentence():
 
 
 # The one install cell every notebook shares; the module docstring says why
-# numpy and pandas are pinned. IPython expands the {...} in a %pip line.
-INSTALL_CELL = """import numpy, pandas
-%pip install -q multibench-sc numpy=={numpy.__version__} pandas=={pandas.__version__}"""
+# numpy and pandas are pinned. IPython expands the {pins} in the %pip line.
+# The requirement is in quotes because the line goes through a shell, where a
+# bare > redirects the output.
+INSTALL_CELL = ('import numpy, pandas\n'
+                'pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"\n'
+                f'%pip install -q "multibench-sc>={mtb.__version__}" {{pins}}')
 
 COLAB_GPU_NOTE = ("On Colab, choose a GPU runtime before you run the notebook: Runtime -> "
                   "Change runtime type -> T4 GPU. On a CPU runtime, an environment that has a "
@@ -352,8 +364,9 @@ def would_run(key, methods, dataset=None, **where):
 
 def check_task(key):
     """Stop when the notebooks' ``run_all`` call would not run every method
-    of the task once, on the task's variant, or when a method reads only some
-    batches of the dataset."""
+    of the task once, on the task's variant, when a method reads only some
+    batches of the dataset, or when section 5 does not work as it stands
+    (``check_own``)."""
     import multibench as mtb
     t = TASKS[key]
     everyone = task_methods(key)
@@ -374,6 +387,7 @@ def check_task(key):
     if t["cat"] != "diagonal" and gas:
         raise SystemExit(f"{and_list(gas)} read gene activity in {t['cat']}: reword the "
                          f"{t['cat']} blurbs and own-data sections")
+    check_own(key)
 
 
 def labels_for_ds(key, method="UINMF"):
@@ -411,363 +425,604 @@ def diagonal_multi_sentence(key):
 
 
 # ---------------------------------------------------------------- own data
-# Section 5 per task: the shape the reader's data usually has, built from a
-# part of the tutorial's dataset, then the export call and the same run_all on
-# the new folder. overwrite=True lets the notebook run twice.
+# Section 5 per task: the files a reader's data usually comes in, the export
+# call, a check of the folder and the same run_all on it.
+# mtb.data.write_example writes example files under the names the read cell
+# reads, so the notebook runs before the reader has put a file in place. A
+# name the reader changes is marked "# <-". The folder name is the variable
+# NAME, which the check and the run use. overwrite=True lets the notebook run
+# twice.
+#
+# The paragraphs of the collapsed block, in the order they appear.
+WHERE = ("The names in quotes say where your file holds each part. `\"X\"` is the main "
+         "matrix, `\"obsm:protein\"` the matrix `obsm[\"protein\"]`, `\"layer:counts\"` the "
+         "layer `layers[\"counts\"]`, and `\"obs:celltype\"` the column `obs[\"celltype\"]`, "
+         "which `\"celltype\"` alone names too. A wrong name raises an error that lists the "
+         "names the file has.")
+PROTEIN_NAMES = ("The example keeps the protein names in `adata.uns[\"protein_names\"]`. A "
+                 "DataFrame in `adata.obsm[\"protein\"]` brings its own names in its columns.")
+ADT_IN_X = ("When the ADT file also holds a matrix in `obsm` under a name that does not "
+            "start with `X_`, `export_dataset` asks which one is the protein matrix. "
+            "`X_umap` and `X_pca` are left alone.")
+TENX_NOTE = ("A 10x Multiome file read with scanpy and `gex_only=False` holds genes and "
+             "peaks in one `X`. The recipe for a 10x `.h5` file splits it into the two "
+             "objects of this section. Without a split or a filter, `export_dataset` raises "
+             "rather than write genes and peaks into one file.")
+MUDATA_NOTE = ("A 10x Multiome MuData goes in with one call. Here the labels are in "
+               "`mdata.obs`. For labels in `mdata[\"rna\"].obs`, write "
+               "`labels=\"rna:celltype\"`.\n\n"
+               "```python\n"
+               "mtb.io.export_dataset(mdata, \"mydata/\" + NAME, rna=\"rna\", atac=\"atac\",\n"
+               "                      atac_kind=\"peak\", labels=\"obs:celltype\",\n"
+               "                      category=\"vertical\")\n"
+               "```")
+DIAG_CLI = ("The command line writes the same folder from the two files:\n\n"
+            "```\n"
+            "multibench convert my_rna.h5ad mydata/{name} --rna X --atac-from my_atac.h5ad \\\n"
+            "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
+            "```")
+DIAG_ONE_SIDE = ("`labels=` needs the column in both files. With cell types for the RNA "
+                 "cells only, leave `labels=` out and follow the recipe for no labels.")
+DIAG_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {peak_only} read "
+             "peaks. `mtb.describe_layout(\"diagonal\")` lists the files each method needs.")
+MULTI_NUMBERING = ("The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
+                   "and ATAC batch 1 need not come from the same sample. The loop takes as "
+                   "many batches as the list `rna` holds.")
+MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
+              "the peak matrix.")
+MOSAIC_LAYOUT = ("`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
+                 "that accept each one. The command line writes one batch per call with "
+                 "`multibench convert ... --category mosaic --batch-index N`.")
+MOSAIC_ONE_FILE = ("A batch with RNA and ADT in one file goes in with a selector, for "
+                   "example `adt=\"obsm:protein\"`.")
+CROSS_ORDER = ("The batches are numbered in the sorted order of their names, read as text: "
+               "donors `A`, `B` and `C` become batches 1, 2 and 3, and `10` comes before `2`.")
+CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
+               "`batch_index=N` instead of `batch=`, and pass `n_batches=` with the number of "
+               "batches in every call.")
+FOLDER_NOTE = ("`NAME` is the dataset name for `scan` and `run_all`, and `mydata` is the "
+               "folder that holds it (`data_path`). With a new value of `NAME`, the folder "
+               "holds the files of your data only.")
+CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
+              "method that reads the modalities in the folder. Without `per_method=True`, it "
+              "has one row per method variant and every column, such as the command of each "
+              "method.")
+LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
+            "cells that the call does not write. `overwrite=True` does not remove them. Give "
+            "`NAME` a new value, or delete the files that the message names.")
+LEFTOVER_BATCH = ("After `batch=`, the files of batch numbers that the call does not write "
+                  "count as well.")
+LEFTOVER_INDEX = ("A call with `batch_index=` checks the files of its own batch number. Files "
+                  "of other batch numbers stay, unless `n_batches=` says that the data has "
+                  "fewer batches.")
 OVERWRITE_NOTE = ("`overwrite=True` replaces the files of an earlier run of this cell. "
                   "Without it, `export_dataset` raises `FileExistsError` rather than "
                   "replace a file.")
+
+
+def batch_advice(obj):
+    """The paragraph of a vertical tutorial on samples or donors. ``obj`` is
+    the variable of the read cell whose ``obs`` holds the column."""
+    return ("Keep several samples or donors in one folder, without `batch=` in "
+            "`export_dataset`. To score how well they mix, give `run_all` the column itself: "
+            f"`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The values are matched to the "
+            "cells by barcode, and every cell needs a donor. A column name alone is not "
+            "enough there, because `run_all` reads the folder and the folder holds no `obs` "
+            "columns.")
+
+
+# Words the visible sentences share.
+BATCH_WORD = "A batch is a donor, a sample or an experiment."
+ADT_WORD = "ADT means the protein counts."
+GAS_WORD = ("Gene-activity scores are an ATAC matrix with one column per gene, as Signac or "
+            "ArchR compute it.")
+PER_BATCH = "`mtb.io.export_dataset` with `batch=` writes one set of files per batch."
+MOSAIC_NEEDS = ("Your data needs raw counts, with one `.h5ad` file per batch and modality and "
+                f"a cell type for each cell. {BATCH_WORD} `mtb.io.export_dataset` with "
+                "`batch_index=` writes one batch per call. Number the batches as below:")
+NUMBER = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+# The recipes of the run guide, for data that does not come as the files of
+# this section, and the ones the tutorials of each category link.
+RECIPES = {
+    "10x": f"[a 10x `.h5` file]({SITE}tutorials/run/#recipe-10x-h5)",
+    "csv": f"[labels in a CSV file]({SITE}tutorials/run/#recipe-labels-csv)",
+    "no_labels": f"[no labels]({SITE}tutorials/run/#recipe-no-labels)",
+    "donors": f"[another number of donors]({SITE}tutorials/run/#recipe-donors)",
+}
+RECIPES_OF = {"vertical": ["10x", "csv", "no_labels", "donors"],
+              "diagonal": ["csv", "no_labels"],
+              "mosaic": ["10x", "csv", "no_labels"],
+              "cross": ["10x", "csv", "no_labels", "donors"]}
+
+# `name` is the folder the export cell writes, a name of its own per tutorial
+# and none that a 0.3.4 tutorial wrote another layout under; `needs` is the
+# visible sentence; `example` says what the example cell writes and `n_files`
+# how many files that is; `read` and `export` are the two cells a reader
+# edits; `notes` are the task's paragraphs of the collapsed block.
 OWN = {
  "vertical_rna_adt": dict(
    name="MYCITE",
-   intro=("Your data needs raw counts for both modalities and a cell type for each "
-          "cell. `mtb.io.export_dataset` writes an AnnData as a dataset folder, and "
-          "`run_all` runs on that folder."),
-   standin="Here an AnnData made from 60% of `D11`'s cells takes the place of your data:",
-   data='''import scanpy as sc
+   needs=("Your data needs raw counts for both modalities and a cell type for each "
+          f"cell, in one `.h5ad` file. {ADT_WORD}"),
+   example="a small example file, `my_file.h5ad`, from 60% of the cells of `D11`",
+   n_files=1,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D11"
-adata = mtb.io.read_canonical(d / "rna.h5")
-adata.obsm["protein"] = mtb.io.read_canonical(d / "adt.h5").to_df()
-adata.obs["celltype"] = pd.read_csv(d / "cty.csv")["x"].values
-adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
+adata = ad.read_h5ad("my_file.h5ad")   # <- your file
 adata''',
-   export='''mtb.io.export_dataset(adata, "mydata/MYCITE", rna="X", adt="obsm:protein",
-                      labels="obs:celltype", overwrite=True)''',
-   notes=["Keep several samples in one folder, without `batch=`. To score the batch "
-          "mixing, pass the batch column to `run_all(batch=...)`."],
+   export='''NAME = "MYCITE"   # <- a new name for your own data
+mtb.io.export_dataset(adata, "mydata/" + NAME,
+                      rna="X",                # <- where the RNA counts are
+                      adt="obsm:protein",     # <- where the proteins (ADT) are
+                      labels="obs:celltype",  # <- the cell-type column
+                      overwrite=True)''',
+   notes=[PROTEIN_NAMES, batch_advice("adata")],
  ),
  "vertical_rna_atac": dict(
    name="MYMULTIOME",
-   intro=("Your data needs raw RNA counts, an ATAC matrix of the same cells and a "
-          "cell type for each cell. `mtb.io.export_dataset` writes them as a dataset "
-          "folder, and `run_all` runs on that folder. Every method of this task reads "
+   needs=("Your data needs raw RNA counts, an ATAC matrix of the same cells and a cell "
+          "type for each cell, as two `.h5ad` files. Every method of this task reads "
           "ATAC as peaks, so the folder holds peaks."),
-   standin=("Here 60% of `D27mini_vertical`'s cells, as an RNA and a peak AnnData, "
-            "take the place of your data:"),
-   data='''import scanpy as sc
+   example=("two small example files, `my_rna.h5ad` and `my_atac.h5ad`, from 60% of the "
+            "cells of `D27mini_vertical`"),
+   n_files=2,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D27mini_vertical"
-rna = mtb.io.read_canonical(d / "rna.h5")
-rna.obs["celltype"] = pd.read_csv(d / "cty.csv")["x"].values
-atac = mtb.io.read_canonical(d / "atac_peak.h5")
-rna = sc.pp.subsample(rna, fraction=0.6, random_state=0, copy=True)
-atac = atac[rna.obs_names].copy()
-rna, atac''',
-   export='''mtb.io.export_dataset(rna, "mydata/MYMULTIOME", atac=atac, atac_kind="peak",
-                      labels="obs:celltype", overwrite=True)''',
-   notes=["A 10x Multiome MuData goes in with one call. Here the labels are in "
-          "`mdata.obs`. For labels in `mdata[\"rna\"].obs`, write `labels=\"rna:celltype\"`.\n\n"
-          "```python\n"
-          "mtb.io.export_dataset(mdata, \"mydata/MYMULTIOME\", rna=\"rna\", atac=\"atac\",\n"
-          "                      atac_kind=\"peak\", labels=\"obs:celltype\",\n"
-          "                      category=\"vertical\")\n"
-          "```",
-          "A cellranger-arc AnnData read with `gex_only=False` holds genes and peaks in "
-          "one `X`. A feature filter splits them: `rna=\"X[feature_types=Gene Expression]\"` "
-          "and `atac=\"X[feature_types=Peaks]\"`."],
+rna = ad.read_h5ad("my_rna.h5ad")     # <- your RNA file
+atac = ad.read_h5ad("my_atac.h5ad")   # <- your ATAC file, the same cells
+print(rna)
+print(atac)''',
+   export='''NAME = "MYMULTIOME"   # <- a new name for your own data
+mtb.io.export_dataset(rna, "mydata/" + NAME,
+                      rna="X",                # <- where the RNA counts are
+                      atac=atac,              # the ATAC file, peak counts in X
+                      atac_kind="peak",       # the methods here read peaks
+                      labels="obs:celltype",  # <- the cell-type column
+                      overwrite=True)''',
+   notes=[TENX_NOTE, MUDATA_NOTE, batch_advice("rna")],
  ),
  "vertical_rna_adt_atac": dict(
    name="MYTRI",
-   intro=("Your data needs raw counts for RNA and protein, an ATAC peak matrix of the "
-          "same cells and a cell type for each cell. `mtb.io.export_dataset` writes "
-          "them as a dataset folder, and `run_all` runs on that folder."),
-   standin="Here 60% of `D22mini`'s cells take the place of your data:",
-   data='''import scanpy as sc
+   needs=("Your data needs raw counts for RNA and protein (ADT) in one `.h5ad` file, an "
+          "ATAC peak matrix of the same cells in another, and a cell type for each cell."),
+   example=("two small example files, `my_file.h5ad` and `my_atac.h5ad`, from 60% of the "
+            "cells of `D22mini`"),
+   n_files=2,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D22mini"
-adata = mtb.io.read_canonical(d / "rna.h5")
-adata.obsm["protein"] = mtb.io.read_canonical(d / "adt.h5").to_df()
-adata.obs["celltype"] = pd.read_csv(d / "cty.csv")["x"].values
-atac = mtb.io.read_canonical(d / "atac.h5")
-adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
-atac = atac[adata.obs_names].copy()
-adata, atac''',
-   export='''mtb.io.export_dataset(adata, "mydata/MYTRI", rna="X", adt="obsm:protein", atac=atac,
-                      atac_kind="peak", labels="obs:celltype", overwrite=True)''',
-   notes=[],
+adata = ad.read_h5ad("my_file.h5ad")   # <- your RNA and protein file
+atac = ad.read_h5ad("my_atac.h5ad")    # <- your ATAC file, the same cells
+print(adata)
+print(atac)''',
+   export='''NAME = "MYTRI"   # <- a new name for your own data
+mtb.io.export_dataset(adata, "mydata/" + NAME,
+                      rna="X",                # <- where the RNA counts are
+                      adt="obsm:protein",     # <- where the proteins (ADT) are
+                      atac=atac,              # the ATAC file, peak counts in X
+                      atac_kind="peak",       # the methods here read peaks
+                      labels="obs:celltype",  # <- the cell-type column
+                      overwrite=True)''',
+   notes=[PROTEIN_NAMES, batch_advice("adata")],
  ),
  "diagonal_rna_atac": dict(
-   name="MYDIAG",
-   intro=("Your data needs raw RNA counts and ATAC as two AnnData objects, with a "
-          "cell type for each cell. `mtb.io.export_dataset` writes them as a dataset "
-          "folder, and `run_all` runs on that folder. iNMF and online_iNMF read ATAC "
-          "as gene-activity scores, and online_iNMF needs about 5,000 cells in total."),
-   standin=("Here 90% of `D27mini`'s RNA profiles and 90% of its ATAC profiles take "
-            "the place of your data:"),
-   data='''import scanpy as sc
+   name="MYDIAG_RNA_ATAC",
+   needs=("Your data needs raw RNA counts in one `.h5ad` file and ATAC in another, with a "
+          "cell type for each cell in both. iNMF and online_iNMF read ATAC as "
+          "gene-activity scores, and online_iNMF needs about 5,000 cells in total. "
+          f"{GAS_WORD}"),
+   example=("two small example files, `my_rna.h5ad` and `my_atac.h5ad`, from 90% of the "
+            "RNA profiles and 90% of the ATAC profiles of `D27mini`"),
+   n_files=2,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D27mini"
-rna = mtb.io.read_canonical(d / "rna.h5")
-rna.obs["celltype"] = pd.read_csv(d / "rna_cty.csv")["x"].values
-atac = mtb.io.read_canonical(d / "atac_gas.h5")
-atac.obs["celltype"] = pd.read_csv(d / "atac_cty.csv")["x"].values
-rna = sc.pp.subsample(rna, fraction=0.9, random_state=0, copy=True)
-atac = sc.pp.subsample(atac, fraction=0.9, random_state=1, copy=True)
-rna, atac''',
-   export='''mtb.io.export_dataset(rna, "mydata/MYDIAG", atac=atac, atac_kind="gene_activity",
-                      labels="obs:celltype", category="diagonal", overwrite=True)''',
-   notes=["The command line writes the same folder from two .h5ad files:\n\n"
-          "```\n"
-          "multibench convert rna.h5ad mydata/MYDIAG --rna X --atac-from atac.h5ad \\\n"
-          "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
-          "```",
-          "For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {peak_only} read "
-          "peaks. `mtb.describe_layout(\"diagonal\")` lists the files each method needs."],
+rna = ad.read_h5ad("my_rna.h5ad")     # <- your RNA file
+atac = ad.read_h5ad("my_atac.h5ad")   # <- your ATAC file, other cells
+print(rna)
+print(atac)''',
+   export='''NAME = "MYDIAG_RNA_ATAC"   # <- a new name for your own data
+mtb.io.export_dataset(rna, "mydata/" + NAME,
+                      rna="X",                    # <- where the RNA counts are
+                      atac=atac,                  # the ATAC file, values in X
+                      atac_kind="gene_activity",  # <- or "peak"
+                      labels="obs:celltype",      # <- the column in both files
+                      category="diagonal", overwrite=True)''',
+   notes=[DIAG_CLI, DIAG_ONE_SIDE, DIAG_PEAK],
  ),
  "diagonal_multi": dict(
-   name="MYDIAG",
-   intro=("Your data needs raw RNA counts and ATAC as one AnnData per batch, with a "
-          "cell type for each cell. `mtb.io.export_dataset` with `batch_index=` writes "
-          "one RNA batch and one ATAC batch per call. iNMF and online_iNMF read ATAC as "
-          "gene-activity scores, and online_iNMF needs about 5,000 cells in total."),
-   standin=("Here the first 900 RNA profiles and the first 900 ATAC profiles of each "
-            "`D37mini` batch take the place of your data:"),
-   data='''d = mtb.config.DEFAULT.data_path / "D37mini"
-n = 900
-rna, atac = [], []
-for b in (1, 2, 3):
-    r = mtb.io.read_canonical(d / f"rna{b}.h5")
-    r.obs["celltype"] = pd.read_csv(d / f"rna_cty{b}.csv")["x"].values
-    a = mtb.io.read_canonical(d / f"atac_gas{b}.h5")
-    a.obs["celltype"] = pd.read_csv(d / f"atac_cty{b}.csv")["x"].values
-    rna.append(r[:n].copy())
-    atac.append(a[:n].copy())
-rna, atac''',
-   export='''for b in (1, 2, 3):
-    mtb.io.export_dataset(rna[b - 1], "mydata/MYDIAG", atac=atac[b - 1],
-                          atac_kind="gene_activity", labels="obs:celltype",
-                          category="diagonal", batch_index=b, overwrite=True)''',
-   notes=["The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
-          "and ATAC batch 1 need not come from the same sample.",
-          "For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
-          "the peak matrix."],
+   name="MYDIAG_BATCHES",
+   needs=("Your data needs raw RNA counts and ATAC as one `.h5ad` file per batch, with a "
+          f"cell type for each cell. {BATCH_WORD} `mtb.io.export_dataset` with "
+          "`batch_index=` writes one RNA batch and one ATAC batch per call. iNMF and "
+          "online_iNMF read ATAC as gene-activity scores, and online_iNMF needs about "
+          f"5,000 cells in total. {GAS_WORD}"),
+   example=("six small example files, `my_rna1.h5ad` to `my_rna3.h5ad` and "
+            "`my_atac1.h5ad` to `my_atac3.h5ad`, from the first 900 RNA profiles and the "
+            "first 900 ATAC profiles of each batch of `D37mini`"),
+   n_files=6,
+   read='''import anndata as ad
+
+rna1 = ad.read_h5ad("my_rna1.h5ad")     # <- RNA batch 1: your file
+rna2 = ad.read_h5ad("my_rna2.h5ad")     # <- RNA batch 2: your file
+rna3 = ad.read_h5ad("my_rna3.h5ad")     # <- RNA batch 3: your file
+atac1 = ad.read_h5ad("my_atac1.h5ad")   # <- ATAC batch 1: your file
+atac2 = ad.read_h5ad("my_atac2.h5ad")   # <- ATAC batch 2: your file
+atac3 = ad.read_h5ad("my_atac3.h5ad")   # <- ATAC batch 3: your file
+print(rna1)
+print(atac1)''',
+   export='''NAME = "MYDIAG_BATCHES"        # <- a new name for your own data
+rna = [rna1, rna2, rna3]       # <- your RNA batches
+atac = [atac1, atac2, atac3]   # <- your ATAC batches
+for b in range(len(rna)):      # one call per batch
+    mtb.io.export_dataset(rna[b], "mydata/" + NAME,
+                          rna="X",                    # <- the RNA counts
+                          atac=atac[b],               # the ATAC batch
+                          atac_kind="gene_activity",  # <- or "peak"
+                          labels="obs:celltype",      # <- the cell-type column
+                          category="diagonal", batch_index=b + 1,
+                          n_batches=len(rna), overwrite=True)''',
+   notes=[MULTI_NUMBERING, MULTI_PEAK],
  ),
  "mosaic_rna_adt": dict(
-   name="MYMOSAIC",
-   intro=("Your data needs raw counts, with one AnnData per batch and a cell type for "
-          "each cell. `mtb.io.export_dataset` with `batch_index=` writes one batch per "
-          "call. Number the batches as below: RNA, then RNA + ADT, then ADT."),
-   standin="Here the first 1,500 cells of each `D38mini` batch take the place of your data:",
-   data='''d = mtb.config.DEFAULT.data_path / "D38mini"
-n = 1500
-rna1 = mtb.io.read_canonical(d / "rna1.h5")[:n]
-rna2 = mtb.io.read_canonical(d / "rna2.h5")[:n]
-adt2 = mtb.io.read_canonical(d / "adt2.h5")[:n]
-adt3 = mtb.io.read_canonical(d / "adt3.h5")[:n]
-labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]''',
-   export='''out = "mydata/MYMOSAIC"
+   name="MYMOSAIC_RNA_ADT",
+   needs=f"{MOSAIC_NEEDS} RNA, then RNA + ADT, then ADT. {ADT_WORD}",
+   example=("four small example files, one per batch and modality, from the first 1,500 "
+            "cells of each batch of `D38mini`"),
+   n_files=4,
+   read='''import anndata as ad
+
+rna1 = ad.read_h5ad("my_rna1.h5ad")   # <- batch 1: your RNA file
+rna2 = ad.read_h5ad("my_rna2.h5ad")   # <- batch 2: your RNA file
+adt2 = ad.read_h5ad("my_adt2.h5ad")   # <- batch 2: proteins (ADT), same cells
+adt3 = ad.read_h5ad("my_adt3.h5ad")   # <- batch 3: your protein (ADT) file
+print(rna2)
+print(adt2)''',
+   export='''NAME = "MYMOSAIC_RNA_ADT"   # <- a new name for your own data
+out = "mydata/" + NAME
+celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA only
-mtb.io.export_dataset(rna1, out, labels=labels[0],
+mtb.io.export_dataset(rna1, out, rna="X", labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ADT
-mtb.io.export_dataset(rna2, out, adt=adt2, labels=labels[1],
+mtb.io.export_dataset(rna2, out, rna="X", adt=adt2, labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ADT only
-mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=labels[2],
+mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
-   notes=["`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
-          "that accept each one. The command line writes one batch per call with "
-          "`multibench convert ... --category mosaic --batch-index N`."],
+   notes=[MOSAIC_LAYOUT, MOSAIC_ONE_FILE, ADT_IN_X],
  ),
  "mosaic_rna_atac": dict(
-   name="MYMOSAIC",
-   intro=("Your data needs raw counts, with one AnnData per batch and a cell type for "
-          "each cell. `mtb.io.export_dataset` with `batch_index=` writes one batch per "
-          "call. Number the batches as below: RNA, then RNA + ATAC, then ATAC. Give "
-          "ATAC as peaks, with the same peaks in both ATAC batches."),
-   standin="Here the first 1,500 cells of each `D45mini` batch take the place of your data:",
-   data='''d = mtb.config.DEFAULT.data_path / "D45mini"
-n = 1500
-rna1 = mtb.io.read_canonical(d / "rna1.h5")[:n]
-rna2 = mtb.io.read_canonical(d / "rna2.h5")[:n]
-atac2 = mtb.io.read_canonical(d / "atac2.h5")[:n]
-atac3 = mtb.io.read_canonical(d / "atac3.h5")[:n]
-labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]''',
-   export='''out = "mydata/MYMOSAIC"
+   name="MYMOSAIC_RNA_ATAC",
+   needs=(f"{MOSAIC_NEEDS} RNA, then RNA + ATAC, then ATAC. Give ATAC as peaks, with the "
+          "same peaks in both ATAC batches."),
+   example=("four small example files, one per batch and modality, from the first 1,500 "
+            "cells of each batch of `D45mini`"),
+   n_files=4,
+   read='''import anndata as ad
+
+rna1 = ad.read_h5ad("my_rna1.h5ad")     # <- batch 1: your RNA file
+rna2 = ad.read_h5ad("my_rna2.h5ad")     # <- batch 2: your RNA file
+atac2 = ad.read_h5ad("my_atac2.h5ad")   # <- batch 2: peaks of the same cells
+atac3 = ad.read_h5ad("my_atac3.h5ad")   # <- batch 3: your peak file
+print(rna2)
+print(atac2)''',
+   export='''NAME = "MYMOSAIC_RNA_ATAC"   # <- a new name for your own data
+out = "mydata/" + NAME
+celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA only
-mtb.io.export_dataset(rna1, out, labels=labels[0],
+mtb.io.export_dataset(rna1, out, rna="X", labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna2, out, atac=atac2, atac_kind="peak", labels=labels[1],
+mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+                      labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ATAC peaks only
-mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak", labels=labels[2],
+mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak",
+                      labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
-   notes=["`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
-          "that accept each one. The command line writes one batch per call with "
-          "`multibench convert ... --category mosaic --batch-index N`."],
+   notes=[MOSAIC_LAYOUT],
  ),
  "mosaic_shared": dict(
-   name="MYMOSAIC",
-   intro=("Your data needs raw counts, with one AnnData per batch and a cell type for "
-          "each cell. `mtb.io.export_dataset` with `batch_index=` writes one batch per "
-          "call. Number the batches as below: RNA + ADT, then RNA + ATAC, then RNA. "
-          "Give ATAC as peaks."),
-   standin="Here the first 1,000 cells of each `D46mini` batch take the place of your data:",
-   data='''d = mtb.config.DEFAULT.data_path / "D46mini"
-n = 1000
-rna = [mtb.io.read_canonical(d / f"rna{b}.h5")[:n] for b in (1, 2, 3)]
-labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]
-adt1 = mtb.io.read_canonical(d / "adt1.h5")[:n]
-atac2 = mtb.io.read_canonical(d / "atac2.h5")[:n]''',
-   export='''out = "mydata/MYMOSAIC"
+   name="MYMOSAIC_SHARED",
+   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then RNA. Give ATAC as peaks. "
+          f"{ADT_WORD}"),
+   example=("five small example files, one per batch and modality, from the first 1,000 "
+            "cells of each batch of `D46mini`"),
+   n_files=5,
+   read='''import anndata as ad
+
+rna1 = ad.read_h5ad("my_rna1.h5ad")     # <- batch 1: your RNA file
+adt1 = ad.read_h5ad("my_adt1.h5ad")     # <- batch 1: proteins (ADT), same cells
+rna2 = ad.read_h5ad("my_rna2.h5ad")     # <- batch 2: your RNA file
+atac2 = ad.read_h5ad("my_atac2.h5ad")   # <- batch 2: peaks of the same cells
+rna3 = ad.read_h5ad("my_rna3.h5ad")     # <- batch 3: your RNA file
+print(rna1)
+print(adt1)''',
+   export='''NAME = "MYMOSAIC_SHARED"   # <- a new name for your own data
+out = "mydata/" + NAME
+celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA + ADT
-mtb.io.export_dataset(rna[0], out, adt=adt1, labels=labels[0],
+mtb.io.export_dataset(rna1, out, rna="X", adt=adt1, labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna[1], out, atac=atac2, atac_kind="peak", labels=labels[1],
+mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+                      labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: RNA only
-mtb.io.export_dataset(rna[2], out, labels=labels[2],
+mtb.io.export_dataset(rna3, out, rna="X", labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
-   notes=["`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
-          "that accept each one. The command line writes one batch per call with "
-          "`multibench convert ... --category mosaic --batch-index N`."],
+   notes=[MOSAIC_LAYOUT, MOSAIC_ONE_FILE, ADT_IN_X],
  ),
  "mosaic_unshared": dict(
-   name="MYMOSAIC",
-   intro=("Your data needs raw counts, with one AnnData per batch and a cell type for "
-          "each cell. `mtb.io.export_dataset` with `batch_index=` writes one batch per "
-          "call. Number the batches as below: RNA + ADT, then RNA + ATAC, then ADT. "
-          "Give ATAC as peaks, and the same proteins in both ADT batches."),
-   standin="Here the first 1,000 cells of each `D49mini` batch take the place of your data:",
-   data='''d = mtb.config.DEFAULT.data_path / "D49mini"
-n = 1000
-rna1 = mtb.io.read_canonical(d / "rna1.h5")[:n]
-rna2 = mtb.io.read_canonical(d / "rna2.h5")[:n]
-adt1 = mtb.io.read_canonical(d / "adt1.h5")[:n]
-adt3 = mtb.io.read_canonical(d / "adt3.h5")[:n]
-atac2 = mtb.io.read_canonical(d / "atac2.h5")[:n]
-labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]''',
-   export='''out = "mydata/MYMOSAIC"
+   name="MYMOSAIC_UNSHARED",
+   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then ADT. Give ATAC as peaks, and "
+          f"the same proteins in both ADT batches. {ADT_WORD}"),
+   example=("five small example files, one per batch and modality, from the first 1,000 "
+            "cells of each batch of `D49mini`"),
+   n_files=5,
+   read='''import anndata as ad
+
+rna1 = ad.read_h5ad("my_rna1.h5ad")     # <- batch 1: your RNA file
+adt1 = ad.read_h5ad("my_adt1.h5ad")     # <- batch 1: proteins (ADT), same cells
+rna2 = ad.read_h5ad("my_rna2.h5ad")     # <- batch 2: your RNA file
+atac2 = ad.read_h5ad("my_atac2.h5ad")   # <- batch 2: peaks of the same cells
+adt3 = ad.read_h5ad("my_adt3.h5ad")     # <- batch 3: your protein (ADT) file
+print(rna1)
+print(adt1)''',
+   export='''NAME = "MYMOSAIC_UNSHARED"   # <- a new name for your own data
+out = "mydata/" + NAME
+celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA + ADT
-mtb.io.export_dataset(rna1, out, adt=adt1, labels=labels[0],
+mtb.io.export_dataset(rna1, out, rna="X", adt=adt1, labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna2, out, atac=atac2, atac_kind="peak", labels=labels[1],
+mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+                      labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ADT only
-mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=labels[2],
+mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
-   notes=["`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
-          "that accept each one. The command line writes one batch per call with "
-          "`multibench convert ... --category mosaic --batch-index N`."],
+   notes=[MOSAIC_LAYOUT, MOSAIC_ONE_FILE, ADT_IN_X],
  ),
  "cross_rna_adt": dict(
-   name="MYCROSS",
-   intro=("Your data needs raw RNA and ADT counts in one AnnData, with a cell type and "
-          "a batch for each cell. `mtb.io.export_dataset` with `batch=` writes one set "
-          "of files per batch, and `run_all` runs on that folder."),
-   standin=("Here one AnnData with 60% of `D52mini`'s cells and a batch column takes "
-            "the place of your data:"),
-   data='''import anndata as ad
-import scanpy as sc
+   name="MYCROSS_RNA_ADT",
+   needs=("Your data needs raw RNA and ADT counts in one `.h5ad` file, with a cell type "
+          f"and a batch for each cell. {ADT_WORD} {BATCH_WORD} {PER_BATCH}"),
+   example=("a small example file, `my_file.h5ad`, from 60% of the cells of `D52mini`, "
+            "with a batch column"),
+   n_files=1,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D52mini"
-batches = []
-for b in (1, 2, 3):
-    a = mtb.io.read_canonical(d / f"rna{b}.h5")
-    a.obsm["protein"] = mtb.io.read_canonical(d / f"adt{b}.h5").to_df()
-    a.obs["celltype"] = pd.read_csv(d / f"cty{b}.csv")["x"].values
-    batches.append(a)
-adata = ad.concat(batches, label="batch", keys=["1", "2", "3"], index_unique="-")
-adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
+adata = ad.read_h5ad("my_file.h5ad")   # <- your file, every batch in it
 adata''',
-   export='''mtb.io.export_dataset(adata, "mydata/MYCROSS", rna="X", adt="obsm:protein",
-                      labels="obs:celltype", batch="obs:batch", category="cross",
-                      overwrite=True)''',
-   notes=["For one AnnData per batch, call `export_dataset` once per batch with "
-          "`batch_index=N` instead of `batch=`."],
+   export='''NAME = "MYCROSS_RNA_ADT"   # <- a new name for your own data
+mtb.io.export_dataset(adata, "mydata/" + NAME,
+                      rna="X",                # <- where the RNA counts are
+                      adt="obsm:protein",     # <- where the proteins (ADT) are
+                      labels="obs:celltype",  # <- the cell-type column
+                      batch="obs:batch",      # <- the batch or donor column
+                      category="cross", overwrite=True)''',
+   notes=[PROTEIN_NAMES],
  ),
  "cross_rna_atac": dict(
-   name="MYCROSS",
-   intro=("Your data needs raw RNA counts and an ATAC peak matrix of the same cells, "
-          "with a cell type and a batch for each cell. `mtb.io.export_dataset` with "
-          "`batch=` writes one set of files per batch, and `run_all` runs on that "
-          "folder. Give the same peaks in every batch."),
-   standin=("Here 60% of `D56mini`'s cells, as an RNA AnnData with a batch column and "
-            "a peak AnnData, take the place of your data:"),
-   data='''import anndata as ad
-import scanpy as sc
+   name="MYCROSS_RNA_ATAC",
+   needs=("Your data needs raw RNA counts in one `.h5ad` file and an ATAC peak matrix of "
+          "the same cells in another, with a cell type and a batch for each cell. "
+          f"{BATCH_WORD} {PER_BATCH} Give the same peaks in every batch."),
+   example=("two small example files, `my_rna.h5ad` and `my_atac.h5ad`, from 60% of the "
+            "cells of `D56mini`, with a batch column"),
+   n_files=2,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D56mini"
-rna, atac = [], []
-for b in (1, 2, 3):
-    r = mtb.io.read_canonical(d / f"rna{b}.h5")
-    r.obs["celltype"] = pd.read_csv(d / f"cty{b}.csv")["x"].values
-    rna.append(r)
-    atac.append(mtb.io.read_canonical(d / f"atac{b}.h5"))
-rna = ad.concat(rna, label="batch", keys=["1", "2", "3"], index_unique="-")
-atac = ad.concat(atac, keys=["1", "2", "3"], index_unique="-")
-rna = sc.pp.subsample(rna, fraction=0.6, random_state=0, copy=True)
-atac = atac[rna.obs_names].copy()
-rna, atac''',
-   export='''mtb.io.export_dataset(rna, "mydata/MYCROSS", atac=atac, atac_kind="peak",
-                      labels="obs:celltype", batch="obs:batch", category="cross",
-                      overwrite=True)''',
-   notes=["For one AnnData per batch, call `export_dataset` once per batch with "
-          "`batch_index=N` instead of `batch=`."],
+rna = ad.read_h5ad("my_rna.h5ad")     # <- your RNA file, every batch in it
+atac = ad.read_h5ad("my_atac.h5ad")   # <- your peak file, the same cells
+print(rna)
+print(atac)''',
+   export='''NAME = "MYCROSS_RNA_ATAC"   # <- a new name for your own data
+mtb.io.export_dataset(rna, "mydata/" + NAME,
+                      rna="X",                # <- where the RNA counts are
+                      atac=atac,              # the ATAC file, peak counts in X
+                      atac_kind="peak",       # the methods here read peaks
+                      labels="obs:celltype",  # <- the cell-type column
+                      batch="obs:batch",      # <- the batch or donor column
+                      category="cross", overwrite=True)''',
+   notes=[],
  ),
  "cross_adt_atac": dict(
-   name="MYCROSS",
-   intro=("Your data needs raw ADT counts and an ATAC peak matrix of the same cells, "
-          "with a cell type and a batch for each cell. `mtb.io.export_dataset` with "
-          "`batch=` writes one set of files per batch, and `run_all` runs on that "
-          "folder. `rna=None` says that the data has no RNA."),
-   standin=("Here 60% of `D58mini`'s cells, as an ADT AnnData with a batch column and "
-            "a peak AnnData, take the place of your data:"),
-   data='''import anndata as ad
-import scanpy as sc
+   name="MYCROSS_ADT_ATAC",
+   needs=("Your data needs raw ADT counts in one `.h5ad` file and an ATAC peak matrix of "
+          "the same cells in another, with a cell type and a batch for each cell. "
+          f"{ADT_WORD} {BATCH_WORD} {PER_BATCH} `rna=None` says that the data has no RNA."),
+   example=("two small example files, `my_adt.h5ad` and `my_atac.h5ad`, from 60% of the "
+            "cells of `D58mini`, with a batch column"),
+   n_files=2,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D58mini"
-adt, atac = [], []
-for b in (1, 2):
-    a = mtb.io.read_canonical(d / f"adt{b}.h5")
-    a.obs["celltype"] = pd.read_csv(d / f"cty{b}.csv")["x"].values
-    adt.append(a)
-    atac.append(mtb.io.read_canonical(d / f"atac{b}.h5"))
-adt = ad.concat(adt, label="batch", keys=["1", "2"], index_unique="-")
-atac = ad.concat(atac, keys=["1", "2"], index_unique="-")
-adt = sc.pp.subsample(adt, fraction=0.6, random_state=0, copy=True)
-atac = atac[adt.obs_names].copy()
-adt, atac''',
-   export='''mtb.io.export_dataset(adt, "mydata/MYCROSS", rna=None, adt="X", atac=atac,
-                      atac_kind="peak", labels="obs:celltype", batch="obs:batch",
+adt = ad.read_h5ad("my_adt.h5ad")     # <- your protein (ADT) file, every batch
+atac = ad.read_h5ad("my_atac.h5ad")   # <- your peak file, the same cells
+print(adt)
+print(atac)''',
+   export='''NAME = "MYCROSS_ADT_ATAC"   # <- a new name for your own data
+mtb.io.export_dataset(adt, "mydata/" + NAME,
+                      rna=None,               # this data has no RNA
+                      adt="X",                # <- where the proteins (ADT) are
+                      atac=atac,              # the ATAC file, peak counts in X
+                      atac_kind="peak",       # the methods here read peaks
+                      labels="obs:celltype",  # <- the cell-type column
+                      batch="obs:batch",      # <- the batch or donor column
                       category="cross", overwrite=True)''',
-   notes=["For one AnnData per batch, call `export_dataset` once per batch with "
-          "`batch_index=N` instead of `batch=`."],
+   notes=[ADT_IN_X],
  ),
  "cross_rna_adt_atac": dict(
-   name="MYCROSS",
-   intro=("Your data needs raw RNA and ADT counts in one AnnData and an ATAC peak "
-          "matrix of the same cells, with a cell type and a batch for each cell. "
-          "`mtb.io.export_dataset` with `batch=` writes one set of files per batch, "
-          "and `run_all` runs on that folder."),
-   standin=("Here 60% of `D59mini`'s cells, as an AnnData with RNA, ADT and a batch "
-            "column and a peak AnnData, take the place of your data:"),
-   data='''import anndata as ad
-import scanpy as sc
+   name="MYCROSS_TRI",
+   needs=("Your data needs raw RNA and ADT counts in one `.h5ad` file and an ATAC peak "
+          "matrix of the same cells in another, with a cell type and a batch for each "
+          f"cell. {ADT_WORD} {BATCH_WORD} {PER_BATCH}"),
+   example=("two small example files, `my_file.h5ad` and `my_atac.h5ad`, from 60% of the "
+            "cells of `D59mini`, with a batch column"),
+   n_files=2,
+   read='''import anndata as ad
 
-d = mtb.config.DEFAULT.data_path / "D59mini"
-batches, atac = [], []
-for b in (1, 2):
-    a = mtb.io.read_canonical(d / f"rna{b}.h5")
-    a.obsm["protein"] = mtb.io.read_canonical(d / f"adt{b}.h5").to_df()
-    a.obs["celltype"] = pd.read_csv(d / f"cty{b}.csv")["x"].values
-    batches.append(a)
-    atac.append(mtb.io.read_canonical(d / f"atac{b}.h5"))
-adata = ad.concat(batches, label="batch", keys=["1", "2"], index_unique="-")
-atac = ad.concat(atac, keys=["1", "2"], index_unique="-")
-adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
-atac = atac[adata.obs_names].copy()''',
-   export='''mtb.io.export_dataset(adata, "mydata/MYCROSS", rna="X", adt="obsm:protein",
-                      atac=atac, atac_kind="peak", labels="obs:celltype",
-                      batch="obs:batch", category="cross", overwrite=True)''',
-   notes=["For one AnnData per batch, call `export_dataset` once per batch with "
-          "`batch_index=N` instead of `batch=`."],
+adata = ad.read_h5ad("my_file.h5ad")   # <- your RNA and protein file
+atac = ad.read_h5ad("my_atac.h5ad")    # <- your peak file, the same cells
+print(adata)
+print(atac)''',
+   export='''NAME = "MYCROSS_TRI"   # <- a new name for your own data
+mtb.io.export_dataset(adata, "mydata/" + NAME,
+                      rna="X",                # <- where the RNA counts are
+                      adt="obsm:protein",     # <- where the proteins (ADT) are
+                      atac=atac,              # the ATAC file, peak counts in X
+                      atac_kind="peak",       # the methods here read peaks
+                      labels="obs:celltype",  # <- the cell-type column
+                      batch="obs:batch",      # <- the batch or donor column
+                      category="cross", overwrite=True)''',
+   notes=[PROTEIN_NAMES],
  ),
 }
+
+
+def cross_batches_sentence(key):
+    """How many batches the methods of a cross task read, for the collapsed
+    block of section 5, from the modalities of the task's variants: every
+    method the same number, or every method one number and some of them a
+    smaller one as well (UINMF's two-batch variants)."""
+    reads = {}
+    for m, v in task_variants(key):
+        numbers = [int(n) for r in v.when["modalities"] for n in re.findall(r"\d+$", r)]
+        if not numbers or len(numbers) != len(v.when["modalities"]):
+            raise SystemExit(f"{key}: {m} reads {v.when['modalities']}, not numbered "
+                             f"batches: reword cross_batches_sentence")
+        reads.setdefault(max(numbers), set()).add(m)
+    most, *fewer = sorted(reads, reverse=True)
+    if reads[most] != set(task_methods(key)) or len(fewer) > 1 or not set(reads) <= set(NUMBER):
+        shape = {n: sorted(ms) for n, ms in sorted(reads.items())}
+        raise SystemExit(f"{key}: the batches each method reads are {shape}: reword "
+                         f"cross_batches_sentence")
+    text = f"The methods of this task read {NUMBER[most]} batches"
+    if fewer:
+        also = sorted(reads[fewer[0]])
+        text += (f", and {and_list(also)} also read{'s' if len(also) == 1 else ''} "
+                 f"{NUMBER[fewer[0]]}")
+    return text + ". The recipe for another number of donors covers the other cases."
+
+
+def check_own(key):
+    """Stop when section 5 of a task does not work as it stands. The example
+    cell has to write the files the read cell reads, and the export cell has
+    to name its folder in ``NAME``. Run in an empty folder, the three cells
+    must not warn, and the folder they write has to hold the input files of
+    the notebook's methods."""
+    import contextlib
+    import io
+    import tempfile
+    import warnings
+    import pandas as pd
+    t, own = TASKS[key], OWN[key]
+    files = EXAMPLES[t["ds"]]
+    read = re.findall(r'"(my_\w+\.h5ad)"', own["read"])
+    if sorted(read) != sorted(files) or own["n_files"] != len(files):
+        raise SystemExit(f"{key}: the read cell reads {read} and n_files is "
+                         f"{own['n_files']}, and write_example writes {list(files)} for "
+                         f"{t['ds']}")
+    count = "a" if len(files) == 1 else NUMBER[len(files)]
+    if not own["example"].startswith(f"{count} small example file"):
+        raise SystemExit(f"{key}: write_example writes {len(files)} files for {t['ds']}: "
+                         f"reword the example sentence")
+    if not re.match(rf'NAME = "{own["name"]}" +# <- a new name for your own data\n',
+                    own["export"]):
+        raise SystemExit(f"{key}: the export cell does not start with NAME = "
+                         f"\"{own['name']}\" and its mark")
+    here = os.getcwd()
+    with tempfile.TemporaryDirectory() as tmp:
+        os.chdir(tmp)
+        try:
+            ns = {"mtb": mtb, "pd": pd, "METHODS": list(t["methods"])}
+            with warnings.catch_warnings(record=True) as seen, \
+                    contextlib.redirect_stdout(io.StringIO()):
+                warnings.simplefilter("always")
+                mtb.data.write_example(t["ds"], quiet=True)
+                exec(compile(own["read"], f"tutorial_{key}: read cell", "exec"), ns)
+                exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                frame = mtb.scan(own["name"], t["cat"], data_path="mydata", verbose=False)
+        finally:
+            os.chdir(here)
+    warned = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
+    if warned:
+        raise SystemExit(f"{key}: the cells of section 5 warn: {warned}")
+    lacking = sorted(set(t["methods"]) - set(frame[frame.files_ok].method))
+    if lacking:
+        raise SystemExit(f"{key}: the folder section 5 writes lacks the input files of "
+                         f"{and_list(lacking)}")
+
+
+def own_cells(key):
+    """Section 5 of a task tutorial as ``[(kind, source), ...]``: the heading
+    with its collapsed block, then a sentence and a code cell each for the
+    example files, the read, the export, the check and the run, and the
+    plot."""
+    t, own = TASKS[key], OWN[key]
+    cat, methods, export = t["cat"], t["methods"], own["export"]
+    one = own["n_files"] == 1
+    same = "the same method" if len(methods) == 1 else "the same methods"
+    peak_only = and_list(atac_forms("diagonal")[1])
+    multi_peak = [m for m, v in task_variants(key) if "atac_peak1" in v.when["modalities"]]
+    multi_peak = and_list(multi_peak) + (" reads" if len(multi_peak) == 1 else " read") \
+        if multi_peak else ""
+    notes = [WHERE] + [n.replace("{peak_only}", peak_only).replace("{multi_peak}", multi_peak)
+                       .replace("{name}", own["name"]) for n in own["notes"]]
+    if cat == "cross":
+        notes += [CROSS_ORDER, cross_batches_sentence(key), CROSS_INDEX]
+    leftover = LEFTOVER
+    if cat == "cross":
+        leftover += " " + LEFTOVER_BATCH
+    elif "batch_index=" in export:
+        leftover += " " + LEFTOVER_INDEX
+    notes += [FOLDER_NOTE, CHECK_NOTE, leftover, OVERWRITE_NOTE]
+    recipes = and_list([RECIPES[r] for r in RECIPES_OF[cat]])
+    write = ("Write the dataset folder. Change each name in quotes marked `# <-`: give "
+             "`NAME` a new value, and write the names that your "
+             f"{'file uses' if one else 'files use'} for the other parts. The printout "
+             "above shows the names of the example.")
+    if cat == "mosaic":
+        write += " Each call writes one batch."
+    elif "n_batches=" in export:
+        write += (" The loop writes one RNA batch and one ATAC batch per call, and "
+                  "`n_batches` says how many batches the data has.")
+    elif cat == "cross":
+        write += (" When the folder holds batches that your data does not have, "
+                  "`export_dataset` stops and names the files. A new value of `NAME` "
+                  "avoids that.")
+    return [
+        ("markdown", f"## 5. Your own data\n\n{own['needs']}\n\n"
+                     f"Starting from something else? See the recipes for {recipes}.\n\n"
+                     + details(*notes, label="Details: export")),
+        ("markdown", f"The cells below read your data, write it as a dataset folder, check "
+                     f"the folder and run {same} on it. So that the notebook runs as it "
+                     f"is, the next cell writes {own['example']}. It leaves a file of your "
+                     f"own with {'that name' if one else 'one of those names'} as it is."),
+        ("code", f'mtb.data.write_example("{t["ds"]}")'),
+        ("markdown", f"Read {'your file' if one else 'your files'}. For your own data, "
+                     f"change {'the file name' if one else 'every file name'} marked `# <-`."
+                     + ("" if one else " A name that you leave is read from the example.")
+                     + f" On Colab, upload {'the file' if one else 'the files'} first: click "
+                       f"the folder icon on the left, then the upload icon."),
+        ("code", own["read"]),
+        ("markdown", write),
+        ("code", export),
+        ("markdown", "Check the folder before you run anything. `runnable` says whether a "
+                     "method can run on your data on this computer, and `reason` says why "
+                     "not. The two lines above the table say what the folder holds and how "
+                     "many cells each file has. Compare them with your data."),
+        ("code", f'mtb.scan(NAME, "{cat}", methods=METHODS, data_path="mydata",\n'
+                 f'         per_method=True)'),
+        ("markdown", f"Run {same} on the folder:"),
+        ("code", f'mine = mtb.run_all(NAME, "{cat}", methods=METHODS, data_path="mydata",\n'
+                 f'                   out_dir="out/" + NAME)\n'
+                 f'mine.summary'),
+        ("code", "mine.plot()"),
+    ]
 
 
 def _notebook(cells, name):
@@ -811,7 +1066,7 @@ def build_tutorial(key):
     md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
     code = lambda t: C.append(nbf.v4.new_code_cell(t))
     check_task(key)
-    t, own = TASKS[key], OWN[key]
+    t = TASKS[key]
     cat, ds, methods = t["cat"], t["ds"], t["methods"]
     names = and_list(methods)
     everyone = task_methods(key)
@@ -881,30 +1136,8 @@ res.summary''')
     code("res.plot()")
 
     # --------------------------------------------------------------- own data
-    peak_only = and_list(atac_forms("diagonal")[1])
-    multi_peak = [m for m, v in task_variants(key) if "atac_peak1" in v.when["modalities"]]
-    multi_peak = and_list(multi_peak) + (" reads" if len(multi_peak) == 1 else " read") \
-        if multi_peak else ""
-    notes = [n.replace("{peak_only}", peak_only).replace("{multi_peak}", multi_peak)
-             for n in own["notes"]]
-    notes += [
-        f"The folder name, `{own['name']}`, is the dataset name for `run_all`, and "
-        f"`data_path` is the folder that holds it.",
-        f"`mtb.scan(\"{own['name']}\", \"{cat}\", data_path=\"mydata\")` checks the folder "
-        f"and the environments without running anything. Its `reason` column says what "
-        f"is missing.",
-        OVERWRITE_NOTE,
-    ]
-    md(f"## 5. Your own data\n\n{own['intro']}\n\n" + details(*notes, label="Details: export"))
-    md(own["standin"])
-    code(own["data"])
-    md("Write the folder, then run the same method on it:" if len(methods) == 1 else
-       "Write the folder, then run the same methods on it:")
-    code(own["export"])
-    code(f'''mine = mtb.run_all("{own['name']}", "{cat}", methods=METHODS, data_path="mydata",
-                   out_dir="out/{own['name']}")
-mine.summary''')
-    code("mine.plot()")
+    for kind, src in own_cells(key):
+        (md if kind == "markdown" else code)(src)
 
     # ------------------------------------------------------------ stored scores
     n_sec = 6
@@ -1123,15 +1356,14 @@ mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
 
 
 if __name__ == "__main__":
+    # every notebook is built, and so checked, before one is written
+    books = []
     for key in TASKS:
-        books = [(f"tutorial_{key}", build_tutorial(key))]
+        books.append((f"tutorial_{key}", build_tutorial(key)))
         if has_all(key):
             books.append((f"tutorial_{key}_all", build_all_methods(key)))
-        for name, cells in books:
-            path = os.path.join(OUT, f"{name}.ipynb")
-            nbf.write(_notebook(cells, name), path)
-            print(f"wrote {path} {len(cells)} cells")
-    C = build_colab_quickstart()
-    path = os.path.join(OUT, "colab_quickstart.ipynb")
-    nbf.write(_notebook(C, "colab_quickstart"), path)
-    print(f"wrote {path} {len(C)} cells")
+    books.append(("colab_quickstart", build_colab_quickstart()))
+    for name, cells in books:
+        path = os.path.join(OUT, f"{name}.ipynb")
+        nbf.write(_notebook(cells, name), path)
+        print(f"wrote {path} {len(cells)} cells")

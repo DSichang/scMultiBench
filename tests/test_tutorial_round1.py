@@ -199,13 +199,18 @@ EXPECTED_FILES = {
 
 
 def _own_data_cells(key):
-    """Section 5's code: the cell that builds the demo data and the cell of
-    export calls after it. ``run_all`` on the folder has its own cell."""
+    """Section 5's code up to the export: the cell that writes the example
+    files, the cell that reads them and the cell of export calls. The check
+    of the folder and ``run_all`` on it have a cell each, and take the folder
+    from ``NAME``, which the export cell sets."""
     code = [src for kind, src in _cells(f"tutorial_{key}") if kind == "code"]
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(" in src)
     assert "run_all" not in code[i], code[i]
-    assert code[i + 1].startswith(f'mine = mtb.run_all("{GEN.OWN[key]["name"]}"'), code[i + 1]
-    return code[i - 1], code[i]
+    assert code[i].startswith(f'NAME = "{GEN.OWN[key]["name"]}"'), code[i]
+    assert code[i + 1].startswith("mtb.scan(NAME, "), code[i + 1]
+    assert code[i + 2].startswith("mine = mtb.run_all(NAME, "), code[i + 2]
+    assert code[i - 2] == f'mtb.data.write_example("{GEN.TASKS[key]["ds"]}")', code[i - 2]
+    return code[i - 2], code[i - 1], code[i]
 
 
 @pytest.mark.parametrize("key", KEYS)
@@ -221,7 +226,7 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monk
     cat = t["cat"]
     if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
-    data, export = _own_data_cells(key)
+    example, read, export = _own_data_cells(key)
     calls = [n for n in ast.walk(ast.parse(export)) if isinstance(n, ast.Call)]
     names = {ast.unparse(n.func) for n in calls}
     assert "mtb.io.to_canonical" not in names and not any(n.endswith("to_csv") for n in names), \
@@ -238,7 +243,8 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monk
     ns = {"mtb": mtb, "pd": pd}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        exec(compile(data, f"tutorial_{key}", "exec"), ns)
+        exec(compile(example, f"tutorial_{key}", "exec"), ns)
+        exec(compile(read, f"tutorial_{key}", "exec"), ns)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
         exec(compile(export, f"tutorial_{key}", "exec"), ns)

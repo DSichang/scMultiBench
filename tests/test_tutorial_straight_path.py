@@ -4,11 +4,11 @@ and runs the methods, on the demo data and on data exported from an AnnData.
 The owner asked for tutorials that let a reader install the environments with
 one call and run the methods themselves, also on a new dataset, in code that
 is short and plain. These tests pin that shape: one shared install cell, no
-flags, fallbacks or helper functions, the environment install and both
-``run_all`` calls in every task tutorial, methods that read every batch of
-their dataset, and download sizes that match the package's own plans. One
-dataset serves every method of a task, and the ``_all`` notebook of the task
-runs them all.
+flags or fallbacks and no function defined in a notebook, the environment
+install and both ``run_all`` calls in every task tutorial, methods that read
+every batch of their dataset, and download sizes that match the package's own
+plans. One dataset serves every method of a task, and the ``_all`` notebook
+of the task runs them all.
 """
 import ast
 import importlib.util
@@ -105,8 +105,8 @@ def _tree(src):
 
 @pytest.mark.parametrize("name", ALL)
 def test_one_shared_install_cell(name):
-    """The first code cell is the shared two-line install, and no other cell
-    installs the package."""
+    """The first code cell is the shared three-line install, and no other
+    cell installs the package."""
     code = _code(name)
     assert code[0] == GEN.INSTALL_CELL
     assert not any("pip" in c for c in code[1:]), name
@@ -151,13 +151,15 @@ def test_task_tutorial_installs_and_runs(key):
     # one line or wrapped: the call is compared with its whitespace collapsed
     assert (_flat(f'res = mtb.run_all("{ds}", "{cat}", methods=METHODS, '
                   f'out_dir="out/{ds}")') in _flat(code))
+    # the export cell names the folder once, in NAME; the run takes it from there
     own = GEN.OWN[key]["name"]
-    assert f'"mydata/{own}"' in code
+    assert f'NAME = "{own}"' in code
+    assert '"mydata/" + NAME' in code
     mine = [c for c in _code(f"tutorial_{key}") if c.startswith("mine = mtb.run_all(")]
     assert len(mine) == 1
     call = _flat(mine[0])
-    assert call.startswith(_flat(f'mine = mtb.run_all("{own}", "{cat}", methods=METHODS, '
-                                 f'data_path="mydata", out_dir="out/{own}")')), call
+    assert call.startswith(_flat(f'mine = mtb.run_all(NAME, "{cat}", methods=METHODS, '
+                                 f'data_path="mydata", out_dir="out/" + NAME)')), call
     assert code.index("mtb.env.install") < code.index("mtb.run_all")
 
 

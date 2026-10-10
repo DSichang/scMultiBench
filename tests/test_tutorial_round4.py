@@ -182,12 +182,17 @@ def test_a_dry_run_command_alone_can_fail():
 
 
 # ---------------------------------------------- R4-13 / R4-02: batch advice
-BATCH_ADVICE = ("Keep several samples in one folder, without `batch=`. To score the "
-                "batch mixing, pass the batch column to `run_all(batch=...)`.")
+# Since 0.3.5 the note shows the call with the column itself, on an object
+# that the tutorial's read cell assigns.
+BATCH_ADVICE = ("Keep several samples or donors in one folder, without `batch=` in "
+                "`export_dataset`. To score how well they mix, give `run_all` the column "
+                "itself: `mtb.run_all(..., batch={obj}.obs[\"donor\"])`.")
 
 
-def test_vertical_export_note_names_the_batch_call():
-    assert BATCH_ADVICE in _markdown("tutorial_vertical_rna_adt")
+@pytest.mark.parametrize("key,obj", [("vertical_rna_adt", "adata"), ("vertical_rna_atac", "rna"),
+                                     ("vertical_rna_adt_atac", "adata")])
+def test_vertical_export_note_names_the_batch_call(key, obj):
+    assert BATCH_ADVICE.format(obj=obj) in _markdown(f"tutorial_{key}")
 
 
 def test_the_package_gives_the_same_batch_advice(tmp_path):
