@@ -425,6 +425,20 @@ def test_other_h5_files_keep_their_message(tmp_path):
     with h5py.File(q, "w") as f:
         f.create_group("matrix/data")
     assert ingest._is_canonical_h5(q) is False
+    # nor is one whose matrix/data has one dimension and no indptr next to
+    # it. The message says what is missed: matrix/data is there
+    r = tmp_path / "flat.h5"
+    with h5py.File(r, "w") as f:
+        f.create_dataset("matrix/data", data=np.ones(4))
+    assert ingest._is_canonical_h5(r) is False
+    for path in (q, r):
+        with pytest.raises(ValueError) as e:
+            ingest.to_canonical(path, tmp_path / "OUT" / "rna.h5", modality="rna")
+        assert str(e.value) == (
+            f"{path} has no 2-D dataset 'matrix/data'; found keys ['matrix'] - a canonical "
+            f"input .h5 holds matrix/data (features x cells), matrix/features and "
+            f"matrix/barcodes; pass an AnnData / .h5ad / .csv to convert instead")
+    assert not (tmp_path / "OUT").exists()
 
 
 def _demo_h5_files():

@@ -286,14 +286,17 @@ def _to_anndata(src):
         try:
             with h5py.File(p, "r") as f:
                 keys = sorted(f.keys())
+                d = f.get("matrix/data")
+                # there, but not as the 2-D dataset of a canonical file
+                flat = d is not None and not (isinstance(d, h5py.Dataset) and d.ndim == 2)
         except OSError as exc:
             raise ValueError(f"{p} is not a readable HDF5 file: {exc}") from exc
         if _is_tenx_h5(p):
             raise ValueError(_tenx_message(p))
         raise ValueError(
-            f"{p} has no dataset 'matrix/data'; found keys {keys} - a canonical "
-            f"input .h5 holds matrix/data (features x cells), matrix/features and "
-            f"matrix/barcodes"
+            f"{p} has no {'2-D ' if flat else ''}dataset 'matrix/data'; found keys {keys} "
+            f"- a canonical input .h5 holds matrix/data (features x cells), "
+            f"matrix/features and matrix/barcodes"
             + (" (a top-level 'data' dataset is a method output such as "
                "out/<method>/embedding.h5, which mtb.evaluate reads)" if "data" in keys else "")
             + "; pass an AnnData / .h5ad / .csv to convert instead")
