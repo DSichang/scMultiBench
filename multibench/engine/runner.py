@@ -442,12 +442,53 @@ def _is_modality_role(role: str) -> bool:
     return role not in _AUX_ROLES and "cty" not in role and "label" not in role
 
 
+def _convert_kw(role: str) -> dict:
+    """The keywords the conversion of ``role`` passes ``ingest.to_canonical``.
+
+    For the two ATAC-representation roles the role token is the modality
+    hint, so the conversion emits ingest's peak-name warning (an atac_gas
+    role fed a chr:start-end matrix). Other roles carry no hint:
+    ``modality='adt'`` would refuse an AnnData that has obsm keys, and
+    in-memory AnnData inputs must keep working unchanged.
+    """
+    hint = role.rstrip("0123456789")
+    return {"modality": hint} if hint in ("atac_gas", "atac_peak") else {}
+
+
+def _h5ad_var(path):
+    """``var`` of an ``.h5ad`` file, and nothing else of it: ``read_h5ad``
+    loads every layer, with ``backed="r"`` too. ``None`` for a file that
+    does not give one; the conversion says what is wrong with it."""
+    import h5py
+    try:
+        try:
+            from anndata.io import read_elem
+        except ImportError:                 # anndata < 0.11
+            from anndata.experimental import read_elem
+        with h5py.File(path, "r") as f:
+            var = read_elem(f["var"])
+    except (ImportError, OSError, KeyError):
+        return None
+    return var if hasattr(var, "columns") else None
+
+
+def _check_feature_types(role: str, var) -> None:
+    """The conversion's check that the matrix holds one feature type
+    (``ingest._check_one_feature_type``), on the ``var`` table alone and
+    worded for the file the conversion of ``role`` writes."""
+    from types import SimpleNamespace
+    ingest._check_one_feature_type(
+        SimpleNamespace(var=var), arg=None, spec=None,
+        role=_convert_kw(role).get("modality") or ingest._layout_family(f"{role}.h5"))
+
+
 def _check_input(role: str, val, *, real: bool) -> str:
-    """Validate one modality input without reading or writing it.
+    """Validate one modality input without reading its matrix or writing it.
 
     Returns ``"pass"`` when the value is a canonical ``.h5``, else
     ``"convert"``. Raises the error the conversion would raise, so a dry run
-    fails exactly where the real run would. A path that does not exist
+    fails exactly where the real run would: of an AnnData and an ``.h5ad``
+    file it reads ``var``, for the feature types. A path that does not exist
     raises ``FileNotFoundError`` in a real run (``real=True``); a preview
     may name files of another host, so it passes an ``.h5`` path through.
     """
@@ -459,6 +500,7 @@ def _check_input(role: str, val, *, real: bool) -> str:
                 f"inputs={{{role!r}: mdata.mod[{(mods or [role])[0]!r}]}} (modalities: "
                 f"{mods}), or write a dataset folder with mtb.io.export_dataset")
         if hasattr(val, "X") and hasattr(val, "obs"):
+            _check_feature_types(role, getattr(val, "var", None))
             return "convert"
         raise TypeError(f"inputs[{role!r}] must be a file path or an AnnData, "
                         f"got {type(val).__name__}")
@@ -477,6 +519,8 @@ def _check_input(role: str, val, *, real: bool) -> str:
         if ingest._is_canonical_h5(p):
             return "pass"
         ingest._to_anndata(p)          # raises the "no dataset 'matrix/data'" error
+    if suf == ".h5ad":
+        _check_feature_types(role, _h5ad_var(p))
     if suf in (".h5ad", ".csv", ".tsv"):
         return "convert"
     if suf == ".loom":
@@ -856,7 +900,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     through. An AnnData or any other file becomes
     ``<out_dir>/inputs/<role>.h5``, and a peak role the method renames
     becomes ``<out_dir>/inputs/<role>_normpeaks.h5``. Input-format errors,
-    such as an ``.h5mu`` file, are raised by the dry run too.
+    such as an ``.h5mu`` file or a matrix with features of several types,
+    are raised by the dry run too.
 
     The dry run prints to stderr what the real run would need first: the
     method's ``setup_hint`` (``method_info(m)['setup_hint']``), a note when
@@ -1085,18 +1130,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     if _modality_roles(inputs):
         inputs_dir.mkdir(parents=True, exist_ok=True)
 
-    # normalize modality inputs to canonical .h5 inside a dedicated inputs dir.
-    # For the two ATAC-representation roles the role token is passed as the
-    # modality hint so the conversion emits ingest's peak-name warning (an
-    # atac_gas role fed a chr:start-end matrix); other roles carry no hint -
-    # `modality='adt'` would refuse an AnnData that has obsm keys, and in-memory
-    # AnnData inputs must keep working unchanged.
+    # normalize modality inputs to canonical .h5 inside a dedicated inputs dir
     values: dict = {}
     for role, step in plan.items():
         if step["convert"]:
-            hint = role.rstrip("0123456789")
-            kw = {"modality": hint} if hint in ("atac_gas", "atac_peak") else {}
-            ingest.to_canonical(step["src"], out=inputs_dir / f"{role}.h5", **kw)
+            ingest.to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
+                                **_convert_kw(role))
         # Some methods (Seurat_v3 etc.) require ATAC peak ids in chr:start-end
         # form: the declared peak roles get per-run copies (originals untouched).
         if step["normpeaks_from"] is not None:

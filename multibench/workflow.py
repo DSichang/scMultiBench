@@ -1166,22 +1166,31 @@ def _row_families(modalities) -> set:
     return {_family(r) for r in roles} & set(_FAMILIES)
 
 
-def _held_families(ds_dir: Path, category: str | None) -> list:
-    """The families the folder holds a file of.
+def _role_files(ds_dir: Path, category: str | None) -> dict:
+    """``{file name: family}`` of the matrix files that are in the folder
+    and that a role of some variant of ``category`` (``None``: of any)
+    resolves to.
 
-    A family is held when a role of some variant of ``category`` (``None``:
-    of any) resolves to a file that is there. The resolver decides
-    (``_resolve._resolve_role``), so an older name such as ``peak.h5``
-    counts and no second list of file names exists. Every variant is asked,
-    not only the rows of one scan: what a folder holds does not depend on
-    the methods a caller names.
+    The resolver decides (``_resolve._resolve_role``), so an older name such
+    as ``peak.h5`` counts and no second list of file names exists. Every
+    variant is asked, not only the rows of one scan: what a folder holds does
+    not depend on the methods a caller names.
     """
-    held = set()
+    files = {}
     for role in dict.fromkeys(r for *_, mods in _variant_rows(category) for r in mods):
         fam = _family(role)
-        if fam in _FAMILIES and fam not in held \
-                and _resolve._resolve_role(ds_dir, role).exists():
-            held.add(fam)
+        if fam not in _FAMILIES:
+            continue
+        p = _resolve._resolve_role(ds_dir, role)
+        if p.name not in files and p.exists():
+            files[p.name] = fam
+    return files
+
+
+def _held_families(ds_dir: Path, category: str | None) -> list:
+    """The families the folder holds a file of: a family is held when one of
+    its roles resolves to a file that is there (:func:`_role_files`)."""
+    held = set(_role_files(ds_dir, category).values())
     return [f for f in _FAMILIES if f in held]
 
 
@@ -1204,15 +1213,53 @@ def _listed(df: "pd.DataFrame", need, held, methods) -> list:
     return keep
 
 
-def _holds_sentence(dataset: str, ds_dir: Path, held) -> str:
+def _tenx_files(ds_dir: Path, files: dict) -> list:
+    """The names in ``files`` (:func:`_role_files`) that are 10x Genomics
+    files, as the folder check tells them (``_resolve._check_matrix_files``),
+    by batch number, then RNA, ADT, ATAC."""
+    from .engine.ingest import _is_canonical_h5, _is_tenx_h5
+
+    def order(name):
+        stem = name.rsplit(".", 1)[0]
+        return int(stem[len(stem.rstrip("0123456789")):] or 0), _FAMILIES.index(files[name])
+    return sorted((n for n in files if not _is_canonical_h5(ds_dir / n)
+                   and _is_tenx_h5(ds_dir / n)), key=order)
+
+
+def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = None) -> str:
     """``D11 holds RNA and ADT.``; with numbered files ``D52 holds RNA and
-    ADT, in batches 1-3.``"""
+    ADT, in batches 1-3.`` ``held`` are the families of ``category``
+    (:func:`_held_families`).
+
+    A 10x Genomics file among their files is named as that and does not
+    count for its family: ``MY holds ADT. rna.h5 is a 10x Genomics file
+    under the name of a dataset file.`` When every one is: ``MY holds no
+    dataset file: rna.h5 and atac.h5 are 10x Genomics files under the names
+    of dataset files.`` With no family held, matrix files under other names
+    (:func:`_cells_per_file`) are told from none: ``D1 holds no RNA, ADT or
+    ATAC file under a name that a vertical method reads.``
+    """
     if not held:
-        return f"{dataset} holds no RNA, ADT or ATAC file."
+        if not _cells_per_file(ds_dir):
+            return f"{dataset} holds no RNA, ADT or ATAC file."
+        return (f"{dataset} holds no RNA, ADT or ATAC file under a name that a "
+                f"{category + ' ' if category else ''}method reads.")
+    files = _role_files(ds_dir, category)
+    tenx = _tenx_files(ds_dir, files)
+    is_tenx = ""
+    if tenx:
+        is_tenx = f" {_resolve._and_list(tenx)} " + (
+            "is a 10x Genomics file under the name of a dataset file." if len(tenx) == 1
+            else "are 10x Genomics files under the names of dataset files.")
+        held = [f for f in held
+                if any(fam == f and n not in tenx for n, fam in files.items())]
+        if not held:
+            return f"{dataset} holds no dataset file:{is_tenx}"
     nums = sorted(_resolve._folder_batches(ds_dir))
     where = (f", in {'batch' if len(nums) == 1 else 'batches'} {_resolve._span(nums)}"
              if nums else "")
-    return f"{dataset} holds {_resolve._and_list(_FAMILY_WORDS[f] for f in held)}{where}."
+    return (f"{dataset} holds {_resolve._and_list(_FAMILY_WORDS[f] for f in held)}{where}."
+            + is_tenx)
 
 
 def _all_spelling() -> str:
@@ -1226,27 +1273,30 @@ def _lacking(families) -> str:
     return _or([_FAMILY_WORDS[f] for f in families])
 
 
-def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path) -> str:
+def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
+                     category: str | None = None) -> str:
     """What the folder holds and how many rows are not listed for it, with
-    the way to list them: the sentences after the counts of a scan."""
+    the way to list them: the sentences after the counts of a scan of
+    ``category``."""
     d, one = df.attrs["not_listed"], df.attrs["not_listed"] == 1
-    return (f"{_holds_sentence(dataset, ds_dir, df.attrs['held'])} {d} "
+    return (f"{_holds_sentence(dataset, ds_dir, df.attrs['held'], category)} {d} "
             f"{'row that reads' if one else 'rows that read'} "
             f"{_lacking(df.attrs['not_held'])} {'is' if one else 'are'} not listed. "
             f"{_all_spelling()} lists {'it' if one else 'them'}.")
 
 
-def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None) -> str:
-    """:func:`_not_listed_note` for a caller that holds the scan frame and the
-    dataset as it was typed (the command line); ``""`` when every row is
-    listed."""
+def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
+               category: str | None = None) -> str:
+    """:func:`_not_listed_note` for a caller that holds the scan frame, and
+    the dataset and the category as they were typed (the command line);
+    ``""`` when every row is listed."""
     if not df.attrs.get("not_listed"):
         return ""
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")       # scan warned about the spelling
         dataset = _resolve.canonical_dataset(base, dataset)
-    return _not_listed_note(df, dataset, base / dataset)
+    return _not_listed_note(df, dataset, base / dataset, category)
 
 
 def scan(dataset: str, category: str | None = None, *,
@@ -1412,11 +1462,13 @@ def scan(dataset: str, category: str | None = None, *,
     plus a reason; ``runnable`` needs both:
 
     - ``files_ok`` / ``files_reason`` - the method's script is present, the
-      input files resolve on disk and are oriented features x cells, every
-      label CSV has one row per cell of the modality it labels, and a
-      ``data_dir`` method (scBridge) finds the files it names. Seurat_v5's
-      ``rna.h5`` and ``atac_peak.h5`` must hold the same cells. A diagonal
-      ``atac_gas.h5`` must list the cells of ``atac_peak.h5`` in its order.
+      input files resolve on disk, are dataset files with features and cells
+      (not a 10x Genomics ``.h5`` under the name of one) and are oriented
+      features x cells, every label CSV has one row per cell of the modality
+      it labels, and a ``data_dir`` method (scBridge) finds the files it
+      names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must hold the same
+      cells. A diagonal ``atac_gas.h5`` must list the cells of
+      ``atac_peak.h5`` in its order.
     - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
       machine; the reason names the env and the one-method install command
       (``multibench env install --methods X --packed --run``). On macOS
@@ -1595,8 +1647,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
       (``runner.script_notes``).
 
     Its ``attrs`` hold the dataset as the folder spells it (``dataset``), the
-    folder (``folder``) and ``(method, families it lacks)`` of each row that
-    is not listed (``unlisted``).
+    folder (``folder``), the ``category`` argument and ``(method, families
+    it lacks)`` of each row that is not listed (``unlisted``).
 
     Without ``modalities`` the frames hold the rows of :func:`_listed`;
     ``modalities="all"`` and a list are not filtered. Either way the first
@@ -1758,14 +1810,15 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     df.attrs.update(held=held, not_listed=len(left_out),
                     not_held=[f for f in _FAMILIES
                               if any(f in lack for _, lack in left_out)])
-    private.attrs.update(dataset=dataset, folder=ds_dir, unlisted=left_out)
+    private.attrs.update(dataset=dataset, folder=ds_dir, unlisted=left_out,
+                         category=category)
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
         rows = _rows_word(df, n)
         line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files, n)} input files. "
                 f"{k_env} of {n} {_have_their(k_env, n)} environment installed.")
         if left_out:
-            line += " " + _not_listed_note(df, dataset, ds_dir)
+            line += " " + _not_listed_note(df, dataset, ds_dir, category)
         if _runner.linux_only_sentence():
             line += f" {LINUX_ONLY_SUMMARY}"
         elif any(e and e not in installed for e in df["env"]):
@@ -1862,9 +1915,10 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if not verbose:
         return out
     n, k = len(out), int(out["runnable"].sum())
+    holds = _holds_sentence(dataset, ds_dir, df.attrs["held"], private.attrs["category"])
     line = (f"[scan] {n_files} of {n} {'method' if n == 1 else 'methods'} "
             f"{_have_their(n_files, n)} input files in {dataset}. {k} of {n} can run on "
-            f"this computer. {_holds_sentence(dataset, ds_dir, df.attrs['held'])}")
+            f"this computer. {holds}")
     # the methods none of whose rows is listed, and the families they lack
     listed, gone = set(df["method"]), {}
     for m, lack in private.attrs["unlisted"]:
@@ -4274,7 +4328,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                              params=params if dry_run else None,
                              out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
     # what the folder holds and how many rows are not listed for it, or ""
-    not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"])
+    not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"], category)
                   if plan_df.attrs["not_listed"] else "")
     if plan_df.empty:
         # only reachable through a modalities= selector that matches nothing:

@@ -601,6 +601,9 @@ def inputs_for(dataset: str, category: str, method: str, *,
     **Content checks** (``check=True``). The same checks ``mtb.scan``
     reports per row as ``files_ok`` / ``files_reason``:
 
+    - dataset files: ``ValueError`` when a matrix file is a 10x Genomics
+      ``.h5`` under the name of a dataset file, or holds 0 features or 0
+      cells;
     - orientation: ``ValueError`` when ``matrix/data`` is stored cells x
       features;
     - label length: ``ValueError`` when a label CSV has a different number of
@@ -658,6 +661,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
         if missing:
             raise FileNotFoundError(_missing_inputs_text(method, category, ds_dir,
                                                          missing, near))
+        _check_matrix_files(method, dataset, out)
         _check_orientation(method, dataset, category, out)
         _check_same_cells(method, dataset, category, out)
         if category == "diagonal":
@@ -667,8 +671,9 @@ def inputs_for(dataset: str, category: str, method: str, *,
             ok, why = _check_data_dir(variant, out["data_dir"], method)
             if not ok:
                 raise FileNotFoundError(why)      # it starts with the method
+            named = _data_dir_files(variant, out["data_dir"])
+            _check_matrix_files(method, dataset, named)
             if category == "diagonal":
-                named = _data_dir_files(variant, out["data_dir"])
                 _check_atac_gas_cells(method, dataset, named)
                 _check_diagonal_label_files(method, dataset, named)
     elif check is None and missing:
@@ -791,6 +796,33 @@ def _sniff_h5(path: str, mtime_ns: int):
                     int(f["matrix/barcodes"].shape[0]))
     except OSError:
         return None
+
+
+def _check_matrix_files(method, dataset, resolved):
+    """Reject a file that is no dataset file, or holds no matrix, under the
+    name of one.
+
+    A 10x Genomics ``.h5`` copied to ``rna.h5`` has ``matrix/data``,
+    ``matrix/features`` and ``matrix/barcodes`` too, so the folder looks
+    complete; ``mtb.run`` refuses the file. It is tested as ``to_canonical``
+    tests it: a file with a 2-D ``matrix/data`` passes. A matrix with 0
+    features (0.3.4 wrote one for an object that was split so that no feature
+    was left) or 0 cells gives a method nothing to read.
+    """
+    from .ingest import _is_canonical_h5, _is_tenx_h5, _tenx_message
+    for path in dict.fromkeys(resolved.values()):
+        p = Path(path)
+        if p.suffix != ".h5" or not p.is_file():
+            continue
+        if not _is_canonical_h5(p) and _is_tenx_h5(p):
+            raise ValueError(_tenx_message(p))
+        sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
+        if sniff is not None and 0 in sniff[1:]:
+            again = config.hint("mtb.io.export_dataset", "multibench convert")
+            raise ValueError(
+                f"{method} reads {p.name} of {dataset}, which holds 0 "
+                f"{'features' if sniff[1] == 0 else 'cells'}. Write the folder again "
+                f"with {again}.")
 
 
 def _check_orientation(method, dataset, category, resolved):

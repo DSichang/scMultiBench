@@ -370,7 +370,7 @@ def _cmd_scan(args) -> int:
                  compact=_compact_plan_columns(df))
     # the rows not listed, after the table and after the --strict error
     from .workflow import _scan_note
-    note = _scan_note(df, args.dataset, args.data_path)
+    note = _scan_note(df, args.dataset, args.data_path, args.category)
     code = _EXIT_OK
     if getattr(args, "strict", False):
         problem = _strict_problem(df, methods)
@@ -1245,7 +1245,7 @@ def _run_all_command(args, stack) -> int:
               f"can run on {args.dataset} ({args.category}). The commands below are what "
               f"multibench run would execute. A {_rows_word(df, 1)} whose input files "
               f"are missing has no command.", file=sys.stderr)
-        note = _scan_note(df, args.dataset, args.data_path)
+        note = _scan_note(df, args.dataset, args.data_path, args.category)
         if note:                            # the rows the plan does not list
             print(f"# {note}", file=sys.stderr)
         wrong_ref = _scripts_ref_note()     # every row also carries it as its reason
@@ -1404,6 +1404,13 @@ def _leiden_flavor(flavor):
         config.DEFAULT.leiden_flavor = before
 
 
+#: the label files of a dataset folder, by category: what the error for a
+#: folder without label files names
+_LABEL_FILE_NAMES = {"vertical": "cty.csv", "diagonal": "rna_cty.csv and atac_cty.csv",
+                     "mosaic": "cty1.csv, cty2.csv, ...",
+                     "cross": "cty1.csv, cty2.csv, ..."}
+
+
 def _evaluate_labels(args, stack):
     """The ``labels=`` value of ``multibench evaluate``.
 
@@ -1411,7 +1418,8 @@ def _evaluate_labels(args, stack):
     stacked in the given order with each file one batch (as
     ``mtb.evaluate(labels=[...])``). ``--column`` picks the column of every
     file. Without ``--labels``, ``--dataset/--method/--category`` read the
-    dataset's label files in the method's cell order (``mtb.labels_for``).
+    dataset's label files in the method's cell order (``mtb.labels_for``);
+    a folder without label files is an error that names them.
     """
     import multibench
     files = list(args.labels or [])
@@ -1433,6 +1441,11 @@ def _evaluate_labels(args, stack):
                            + " For your own embedding, pass the label files with --labels.")
         labels = multibench.labels_for(args.dataset, args.category, args.method,
                                        data_path=args.data_path)
+        if not labels:
+            # before the line below, which would name no file
+            raise ValueError(
+                f"{args.dataset} has no label file ({_LABEL_FILE_NAMES[args.category]}), "
+                f"so there is nothing to score. Pass a label file with --labels.")
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
               f"{args.dataset}, in {args.method}'s cell order", file=sys.stderr)
         if args.column is None:
@@ -2326,9 +2339,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="mode 2: peak writes atac_peak.h5, and atac.h5 without "
                          "--category. gene_activity writes atac_gas.h5. --category "
                          "vertical writes atac.h5 and mosaic atac<i>.h5 for both")
-    pc.add_argument("--labels", help="mode 2: cell-type column, obs:<col> for the global "
-                                     "obs or <mod>:<col>. Written to cty.csv, for "
-                                     "diagonal to rna_cty.csv and atac_cty.csv")
+    pc.add_argument("--labels", help="mode 2: cell-type column: obs:<col>, or "
+                                     "<mod>:<col> for a modality of a .h5mu file. "
+                                     "Written to cty.csv, for diagonal to rna_cty.csv "
+                                     "and atac_cty.csv")
     pc.add_argument("--batch", help="mode 2: batch column, as for --labels. Cells are "
                                     "split per batch into numbered files rna1.h5, "
                                     "rna2.h5, cty1.csv ..., read by mosaic and cross methods")

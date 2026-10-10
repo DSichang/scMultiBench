@@ -197,6 +197,101 @@ def test_first_line(linux, monkeypatch, tmp_path, capsys):
         "computer. EMPTY holds no RNA, ADT or ATAC file.")
 
 
+def _tenx(path, n=60):
+    """A 10x Genomics file: a sparse matrix (matrix/indptr) with its
+    features in a group."""
+    with h5py.File(path, "w") as f:
+        g = f.create_group("matrix")
+        g["data"], g["indices"] = np.ones(n), np.zeros(n, dtype=int)
+        g["indptr"] = np.arange(n + 1)
+        g["shape"] = np.array([40, n])
+        g["barcodes"] = np.array([f"c{i}-1" for i in range(n)], dtype="S32")
+        g.create_group("features")["name"] = np.array(GENES, dtype="S32")
+
+
+def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
+    """A 10x file copied to rna.h5 is not RNA that the folder holds."""
+    def first(*a, **kw):
+        pm = _quiet(mtb.scan, *a, per_method=True, data_path=tmp_path, **kw)
+        return pm, capsys.readouterr().out.splitlines()[0]
+
+    counts = ("[scan] 0 of 2 methods have their input files in {0}. 0 of 2 can run on "
+              "this computer. ")
+    for name, other, methods in (("TXADT", "adt.h5", ["Seurat_WNN", "totalVI"]),
+                                 ("TXATAC", "atac.h5", ["VIMCCA", "scMM"])):
+        (tmp_path / name).mkdir()
+        _tenx(tmp_path / name / "rna.h5")
+        _tenx(tmp_path / name / other)
+        pm, line = first(name, "vertical", methods=methods)
+        assert line == counts.format(name) + (
+            f"{name} holds no dataset file: rna.h5 and {other} are 10x Genomics files "
+            f"under the names of dataset files.")
+        assert "holds RNA and" not in line
+        # the rows listed are still those of the names in the folder
+        assert pm.attrs["held"] == ["rna", other[:-len(".h5")]]
+        assert list(pm["method"]) == methods and not pm["runnable"].any()
+    # with the rows that are not listed: the same sentence starts the note
+    _quiet(mtb.run_all, "TXADT", "vertical", data_path=tmp_path, dry_run=True)
+    assert capsys.readouterr().out.splitlines()[1] == (
+        "[run_all] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
+        "under the names of dataset files. 19 rows that read ATAC are not listed. "
+        'modalities="all" lists them.')
+    # one of two: the family of the other file is held, and the 10x file is named
+    _cite(tmp_path, "MIX")
+    _tenx(tmp_path / "MIX" / "rna.h5")
+    pm, line = first("MIX", "vertical", methods=["Seurat_WNN", "totalVI"])
+    assert line == counts.format("MIX") + (
+        "MIX holds ADT. rna.h5 is a 10x Genomics file under the name of a dataset file.")
+    assert pm.attrs["held"] == ["rna", "adt"]
+    # numbered files: the batches of the families named
+    _donors(tmp_path, "TWO", 2)
+    _tenx(tmp_path / "TWO" / "rna1.h5", n=40)
+    _tenx(tmp_path / "TWO" / "adt2.h5", n=40)
+    pm, line = first("TWO", "cross", methods=["StabMap", "sciPENN"])
+    assert line == counts.format("TWO") + (
+        "TWO holds RNA and ADT, in batches 1-2. rna1.h5 and adt2.h5 are 10x Genomics "
+        "files under the names of dataset files.")
+    # a 2-D matrix/data next to a matrix/indptr is a dataset file, as for mtb.run
+    _cite(tmp_path, "BOTH")
+    with h5py.File(tmp_path / "BOTH" / "rna.h5", "a") as f:
+        f["matrix/indptr"] = np.arange(3)
+    pm, line = first("BOTH", "vertical", methods=["Seurat_WNN", "totalVI"])
+    assert line == ("[scan] 2 of 2 methods have their input files in BOTH. 2 of 2 can run "
+                    "on this computer. BOTH holds RNA and ADT.")
+
+
+def test_files_of_another_layout_are_not_called_no_file(linux, tmp_path, capsys):
+    """The line under it lists the matrix files, so "no file" was false."""
+    def lines(*a, **kw):
+        pm = _quiet(mtb.scan, *a, per_method=True, data_path=tmp_path, **kw)
+        return pm, capsys.readouterr().out.splitlines()
+
+    counts = ("[scan] 0 of 2 methods have their input files in {0}. 0 of 2 can run on "
+              "this computer. ")
+    # one file per batch, scanned as vertical
+    _donors(tmp_path, "D1", 2)
+    pm, out = lines("D1", "vertical", methods=["Matilda", "sciPENN"])
+    assert out[:2] == [
+        counts.format("D1") + "D1 holds no RNA, ADT or ATAC file under a name that a "
+        "vertical method reads.",
+        "[scan] Cells per file: rna1.h5 40, adt1.h5 40, rna2.h5 40, adt2.h5 40."]
+    assert pm.attrs["held"] == []
+    # one file per modality, scanned as cross
+    _cite(tmp_path)
+    pm, out = lines("MYCITE", "cross", methods=["StabMap", "sciPENN"])
+    assert out[:2] == [
+        counts.format("MYCITE") + "MYCITE holds no RNA, ADT or ATAC file under a name "
+        "that a cross method reads.",
+        "[scan] Cells per file: rna.h5 60, adt.h5 60."]
+    assert pm.attrs["held"] == []
+    # a folder with label files and no matrix file holds none, as an empty one
+    (tmp_path / "LABELS").mkdir()
+    _labels(tmp_path / "LABELS" / "cty.csv", 60)
+    pm, out = lines("LABELS", "vertical", methods=["Matilda", "sciPENN"])
+    assert out[0] == counts.format("LABELS") + "LABELS holds no RNA, ADT or ATAC file."
+    assert not any(l.startswith("[scan] Cells per file") for l in out)
+
+
 def test_first_line_counts_the_methods_that_are_not_listed(linux, monkeypatch, capsys):
     # D11 holds no ATAC: four vertical methods read nothing else
     pm = mtb.scan("D11", "vertical", per_method=True)

@@ -145,6 +145,46 @@ def test_evaluate_column_names_the_word_of_the_sheet(tmp_path, capsys):
     assert rc == 0 and "warning: Scored the 296 labelled cells of 300. " in err
 
 
+@pytest.mark.parametrize("category,method,files,named", [
+    ("vertical", "totalVI", ["rna.h5", "adt.h5"], "cty.csv"),
+    ("diagonal", "SCALEX", ["rna.h5", "atac_gas.h5"], "rna_cty.csv and atac_cty.csv"),
+    ("cross", "StabMap", ["rna1.h5", "adt1.h5", "rna2.h5", "adt2.h5"],
+     "cty1.csv, cty2.csv, ..."),
+    ("mosaic", "StabMap", ["rna1.h5", "adt1.h5", "rna2.h5", "adt2.h5"],
+     "cty1.csv, cty2.csv, ..."),
+])
+def test_evaluate_dataset_without_label_files(category, method, files, named, tmp_path,
+                                              capsys):
+    """A folder written without labels: the error named labels_for and an
+    empty dict, under a line '# labels:  from NOLAB'."""
+    d = tmp_path / "NOLAB"
+    d.mkdir()
+    for name in files:
+        with h5py.File(d / name, "w") as f:
+            f["matrix/data"] = np.ones((5, 30))
+            f["matrix/features"] = np.array([f"f{i}" for i in range(5)], dtype="S8")
+            f["matrix/barcodes"] = np.array([f"{name}{i}" for i in range(30)], dtype="S16")
+    cells = 30 if category == "vertical" else 60        # the cells of the folder
+    np.save(tmp_path / "emb.npy", np.random.default_rng(0).normal(size=(cells, 5)))
+    argv = ["evaluate", "--output", str(tmp_path / "emb.npy"), "--dataset", "NOLAB",
+            "--method", method, "--category", category, "--data-path", str(tmp_path),
+            "--metrics", "ASW"]
+    for extra in ([], ["--missing-labels", "drop"], ["--column", "celltype"]):
+        rc, out, err = _cli(argv + extra, capsys)
+        assert rc == 1 and out == ""
+        assert err.splitlines() == [
+            f"error: NOLAB has no label file ({named}), so there is nothing to score. "
+            "Pass a label file with --labels.",
+            "(set MULTIBENCH_DEBUG=1 for the full traceback)"]
+    # with its label files the folder is read as before
+    stems = {"vertical": ["cty"], "diagonal": ["rna_cty", "atac_cty"]}.get(
+        category, ["cty1", "cty2"])
+    for stem in stems:
+        pd.DataFrame({"x": ["A", "B"] * 15}).to_csv(d / f"{stem}.csv", index=False)
+    rc, out, err = _cli(argv, capsys)
+    assert rc == 0 and err.splitlines()[0].startswith("# labels: ")
+
+
 # ------------------------------------------------------------------ scan
 def test_scan_modalities_all_and_the_stderr_note(no_envs, capsys):
     rc, out, err = _cli(["scan", "D11", "--category", "vertical"], capsys)
@@ -368,6 +408,16 @@ def test_convert_n_batches(tmp_path, capsys):
                   "--n-batches", "two"])
     assert e.value.code == 2
     capsys.readouterr()
+
+
+def test_convert_help_says_which_file_takes_mod_col():
+    """'<mod>:<col>' next to 'the global obs' read as a spelling for an
+    .h5ad file, where every string is the name of an obs column."""
+    assert _help("convert", "--labels") == (
+        "mode 2: cell-type column: obs:<col>, or <mod>:<col> for a modality of a .h5mu "
+        "file. Written to cty.csv, for diagonal to rna_cty.csv and atac_cty.csv")
+    folded = " ".join(_sub("convert").format_help().split())
+    assert "<mod>:<col> for a modality of a .h5mu file" in folded
 
 
 def test_convert_refuses_a_10x_file(tmp_path, capsys):
