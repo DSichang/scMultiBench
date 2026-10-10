@@ -309,21 +309,24 @@ def test_batch_advice_names_run_all_and_evaluate(monkeypatch):
     from multibench.engine import resolve
     py = resolve._one_file_advice("vertical", has_adt=True)
     assert py == ("Vertical methods read one rna.h5. Export without batch= and pass the "
-                  "batch column to run_all(batch=...) or evaluate(batch=...). For RNA+ADT "
-                  "batches, use category=\"cross\".")
+                  "batch column itself, such as adata.obs[\"donor\"], to run_all(batch=...) "
+                  "or evaluate(batch=...). For RNA+ADT batches, use category=\"cross\".")
     monkeypatch.setattr(config, "_CLI", True)
     several = resolve._several_batch_diagonal_methods()
     assert sorted(several) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
     assert resolve._one_file_advice("diagonal") == (
         "Diagonal methods read one rna.h5 and one ATAC file. Convert without --batch "
-        "and pass the batch column to run-all --batch or evaluate --batch. "
+        "and pass the batch of each cell to run-all --batch or evaluate --batch, as a "
+        "CSV file with the barcodes in its first column. "
         f"{resolve._and_list(several)} also read several RNA and ATAC batches, written "
         "one batch per call with --batch-index.")
 
 
 def test_batch_with_atac_warning_names_run_all():
     from multibench.engine import ingest
-    with pytest.warns(UserWarning, match=r"pass the batch column to run_all\(batch=\.\.\.\) "
+    with pytest.warns(UserWarning, match=r"pass the batch column itself, such as "
+                                         r"adata\.obs\[\"donor\"\], to "
+                                         r"run_all\(batch=\.\.\.\) "
                                          r"or evaluate\(batch=\.\.\.\)"):
         ingest._check_batch_args("obs:batch", None, None, adt=None, atac="X")
     for fn in (mtb.io.export_dataset, mtb.labels_for):

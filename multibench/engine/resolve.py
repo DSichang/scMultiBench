@@ -77,10 +77,12 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 def _batch_column_advice() -> str:
     """Export without per-batch files, then where the batch column goes."""
-    return config.hint("export without batch= and pass the batch column to "
-                       "run_all(batch=...) or evaluate(batch=...)",
-                       "convert without --batch and pass the batch column to "
-                       "run-all --batch or evaluate --batch")
+    return config.hint('export without batch= and pass the batch column itself, such '
+                       'as adata.obs["donor"], to run_all(batch=...) or '
+                       'evaluate(batch=...)',
+                       "convert without --batch and pass the batch of each cell to "
+                       "run-all --batch or evaluate --batch, as a CSV file with the "
+                       "barcodes in its first column")
 
 
 def _and_list(names) -> str:
@@ -1753,8 +1755,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     holds ``rna1.h5``, ``rna2.h5`` ... and ``cty1.csv``, ``cty2.csv`` ....
     Vertical and diagonal methods read one ``rna.h5`` and one label file.
     With such a ``category``, ``check=None`` warns and ``check=True`` raises.
-    Export without ``batch=`` and pass the batch column to
-    ``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``.
+    Export without ``batch=`` and pass the batch column itself, such as
+    ``adata.obs["donor"]``, to ``mtb.run_all(batch=...)`` or
+    ``mtb.evaluate(batch=...)``.
 
     **Diagonal data in several batches.** A folder with ``rna<i>.h5``,
     ``atac_gas<i>.h5`` or ``atac_peak<i>.h5``, ``rna_cty<i>.csv`` and

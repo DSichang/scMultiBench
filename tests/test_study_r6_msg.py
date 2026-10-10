@@ -459,13 +459,13 @@ def test_per_batch_hint_is_sentences(tmp_path):
     msg = str(e.value)
     assert msg.endswith(
         "This folder holds per-batch files (adt1.h5, adt2.h5, ...). Vertical methods read "
-        "one adt.h5. Export without batch= and pass the batch column to "
-        "run_all(batch=...) or evaluate(batch=...). For RNA+ADT batches, use "
-        'category="cross".') or msg.endswith(
+        "one adt.h5. Export without batch= and pass the batch column itself, such as "
+        'adata.obs["donor"], to run_all(batch=...) or evaluate(batch=...). For RNA+ADT '
+        'batches, use category="cross".') or msg.endswith(
         "This folder holds per-batch files (rna1.h5, rna2.h5, ...). Vertical methods read "
-        "one rna.h5. Export without batch= and pass the batch column to "
-        "run_all(batch=...) or evaluate(batch=...). For RNA+ADT batches, use "
-        'category="cross".'), msg
+        "one rna.h5. Export without batch= and pass the batch column itself, such as "
+        'adata.obs["donor"], to run_all(batch=...) or evaluate(batch=...). For RNA+ADT '
+        'batches, use category="cross".'), msg
     assert " - " not in msg and "; " not in msg
 
 
