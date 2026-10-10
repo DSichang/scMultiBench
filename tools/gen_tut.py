@@ -437,8 +437,8 @@ def diagonal_multi_sentence(key):
 WHERE = ("The names in quotes say where your file holds each part. `\"X\"` is the main "
          "matrix, `\"obsm:protein\"` the matrix `obsm[\"protein\"]`, `\"layer:counts\"` the "
          "layer `layers[\"counts\"]`, and `\"obs:celltype\"` the column `obs[\"celltype\"]`, "
-         "which `\"celltype\"` alone names too. A wrong name raises an error that lists the "
-         "names the file has.")
+         "which `\"celltype\"` alone names too. A wrong name after `obsm:`, `layer:` or "
+         "`obs:` raises an error that lists the names the file has.")
 PROTEIN_NAMES = ("The example keeps the protein names in `adata.uns[\"protein_names\"]`. A "
                  "DataFrame in `adata.obsm[\"protein\"]` brings its own names in its columns.")
 ADT_IN_X = ("When the ADT file also holds a matrix in `obsm` under a name that does not "
@@ -501,14 +501,18 @@ OVERWRITE_NOTE = ("`overwrite=True` replaces the files of an earlier run of this
 
 
 def batch_advice(obj):
-    """The paragraph of a vertical tutorial on samples or donors. ``obj`` is
-    the variable of the read cell whose ``obs`` holds the column."""
-    return ("Keep several samples or donors in one folder, without `batch=` in "
-            "`export_dataset`. To score how well they mix, give `run_all` the column itself: "
-            f"`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The values are matched to the "
-            "cells by barcode, and every cell needs a donor. A column name alone is not "
-            "enough there, because `run_all` reads the folder and the folder holds no `obs` "
-            "columns.")
+    """What a vertical tutorial says on samples or donors, as ``(visible,
+    collapsed)``: the sentence of the first cell with the call, and the
+    paragraph of the collapsed block. ``obj`` is the variable of the read
+    cell whose ``obs`` holds the column."""
+    return (("Several donors or samples in the file? Keep them in one folder, without "
+             "`batch=` in `export_dataset`, and give `run_all` the column itself: "
+             f"`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
+             "scores for how well they mix."),
+            ("The donors that `run_all` gets as `batch=` are matched to the cells by "
+             "barcode, and every cell needs a donor. A column name alone is not enough "
+             "there, because `run_all` reads the folder and the folder holds no `obs` "
+             "columns."))
 
 
 # Words the visible sentences share.
@@ -523,14 +527,18 @@ MOSAIC_NEEDS = ("Your data needs raw counts, with one `.h5ad` file per batch and
 NUMBER = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
 
 # The recipes of the run guide, for data that does not come as the files of
-# this section, and the ones the tutorials of each category link.
+# this section, and the ones the tutorials of each category link. A vertical
+# tutorial links the donors recipe as the one for a donor or sample column,
+# a cross tutorial as the one for another number of batches than its methods
+# read.
 RECIPES = {
     "10x": f"[a 10x `.h5` file]({SITE}tutorials/run/#recipe-10x-h5)",
     "csv": f"[labels in a CSV file]({SITE}tutorials/run/#recipe-labels-csv)",
     "no_labels": f"[no labels]({SITE}tutorials/run/#recipe-no-labels)",
     "donors": f"[another number of donors]({SITE}tutorials/run/#recipe-donors)",
+    "donors_vertical": f"[several donors or samples]({SITE}tutorials/run/#recipe-donors)",
 }
-RECIPES_OF = {"vertical": ["10x", "csv", "no_labels", "donors"],
+RECIPES_OF = {"vertical": ["10x", "csv", "no_labels", "donors_vertical"],
               "diagonal": ["csv", "no_labels"],
               "mosaic": ["10x", "csv", "no_labels"],
               "cross": ["10x", "csv", "no_labels", "donors"]}
@@ -539,7 +547,8 @@ RECIPES_OF = {"vertical": ["10x", "csv", "no_labels", "donors"],
 # and none that a 0.3.4 tutorial wrote another layout under; `needs` is the
 # visible sentence; `example` says what the example cell writes and `n_files`
 # how many files that is; `read` and `export` are the two cells a reader
-# edits; `notes` are the task's paragraphs of the collapsed block.
+# edits; `notes` are the task's paragraphs of the collapsed block; `donors`
+# is the variable of the read cell that `batch_advice` names.
 OWN = {
  "vertical_rna_adt": dict(
    name="MYCITE",
@@ -557,7 +566,7 @@ mtb.io.export_dataset(adata, "mydata/" + NAME,
                       adt="obsm:protein",     # <- where the proteins (ADT) are
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[PROTEIN_NAMES, batch_advice("adata")],
+   notes=[PROTEIN_NAMES], donors="adata",
  ),
  "vertical_rna_atac": dict(
    name="MYMULTIOME",
@@ -580,7 +589,7 @@ mtb.io.export_dataset(rna, "mydata/" + NAME,
                       atac_kind="peak",       # the methods here read peaks
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[TENX_NOTE, MUDATA_NOTE, batch_advice("rna")],
+   notes=[TENX_NOTE, MUDATA_NOTE], donors="rna",
  ),
  "vertical_rna_adt_atac": dict(
    name="MYTRI",
@@ -603,7 +612,7 @@ mtb.io.export_dataset(adata, "mydata/" + NAME,
                       atac_kind="peak",       # the methods here read peaks
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[PROTEIN_NAMES, batch_advice("adata")],
+   notes=[PROTEIN_NAMES], donors="adata",
  ),
  "diagonal_rna_atac": dict(
    name="MYDIAG_RNA_ATAC",
@@ -882,10 +891,10 @@ mtb.io.export_dataset(adata, "mydata/" + NAME,
 
 
 def cross_batches_sentence(key):
-    """How many batches the methods of a cross task read, for the collapsed
-    block of section 5, from the modalities of the task's variants: every
-    method the same number, or every method one number and some of them a
-    smaller one as well (UINMF's two-batch variants)."""
+    """How many batches the methods of a cross task read, for the visible
+    text of section 5's first cell, from the modalities of the task's
+    variants: every method the same number, or every method one number and
+    some of them a smaller one as well (UINMF's two-batch variants)."""
     reads = {}
     for m, v in task_variants(key):
         numbers = [int(n) for r in v.when["modalities"] for n in re.findall(r"\d+$", r)]
@@ -972,8 +981,15 @@ def own_cells(key):
         if multi_peak else ""
     notes = [WHERE] + [n.replace("{peak_only}", peak_only).replace("{multi_peak}", multi_peak)
                        .replace("{name}", own["name"]) for n in own["notes"]]
-    if cat == "cross":
-        notes += [CROSS_ORDER, cross_batches_sentence(key), CROSS_INDEX]
+    # a paragraph of its own between the needs and the recipes: what to do
+    # with a donor column, or how many batches the methods read
+    also = ""
+    if cat == "vertical":
+        also, donors_note = batch_advice(own["donors"])
+        notes.append(donors_note)
+    elif cat == "cross":
+        also = cross_batches_sentence(key)
+        notes += [CROSS_ORDER, CROSS_INDEX]
     leftover = LEFTOVER
     if cat == "cross":
         leftover += " " + LEFTOVER_BATCH
@@ -981,10 +997,20 @@ def own_cells(key):
         leftover += " " + LEFTOVER_INDEX
     notes += [FOLDER_NOTE, CHECK_NOTE, leftover, OVERWRITE_NOTE]
     recipes = and_list([RECIPES[r] for r in RECIPES_OF[cat]])
+    tenx = (" The cell reads `.h5ad` files. A 10x `.h5` file is read another way: see the "
+            "recipe for a 10x `.h5` file, linked at the top of this section."
+            if "10x" in RECIPES_OF[cat] else "")
+    # the read cell shows one object where it ends in a name, else one per print
+    shown = len(re.findall(r"^print\(", own["read"], re.M)) or 1
+    printed = ("your file" if one else "your files" if shown == own["n_files"] else
+               f"{NUMBER[shown]} of your files. The other files need the same names")
     write = ("Write the dataset folder. Change each name in quotes marked `# <-`: give "
              "`NAME` a new value, and write the names that your "
              f"{'file uses' if one else 'files use'} for the other parts. The printout "
-             "above shows the names of the example.")
+             f"above lists the names in {printed}. Write a name listed after `obs:` with "
+             "that prefix, as `\"obs:celltype\"`"
+             + (", and one after `obsm:` as `\"obsm:protein\"`" if '"obsm:' in export else "")
+             + ".")
     if cat == "mosaic":
         write += " Each call writes one batch."
     elif "n_batches=" in export:
@@ -994,9 +1020,23 @@ def own_cells(key):
         write += (" When the folder holds batches that your data does not have, "
                   "`export_dataset` stops and names the files. A new value of `NAME` "
                   "avoids that.")
+    check = ("Check the folder before you run anything. `runnable` says whether a method "
+             "can run on your data on this computer, and `reason` says why not. The first "
+             "two lines above the table say what the folder holds and how many cells each "
+             "file has. Compare them with your data.")
+    if 'atac_kind="peak"' in export and "category=" not in export:
+        # without a category, the export writes the peaks under both names
+        check += (" `atac.h5` and `atac_peak.h5` are one matrix under two names. Diagonal "
+                  "methods read the second.")
+    check += (" A further line is about one method: why it cannot run, or what it does not "
+              "read or needs from your data.")
+    if cat == "cross":
+        check += (" With fewer batches than the methods read, such a line names the files "
+                  "that are not there. With more, it says which batches are not used.")
     return [
         ("markdown", f"## 5. Your own data\n\n{own['needs']}\n\n"
-                     f"Starting from something else? See the recipes for {recipes}.\n\n"
+                     + (f"{also}\n\n" if also else "")
+                     + f"Starting from something else? See the recipes for {recipes}.\n\n"
                      + details(*notes, label="Details: export")),
         ("markdown", f"The cells below read your data, write it as a dataset folder, check "
                      f"the folder and run {same} on it. So that the notebook runs as it "
@@ -1007,14 +1047,11 @@ def own_cells(key):
                      f"change {'the file name' if one else 'every file name'} marked `# <-`."
                      + ("" if one else " A name that you leave is read from the example.")
                      + f" On Colab, upload {'the file' if one else 'the files'} first: click "
-                       f"the folder icon on the left, then the upload icon."),
+                       f"the folder icon on the left, then the upload icon." + tenx),
         ("code", own["read"]),
         ("markdown", write),
         ("code", export),
-        ("markdown", "Check the folder before you run anything. `runnable` says whether a "
-                     "method can run on your data on this computer, and `reason` says why "
-                     "not. The two lines above the table say what the folder holds and how "
-                     "many cells each file has. Compare them with your data."),
+        ("markdown", check),
         ("code", f'mtb.scan(NAME, "{cat}", methods=METHODS, data_path="mydata",\n'
                  f'         per_method=True)'),
         ("markdown", f"Run {same} on the folder:"),
@@ -1204,7 +1241,7 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 |---|---|
 | `env.install` refuses on macOS or Windows | methods run only on Linux: use Colab or a Linux machine |
 | a method needs an NVIDIA GPU | choose a GPU runtime on Colab, or a machine with a GPU |
-| a method fails on a small dataset | `mtb.scan` names what the method needs from the data's size in its `caveat` column |
+| a method fails on a small dataset | `mtb.scan` without `per_method=True` names what the method needs from the data's size in its `caveat` column |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
 | a method times out | raise `timeout=` in `run_all` |

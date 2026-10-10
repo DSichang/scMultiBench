@@ -74,18 +74,26 @@ EXAMPLE, READ, EXPORT, CHECK, RUN = 2, 4, 6, 8, 10
 
 RECIPES = "https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-"
 LINKS = {"10x-h5": "a 10x `.h5` file", "labels-csv": "labels in a CSV file",
-         "no-labels": "no labels", "donors": "another number of donors"}
+         "no-labels": "no labels"}
+#: the donors recipe is linked by what the reader of the category comes with:
+#: a donor or sample column, or another number of batches than the methods read
+DONORS_LINK = {"vertical": "several donors or samples", "cross": "another number of donors"}
 LINKS_OF = {"vertical": ["10x-h5", "labels-csv", "no-labels", "donors"],
             "diagonal": ["labels-csv", "no-labels"],
             "mosaic": ["10x-h5", "labels-csv", "no-labels"],
             "cross": ["10x-h5", "labels-csv", "no-labels", "donors"]}
 
+#: what a vertical tutorial says on donors: in the visible text of the first
+#: cell, and in its collapsed block
 BATCH_ADVICE = (
-    "Keep several samples or donors in one folder, without `batch=` in `export_dataset`. "
-    "To score how well they mix, give `run_all` the column itself: "
-    "`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The values are matched to the cells "
-    "by barcode, and every cell needs a donor. A column name alone is not enough there, "
-    "because `run_all` reads the folder and the folder holds no `obs` columns.")
+    "Several donors or samples in the file? Keep them in one folder, without `batch=` in "
+    "`export_dataset`, and give `run_all` the column itself: "
+    "`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The summary then has the scores for how "
+    "well they mix.")
+BATCH_ADVICE_COLLAPSED = (
+    "The donors that `run_all` gets as `batch=` are matched to the cells by barcode, and "
+    "every cell needs a donor. A column name alone is not enough there, because `run_all` "
+    "reads the folder and the folder holds no `obs` columns.")
 
 
 def _cells(key):
@@ -107,6 +115,17 @@ def _sources(key):
     section = _section(key)
     assert [kind for kind, _ in section] == KINDS, key
     return [src for _, src in section]
+
+
+def _visible(src):
+    """A markdown cell without its collapsed block."""
+    return re.sub(r"<details>.*?</details>", "", src, flags=re.S)
+
+
+def _collapsed(src):
+    """The collapsed block of a markdown cell that has one."""
+    (block,) = re.findall(r"<details>.*?</details>", src, flags=re.S)
+    return block
 
 
 def _run_cell(src, ns):
@@ -238,7 +257,8 @@ def test_recipe_links(key):
     cat = GEN.TASKS[key]["cat"]
     first = _sources(key)[0]
     visible = re.sub(r"<details>.*?</details>", "", first, flags=re.S)
-    links = [f"[{LINKS[a]}]({RECIPES}{a})" for a in LINKS_OF[cat]]
+    text = {**LINKS, "donors": DONORS_LINK.get(cat)}
+    links = [f"[{text[a]}]({RECIPES}{a})" for a in LINKS_OF[cat]]
     assert (f"Starting from something else? See the recipes for "
             f"{GEN.and_list(links)}.") in visible
     assert re.findall(r"#(recipe-[a-z0-9-]+)", first) == [f"recipe-{a}" for a in LINKS_OF[cat]]
@@ -569,6 +589,8 @@ def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, m
 def test_the_batch_sentence_uses_a_variable_of_the_notebook(key):
     """The vertical tutorials say how to score samples or donors, with a call
     a reader can copy: the object in it is one the read cell assigns. The
+    call is in the visible text, in a paragraph of its own before the
+    recipes, and the collapsed block says how the values are matched. The
     other tutorials do not bring a donor column up."""
     src = _sources(key)
     everything = "\n".join(s for _, s in _cells(key))
@@ -576,7 +598,10 @@ def test_the_batch_sentence_uses_a_variable_of_the_notebook(key):
         assert '.obs["donor"]' not in everything
         return
     (obj,) = re.findall(r'batch=(\w+)\.obs\["donor"\]', everything)
-    assert BATCH_ADVICE.format(obj=obj) in src[0]
+    assert (f"\n\n{BATCH_ADVICE.format(obj=obj)}\n\nStarting from something else?"
+            in _visible(src[0]))
+    assert f"\n\n{BATCH_ADVICE_COLLAPSED}\n\n" in _collapsed(src[0])
+    assert "Keep several samples or donors" not in everything
     assigned = [n.targets[0].id for n in ast.walk(ast.parse(src[READ]))
                 if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)]
     assert obj in assigned
@@ -612,6 +637,41 @@ def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
         eval(call, ns)
 
 
+@pytest.mark.parametrize("key", VERTICAL)
+def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
+        key, linux, tmp_path, monkeypatch):
+    """A reader whose file has a donor column finds what to do with it before
+    the cells, and the link to the recipe names that case. The run cell with
+    the argument of the sentence gives the scores that say how well the
+    donors mix, as the sentence says. The run cell as it is gives none
+    (``test_one_name_drives_the_three_cells``, on the RNA + ADT folder)."""
+    from multibench.eval import scib as escib
+    _on_disk(key)
+    # the probe of scib's helper binary itself, not an answer in its cache
+    monkeypatch.setattr(escib, "_lisi_helper_problem", escib._lisi_helper_problem.__wrapped__)
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    visible = _visible(src[0])
+    (arg,) = re.findall(r'`mtb\.run_all\(\.\.\., (batch=\w+\.obs\["donor"\])\)`', visible)
+    obj = arg[len("batch="):].split(".")[0]
+    assert BATCH_ADVICE.format(obj=obj) in visible
+    assert visible.rstrip().endswith(f"and [several donors or samples]({RECIPES}donors).")
+    _run_cell(src[EXAMPLE], ns)
+    _run_cell(src[READ], ns)
+    ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
+    _run_cell(src[EXPORT], ns)                 # without batch=, as the sentence says
+    # the "..." of the sentence are the arguments of the run cell
+    last = '                   out_dir="out/" + NAME)\n'
+    assert src[RUN].count(last) == 1 and "batch=" not in src[RUN]
+    _run_cell(src[RUN].replace(last, last.replace(")\n", f",\n                   {arg})\n")), ns)
+    summary = ns["mine"].summary
+    assert sorted(summary["method"]) == sorted(GEN.TASKS[key]["methods"])
+    assert set(summary["status"]) == {"CHAIN_OK"}
+    assert summary[["ARI", "ASW_batch", "GC"]].notna().all().all()
+    # iLISI is a number wherever scib's helper binary runs
+    assert summary["iLISI"].notna().all() == (escib._lisi_helper_problem() is None)
+
+
 def test_the_command_line_of_the_diagonal_tutorial_writes_the_same_folder(tmp_path, monkeypatch):
     """The collapsed block of the diagonal tutorial gives a command line and
     says that it writes the same folder from the two files."""
@@ -634,6 +694,298 @@ def test_the_command_line_of_the_diagonal_tutorial_writes_the_same_folder(tmp_pa
     assert _content(Path("mydata") / NAMES[key]) == by_cell
 
 
+# ------------------------------------------------- the sentences above the cells
+READ_ONE = ("Read your file. For your own data, change the file name marked `# <-`. On Colab, "
+            "upload the file first: click the folder icon on the left, then the upload icon.")
+READ_SEVERAL = ("Read your files. For your own data, change every file name marked `# <-`. A "
+                "name that you leave is read from the example. On Colab, upload the files "
+                "first: click the folder icon on the left, then the upload icon.")
+READS_H5AD = (" The cell reads `.h5ad` files. A 10x `.h5` file is read another way: see the "
+              "recipe for a 10x `.h5` file, linked at the top of this section.")
+
+WRITE = ("Write the dataset folder. Change each name in quotes marked `# <-`: give `NAME` a new "
+         "value, and write the names that your {files} for the other parts. The printout above "
+         "lists the names in {printed}. Write a name listed after `obs:` with that prefix, as "
+         "`\"obs:celltype\"`{obsm}.")
+WRITE_OBSM = ", and one after `obsm:` as `\"obsm:protein\"`"
+#: what the sentence adds where the cell writes batches, by category or by tutorial
+WRITE_BATCHES = {
+    "mosaic": " Each call writes one batch.",
+    "diagonal_multi": (" The loop writes one RNA batch and one ATAC batch per call, and "
+                       "`n_batches` says how many batches the data has."),
+    "cross": (" When the folder holds batches that your data does not have, `export_dataset` "
+              "stops and names the files. A new value of `NAME` avoids that."),
+}
+
+CHECK_TEXT = ("Check the folder before you run anything. `runnable` says whether a method can "
+              "run on your data on this computer, and `reason` says why not. The first two "
+              "lines above the table say what the folder holds and how many cells each file "
+              "has. Compare them with your data.")
+CHECK_TWO_NAMES = (" `atac.h5` and `atac_peak.h5` are one matrix under two names. Diagonal "
+                   "methods read the second.")
+CHECK_FURTHER = (" A further line is about one method: why it cannot run, or what it does not "
+                 "read or needs from your data.")
+CHECK_CROSS = (" With fewer batches than the methods read, such a line names the files that "
+               "are not there. With more, it says which batches are not used.")
+#: the tutorials whose folder holds the ATAC peaks under two names
+TWO_ATAC_NAMES = {"vertical_rna_atac", "vertical_rna_adt_atac"}
+
+SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` without `per_method=True` "
+                     "names what the method needs from the data's size in its `caveat` column |")
+WRONG_NAME = ("A wrong name after `obsm:`, `layer:` or `obs:` raises an error that lists the "
+              "names the file has.")
+
+
+def _tenx_file(path, n_cells=30):
+    """A file in the layout of Cell Ranger's ``filtered_feature_bc_matrix.h5``:
+    features x barcodes, sparse, with a type per feature."""
+    import scipy.sparse as sp
+    types = ["Gene Expression"] * 30 + ["Peaks"] * 10
+    m = sp.csc_matrix(np.random.default_rng(0).poisson(0.6, (len(types), n_cells))
+                      .astype(np.int32))
+    with h5py.File(path, "w") as f:
+        g = f.create_group("matrix")
+        g.create_dataset("barcodes", data=np.array([f"BC{i}-1" for i in range(n_cells)],
+                                                   dtype="S"))
+        for name in ("data", "indices", "indptr"):
+            g.create_dataset(name, data=getattr(m, name))
+        g.create_dataset("shape", data=np.array(m.shape, dtype=np.int32))
+        ft = g.create_group("features")
+        ft.create_dataset("_all_tag_keys", data=np.array(["genome"], dtype="S"))
+        ft.create_dataset("feature_type", data=np.array(types, dtype="S"))
+        ft.create_dataset("genome", data=np.array(["GRCh38"] * len(types), dtype="S"))
+        ft.create_dataset("id", data=np.array([f"ID{i}" for i in range(len(types))], dtype="S"))
+        ft.create_dataset("name", data=np.array([f"F{i}" for i in range(len(types))], dtype="S"))
+
+
+def test_the_read_sentence_sends_a_10x_file_to_its_recipe(tmp_path):
+    """The read cell calls ``read_h5ad``, which does not read a 10x ``.h5``
+    file. Where the first cell links the recipe for that file, the sentence
+    above the read cell says what the cell reads and points to the link. The
+    sentence itself links nothing: each recipe is linked once."""
+    import scanpy as sc
+    for key in KEYS:
+        cat = GEN.TASKS[key]["cat"]
+        src = _sources(key)
+        tenx = "10x-h5" in LINKS_OF[cat]
+        assert tenx == ("10x" in GEN.RECIPES_OF[cat]) == (cat != "diagonal")
+        n = len(EXAMPLES[GEN.TASKS[key]["ds"]])
+        assert src[READ - 1] == (READ_ONE if n == 1 else READ_SEVERAL) + (READS_H5AD if tenx
+                                                                         else ""), key
+        assert (f"[a 10x `.h5` file]({RECIPES}10x-h5)" in _visible(src[0])) == tenx
+        assert "](" not in src[READ - 1]
+        assert re.findall(r'read_h5ad\("\w+(\.\w+)"\)', src[READ]) == [".h5ad"] * n
+    path = tmp_path / "filtered_feature_bc_matrix.h5"
+    _tenx_file(path)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        # scanpy reads the file as the recipe does, so it is a 10x file
+        assert sc.read_10x_h5(path, gex_only=False).shape == (30, 40)
+        # the class and the text of the error are anndata's
+        with pytest.raises(Exception) as e:
+            ad.read_h5ad(path)
+    assert not isinstance(e.value, (FileNotFoundError, ImportError)), e.value
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_the_write_sentence_speaks_of_the_file_that_was_read(key, tmp_path, monkeypatch, capsys):
+    """The sentence above the export cell says where the names to write are:
+    in the printout of the read cell, which lists the names of the files
+    that were read. It counts the files that the cell shows, and it names
+    ``obsm:`` where the export cell takes a matrix from there. The names it
+    quotes are those the printout shows for the example."""
+    ds = _on_disk(key)
+    assert "the names of the example" not in "\n".join(s for _, s in _cells(key))
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    _run_cell(src[EXAMPLE], ns)
+    capsys.readouterr()
+    shown = _run_cell(src[READ], ns)
+    printout = capsys.readouterr().out + ("" if shown is None else repr(shown))
+    n_read, n_shown = len(EXAMPLES[ds]), printout.count("AnnData object with n_obs")
+    assert n_shown == min(n_read, 2)
+    printed = ("your file" if n_read == 1 else "your files" if n_shown == n_read else
+               "two of your files. The other files need the same names")
+    obsm = '"obsm:' in src[EXPORT]
+    assert src[EXPORT - 1] == WRITE.format(
+        files="file uses" if n_read == 1 else "files use", printed=printed,
+        obsm=WRITE_OBSM if obsm else "") + WRITE_BATCHES.get(
+            key, WRITE_BATCHES.get(GEN.TASKS[key]["cat"], "")), key
+    lines = [ln.strip() for ln in printout.splitlines()]
+    listed = [ln for ln in lines if ln.startswith("obs: ")]
+    assert len(listed) == n_shown and all(ln.startswith("obs: 'celltype'") for ln in listed)
+    assert [ln for ln in lines if ln.startswith("obsm: ")] == (["obsm: 'protein'"] if obsm
+                                                                else [])
+    assert ('"obs:celltype"' in src[EXPORT]) and (obsm == ('"obsm:protein"' in src[EXPORT]))
+    if key != "vertical_rna_adt":
+        return
+    # a file of the reader: the printout is that of the file, with its names
+    rng = np.random.default_rng(0)
+    theirs = ad.AnnData(X=rng.poisson(1.0, (50, 30)).astype(np.float32))
+    theirs.obs["celltype.l1"] = rng.choice(["T", "B"], 50)
+    theirs.obsm["protein_expression"] = pd.DataFrame(
+        rng.poisson(3.0, (50, 6)).astype(np.float32), index=theirs.obs_names,
+        columns=[f"CD{i}" for i in range(6)])
+    theirs.write_h5ad("my_citeseq.h5ad")
+    assert src[READ].count('"my_file.h5ad"') == 1
+    shown = _run_cell(src[READ].replace('"my_file.h5ad"', '"my_citeseq.h5ad"'), ns)
+    lines = [ln.strip() for ln in repr(shown).splitlines()]
+    assert "obs: 'celltype.l1'" in lines and "obsm: 'protein_expression'" in lines
+    # written as the sentence says, the two names give the folder
+    export = _renamed(src[EXPORT], key, "THEIRS")
+    for old, new in (('"obs:celltype"', '"obs:celltype.l1"'),
+                     ('"obsm:protein"', '"obsm:protein_expression"')):
+        assert export.count(old) == 1
+        export = export.replace(old, new)
+    _run_cell(export, ns)
+    assert sorted(p.name for p in (Path("mydata") / "THEIRS").iterdir()) == [
+        "adt.h5", "cty.csv", "rna.h5"]
+
+
+def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatch, capsys):
+    """The check prints two lines on the folder and then a line for each
+    method that cannot run or that leaves part of the folder out. The
+    sentence above the cell says what the first two are and what a further
+    line is. In a cross tutorial it says what such a line holds for fewer
+    and for more batches than the methods read, the two cases that the first
+    cell of the section announces."""
+    for key in KEYS:
+        cat = GEN.TASKS[key]["cat"]
+        assert _sources(key)[CHECK - 1] == (
+            CHECK_TEXT + (CHECK_TWO_NAMES if key in TWO_ATAC_NAMES else "") + CHECK_FURTHER
+            + (CHECK_CROSS if cat == "cross" else "")), key
+        assert "The two lines above" not in "\n".join(s for _, s in _cells(key))
+    key = "cross_rna_adt"
+    _on_disk(key)
+    assert CROSS_BATCHES[key].startswith("The methods of this task read three batches")
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    _run_cell(src[EXAMPLE], ns)
+    _run_cell(src[READ], ns)
+    every = ns["adata"]
+    donor = every.obs["batch"].astype(str).to_numpy()
+    assert sorted(set(donor)) == ["1", "2", "3"]
+
+    # two donors: the methods lack the files of the third batch
+    ns["adata"] = every[donor != "3"].copy()
+    _run_cell(_renamed(src[EXPORT], key, "TWO"), ns)
+    capsys.readouterr()
+    table = _run_cell(src[CHECK], ns)
+    n1, n2 = (format(int((donor == d).sum()), ",") for d in ("1", "2"))
+    assert capsys.readouterr().out.splitlines() == [
+        "[scan] 0 of 2 methods have their input files in TWO. 0 of 2 can run on this computer. "
+        "TWO holds RNA and ADT, in batches 1-2.",
+        f"[scan] Cells per file: rna1.h5 {n1}, adt1.h5 {n1}, rna2.h5 {n2}, adt2.h5 {n2}.",
+        "[scan] StabMap: rna3.h5, adt3.h5 are missing.",
+        "[scan] sciPENN: rna3.h5, adt3.h5 are missing."]
+    assert table.to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [False] * 2,
+                                     "reason": ["rna3.h5, adt3.h5 are missing."] * 2}
+
+    # five donors: the methods run, and leave two batches out
+    five = every.copy()
+    donor = donor.copy()
+    donor[3::5], donor[4::5] = "4", "5"
+    five.obs["batch"] = donor
+    ns["adata"] = five
+    _run_cell(_renamed(src[EXPORT], key, "FIVE"), ns)
+    capsys.readouterr()
+    table = _run_cell(src[CHECK], ns)
+    n = [format(int((donor == d).sum()), ",") for d in "1234"]
+    assert capsys.readouterr().out.splitlines() == [
+        "[scan] 2 of 2 methods have their input files in FIVE. 2 of 2 can run on this computer. "
+        "FIVE holds RNA and ADT, in batches 1-5.",
+        "[scan] Cells per file: " + ", ".join(f"rna{i}.h5 {c}, adt{i}.h5 {c}"
+                                              for i, c in enumerate(n, 1)) + " and 2 more.",
+        "[scan] StabMap reads batches 1-3 of 5. Batches 4-5 are not used.",
+        "[scan] sciPENN reads batches 1-3 of 5. Batches 4-5 are not used."]
+    assert table.to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [True] * 2,
+                                     "reason": [""] * 2}
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_the_check_names_the_two_atac_files(key, tmp_path, monkeypatch, capsys):
+    """Without a category, the export writes the ATAC peaks as ``atac.h5``
+    and as ``atac_peak.h5``. The second line of the check lists both, under a
+    sentence that asks the reader to compare the files with their data, so
+    the sentence says that the two are one matrix. It is there exactly where
+    the folder holds both."""
+    _on_disk(key)
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    for i in (EXAMPLE, READ, EXPORT):
+        _run_cell(src[i], ns)
+    table = _run_cell(src[CHECK], ns)
+    capsys.readouterr()
+    cells = table.attrs["cells"]
+    both = {"atac.h5", "atac_peak.h5"} <= set(cells)
+    assert both == (key in TWO_ATAC_NAMES) == (CHECK_TWO_NAMES in src[CHECK - 1])
+    assert ("atac_peak.h5" in src[CHECK - 1]) == both
+    if both:
+        content = _content(Path("mydata") / NAMES[key])
+        assert cells["atac.h5"] == cells["atac_peak.h5"] > 0
+        assert content["atac.h5"] == content["atac_peak.h5"]
+        # "Diagonal methods read the second": none of them reads a file named atac.h5
+        roles = {r for m in mtb.list_methods(category="diagonal")
+                 for v in mtb.method_info(m)["supports"] if v["category"] == "diagonal"
+                 for r in v["modalities"] if r.startswith("atac")}
+        assert "atac_peak" in roles and not [r for r in roles if re.fullmatch(r"atac\d*", r)]
+
+
+def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monkeypatch,
+                                                                  capsys):
+    """The Troubleshooting row sends a reader to the ``caveat`` column of
+    ``scan``. The check cell of the tutorial has no such column, so the row
+    names the call that has it: the same one without ``per_method=True``."""
+    for key in KEYS:
+        rows = [ln for _, s in _cells(key) for ln in s.splitlines()
+                if ln.startswith("| a method fails on a small dataset |")]
+        assert rows == [SMALL_DATASET_ROW], key
+    key = "diagonal_rna_atac"
+    _on_disk(key)
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    for i in (EXAMPLE, READ, EXPORT):
+        _run_cell(src[i], ns)
+    assert list(_run_cell(src[CHECK], ns).columns) == ["method", "runnable", "reason"]
+    flag = ",\n         per_method=True)"
+    assert src[CHECK].count(flag) == 1
+    full = _run_cell(src[CHECK].replace(flag, ")"), ns)
+    capsys.readouterr()
+    needs = "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
+    assert needs in [v.size_hint for v in registry.get("online_iNMF").variants]
+    row = full[(full["method"] == "online_iNMF") & (full["modalities"] == "rna+atac_gas")]
+    assert len(row) == 1 and row["caveat"].iloc[0].startswith(needs)
+
+
+def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):
+    """The collapsed block says that a wrong name after one of the three
+    prefixes raises an error that lists the names the file has. Each of the
+    three does, and the refused call writes nothing."""
+    for key in KEYS:
+        everything = "\n".join(s for _, s in _cells(key))
+        assert _collapsed(_sources(key)[0]).count(WRONG_NAME) == 1, key
+        assert everything.count("A wrong name") == 1, key
+    key = "vertical_rna_adt"
+    _on_disk(key)
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    _run_cell(src[EXAMPLE], ns)
+    _run_cell(src[READ], ns)
+    ns["adata"].layers["counts"] = ns["adata"].X.copy()
+    for old, new, message in [
+            ('adt="obsm:protein"', 'adt="obsm:nope"',
+             "obsm key 'nope' not found; available: ['protein']"),
+            ('rna="X"', 'rna="layer:nope"', "layer 'nope' not found; available: ['counts']"),
+            ('labels="obs:celltype"', 'labels="obs:nope"',
+             "labels='obs:nope': column 'nope' not in obs: searched data.obs; available: "
+             "['celltype']")]:
+        assert src[EXPORT].count(old) == 1
+        with pytest.raises(KeyError) as e:
+            _run_cell(src[EXPORT].replace(old, new), ns)
+        assert e.value.args[0] == message
+        assert not Path("mydata").exists()
+
+
 # ------------------------------------------------------ the generator's checks
 CROSS_BATCHES = {
     "cross_rna_adt": "The methods of this task read three batches, and UINMF also reads two.",
@@ -644,8 +996,10 @@ CROSS_BATCHES = {
 
 
 def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
-    """Each cross tutorial says how many batches its methods read. The
-    generator counts them in the modalities of the task's variants."""
+    """Each cross tutorial says how many batches its methods read, in the
+    visible text: a reader with two or five donors sees the number before
+    the cells. The generator counts the batches in the modalities of the
+    task's variants."""
     assert set(CROSS_BATCHES) == {k for k in KEYS if GEN.TASKS[k]["cat"] == "cross"}
     for key in KEYS:
         first = _sources(key)[0]
@@ -655,6 +1009,9 @@ def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
         sentence = (f"{CROSS_BATCHES[key]} The recipe for another number of donors covers "
                     f"the other cases.")
         assert GEN.cross_batches_sentence(key) == sentence and sentence in first
+        # a paragraph of its own before the recipes, and not in the collapsed block
+        assert f"\n\n{sentence}\n\nStarting from something else?" in _visible(first)
+        assert "The methods of this task read" not in _collapsed(first)
         counts = {m: set() for m in GEN.task_methods(key)}
         for m, v in GEN.task_variants(key):
             counts[m].add(max(int(r[-1]) for r in v.when["modalities"]))
