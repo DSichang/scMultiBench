@@ -500,7 +500,7 @@ def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, caps
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out", data_path=root,
-                 evaluate=False)
+                 evaluate=False, modalities="all")
     log = capsys.readouterr().out
     m = re.search(r"^\[run_all\] (\d+) more rows need files this folder does not "
                   r"have\. mtb\.scan shows them\.$", log, re.M)
@@ -514,7 +514,7 @@ def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
         tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
     res = _quiet(mtb.run_all, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
-                 evaluate=False)
+                 evaluate=False, modalities="all")
     log = capsys.readouterr().out
     assert [r["status"] for r in res.records] == ["RUN_OK"]
     assert res.failures.empty

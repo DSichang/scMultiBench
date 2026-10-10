@@ -348,7 +348,7 @@ def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, cap
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path)])
     err = capsys.readouterr().err
     assert rc == 1 and "No method can run on D11 (vertical)." in err
-    assert "multibench scan D11 --category vertical shows every row" in err
+    assert "multibench scan D11 --category vertical shows the listed rows" in err
     assert "multibench env doctor checks the environments" in err
     assert "`" not in err
     assert "mtb.scan(" not in err and "mtb.env.doctor()" not in err
@@ -360,7 +360,8 @@ def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, cap
 
 def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=str(tmp_path), verbose=False)
+        mtb.run_all("D11", "vertical", out_dir=str(tmp_path), verbose=False,
+                    modalities="all")
     body = str(e.value).split("blocked rows:\n", 1)[1]
     lines = [l for l in body.splitlines() if l.startswith("  ")]
     # D11 is CITE-seq: the rna+adt rows have their files; MIRA (rna+atac) does not

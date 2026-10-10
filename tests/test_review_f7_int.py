@@ -42,12 +42,12 @@ def test_scan_summary_names_doctor_on_linux_when_an_environment_is_missing(monke
                                                                             capsys):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    mtb.scan("D11", "vertical")
+    mtb.scan("D11", "vertical", modalities="all")
     line = capsys.readouterr().out.strip()
     assert line.startswith("[scan] ") and line.endswith(
         " have their environment installed. mtb.env.doctor() checks the environments."), line
     monkeypatch.setattr(config, "_CLI", True)
-    mtb.scan("D11", "vertical")
+    mtb.scan("D11", "vertical", modalities="all")
     assert capsys.readouterr().out.strip().endswith(
         "multibench env doctor checks the environments.")
     # every environment installed: nothing to check

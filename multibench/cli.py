@@ -69,6 +69,13 @@ def _csv_list(s) -> list[str] | None:
     return [x.strip() for x in str(s).split(",") if x.strip()]
 
 
+def _modalities_arg(value):
+    """``--modalities`` as ``mtb.scan`` and ``mtb.run_all`` take it: the list
+    of tokens, or ``"all"`` (every combination) for the one token ``all``."""
+    tokens = _csv_list(value)
+    return "all" if tokens == ["all"] else tokens
+
+
 _TRI = {None: None, "true": True, "false": False}
 
 
@@ -343,14 +350,17 @@ def _cmd_scan(args) -> int:
     Whatever columns ``scan`` returns are printed (no hard-coded list); use
     ``--columns`` to pick some and ``--format csv`` to pipe into other tools.
     ``--category`` is optional, exactly as in ``mtb.scan(dataset)``: without
-    it every category is scanned.
+    it every category is scanned. ``--modalities all`` is
+    ``modalities="all"``. When rows are not listed because the folder does
+    not hold their modalities, one ``# ...`` line on stderr says so, after
+    the table and after the ``--strict`` error.
     """
     import multibench
     from .engine import registry
     methods = _csv_list(args.methods)
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
-    kw = dict(data_path=args.data_path, modalities=_csv_list(args.modalities),
+    kw = dict(data_path=args.data_path, modalities=_modalities_arg(args.modalities),
               verbose=False, assume_gpu=getattr(args, "assume_gpu", False),
               allow_atac_mismatch=getattr(args, "allow_atac_mismatch", False))
     # a named method with no variant here raises ValueError with its reason
@@ -358,12 +368,18 @@ def _cmd_scan(args) -> int:
     shown = _strict_table(df) if getattr(args, "strict", False) else df
     _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
                  compact=_compact_plan_columns(df))
+    # the rows not listed, after the table and after the --strict error
+    from .workflow import _scan_note
+    note = _scan_note(df, args.dataset, args.data_path)
+    code = _EXIT_OK
     if getattr(args, "strict", False):
         problem = _strict_problem(df, methods)
         if problem:
             print(f"error: --strict: {problem}", file=sys.stderr)
-            return _EXIT_ERROR
-    return _EXIT_OK
+            code = _EXIT_ERROR
+    if note:
+        print(f"# {note}", file=sys.stderr)
+    return code
 
 
 #: The reason ``scan --strict`` prints for a row blocked only by the method scripts.
@@ -503,7 +519,7 @@ def _cmd_layout(args) -> int:
 
 
 _EXPORT_FLAGS = ("rna", "adt", "atac", "atac_kind", "labels", "batch", "batch_index",
-                 "atac_from")
+                 "atac_from", "n_batches")
 
 #: The recipes of ``multibench convert --help``: a feature filter, unpaired
 #: RNA and ATAC, and a D46-shaped mosaic folder (batch 1 RNA+ADT, batch 2
@@ -618,6 +634,9 @@ def _cmd_convert(args) -> int:
             if batch_index < 1:
                 _usage_error(args, f"--batch-index counts from 1, got {batch_index}")
             extra["batch_index"] = batch_index
+        if getattr(args, "n_batches", None) is not None:
+            # export_dataset checks it against --batch-index
+            extra["n_batches"] = args.n_batches
         atac = args.atac
         if args.atac_from is not None:
             if category != "diagonal":
@@ -1170,7 +1189,10 @@ def _cmd_run_all(args) -> int:
     ``--out-dir`` is optional with ``--dry-run`` only: the commands then show
     the ``<out_dir>`` placeholder, as ``run_all(dry_run=True)`` does.
     ``--batch CSV`` becomes ``run_all(batch=CSV)``; a missing file exits 1
-    before any method runs, and ``--dry-run`` reads the file as a check.
+    before any method runs, and ``--dry-run`` reads the file as a check. A
+    value that can only be the name of an obs column exits 1 with what to
+    pass. With ``--dry-run``, the rows that are not listed get one ``# ...``
+    line after the header, as in ``multibench scan``.
     ``--batch-column NAME`` reads that column of the file (:func:`_batch_arg`).
     A finished run with a non-empty ``failures`` exits 3 (``_EXIT_METHOD_FAILED``)
     after saving; the Python ``run_all`` does not raise.
@@ -1191,21 +1213,27 @@ def _run_all_command(args, stack) -> int:
     if getattr(args, "assume_gpu", False) and not args.dry_run:
         _usage_error(args, "--assume-gpu applies to --dry-run only; a real run checks "
                            "this host's GPU")
+    from .eval import io as eio
+    if eio._names_no_file(getattr(args, "batch", None)):
+        # the name of an obs column: a dataset folder holds none
+        from .workflow import _column_name_error
+        raise FileNotFoundError(_column_name_error("batch", args.batch))
     batch = _batch_arg(args, stack)
     batch_vec = None
     if batch is not None:
-        from .eval import io as eio
         eio._require_file(batch, "--batch file")   # exit 1 before any method runs
         if args.dry_run:
             from .workflow import _batch_vector
             # a file it cannot read, or ids that are not cells of the dataset, fail
             batch_vec = _batch_vector(batch, args.dataset, args.data_path)
     if args.dry_run:
-        from .workflow import _batch_length_problem, _dry_run_notes, _scripts_ref_note
+        from .workflow import (_batch_length_problem, _dry_run_notes, _scan_note,
+                               _scripts_ref_note)
+        modalities = _modalities_arg(args.modalities)
         with _quiet_stdout():
             df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
                                     methods=_csv_list(args.methods),
-                                    modalities=_csv_list(args.modalities),
+                                    modalities=modalities,
                                     data_path=args.data_path, params=params,
                                     dry_run=True, verbose=False,
                                     assume_gpu=getattr(args, "assume_gpu", False),
@@ -1217,11 +1245,14 @@ def _run_all_command(args, stack) -> int:
               f"can run on {args.dataset} ({args.category}). The commands below are what "
               f"multibench run would execute. A {_rows_word(df, 1)} whose input files "
               f"are missing has no command.", file=sys.stderr)
+        note = _scan_note(df, args.dataset, args.data_path)
+        if note:                            # the rows the plan does not list
+            print(f"# {note}", file=sys.stderr)
         wrong_ref = _scripts_ref_note()     # every row also carries it as its reason
         if wrong_ref:
             print(f"# {wrong_ref}", file=sys.stderr)
         # the caveats of the rows the sweep would run: the compact table clips them
-        scripts, lines = _dry_run_notes(df, _csv_list(args.modalities))
+        scripts, lines = _dry_run_notes(df, None if modalities == "all" else modalities)
         if scripts:
             print(f"# {scripts}", file=sys.stderr)
         for _m, cav in lines:              # each caveat starts with its method
@@ -1253,7 +1284,7 @@ def _run_all_command(args, stack) -> int:
     with _quiet_stdout(), _leiden_flavor(getattr(args, "leiden_flavor", None)):
         res = multibench.run_all(args.dataset, args.category, out_dir=args.out,
                                methods=_csv_list(args.methods),
-                               modalities=_csv_list(args.modalities),
+                               modalities=_modalities_arg(args.modalities),
                                data_path=args.data_path, params=params,
                                evaluate=not args.no_evaluate, dry_run=False,
                                timeout=args.timeout, skip_existing=args.skip_existing,
@@ -1428,7 +1459,8 @@ def _evaluate_labels(args, stack):
             # the file keeps its name: evaluate's errors name the files typed
             out = tmp / str(i) / Path(f).name
             out.parent.mkdir()
-            vals, first = eio.read_labels_ids(f, args.column)
+            # as the file writes them: a message names the word for a missing label
+            vals, first = eio.read_labels_ids(f, args.column, as_written=True)
             cols = {"x": vals} if first is None else {"id": first.to_numpy(), "x": vals}
             pd.DataFrame(cols).to_csv(out, index=False, sep=eio._sep_for(out))
             picked.append(str(out))
@@ -1613,7 +1645,7 @@ def _cmd_evaluate(args) -> int:
         batch = _batch_arg(args, stack)
         labels = _evaluate_labels(args, stack)
         kw = dict(category=args.category, labels=labels, clustering=args.cluster,
-                  batch=batch)
+                  batch=batch, missing_labels=args.missing_labels)
         if args.obsm is not None:
             kw["obsm"] = args.obsm
         # labels read from --dataset: a count error names that dataset's files
@@ -2214,7 +2246,9 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--modalities", help="comma-separated modality roles to restrict the "
                                          "variants to, e.g. rna,adt. protein is accepted "
                                          "for adt. atac_peak and atac_gas select by what "
-                                         "the method reads")
+                                         "the method reads. Default: the combinations "
+                                         "whose modalities the folder holds. all lists "
+                                         "every combination")
     ps.add_argument("--columns", help="comma-separated columns to print, in this order, "
                                       "or 'all'. Default: the main columns for table "
                                       "output, all for csv, tsv and json. An unknown "
@@ -2304,9 +2338,13 @@ def build_parser() -> argparse.ArgumentParser:
                          "With --category diagonal: rna<N>.h5, atac_gas<N>.h5 or "
                          "atac_peak<N>.h5, rna_cty<N>.csv and atac_cty<N>.csv. "
                          "One call per batch file. Python: batch_index=N")
+    pc.add_argument("--n-batches", dest="n_batches", type=int, metavar="N",
+                    help="mode 2, with --batch-index: how many batches the dataset "
+                         "has. Files of a higher batch number in OUT are refused")
     pc.add_argument("--overwrite", action="store_true",
                     help="mode 2: replace files already in OUT (default: refuse and "
-                         "list them)")
+                         "list them). Files of other data that the call does not "
+                         "write are refused either way")
     pc.add_argument("--dtype", default="float64",
                     help="stored dtype of matrix/data. Default float64, like the "
                          "shipped files. float32 halves the size")
@@ -2447,7 +2485,9 @@ def build_parser() -> argparse.ArgumentParser:
                                                        "runnable method)")
     pra.add_argument("--modalities", help="comma-separated modalities to restrict the "
                                           "method variants to, e.g. rna,adt; atac_peak "
-                                          "and atac_gas select by what the method reads")
+                                          "and atac_gas select by what the method reads. "
+                                          "Default: the combinations whose modalities "
+                                          "the folder holds. all lists every combination")
     pra.add_argument("--data-path", dest="data_path",
                      help="folder that contains the dataset folder (default: shown "
                           "by multibench config)")
@@ -2545,6 +2585,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Leiden backend of the clustering sweep (default: shown by "
                          "multibench config). leidenalg matches both stored tables, "
                          "published and re-run")
+    pe.add_argument("--missing-labels", dest="missing_labels", choices=["error", "drop"],
+                    default="error",
+                    help="what to do when a label is missing. error (default) stops. "
+                         "drop scores the labelled cells only and says how many")
     pe.add_argument("--only", help=argparse.SUPPRESS)     # deprecated spelling of --metrics
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
                                    "embedding (default X_emb; 'X' = .X)")

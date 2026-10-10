@@ -358,7 +358,7 @@ def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
 
 
 def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
-    msg = _nothing_runnable(methods=["Matilda", "totalVI"])
+    msg = _nothing_runnable(methods=["Matilda", "totalVI"], modalities="all")
     lines = msg.splitlines()
     assert lines[0] == ("None of the requested methods (Matilda, totalVI) can run on "
                         "MYDATA (vertical).")
@@ -369,14 +369,15 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
     assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
                         "which is not in the folder.")
     assert lines[5].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
-                               "methods=['Matilda', 'totalVI']) shows these rows.")
+                               "methods=['Matilda', 'totalVI'], modalities=\"all\") "
+                               "shows these rows.")
     assert "not on this computer" not in msg
 
 
 def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monkeypatch):
     # the review of round 8: rows whose files MYDATA lacks are counted, not listed
-    msg = _nothing_runnable()
-    plan = _plan()
+    msg = _nothing_runnable(modalities="all")
+    plan = _plan(modalities="all")
     lacking = int((~plan["files_ok"]).sum())
     have = plan[plan["files_ok"]]
     lines = msg.splitlines()
@@ -385,7 +386,7 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
     # scripts at another commit block every row: the first 3 are listed
     from multibench import config
     monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: "Wrong scripts.")
-    msg = _nothing_runnable()
+    msg = _nothing_runnable(modalities="all")
     lines = msg.splitlines()
     n = len(have)
     assert lines[2] == (f"{n} of {n} methods are also blocked by something else. "
@@ -394,8 +395,8 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
     assert [l.split(" (")[0].strip() for l in listed] == sorted(have["method"])[:3]
     assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
     assert lines[6] == f"{lacking} rows need files that MYDATA does not have."
-    assert lines[7].startswith("mtb.scan('MYDATA', 'vertical', data_path='data') shows "
-                               "every row.")
+    assert lines[7].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
+                               "modalities=\"all\") shows every row.")
 
 
 def test_a_gpu_block_is_listed_without_the_linux_sentence(macos, mydata, monkeypatch):
@@ -449,7 +450,7 @@ def test_the_dry_run_header_names_no_column(no_envs, mydata, capsys):
     assert "files_ok False" not in head
     assert head.endswith(" A method whose input files are missing has no command."), head
     rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
-                   "--methods", "Matilda", "--dry-run"])
+                   "--methods", "Matilda", "--dry-run", "--modalities", "all"])
     head = capsys.readouterr().err.splitlines()[0]
     assert head.endswith(" A row whose input files are missing has no command."), head
 

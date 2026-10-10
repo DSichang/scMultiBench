@@ -49,7 +49,7 @@ def test_short_reason_strips_exception_prefix_cell_check_opening_and_absolute_pa
 
 def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     from multibench import config
-    df = mtb.scan("D11", "vertical")
+    df = mtb.scan("D11", "vertical", modalities="all")
     blocked = df[~df["files_ok"]]
     assert len(blocked) > 0
     root = str(config.DEFAULT.data_path)

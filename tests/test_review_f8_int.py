@@ -107,15 +107,16 @@ def _nothing_runnable(dataset, category, **kw):
 
 
 def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
-    msg = _nothing_runnable("D11", "vertical")
-    plan = mtb.scan("D11", "vertical", verbose=False)
+    msg = _nothing_runnable("D11", "vertical", modalities="all")
+    plan = mtb.scan("D11", "vertical", verbose=False, modalities="all")
     lacking = int((~plan["files_ok"]).sum())
     have = len(plan) - lacking
     lines = msg.splitlines()
     assert lines[2] == f"1 of {have} methods is also blocked by something else:"
     assert lines[3].startswith("  moETM (rna+adt): moETM needs an NVIDIA GPU")
     assert lines[4] == f"{lacking} rows need files that D11 does not have."
-    assert lines[5].startswith("mtb.scan('D11', 'vertical') shows every row.")
+    assert lines[5].startswith("mtb.scan('D11', 'vertical', modalities=\"all\") shows "
+                               "every row.")
     assert "atac" not in msg
     # with modalities= the rows the folder cannot have are not in the scan
     msg = _nothing_runnable("D11", "vertical", modalities=["rna", "adt"])

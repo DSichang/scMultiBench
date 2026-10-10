@@ -30,7 +30,7 @@ def no_envs(monkeypatch):
 def test_nothing_runnable_lists_only_requested_methods(no_envs):
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused",
-                    verbose=False)
+                    verbose=False, modalities="all")
     msg = str(e.value)
     assert msg.startswith("None of the requested methods (Matilda) can run on D11 "
                           "(vertical).")
@@ -41,12 +41,13 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
     # nobody else's reason - Concerto/MIRA/MOFA2 were not requested
     for other in ("Concerto", "MIRA", "MOFA2", "scmb_concerto"):
         assert other not in msg
-    assert "mtb.scan('D11', 'vertical', methods=['Matilda'])" in msg
+    assert "mtb.scan('D11', 'vertical', methods=['Matilda'], modalities=\"all\")" in msg
 
 
 def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False)
+        mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False,
+                    modalities="all")
     msg = str(e.value)
     m = re.search(r"The first 3 of (\d+) blocked rows:\n", msg)
     assert m and int(m.group(1)) >= 10
@@ -173,7 +174,7 @@ def test_cli_run_all_dry_run_prints_commands(capsys, tmp_path, monkeypatch):
     # pins that line); this test pins the conda line on every host
     monkeypatch.setattr(envs, "env_prefix", lambda env, conda=None: None)
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path),
-                   "--dry-run", "--methods", "Matilda,scMoMaT"])
+                   "--dry-run", "--methods", "Matilda,scMoMaT", "--modalities", "all"])
     cap = capsys.readouterr()
     assert rc == 0
     assert "# Commands of the 2 rows whose input files are in place." in cap.out
@@ -185,7 +186,8 @@ def test_cli_run_all_dry_run_prints_commands(capsys, tmp_path, monkeypatch):
     assert "rna.h5" in mat and "adt.h5" in mat and "cty.csv" in mat
     # machine formats carry the same thing as a column
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path),
-                   "--dry-run", "--methods", "Matilda", "--format", "json"])
+                   "--dry-run", "--methods", "Matilda", "--format", "json",
+                   "--modalities", "all"])
     rows = json.loads(capsys.readouterr().out)
     assert rc == 0 and "command" in rows[0]
     by_mods = {r["modalities"]: r["command"] for r in rows}

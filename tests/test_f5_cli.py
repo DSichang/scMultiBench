@@ -310,17 +310,17 @@ def test_scan_env_reason_on_linux_names_the_command_without_backticks(monkeypatc
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    df = mtb.scan("D11", "vertical")
+    df = mtb.scan("D11", "vertical", modalities="all")
     out = capsys.readouterr().out
     n, k = len(df), int(df["files_ok"].sum())
     assert out == (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
                    f"environment installed. mtb.env.doctor() checks the environments.\n")
-    mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True)
+    mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, modalities="all")
     line = next(l for l in capsys.readouterr().out.splitlines() if "Dry run" in l)
     assert line.startswith(f"[run_all] Dry run: 0 of {n} requested rows can run on D11 "
                            f"(vertical). {n} are blocked. The table's reason column")
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False)
+        mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False, modalities="all")
     assert f"\nThe first 3 of {n} blocked rows:\n" in str(e.value)
     for text in (out, line, str(e.value)):
         assert "(s)" not in text and "variant" not in text

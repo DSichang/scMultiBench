@@ -121,8 +121,8 @@ def test_run_all_dry_run_uses_the_same_rule():
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D28", "diagonal"),
                                     ("D45", "mosaic"), ("D52", "cross")])
 def test_scan_rows_without_modalities_are_one_per_variant(ds, cat):
-    """No modalities= keeps every variant of the category, exactly once."""
-    df = mtb.scan(ds, cat, verbose=False)
+    """modalities="all" keeps every variant of the category, exactly once."""
+    df = mtb.scan(ds, cat, modalities="all", verbose=False)
     want = {(s.id, "+".join(v.when.get("modalities", [])) or "(data_dir)")
             for s in registry.load() for v in s.variants if v.when.get("category") == cat}
     assert _rows(df) == want and len(df) == len(want)
@@ -385,7 +385,8 @@ def test_cli_json_carries_the_full_reason(tmp_path, no_envs, capsys):
 
 # ----------------------------------------------------------------- L32: atac column
 def test_atac_column_is_none_for_a_variant_without_atac():
-    df = mtb.scan("D11", "vertical", methods=["Seurat_WNN"], verbose=False)
+    df = mtb.scan("D11", "vertical", methods=["Seurat_WNN"], modalities="all",
+                  verbose=False)
     by = df.set_index("modalities")["atac"]
     assert by["rna+adt"] is None or pd.isna(by["rna+adt"])
     assert by["rna+atac"] == "peak"

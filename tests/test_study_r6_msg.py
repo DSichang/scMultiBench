@@ -249,7 +249,8 @@ def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
             "--allow-atac-mismatch to run GLUE anyway.\n") in err
     assert "  scBridge: scBridge needs atac_gas.h5, and LUNG_ids has no such file.\n" in err
     rc, _, err = _cli(["scan", "D52", "--category", "cross", "--data-path",
-                       str(root / "data"), "--methods", "UINMF,StabMap", "--strict"], capsys)
+                       str(root / "data"), "--methods", "UINMF,StabMap", "--strict",
+                       "--modalities", "all"], capsys)
     # UINMF has six cross rows and StabMap four; D52 holds the files of three
     assert rc == 1 and err.startswith(
         "error: --strict: 0 of 10 rows are runnable. Rows with missing input files: 7. "
@@ -399,14 +400,14 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     assert out.startswith(f"[scan] {int(df['files_ok'].sum())} of {len(df)} methods have "
                           f"their input files. 0 of {len(df)} have their environment "
                           f"installed."), out
-    d11 = mtb.scan("D11", "vertical")
+    d11 = mtb.scan("D11", "vertical", modalities="all")
     assert not d11["method"].is_unique
     assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
     mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True,
                 methods=["sciPENN", "totalVI", "Concerto"])
     assert "[run_all] Dry run: 0 of 3 requested methods can run on D52 (cross)." in \
         capsys.readouterr().out
-    mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True)
+    mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True, modalities="all")
     assert "[run_all] Dry run: 0 of 30 requested rows can run on D52 (cross)." in \
         capsys.readouterr().out
 

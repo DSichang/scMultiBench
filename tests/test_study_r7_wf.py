@@ -209,7 +209,7 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
     assert plan["method"].is_unique and len(plan) > 3
     assert f"\nThe first 3 of {len(plan)} blocked methods:\n" in msg
     # several rows per method: still rows
-    msg = _nothing_runnable(data_path="data")
+    msg = _nothing_runnable(data_path="data", modalities="all")
     assert re.search(r"\nThe first 3 of \d+ blocked rows:\n", msg), msg
     # with methods=, one line per requested method or row
     msg = _nothing_runnable(data_path="data", methods=["Matilda", "totalVI"],
@@ -266,7 +266,7 @@ def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
         with pytest.raises(ValueError) as e:
             mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False, **kw)
         assert e.value.args[0].splitlines()[-1].startswith(
-            "mtb.scan('D11', 'vertical') shows every row. ")
+            "mtb.scan('D11', 'vertical') shows the listed rows. ")
 
 
 # ============================================================ R7-05

@@ -296,7 +296,8 @@ def test_strict_line_of_a_named_method_reads_the_row_with_its_files(tmp_path, pi
                                                                     capsys, gas_matilda):
     root = _vertical(tmp_path, "MYMO2", PEAKS)          # Multiome: no adt.h5
     rc = _quiet(cli.main, ["scan", "MYMO2", "--category", "vertical", "--data-path",
-                           str(root), "--methods", "Matilda", "--strict"])
+                           str(root), "--methods", "Matilda", "--strict",
+                           "--modalities", "all"])
     err = capsys.readouterr().err
     assert rc == 1
     # Matilda's three vertical rows: the two that read ADT lack adt.h5

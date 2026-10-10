@@ -219,12 +219,12 @@ def test_the_run_all_line_for_rows_without_files_is_sentences(monkeypatch, tmp_p
     monkeypatch.setattr(config, "_CLI", True)
     # Multigrate has four mosaic rows, and D45 holds the files of one
     _quiet(mtb.run_all, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
-           evaluate=False)
+           evaluate=False, modalities="all")
     assert ("[run_all] 3 more rows need files this folder does not have. multibench "
             "scan shows them.") in capsys.readouterr().out
     # scMDC has two cross rows (RNA + ADT, RNA + ATAC), and D52 holds RNA + ADT
     _quiet(mtb.run_all, "D52", "cross", tmp_path / "out2", methods=["scMDC"],
-           evaluate=False)
+           evaluate=False, modalities="all")
     assert ("[run_all] 1 more row needs files this folder does not have. multibench "
             "scan shows it.") in capsys.readouterr().out
 
@@ -350,7 +350,8 @@ def test_the_dry_run_commands_header_counts_methods(monkeypatch, capsys):
     assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
                      r"\[env missing\] marks a method whose environment", out, re.M), out
     # the whole category: several methods have more than one row, so it counts rows
-    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run"], capsys)
+    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run",
+                         "--modalities", "all"], capsys)
     n = len(list(W._variant_rows("cross")))
     assert rc == 0 and f"0 of {n} rows can run on D52 (cross)." in err
     assert "A row whose input files are missing has no command." in err
@@ -364,7 +365,8 @@ def test_the_dry_run_commands_header_counts_methods(monkeypatch, capsys):
 @needs_git
 def test_strict_without_methods_prints_the_scripts_ref_fix(wrong_ref, capsys):
     repo, head = wrong_ref
-    rc, _, err = _cli(["scan", "D52", "--category", "cross", "--strict"], capsys)
+    rc, _, err = _cli(["scan", "D52", "--category", "cross", "--strict",
+                       "--modalities", "all"], capsys)
     assert rc == 1
     ref = (f"The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). "
            f"Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and "

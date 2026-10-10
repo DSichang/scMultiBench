@@ -124,7 +124,7 @@ def test_scan_env_reason_names_method_and_category(no_envs):
 
 
 def test_scan_new_columns_present_and_old_order_kept(all_envs):
-    df = mtb.scan("D11")
+    df = mtb.scan("D11", modalities="all")
     assert list(df.columns[:len(OLD_COLUMNS)]) == OLD_COLUMNS
     assert list(df.columns) == W.SCAN_COLUMNS == OLD_COLUMNS + NEW_COLUMNS
     assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
@@ -156,7 +156,7 @@ def test_scan_modalities_filter_accepts_protein_alias():
 
 
 def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
-    df = mtb.scan("D11", "vertical")                  # verbose=True is the default
+    df = mtb.scan("D11", "vertical", modalities="all")  # verbose=True is the default
     out = capsys.readouterr().out
     n = len(df)
     k = int(df["files_ok"].sum())
