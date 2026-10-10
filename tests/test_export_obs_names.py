@@ -154,7 +154,7 @@ def test_diagonal_side_without_the_column(tmp_path, spec):
         ingest.export_dataset(rna, out, atac=atac, **kw)
     assert e.value.args[0] == (
         f"labels={spec!r}: column 'celltype' not in obs of the ATAC object (atac); "
-        f"available: ['donor'] Without cell types for the ATAC cells, leave labels= out and "
+        f"available: ['donor']. Without cell types for the ATAC cells, leave labels= out and "
         f"run with evaluate=False.")
     del rna.obs["celltype"]
     atac.obs["celltype"] = "T"
@@ -162,7 +162,7 @@ def test_diagonal_side_without_the_column(tmp_path, spec):
         ingest.export_dataset(rna, out, atac=atac, **kw)
     assert e.value.args[0] == (
         f"labels={spec!r}: column 'celltype' not in obs of the RNA object (data); "
-        f"available: ['donor'] Without cell types for the RNA cells, leave labels= out and "
+        f"available: ['donor']. Without cell types for the RNA cells, leave labels= out and "
         f"run with evaluate=False.")
     assert not out.exists()
 
@@ -177,8 +177,86 @@ def test_diagonal_side_without_the_column_on_the_command_line(tmp_path, capsys):
                            "--atac-kind", "gene_activity", "--labels", "obs:celltype",
                            "--category", "diagonal"], capsys)
     assert rc == 1 and not (tmp_path / "OUT").exists()
-    assert line.endswith("available: ['donor'] Without cell types for the ATAC cells, leave "
+    assert line.endswith("available: ['donor']. Without cell types for the ATAC cells, leave "
                          "--labels out and run with --no-evaluate.")
+
+
+def test_a_diagonal_side_with_an_empty_column_gets_the_way_out(tmp_path, monkeypatch):
+    """The column is there and no cell of the side has a label: the same
+    case as a side without the column, with the same way out."""
+    rna, atac = _cells(60, "r"), _cells(70, "a", seed=1)
+    kw = dict(rna="X", atac=atac, atac_kind="gene_activity", category="diagonal")
+    each = ("with category='diagonal', labels='obs:<col>' reads the column from each "
+            "object's own obs")
+    atac.obs["celltype"] = np.nan
+    assert _value_error(tmp_path, rna, labels="obs:celltype", **kw) == (
+        f"labels='obs:celltype': 70 of the 70 labels for the ATAC cells (atac) are missing "
+        f"(NaN, None or ''); {each}. Without cell types for the ATAC cells, leave labels= "
+        f"out and run with evaluate=False.")
+    # the labels passed as a Series, and a text that a label file reads as missing
+    both = pd.concat([rna.obs["celltype"], atac.obs["celltype"]])
+    assert _value_error(tmp_path, rna, labels=both, **kw) == (
+        f"labels=Series: 70 of the 70 labels for the ATAC cells (atac) are missing (NaN, "
+        f"None or ''); {each}. Without cell types for the ATAC cells, leave labels= out and "
+        f"run with evaluate=False.")
+    atac.obs["celltype"] = "NA"
+    assert _value_error(tmp_path, rna, labels="celltype", **kw) == (
+        f"labels='celltype': 70 of the 70 labels for the ATAC cells (atac) are missing (NaN, "
+        f"None, '' or text that a label file reads as missing: 'NA'); {each}. Without cell "
+        f"types for the ATAC cells, leave labels= out and run with evaluate=False. If 'NA' is "
+        f"the name of a cell type, rename it")
+    # some cells of the side have a label: the text of before
+    atac.obs["celltype"] = ["T"] * 65 + [np.nan] * 5
+    assert _value_error(tmp_path, rna, labels="obs:celltype", **kw) == (
+        f"labels='obs:celltype': 5 of the 70 labels for the ATAC cells (atac) are missing "
+        f"(NaN, None or ''); {each}")
+    # the command line names its options
+    from multibench import config
+    monkeypatch.setattr(config, "_CLI", True)
+    atac.obs["celltype"] = np.nan
+    assert _value_error(tmp_path, rna, labels="obs:celltype", **kw).endswith(
+        f"{each}. Without cell types for the ATAC cells, leave --labels out and run with "
+        f"--no-evaluate.")
+
+
+def test_a_modality_prefix_on_an_anndata_names_the_obs_spelling(tmp_path, capsys):
+    """``'<mod>:<col>'`` reads a column of one modality of a MuData. Two
+    AnnData objects have no modalities: 0.3.4 answered with a ValueError
+    about the spelling, and so does this."""
+    rna, atac = _cells(60, "r"), _cells(40, "a", seed=1)
+    kw = dict(rna="X", atac=atac, atac_kind="gene_activity", category="diagonal")
+    head = ("'<mod>:<col>' names a column of one modality of a MuData, and this data is an "
+            "AnnData.")
+    assert _value_error(tmp_path, rna, labels="rna:celltype", **kw) == (
+        f"labels='rna:celltype': {head} Write labels='obs:celltype'.")
+    assert _value_error(tmp_path, rna, labels="atac:nope", **kw) == (
+        f"labels='atac:nope': {head} Name the column, as labels='obs:<col>'.")
+    # what the message says to write is read
+    out = ingest.export_dataset(rna, tmp_path / "OBS", labels="obs:celltype", **kw)
+    assert sorted(_files(out)) == ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"]
+    # a column that really has this name is a column
+    for a in (rna, atac):
+        a.obs["rna:celltype"] = a.obs["celltype"].to_numpy()
+    named = ingest.export_dataset(rna, tmp_path / "NAMED", labels="rna:celltype", **kw)
+    for name in ("rna_cty.csv", "atac_cty.csv"):
+        assert (named / name).read_bytes() == (out / name).read_bytes()
+    # the command line: its option, and the files it reads
+    for a in (rna, atac):
+        del a.obs["rna:celltype"]
+    rna.write_h5ad(tmp_path / "rna.h5ad")
+    atac.write_h5ad(tmp_path / "atac.h5ad")
+    argv = ["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT"), "--rna", "X",
+            "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind", "gene_activity",
+            "--category", "diagonal", "--labels"]
+    cli_head = ("<mod>:<col> names a column of one modality of a .h5mu file, and SRC is an "
+                ".h5ad file.")
+    rc, line = _cli_error(argv + ["rna:celltype"], capsys)
+    assert rc == 1 and line == (
+        f"error: --labels rna:celltype: {cli_head} Write --labels obs:celltype.")
+    rc, line = _cli_error(argv + ["rna:nope"], capsys)
+    assert rc == 1 and line == (
+        f"error: --labels rna:nope: {cli_head} Name the column, as --labels obs:<col>.")
+    assert not (tmp_path / "OUT").exists()
 
 
 def test_mudata_spellings_are_unchanged(tmp_path):

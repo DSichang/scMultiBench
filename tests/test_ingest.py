@@ -203,6 +203,29 @@ def test_layer_selects_layer(tmp_path):
         ingest.to_canonical(a, out=tmp_path / "x.h5", layer="nope")
 
 
+def test_the_layer_error_lists_layers_only(tmp_path):
+    """anndata 0.13 lists X among the layers, under the key None: the error
+    read "available: [None]" for an object without a layer."""
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.ones((3, 4)))
+    out = tmp_path / "OUT"
+    with pytest.raises(KeyError) as e:
+        ingest.export_dataset(a, out, rna="layer:counts")
+    assert e.value.args[0] == ("layer 'counts' not found: the object has no layers, only the "
+                               "main matrix X.")
+    a.layers["raw"] = np.ones((3, 4))
+    with pytest.raises(KeyError) as e:
+        ingest.export_dataset(a, out, rna="layer:counts")
+    assert e.value.args[0] == "layer 'counts' not found; available: ['raw']"
+    with pytest.raises(KeyError) as e:
+        ingest.to_canonical(a, out / "rna.h5", layer="counts")
+    assert e.value.args[0] == "layer 'counts' not found; available: ['raw']"
+    assert not out.exists()
+    # the layer that is there is written
+    ingest.export_dataset(a, out, rna="layer:raw")
+    assert ingest.read_canonical(out / "rna.h5").shape == (3, 4)
+
+
 def test_1d_matrix_raises(tmp_path):
     ad = pytest.importorskip("anndata")
     a = ad.AnnData(np.ones((3, 2)))

@@ -1,6 +1,7 @@
 """Guards of export_dataset on what the cells carry.
 
 - Data with 0 cells is refused. 0.3.4 wrote files with no cell in them.
+- A matrix with 0 features is refused. 0.3.4 wrote a file of barcodes.
 - A batch column with a missing value is refused. 0.3.4 left those cells
   out without a word, or made the text ``'nan'`` batch 1.
 - A label that a label file reads back as missing (``'NA'``, ``'None'``,
@@ -93,6 +94,83 @@ def test_the_way_there_is_a_label_table_with_other_barcodes(tmp_path):
     kept = a[a.obs["celltype"].notna()].copy()
     assert kept.n_obs == 0
     assert _value_error(tmp_path, kept, rna="X", labels="obs:celltype") == NO_CELLS
+
+
+# ----------------------------------------------------------------- 0 features
+NO_FEATURES = ("The {what}matrix holds 0 features for 60 cells, so there is nothing to write. ")
+WHY = ("If the data came from sc.read_10x_h5, read the file with gex_only=False: without it "
+       "scanpy returns the genes alone. If you split it by var['feature_types'], compare the "
+       "type name in the split with adata.var['feature_types'].value_counts().")
+
+
+def _split_without_peaks():
+    """``(rna, none)``: a 10x file read without ``gex_only=False`` holds the
+    genes alone, so the split by feature type gives peaks of 0 columns."""
+    a = _cite()
+    a.var["feature_types"] = "Gene Expression"
+    kind = a.var["feature_types"]
+    rna, none = a[:, kind == "Gene Expression"].copy(), a[:, kind == "Peaks"].copy()
+    assert rna.shape == (60, 20) and none.shape == (60, 0)
+    return rna, none
+
+
+def test_a_matrix_without_features_is_refused(tmp_path):
+    """0.3.4 wrote such a matrix as a file of barcodes, and said only that 0%
+    of the ATAC feature names look like peaks."""
+    rna, none = _split_without_peaks()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")          # nothing about peak names before the refusal
+        assert _value_error(tmp_path, none, rna="X") == NO_FEATURES.format(what="rna ") + WHY
+        assert _value_error(tmp_path, rna, rna="X", adt=none) \
+            == NO_FEATURES.format(what="adt ") + WHY
+        for kind in ("peak", "gene_activity"):
+            assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind=kind,
+                                labels="obs:ct") == NO_FEATURES.format(what="atac ") + WHY
+        assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak",
+                            labels="obs:ct", category="diagonal") \
+            == NO_FEATURES.format(what="atac ") + WHY
+        for modality in ("atac_peak", "rna", None):
+            with pytest.raises(ValueError) as e:
+                ingest.to_canonical(none, tmp_path / "OUT" / "atac_peak.h5", modality=modality)
+            assert str(e.value) == NO_FEATURES.format(what="") + WHY
+        assert not (tmp_path / "OUT").exists()
+    # a folder that is there keeps every file as it was
+    out = ingest.export_dataset(rna, tmp_path / "HERE", rna="X", labels="obs:ct")
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(rna, out, rna="X", atac=none, atac_kind="peak", labels="obs:ct",
+                              overwrite=True)
+    assert str(e.value) == NO_FEATURES.format(what="atac ") + WHY
+    with pytest.raises(ValueError) as e:
+        ingest.to_canonical(none, out, modality="atac_peak")
+    assert str(e.value) == NO_FEATURES.format(what="") + WHY
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+    # one feature is a matrix to write
+    one = ingest.export_dataset(rna, tmp_path / "ONE", rna="X", adt=rna[:, :1].copy())
+    assert ingest.read_canonical(one / "adt.h5").shape == (60, 1)
+
+
+def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
+    """The command line reads files: it names no Python argument, and says
+    where to look."""
+    rna, none = _split_without_peaks()
+    rna.write_h5ad(tmp_path / "rna.h5ad")
+    none.write_h5ad(tmp_path / "none.h5ad")
+    look = ("Check which feature types the file holds, in Python with "
+            "adata.var['feature_types'].value_counts().")
+    src, out = str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT")
+    for argv, what in (
+            (["convert", str(tmp_path / "none.h5ad"), out, "--rna", "X"], "rna "),
+            (["convert", src, out, "--rna", "X", "--atac-from", str(tmp_path / "none.h5ad"),
+              "--atac-kind", "peak", "--category", "diagonal"], "atac "),
+            (["convert", str(tmp_path / "none.h5ad"), out + "/", "--modality", "atac_peak"], "")):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            rc = cli.main(argv)
+        err = capsys.readouterr().err
+        assert rc == 1 and not (tmp_path / "OUT").exists()
+        assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) \
+            == "error: " + NO_FEATURES.format(what=what) + look
 
 
 # ------------------------------------------------------------- a missing batch

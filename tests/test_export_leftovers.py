@@ -456,6 +456,90 @@ def test_another_atac_kind_for_other_cells_is_refused(tmp_path):
     assert _names(f) == ["atac.h5", "atac_gas.h5", "atac_peak.h5", "cty.csv", "rna.h5"]
 
 
+# ------------------------------ labels alone, for a folder of two sides or of batches
+def _held(files, holds="holds"):
+    """The closing advice when the folder holds the cells of a call that
+    writes labels only: the other files may be part of the same dataset."""
+    return ("A method would read them as part of this dataset. This call writes labels only, "
+            f"and {files} in the folder {holds} their cells. If the files above are the other "
+            "side or the other batches of the same dataset, keep them, and add the labels "
+            "with the export call that wrote the folder (its category= and batch_index=) and "
+            "labels=. Otherwise export to a new folder, and use that folder name in scan and "
+            "run_all too, or delete these files and run the export again.")
+
+
+def test_a_labels_only_call_on_a_diagonal_folder_names_the_call_that_wrote_it(tmp_path):
+    """Cell types that come later, for a diagonal folder written without
+    them. Its ATAC file holds other cells by design: deleting it, as the
+    message said, left a folder that was no longer diagonal."""
+    rna, _ = _cells(120, "RNA")
+    _, atac = _cells(90, "ATAC", seed=1)
+    f = tmp_path / "DIAG"
+    wrote = dict(rna="X", atac=_genes(atac), atac_kind="gene_activity", category="diagonal")
+    _write(rna, f, **wrote)
+    assert _names(f) == ["atac_gas.h5", "rna.h5"]
+    head = (f"{f} holds files of other data that this call does not write. atac_gas.h5 holds "
+            f"other cells than this call writes. ")
+    assert _refused(rna, f, rna=None, labels="obs:celltype") == head + _held("rna.h5")
+    # labels without barcodes are the cells of rna.h5 by their number
+    assert _refused(None, f, rna=None, labels=list(rna.obs["celltype"])) \
+        == head + _held("rna.h5")
+    # category='diagonal' alone does not make it the call that wrote the folder
+    before = _snapshot(f)
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(rna, f, rna=None, labels="obs:celltype", category="diagonal",
+                              overwrite=True)
+    assert str(e.value) == (
+        "category='diagonal' names the label file after the modality it labels "
+        "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
+    assert _snapshot(f) == before
+    # the call that wrote the folder, and labels=: both label files
+    cells = {n: resolve._barcodes_of(f / n) for n in _names(f)}
+    _write(rna, f, labels="obs:celltype", **wrote)
+    assert _names(f) == ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"]
+    assert {n: resolve._barcodes_of(f / n) for n in cells} == cells
+    assert pd.read_csv(f / "rna_cty.csv")["x"].tolist() == list(rna.obs["celltype"])
+    assert pd.read_csv(f / "atac_cty.csv")["x"].tolist() == list(atac.obs["celltype"])
+    # two files hold the cells of the labels
+    g = tmp_path / "DIAG_ADT"
+    _write(rna, g, adt="obsm:protein", **wrote)
+    assert _refused(rna, g, rna=None, labels="obs:celltype") \
+        == head.replace(str(f), str(g)) + _held("rna.h5 and adt.h5", "hold")
+
+
+def test_a_labels_only_call_on_a_mosaic_folder_names_the_call_that_wrote_it(tmp_path):
+    """The same for one batch of a mosaic folder: the files of the other
+    batches hold other cells, and the labels of batch 1 belong in cty1.csv."""
+    f = tmp_path / "MOSAIC"
+    one, two, three = (_cells(n, f"B{b}", seed=b)[0] for b, n in ((1, 80), (2, 100), (3, 90)))
+    _write(one, f, rna="X", batch_index=1, category="mosaic")
+    _write(two, f, rna="X", adt="obsm:protein", batch_index=2, category="mosaic")
+    _write(three, f, rna=None, adt="obsm:protein", batch_index=3, category="mosaic")
+    assert _refused(one, f, rna=None, labels="obs:celltype") == (
+        f"{f} holds files of other data that this call does not write. rna2.h5, adt2.h5 and "
+        f"adt3.h5 hold other cells than this call writes. " + _held("rna1.h5"))
+    _write(one, f, rna="X", labels="obs:celltype", batch_index=1, category="mosaic")
+    assert _names(f) == ["adt2.h5", "adt3.h5", "cty1.csv", "rna1.h5", "rna2.h5"]
+    assert pd.read_csv(f / "cty1.csv")["x"].tolist() == list(one.obs["celltype"])
+
+
+def test_a_folder_that_does_not_hold_the_cells_of_the_labels_keeps_the_advice(tmp_path):
+    """No matrix of the folder holds the cells of the labels: the folder is
+    one of other data, whatever its layout."""
+    other, _ = _cells(120, "ME", seed=5)
+    paired = tmp_path / "PAIRED"
+    _write(_cells(120, "EX")[0], paired, rna="X", adt="obsm:protein")
+    assert _refused(other, paired, rna=None, labels="obs:celltype") == (
+        f"{paired} holds files of other data that this call does not write. rna.h5 and "
+        f"adt.h5 hold other cells than this call writes. {ADVICE}")
+    diagonal = tmp_path / "DIAG"
+    _write(_cells(120, "RNA")[0], diagonal, rna="X", atac=_genes(_cells(90, "ATAC", seed=1)[1]),
+           atac_kind="gene_activity", category="diagonal")
+    assert _refused(other, diagonal, rna=None, labels="obs:celltype") == (
+        f"{diagonal} holds files of other data that this call does not write. rna.h5 and "
+        f"atac_gas.h5 hold other cells than this call writes. {ADVICE}")
+
+
 # ----------------------------------------------------- (c) other label counts
 def test_labels_left_out_for_other_cells(tmp_path):
     f = tmp_path / "NOLABELS"
@@ -597,6 +681,39 @@ def test_cli_wording(tmp_path, capsys):
         assert word in err
     assert "overwrite=True" not in err and "this call" not in err and "run_all" not in err
     assert _snapshot(out) == before
+
+
+def test_cli_wording_of_labels_alone_on_a_diagonal_folder(tmp_path, capsys):
+    """The command line names the convert command that wrote the folder, and
+    that command with --labels writes both label files."""
+    rna, atac = _cells(120, "RNA")[0], _genes(_cells(90, "ATAC", seed=1)[1])
+    del rna.obsm["protein"]
+    rna.write_h5ad(tmp_path / "rna.h5ad")
+    atac.write_h5ad(tmp_path / "atac.h5ad")
+    out = tmp_path / "OUT"
+    wrote = ["convert", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X", "--atac-from",
+             str(tmp_path / "atac.h5ad"), "--atac-kind", "gene_activity", "--category",
+             "diagonal"]
+    assert _quiet(cli.main, wrote) == 0
+    before = _snapshot(out)
+    capsys.readouterr()
+    assert _quiet(cli.main, ["convert", str(tmp_path / "rna.h5ad"), str(out), "--labels",
+                             "obs:celltype", "--overwrite"]) == 1
+    err = capsys.readouterr().err
+    assert _error_line(err) == (
+        f"error: {out} holds files of other data that this command does not write. "
+        f"atac_gas.h5 holds other cells than this command writes. A method would read them as "
+        f"part of this dataset. This command writes labels only, and rna.h5 in the folder "
+        f"holds their cells. If the files above are the other side or the other batches of "
+        f"the same dataset, keep them, and add the labels with the convert command that wrote "
+        f"the folder (its --category and --batch-index) and --labels. Otherwise convert into "
+        f"a new folder, and use that folder name in scan and run-all too, or delete these "
+        f"files and run convert again.")
+    for word in ("labels=", "category=", "batch_index=", "this call", "run_all", "export"):
+        assert word not in err, word
+    assert _snapshot(out) == before
+    assert _quiet(cli.main, wrote + ["--labels", "obs:celltype", "--overwrite"]) == 0
+    assert _names(out) == ["atac_cty.csv", "atac_gas.h5", "rna.h5", "rna_cty.csv"]
 
 
 def test_cli_wording_of_n_batches(tmp_path, monkeypatch):

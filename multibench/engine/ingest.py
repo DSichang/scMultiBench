@@ -480,7 +480,11 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
     _check_one_feature_type(adata, arg=arg, spec=spec, role=role or what)
     if layer is not None:
         if layer not in adata.layers:
-            raise KeyError(f"layer {layer!r} not found; available: {list(adata.layers)}")
+            # anndata 0.13 lists X among the layers, under the key None
+            layers = [k for k in adata.layers if k is not None]
+            raise KeyError(f"layer {layer!r} not found" + (
+                f"; available: {layers}" if layers
+                else ": the object has no layers, only the main matrix X."))
         X = adata.layers[layer]
     else:
         X = adata.X
@@ -788,6 +792,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     - ``modality='adt'`` on an AnnData with ``obsm`` keys but no ``obsm=`` /
       ``layer=``;
     - ``X`` or a layer with several values in ``var['feature_types']``;
+    - a matrix with 0 features;
     - a feature-name or barcode count that does not match the matrix.
 
     The ``FileNotFoundError`` message names the path and the current
@@ -847,6 +852,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
                             feature_names=feature_names, what=modality,
                             names_arg="feature_names",
                             role=modality or _layout_family(out.name))
+    if feats is not None and len(feats) == 0:
+        raise ValueError(_no_features_message(len(adata.obs_names)))
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
@@ -887,6 +894,8 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
     ------
     FileNotFoundError
         ``path`` does not exist; the message names ``mtb.config.DEFAULT.data_path``.
+    ValueError
+        ``path`` is a 10x Genomics ``.h5`` file; the message says how to read it.
 
     Examples
     --------
@@ -908,7 +917,9 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
     benchmark inputs and for what ``to_canonical`` writes, not for a
     100k-cell peak matrix.
 
-    **No validation.** A file without ``matrix/data`` raises h5py's
+    **Other files.** A 10x Genomics ``.h5`` file (a sparse matrix, with
+    ``matrix/indptr``) raises ``ValueError``: read it with scanpy. Nothing
+    else is checked. A file without ``matrix/data`` raises h5py's
     ``KeyError``. ``matrix/features`` and ``matrix/barcodes`` are optional;
     without them AnnData's default names (``'0'``, ``'1'``, ...) are kept.
 
@@ -922,6 +933,9 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
         raise FileNotFoundError(
             f"{os.fspath(path)} not found. Demo datasets are under "
             f"mtb.config.DEFAULT.data_path ({config.DEFAULT.data_path}).")
+    if not _is_canonical_h5(path) and _is_tenx_h5(path):
+        # its 1-D matrix/data would fail below with a line about unpacking
+        raise ValueError(_tenx_message(path))
     with h5py.File(path, "r") as f:
         data = np.array(f["matrix/data"]).T  # features x cells -> cells x features
         X = np.asarray(data, dtype=float)
@@ -1603,7 +1617,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
       no filter that keeps one;
     - ``adt`` taking ``X`` of an object that also holds an ``obsm`` matrix
       under a key that does not start with ``X_``;
-    - data with 0 cells;
+    - data with 0 cells, or a matrix with 0 features;
     - a bare array whose cell order cannot be checked (no barcodes anywhere)
       or with the wrong row count;
     - a modality whose barcodes differ from the master order (the message
@@ -1769,6 +1783,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                     names_arg="adt_names" if role == "adt" else None,
                                     arg=what, spec=given[what]
                                     if isinstance(given[what], str) else None)
+            if feats is not None and len(feats) == 0:
+                raise ValueError(_no_features_message(len(a.obs_names), what))
             if role in ("atac_peak", "atac_gas"):
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
@@ -1822,9 +1838,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                        by_column=batch is not None, batch_index=batch_index,
                        n_batches=n_batches)
     if any(found):
+        held = []
+        if not prepared and category is None and batch_index is None:
+            # labels alone, for a folder that may be written with a category
+            held = _matrices_of(out, masters.get("rna"), len(lab["rna"]),
+                                skip={name for names in found for name in names})
         raise FileExistsError(_leftover_message(
             out, found, written=[int(suf) for suf, _ in groups if suf],
-            n_batches=n_batches, replace=bool(existing) and not overwrite))
+            n_batches=n_batches, replace=bool(existing) and not overwrite, held=held))
     if existing and not overwrite:
         from .resolve import _and_list
         raise FileExistsError(
@@ -1869,6 +1890,21 @@ _NO_CELLS = ("The data holds 0 cells, so there is nothing to write. If you kept 
              "that have a label, no cell had one: check that the barcodes of the label "
              "table are spelled as the cell names of the data (obs_names) are, for example "
              "with the same -1 ending.")
+
+
+def _no_features_message(n_cells: int, what: str | None = None) -> str:
+    """Z2: a selected matrix without a feature, which would be written as a
+    file of barcodes alone. ``what`` is the modality argument (``'atac'``);
+    ``to_canonical`` has none. A 10x Genomics file read without
+    ``gex_only=False`` gives such a matrix when it is split by feature type."""
+    return (f"The {what + ' ' if what else ''}matrix holds 0 features for {n_cells:,} cells, "
+            f"so there is nothing to write. " + config.hint(
+                "If the data came from sc.read_10x_h5, read the file with gex_only=False: "
+                "without it scanpy returns the genes alone. If you split it by "
+                "var['feature_types'], compare the type name in the split with "
+                "adata.var['feature_types'].value_counts().",
+                "Check which feature types the file holds, in Python with "
+                "adata.var['feature_types'].value_counts()."))
 
 
 def _check_batch_complete(vals, *, spec) -> None:
@@ -2045,10 +2081,35 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
     return other_batch, other_cells, other_count
 
 
-def _leftover_message(out: Path, found, *, written, n_batches, replace: bool) -> str:
+def _matrices_of(out: Path, cells, n: int, *, skip) -> list:
+    """The matrix files of the layout in ``out`` that hold the cells of a call
+    which writes labels only: the barcodes ``cells``, or ``n`` cells when the
+    call has no unique barcodes to compare. ``skip`` are the leftovers."""
+    barcodes_of, _ = _folder_readers()
+    named = cells is not None and len(set(cells)) == len(cells)
+    held = []
+    for p in sorted(out.iterdir(), key=lambda p: p.name):
+        unit = _layout_unit(p.name, False)
+        if unit is None or not unit[2] or p.name in skip or not p.is_file():
+            continue
+        old = barcodes_of(p)
+        if old is not None and ((_cell_order(old, cells)[0] in ("same", "order")) if named
+                                else (len(old) == n)):
+            held.append(p.name)
+    return held
+
+
+def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
+                      held=()) -> str:
     """L1: the leftovers of :func:`_leftovers`, why each kind is one, and what
     to do. ``written`` are the batch numbers of the call; ``replace`` adds
-    that the files of the call are there too and ``overwrite`` is not set."""
+    that the files of the call are there too and ``overwrite`` is not set.
+
+    ``held`` are the matrix files that hold the cells of a call which writes
+    labels only, without a category (:func:`_matrices_of`). The leftovers are
+    then the other side of a diagonal folder or the other batches of a mosaic
+    one, unless the folder was used for two datasets: deleting them is not
+    the first advice."""
     from .resolve import _and_list, _span
 
     def names(files):
@@ -2077,11 +2138,26 @@ def _leftover_message(out: Path, found, *, written, n_batches, replace: bool) ->
     if other_count:
         text.append(f"{names(other_count)} {'has' if len(other_count) == 1 else 'have'} "
                     f"another number of labels than {call} has cells.")
-    text.append("A method would read them as part of this dataset. " + config.hint(
-        "Export to a new folder, and use that folder name in scan and run_all too. To keep "
-        "this folder, delete these files and run the export again.",
-        "Convert into a new folder, and use that folder name in scan and run-all too. To "
-        "keep this folder, delete these files and run convert again."))
+    if held:
+        text.append(
+            f"A method would read them as part of this dataset. {call[:1].upper()}{call[1:]} "
+            f"writes labels only, and {names(held)} in the folder "
+            f"{'holds' if len(held) == 1 else 'hold'} their cells. If the files above are the "
+            f"other side or the other batches of the same dataset, keep them, and add the "
+            f"labels with " + config.hint(
+                "the export call that wrote the folder (its category= and batch_index=) and "
+                "labels=. Otherwise export to a new folder, and use that folder name in scan "
+                "and run_all too, or delete these files and run the export again.",
+                "the convert command that wrote the folder (its --category and "
+                "--batch-index) and --labels. Otherwise convert into a new folder, and use "
+                "that folder name in scan and run-all too, or delete these files and run "
+                "convert again."))
+    else:
+        text.append("A method would read them as part of this dataset. " + config.hint(
+            "Export to a new folder, and use that folder name in scan and run_all too. To "
+            "keep this folder, delete these files and run the export again.",
+            "Convert into a new folder, and use that folder name in scan and run-all too. To "
+            "keep this folder, delete these files and run convert again."))
     if replace:
         text.append(f"The files {call} writes are there too, so also pass "
                     f"{config.hint('overwrite=True', '--overwrite')}.")
@@ -2315,9 +2391,12 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 col_each = spec
         elif not mu and not spec.startswith("mod:"):
             col_each = spec                 # '<col>' names the column as 'obs:<col>' does
-            if _is_file_name(spec) and not any(spec in sides[side][0][1].obs.columns
-                                               for side in present):
+            columns = {c for side in present for c in sides[side][0][1].obs.columns}
+            if _is_file_name(spec) and spec not in columns:
                 raise ValueError(_file_name_message(spec, "labels"))
+            name, _, col = spec.partition(":")
+            if name and col and spec not in columns:
+                raise ValueError(_mod_prefix_message(spec, col if col in columns else None))
     out = {}
     for side in present:
         role, a, kw, what, src = sides[side][0]
@@ -2325,7 +2404,8 @@ def _diagonal_labels(data, spec, sides) -> dict:
         if col_each is not None and col_each in a.obs.columns:
             out[side] = np.asarray(a.obs[col_each])
             _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells "
-                                   f"({src})", advice=_diagonal_label_advice(data, spec, sides))
+                                   f"({src})", advice=_diagonal_label_advice(data, spec, sides),
+                                   when_none=_no_cell_types_advice(side))
             continue
         if col_each is not None:
             if spec.startswith("obs:") and mu and col_each in data.obs.columns:
@@ -2333,10 +2413,8 @@ def _diagonal_labels(data, spec, sides) -> dict:
             else:
                 raise KeyError(
                     f"labels={spec!r}: column {col_each!r} not in obs of the "
-                    f"{side.upper()} object ({src}); available: {list(a.obs.columns)}"
-                    f" Without cell types for the {side.upper()} cells, leave "
-                    + config.hint("labels= out and run with evaluate=False.",
-                                  "--labels out and run with --no-evaluate."))
+                    f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
+                    + _no_cell_types_advice(side))
         elif isinstance(spec, str):
             ser = _select_obs(data, spec, what="labels")
         else:
@@ -2354,8 +2432,30 @@ def _diagonal_labels(data, spec, sides) -> dict:
         else:
             out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
         _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells ({src})",
-                               advice=_diagonal_label_advice(data, spec, sides))
+                               advice=_diagonal_label_advice(data, spec, sides),
+                               when_none=_no_cell_types_advice(side))
     return out
+
+
+def _no_cell_types_advice(side: str) -> str:
+    """C6: the way out for the side of a diagonal export that has no cell
+    types, whether its object lacks the column or the column is empty."""
+    return (f"Without cell types for the {side.upper()} cells, leave "
+            + config.hint("labels= out and run with evaluate=False.",
+                          "--labels out and run with --no-evaluate."))
+
+
+def _mod_prefix_message(spec: str, col: str | None) -> str:
+    """``labels='<mod>:<col>'`` for a diagonal export of AnnData objects, which
+    have no modalities. ``col`` is the part after the colon when it is a
+    column of one of the objects, else ``None``."""
+    return config.hint(
+        f"labels={spec!r}: '<mod>:<col>' names a column of one modality of a MuData, and "
+        f"this data is an AnnData. "
+        + (f"Write labels='obs:{col}'." if col else "Name the column, as labels='obs:<col>'."),
+        f"--labels {spec}: <mod>:<col> names a column of one modality of a .h5mu file, and "
+        f"SRC is an .h5ad file. "
+        + (f"Write --labels obs:{col}." if col else "Name the column, as --labels obs:<col>."))
 
 
 def _diagonal_label_advice(data, spec, sides) -> str:
@@ -2379,9 +2479,12 @@ def _n_missing_labels(vals) -> int:
     return int(eio.missing_mask(vals).sum())
 
 
-def _check_labels_complete(vals, *, spec, where: str, advice: str) -> None:
+def _check_labels_complete(vals, *, spec, where: str, advice: str,
+                           when_none: str = "") -> None:
     """Refuse a label vector with missing values: mtb.evaluate does not score
-    a missing label, and the label file would hold one for every such cell."""
+    a missing label, and the label file would hold one for every such cell.
+    ``when_none`` is a sentence that follows ``advice`` when no cell has a
+    label."""
     from ..eval import io as eio
 
     n = _n_missing_labels(vals)
@@ -2393,6 +2496,9 @@ def _check_labels_complete(vals, *, spec, where: str, advice: str) -> None:
                      + eio._and(eio._missing_shown(words)))
             rename = (f". If {repr(words[0]) if len(words) == 1 else 'one of them'} is the "
                       f"name of a cell type, rename it")
+        if when_none and n == len(vals):
+            # the sentence brings its own full stop
+            advice, rename = f"{advice}. {when_none}", rename[1:]
         raise ValueError(
             f"labels={_shown(spec)}: {n} of the {len(vals)} labels for {where} are missing "
             f"({forms}); {advice}{rename}")

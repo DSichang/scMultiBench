@@ -408,6 +408,38 @@ def test_a_10x_file_is_named(tmp_path, capsys):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["filtered_feature_bc_matrix.h5"]
 
 
+def test_read_canonical_names_a_10x_file(tmp_path):
+    """The reader of dataset files said "not enough values to unpack" for a
+    10x file. Whatever it read back before, it reads back."""
+    src = _tenx_h5(tmp_path / "filtered_feature_bc_matrix.h5")
+    for path in (src, str(src)):
+        with pytest.raises(ValueError) as e:
+            mtb.io.read_canonical(path)
+        assert str(e.value) == ingest._tenx_message(path) == (
+            f"{src} is a 10x Genomics file, not a multibench dataset file. Read it with "
+            f"scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
+            f"var['feature_types'] and write a dataset folder with mtb.io.export_dataset. "
+            f"{RECIPE}")
+    # a dataset file, with its shape and names
+    arc = _arc()
+    made = ingest.to_canonical(arc[:, :GENES].copy(), tmp_path / "rna.h5")
+    back = mtb.io.read_canonical(made)
+    assert back.shape == (arc.n_obs, GENES) and list(back.obs_names) == list(arc.obs_names) \
+        and list(back.var_names) == list(arc.var_names[:GENES])
+    # a 2-D matrix/data is read as before, whatever lies next to it
+    odd = tmp_path / "odd.h5"
+    with h5py.File(odd, "w") as f:
+        f.create_dataset("matrix/data", data=np.arange(12.0).reshape(3, 4))
+        f.create_dataset("matrix/indptr", data=np.arange(3))
+    assert ingest._is_tenx_h5(odd) and mtb.io.read_canonical(odd, sparse=False).shape == (4, 3)
+    # and a file without matrix/data keeps h5py's KeyError
+    bare = tmp_path / "bare.h5"
+    with h5py.File(bare, "w") as f:
+        f.create_dataset("data", data=np.zeros((3, 4)))
+    with pytest.raises(KeyError):
+        mtb.io.read_canonical(bare)
+
+
 def test_other_h5_files_keep_their_message(tmp_path):
     """Not canonical and not 10x: the keys are listed, as before."""
     p = tmp_path / "embedding.h5"
