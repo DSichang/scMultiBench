@@ -371,7 +371,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False):
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=Path(x).name,
             target="the output", order="the rows of the output",
-            no_ids=_no_ids(ids), stacklevel=5)[0]
+            no_ids=_no_ids(ids), stacklevel=5, drop=what == "labels")[0]
     if _carries_ids(x):
         if ids is not None:
             return io.align_vector(x, ids, what=what, column=column)
@@ -445,7 +445,7 @@ def _stack_label_files(files, ids, as_written=False):
         pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
             [first for _, first in read], ignore_index=True), ids if unique else None,
             what="labels", name=name, target="the output", order=order,
-            no_ids=_no_ids(ids), stacklevel=5, n_files=len(names))
+            no_ids=_no_ids(ids), stacklevel=5, n_files=len(names), drop=True)
         return vals[pos], origin[pos]
     for (v, first), name in zip(read, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the output",
@@ -595,12 +595,15 @@ def _n_batches(ba) -> int:
     return len(set(ba[~io.missing_mask(ba)].astype(str).tolist()))
 
 
-def _dropped_warning(n_scored: int, n_cells: int, batches=None) -> str:
+def _dropped_warning(n_scored: int, n_cells: int, batches=None,
+                     batch_scored: bool = False) -> str:
     """evaluate()'s warning after ``missing_labels="drop"`` left cells out.
 
-    ``batches`` is ``(b, B)`` when a batch vector was scored: the batches
-    that hold a labelled cell, of the batches given. Fewer of them changes
-    what the batch metrics measure, and the warning says so.
+    ``batches`` is ``(b, B)`` when a batch vector is known (``batch=``, or
+    the file of origin of several label files): the batches that hold a
+    labelled cell, of the batches given. A batch without one is left out of
+    every score, and the warning says so. ``batch_scored`` says that a batch
+    metric is scored: with one batch left, it does not measure mixing.
     """
     n = n_cells - n_scored
     msg = (f"Scored the {n_scored:,} labelled cells of {n_cells:,}. {n:,} "
@@ -609,8 +612,10 @@ def _dropped_warning(n_scored: int, n_cells: int, batches=None) -> str:
            f"labelled cells only.")
     b, n_batches = batches or (0, 0)
     if b == 1 < n_batches:
-        msg += (" The labelled cells are all in one batch, so the batch metrics do "
-                "not measure mixing.")
+        msg += (" The labelled cells are all in one batch, so no score changes with "
+                "where the cells of the other batches are placed")
+        msg += (", and the batch metrics do not measure mixing." if batch_scored
+                else ".")
     elif b < n_batches:
         msg += f" The labelled cells come from {b} of the {n_batches} batches."
     return msg
@@ -634,20 +639,51 @@ def _batch_files(path: Path, n_cells: int) -> list:
     return [q for _, q in found] if len(found) > 1 and total == n_cells else []
 
 
-def _count_error(what: str, n: int, n_cells: int, given) -> str:
+def _diagonal_side(files) -> tuple | None:
+    """The side of a diagonal folder that the label ``files`` name, and the
+    other side: ``("RNA", "ATAC")`` when every file is ``rna_cty<N>.csv``
+    and no folder of theirs holds a label file of the ATAC cells
+    (``atac_cty<N>.csv``, or its other name ``peak_cty<N>.csv``), and the
+    reverse for ``atac_cty<N>.csv``. ``None`` for any other files: a folder
+    with the label files of both sides is short of labels for another reason.
+    """
+    import re
+    sides = {m.group(1) if m else None
+             for m in (re.fullmatch(r"(rna|atac)_cty\d*", f.stem) for f in files)}
+    if len(sides) != 1 or None in sides:
+        return None
+    side = sides.pop()
+    other = re.compile(r"(atac|peak)_cty\d*" if side == "rna" else r"rna_cty\d*")
+    if any(other.fullmatch(q.stem) and q.suffix.lower() in io._LABEL_FILE_SUFFIXES
+           for folder in {f.parent for f in files} for q in folder.iterdir()):
+        return None
+    return ("RNA", "ATAC") if side == "rna" else ("ATAC", "RNA")
+
+
+def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
     """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows.
 
     On the command line it names the flag and the file(s) the user typed;
     for too few labels it adds the per-batch fix (the sibling files when
-    they add up to the cell count).
+    they add up to the cell count). Label files of one side of a diagonal
+    folder (:func:`_diagonal_side`) are named as that instead: the cells of
+    the other side have no entry, which ``missing_labels="drop"`` does not
+    cover. ``category`` is evaluate's own argument (``--category``).
     """
     from . import scib as escib
     files, names = _label_files(given), _src(given)
     dataset = _CLI_LABELS_FROM.get() if what == "labels" else None
+    side = _diagonal_side(files) if what == "labels" and n < n_cells else None
     if dataset:
         cli = (f"the label files of {dataset}{names} hold {n:,} labels for "
-               f"{n_cells:,} cells in --output. Check that --output holds the "
-               f"embedding of --method on {dataset}.")
+               f"{n_cells:,} cells in --output. ")
+        if side and category == "diagonal":
+            cli += (f"They are the labels of the {side[0]} cells, and {dataset} has "
+                    f"no label file for the {side[1]} cells. --dataset scores a "
+                    f"diagonal folder only when both sides have a label file, and "
+                    f"--missing-labels drop does not change that.")
+        else:
+            cli += f"Check that --output holds the embedding of --method on {dataset}."
         return config.hint(escib.count_error(what, n, n_cells), cli)
     msg = config.hint(
         escib.count_error(what, n, n_cells),
@@ -656,6 +692,13 @@ def _count_error(what: str, n: int, n_cells: int, given) -> str:
     if what != "labels" or n >= n_cells:
         return msg
     batches = _batch_files(files[0], n_cells) if len(files) == 1 else []
+    if side and not batches:
+        drop = config.hint('missing_labels="drop"', "--missing-labels drop")
+        return (f"{msg} {_and_list(f.name for f in files)} "
+                f"{'names' if len(files) == 1 else 'name'} the labels of {side[0]} "
+                f"cells. If the embedding also holds the {side[1]} cells of a diagonal "
+                f"folder, they have no entry here: {drop} leaves out cells whose label "
+                f"is missing, not cells without an entry.")
     order = f" ({', '.join(f.name for f in batches)})" if batches else ""
     return msg + " " + config.hint(
         "For a folder with one label file per batch, pass "
@@ -1139,6 +1182,12 @@ def evaluate(
     _validate_category(category)
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
+    if isinstance(labels, dict) and not labels:
+        raise ValueError(
+            "labels is an empty dict, so there is nothing to score. mtb.labels_for "
+            "returns one for a dataset folder without label files (cty.csv, cty1.csv, "
+            "cty2.csv, ... for data in batches, or rna_cty.csv and atac_cty.csv for "
+            "diagonal data).")
     # a labels_for() dict becomes the list of paths in cell order first, so the
     # file-of-origin batch rule below sees it like any other list of files
     if isinstance(labels, dict):
@@ -1203,7 +1252,7 @@ def evaluate(
     for what, values, given in (("labels", ct, labels), ("clustering", cl, clustering),
                                 ("batch", ba, batch)):
         if values is not None and len(values) != n_cells:
-            raise ValueError(_count_error(what, len(values), n_cells, given))
+            raise ValueError(_count_error(what, len(values), n_cells, given, category))
     # a missing label is not a cell type: checked here, on the labels in cell
     # order, because compute() casts them to str and "nan" becomes one more type
     miss, dropped = io.missing_mask(ct), None
@@ -1213,13 +1262,15 @@ def evaluate(
             shown = _as_written(labels, adata, ids, what="labels")
             raise ValueError(_no_label_error(
                 ct if shown is None else shown, miss, labels))
-        # the batches before and after count only when a batch metric is scored
-        scored = group in {"batch", "all"}
-        n_batches = _n_batches(ba) if scored else None
+        # the batches before and after count whenever a batch vector is known.
+        # For several label files that is the file of origin: ba is zeros
+        # when no batch metric is scored
+        known = ba if batch is not None else origin if batch_from_files else None
+        batches = None if known is None else (
+            _n_batches(np.asarray(known)[keep]), _n_batches(known))
         emb, ct, ba = emb[keep], np.asarray(ct)[keep], np.asarray(ba)[keep]
         cl = None if cl is None else np.asarray(cl)[keep]
-        dropped = (int(keep.sum()), n_cells,
-                   (_n_batches(ba), n_batches) if scored else None)
+        dropped = (int(keep.sum()), n_cells, batches, group in {"batch", "all"})
     if batch is not None:
         # after the drop: only the cells that are scored need a batch
         no_batch = io.missing_mask(ba)

@@ -102,6 +102,149 @@ def test_cli_one_label_file_without_siblings_gives_the_general_fix(tmp_path, cap
             "--category and --method.") in err
 
 
+# --- the review of 0.3.5: label files of one diagonal side, and none at all ---
+
+def _folder(root, name, cells, labels):
+    """A dataset folder ``root/name``: ``cells`` gives the cells of each data
+    file, ``labels`` the labels of each label file."""
+    import h5py
+    d = root / name
+    d.mkdir(parents=True)
+    for file, n in cells.items():
+        with h5py.File(d / file, "w") as f:
+            g = f.create_group("matrix")
+            g.create_dataset("data", data=np.ones((4, n)))
+            g.create_dataset("features", data=np.array(
+                [f"GENE{i}" for i in range(4)], dtype="S32"))
+            g.create_dataset("barcodes", data=np.array(
+                [f"{file[:-3]}_{i}" for i in range(n)], dtype="S32"))
+    for file, n in labels.items():
+        pd.DataFrame({"x": ["T", "B"] * (n // 2)}).to_csv(d / file, index=False)
+    return d
+
+
+def _cli_error(capsys, *argv):
+    """The message of a ``multibench evaluate`` call that stops with an error."""
+    assert cli.main(["evaluate", *argv]) == 1
+    lines = [line for line in capsys.readouterr().err.splitlines()
+             if line.startswith("error: ")]
+    assert len(lines) == 1, lines
+    return lines[0][len("error: "):]
+
+
+def _one_side(file, side, other, drop):
+    return (f"{file} the labels of {side} cells. If the embedding also holds the "
+            f"{other} cells of a diagonal folder, they have no entry here: {drop} "
+            f"leaves out cells whose label is missing, not cells without an entry.")
+
+
+def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
+    """rna_cty.csv without atac_cty.csv: the 70 ATAC cells of the embedding
+    have no entry. The message says that. It does not blame the embedding or
+    name the call that was made, and missing_labels="drop" does not change it."""
+    emb = np.random.default_rng(0).normal(size=(150, 5))
+    np.save(tmp_path / "emb.npy", emb)
+    data = tmp_path / "data"
+    d = _folder(data, "BRAIN", {"rna.h5": 80, "atac_gas.h5": 70}, {"rna_cty.csv": 80})
+    py = ("labels has 80 entries for 150 cells in the embedding. "
+          + _one_side("rna_cty.csv names", "RNA", "ATAC", 'missing_labels="drop"'))
+    found = mtb.labels_for("BRAIN", "diagonal", "SCALEX", data_path=data)
+    assert list(found) == ["rna_cty"]
+    for labels in (found, str(d / "rna_cty.csv")):
+        for kw in ({}, {"missing_labels": "drop"}):
+            with pytest.raises(ValueError) as e:
+                mtb.evaluate(emb, labels=labels, metrics=["ASW"], **kw)
+            assert str(e.value) == py
+    out = ["--output", str(tmp_path / "emb.npy"), "--metrics", "ASW"]
+    dataset = ["--dataset", "BRAIN", "--method", "SCALEX", "--category", "diagonal",
+               "--data-path", str(data)]
+    from_dataset = _cli_error(capsys, *out, *dataset, "--missing-labels", "drop")
+    assert from_dataset == (
+        "the label files of BRAIN (rna_cty.csv) hold 80 labels for 150 cells in "
+        "--output. They are the labels of the RNA cells, and BRAIN has no label file "
+        "for the ATAC cells. --dataset scores a diagonal folder only when both sides "
+        "have a label file, and --missing-labels drop does not change that.")
+    # --column reads the same files
+    assert _cli_error(capsys, *out, *dataset, "--column", "x") == from_dataset
+    from_file = _cli_error(capsys, *out, "--labels", str(d / "rna_cty.csv"),
+                           "--missing-labels", "drop")
+    assert from_file == (
+        "--labels gave 80 labels (rna_cty.csv) for 150 cells in --output. "
+        + _one_side("rna_cty.csv names", "RNA", "ATAC", "--missing-labels drop"))
+    for msg in (py, from_dataset, from_file):
+        assert "Check that --output holds" not in msg
+        assert "pass mtb.labels_for(" not in msg
+    # the ATAC side alone reads the other way round, and two files in the plural
+    d = _folder(data, "ATAC", {}, {"atac_cty.csv": 70})
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=str(d / "atac_cty.csv"), metrics=["ASW"])
+    assert str(e.value) == (
+        "labels has 70 entries for 150 cells in the embedding. "
+        + _one_side("atac_cty.csv names", "ATAC", "RNA", 'missing_labels="drop"'))
+    d = _folder(data, "RNA2", {}, {"rna_cty1.csv": 40, "rna_cty2.csv": 40})
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=[d / "rna_cty1.csv", d / "rna_cty2.csv"],
+                     metrics=["ASW"])
+    assert str(e.value) == (
+        "labels has 80 entries for 150 cells in the embedding. " + _one_side(
+            "rna_cty1.csv and rna_cty2.csv name", "RNA", "ATAC", 'missing_labels="drop"'))
+
+
+def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
+    """rna_cty.csv is also the older name of a paired folder's label file, and
+    a diagonal folder may hold atac_cty.csv next to it: those keep their text."""
+    emb = np.random.default_rng(0).normal(size=(150, 5))
+    np.save(tmp_path / "emb.npy", emb)
+    np.save(tmp_path / "emb80.npy", emb[:80])
+    data = tmp_path / "data"
+    out = ["--output", str(tmp_path / "emb.npy"), "--metrics", "ASW"]
+    # a paired folder: the embedding is the first thing to check
+    _folder(data, "OLDPAIR", {"rna.h5": 120, "adt.h5": 120}, {"rna_cty.csv": 120})
+    assert _cli_error(capsys, *out, "--dataset", "OLDPAIR", "--method", "totalVI",
+                      "--category", "vertical", "--data-path", str(data)) == (
+        "the label files of OLDPAIR (rna_cty.csv) hold 120 labels for 150 cells in "
+        "--output. Check that --output holds the embedding of --method on OLDPAIR.")
+    # the label file of the other side is next to it: several files are the fix
+    d = _folder(data, "BOTH", {"rna.h5": 80, "atac_gas.h5": 70},
+                {"rna_cty.csv": 80, "atac_cty.csv": 70})
+    assert _cli_error(capsys, *out, "--labels", str(d / "rna_cty.csv")) == (
+        "--labels gave 80 labels (rna_cty.csv) for 150 cells in --output. For several "
+        "label files, repeat --labels in the row order of --output, or pass --dataset, "
+        "--category and --method.")
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=str(d / "rna_cty.csv"), metrics=["ASW"])
+    assert str(e.value) == (
+        "labels has 80 entries for 150 cells in the embedding. For a folder with one "
+        "label file per batch, pass mtb.labels_for(dataset, category, method).")
+    # one file of several of one side, which add up to the cells: the same
+    d = _folder(data, "RNA2", {}, {"rna_cty1.csv": 40, "rna_cty2.csv": 40})
+    assert _cli_error(capsys, "--output", str(tmp_path / "emb80.npy"), "--metrics", "ASW",
+                      "--labels", str(d / "rna_cty1.csv")) == (
+        "--labels gave 40 labels (rna_cty1.csv) for 80 cells in --output. For several "
+        "label files (rna_cty1.csv, rna_cty2.csv), repeat --labels in the row order of "
+        "--output, or pass --dataset, --category and --method.")
+
+
+def test_an_empty_labels_dict_has_nothing_to_score(tmp_path):
+    """mtb.labels_for returns an empty dict for a folder without label files.
+    evaluate says that, not that the labels have 0 entries."""
+    emb, _ = _blobs()
+    text = ("labels is an empty dict, so there is nothing to score. mtb.labels_for "
+            "returns one for a dataset folder without label files (cty.csv, cty1.csv, "
+            "cty2.csv, ... for data in batches, or rna_cty.csv and atac_cty.csv for "
+            "diagonal data).")
+    data = tmp_path / "data"
+    _folder(data, "NOLAB", {"rna.h5": 50, "atac_gas.h5": 40}, {})
+    _folder(data, "X_NOLAB", {f"{m}{i}.h5": 45 for m in ("rna", "adt") for i in (1, 2)},
+            {})
+    for labels in ({}, mtb.labels_for("NOLAB", "diagonal", "SCALEX", data_path=data),
+                   mtb.labels_for("X_NOLAB", "cross", data_path=data)):
+        assert labels == {}
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(emb, labels=labels, metrics=["ASW"])
+        assert str(e.value) == text
+
+
 # --- R3-14 (b) ---------------------------------------------------------------
 
 def test_export_partial_overlap_names_the_object_passed_as_data(tmp_path):

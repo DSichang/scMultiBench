@@ -444,7 +444,8 @@ def _looks_like_ids(col: pd.Series) -> bool:
 
 
 def by_id_column(values, first, ids, *, what: str, name: str, target: str,
-                 order: str, no_ids: str, stacklevel: int = 3, n_files: int = 1):
+                 order: str, no_ids: str, stacklevel: int = 3, n_files: int = 1,
+                 drop: bool = False):
     """Put a per-cell file in the order of ``ids`` by its first column.
 
     ``values`` and ``first`` come from :func:`read_labels_ids`; ``ids`` are
@@ -467,6 +468,10 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
 
     ``n_files`` > 1 when ``name`` names several stacked files: the warnings
     then speak of them in the plural.
+
+    ``drop`` is true for the labels of a caller that can leave out the cells
+    without a label (``evaluate(missing_labels="drop")``): the error for a
+    cell without a row then says how to mark such a cell.
     """
     vals = np.asarray(values)
     if first is None:
@@ -509,10 +514,16 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
             f"{_first(dup, 3)}). Give each cell one row.")
     missing = ids.difference(keys, sort=False)
     if len(missing):
+        mark = ""
+        if drop:
+            from .. import config
+            how = config.hint('missing_labels="drop"', "--missing-labels drop")
+            mark = (f" A cell without a label needs a row too, with an empty label; "
+                    f"{how} then leaves it out.")
         raise ValueError(
             f"{what}: {name} has no row for {len(missing):,} of the {len(ids):,} "
             f"cells of {target} (first: {_first(missing, 3)}). Give a row for every "
-            f"cell.")
+            f"cell.{mark}")
     return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
 
 
@@ -699,7 +710,9 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
         ``x`` (or ``ids``) has duplicate ids so the mapping is ambiguous; some
         of the output's ids are missing from ``x``; ``x`` has ids the output
         lacks. The message names the first few offenders and the positional
-        escape hatch (``{what}.to_numpy()``).
+        escape hatch (``{what}.to_numpy()``). For labels that only lack some
+        of the output's cells, it also says how to pass the cells without a
+        label (``labels.reindex(ids)`` with ``missing_labels="drop"``).
     """
     if isinstance(x, pd.DataFrame):
         if column is not None:
@@ -737,6 +750,11 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
         if len(missing) == len(ids):
             hint = (" The two id sets are disjoint: is the output transposed "
                     "(evaluate expects cells x dims), or indexed differently?")
+        elif what == "labels" and not len(extra):
+            # every id is a cell of the output, and some cells have none
+            hint = (" For cells without a label, pass labels.reindex(ids), where ids "
+                    "are the cell ids of the output (adata.obs_names for an AnnData), "
+                    'with missing_labels="drop".')
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the output's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}) "

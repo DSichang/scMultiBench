@@ -23,6 +23,7 @@ import pytest
 
 from multibench.eval import io
 from multibench.eval.pipeline import evaluate, to_long
+from tests.test_study_r4_wf import N as N_CITE, _quiet, cite  # noqa: F401
 
 pytest.importorskip("scib")
 
@@ -173,6 +174,85 @@ def test_labels_series_missing_or_extra_ids_raise_naming_them():
     with pytest.raises(ValueError, match="batch: cannot align by cell id"):
         evaluate(df, labels=ser, batch=pd.Series(["s1"] * 89, index=ids[:-1]),
                  metrics=["GC"])
+
+
+def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
+    """A cell without an entry is not a cell with a missing label, so labels
+    for some of the output's cells are refused whatever missing_labels is.
+    Both errors say how to mark the other cells, and both ways score."""
+    ad = pytest.importorskip("anndata")
+    from multibench import cli
+    emb, ct, _, ids = _toy()
+    a = ad.AnnData(np.zeros((len(ct), 2)))
+    a.obs_names = ids
+    a.obsm["X_emb"] = emb
+    a.obs["celltype"] = ct
+    some = pd.Series(ct, index=ids).iloc[:60]
+    kw = dict(metrics=["ASW"], missing_labels="drop")
+    series = ("{0}: cannot align by cell id - 30 of the output's 90 cells are missing "
+              "from {0} (first: ['cell60', 'cell61', 'cell62', 'cell63', 'cell64']) and "
+              "{0} has 0 id(s) the output lacks (first: []). Pass {0} for exactly the "
+              "output's cells, or {0}.to_numpy() to match positionally.")
+    with pytest.raises(ValueError) as exc:
+        evaluate(a, labels=some, **kw)
+    assert str(exc.value) == series.format("labels") + (
+        " For cells without a label, pass labels.reindex(ids), where ids are the cell "
+        "ids of the output (adata.obs_names for an AnnData), with "
+        "missing_labels=\"drop\".")
+    file = ("{}: some.csv has no row for 30 of the 90 cells of the output (first: "
+            "['cell60', 'cell61', 'cell62']). Give a row for every cell.")
+    row = " A cell without a label needs a row too, with an empty label; "
+    some.rename("x").to_frame().to_csv(tmp_path / "some.csv")
+    with pytest.raises(ValueError) as exc:
+        evaluate(a, labels=str(tmp_path / "some.csv"), **kw)
+    assert str(exc.value) == (file.format("labels") + row
+                              + "missing_labels=\"drop\" then leaves it out.")
+    # the command line names its own flag
+    a.write_h5ad(tmp_path / "emb.h5ad")
+    assert cli.main(["evaluate", "--output", str(tmp_path / "emb.h5ad"), "--labels",
+                     str(tmp_path / "some.csv"), "--metrics", "ASW",
+                     "--missing-labels", "drop"]) == 1
+    assert ("error: " + file.format("labels") + row
+            + "--missing-labels drop then leaves it out.\n") in capsys.readouterr().err
+    # both ways out score the 60 labelled cells, also for a DataFrame output
+    some.reindex(ids).rename("x").to_frame().to_csv(tmp_path / "every.csv")
+    frame = pd.DataFrame(emb, index=ids)
+    for output, labels in ((a, some.reindex(a.obs_names)),
+                           (a, str(tmp_path / "every.csv")),
+                           (frame, some.reindex(frame.index))):
+        with pytest.warns(UserWarning, match="^Scored the 60 labelled cells of 90"):
+            got = evaluate(output, labels=labels, **kw)
+        assert (got.attrs["cells_scored"], got.attrs["cells_total"]) == (60, 90)
+    # labels with an id that is no cell of the output: reindex is not the advice
+    odd = pd.concat([some, pd.Series(["B"], index=["ghost"])])
+    with pytest.raises(ValueError) as exc:
+        evaluate(a, labels=odd, **kw)
+    assert str(exc.value).endswith("or labels.to_numpy() to match positionally.")
+    # batch= has no such way out: both errors keep their text
+    with pytest.raises(ValueError) as exc:
+        evaluate(a, labels="celltype", batch=some, metrics=["GC"])
+    assert str(exc.value) == series.format("batch")
+    with pytest.raises(ValueError) as exc:
+        evaluate(a, labels="celltype", batch=str(tmp_path / "some.csv"), metrics=["GC"])
+    assert str(exc.value) == file.format("batch")
+
+
+def test_rescore_keeps_its_text_for_a_label_file_without_every_cell(cite, tmp_path):
+    """rescore has no missing_labels, so its error for a label file that lacks
+    cells of the dataset gives no advice about it."""
+    import multibench as mtb
+    data, _, _ = cite
+    _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", data_path=data,
+           methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
+    res = mtb.load_batch(tmp_path / "a")
+    pd.DataFrame({"barcode": [f"c{i}" for i in range(N_CITE - 30)],
+                  "x": ["A"] * 60 + ["B"] * 30}).to_csv(tmp_path / "part.csv", index=False)
+    with pytest.raises(ValueError) as exc:
+        res.rescore(labels=str(tmp_path / "part.csv"))
+    assert str(exc.value) == (
+        "labels: part.csv has no row for 30 of the 120 cells of MYCITE (first: "
+        "['c90', 'c91', 'c92']). Give a row for every cell.")
+    assert "missing_labels" not in str(exc.value)
 
 
 def test_labels_series_with_ids_against_bare_array_is_positional_with_warning():

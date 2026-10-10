@@ -747,12 +747,13 @@ def test_drop_names_a_lost_batch(tmp_path):
     assert said == [
         "Scored the 100 labelled cells of 300. 200 cells have no label and were left "
         "out, so the scores describe the labelled cells only. The labelled cells are "
-        "all in one batch, so the batch metrics do not measure mixing."]
+        "all in one batch, so no score changes with where the cells of the other "
+        "batches are placed, and the batch metrics do not measure mixing."]
     # every batch keeps a labelled cell: nothing to add
     _, said = _drop(emb, labels=_gaps(lab), batch=bat, **kw)
     assert said == ["Scored the 270 labelled cells of 300. 30 cells have no label and "
                     "were left out, so the scores describe the labelled cells only."]
-    # no batch metric is scored: the batches are not counted
+    # no batch vector is given: there are no batches to count
     _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), metrics=["ASW"])
     assert said == [base]
 
@@ -766,7 +767,8 @@ def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
     assert said == [
         "Scored the 150 labelled cells of 300. 150 cells have no label and were left "
         "out, so the scores describe the labelled cells only. The labelled cells are "
-        "all in one batch, so the batch metrics do not measure mixing."]
+        "all in one batch, so no score changes with where the cells of the other "
+        "batches are placed, and the batch metrics do not measure mixing."]
     assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (150, 300)
     _same(out, mtb.evaluate(emb[:150], labels=lab[:150], batch=np.ones(150, dtype=int),
                             metrics="all", verbose=False))
@@ -774,6 +776,51 @@ def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[str(p) for p in files])
     assert str(e.value) == _e1(" (cty1.csv, cty2.csv)", SEEN_NA, RENAME_NA, n=150)
+
+
+def test_one_labelled_batch_hides_the_other_batches_from_every_score(tmp_path):
+    """With labels in one batch only, every cell of the other batches is left
+    out: two embeddings that differ only in those cells get the same scores.
+    The warning says so whenever a batch vector is known."""
+    emb, lab = _cells()
+    bat = _donors()
+    one = _gaps(lab, at=bat != "d1")
+    moved = emb.copy()
+    moved[bat != "d1"] = np.random.default_rng(1).normal(size=(200, 8)) * 9
+    base = ("Scored the 100 labelled cells of 300. 200 cells have no label and were "
+            "left out, so the scores describe the labelled cells only.")
+    hidden = (" The labelled cells are all in one batch, so no score changes with where "
+              "the cells of the other batches are placed")
+    kw = dict(labels=one, batch=bat, metrics="all")
+    got, said = _drop(emb, **kw)
+    other, said_other = _drop(moved, **kw)
+    _same(got, other)
+    assert got.index.tolist() == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
+                                  "ASW_batch", "GC", "iLISI"]
+    assert said == said_other == [
+        base + hidden + ", and the batch metrics do not measure mixing."]
+    # no batch metric is scored: the sentence ends after the scores
+    kw = dict(labels=one, batch=bat, metrics=["ASW"])
+    got, said = _drop(emb, **kw)
+    _same(got, _drop(moved, **kw)[0])
+    assert said == [base + hidden + "."]
+    # labels in two of the three batches are counted without a batch metric too
+    _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), batch=bat, metrics=["ASW"])
+    assert said == ["Scored the 200 labelled cells of 300. 100 cells have no label and "
+                    "were left out, so the scores describe the labelled cells only. The "
+                    "labelled cells come from 2 of the 3 batches."]
+    # no batch vector: evaluate cannot tell which cells were left out
+    got, said = _drop(emb, labels=one, metrics=["ASW"])
+    _same(got, _drop(moved, labels=one, metrics=["ASW"])[0])
+    assert said == [base]
+    # the file of origin is a batch vector, also when no batch metric is scored
+    files = [tmp_path / "cty1.csv", tmp_path / "cty2.csv"]
+    pd.DataFrame({"x": lab[:150]}).to_csv(files[0], index=False)
+    pd.DataFrame({"x": ["NA"] * 150}).to_csv(files[1], index=False)
+    _, said = _drop(emb, labels=[str(p) for p in files], metrics=["ASW"])
+    assert said == ["Scored the 150 labelled cells of 300. 150 cells have no label and "
+                    "were left out, so the scores describe the labelled cells only."
+                    + hidden + "."]
 
 
 # ============================================================ the reference
