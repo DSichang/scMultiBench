@@ -171,9 +171,10 @@ def test_collapsed_blocks_render_as_markdown():
 
 
 def test_tutorials_use_the_public_api_not_raw_csv_reads():
-    """Stored scores come from load_results and matrices from read_canonical.
-    The one read_csv the tutorials keep reads a dataset's label file into a
-    demo AnnData for the own-data section."""
+    """Stored scores come from load_results. The tutorials read no file of a
+    dataset themselves: ``mtb.data.write_example`` writes the example files
+    of the task's dataset, and the one kind of read the tutorials keep is the
+    ``read_h5ad`` of these ``my_*.h5ad`` files in the own-data section."""
     gen = _load_gen_tut()
     for key, s in gen.TASKS.items():
         cells = gen.build_tutorial(key)
@@ -183,12 +184,14 @@ def test_tutorials_use_the_public_api_not_raw_csv_reads():
         assert ("mtb.load_results(" in src) == bool(s.get("stored_ds")), key
         assert src.count("mtb.load_results(") == src.count('source="rerun"'), key
         assert "mtb.cite(" in md
-        reads = re.findall(r"read_csv\(([^)]*)\)", src)
+        assert f'mtb.data.write_example("{s["ds"]}")' in src, key
+        assert src.count("write_example(") == 1, key
+        assert 'ad.read_h5ad("my_' in src, key
+        reads = re.findall(r"read_h5ad\(([^)]*)\)", src)
         assert reads, key
         for arg in reads:
-            assert re.fullmatch(r'd / f?"\w*cty\{?\w*\}?\.csv"', arg), (key, arg)
-        assert f'd = mtb.config.DEFAULT.data_path / "{s["ds"]}"' in src
-        assert "mtb.io.read_canonical(" in src and "h5py" not in src
+            assert re.fullmatch(r'"my_\w+\.h5ad"', arg), (key, arg)
+        assert "read_csv(" not in src and "read_canonical(" not in src and "h5py" not in src, key
         assert "read_csv(RESULTS" not in src and "results/" not in src
         assert "from multibench.engine import registry" not in src
 
@@ -499,6 +502,7 @@ REFERENCE = {
     "mtb.data.fetch": ("data.md", "multibench.data.fetch.fetch"),
     "mtb.data.fetch_outputs": ("data.md", "multibench.data.fetch.fetch_outputs"),
     "mtb.data.fetchable": ("data.md", "multibench.data.results.fetchable"),
+    "mtb.data.write_example": ("data.md", "multibench.data.examples.write_example"),
     "mtb.catalog.methods": ("catalog.md", "multibench.data.catalog.methods"),
     "mtb.catalog.datasets": ("catalog.md", "multibench.data.catalog.datasets"),
     "mtb.catalog.metrics": ("catalog.md", "multibench.data.catalog.metrics"),
@@ -1049,3 +1053,214 @@ def test_the_site_has_no_every_method_pages():
     yml = (root / "mkdocs.yml").read_text()
     for key in gen.TASKS:
         assert f"tutorials/{key}_all.md: {gen.SITE}tutorials/{key}/" in yml, key
+
+
+# ---- 0.3.5: the own-data changes on the API overview and the Changes page ----
+def _flat(page):
+    return " ".join((_docs_root() / page).read_text().split())
+
+
+@needs_docs
+def test_api_overview_names_both_cases_of_file_exists_error(tmp_path):
+    """``export_dataset`` raises ``FileExistsError`` for a file it would
+    replace, and for files of other data that the call does not write.
+    ``overwrite=True`` helps for the first only. The overview gives a fix for
+    each, and the package raises in both."""
+    api = _flat("api.md")
+    assert "or the folder holds files of other data that the call does not write" in api
+    assert ("- `FileExistsError`: `mtb.io.export_dataset` or `multibench convert` would "
+            "replace a file, or the folder holds files of other data that the call does not "
+            "write. For the first, pass `overwrite=True`, or `--overwrite` on the command "
+            "line. For the second, export to a new folder, or delete the files the message "
+            "names.") in api
+    ad = pytest.importorskip("anndata")
+    import numpy as np
+    import multibench as mtb
+
+    def cells(prefix, n):
+        a = ad.AnnData(np.random.default_rng(0).poisson(1.0, (n, 20)).astype(float))
+        a.obs_names = [f"{prefix}{i}" for i in range(n)]
+        a.var_names = [f"g{i}" for i in range(20)]
+        a.obs["celltype"] = ["A", "B"] * (n // 2)
+        return a
+    first = cells("c", 40)
+    out = mtb.io.export_dataset(first, tmp_path / "MINE", labels="obs:celltype")
+    held = {p.name: p.read_bytes() for p in out.iterdir()}
+    # the first case, and its fix
+    with pytest.raises(FileExistsError, match=r"already holds .* Pass overwrite=True to "
+                                              r"replace them\.$"):
+        mtb.io.export_dataset(first, out, labels="obs:celltype")
+    mtb.io.export_dataset(first, out, labels="obs:celltype", overwrite=True)
+    # the second case: overwrite=True does not help, a new folder does
+    other = cells("z", 30)
+    for overwrite in (False, True):
+        with pytest.raises(FileExistsError, match="holds files of other data that this call "
+                                                  "does not write"):
+            mtb.io.export_dataset(other, out, overwrite=overwrite)
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == held
+    mtb.io.export_dataset(other, tmp_path / "OTHER")
+
+
+#: the recipes of tutorials/run, which the Changes page links
+RECIPE_ANCHORS = ["own-data-recipes", "recipe-10x-h5", "recipe-labels-csv",
+                  "recipe-no-labels", "recipe-donors"]
+
+
+def _changes_0_3_5():
+    """The two 0.3.5 sections of the Changes page, each on one line."""
+    page = (_docs_root() / "changes.md").read_text()
+    heads = re.findall(r"^## (.+)$", page, re.M)
+    assert heads[:3] == ["New in 0.3.5", "Behaviour changes in 0.3.5", "New in 0.3.4"]
+    return [" ".join(page.split(f"## {h}\n", 1)[1].split("\n## ", 1)[0].split())
+            for h in heads[:2]]
+
+
+@needs_docs
+def test_changes_page_lists_0_3_5():
+    """The page names what 0.3.5 adds by the spelling a reader types, and
+    each name exists. Its behaviour changes cover the nine groups, and it
+    says plainly what 0.3.5 does not solve."""
+    import multibench as mtb
+    from multibench import cli
+    new, changed = _changes_0_3_5()
+    for name in ("`mtb.data.write_example(dataset)`", "`mtb.scan(..., per_method=True)`",
+                 '`mtb.scan(..., modalities="all")`', '`mtb.run_all(..., modalities="all")`',
+                 '`mtb.evaluate(..., missing_labels="drop")`',
+                 "`mtb.io.export_dataset(..., batch_index=N, n_batches=M)`",
+                 "`multibench scan --modalities all`", "`multibench run-all --modalities all`",
+                 "`multibench evaluate --missing-labels drop`",
+                 "`multibench convert --n-batches M`",
+                 '`"obs:<column>"` or `"<column>"`', "`multibench-sc>=0.3.5`"):
+        assert name in new, name
+    assert callable(mtb.data.write_example)
+    for fn, keyword in ((mtb.scan, "per_method"), (mtb.evaluate, "missing_labels"),
+                        (mtb.io.export_dataset, "n_batches")):
+        assert keyword in inspect.signature(fn).parameters, keyword
+    parser = cli.build_parser()
+    for argv in (["scan", "D11", "--modalities", "all"],
+                 ["run-all", "D11", "--category", "vertical", "--modalities", "all", "--dry-run"],
+                 ["evaluate", "--output", "e.h5", "--labels", "c.csv", "--missing-labels", "drop"],
+                 ["convert", "a.h5ad", "OUT", "--rna", "X", "--batch-index", "1",
+                  "--n-batches", "3"]):
+        parser.parse_args(argv)
+    # the four attrs keys of the scan table
+    assert ("The table of `mtb.scan` has three `attrs` keys: `held`, the modalities the "
+            "folder holds, `not_listed`, the number of rows left out, and `not_held`, the "
+            "modalities those rows lack. With `per_method=True` it has a fourth, `cells`, "
+            "the number of cells of each matrix file.") in new
+    # the recipes, each by its anchor on tutorials/run
+    run = (_docs_root() / "tutorials" / "run.md").read_text()
+    for anchor in RECIPE_ANCHORS:
+        assert f"(tutorials/run.md#{anchor})" in new, anchor
+        assert f"{{ #{anchor} }}" in run, anchor
+    heads = re.findall(r"^### (.+)$", (_docs_root() / "changes.md").read_text()
+                       .split("## Behaviour changes in 0.3.5", 1)[1].split("\n## ", 1)[0], re.M)
+    assert heads == ["Missing labels and batches", "Dataset folders", "scan and dry runs",
+                     "Messages", "Tutorials", "Not solved in 0.3.5"]
+    for said in (
+            # missing labels: evaluate, run_all, export
+            "`mtb.evaluate` raises `ValueError` when a cell has no label. 0.3.4 scored the "
+            "cells without a label as one more cell type, so its scores were wrong.",
+            "`mtb.run_all` raises `ValueError` before it runs a method when a label file of "
+            "the dataset folder has a missing label.",
+            "`mtb.io.export_dataset` raises `ValueError` for a label that a label file reads "
+            "as missing, such as the text `NA`.",
+            # missing batches: evaluate, run_all, export
+            "raise `ValueError` when a cell has no batch. 0.3.4 counted the cells without a "
+            "batch as one more batch, so its batch metrics were wrong, without a warning.",
+            "`mtb.io.export_dataset(batch=...)` raises `ValueError` when a cell has no batch.",
+            # files of other data, and the row order
+            "raise `FileExistsError` when the folder holds files of other data that the call "
+            "does not write.",
+            "The call writes nothing, and `overwrite=True` does not remove these files.",
+            "A file written for cells that the folder already holds follows the cell order "
+            "of the files in the folder, and a line on stderr says so.",
+            "Data with 0 cells raises `ValueError`. 0.3.4 wrote files without a cell.",
+            # several feature types, and the 10x file
+            "This applies to an AnnData and to an `.h5ad` file, in `export_dataset`, "
+            "`to_canonical`, `multibench convert` and the conversion that `mtb.run` does.",
+            "A 10x Genomics `.h5` file raises `ValueError` in `to_canonical`, "
+            "`multibench convert` and `mtb.run`.",
+            # ADT read from X
+            "0.3.4 raised `ValueError` for any `obsm` entry, so such a file could not be "
+            "exported.",
+            # the rows scan lists
+            "list the variants whose modalities the folder holds. 0.3.4 listed every variant "
+            "of the category.",
+            "The table of 0.3.4 was not wrong. `modalities=\"all\"`, or `--modalities all`, "
+            "gives it back.",
+            "With `verbose=False` nothing is printed, and only the `attrs` keys `not_listed` "
+            "and `not_held` of the table say that rows were left out.",
+            "a named method that is skipped gets a `skipping` line for its listed variants "
+            "only.",
+            # reworded errors, and the folder names of the tutorials
+            "Some errors have a new text and the same exception class.",
+            "Ten tutorials write the folder of their section \"Your own data\" under a new "
+            "name, one name per tutorial."):
+        assert said in changed, said
+    unsolved = changed.split("### Not solved in 0.3.5", 1)[1]
+    for said in (
+            "An export with `batch_index=` and without `n_batches=` does not look at the "
+            "files of other batch numbers.",
+            "When you change only some of the file names in the read cell of a tutorial, the "
+            "export writes your cells next to cells of the example, and no error says so.",
+            "Diagonal data with cell types for one side only cannot be scored through "
+            "`run_all`."):
+        assert said in unsolved, said
+    # the tutorials whose run still counts rows without files: the ones that
+    # tests/test_tutorial_own_data.py runs and finds the line in
+    from tests.test_tutorial_own_data import MORE_ROWS, NAMES, OLD
+    line = "`N more rows need files this folder does not have. mtb.scan shows them.`"
+    assert changed.count(line) == 2 and line in unsolved
+    listed = re.search(r"in five tutorials: ([^.]+)\.", unsolved).group(1)
+    assert re.findall(r"`(\w+)`", listed) == list(MORE_ROWS) and len(MORE_ROWS) == 5
+    # the folder names: every new name is on the page, next to the name it replaces
+    renamed = {key: name for key, name in NAMES.items() if name != OLD[key]["name"]}
+    assert len(renamed) == 10
+    for key, name in renamed.items():
+        was = OLD[key]["name"]
+        assert re.search(rf"`{was}` became [^.]*`{name}`", changed), (was, name)
+    kept = sorted(set(NAMES.values()) - set(renamed.values()))
+    assert f"`{kept[0]}`, `{kept[1]}` and `{kept[2]}` are unchanged." in changed
+
+
+@needs_docs
+def test_changes_page_quotes_the_live_0_3_5_texts(capsys, monkeypatch):
+    """The lines and numbers that the 0.3.5 sections quote are what the
+    package prints: the rows of ``scan`` on D11, its count line with the
+    sentence about rows that are not listed, and the end of ``scored_with``."""
+    import numpy as np
+    import multibench as mtb
+    from multibench import workflow as W
+    new, changed = _changes_0_3_5()
+    if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
+        pytest.skip("D11 is not on disk")
+    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+    table = mtb.scan("D11", "vertical")
+    first = capsys.readouterr().out.splitlines()[0]
+    every = mtb.scan("D11", "vertical", modalities="all", verbose=False)
+    assert (len(table), len(every)) == (14, 33)
+    assert '`mtb.scan("D11", "vertical")` has 14 rows, where 0.3.4 had 33' in changed
+    assert table.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
+    count = "14 of 14 methods have their input files."
+    note = ('D11 holds RNA and ADT. 19 rows that read ATAC are not listed. modalities="all" '
+            'lists them.')
+    assert first.startswith(f"[scan] {count} ") and f" {note}" in first
+    assert f"`{count}`" in changed and f"`{note}`" in changed
+    # "Only rows whose input files are missing are left out."
+    key = ["method", "modalities"]
+    listed = set(map(tuple, table[key].values))
+    with_files = {tuple(r) for r in every.loc[every["files_ok"], key].values}
+    assert with_files == {tuple(r) for r in table.loc[table["files_ok"], key].values}
+    assert len(with_files) == 14 and with_files <= listed
+    # the fourth part of scored_with
+    emb = np.random.default_rng(0).normal(size=(300, 4))
+    labels = np.array(["A", "B", "C"] * 100, dtype=object)
+    labels[:30] = None
+    with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\. "):
+        scores = mtb.evaluate(emb, labels=labels, metrics=["ASW"], missing_labels="drop",
+                              verbose=False)
+    assert (scores.attrs["cells_scored"], scores.attrs["cells_total"]) == (270, 300)
+    long = mtb.to_long(scores, method="mine", dataset="D", category="vertical")
+    assert set(long["scored_with"].str.rsplit("/", n=1).str[-1]) == {"270 of 300 cells"}
+    assert "ends with them, such as `270 of 300 cells`" in new
