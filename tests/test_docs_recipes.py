@@ -9,10 +9,13 @@ the tutorial then work on the folder of the recipe.
 
 These tests read the page and run its code fences in page order, on
 synthetic files, with the names the page uses (``annotation.csv``,
-``mydata/``, ``celltype``). What the page says in words next to a fence is
-checked on the same run: the folder a recipe writes, the lines it prints, the
-errors it names. No method runs: the environments are pinned as present, and
-``_run`` writes a random embedding.
+``mydata/``, ``celltype``). A value that the page quotes next to a fence (a
+status, a file name, a line of the check, the name of an error, a feature
+type) is read from the page and compared with the run, so an edit of the
+page fails here as a change of the package does. A sentence that says what a
+call does, without a value to compare, is looked up on the page next to the
+run that shows it. No method runs: the environments are pinned as present,
+and ``_run`` writes a random embedding.
 
 Needs the docs source (SCMULTIBENCH_DOCS=<docs dir>); skipped without it.
 """
@@ -30,7 +33,8 @@ import pytest
 import multibench as mtb
 from multibench import cli, config
 from multibench import workflow as W
-from multibench.engine import envs, registry, resolve, schema
+from multibench.engine import envs, ingest, registry, resolve, schema
+from multibench.eval import io as eio
 
 from tests.test_docs_r4 import _read, needs_docs
 from tests.test_tutorial_own_data import (CHECK, EXAMPLE, EXPORT, GEN, NAMES, READ, RUN,
@@ -75,6 +79,8 @@ GENES[1] = GENES[0]                       # 10x files repeat gene names
 PEAKS = [f"chr1:{i * 1000}-{i * 1000 + 500}" for i in range(60)]
 ANTIBODIES = [f"CD{i}" for i in range(20)]
 ANTIBODIES[3], ANTIBODIES[7] = "GENE5", "GENE9"     # two antibodies named as a gene
+#: the type that Cell Ranger gives the features of each modality
+TENX_TYPES = {"rna": "Gene Expression", "adt": "Antibody Capture", "atac": "Peaks"}
 
 ZERO_CELLS = (
     "The data holds 0 cells, so there is nothing to write. If you kept the cells that have a "
@@ -105,13 +111,50 @@ def _said(anchor):
     return " ".join(_recipe(anchor).split())
 
 
+def _says(anchor, sentence):
+    """The recipe has ``sentence``, word for word."""
+    assert sentence in _said(anchor), sentence
+
+
+def _quoted(anchor, pattern):
+    """What the recipe quotes in its one sentence that matches ``pattern``:
+    the group, or the groups as a tuple. A sentence that is reworded on the
+    page, or that is there twice, fails here."""
+    found = re.findall(pattern, _said(anchor))
+    assert len(found) == 1, (anchor, pattern, found)
+    return found[0]
+
+
+def _feature_types():
+    """``{modality: feature type}`` as the recipe names them for the two
+    kinds of 10x file: the names that Cell Ranger writes, and that the
+    package knows such a file by."""
+    rna, atac, rna_again, adt = _quoted(
+        "recipe-10x-h5", r"A 10x Multiome file holds `([^`]+)` and `([^`]+)`, and a CITE-seq "
+                         r"file holds `([^`]+)` and `([^`]+)`\.")
+    assert rna == rna_again
+    types = {"rna": rna, "adt": adt, "atac": atac}
+    assert types == TENX_TYPES == ingest._TENX_TYPE
+    return types
+
+
+def _scanpy_warning():
+    """The warning of scanpy that the recipe names, as scanpy words it."""
+    what = _quoted("recipe-10x-h5", r"scanpy warns that ([a-z ]+) are not unique, here and in "
+                                    r"the next steps\.")
+    return f"{what.capitalize()} are not unique"
+
+
 # ------------------------------------------------------------- synthetic data
-def _tenx(path, features, other, other_type, n_cells=300):
+def _tenx(path, features, other, modality, n_cells=300):
     """A Cell Ranger ``filtered_feature_bc_matrix.h5`` as scanpy reads it:
-    features x barcodes, sparse, with a type per feature. Returns the barcodes."""
+    features x barcodes, sparse, with a type per feature. The genes and the
+    features of ``modality`` (``"atac"`` or ``"adt"``) get the types that the
+    recipe names. Returns the barcodes."""
     rng = np.random.default_rng(0)
     names = list(features) + list(other)
-    types = ["Gene Expression"] * len(features) + [other_type] * len(other)
+    kinds = _feature_types()
+    types = [kinds["rna"]] * len(features) + [kinds[modality]] * len(other)
     m = sp.csc_matrix(rng.poisson(0.6, (len(names), n_cells)).astype(np.int32))
     bars = ["".join(rng.choice(list("ACGT"), 16)) + "-1" for _ in range(n_cells)]
     with h5py.File(path, "w") as f:
@@ -180,11 +223,12 @@ def _run_recipe_cell(src, ns):
     """Run a fence that works on the 10x object. scanpy warns that its
     variable names are not unique, as the page says; a warning of the
     package's own class with another text would be new."""
+    named = _scanpy_warning()
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
         out = _run_cell(src, ns)
     told = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
-    assert [t for t in told if "Variable names are not unique" not in t] == []
+    assert [t for t in told if named not in t] == []
     return out, len(told)
 
 
@@ -245,11 +289,34 @@ def test_the_anchors_exist_once(tmp_path):
     # the title that the error for a 10x file gives
     assert re.search(r"^#### A 10x `\.h5` file \{ #recipe-10x-h5 \}$", page, flags=re.M)
     src = tmp_path / "filtered_feature_bc_matrix.h5"
-    _tenx(src, GENES, PEAKS, "Peaks", n_cells=20)
+    _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     with pytest.raises(ValueError) as e:
         mtb.io.to_canonical(src, tmp_path / "out" / "rna.h5")
     assert str(e.value).endswith('The documentation has the steps as the recipe "A 10x .h5 file".')
     assert not (tmp_path / "out").exists()
+
+
+def test_a_10x_file_is_not_read_as_a_dataset_file(tmp_path, monkeypatch, capsys):
+    """The recipe opens by saying that the package does not read the file,
+    and the command-line block says so for ``multibench convert``. A run and
+    a conversion that are given the file stop and write nothing."""
+    _says("recipe-10x-h5", "`scan`, `run_all` and `multibench convert` do not read this file. "
+                           "Read it with scanpy first.")
+    _says("recipe-donors", "`multibench convert` reads `.h5ad` files, not a 10x `.h5` file.")
+    monkeypatch.chdir(tmp_path)
+    src = "filtered_feature_bc_matrix.h5"
+    _tenx(src, GENES, PEAKS, "atac", n_cells=20)
+    # the call that run_all makes for each method
+    with pytest.raises(ValueError, match="is a 10x Genomics file, not a multibench dataset "
+                                         "file"):
+        mtb.run("scMDC", "vertical", inputs={"rna": src, "adt": src}, out_dir="out",
+                dry_run=True)
+    for argv in (["convert", src, "OUT/", "--modality", "rna"],
+                 ["convert", src, "OUT", "--rna", "X"]):
+        assert cli.main(argv) == 1
+        assert "multibench convert reads .h5ad files, not this file." \
+            in capsys.readouterr().err
+    assert sorted(p.name for p in Path(".").iterdir()) == [src]
 
 
 def test_the_fences_are_the_ones_these_tests_run():
@@ -281,25 +348,33 @@ def test_10x_recipe_runs(host, tmp_path, monkeypatch, capsys):
         _run_cell(src[i], ns)
     example = Path("mydata") / NAMES[key]
     before = _bytes(example)
-    bars = _tenx("filtered_feature_bc_matrix.h5", GENES, PEAKS, "Peaks")
+    bars = _tenx("filtered_feature_bc_matrix.h5", GENES, PEAKS, "atac")
     labels = _annotation("annotation.csv", bars, keep=270)
     fences = _fences("recipe-10x-h5")
+    kinds = _feature_types()
     capsys.readouterr()
 
     # "scanpy warns that variable names are not unique, here and in the next steps"
     _, warned = _run_recipe_cell(fences[READ_10X], ns)
     assert warned
+    # "The printout lists the feature types of the file."
     printed = capsys.readouterr().out
-    assert re.search(r"^Gene Expression +120$", printed, flags=re.M)
-    assert re.search(r"^Peaks +60$", printed, flags=re.M)
+    assert re.search(rf"^{re.escape(kinds['rna'])} +120$", printed, flags=re.M)
+    assert re.search(rf"^{re.escape(kinds['atac'])} +60$", printed, flags=re.M)
     _, warned = _run_recipe_cell(fences[LABELS], ns)
     assert warned
     assert capsys.readouterr().out == "270 of 300 cells have a label\n"
-    # "export_dataset raises ValueError when a modality would hold two
-    # feature types, for example rna="X" on the object before the split"
-    with pytest.raises(ValueError, match=r"^rna='X' selects 180 features of 2 types: "):
+    # the error that the recipe names for the object before the split
+    error = _quoted("recipe-10x-h5", r"`export_dataset` raises `(\w+)` when a modality would "
+                                     r"hold two feature types, for example `rna=\"X\"` on the "
+                                     r"object before the split\.")
+    with pytest.raises(ValueError, match=r"^rna='X' selects 180 features of 2 types: ") as e:
         mtb.io.export_dataset(ns["adata"], "mydata/TWO_TYPES", rna="X")
+    assert type(e.value).__name__ == error
     assert not Path("mydata/TWO_TYPES").exists()
+    # the split takes each part by the type that the recipe names for it
+    assert f'kind == "{kinds["rna"]}"' in fences[MULTIOME]
+    assert f'kind == "{kinds["atac"]}"' in fences[MULTIOME]
     _, warned = _run_recipe_cell(fences[MULTIOME], ns)
     assert warned
 
@@ -360,11 +435,13 @@ def test_10x_recipe_for_cite_seq(host, tmp_path, monkeypatch, capsys):
         _run_cell(src[i], ns)
     example = Path("mydata") / NAMES[key]
     before = _bytes(example)
-    bars = _tenx("filtered_feature_bc_matrix.h5", GENES, ANTIBODIES, "Antibody Capture")
+    bars = _tenx("filtered_feature_bc_matrix.h5", GENES, ANTIBODIES, "adt")
     labels = _annotation("annotation.csv", bars, keep=270)
     fences = _fences("recipe-10x-h5")
+    kinds = _feature_types()
     _run_recipe_cell(fences[READ_10X], ns)
-    assert re.search(r"^Antibody Capture +20$", capsys.readouterr().out, flags=re.M)
+    assert re.search(rf"^{re.escape(kinds['adt'])} +20$", capsys.readouterr().out, flags=re.M)
+    assert f'kind == "{kinds["adt"]}"' in fences[CITE]
     _run_recipe_cell(fences[LABELS], ns)
     # "on the whole object it also renames an antibody that has the name of a gene"
     whole = _quiet(ns["adata"].copy)
@@ -395,21 +472,23 @@ def test_10x_recipe_for_cite_seq(host, tmp_path, monkeypatch, capsys):
     assert table["runnable"].all()
 
 
-@pytest.mark.parametrize("other,other_type,fence,files", [
-    (PEAKS, "Peaks", MULTIOME, ["atac.h5", "atac_peak.h5", "rna.h5"]),
-    (ANTIBODIES, "Antibody Capture", CITE, ["adt.h5", "rna.h5"]),
+@pytest.mark.parametrize("other,modality,fence,files", [
+    (PEAKS, "atac", MULTIOME, ["atac.h5", "atac_peak.h5", "rna.h5"]),
+    (ANTIBODIES, "adt", CITE, ["adt.h5", "rna.h5"]),
 ], ids=["multiome", "cite_seq"])
-def test_10x_recipe_without_labels(other, other_type, fence, files, tmp_path, monkeypatch,
+def test_10x_recipe_without_labels(other, modality, fence, files, tmp_path, monkeypatch,
                                    capsys):
     """The recipe says to skip the label block without cell types, and to
     leave the ``labels=`` line out of the export. The folder then has no
     label file."""
+    _says("recipe-10x-h5", "Without cell types, skip this block and leave the `labels=` line "
+                           "out of the export below, as in [No labels](#recipe-no-labels).")
     monkeypatch.chdir(tmp_path)
-    _tenx("filtered_feature_bc_matrix.h5", GENES, other, other_type)
+    _tenx("filtered_feature_bc_matrix.h5", GENES, other, modality)
     fences, ns = _fences("recipe-10x-h5"), {"mtb": mtb}
     _run_recipe_cell(fences[READ_10X], ns)
-    # "gex_only=False keeps the peaks or the antibody counts. Without it,
-    # scanpy returns the genes alone."
+    _says("recipe-10x-h5", "`gex_only=False` keeps the peaks or the antibody counts. Without "
+                           "it, scanpy returns the genes alone.")
     assert ns["adata"].n_vars == len(GENES) + len(other)
     assert _quiet(ns["sc"].read_10x_h5, "filtered_feature_bc_matrix.h5").n_vars == len(GENES)
     line = '                      labels="obs:celltype",\n'
@@ -461,14 +540,24 @@ def test_csv_recipe_label_forms(labels, labelled, tmp_path, monkeypatch, capsys)
 def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
     """A text that the list of the recipe does not have is named by
     ``export_dataset``, and the recipe says to add it to the list."""
-    assert "When `export_dataset` names another such text, add it to that list." \
-        in _said("recipe-labels-csv")
+    _says("recipe-labels-csv", "The third line turns a blank label and the text `NA` into a "
+                               "missing value, because a label file reads them as missing.")
+    _says("recipe-labels-csv", "When `export_dataset` names another such text, add it to that "
+                               "list.")
     monkeypatch.chdir(tmp_path)
     adata = _cells()
     labels = np.array(["T", "B", "NK"] * 100, dtype=object)
     labels[:12] = "N/A "                        # read as text, for the blank after it
     _annotation("annotation.csv", adata.obs_names, labels)
     add, keep = _fences("recipe-labels-csv")
+    # a label file reads each text of the list in the third line as missing
+    listed = '["", "NA", "nan"]'
+    assert add.count(listed) == 1 and listed in add.splitlines()[4]
+    texts = json.loads(listed)
+    assert eio.missing_mask(texts).all()
+    Path("labels.csv").write_text("cell,label\n" + "".join(
+        f"c{i},{t}\n" for i, t in enumerate(texts + ["T"])))
+    assert pd.isna(eio.read_labels("labels.csv")).tolist() == [True] * len(texts) + [False]
     ns = {"mtb": mtb, "adata": adata.copy()}
     _run_cell(add, ns)
     _run_cell(keep, ns)
@@ -477,8 +566,6 @@ def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
         mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
     assert "text that a label file reads as missing: 'N/A'" in str(e.value)
     assert not Path("mydata").exists()
-    listed = '["", "NA", "nan"]'
-    assert add.count(listed) == 1
     ns = {"mtb": mtb, "adata": adata.copy()}
     _run_cell(add.replace(listed, '["", "NA", "nan", "N/A"]'), ns)
     _run_cell(keep, ns)
@@ -498,12 +585,17 @@ def test_csv_with_other_barcodes_stops(tmp_path, monkeypatch, capsys):
     ns = {"mtb": mtb, "adata": adata}
     _run_cell(add, ns)
     assert capsys.readouterr().out == "0 of 300 cells have a label\n"
-    assert "When it prints 0, or fewer cells than you expect, stop here." \
-        in _said("recipe-labels-csv")
+    _says("recipe-labels-csv", "When it prints 0, or fewer cells than you expect, stop here.")
     # "Compare ann.index[:3] with adata.obs_names[:3]": the ending shows
-    assert "Compare `ann.index[:3]` with `adata.obs_names[:3]`" in _said("recipe-labels-csv")
-    assert not [c for c in ns["ann"].index[:3] if c.endswith("-1")]
-    assert all(c.endswith("-1") for c in ns["adata"].obs_names[:3])
+    _says("recipe-labels-csv", "Compare `ann.index[:3]` with `adata.obs_names[:3]`")
+    # the ending that the recipe names as the usual difference, in the two
+    # expressions it says to compare
+    ending, mine, theirs = _quoted(
+        "recipe-labels-csv", r"often by an ending such as `([^`]+)`\. Compare `([^`]+)` with "
+                             r"`([^`]+)`, and do not go on until the number is right\.")
+    assert ending == "-1"
+    assert not [c for c in eval(mine, ns) if c.endswith(ending)]
+    assert all(c.endswith(ending) for c in eval(theirs, ns))
     _run_cell(keep, ns)
     with pytest.raises(ValueError) as e:
         mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
@@ -523,6 +615,12 @@ def test_csv_with_half_the_cells(tmp_path, monkeypatch, capsys):
     ns = {"mtb": mtb, "adata": adata, "atac": atac}
     _run_cell(add, ns)
     assert capsys.readouterr().out == "150 of 300 cells have a label\n"
+    _says("recipe-labels-csv", "A cell without a label cannot be scored, and `export_dataset` "
+                               "refuses it. When some cells have no label, keep the labelled "
+                               "cells.")
+    with pytest.raises(ValueError, match=r"^labels='obs:celltype': 150 of the 300 labels "):
+        mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
+    assert not Path("mydata").exists()
     _run_cell(keep, ns)
     again = "atac = atac[adata.obs_names].copy()"
     assert f"`{again}`" in _said("recipe-labels-csv")
@@ -552,27 +650,51 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[0] == ("[scan] 1 of 2 methods has its input files in MYDATA. 1 of 2 can run on "
                       "this computer. MYDATA holds RNA and ADT.")
-    # "The check names those methods: their reason says cty.csv is missing."
+    # the reason that the recipe quotes for a method that reads the cell types
+    missing = _quoted("recipe-no-labels", r"A few methods also read them as an input\. The "
+                                          r"check names those methods: their `reason` says "
+                                          r"`([^`]+)`")
+    assert missing == "cty.csv is missing."
     reason = dict(zip(table["method"], table["reason"]))
-    assert reason == {"sciPENN": "", "Matilda": "cty.csv is missing."}
-    assert "[scan] Matilda: cty.csv is missing." in out
+    assert reason == {"sciPENN": "", "Matilda": missing}
+    assert f"[scan] Matilda: {missing}" in out
 
+    # the two statuses that the recipe explains, and the third without evaluate=False
+    ran, skipped = _quoted(
+        "recipe-no-labels", r"The status `(\w+)` means that the method ran and nothing was "
+                            r"scored\. `(\w+)` marks a method that needs cell types as an "
+                            r"input\.")
+    unmatched = _quoted("recipe-no-labels", r"Without `evaluate=False` the methods run as "
+                                            r"well, and the status `(\w+)` says that nothing "
+                                            r"was scored\.")
+    assert (ran, skipped, unmatched) == ("RUN_OK", "SKIPPED", "RUN_OK_NO_LABEL_MATCH")
     status = _run_cell(run, ns)
     assert list(status.columns) == ["method", "status"]
-    assert dict(zip(status["method"], status["status"])) == {
-        "Matilda": "SKIPPED", "sciPENN": "RUN_OK"}
+    assert dict(zip(status["method"], status["status"])) == {"Matilda": skipped, "sciPENN": ran}
     assert [m for m, _ in host] == ["sciPENN"]
-    # "Each method has a folder in out/MYDATA/ ... the file embedding.h5 in it"
-    (run_dir,) = [p for p in Path("out/MYDATA").iterdir() if p.is_dir()]
-    assert run_dir.name.startswith("sciPENN") and (run_dir / "embedding.h5").is_file()
-    # "Without evaluate=False the methods run as well"
+    assert not set(ns["mine"].summary.columns) & set(mtb.catalog.known_metrics())
+    # the folder of the run, and the file in it, as the recipe names them: a
+    # folder for the method that ran, none for the one that was skipped
+    out_dir, embedding = _quoted(
+        "recipe-no-labels", r"Each method that ran has a folder in `([^`]+)`\. For most methods "
+                            r"the embedding is the file `([^`]+)` in it\.")
+    assert (out_dir, embedding) == ("out/MYDATA/", "embedding.h5")
+    assert Path(out_dir) == Path("out") / ns["NAME"]
+    (run_dir,) = [p for p in Path(out_dir).iterdir() if p.is_dir()]
+    assert run_dir.name.startswith("sciPENN") and (run_dir / embedding).is_file()
     unscored = mtb.run_all("MYDATA", "vertical", methods=methods, data_path="mydata",
                            out_dir="out/UNSCORED", verbose=False)
     assert dict(zip(unscored.summary["method"], unscored.summary["status"])) == {
-        "Matilda": "SKIPPED", "sciPENN": "RUN_OK_NO_LABEL_MATCH"}
+        "Matilda": skipped, "sciPENN": unmatched}
+    assert [m for m, _ in host] == ["sciPENN"] * 2
     host.clear()
 
     # cell types later: by then the object is in another row order
+    _says("recipe-no-labels", "When you have cell types later, add them to the folder and "
+                              "score the saved embeddings. No method runs again.")
+    _says("recipe-no-labels", "`export_dataset` writes the labels in the cell order of the "
+                              "files already in the folder, whatever the row order of `adata` "
+                              "is by then. It refuses labels for other cells.")
     ns["adata"] = adata[np.random.default_rng(3).permutation(adata.n_obs)].copy()
     assert list(ns["adata"].obs_names) != list(adata.obs_names)
     capsys.readouterr()
@@ -588,8 +710,8 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
         scored = summary.set_index("method")
         assert scored.loc["sciPENN", "status"] == "CHAIN_OK"
         assert np.isfinite(scored.loc["sciPENN", "ARI"])
-    assert host == []                            # "No method runs again."
-    # "It refuses labels for other cells."
+    assert host == []                            # no method ran again
+    # labels for other cells
     other = adata.copy()
     other.obs_names = [f"other{i}" for i in range(other.n_obs)]
     before = _bytes(folder)
@@ -652,6 +774,12 @@ def test_donor_recipe(host, tmp_path, monkeypatch):
     vertical tutorial, with the methods of that tutorial."""
     adata = _cite(150, donors="ABCDE")
     run, keep_three = _fences("recipe-donors")
+    # the batch metrics that the recipe names
+    metrics = list(_quoted("recipe-donors", r"The summary then has the batch metrics `(\w+)`, "
+                                            r"`(\w+)` and `(\w+)`, which say how well the "
+                                            r"donors mix\."))
+    assert metrics == ["ASW_batch", "GC", "iLISI"]
+    _says("recipe-donors", "The methods do not read `batch=`.")
     for key in VERTICAL:
         (tmp_path / key).mkdir()
         monkeypatch.chdir(tmp_path / key)
@@ -662,23 +790,45 @@ def test_donor_recipe(host, tmp_path, monkeypatch):
             "adt.h5", "cty.csv", "rna.h5"]                       # "no batch= here"
         assert sorted(summary["method"]) == sorted(ns["METHODS"])
         assert set(summary["status"]) == {"CHAIN_OK"}, key
-        # "The summary then has the batch metrics ASW_batch, GC and iLISI"
-        assert summary[["ASW_batch", "GC", "iLISI"]].notna().all().all()
+        # they are the batch metrics of the summary, with a value for each method
+        assert [c for c in summary.columns if c in mtb.plot.BATCH_METRICS] == metrics
+        assert summary[metrics].notna().all().all()
         assert set(summary["n_batches"]) == {5} and set(summary["batch_source"]) == {"user"}
-        # "The methods do not read batch=."
+        # the methods were given the files of the folder, and no donor
         assert sorted(m for m, _ in host) == sorted(ns["METHODS"])
         for _m, files in host:
             assert {f.name for f in files.values()} <= {"rna.h5", "adt.h5", "cty.csv"}
 
-    # "StabMap, a cross method, does not run on vertical data."
+    # the column itself, not its name; matched to the cells by barcode
+    _says("recipe-donors", "`batch=` takes the column itself, not its name. `run_all` reads "
+                           "the folder, and the folder holds no `obs` columns. The values are "
+                           "matched to the cells by barcode. Every cell needs a donor: "
+                           "`run_all` stops when one is missing.")
+    column = 'batch=adata.obs["donor"]'
+    assert run.count(column) == 1
+    host.clear()
+    for name in ('batch="donor"', 'batch="obs:donor"'):
+        with pytest.raises(FileNotFoundError, match="Pass the column itself"):
+            _run_cell(run.replace(column, name), dict(ns))
+    assert host == []
+    # the donors in another row order give the same batch metrics; taken row
+    # by row, without the barcodes, they give others
+    mixed = 'batch=adata.obs["donor"].sample(frac=1, random_state=3)'
+    by_barcode = _quiet(_run_cell, run.replace(column, mixed), dict(ns))
+    assert by_barcode[metrics].equals(summary[metrics])
+    by_row = _quiet(_run_cell, run.replace(column, mixed + ".to_numpy()"), dict(ns))
+    assert not by_row[metrics].equals(summary[metrics])
+
+    # the cross method that the recipe names does not run on vertical data
     monkeypatch.chdir(tmp_path)
-    assert "StabMap, a cross method, does not run on vertical data." in _said("recipe-donors")
+    named = _quoted("recipe-donors", r"(\w+), a cross method, does not run on vertical data\.")
+    assert named == "StabMap"
     cross = list(GEN.TASKS["cross_rna_adt"]["methods"])
-    assert "StabMap" in cross
+    assert named in cross
     host.clear()
     with pytest.raises(ValueError) as e:
         _run_cell(run, {"mtb": mtb, "METHODS": cross, "adata": adata})
-    assert str(e.value).startswith("StabMap does not run on vertical data.")
+    assert str(e.value).startswith(f"{named} does not run on vertical data.")
     assert host == [] and not Path("out").exists()
 
     # "Every cell needs a donor: run_all stops when one is missing."
@@ -694,9 +844,22 @@ def test_donor_recipe(host, tmp_path, monkeypatch):
     assert host == [] and not Path("out").exists()
 
     # "To use the cross tutorial instead, keep as many donors as its methods read."
+    _says("recipe-donors", "To use the cross tutorial instead, keep as many donors as its "
+                           "methods read.")
     ns = {"adata": adata}
     _run_cell(keep_three, ns)
     assert ns["adata"].obs["donor"].nunique() == 3 and ns["adata"].n_obs == 90
+    # three is what the methods of the cross RNA + ADT tutorial read. For
+    # ADT + ATAC the recipe says two, with two names in the list of that line
+    reads = _cross_reads()
+    assert set(reads[("rna", "adt")]) == {3, 2} and set(reads[("adt", "atac")]) == {2}
+    _says("recipe-donors", "ADT + ATAC has no vertical task: for that data, keep two donors, "
+                           "as shown further down, with two names in the list.")
+    names = '["A", "B", "C"]'
+    assert keep_three.count(names) == 1 and keep_three.rstrip().endswith("# <- three donors")
+    ns = {"adata": adata}
+    _run_cell(keep_three.replace(names, '["A", "B"]'), ns)
+    assert ns["adata"].obs["donor"].nunique() == 2 and ns["adata"].n_obs == 60
 
 
 def test_quoted_check_lines_are_live(host, tmp_path, monkeypatch, capsys):
@@ -755,6 +918,21 @@ def _cross_patterns():
     return out
 
 
+def _cross_reads():
+    """``{modalities: {number of batches: methods}}`` of the cross variants
+    in the registry."""
+    reads = {}
+    for method in mtb.list_methods("cross"):
+        for v in registry.get(method).variants:
+            if v.when.get("category") != "cross":
+                continue
+            roles = v.when["modalities"]
+            mods = tuple(dict.fromkeys(schema.base_modality(r) for r in roles))
+            n = max(int(re.search(r"\d+$", r).group()) for r in roles)
+            reads.setdefault(mods, {}).setdefault(n, set()).add(method)
+    return reads
+
+
 def test_batch_counts_follow_the_registry():
     """The recipe says how many batches a cross method reads, per pair of
     modalities, and that ``describe_layout("cross")`` lists them. Both
@@ -765,15 +943,7 @@ def test_batch_counts_follow_the_registry():
         in _said("recipe-donors")
     said = {("rna", "adt"): (3, {"UINMF": 2}), ("rna", "atac"): (3, {"UINMF": 2}),
             ("adt", "atac"): (2, {}), ("rna", "adt", "atac"): (2, {})}
-    reads = {}
-    for method in mtb.list_methods("cross"):
-        for v in registry.get(method).variants:
-            if v.when.get("category") != "cross":
-                continue
-            roles = v.when["modalities"]
-            mods = tuple(dict.fromkeys(schema.base_modality(r) for r in roles))
-            n = max(int(re.search(r"\d+$", r).group()) for r in roles)
-            reads.setdefault(mods, {}).setdefault(n, set()).add(method)
+    reads = _cross_reads()
     assert reads == _cross_patterns()
     assert set(reads) == set(said)
     for mods, (n, also) in said.items():
@@ -808,6 +978,8 @@ def test_the_command_lines_parse(host, tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     convert, run_all = _commands()
     assert convert[:2] == ["multibench", "convert"] and run_all[:2] == ["multibench", "run-all"]
+    _says("recipe-donors", "Without cell types, leave `--labels` out and run without scores.")
+    assert "--labels" not in convert and "--no-evaluate" in run_all
     parser = cli.build_parser()
     for argv in (convert, run_all):
         parser.parse_args(argv[1:])
