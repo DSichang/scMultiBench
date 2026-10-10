@@ -1207,7 +1207,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
                                 facecolor="#bbbbbb", edgecolor="#333333",
                                 linewidth=0.4, zorder=2, gid="legend"))
         if n_bub > 1:
-            ax.text(xoff - 0.65, ly2 - 0.62, str(n_rows), fontsize=6.6,
+            ax.text(xoff, ly2 - 0.62, str(n_rows), fontsize=6.6,
                     ha="center", gid="legend")
         ax.text(xoff + (n_bub - 1) * 1.0, ly2 - 0.62, "1", fontsize=6.6,
                 ha="center", gid="legend")
