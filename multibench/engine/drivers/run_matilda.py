@@ -43,7 +43,19 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--device", default="auto")
+    # the other knobs of main_matilda_train.py (params.yaml lists them); unset
+    # leaves matilda's own default
+    shape = ("batch_size", "z_dim", "hidden_rna", "hidden_adt", "hidden_atac")
+    for k in shape:
+        p.add_argument(f"--{k}", type=int)
+    p.add_argument("--lr", type=float)
+    # on by default; the runner drops a Python False, so "False" turns it off
+    p.add_argument("--augmentation", nargs="?", const="True", default="True")
     a = p.parse_args()
+    shape = {k: getattr(a, k) for k in shape if getattr(a, k) is not None}
+    fit_kw = dict(shape, augmentation=a.augmentation != "False")
+    if a.lr is not None:
+        fit_kw["lr"] = a.lr
 
     import matilda
 
@@ -55,11 +67,12 @@ def main() -> None:
           f" labels={labels.shape} ({len(set(labels))} types)", flush=True)
 
     fit = matilda.train(rna, adt, atac, labels=labels,
-                        seed=a.seed, epochs=a.epochs, device=a.device)
+                        seed=a.seed, epochs=a.epochs, device=a.device, **fit_kw)
     print(f"[matilda] trained mode={getattr(fit, 'mode', '?')}", flush=True)
 
     res = matilda.task(rna, adt, atac, labels=labels, model=fit,
-                       dim_reduce=True, classification=True, device=a.device)
+                       dim_reduce=True, classification=True, seed=a.seed,
+                       device=a.device, **shape)
 
     out = str(a.save_path)
     os.makedirs(out, exist_ok=True)
