@@ -58,11 +58,13 @@ ANCHORS = ["own-data-recipes", "recipe-10x-h5", "recipe-labels-csv", "recipe-no-
 #: added to the page has no test until it is listed here.
 FENCES = {
     "recipe-10x-h5": ["import scanpy as sc", "import pandas as pd",
+                      'ann.index = ann.index + "-1"',
                       'adata = adata[adata.obs["celltype"].notna()].copy()',
                       'kind = adata.var["feature_types"]', 'kind = adata.var["feature_types"]',
                       'mtb.scan(NAME, "vertical", methods=METHODS, data_path="mydata", '
                       'per_method=True)'],
     "recipe-labels-csv": ["import pandas as pd",
+                          'ann.index = ann.index + "-1"',
                           'adata = adata[adata.obs["celltype"].notna()].copy()'],
     "recipe-no-labels": ['NAME = "MYDATA"   # <- a name for your data',
                          'mine = mtb.run_all(NAME, "vertical", methods=METHODS, '
@@ -80,7 +82,7 @@ PLACEHOLDERS = '["A", "B", "C"]'
 #: donor names of a file, which are not those of the page
 DONORS = ["P01", "P02", "P03", "P04", "P05"]
 # the fences of the 10x recipe, in page order
-READ_10X, LABELS, KEEP, MULTIOME, CITE, PAGE_CHECK = range(6)
+READ_10X, LABELS, ENDING, KEEP, MULTIOME, CITE, PAGE_CHECK = range(7)
 
 GENES = [f"GENE{i}" for i in range(120)]
 GENES[1] = GENES[0]                       # 10x files repeat gene names
@@ -91,9 +93,15 @@ ANTIBODIES[3], ANTIBODIES[7] = "GENE5", "GENE9"     # two antibodies named as a 
 TENX_TYPES = {"rna": "Gene Expression", "adt": "Antibody Capture", "atac": "Peaks"}
 
 ZERO_CELLS = (
-    "The data holds 0 cells, so there is nothing to write. If you kept the cells that have a "
-    "label, no cell had one: check that the barcodes of the label table are spelled as the "
-    "cell names of the data (obs_names) are, for example with the same -1 ending.")
+    "The data holds 0 cells, so there is nothing to write. A filter kept no cell, or you kept "
+    "the cells that have a label and no cell had one. For a filter, check that its values are "
+    "spelled as the data has them. For labels, check that the barcodes of the label table are "
+    "spelled as the cell names of the data (obs_names) are, for example with the same -1 "
+    "ending.")
+#: where the line that adds the ending goes, as both recipes say it
+ENDING_SENTENCE = ("When the barcodes of the CSV lack the `-1` ending that the cell names "
+                   "have, put the next line into the block above, after the line that reads "
+                   "the CSV, and run the block again.")
 
 
 # ------------------------------------------------------------------ the page
@@ -219,6 +227,14 @@ def _h5(path, key):
     with h5py.File(path, "r") as f:
         v = f[f"matrix/{key}"]
         return v.shape if key == "data" else [x.decode() for x in v[()]]
+
+
+def _with_ending(add, ending):
+    """The block that adds the column, with the line that adds the ending
+    where the recipes say to put it: after the line that reads the CSV."""
+    lines = add.splitlines()
+    (read,) = [i for i, line in enumerate(lines) if line.startswith("ann = pd.read_csv(")]
+    return "\n".join(lines[:read + 1] + [ending.strip()] + lines[read + 1:]) + "\n"
 
 
 def _quiet(fn, *a, **kw):
@@ -408,13 +424,19 @@ def test_10x_recipe_runs(host, tmp_path, monkeypatch, capsys):
     # leaves the cells in, so the reader can stop there, as the recipe says
     compare, theirs = _quoted(
         "recipe-10x-h5", r"When it prints 0, or fewer cells than you expect, stop here and "
-                         r"compare `([^`]+)` with `([^`]+)`\. Then keep the labelled cells\.")
-    _annotation("annotation.csv", [b[:-2] for b in bars])
+                         r"compare `([^`]+)` with `([^`]+)`\. " + re.escape(ENDING_SENTENCE)
+                         + r" ```python [^`]+``` Then keep the labelled cells\.")
+    short = _annotation("annotation.csv", [b[:-2] for b in bars])
     _run_recipe_cell(fences[LABELS], ns)
     assert capsys.readouterr().out == "0 of 300 cells have a label\n"
     assert ns["adata"].n_obs == 300
     assert not [c for c in eval(compare, ns) if c.endswith("-1")]
     assert all(c.endswith("-1") for c in eval(theirs, ns))
+    # the line of the recipe, put where the recipe says: every cell has the
+    # label of its row of the CSV
+    _run_recipe_cell(_with_ending(fences[LABELS], fences[ENDING]), ns)
+    assert capsys.readouterr().out == "300 of 300 cells have a label\n"
+    assert ns["adata"].obs["celltype"].to_dict() == {b + "-1": v for b, v in short.items()}
     # the block again, with the corrected table
     labels = _annotation("annotation.csv", bars, keep=270)
     _run_recipe_cell(fences[LABELS], ns)
@@ -607,7 +629,7 @@ def test_csv_recipe_label_forms(labels, labelled, tmp_path, monkeypatch, capsys)
     monkeypatch.chdir(tmp_path)
     adata = _cells()
     written = _annotation("annotation.csv", adata.obs_names, labels)
-    add, keep = _fences("recipe-labels-csv")
+    add, _ending, keep = _fences("recipe-labels-csv")
     ns = {"mtb": mtb, "adata": adata}
     _run_cell(add, ns)
     assert capsys.readouterr().out == f"{labelled} of 300 cells have a label\n"
@@ -633,7 +655,7 @@ def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
     labels = np.array(["T", "B", "NK"] * 100, dtype=object)
     labels[:12] = "N/A "                        # read as text, for the blank after it
     _annotation("annotation.csv", adata.obs_names, labels)
-    add, keep = _fences("recipe-labels-csv")
+    add, _ending, keep = _fences("recipe-labels-csv")
     # a label file reads each text of the list in the third line as missing
     listed = '["", "NA", "nan"]'
     assert add.count(listed) == 1 and listed in add.splitlines()[4]
@@ -665,7 +687,7 @@ def test_csv_with_other_barcodes_stops(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     adata = _cells()
     _annotation("annotation.csv", [c[:-2] for c in adata.obs_names])
-    add, keep = _fences("recipe-labels-csv")
+    add, _ending, keep = _fences("recipe-labels-csv")
     ns = {"mtb": mtb, "adata": adata}
     _run_cell(add, ns)
     assert capsys.readouterr().out == "0 of 300 cells have a label\n"
@@ -687,6 +709,37 @@ def test_csv_with_other_barcodes_stops(tmp_path, monkeypatch, capsys):
     assert not Path("mydata").exists()
 
 
+def test_csv_without_the_ending_gets_it_from_the_line_of_the_recipe(tmp_path, monkeypatch,
+                                                                   capsys):
+    """The barcodes of the CSV lack the ``-1`` of the cell names. The reader
+    copies the line of the recipe into the block that adds the column, after
+    the line that reads the CSV, and runs the block again: every cell gets
+    the label of its row. A second run adds the ending once, because the
+    block reads the CSV first."""
+    monkeypatch.chdir(tmp_path)
+    adata = _cells()
+    short = _annotation("annotation.csv", [c[:-2] for c in adata.obs_names])
+    add, ending, keep = _fences("recipe-labels-csv")
+    assert ending == 'ann.index = ann.index + "-1"\n'
+    _says("recipe-labels-csv", ENDING_SENTENCE + " The line that reads the CSV comes first, "
+                               "so that a second run does not add the ending twice.")
+    ns = {"mtb": mtb, "adata": adata}
+    _run_cell(add, ns)
+    assert capsys.readouterr().out == "0 of 300 cells have a label\n"
+    block = _with_ending(add, ending)
+    for _ in range(2):
+        _run_cell(block, ns)
+        assert capsys.readouterr().out == "300 of 300 cells have a label\n"
+        assert ns["adata"].obs["celltype"].to_dict() == {b + "-1": v for b, v in short.items()}
+    # the line alone, run twice, would add the ending twice: the recipe does
+    # not say to run it alone
+    assert list(ns["ann"].index) == [b + "-1" for b in short]
+    _run_cell(keep, ns)
+    out = mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
+    assert pd.read_csv(out / "cty.csv")["x"].tolist() \
+        == [short[b[:-2]] for b in _h5(out / "rna.h5", "barcodes")]
+
+
 def test_csv_with_half_the_cells(tmp_path, monkeypatch, capsys):
     """A CSV for half of the cells: the recipe says so, keeps the labelled
     cells, and a second object of the same cells is cut to them."""
@@ -695,7 +748,7 @@ def test_csv_with_half_the_cells(tmp_path, monkeypatch, capsys):
     atac = _cells(genes=30, seed=1)
     atac.var_names = PEAKS[:30]
     _annotation("annotation.csv", adata.obs_names, keep=150)
-    add, keep = _fences("recipe-labels-csv")
+    add, _ending, keep = _fences("recipe-labels-csv")
     ns = {"mtb": mtb, "adata": adata, "atac": atac}
     _run_cell(add, ns)
     assert capsys.readouterr().out == "150 of 300 cells have a label\n"
@@ -743,7 +796,7 @@ def test_csv_recipe_names_the_object_above_its_code(tmp_path, monkeypatch, capsy
     atac = _cells(genes=30, seed=1)
     atac.var_names = PEAKS[:30]
     _annotation("annotation.csv", rna.obs_names, keep=150)
-    add, keep = _fences("recipe-labels-csv")
+    add, _ending, keep = _fences("recipe-labels-csv")
     again = "atac = atac[adata.obs_names].copy()"
     assert f"`{again}`" in _said("recipe-labels-csv")
     # as pasted, the first block stops on the name
@@ -776,7 +829,7 @@ def test_csv_with_a_barcode_twice_stops(tmp_path, monkeypatch, capsys):
     labels = np.random.default_rng(1).choice(["T", "B", "NK"], adata.n_obs)
     ann = pd.DataFrame({"cluster_annotation": labels}, index=list(adata.obs_names))
     pd.concat([ann, ann.iloc[:1]]).to_csv("annotation.csv")       # the first barcode again
-    add, _keep = _fences("recipe-labels-csv")
+    add, _ending, _keep = _fences("recipe-labels-csv")
     ns = {"mtb": mtb, "adata": adata}
     with pytest.raises(ValueError) as e:
         _run_cell(add, ns)

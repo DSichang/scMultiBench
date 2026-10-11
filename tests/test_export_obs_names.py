@@ -154,16 +154,20 @@ def test_diagonal_side_without_the_column(tmp_path, spec):
         ingest.export_dataset(rna, out, atac=atac, **kw)
     assert e.value.args[0] == (
         f"labels={spec!r}: column 'celltype' not in obs of the ATAC object (atac); "
-        f"available: ['donor']. Without cell types for the ATAC cells, leave labels= out and "
-        f"run with evaluate=False.")
+        f"available: ['donor']. If one of them holds the cell types, give the object a "
+        f"column named 'celltype' first, for example atac.obs['celltype'] = "
+        f"atac.obs['<its column>'], then export again. Without cell types for the ATAC "
+        f"cells, leave labels= out and run with evaluate=False.")
     del rna.obs["celltype"]
     atac.obs["celltype"] = "T"
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(rna, out, atac=atac, **kw)
     assert e.value.args[0] == (
         f"labels={spec!r}: column 'celltype' not in obs of the RNA object (data); "
-        f"available: ['donor']. Without cell types for the RNA cells, leave labels= out and "
-        f"run with evaluate=False.")
+        f"available: ['donor']. If one of them holds the cell types, give the object a "
+        f"column named 'celltype' first, for example rna.obs['celltype'] = "
+        f"rna.obs['<its column>'], then export again. Without cell types for the RNA "
+        f"cells, leave labels= out and run with evaluate=False.")
     assert not out.exists()
 
 
@@ -177,8 +181,13 @@ def test_diagonal_side_without_the_column_on_the_command_line(tmp_path, capsys):
                            "--atac-kind", "gene_activity", "--labels", "obs:celltype",
                            "--category", "diagonal"], capsys)
     assert rc == 1 and not (tmp_path / "OUT").exists()
-    assert line.endswith("available: ['donor']. Without cell types for the ATAC cells, leave "
-                         "--labels out and run with --no-evaluate.")
+    assert line.endswith(
+        "available: ['donor']. If one of them holds the cell types, convert each side with "
+        "its own command and its own --labels, for example multibench convert RNA_FILE OUT "
+        "--rna X --labels obs:celltype --category diagonal, then multibench convert "
+        "ATAC_FILE OUT --atac X --atac-kind gene_activity --labels obs:<its column> "
+        "--category diagonal --overwrite. Without cell types for the ATAC cells, leave "
+        "--labels out and run with --no-evaluate.")
 
 
 def test_a_diagonal_side_with_an_empty_column_gets_the_way_out(tmp_path, monkeypatch):

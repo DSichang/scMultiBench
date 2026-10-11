@@ -712,7 +712,10 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
     and the folder has peaks (atac_peak.h5).`` Other files follow as
     ``adt.h5 is missing.``, then the per-batch hint of ``inputs_for`` when
     the folder holds ``rna1.h5, rna2.h5, ...`` for a vertical or diagonal
-    method. Each part is a sentence with its own subject.
+    method. Each part is a sentence with its own subject. Numbered ATAC
+    files that are missing in the same way share one sentence: ``StabMap needs peak
+    ATAC (atac1.h5, atac2.h5), and the folder has gene activity
+    (atac_gas1.h5, atac_gas2.h5).``
     """
     try:
         paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
@@ -724,6 +727,7 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
     if not missing:
         return ""
     atac_parts, other = [], []
+    has_other = {}                      # (need, kinds found) -> its part, to extend
     for role, p in missing.items():
         if is_label_role(role) or _schema_base(role) != "atac":
             other.append(p.name)
@@ -737,7 +741,7 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
             want = "gene-activity"
         else:
             want = {"peak": "peak", "gene_activity": "gene-activity"}.get(spec.atac or "", "")
-        need = f"{spec.id} needs {want + ' ' if want else ''}ATAC ({want_file})"
+        need = f"{spec.id} needs {want + ' ' if want else ''}ATAC"
         found = [p.parent / f"{b}{digits}.h5" for b in ("atac", "atac_peak", "atac_gas", "peak")]
         found = [f for f in found if f.is_file() and f.name != want_file]
         # the right representation under a diagonal name: only the name is wrong
@@ -750,10 +754,20 @@ def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str
                 f"{want_file}, or write it with " + config.hint('category="vertical"',
                                                                 "--category vertical"))
         elif found:
-            has = ", ".join(f"{_atac_kind_of(f)} ({f.name})" for f in found)
-            atac_parts.append(f"{need}, and the folder has {has}")
+            kinds = tuple(_atac_kind_of(f) for f in found)
+            part = has_other.get((need, kinds))
+            if part is None:
+                part = has_other[need, kinds] = ([], [[] for _ in found])
+                atac_parts.append(part)
+            part[0].append(want_file)
+            for names, f in zip(part[1], found):
+                names.append(f.name)
         else:
-            atac_parts.append(f"{need}, which is not in the folder")
+            atac_parts.append(f"{need} ({want_file}), which is not in the folder")
+    for (need, kinds), part in has_other.items():
+        has = ", ".join(f"{k} ({', '.join(names)})" for k, names in zip(kinds, part[1]))
+        atac_parts[atac_parts.index(part)] = (
+            f"{need} ({', '.join(part[0])}), and the folder has {has}")
     if other:
         atac_parts.append(", ".join(other) + (" is" if len(other) == 1 else " are")
                           + " missing")
@@ -1177,6 +1191,12 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
     each method reads, and no second list of file names exists. Every
     variant is asked, not only the rows of one scan: what a folder holds does
     not depend on the methods a caller names.
+
+    An ATAC role whose file is absent counts the ATAC file of the same batch
+    under another name of the layout (``_resolve._ATAC_FILE_BASES``): a cross
+    folder written with gene activity holds ``atac_gas1.h5`` where the role
+    reads ``atac1.h5``. The folder holds ATAC, in the form the methods do not
+    read, and the reason of each row says so (:func:`_missing_files_reason`).
     """
     from .engine.schema import is_label_role
     files = {}
@@ -1187,6 +1207,12 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
                 continue
             if p.name not in files and p.exists():
                 files[p.name] = fam
+            elif fam == "atac" and not p.exists():
+                digits = role[len(role.rstrip("0123456789")):]
+                for base in _resolve._ATAC_FILE_BASES:
+                    q = ds_dir / f"{base}{digits}.h5"
+                    if q.name not in files and q.is_file():
+                        files[q.name] = fam
     return files
 
 
@@ -1453,8 +1479,9 @@ def scan(dataset: str, category: str | None = None, *,
     the method's listed variants is runnable, which is when ``run_all``
     with the same arguments tries the method. ``reason`` is empty for those.
     Otherwise it is the ``reason`` of one variant: one whose input files are
-    all in the folder, else the one that lacks the fewest files. Runnable
-    methods come first, then by name. Three things are printed above the
+    all in the folder, else one that reads the modalities the folder holds,
+    else the one that lacks the fewest files. Runnable methods come first,
+    then by name. Three things are printed above the
     table: the counts with the modalities and batches the folder holds, the
     cells of each matrix file, and the full reason of each method that
     cannot run. A note on the folder that a method which would run carries
@@ -1886,9 +1913,11 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     method is runnable, which is when ``run_all`` tries the method) and
     ``reason`` (empty when runnable). Otherwise ``reason`` is that of one
     row: a row whose input files are all in the folder first
-    (:func:`_inputs_on_disk`), then the row that lacks the fewest files, then
-    the first one. Runnable methods first, then by name. ``attrs`` are those
-    of ``df`` and ``cells`` (:func:`_cells_per_file`).
+    (:func:`_inputs_on_disk`), then a row that reads the families the folder
+    holds (a folder of RNA and ATAC is not told that ADT files are missing),
+    then the row that lacks the fewest files, then the first one. Runnable
+    methods first, then by name. ``attrs`` are those of ``df`` and ``cells``
+    (:func:`_cells_per_file`).
 
     With ``verbose`` it prints, each line after ``[scan]``: the counts with
     what the folder holds, the cells of each matrix file, the reason of each
@@ -1901,12 +1930,14 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     """
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
     rows, reasons, n_files = [], [], 0
+    held = set(df.attrs["held"])
     for method, g in df.groupby("method", sort=False):
         n_files += bool(g["files_ok"].any())
         if g["runnable"].any():
             rows.append((method, True, ""))
             continue
         i = min(g.index, key=lambda i: (not _inputs_on_disk(g.loc[i], dataset, data_path),
+                                        len(_row_families(g.at[i, "modalities"]) - held),
                                         _missing_inputs(g.loc[i], dataset, data_path), i))
         rows.append((method, False, g.at[i, "reason"]))
         reasons.append((method, private.at[i, "_other"]))

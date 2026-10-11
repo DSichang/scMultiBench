@@ -261,12 +261,22 @@ def test_adt_hint_follows_the_obsm_selector(tmp_path):
 
 
 def test_adt_hint_for_a_layer_stays_layer_counts(tmp_path):
+    """For ADT read by a selector. ADT passed as its own object has no
+    selector: ``adt='layer:counts'`` would read a layer of the RNA object, so
+    the hint names the X of the ADT object (review round 3 of 0.3.5)."""
     rna = _rna_adata([f"c{i}" for i in range(30)])
     prot = ad.AnnData(np.random.default_rng(0).normal(size=(30, 5)))
     prot.obs_names = list(rna.obs_names)
     prot.var_names = [f"p{i}" for i in range(5)]
-    with pytest.warns(UserWarning, match=r"for example with adt='layer:counts'\."):
+    with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "L", adt=prot)
+    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [
+        "The adt values are not whole numbers, so they look log-normalised. The methods "
+        "normalise raw counts themselves. adt= is an object, and its X is written. Put the "
+        "raw counts of that object in its X first, for example adt.X = "
+        "adt.layers[\"counts\"], then export again."]
+    with pytest.warns(UserWarning, match=r"for example with adt='layer:counts'\."):
+        mtb.io.export_dataset(prot, tmp_path / "S", rna=None, adt="X")
 
 
 # --- M21: UnitedNet reads the vertical cty.csv --------------------------------

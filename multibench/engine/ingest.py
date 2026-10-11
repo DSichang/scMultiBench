@@ -98,15 +98,84 @@ def _matrix_has_fraction(X) -> bool | None:
         return None
 
 
-def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int) -> None:
+def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int,
+                     how: str | None = None) -> None:
     """``UserWarning`` when ``X`` holds non-integer values, which look
-    log-normalised; ``hint`` is the selector of the raw counts."""
+    log-normalised; ``hint`` is the selector of the raw counts. ``how``
+    replaces the sentence that names it, for a matrix no selector reads."""
     if _matrix_has_fraction(X):
         warnings.warn(
             f"The {name} values are not whole numbers, so they look log-normalised. "
-            f"The methods normalise raw counts themselves. Export raw counts, for "
-            f"example with {hint}.",
+            f"The methods normalise raw counts themselves. "
+            + (how or f"Export raw counts, for example with {hint}."),
             UserWarning, stacklevel=stacklevel + 1)
+
+
+def _counts_of_object_advice(what: str, spec) -> str | None:
+    """The last sentence of the raw-count warning for a modality that came as
+    its own object, or ``None`` for a selector string.
+
+    A selector reads the object passed as ``data``, so ``adt='layer:counts'``
+    after ``adt=<AnnData>`` would write a layer of the first object as
+    ``adt.h5``. The command line gives ``--atac-from`` an object and takes
+    the selector for it in ``--atac``, so its hint stays."""
+    if isinstance(spec, str) or config._CLI:
+        return None
+    if _is_anndata(spec):
+        return (f"{what}= is an object, and its X is written. Put the raw counts of that "
+                f"object in its X first, for example {what}.X = {what}.layers[\"counts\"], "
+                f"then export again.")
+    return f"Pass the raw counts of these cells as {what}=."
+
+
+def _matrix_key(data, spec):
+    """What tells whether two modality arguments of :func:`export_dataset`
+    read one matrix: the parts of a selector string (the object, the place,
+    the feature filter), or the object itself. ``data`` passed again as an
+    object is its ``X``."""
+    if isinstance(spec, str):
+        base, flt = _split_var_filter(spec)
+        mod = None
+        if base.startswith("mod:"):
+            mod, _, base = base[4:].partition(".")
+        return "selector", mod, base or "X", flt
+    if spec is data:
+        return "selector", None, "X", None
+    return "object", id(spec)
+
+
+def _check_one_matrix_each(data, specs, given) -> None:
+    """``ValueError`` when two modalities are read from the same matrix of the
+    same object (``rna='X', adt='X'``): the second file would be a copy of
+    the first under the name of another modality. ``specs`` are the
+    arguments as they are resolved and ``given`` as they were written. Two
+    feature filters on one ``X`` are two matrices."""
+    seen = {}
+    for what, spec in specs.items():
+        if spec is None:
+            continue
+        key = _matrix_key(data, spec)
+        first = seen.setdefault(key, what)
+        if first == what:
+            continue
+        if what == "adt" and key[:3] == ("selector", None, "X") and _adt_obsm_keys(data):
+            # the protein matrix is probably one of these: the message that names them
+            raise ValueError(_adt_in_x_message(given["adt"], _adt_obsm_keys(data)))
+        example = f"X[feature_types={_TENX_TYPE[what]}]"
+        pair = config.hint(
+            f"{first}={_shown(given[first])} and {what}={_shown(given[what])}",
+            f"--{first} {given[first]} and --{what} {given[what]}")
+        if key[0] == "object":
+            pair = f"{first}= and {what}= are given one object, so they"
+        raise ValueError(
+            f"{pair} name the same matrix, and one file holds one modality. " + config.hint(
+                f"Pass the {what.upper()} as its own object ({what}=<AnnData>), or name "
+                f"its own place in the object, such as {what}='obsm:<key>' or a feature "
+                f"filter ({what}='{example}').",
+                f"Name the place of the {what.upper()} in SRC, such as --{what} obsm:<key> "
+                f"or a feature filter (--{what} \"{example}\")."
+                + (" With --category diagonal, --atac-from names the file of the ATAC "
+                   "cells." if what == "atac" else "")))
 
 
 #: a trailing ``-<n>`` (10x GEM-well) suffix of a cell barcode
@@ -1493,7 +1562,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     **Raw counts.** Methods normalise the data themselves; give raw counts. A
     ``UserWarning`` says when sampled RNA, ADT or peak values are not whole
     numbers (log-normalised data). ``rna='layer:counts'`` usually selects the
-    counts. Gene-activity scores are not checked.
+    counts. A selector reads ``data``: for a modality passed as its own
+    object, put the counts into its ``X`` first
+    (``adt.X = adt.layers["counts"]``). Gene-activity scores are not checked.
 
     **MuData.** A bare modality name selects ``mdata.mod[name].X``
     (``rna='rna'``); a full ``'mod:<name>'`` selector works too. The default
@@ -1619,6 +1690,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
       no filter that keeps one;
     - ``adt`` taking ``X`` of an object that also holds an ``obsm`` matrix
       under a key that does not start with ``X_``;
+    - two modalities that name the same matrix of the same object
+      (``rna='X', adt='X'``): one file holds one modality;
+    - ``adt_names`` given as a string instead of a list;
     - data with 0 cells, or a matrix with 0 features;
     - a bare array whose cell order cannot be checked (no barcodes anywhere)
       or with the wrong row count;
@@ -1683,6 +1757,15 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
     _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)
+    if isinstance(adt_names, str):
+        # a string is a sequence of characters: 13 letters would name 13 proteins
+        key = adt_names if adt_names in (getattr(data, "uns", None) or {}) else "protein_names"
+        raise ValueError(
+            f"adt_names={adt_names!r} is one string, and adt_names= takes a list of the "
+            f"protein names, one for each column of the ADT matrix. For names that the "
+            f"object keeps, pass the list, for example "
+            f"adt_names=list(adata.uns[{key!r}]).")
+    _check_one_matrix_each(data, {"rna": rna, "adt": adt, "atac": atac}, given)
     diagonal = category == "diagonal"
     if diagonal and labels is not None and rna is None and adt is None and atac is None:
         raise ValueError(
@@ -1804,7 +1887,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     mod = sel[4:].partition(".")[0] if sel.startswith("mod:") else None
                     counts = f"mod:{mod}.layer:counts" if mod else "layer:counts"
                     hint = config.hint(f"{what}='{counts}'", f"--{what} {counts}")
-                _warn_not_counts(X, what, hint, stacklevel=2)
+                _warn_not_counts(X, what, hint, stacklevel=2,
+                                 how=_counts_of_object_advice(what, given[what]))
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
     # --- the files this call writes, each with its unit: the side and the
@@ -1880,18 +1964,26 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         import sys
 
         from .resolve import _and_list
-        for unit, (_, ref) in follow.items():
+        for unit, (_, refs) in follow.items():
             files = [pth.name for pth, _, _, u in plan if u == unit]
+            # a file this call replaced is no file that the new one follows
+            ref = next((name for name in refs if name not in files), None)
+            if ref is None:
+                print(f"export_dataset: wrote the rows of {_and_list(files)} in the cell "
+                      f"order that {refs[0]} had in {out} before this call.",
+                      file=sys.stderr, flush=True)
+                continue
             print(f"export_dataset: wrote the rows of {_and_list(files)} in the cell order "
                   f"of {ref}, which the files of {out} follow.", file=sys.stderr, flush=True)
     return out
 
 
 #: Z1: nothing to write
-_NO_CELLS = ("The data holds 0 cells, so there is nothing to write. If you kept the cells "
-             "that have a label, no cell had one: check that the barcodes of the label "
-             "table are spelled as the cell names of the data (obs_names) are, for example "
-             "with the same -1 ending.")
+_NO_CELLS = ("The data holds 0 cells, so there is nothing to write. A filter kept no cell, "
+             "or you kept the cells that have a label and no cell had one. For a filter, "
+             "check that its values are spelled as the data has them. For labels, check "
+             "that the barcodes of the label table are spelled as the cell names of the "
+             "data (obs_names) are, for example with the same -1 ending.")
 
 
 def _no_features_message(n_cells: int, what: str | None = None) -> str:
@@ -2174,7 +2266,7 @@ def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
 
 
 def _row_order(out: Path, units, *, diagonal) -> dict:
-    """``{unit: (index, reference file name)}`` for the units of this call
+    """``{unit: (index, reference file names)}`` for the units of this call
     whose cells the folder holds in another row order.
 
     The reference of a unit is a matrix file of that unit in ``out`` with
@@ -2212,7 +2304,7 @@ def _row_order(out: Path, units, *, diagonal) -> dict:
                                   "folder."))
         kind, idx = _cell_order(units[unit][0], first)
         if kind == "order":
-            follow[unit] = (idx, ref)
+            follow[unit] = (idx, [name for name, _ in refs])
     return follow
 
 
@@ -2424,6 +2516,7 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 raise KeyError(
                     f"labels={spec!r}: column {col_each!r} not in obs of the "
                     f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
+                    + _other_column_advice(data, col_each, side, sides)
                     + _no_cell_types_advice(side))
         elif isinstance(spec, str):
             ser = _select_obs(data, spec, what="labels")
@@ -2445,6 +2538,31 @@ def _diagonal_labels(data, spec, sides) -> dict:
                                advice=_diagonal_label_advice(data, spec, sides),
                                when_none=_no_cell_types_advice(side))
     return out
+
+
+def _other_column_advice(data, col: str, side: str, sides) -> str:
+    """The way that keeps the labels when the object of ``side`` lacks the
+    column ``col`` of a diagonal export and has other obs columns: its cell
+    types may be there under another name. A sentence with its closing
+    space, or ``""`` (no other column; a ``.h5mu`` file on the command line,
+    whose two commands would need its modality names).
+
+    In Python the object gets a column of the same name. The command line
+    cannot add a column, so each side is converted with its own command and
+    its own ``--labels``, into the same folder."""
+    role, a, _kw, _what, src = sides[side][0]
+    if not len(a.obs.columns) or (config._CLI and _is_mudata(data)):
+        return ""
+    obj = src if src.startswith("mdata[") else side
+    kind = "peak" if (sides["atac"] and sides["atac"][0][0] == "atac_peak") else "gene_activity"
+    lab = {s: f"obs:{'<its column>' if s == side else col}" for s in ("rna", "atac")}
+    return "If one of them holds the cell types, " + config.hint(
+        f"give the object a column named {col!r} first, for example "
+        f"{obj}.obs[{col!r}] = {obj}.obs['<its column>'], then export again. ",
+        f"convert each side with its own command and its own --labels, for example "
+        f"multibench convert RNA_FILE OUT --rna X --labels {lab['rna']} --category "
+        f"diagonal, then multibench convert ATAC_FILE OUT --atac X --atac-kind {kind} "
+        f"--labels {lab['atac']} --category diagonal --overwrite. ")
 
 
 def _no_cell_types_advice(side: str) -> str:

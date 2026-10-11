@@ -25,10 +25,11 @@ from multibench.eval import io as eio
 
 ad = pytest.importorskip("anndata")
 
-NO_CELLS = ("The data holds 0 cells, so there is nothing to write. If you kept the cells that "
-            "have a label, no cell had one: check that the barcodes of the label table are "
-            "spelled as the cell names of the data (obs_names) are, for example with the "
-            "same -1 ending.")
+NO_CELLS = ("The data holds 0 cells, so there is nothing to write. A filter kept no cell, or "
+            "you kept the cells that have a label and no cell had one. For a filter, check "
+            "that its values are spelled as the data has them. For labels, check that the "
+            "barcodes of the label table are spelled as the cell names of the data "
+            "(obs_names) are, for example with the same -1 ending.")
 
 
 def _cite(n=60, seed=0):

@@ -52,6 +52,13 @@ def _note(files, ref, out):
             f"the files of {out} follow.\n")
 
 
+def _replaced(files, ref, out):
+    """The note of a call that wrote again every matrix file of these cells:
+    no file is left that the new ones follow."""
+    return (f"export_dataset: wrote the rows of {files} in the cell order that {ref} had in "
+            f"{out} before this call.\n")
+
+
 def test_labels_added_later_follow_the_matrix(tmp_path, capsys):
     a = _cells()
     f = tmp_path / "LATER"
@@ -89,7 +96,7 @@ def test_a_full_rewrite_keeps_the_order(tmp_path, capsys):
     ingest.export_dataset(a, f, **kw)
     capsys.readouterr()
     ingest.export_dataset(_shuffled(a), f, overwrite=True, **kw)
-    assert capsys.readouterr().err == _note("rna.h5, adt.h5 and cty.csv", "rna.h5", f)
+    assert capsys.readouterr().err == _replaced("rna.h5, adt.h5 and cty.csv", "rna.h5", f)
     assert _bars(f / "rna.h5") == _bars(f / "adt.h5") == list(a.obs_names)
     assert np.array_equal(_matrix(f / "rna.h5").X, a.X)
     assert _labels(f / "cty.csv") == list(a.obs["celltype"])
@@ -135,9 +142,10 @@ def test_diagonal_sides_are_judged_apart(tmp_path, capsys):
     ingest.export_dataset(rna, f, atac=atac, **kw)
     capsys.readouterr()
     ingest.export_dataset(rna, f, atac=_shuffled(atac), overwrite=True, **kw)
-    assert capsys.readouterr().err == _note("atac_gas.h5 and atac_cty.csv", "atac_gas.h5", f)
+    assert capsys.readouterr().err == _replaced("atac_gas.h5 and atac_cty.csv",
+                                                "atac_gas.h5", f)
     ingest.export_dataset(_shuffled(rna), f, atac=atac, overwrite=True, **kw)
-    assert capsys.readouterr().err == _note("rna.h5 and rna_cty.csv", "rna.h5", f)
+    assert capsys.readouterr().err == _replaced("rna.h5 and rna_cty.csv", "rna.h5", f)
     assert _bars(f / "rna.h5") == list(rna.obs_names)
     assert _bars(f / "atac_gas.h5") == list(atac.obs_names)
     assert _labels(f / "rna_cty.csv") == list(rna.obs["celltype"])

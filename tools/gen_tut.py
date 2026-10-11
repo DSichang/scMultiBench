@@ -702,8 +702,7 @@ mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=celltype,
  ),
  "mosaic_rna_atac": dict(
    name="MYMOSAIC_RNA_ATAC",
-   needs=(f"{MOSAIC_NEEDS} RNA, then RNA + ATAC, then ATAC. Give ATAC as peaks, with the "
-          "same peaks in both ATAC batches."),
+   needs=f"{MOSAIC_NEEDS} RNA, then RNA + ATAC, then ATAC. Give ATAC as peaks.",
    example=("four small example files, one per batch and modality, from the first 1,500 "
             "cells of each batch of `D45mini`"),
    n_files=4,
@@ -764,8 +763,8 @@ mtb.io.export_dataset(rna3, out, rna="X", labels=celltype,
  ),
  "mosaic_unshared": dict(
    name="MYMOSAIC_UNSHARED",
-   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then ADT. Give ATAC as peaks, and "
-          f"the same proteins in both ADT batches. {ADT_WORD}"),
+   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then ADT. Give ATAC as peaks. "
+          f"{ADT_WORD}"),
    example=("five small example files, one per batch and modality, from the first 1,000 "
             "cells of each batch of `D49mini`"),
    n_files=5,
@@ -890,6 +889,23 @@ mtb.io.export_dataset(adata, "mydata/" + NAME,
 }
 
 
+def mosaic_features_sentence(key):
+    """What the files of two batches must share, for the modalities that the
+    task has in more than one batch. scMoMaT reads ``matrix/data`` alone
+    (tools_scripts/scMoMaT/util.py) and takes feature ``i`` of one batch as
+    feature ``i`` of the next; StabMap and UINMF match the names. The folder
+    check compares no feature names across batches."""
+    roles = TASKS[key]["variants"][0]
+    words = {"rna": "RNA file the same gene names", "adt": "ADT file the same protein names",
+             "atac": "ATAC file the same peaks"}
+    several = [w for fam, w in words.items()
+               if sum(r.rstrip("0123456789") == fam for r in roles) > 1]
+    several[0] = several[0].replace(" file ", " file needs ")
+    return ("Every " + " and every ".join(several) + ", in the same order. scMoMaT matches "
+            "the features of two batches by position, and the check does not compare their "
+            "names across batches.")
+
+
 def cross_batches_sentence(key):
     """How many batches the methods of a cross task read, for the visible
     text of section 5's first cell, from the modalities of the task's
@@ -990,6 +1006,8 @@ def own_cells(key):
     elif cat == "cross":
         also = cross_batches_sentence(key)
         notes += [CROSS_ORDER, CROSS_INDEX]
+    elif cat == "mosaic":
+        also = mosaic_features_sentence(key)
     leftover = LEFTOVER
     if cat == "cross":
         leftover += " " + LEFTOVER_BATCH
