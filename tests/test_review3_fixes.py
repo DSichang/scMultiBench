@@ -168,7 +168,9 @@ def test_two_modalities_from_one_matrix_are_refused(tmp_path):
     assert _refused(tmp_path, None, rna=rna, adt=rna) == (
         "rna= and adt= are given one object, so they" + SAME + OWN_ADT)
     assert _refused(tmp_path, rna, rna="X", adt=rna) == (
-        "rna='X' and adt=AnnData" + SAME + OWN_ADT)
+        "data and adt= are the same object, so rna='X' and adt=" + SAME + "The ADT needs "
+        "its own object (adt=<another AnnData>) or its own place in this object, such as "
+        "adt='obsm:<key>' or a feature filter (adt='X[feature_types=Antibody Capture]').")
     # one filter twice is one matrix
     rna.var["feature_types"] = "Gene Expression"
     assert _refused(tmp_path, rna, rna="X[feature_types=Gene Expression]",
@@ -463,7 +465,9 @@ def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsy
     second = ("multibench convert ATAC_FILE OUT --atac X --atac-kind gene_activity --labels "
               "obs:<its column> --category diagonal --overwrite")
     assert capsys.readouterr().err == (
-        "error: " + HEAD + "convert each side with its own command and its own --labels, "
+        "error: --labels obs:cell_type: column 'cell_type' not in obs of the ATAC object "
+        "(atac); available: ['predicted.id', 'prediction.score']. If one of them holds the "
+        "cell types, convert each side with its own command and its own --labels, "
         f"for example {first}, then {second}. Without cell types for the ATAC cells, leave "
         "--labels out and run with --no-evaluate.\n" + DEBUG)
     assert not out.exists()
@@ -553,8 +557,8 @@ def test_adt_names_as_a_string_is_refused(tmp_path):
     cite = _rna(log=False)
     cite.obsm["protein"] = _adt(log=False).X
     cite.uns["protein_ids"] = [f"CD{j}" for j in range(8)]
-    for names, key in (("protein_ids", "protein_ids"), ("CD3", "protein_names"),
-                       ("12345678", "protein_names")):
+    for names, key in (("protein_ids", "protein_ids"), ("CD3", "<key>"),
+                       ("12345678", "<key>"), ("protein_names", "<key>")):
         assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
             f"adt_names={names!r} is one string, and adt_names= takes a list of the protein "
             f"names, one for each column of the ADT matrix. For names that the object keeps, "

@@ -128,6 +128,45 @@ def _counts_of_object_advice(what: str, spec) -> str | None:
     return f"Pass the raw counts of these cells as {what}=."
 
 
+def _raw_count_hint(arg: str, spec, *, to_canonical: bool = False):
+    """``(hint, how)`` of :func:`_warn_not_counts` for the matrix that the
+    selector ``spec`` reads: the selector of the raw counts of that matrix,
+    or a sentence when no selector can be named. ``arg`` is the argument the
+    caller wrote (``rna``, ``adt``, ``atac``); with ``to_canonical`` the
+    selector is the ``obsm=`` key or ``None``, and ``arg`` the modality.
+
+    ``'layer:counts'`` is a layer of the matrix the selector reads (``X``),
+    so it is named only for a selector of ``X`` or of a layer, with the
+    modality and the feature filter of that selector. A matrix in ``obsm``
+    has no layer: its raw counts are in an ``obsm`` entry too. For the ADT
+    that entry is usually ``protein_counts``; for another modality, and for
+    an ADT selector that already reads ``protein_counts``, the message names
+    the entry that was read."""
+    if to_canonical:
+        key, pre, flt = spec, "", None
+        shown = lambda k: config.hint(f"obsm='{k}'", f"--obsm {k}")     # noqa: E731
+        layer = config.hint("layer='counts'", "--layer counts")
+    else:
+        base, flt = _split_var_filter(spec if isinstance(spec, str) else "")
+        mod = None
+        if base.startswith("mod:"):
+            mod, _, base = base[4:].partition(".")
+        pre = f"mod:{mod}." if mod else ""
+        key = base[5:] if base.startswith("obsm:") else None
+        shown = lambda k: config.hint(f"{arg}='{pre}obsm:{k}'",          # noqa: E731
+                                      f"--{arg} {pre}obsm:{k}")
+        counts = f"{pre}layer:counts" + (f"[{flt[0]}={flt[1]}]" if flt else "")
+        layer = config.hint(f"{arg}='{counts}'",
+                            f"--{arg} \"{counts}\"" if flt else f"--{arg} {counts}")
+    if key is None:
+        return layer, None
+    if arg == "adt" and key != "protein_counts":
+        return shown("protein_counts"), None
+    return None, (f"Export raw counts: {shown(key)} writes obsm[{key!r}], so that entry "
+                  f"must hold them. Put the raw counts there, or name the obsm entry that "
+                  f"holds them, for example {shown('<key>')}.")
+
+
 def _matrix_key(data, spec):
     """What tells whether two modality arguments of :func:`export_dataset`
     read one matrix: the parts of a selector string (the object, the place,
@@ -167,10 +206,21 @@ def _check_one_matrix_each(data, specs, given) -> None:
             f"--{first} {given[first]} and --{what} {given[what]}")
         if key[0] == "object":
             pair = f"{first}= and {what}= are given one object, so they"
+        own = (f"Pass the {what.upper()} as its own object ({what}=<AnnData>), or name its "
+               f"own place in the object")
+        same = [w for w in (first, what) if specs[w] is data]
+        if same and not config._CLI:
+            # an object was passed, and it is data: the pair is named by what it is
+            pair = (f"data and {same[0]}= are the same object, so " + " and ".join(
+                f"{w}=" if w in same else f"{w}={_shown(given[w])}" for w in (first, what))
+                if len(same) == 1 else
+                f"data, {first}= and {what}= are the same object, so {first}= and {what}=")
+            if what in same:
+                own = (f"The {what.upper()} needs its own object ({what}=<another AnnData>) "
+                       f"or its own place in this object")
         raise ValueError(
             f"{pair} name the same matrix, and one file holds one modality. " + config.hint(
-                f"Pass the {what.upper()} as its own object ({what}=<AnnData>), or name "
-                f"its own place in the object, such as {what}='obsm:<key>' or a feature "
+                f"{own}, such as {what}='obsm:<key>' or a feature "
                 f"filter ({what}='{example}').",
                 f"Name the place of the {what.upper()} in SRC, such as --{what} obsm:<key> "
                 f"or a feature filter (--{what} \"{example}\")."
@@ -927,10 +977,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
-        hint = (config.hint("obsm='protein_counts'", "--obsm protein_counts")
-                if obsm is not None and modality == "adt"
-                else config.hint("layer='counts'", "--layer counts"))
-        _warn_not_counts(X, modality, hint, stacklevel=2)
+        hint, how = _raw_count_hint(modality, obsm, to_canonical=True)
+        _warn_not_counts(X, modality, hint, stacklevel=2, how=how)
     if modality == "atac_gas" and category in (None, "diagonal"):
         X, bars = _follow_peak_order(out, X, bars)
     if getattr(X, "ndim", 0) == 2:
@@ -1759,12 +1807,13 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)
     if isinstance(adt_names, str):
         # a string is a sequence of characters: 13 letters would name 13 proteins
-        key = adt_names if adt_names in (getattr(data, "uns", None) or {}) else "protein_names"
+        # a key of uns is named only when the string is one
+        key = repr(adt_names) if adt_names in (getattr(data, "uns", None) or {}) else "'<key>'"
         raise ValueError(
             f"adt_names={adt_names!r} is one string, and adt_names= takes a list of the "
             f"protein names, one for each column of the ADT matrix. For names that the "
             f"object keeps, pass the list, for example "
-            f"adt_names=list(adata.uns[{key!r}]).")
+            f"adt_names=list(adata.uns[{key}]).")
     _check_one_matrix_each(data, {"rna": rna, "adt": adt, "atac": atac}, given)
     diagonal = category == "diagonal"
     if diagonal and labels is not None and rna is None and adt is None and atac is None:
@@ -1875,20 +1924,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
             if role in _COUNT_ROLES:
-                # the hint follows the selector: raw ADT counts of a CITE-seq
-                # object usually sit in another obsm key, not in a layer
-                if role == "adt" and kw.get("obsm") is not None:
-                    hint = config.hint("adt='obsm:protein_counts'",
-                                       "--adt obsm:protein_counts")
-                else:
-                    # the MuData form only for a selector that reads a modality
-                    sel = {"rna": rna, "adt": adt, "atac": atac}.get(what)
-                    sel = _split_var_filter(sel)[0] if isinstance(sel, str) else ""
-                    mod = sel[4:].partition(".")[0] if sel.startswith("mod:") else None
-                    counts = f"mod:{mod}.layer:counts" if mod else "layer:counts"
-                    hint = config.hint(f"{what}='{counts}'", f"--{what} {counts}")
+                # the hint follows the selector the matrix was read with; the
+                # command line's --atac-from hands over an object and its selector
+                sel = {"rna": rna, "adt": adt, "atac": atac}[what]     # as resolved
+                if not isinstance(sel, str) and config._CLI:
+                    sel = getattr(sel, "_selector", None)
+                hint, how = _raw_count_hint(what, sel)
                 _warn_not_counts(X, what, hint, stacklevel=2,
-                                 how=_counts_of_object_advice(what, given[what]))
+                                 how=_counts_of_object_advice(what, given[what]) or how)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
     # --- the files this call writes, each with its unit: the side and the
@@ -2514,7 +2557,8 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 ser = data.obs[col_each]
             else:
                 raise KeyError(
-                    f"labels={spec!r}: column {col_each!r} not in obs of the "
+                    config.hint(f"labels={spec!r}", f"--labels {spec}")
+                    + f": column {col_each!r} not in obs of the "
                     f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
                     + _other_column_advice(data, col_each, side, sides)
                     + _no_cell_types_advice(side))
@@ -2669,9 +2713,10 @@ def _select_object(obj, spec: str, *, what: str):
         # 'X' never reaches _pick_matrix, and the selector the user wrote is
         # known only here
         _check_one_feature_type(a, arg=what, spec=user_spec)
-    if not kw:
-        return a
-    X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"), what=what)
-    b = ad.AnnData(X, obs=a.obs.copy())
-    b.var_names = [str(x) for x in feats]
-    return b
+    if kw:
+        X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"), what=what)
+        b = ad.AnnData(X, obs=a.obs.copy())
+        b.var_names = [str(x) for x in feats]
+        a = b
+    a._selector = spec          # for the raw-count hint of export_dataset
+    return a
