@@ -1211,7 +1211,7 @@ def evaluate(
     number. Labels, batches and clusters with cell ids must then name
     exactly those cells: another row order is matched by barcode, and a
     line on stderr says so; other cells raise ``ValueError`` with the
-    counts and three barcodes of each side. A first column of numbers
+    number of cells that are missing and one of them. A first column of numbers
     without a header (row numbers) is left out and gives no ids, and one
     with a header is a column of the embedding.
 
