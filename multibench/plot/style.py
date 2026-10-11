@@ -31,10 +31,9 @@ def minmax(x: np.ndarray) -> np.ndarray:
     (:func:`constant_columns`); the numbers stay as in R.
     """
     x = _tie_round(x)
-    lo = np.nanmin(x) if np.isfinite(x).any() else np.nan
-    hi = np.nanmax(x) if np.isfinite(x).any() else np.nan
-    if not np.isfinite(lo) or lo == hi:
+    if not np.isfinite(x).any() or np.nanmin(x) == np.nanmax(x):
         return np.where(np.isnan(x), np.nan, 1.0)
+    lo, hi = np.nanmin(x), np.nanmax(x)
     return (x - lo) / (hi - lo)
 
 
@@ -279,10 +278,6 @@ def constant_columns(mat: pd.DataFrame) -> dict:
         if len(v) and (v == v[0]).all():
             out[col] = float(v[0])
     return out
-
-
-#: metrics whose value depends on the Leiden backend of the clustering sweep
-LEIDEN_METRICS = ("ARI", "NMI", "iF1")
 
 
 def backend_warning(df: pd.DataFrame) -> str | None:

@@ -283,8 +283,8 @@ def test_summary_require_complete_restricts_and_raises():
     # the drop is kept, but never silent: ONE warning names the dropped
     # method(s) and the dataset(s) each lacks (re-test round 3: a student's
     # own method on one dataset vanished from the notebook's summary figure)
-    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method that "
-                                         r"lacks a dataset: C lacks DS2\.") as rec:
+    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method: "
+                                         r"C lacks DS2\.") as rec:
         tbl = bubble.build_table(long, aggregate="summary", require_complete=True)
     assert set(tbl.methods) == {"A", "B"}
     assert len([w for w in rec if "require_complete=True dropped" in str(w.message)]) == 1
