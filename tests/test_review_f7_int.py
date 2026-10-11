@@ -313,14 +313,6 @@ def test_method_info_returns_and_raises_read_as_a_card():
     assert "``params`` - what ``run(params=...)`` can change" in flat
 
 
-def test_bubble_badge_note_names_the_needs_labels_column():
-    doc = inspect.getdoc(mtb.plot.bubble)
-    flat = " ".join(doc.split("**Chips and badge**", 1)[1].split())
-    assert "(supervised)" not in flat and "method-level flag" not in flat
-    assert "A ``needs_labels`` column decides first." in flat
-    assert "scMoMaT has it in mosaic only." in flat
-
-
 def test_normalize_peak_names_example_follows_to_canonical(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     atac = ad.AnnData(np.ones((6, 3)))

@@ -1,9 +1,8 @@
 """Plot fixes after the seventh student study (fix round 7).
 
-R7-04: the chip key under a bubble figure called a renamed re-run such as
-``SCALEX_rerun`` "not a package method". The key now says what is true for
-every ``?`` row, and the footnote lines and row labels of a narrow figure fit
-inside the figure at its own size.
+R7-04: a renamed re-run such as ``SCALEX_rerun`` keeps its ``?`` chip and is
+not called "not a package method"; the legends and row labels of a narrow
+figure fit inside the figure at its own size.
 R7-12: plain wording for ``order`` (build_table, bubble) and for a one-entry
 label dict (evaluate Notes).
 """
@@ -21,8 +20,6 @@ matplotlib.use("Agg")
 
 B = importlib.import_module("multibench.plot.bubble")
 
-NEW_KEY = ("Py / R = language · L = uses cell-type labels · "
-           "? = a name the package does not know · DR = dimension reduction")
 UNKNOWN = "a name the package does not know, such as your own or a renamed re-run"
 
 
@@ -50,7 +47,7 @@ def _texts(fig):
 
 
 def _chips(fig):
-    """Row label -> the chip / badge letters drawn on that row."""
+    """Row label -> the chip letters drawn on that row."""
     ax = fig.axes[0]
     rows = {round(float(y), 3): lab.get_text()
             for y, lab in zip(ax.get_yticks(), ax.get_yticklabels())}
@@ -62,28 +59,23 @@ def _chips(fig):
     return out
 
 
-# --- R7-04: the chip key is true for a renamed re-run -------------------------
+# --- R7-04: the chip of a renamed re-run --------------------------------------
 
-def test_chip_key_wording():
-    assert B.CHIP_KEY == NEW_KEY
-
-
-def test_renamed_rerun_footer_does_not_say_not_a_package_method():
+def test_renamed_rerun_keeps_its_question_mark():
     df = pd.concat([_d28(), _rerun("SCALEX_rerun")], ignore_index=True)
     fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
     texts = _texts(fig)
     assert not any("not a package method" in t for t in texts), texts
-    assert NEW_KEY in texts
     # the chip still follows the row name: the renamed row keeps its '?'
     assert _chips(fig)["SCALEX_rerun"] == ["?"]
     assert _chips(fig)["SCALEX"] == ["Py"]
 
 
-def test_renamed_supervised_rerun_shows_question_mark_and_badge_under_a_true_key():
+def test_renamed_supervised_rerun_shows_question_mark_and_no_badge():
     df = pd.concat([_d28(), _rerun("Seurat_v3_rerun", needs_labels=True)],
                    ignore_index=True)
     fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
-    assert _chips(fig)["Seurat_v3_rerun"] == ["?", "L"]
+    assert _chips(fig)["Seurat_v3_rerun"] == ["?"]
     assert not any("not a package method" in t for t in _texts(fig))
 
 
@@ -96,10 +88,10 @@ def test_docstrings_use_the_key_wording():
     assert "add a boolean ``needs_labels`` column" in inspect.getdoc(mtb.to_long)
 
 
-# --- R7-04: the footnote lines and row labels fit the narrow figures ----------
+# --- R7-04: the legends and row labels fit the narrow figures -----------------
 
 def _outside(fig, pad=0.5):
-    """Texts of the axes (footnotes, row labels, title) that leave the figure."""
+    """Texts of the axes (legends, row labels, title) that leave the figure."""
     fig.draw_without_rendering()
     ax, box = fig.axes[0], fig.bbox
     arts = [t for t in ax.texts if t.get_text()]
@@ -123,17 +115,17 @@ def _outside(fig, pad=0.5):
     {"metrics": ["ARI", "NMI", "cLISI"]},                           # the Quickstart figure
     {"metrics": ["ARI"], "show_language": False},
 ])
-def test_narrow_figures_keep_footnotes_and_row_labels_inside(kw):
+def test_narrow_figures_keep_legends_and_row_labels_inside(kw):
     fig = _quiet(mtb.plot.bubble, _d28(), **kw)
     assert _outside(fig) == [], kw
 
 
-def test_renamed_rerun_alone_keeps_its_footnotes_inside():
+def test_renamed_rerun_alone_keeps_its_texts_inside():
     fig = _quiet(mtb.plot.bubble, _rerun("SCALEX_rerun"))
     assert _outside(fig) == []
 
 
-def test_narrow_summary_figure_keeps_its_footnotes_inside():
+def test_narrow_summary_figure_keeps_its_texts_inside():
     df = pd.concat([_quiet(mtb.load_results, "diagonal", dataset=d, source="published")
                     for d in ("D24", "D25", "D28")], ignore_index=True)
     fig = _quiet(mtb.plot.bubble, df, metrics=["ARI"], aggregate="summary")
@@ -141,12 +133,15 @@ def test_narrow_summary_figure_keeps_its_footnotes_inside():
 
 
 def test_fit_widens_only_and_keeps_the_height():
-    tbl = _quiet(B.build_table, _d28(), metrics=["ARI"], methods=["Conos"])
+    # a row label wider than the left margin: only the fit can make room for it
+    long_name = "A_renamed_rerun_with_a_name_much_longer_than_any_package_method"
+    tbl = _quiet(B.build_table, _rerun(long_name), metrics=["ARI"])
     fig = _quiet(B.render, tbl)
     w, h = fig.get_size_inches()
     assert h == pytest.approx(0.42 * 1 + 2.9)
     # 0.6 inch per x-unit past the table, plus 2.8: the width before the fit
     assert w > 0.6 * (4.82 - 0.45) + 2.8
+    assert _outside(fig) == []
 
 
 def test_wide_figure_is_not_widened():

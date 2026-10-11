@@ -332,30 +332,25 @@ def test_overall_basis_shared_with_bar():
     assert bubble.build_table(long, aggregate="summary").overall_basis == "rank"
     tbl = bubble.build_table(long, aggregate="summary", overall="mean_overall")
     assert tbl.overall_basis == "mean_overall"
-    fig = bubble.render(tbl)
-    assert any("mean_overall" in t.get_text() for t in fig.axes[0].texts)
 
 
-def test_nan_cell_drawn_as_dash_with_legend():
+def test_nan_cell_drawn_as_dash():
     import matplotlib; matplotlib.use("Agg")
     long = _three()
     long = long[~((long.method == "B") & (long.metric == "NMI"))]
     fig = bubble.render(bubble.build_table(long))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts.count(bubble.NA_MARK) == 1
-    assert any("n/a" in t for t in texts)
-    fig0 = bubble.render(bubble.build_table(_three()))
-    assert not any("n/a" in t.get_text() for t in fig0.axes[0].texts)
 
 
-def test_badges_unknown_and_supervised(monkeypatch):
+def test_chips_unknown_and_known(monkeypatch):
     import matplotlib; matplotlib.use("Agg")
     from matplotlib.patches import Circle
     # unknown (non-registry) methods get a '?' chip
     fig = bubble.render(bubble.build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts.count("?") == 3 and "L" not in texts
-    # a registry method that needs labels gets an 'L' badge next to the chip
+    # a registry method gets its language chip, and no badge for using labels
     from multibench.engine import registry
 
     class _Spec:
@@ -363,9 +358,9 @@ def test_badges_unknown_and_supervised(monkeypatch):
     monkeypatch.setattr(registry, "get", lambda name: _Spec())
     fig = bubble.render(bubble.build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
-    assert texts.count("L") == 3 and texts.count("Py") == 3
+    assert "L" not in texts and texts.count("Py") == 3
     badges = [p for p in fig.axes[0].patches if isinstance(p, Circle) and p.center[0] < 0]
-    assert all(p.center[0] < 0 for p in badges) and len(badges) == 6
+    assert len(badges) == 3
 
 
 # --- P10: BubbleTable.ranks / .norm as the concatenation over blocks -------
@@ -411,17 +406,23 @@ def test_bubble_table_properties_are_not_dataclass_fields():
     assert "ranks" in bubble.BubbleTable.__doc__ and "n" in bubble.BubbleTable.ranks.__doc__
 
 
-# --- P18: on-figure key for the chips ---------------------------------------
+# --- the figure carries its legends and nothing under them -------------------
 
-def test_chip_key_drawn_with_language_chips():
+def test_figure_has_no_footnote_lines():
     import matplotlib; matplotlib.use("Agg")
-    fig = bubble.render(bubble.build_table(_three()))
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert B.CHIP_KEY in texts
-    assert B.CHIP_KEY.startswith("Py / R = language") and "L = uses cell-type labels" in B.CHIP_KEY
-    assert "? = a name the package does not know" in B.CHIP_KEY
-    fig2 = bubble.render(bubble.build_table(_three()), show_language=False)
-    assert B.CHIP_KEY not in [t.get_text() for t in fig2.axes[0].texts]
+    long = _three()
+    long = long[~((long.method == "B") & (long.metric == "NMI"))]   # an n/a cell
+    long.loc[long.metric == "ARI", "value"] = 0.5                   # a grey column
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        figs = [bubble.render(bubble.build_table(long)),
+                bubble.render(bubble.build_table(_three(datasets=("D1", "D2")),
+                                                 aggregate="summary"))]
+    for fig in figs:
+        ax = fig.axes[0]
+        below = [t.get_text() for t in ax.texts
+                 if t.get_position()[1] < 0 and t.get_gid() != "legend"]
+        assert below == []
 
 
 # --- P19: the missing-metric Overall rule is said out loud ------------------
@@ -470,13 +471,11 @@ def test_na_rule_in_summary_mode_is_rank_zero():
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 
 
-def test_bubble_passes_na_through_and_legend_states_the_rule():
+def test_bubble_passes_na_through():
     import matplotlib; matplotlib.use("Agg")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        fig = bubble(_with_gap(), na="skip")
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert any("Overall averages the metrics the method has" in t for t in texts)
+        bubble(_with_gap(), na="skip")
     with pytest.raises(ValueError, match="has no NMI"):
         bubble(_with_gap(), na="raise")
 

@@ -9,7 +9,6 @@ Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is skipped w
 import pytest
 
 import multibench as mtb
-from multibench.plot.bubble import CHIP_KEY
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_f6_cli import _DATA, _lung
 
@@ -34,13 +33,6 @@ def test_changes_page_lists_round_7_changes():
             "`params_for` and `evaluate`. Also the environment messages, file checks, "
             "plot and scan warnings,"):
         assert phrase in text, phrase
-
-
-@needs_docs
-def test_changes_page_quotes_the_live_chip_key():
-    shown = "? = a name the package does not know"
-    assert shown in CHIP_KEY
-    assert f"The chip key of `bubble` reads `{shown}`." in _flat("changes.md")
 
 
 @needs_docs

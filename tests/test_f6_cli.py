@@ -165,10 +165,7 @@ def _d11_emb(tmp_path):
     return emb
 
 
-def test_name_with_package_method_writes_needs_labels_and_bubble_badges(tmp_path):
-    import matplotlib
-    matplotlib.use("Agg")
-    from multibench.plot import bubble as B
+def test_name_with_package_method_writes_needs_labels(tmp_path):
     emb = _d11_emb(tmp_path)
     out = tmp_path / "m.csv"
     assert cli.main(["evaluate", "--output", str(emb), "--method", "Matilda", "--name",
@@ -183,19 +180,6 @@ def test_name_with_package_method_writes_needs_labels_and_bubble_badges(tmp_path
                      "--dataset", "D11", "--category", "vertical", "--data-path",
                      str(_DATA), "--metrics", "ASW", "--out", str(out2)]) == 0
     assert "needs_labels" not in pd.read_csv(out2).columns
-    # bubble badges the renamed row
-    df = pd.concat([mtb.load_results("vertical", dataset="D11", source="rerun"), mine],
-                   ignore_index=True)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tbl = B.build_table(df, na="skip")
-        fig = B.render(tbl)
-    assert tbl.needs_labels.get("Matilda_rerun") is True
-    from matplotlib.patches import Circle
-    badged = [tbl.methods[len(tbl.methods) - int(p.center[1] + 0.5)]
-              for p in fig.axes[0].patches
-              if isinstance(p, Circle) and abs(p.center[0] - (-0.38)) < 1e-6]
-    assert "Matilda_rerun" in badged and "Matilda" in badged
 
 
 def test_name_help_says_method_can_be_left_out():
