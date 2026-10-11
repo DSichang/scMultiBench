@@ -85,7 +85,11 @@ def test_step1_names_both_routes_for_citeseq_donors():
         assert "D11" in set(mtb.results_coverage("vertical").dataset)
         assert "D52" in set(mtb.results_coverage("cross").dataset)
     assert "CITE-seq donors: use `vertical` in the same way." in step1
-    assert "The `cross` category also fits three donors, one file each" in step1
+    assert ("The `cross` category integrates the donors as batches and reads a fixed number "
+            "of them, three for RNA + ADT: see the "
+            "[One file per batch](tutorials/run.md#one-file-per-batch) tab. With another "
+            "number of donors, use `vertical`, as in the recipe "
+            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
     assert f"the `vertical` category has {n_v} RNA + ADT methods and the stored table D11" in whole
     # cross has tasks without RNA + ADT since the article's 13 tasks: the
     # sentence counts the methods that read the CITE-seq donors

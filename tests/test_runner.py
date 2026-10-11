@@ -217,14 +217,11 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
     use = ", or use mtb.io.export_dataset, whose selectors take a filter such as "
     texts = {
         "rna": head + "for example adata[:, adata.var['feature_types'] == 'Gene Expression']"
-        + use + "'X[feature_types=Gene Expression]'. If all of them are RNA features, "
-        "delete the column from the object first, for example del adata.var['feature_types'].",
+        + use + "'X[feature_types=Gene Expression]'.",
         "atac": head + "for example adata[:, adata.var['feature_types'] == 'Peaks']"
-        + use + "'X[feature_types=Peaks]'. If all of them are ATAC features, delete the "
-        "column from the object first, for example del adata.var['feature_types'].",
+        + use + "'X[feature_types=Peaks]'.",
         "atac_gas": head + "as adata[:, adata.var['feature_types'] == '<type>']"
-        + use + "'X[feature_types=<type>]'. If all of them are ATAC features, delete the "
-        "column from the object first, for example del adata.var['feature_types']."}
+        + use + "'X[feature_types=<type>]'."}
 
     out = tmp_path / "out"
     (tmp_path / "repo" / "tools_scripts").mkdir(parents=True)

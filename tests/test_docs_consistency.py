@@ -854,6 +854,8 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     (tmp_path / "pkg" / "multibench" / "__init__.py").write_text('__version__ = "9.9.9"\n')
     gate.pypi_releases = lambda *a, **k: {"9.9.9"}
     gate.data_problems = lambda checkout: []                   # its own test: test_review_f3_int
+    # the Changes page of that version (its own test: test_deploy_gate_changes)
+    (tmp_path / "docs" / "changes.md").write_text("# Changes\n\n## New in 9.9.9\n")
     monkeypatch.delenv("DEPLOY_GATE", raising=False)
     gate.on_startup(command="build", dirty=False)
     assert gate.on_config(config) is config
@@ -923,12 +925,86 @@ def test_deploy_gate_refuses_a_version_that_is_not_on_pypi(tmp_path, monkeypatch
     gate.package_checkout = lambda cfg: pkg
     monkeypatch.setattr(gate, "data_problems", lambda checkout: [])
     monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1"})
+    # the Changes page of that version (its own test: test_deploy_gate_changes)
+    (tmp_path / "docs" / "changes.md").write_text("# Changes\n\n## New in 0.3.2\n")
     gate.on_startup(command="gh-deploy", dirty=False)
     with pytest.raises(Abort, match=r"multibench-sc 0\.3\.2 .* is not on PyPI") as e:
         gate.on_config({"docs_dir": str(tmp_path / "docs")})
     assert "nothing was built or pushed" in str(e.value)
     monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1", "0.3.2"})
     config = {"docs_dir": str(tmp_path / "docs")}
+    assert gate.on_config(config) is config
+
+
+@needs_docs
+def test_deploy_gate_refuses_a_changes_page_of_another_version(tmp_path, monkeypatch):
+    """The newest section of docs/changes.md (its first ``## New in X.Y.Z``)
+    must be that of the version being deployed: a site of 0.3.5 whose Changes
+    page ends at 0.3.4 would be published without a word. The message names
+    both versions and the file, and a page whose heading cannot be read fails
+    closed."""
+    import importlib.util
+    from mkdocs.exceptions import Abort
+    repo = _docs_root().parent
+    spec = importlib.util.spec_from_file_location("deploy_gate", repo / "hooks" / "deploy_gate.py")
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+    pkg = tmp_path / "pkg"
+    (pkg / "multibench").mkdir(parents=True)
+    (pkg / "multibench" / "__init__.py").write_text('__version__ = "0.3.5"\n')
+    page = tmp_path / "docs" / "changes.md"
+    page.parent.mkdir()
+    page.write_text("# Changes\n\n## New in 0.3.5\n\ntext\n\n## Behaviour changes in 0.3.5\n"
+                    "\n## New in 0.3.4\n")
+    assert gate.changes_version(page) == "0.3.5"
+    assert gate.changes_problems(pkg, page) == []
+    # the page of the release before
+    page.write_text("# Changes\n\n## New in 0.3.4\n\ntext\n\n## New in 0.3.3\n")
+    assert gate.changes_version(page) == "0.3.4"
+    assert gate.changes_problems(pkg, page) == [
+        f"the newest section of {page} is '## New in 0.3.4', and the package being "
+        f"deployed is multibench-sc 0.3.5 (the version of {pkg}): add the section '## New "
+        f"in 0.3.5' to {page}, or deploy from the checkout of 0.3.4"]
+    # a page ahead of the package is refused too
+    page.write_text("## New in 0.3.6\n\n## New in 0.3.5\n")
+    (msg,) = gate.changes_problems(pkg, page)
+    assert "'## New in 0.3.6'" in msg and "multibench-sc 0.3.5" in msg and str(page) in msg
+    # fails closed: no heading, a heading without a version, no file, no version
+    unreadable = [
+        f"{page} has no readable version heading (its first '## New in X.Y.Z' line), so "
+        f"it cannot be checked against multibench-sc 0.3.5: add the section '## New in "
+        f"0.3.5'"]
+    for text in ("# Changes\n\n### New in 0.3.5\n", "## New in the next release\n\n"
+                 "## New in 0.3.5\n", "## Behaviour changes in 0.3.5\n", ""):
+        page.write_text(text)
+        assert gate.changes_version(page) is None
+        assert gate.changes_problems(pkg, page) == unreadable
+    page.unlink()
+    assert gate.changes_problems(pkg, page) == unreadable
+    page.write_text("## New in 0.3.5\n")
+    assert gate.changes_problems(tmp_path / "nowhere", page) == [
+        f"no __version__ in {tmp_path / 'nowhere' / 'multibench' / '__init__.py'}, so the "
+        f"newest section of {page} cannot be checked"]
+    # the page of the docs repo names the version of this checkout
+    import multibench
+    assert gate.changes_version(_docs_root() / "changes.md") == multibench.__version__
+    assert gate.changes_problems(ROOT, _docs_root() / "changes.md") == []
+    # gh-deploy refuses; the other checks pass here
+    _write_nb(pkg / "notebooks" / "tutorial_a.ipynb", [("code", "x = 1")], executed=False)
+    _write_nb(tmp_path / "docs" / "tutorials" / "a.ipynb", [("code", "x = 1")])
+    gate.package_checkout = lambda cfg: pkg
+    monkeypatch.setattr(gate, "data_problems", lambda checkout: [])
+    monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.5"})
+    monkeypatch.delenv("DEPLOY_GATE", raising=False)
+    config = {"docs_dir": str(tmp_path / "docs")}
+    gate.on_startup(command="gh-deploy", dirty=False)
+    assert gate.on_config(config) is config
+    page.write_text("## New in 0.3.4\n")
+    with pytest.raises(Abort, match=r"is '## New in 0\.3\.4', and the package being "
+                                    r"deployed is multibench-sc 0\.3\.5") as e:
+        gate.on_config(config)
+    assert "nothing was built or pushed" in str(e.value)
+    gate.on_startup(command="build", dirty=False)              # mkdocs build is not gated
     assert gate.on_config(config) is config
 
 
@@ -1229,8 +1305,9 @@ def test_changes_page_lists_0_3_5():
         assert f"{{ #{anchor} }}" in run, anchor
     heads = re.findall(r"^### (.+)$", (_docs_root() / "changes.md").read_text()
                        .split("## Behaviour changes in 0.3.5", 1)[1].split("\n## ", 1)[0], re.M)
-    assert heads == ["Missing labels and batches", "Dataset folders and exports",
-                     "scan and dry runs", "Messages", "Tutorials", "Not solved in 0.3.5"]
+    assert heads == ["Missing labels and batches", "Cell order in evaluate",
+                     "Dataset folders and exports", "scan and dry runs", "Messages",
+                     "Tutorials", "Not solved in 0.3.5"]
     # what 0.3.4 did is not run here: 0.3.4 is not installed where the tests
     # run. These sentences were run once against the release, and are kept
     # as they were then

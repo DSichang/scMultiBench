@@ -535,7 +535,10 @@ def test_pages_state_the_donor_count_cross_reads():
     assert ("These methods read batches 1-3. UINMF also has a variant for two "
             "batches.") in step1
     assert "UINMF reads only the first two" not in step1
-    assert "also fits three donors, one file each" in step1
+    assert ("The `cross` category integrates the donors as batches and reads a fixed number "
+            "of them, three for RNA + ADT: see the") in step1
+    assert ("With another number of donors, use `vertical`, as in the recipe "
+            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
     run = _flat("tutorials/run.md")
     assert ('category="cross") ``` The cross methods for RNA + ADT read batches 1-3. '
             '`describe_layout("cross")` lists every batch pattern.') in run

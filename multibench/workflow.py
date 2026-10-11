@@ -3595,6 +3595,10 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
             stacklevel=stacklevel)
     vals = _eio.as_vector(x, what=what)
     if not _carries_ids(x):
+        if what == "batch" and isinstance(x, pd.Series) \
+                and _eio._numbers_rows(x, _dataset_cell_ids(dataset, data_path)):
+            warnings.warn(_eio._by_position(what, len(x), order), UserWarning,
+                          stacklevel=stacklevel - 1)
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
     if ids is None:

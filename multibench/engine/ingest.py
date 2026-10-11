@@ -497,6 +497,11 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
     a filtered view passes. ``arg`` is the keyword the user wrote (``'rna'``)
     and ``spec`` the selector, ``None`` for an object; ``to_canonical`` has
     neither and gives the modality as ``role``. They only word the message.
+
+    The message ends with one more way out, deleting the column when all
+    the features are of one modality, unless one of the type names found is
+    a 10x Genomics name (``Gene Expression``, ``Antibody Capture``,
+    ``Peaks``): those features are of several modalities.
     """
     var = getattr(adata, "var", None)
     if var is None or "feature_types" not in var.columns:
@@ -518,11 +523,15 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
     kind = f"{family.upper()} features" if family else "features of one modality"
     subset = "adata[:, adata.var['feature_types'] == " + repr(example or "<type>") + "]"
     obj = "adata" if arg is None or spec is not None else arg
-    way_out = config.hint(
+    way_out = " " + config.hint(
         f"If all of them are {kind}, delete the column from the object first, for "
         f"example del {obj}.var['feature_types'].",
         f"If all of them are {kind}, delete the var column feature_types in Python and "
         f"save the file again.")
+    if set(counts.index) & set(_TENX_TYPE.values()):
+        # a 10x name says what the features are: without the column, genes
+        # and peaks (or antibodies) would be written into one file
+        way_out = ""
     if arg is None:                             # to_canonical, and what mtb.run converts
         flags = f'--{family or "rna"} "X[feature_types={example or "<type>"}]"'
         if family == "atac":                    # --atac does not go without its kind
@@ -531,7 +540,7 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
         raise ValueError(f"The matrix holds {head} " + config.hint(
             f"Pass the features of one type, {how} {subset}, or use "
             f"mtb.io.export_dataset, whose selectors take a filter such as "
-            f"'X[feature_types={example or '<type>'}]'. {way_out}",
+            f"'X[feature_types={example or '<type>'}]'.{way_out}",
             f"Write the dataset folder instead, {how} multibench convert SRC OUT {flags}."))
     if spec is not None and _split_var_filter(spec)[1] is None:
         filtered = f"{spec}[feature_types={example or '<type>'}]"
@@ -539,12 +548,12 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
         add = (f"Add a filter, for example {filtered}." if example else
                f"Add a filter that names the type holding the {kind}, as {filtered}.")
         raise ValueError(config.hint(f"{arg}={spec!r}", f"--{arg} {spec}")
-                         + f" selects {head} {add} {way_out}")
+                         + f" selects {head} {add}{way_out}")
     shown = repr(spec) if spec is not None else type(adata).__name__
     raise ValueError(
         config.hint(f"{arg}={shown}", f"--{arg} {spec}") + f" holds {head} " + config.hint(
             f"Pass the features of one type, {'for example' if example else 'as'} "
-            f"{arg}={subset}. {way_out}",
+            f"{arg}={subset}.{way_out}",
             f"A selector takes one filter. Keep the features of one type in the file "
             f"first. In Python: {subset}.write_h5ad(\"one_type.h5ad\")."))
 
@@ -614,6 +623,78 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             raise ValueError(f"{len(names)} feature names for {X.shape[1]} features")
         return X, names
     return X, [str(v) for v in adata.var_names]
+
+
+def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
+                             mudata=False) -> str | None:
+    """The warning of :func:`export_dataset` for feature names that occur
+    more than once in one matrix, or ``None`` when every name is unique.
+
+    The names are written as they are. The message gives the number of
+    repeated names, up to three of them, and how to make them unique for
+    the way the matrix was passed: ``arg`` is the keyword (``'rna'``),
+    ``spec`` what the user gave it (a selector string or an object),
+    ``role`` the modality written and ``obsm`` the key when the matrix is an
+    ``obsm`` entry. ``var_names_make_unique()`` is named for the object that
+    holds these features alone: on an object with features of several types
+    it also renames a feature of another type that has the same name. A
+    peak name is a region and is not renamed.
+    """
+    import pandas as pd
+
+    from .resolve import _and_list
+    names = pd.Index([str(f) for f in feats])
+    dup = names[names.duplicated()].unique()
+    if not len(dup):
+        return None
+    sel = spec if isinstance(spec, str) else getattr(spec, "_selector", None)
+    where = config.hint(
+        f"{arg}={spec!r}" if isinstance(spec, str) else f"{arg}={type(spec).__name__}",
+        f"--{arg} {sel or 'X'}")
+    shown = _and_list([str(d) for d in dup[:3]])
+    if len(dup) == 1:
+        head = (f"In {where}, 1 feature name occurs more than once: {shown}. It is written "
+                f"as it is.")
+    elif len(dup) <= 3:
+        head = (f"In {where}, {len(dup)} feature names occur more than once: {shown}. "
+                f"They are written as they are.")
+    else:
+        head = (f"In {where}, {len(dup):,} feature names occur more than once, for example "
+                f"{shown}. They are written as they are.")
+    them = "it" if len(dup) == 1 else "them"
+    when = config.hint("before the export", "in Python and save the file again")
+    if role == "atac_peak":
+        return (f"{head} A peak name is a region, so do not rename {them}. Keep one "
+                f"column for each peak {when}.")
+    base, flt = _split_var_filter(sel) if isinstance(sel, str) else (None, None)
+    obj = "adata"
+    if base is not None and base.startswith("mod:"):
+        name, _, base = base[4:].partition(".")
+        obj, base = f"mdata.mod[{name!r}]", base or "X"
+    elif mudata and base is not None:
+        mod, _, rest = base.partition(".")
+        obj, base = f"mdata.mod[{mod!r}]", rest or "X"
+    if obsm is not None or (base or "").startswith("obsm:") \
+            or not (isinstance(spec, str) or _is_anndata(spec)):
+        names_arg = config.hint(", or pass unique names as adt_names=", "") \
+            if arg == "adt" else ""
+        return f"{head} Give each column its own name {when}{names_arg}."
+    if not isinstance(spec, str) and not config._CLI:
+        return f"{head} To make {them} unique, run {arg}.var_names_make_unique() {when}."
+    if flt is None:
+        return f"{head} To make {them} unique, run {obj}.var_names_make_unique() {when}."
+    part = f"part = {obj}[:, {obj}.var[{flt[0]!r}] == {flt[1]!r}].copy()"
+    whole = ("On the whole object, var_names_make_unique() also renames a feature of "
+             "another type that has the same name.")
+    if config._CLI:
+        return (f"{head} To make {them} unique, keep these features in their own file "
+                f"first. In Python: {part}, then part.var_names_make_unique() and "
+                f'part.write_h5ad("one_type.h5ad"). {whole}')
+    layer = (f", set part.X = part.layers[{base[6:]!r}]" if base.startswith("layer:")
+             else "")
+    return (f"{head} To make {them} unique, take these features into their own object "
+            f"first: {part}. Then run part.var_names_make_unique(){layer} and pass "
+            f"{arg}=part. {whole}")
 
 
 def _adt_obsm_keys(adata) -> list:
@@ -1460,6 +1541,12 @@ def _as_obs_vector(data, spec, *, what, master):
             pos = {k: i for i, k in enumerate(idx)}
             return np.asarray(spec)[[pos[x] for x in m]]
         if isinstance(spec.index, pd.RangeIndex) and len(spec) == len(m):
+            if what == "batch":
+                # the cells have barcodes (m is not 0..n-1 here) and the Series
+                # has none: a filtered or sorted column would go to other cells
+                from ..eval import io as eio
+                warnings.warn(eio._by_position(what, len(m), "the cells of the data"),
+                              UserWarning, stacklevel=3)
             return np.asarray(spec)             # unlabeled: positional
         lack = [x for x in m if x not in set(idx)]
         raise ValueError(
@@ -1771,6 +1858,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     - RNA, ADT or peak values that are not whole numbers;
     - feature names that contradict ``atac_kind``, or none at all
       (``feature_0..`` is written; for ADT pass ``adt_names``);
+    - feature names that occur more than once in one matrix: they are
+      written as they are, and the message says how to make them unique;
+    - a ``batch`` Series whose index is the row numbers ``0..n-1`` while the
+      cells have barcodes: it is matched by position;
     - non-unique barcodes (paired positionally);
     - a dense ``matrix/data`` over 1 GB;
     - ``batch`` with ``atac`` and no ``category``: only mosaic methods read
@@ -1919,6 +2010,12 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                     if isinstance(given[what], str) else None)
             if feats is not None and len(feats) == 0:
                 raise ValueError(_no_features_message(len(a.obs_names), what))
+            if feats is not None:
+                repeated = _duplicate_names_warning(
+                    feats, arg=what, spec=given[what], role=role, obsm=kw.get("obsm"),
+                    mudata=_is_mudata(data))
+                if repeated:
+                    warnings.warn(repeated, UserWarning, stacklevel=2)
             if role in ("atac_peak", "atac_gas"):
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)

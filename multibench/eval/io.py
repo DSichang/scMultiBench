@@ -764,6 +764,58 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
     return np.asarray(x.reindex(ids).to_numpy())
 
 
+def _by_position(what: str, n: int, order: str) -> str:
+    """The warning for a ``batch`` Series that numbers its rows (a plain
+    ``RangeIndex``) while the cells have barcodes: it is matched by
+    position. ``order`` names the order its ``n`` values must follow.
+    ``export_dataset``, ``evaluate`` and ``run_all`` say it with this."""
+    return (f"{what} is a Series whose index is the row numbers 0 to {n - 1}, not the "
+            f"cell barcodes, so it is matched to the cells by position. Check that its "
+            f"values follow {order}. To match by barcode, pass a Series indexed by "
+            f'barcode, such as adata.obs["donor"].')
+
+
+def _numbers_rows(x, ids) -> bool:
+    """``x`` is a Series with a plain ``RangeIndex`` and ``ids``, the cell
+    ids it is matched to by position, are barcodes: not ``None`` and not the
+    row numbers ``'0'``, ``'1'``, ... themselves."""
+    if not isinstance(x, pd.Series) or not isinstance(x.index, pd.RangeIndex) \
+            or ids is None:
+        return False
+    return [str(i) for i in ids] != [str(i) for i in range(len(ids))]
+
+
+def _labels_look_measured(values) -> tuple[str, int, int] | None:
+    """Why per-cell labels look like a number measured for each cell and not
+    like a cell type, as ``(reason, distinct, cells)``; ``None`` when they
+    do not.
+
+    Two signs, either is enough:
+
+    - ``"distinct"``: there are at least 20 cells and more distinct labels
+      than half of the cells, so almost every cell has a label of its own;
+    - ``"fraction"``: the labels are numbers and some are not whole numbers
+      (``0.37``); text such as ``'0.5'`` is not a number here.
+
+    Whole-number cluster ids with few distinct values give ``None``.
+    """
+    vals = np.asarray(values)
+    n = len(vals)
+    if not n:
+        return None
+    distinct = int(pd.Series(vals.astype(object)).nunique(dropna=True))
+    numbers = vals.dtype.kind == "f" or (vals.dtype == object and pd.api.types.infer_dtype(
+        vals, skipna=True) in ("floating", "mixed-integer-float"))
+    if numbers:
+        num = pd.to_numeric(pd.Series(vals.astype(object)), errors="coerce").to_numpy(float)
+        num = num[np.isfinite(num)]
+        if len(num) and bool((num != np.round(num)).any()):
+            return "fraction", distinct, n
+    if n >= 20 and distinct > n / 2:
+        return "distinct", distinct, n
+    return None
+
+
 def _anndata_matrix(adata, obsm: str) -> np.ndarray:
     if obsm == "X":
         X = adata.X
@@ -779,13 +831,32 @@ def _anndata_matrix(adata, obsm: str) -> np.ndarray:
     return np.asarray(X, dtype=float)
 
 
-def _read_csv_matrix(path: Path) -> np.ndarray:
+def _read_csv_embedding(path: Path):
+    """A ``.csv`` / ``.tsv`` embedding as ``(matrix, ids)``.
+
+    The first column is left out of the matrix when the file has two or more
+    columns and that column has no header (pandas' ``Unnamed: 0``, the index
+    ``DataFrame.to_csv`` writes) or holds text. This is the rule of 0.3.4.
+
+    ``ids`` are that column's values when it holds text, that is, when at
+    least one of its values is not a number: the cell barcodes, in file
+    order. Row numbers without a header are left out and give no ids
+    (``None``), and a first column of numbers with a header is data.
+    """
+    path = Path(path)
     d = pd.read_csv(path, sep=_sep_for(path))
+    ids = None
     if d.shape[1] > 1 and (str(d.columns[0]).startswith("Unnamed")
                            or d.iloc[:, 0].dtype == object):
         # a written index (pandas' default "Unnamed: 0" or a barcode column)
+        if _looks_like_ids(d.iloc[:, 0]):
+            ids = pd.Index(d.iloc[:, 0].astype(str))
         d = d.iloc[:, 1:]
-    return d.to_numpy(dtype=float)
+    return d.to_numpy(dtype=float), ids
+
+
+def _read_csv_matrix(path: Path) -> np.ndarray:
+    return _read_csv_embedding(path)[0]
 
 
 def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
@@ -799,8 +870,9 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
     * ``str`` / ``Path``, dispatched on suffix: ``.h5``/``.hdf5`` -> dataset
       ``data`` via :func:`read_embedding`; ``.h5ad`` -> ``obsm[obsm]``;
       ``.npy`` -> ``numpy.load``; ``.csv``/``.tsv`` -> numeric table (a
-      leading index/barcode column is dropped). Any other suffix is tried as
-      HDF5 and otherwise rejected.
+      leading index/barcode column is not part of the matrix;
+      :func:`multibench.evaluate` keeps the barcodes as the cell ids). Any
+      other suffix is tried as HDF5 and otherwise rejected.
 
     Orientation is not decided here: :func:`read_embedding` orients HDF5
     files, and :func:`multibench.evaluate` orients everything else against the

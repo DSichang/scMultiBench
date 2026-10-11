@@ -118,9 +118,13 @@ def test_step1_donor_block_is_two_plain_bullets():
     step1 = _step1_visible()
     assert ("- 10x Multiome samples: use `vertical`. Keep all cells in one folder and "
             "pass each cell's sample as `batch=` to `run_all` or `evaluate`.") in step1
-    assert ("- CITE-seq donors: use `vertical` in the same way. The `cross` category "
-            "also fits three donors, one file each: see the "
-            "[One file per batch](tutorials/run.md#one-file-per-batch) tab.") in step1
+    assert ("- CITE-seq donors: use `vertical` in the same way. It takes any number of donors. "
+            "For `run_all`, `batch=` takes the donor column itself, such as "
+            "`batch=adata.obs[\"donor\"]`, not its name. The `cross` category integrates the "
+            "donors as batches and reads a fixed number of them, three for RNA + ADT: see "
+            "the [One file per batch](tutorials/run.md#one-file-per-batch) tab. With "
+            "another number of donors, use `vertical`, as in the recipe "
+            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
     block = step1.split("For several samples or donors:", 1)[1]
     assert "fit both" not in block and "(" not in block.replace("](", "").replace(".md#", "")
     assert "stored table" not in block and "UINMF" not in block

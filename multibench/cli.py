@@ -2560,7 +2560,8 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--output", required=True,
                     help="the embedding, cells x dims: .h5 (dataset 'data', the "
                          "benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
-                         ".csv/.tsv (a leading barcode column is dropped)")
+                         ".csv/.tsv (a first column of barcodes gives the cell ids: "
+                         "labels and batches with barcodes are matched by them)")
     pe.add_argument("--category", help=_CATEGORY_HELP + " Required with --method or "
                                                         "--dataset.")
     pe.add_argument("--task", choices=["clustering", "batch", "all"],
@@ -2569,8 +2570,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="cell-type labels CSV with a header row, one row per cell "
                          "in the embedding's order. The labels are column x, the only "
                          "column, or --column. A first column of barcodes is aligned "
-                         "to the obs_names of an .h5ad --output. Repeat --labels for "
-                         "several files. They are stacked in the order given, and "
+                         "to the obs_names of an .h5ad --output, or to the barcodes in "
+                         "the first column of a .csv --output. With an .h5ad --output, "
+                         "--labels can instead name a column of its obs, as celltype or "
+                         "obs:celltype: give it once, without --column. Repeat --labels "
+                         "for several files. They are stacked in the order given, and "
                          "each file counts as one batch. Without --labels, --dataset, "
                          "--method and --category read the dataset's label files "
                          "(mtb.labels_for)")
@@ -2579,7 +2583,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "folder that holds the dataset folder (default: the "
                          "configured data_path, shown by multibench config)")
     pe.add_argument("--batch", help="per-cell batch labels CSV; a first column of "
-                                    "barcodes is aligned as for --labels. Without "
+                                    "barcodes is aligned as for --labels. With an .h5ad "
+                                    "--output it can instead name a column of its obs, "
+                                    "without --batch-column. Without "
                                     "--metrics the batch metrics are then computed too")
     pe.add_argument("--batch-column", dest="batch_column", metavar="NAME",
                     help=_BATCH_COLUMN_HELP)
