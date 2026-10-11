@@ -93,11 +93,8 @@ ANTIBODIES[3], ANTIBODIES[7] = "GENE5", "GENE9"     # two antibodies named as a 
 TENX_TYPES = {"rna": "Gene Expression", "adt": "Antibody Capture", "atac": "Peaks"}
 
 ZERO_CELLS = (
-    "The data holds 0 cells, so there is nothing to write. A filter kept no cell, or you kept "
-    "the cells that have a label and no cell had one. For a filter, check that its values are "
-    "spelled as the data has them. For labels, check that the barcodes of the label table are "
-    "spelled as the cell names of the data (obs_names) are, for example with the same -1 "
-    "ending.")
+    "The data holds 0 cells, so there is nothing to write. Check the filter that selects the "
+    "cells.")
 #: where the line that adds the ending goes, as both recipes say it
 ENDING_SENTENCE = ("When the barcodes of the CSV lack the `-1` ending that the cell names "
                    "have, put the next line into the block above, after the line that reads "
@@ -322,7 +319,7 @@ def test_the_anchors_exist_once(tmp_path):
     _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     with pytest.raises(ValueError) as e:
         mtb.io.to_canonical(src, tmp_path / "out" / "rna.h5")
-    assert str(e.value).endswith('The documentation has the steps as the recipe "A 10x .h5 file".')
+    assert str(e.value) == f'{src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
     assert not (tmp_path / "out").exists()
 
 
@@ -337,15 +334,16 @@ def test_a_10x_file_is_not_read_as_a_dataset_file(tmp_path, monkeypatch, capsys)
     src = "filtered_feature_bc_matrix.h5"
     _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     # the call that run_all makes for each method
-    with pytest.raises(ValueError, match="is a 10x Genomics file, not a multibench dataset "
-                                         "file"):
+    with pytest.raises(ValueError, match=rf'{re.escape(src)} is a 10x Genomics file\. See the '
+                                         r'recipe "A 10x \.h5 file" in the docs\.$'):
         mtb.run("scMDC", "vertical", inputs={"rna": src, "adt": src}, out_dir="out",
                 dry_run=True)
     for argv in (["convert", src, "OUT/", "--modality", "rna"],
                  ["convert", src, "OUT", "--rna", "X"]):
         assert cli.main(argv) == 1
-        assert "multibench convert reads .h5ad files, not this file." \
-            in capsys.readouterr().err
+        assert capsys.readouterr().err.splitlines()[0] == (
+            f'error: {src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the '
+            f'docs.')
     assert sorted(p.name for p in Path(".").iterdir()) == [src]
 
 
@@ -449,7 +447,7 @@ def test_10x_recipe_runs(host, tmp_path, monkeypatch, capsys):
     error = _quoted("recipe-10x-h5", r"`export_dataset` raises `(\w+)` when a modality would "
                                      r"hold two feature types, for example `rna=\"X\"` on the "
                                      r"object before the split\.")
-    with pytest.raises(ValueError, match=r"^rna='X' selects 180 features of 2 types: ") as e:
+    with pytest.raises(ValueError, match=r"^rna='X' selects features of 2 types, ") as e:
         mtb.io.export_dataset(ns["adata"], "mydata/TWO_TYPES", rna="X")
     assert type(e.value).__name__ == error
     assert not Path("mydata/TWO_TYPES").exists()
@@ -670,7 +668,10 @@ def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
     assert capsys.readouterr().out == "300 of 300 cells have a label\n"
     with pytest.raises(ValueError) as e:
         mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
-    assert "text that a label file reads as missing: 'N/A'" in str(e.value)
+    assert str(e.value) == (
+        "labels='obs:celltype': 12 of the 300 labels for the cells (data.obs) are missing "
+        "(NaN, None, '' or text such as 'N/A'); give every cell a label, or subset the data "
+        "to the labelled cells first")
     assert not Path("mydata").exists()
     ns = {"mtb": mtb, "adata": adata.copy()}
     _run_cell(add.replace(listed, '["", "NA", "nan", "N/A"]'), ns)
@@ -922,8 +923,7 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
     for _ in (1, 2):                             # the cell runs a second time
         summary = _quiet(_run_cell, later, ns)
         assert capsys.readouterr().err == (
-            "export_dataset: wrote the rows of cty.csv in the cell order of rna.h5, which "
-            "the files of mydata/MYDATA follow.\n")
+            "export_dataset: wrote cty.csv in the cell order of rna.h5.\n")
         cells = _h5(folder / "rna.h5", "barcodes")
         assert cells == list(adata.obs_names)
         assert pd.read_csv(folder / "cty.csv")["x"].tolist() == \
@@ -936,8 +936,8 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
     other = adata.copy()
     other.obs_names = [f"other{i}" for i in range(other.n_obs)]
     before = _bytes(folder)
-    with pytest.raises(FileExistsError, match="rna.h5 and adt.h5 hold other cells than this "
-                                              "call writes"):
+    with pytest.raises(FileExistsError, match=r"^mydata/MYDATA holds rna\.h5 and 1 more file "
+                                              r"with other cells\. Export to a new folder\.$"):
         mtb.io.export_dataset(other, "mydata/MYDATA", rna=None, labels="obs:celltype",
                               overwrite=True)
     assert _bytes(folder) == before
@@ -1012,8 +1012,8 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     atac = _cells(60, seed=1)
     atac.obs_names = [f"A{i:04d}-1" for i in range(60)]
     # export_dataset does not write the labels of one side alone
-    with pytest.raises(KeyError, match="Without cell types for the ATAC cells, leave labels= "
-                                       "out and run with evaluate=False."):
+    with pytest.raises(KeyError, match=r"Without cell types for the ATAC cells, leave labels= "
+                                       r"out\.\"?$"):
         mtb.io.export_dataset(rna, "mydata/ONESIDE", atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal")
     assert not Path("mydata").exists()
@@ -1038,7 +1038,7 @@ def test_the_evaluate_call_of_the_page_scores_the_labelled_cells():
     adata.obs["celltype"] = adata.obs["celltype"].astype(object)
     adata.obs.loc[adata.obs_names[:12], "celltype"] = np.nan
     # "It says how many cells it scored."
-    with pytest.warns(UserWarning, match=r"^Scored the 108 labelled cells of 120\. "):
+    with pytest.warns(UserWarning, match=r"^Scored the 108 labelled cells of 120\.$"):
         scores = eval(call, {"mtb": mtb, "adata": adata})
     assert (scores.attrs["cells_scored"], scores.attrs["cells_total"]) == (108, 120)
     # "Without missing_labels="drop", evaluate raises when a label is missing."
@@ -1070,7 +1070,7 @@ def test_scores_of_one_labelled_side_do_not_see_the_other_side():
     scores = []
     for atac in (rna, rna + 100.0, np.zeros((n, 4))):
         adata.obsm["X_emb"] = np.vstack([rna, atac])
-        with pytest.warns(UserWarning, match=r"^Scored the 120 labelled cells of 240\. "):
+        with pytest.warns(UserWarning, match=r"^Scored the 120 labelled cells of 240\.$"):
             scores.append(eval(call, {"mtb": mtb, "adata": adata}))
     assert scores[0]["Value"].notna().all()
     assert scores[1].equals(scores[0]) and scores[2].equals(scores[0])
@@ -1190,15 +1190,17 @@ def test_labels_later_on_a_diagonal_folder(key, host, tmp_path, monkeypatch):
     export, rescore = _later()
 
     # the line of the recipe, with the RNA object of the tutorial for adata
-    with pytest.raises(FileExistsError, match="holds? other cells than this call writes"):
+    with pytest.raises(FileExistsError, match=r" with other cells\. To add labels, run the "
+                                              r"export call that wrote the folder again with "
+                                              r"labels= and overwrite=True\.$"):
         _run_cell(export.replace("(adata,", f"({rna},"), dict(ns))
     assert _bytes(folder) == before
     # "Diagonal data needs the column in both files."
     one_side = dict(ns)
     one_side[atac] = ns[atac].copy()
     del one_side[atac].obs["celltype"]
-    with pytest.raises(KeyError, match="Without cell types for the ATAC cells, leave labels= "
-                                       "out and run with evaluate=False."):
+    with pytest.raises(KeyError, match=r"Without cell types for the ATAC cells, leave labels= "
+                                       r"out\.\"?$"):
         _run_cell(export_cell, one_side)
     assert _bytes(folder) == before
 
@@ -1328,9 +1330,7 @@ def test_donor_recipe(host, tmp_path, monkeypatch, capsys):
     with pytest.raises(ValueError) as e:
         _run_cell(run, {"mtb": mtb, "METHODS": ["Matilda", "sciPENN"], "adata": gap})
     assert str(e.value) == (
-        "batch: 11 of the 150 cells of MYDONORS have no batch. The missing value is written "
-        "NaN. A missing batch is not a batch, so the batch metrics are not computed on it. "
-        "Give every cell a batch, or write the dataset folder without these cells.")
+        "batch: 11 of the 150 cells of MYDONORS have no batch. Give every cell a batch.")
     assert host == [] and not Path("out").exists()
 
     # "To use the cross tutorial instead, keep as many donors as its methods read."
@@ -1639,12 +1639,14 @@ def test_details_name_the_filter_error_and_the_files_of_other_data(tmp_path):
             "data that it does not write: files with other cells, and after `batch=` files "
             "of other batch numbers. With `batch_index=`, a call checks its own batch "
             "number, and `n_batches=` says how many batches the data has. The message names "
-            "the files. `overwrite=True` does not remove them.") in said
+            "the first file. `overwrite=True` does not remove them.") in said
     # the two filters of the paragraph select the two parts
     both = _cells(60, genes=50)
     both.var_names = GENES[2:32] + PEAKS[:20]
     both.var["feature_types"] = ["Gene Expression"] * 30 + ["Peaks"] * 20
-    with pytest.raises(ValueError, match="selects 50 features of 2 types"):
+    with pytest.raises(ValueError, match=r"^rna='X' selects features of 2 types, 'Gene Expression' and "
+                                         r"'Peaks'\. Add a filter, as "
+                                         r"rna='X\[feature_types=Gene Expression\]'\.$"):
         mtb.io.export_dataset(both, tmp_path / "ARC")
     assert not (tmp_path / "ARC").exists()
     filters = dict(re.findall(r'`(rna|atac)="(X\[feature_types=[^"]+\])"`', said))
@@ -1656,6 +1658,8 @@ def test_details_name_the_filter_error_and_the_files_of_other_data(tmp_path):
     other.obs_names = [f"other{i}" for i in range(40)]
     before = _bytes(out)
     for overwrite in (False, True):
-        with pytest.raises(FileExistsError, match="hold other cells than this call writes"):
+        with pytest.raises(FileExistsError) as left:
             mtb.io.export_dataset(other, tmp_path / "ARC", overwrite=overwrite)
+        assert str(left.value) == (f"{out} holds atac.h5 and 1 more file with other cells. "
+                                   f"Export to a new folder.")
     assert _bytes(out) == before

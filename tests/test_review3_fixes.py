@@ -37,8 +37,8 @@ N = 60
 CELLS = [f"c{i:03d}" for i in range(N)]
 PEAKS = [f"chr1:{j * 1000}-{j * 1000 + 500}" for j in range(30)]
 DEBUG = "(set MULTIBENCH_DEBUG=1 for the full traceback)\n"
-NOT_COUNTS = ("The {what} values are not whole numbers, so they look log-normalised. The "
-              "methods normalise raw counts themselves. ")
+LOOKS = "The {what} values are not whole numbers, so they look log-normalised. "
+NOT_COUNTS = LOOKS + "The methods normalise raw counts themselves. "
 
 
 def _obj(names, seed, *, log=True, cells=CELLS):
@@ -98,20 +98,15 @@ def test_the_warning_for_an_object_names_its_own_x(tmp_path):
     assert msgs == [
         NOT_COUNTS.format(what="rna") + "Export raw counts, for example with "
                                         "rna='layer:counts'.",
-        NOT_COUNTS.format(what="adt") + "adt= is an object, and its X is written. Put the "
-        "raw counts of that object in its X first, for example adt.X = "
-        "adt.layers[\"counts\"], then export again.",
-        NOT_COUNTS.format(what="atac") + "atac= is an object, and its X is written. Put the "
-        "raw counts of that object in its X first, for example atac.X = "
-        "atac.layers[\"counts\"], then export again."]
+        LOOKS.format(what="adt") + "Set adt.X = adt.layers[\"counts\"] first.",
+        LOOKS.format(what="atac") + "Set atac.X = atac.layers[\"counts\"] first."]
 
 
 def test_the_warning_for_a_table_has_no_layer_to_name(tmp_path):
     a = _adt()
     table = pd.DataFrame(np.asarray(a.X), index=a.obs_names, columns=a.var_names)
     msgs = _warned(ingest.export_dataset, _rna(log=False), tmp_path / "A", rna="X", adt=table)
-    assert msgs == [NOT_COUNTS.format(what="adt") + "Pass the raw counts of these cells as "
-                                                    "adt=."]
+    assert msgs == [LOOKS.format(what="adt") + "Pass the raw counts as adt=."]
 
 
 def test_the_command_line_keeps_its_selector_for_the_atac_file(tmp_path, monkeypatch):
@@ -140,13 +135,9 @@ def test_following_the_advice_writes_the_counts_of_that_object(tmp_path):
 
 
 # --------------------------------------- 1(b): one matrix for two modalities
-SAME = " name the same matrix, and one file holds one modality. "
-OWN_ADT = ("Pass the ADT as its own object (adt=<AnnData>), or name its own place in the "
-           "object, such as adt='obsm:<key>' or a feature filter "
-           "(adt='X[feature_types=Antibody Capture]').")
-OWN_ATAC = ("Pass the ATAC as its own object (atac=<AnnData>), or name its own place in the "
-            "object, such as atac='obsm:<key>' or a feature filter "
-            "(atac='X[feature_types=Peaks]').")
+SAME = " name the same matrix. "
+OWN_ADT = "Name where the ADT is, as adt='obsm:<key>'."
+OWN_ATAC = "Pass the ATAC as its own object, as atac=<AnnData>."
 
 
 def test_two_modalities_from_one_matrix_are_refused(tmp_path):
@@ -164,33 +155,30 @@ def test_two_modalities_from_one_matrix_are_refused(tmp_path):
                     category="diagonal") == "rna='X' and atac='X'" + SAME + OWN_ATAC
     assert _refused(tmp_path, rna, rna=None, adt="obsm:m", atac="obsm:m",
                     atac_kind="peak") == "adt='obsm:m' and atac='obsm:m'" + SAME + OWN_ATAC
-    # the object itself, twice, and the object passed as data once more
-    assert _refused(tmp_path, None, rna=rna, adt=rna) == (
-        "rna= and adt= are given one object, so they" + SAME + OWN_ADT)
-    assert _refused(tmp_path, rna, rna="X", adt=rna) == (
-        "data and adt= are the same object, so rna='X' and adt=" + SAME + "The ADT needs "
-        "its own object (adt=<another AnnData>) or its own place in this object, such as "
-        "adt='obsm:<key>' or a feature filter (adt='X[feature_types=Antibody Capture]').")
+    # the object passed as data once more
+    assert _refused(tmp_path, rna, rna="X", adt=rna) == "rna='X' and adt=" + SAME + OWN_ADT
     # one filter twice is one matrix
     rna.var["feature_types"] = "Gene Expression"
     assert _refused(tmp_path, rna, rna="X[feature_types=Gene Expression]",
                     adt="X[feature_types=Gene Expression]") == (
         "rna='X[feature_types=Gene Expression]' and adt='X[feature_types=Gene Expression]'"
         + SAME + OWN_ADT)
+    # the object itself, twice, and no data: no selector can be read, so the way out
+    # is an object
+    assert _refused(tmp_path, None, rna=rna, adt=rna) == (
+        "rna= and adt= name the same matrix. Pass the ADT as its own object, as "
+        "adt=<AnnData>.")
 
 
 def test_the_refusal_on_the_command_line(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
     assert _refused(tmp_path, _rna(), rna="X", adt="X") == (
-        "--rna X and --adt X name the same matrix, and one file holds one modality. Name "
-        "the place of the ADT in SRC, such as --adt obsm:<key> or a feature filter "
-        "(--adt \"X[feature_types=Antibody Capture]\").")
+        "--rna X and --adt X name the same matrix. Name where the ADT is, as "
+        "--adt obsm:<key>.")
     assert _refused(tmp_path, _rna(), rna="layer:counts", atac="layer:counts",
                     atac_kind="peak") == (
-        "--rna layer:counts and --atac layer:counts name the same matrix, and one file "
-        "holds one modality. Name the place of the ATAC in SRC, such as --atac obsm:<key> "
-        "or a feature filter (--atac \"X[feature_types=Peaks]\"). With --category diagonal, "
-        "--atac-from names the file of the ATAC cells.")
+        "--rna layer:counts and --atac layer:counts name the same matrix. Name where the "
+        "ATAC is, as --atac \"X[feature_types=Peaks]\".")
 
 
 def test_convert_refuses_one_matrix_twice_and_writes_nothing(tmp_path, capsys):
@@ -199,9 +187,8 @@ def test_convert_refuses_one_matrix_twice_and_writes_nothing(tmp_path, capsys):
     out = tmp_path / "OUT"
     assert cli.main(["convert", str(src), str(out), "--rna", "X", "--adt", "X"]) == 1
     assert capsys.readouterr().err == (
-        "error: --rna X and --adt X name the same matrix, and one file holds one modality. "
-        "Name the place of the ADT in SRC, such as --adt obsm:<key> or a feature filter "
-        "(--adt \"X[feature_types=Antibody Capture]\").\n" + DEBUG)
+        "error: --rna X and --adt X name the same matrix. Name where the ADT is, as "
+        "--adt obsm:<key>.\n" + DEBUG)
     assert not out.exists()
 
 
@@ -217,13 +204,12 @@ def test_a_refused_call_leaves_the_folder_as_it_was(tmp_path):
 
 def test_adt_in_x_next_to_an_obsm_matrix_keeps_its_message(tmp_path):
     """The object holds what is probably the protein matrix: the message
-    that names the key comes first, as before."""
+    that names the key comes first, and its advice names that key."""
     rna = _rna(log=False)
     rna.obsm["protein"] = _adt(log=False).X
     assert _refused(tmp_path, rna, rna="X", adt="X") == (
-        "adt='X' takes X of this object, and the object also holds the obsm key 'protein'. "
-        "If one of them is the protein matrix, pass adt='obsm:<key>'. If X is the protein "
-        "matrix, delete it first, for example del adata.obsm['protein'].")
+        "adt='X' takes X, and the object also holds obsm['protein']. If that is the protein "
+        "matrix, pass adt='obsm:protein'.")
 
 
 def test_two_matrices_of_one_object_pass(tmp_path):
@@ -397,8 +383,7 @@ def _two_cohorts():
 
 
 HEAD = ("labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
-        "available: ['predicted.id', 'prediction.score']. If one of them holds the cell "
-        "types, ")
+        "available: ['predicted.id', 'prediction.score']. ")
 
 
 def test_the_other_column_name_is_the_first_advice(tmp_path):
@@ -408,9 +393,9 @@ def test_the_other_column_name_is_the_first_advice(tmp_path):
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(rna, out, labels="obs:cell_type", **kw)
     assert e.value.args[0] == (
-        HEAD + "give the object a column named 'cell_type' first, for example "
-        "atac.obs['cell_type'] = atac.obs['<its column>'], then export again. Without cell "
-        "types for the ATAC cells, leave labels= out and run with evaluate=False.")
+        HEAD + "Copy its cell-type column first, as atac.obs['cell_type'] = "
+        "atac.obs['<its column>'].")
+    assert "evaluate=False" not in e.value.args[0]
     assert not out.exists()
     # the advice, followed: each side gets the labels of its own cells
     atac.obs["cell_type"] = atac.obs["predicted.id"]
@@ -429,10 +414,8 @@ def test_the_rna_side_without_the_column(tmp_path):
                               labels="obs:predicted.id", category="diagonal")
     assert e.value.args[0] == (
         "labels='obs:predicted.id': column 'predicted.id' not in obs of the RNA object "
-        "(data); available: ['cell_type']. If one of them holds the cell types, give the "
-        "object a column named 'predicted.id' first, for example rna.obs['predicted.id'] = "
-        "rna.obs['<its column>'], then export again. Without cell types for the RNA cells, "
-        "leave labels= out and run with evaluate=False.")
+        "(data); available: ['cell_type']. Copy its cell-type column first, as "
+        "rna.obs['predicted.id'] = rna.obs['<its column>'].")
 
 
 def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
@@ -444,14 +427,14 @@ def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
                               category="diagonal")
     assert e.value.args[0] == (
         "labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
-        "available: []. Without cell types for the ATAC cells, leave labels= out and run "
-        "with evaluate=False.")
+        "available: []. Without cell types for the ATAC cells, leave labels= out.")
 
 
 def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsys):
-    """The message of ``multibench convert`` names two commands. Run as
-    written, with the file names and the column in place, they write the
-    folder with the labels of each side on its own cells."""
+    """The message of ``multibench convert`` says to convert each side with
+    its own command and its own ``--labels``. It does not print the two
+    commands; the two below follow it, and they write the folder with the
+    labels of each side on its own cells."""
     rna, atac = _two_cohorts()
     rna.write_h5ad(tmp_path / "rna.h5ad")
     atac.write_h5ad(tmp_path / "atac.h5ad")
@@ -466,10 +449,8 @@ def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsy
               "obs:<its column> --category diagonal --overwrite")
     assert capsys.readouterr().err == (
         "error: --labels obs:cell_type: column 'cell_type' not in obs of the ATAC object "
-        "(atac); available: ['predicted.id', 'prediction.score']. If one of them holds the "
-        "cell types, convert each side with its own command and its own --labels, "
-        f"for example {first}, then {second}. Without cell types for the ATAC cells, leave "
-        "--labels out and run with --no-evaluate.\n" + DEBUG)
+        "(atac); available: ['predicted.id', 'prediction.score']. Convert each side with "
+        "its own command and its own --labels.\n" + DEBUG)
     assert not out.exists()
     for command, src, col in ((first, "rna.h5ad", None), (second, "atac.h5ad", "predicted.id")):
         argv = command.replace("<its column>", col or "").split()[1:]
@@ -486,16 +467,19 @@ def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsy
 
 
 def test_the_command_line_names_the_kind_and_the_side(tmp_path, monkeypatch):
-    """Peaks, and the RNA file is the one without the column."""
+    """Peaks, and the RNA file is the one without the column: the message
+    names the RNA object, and the same advice. It prints no command."""
     monkeypatch.setattr(config, "_CLI", True)
     rna, atac = _two_cohorts()
     atac.var_names = PEAKS + [f"chr2:{j}-{j + 9}" for j in range(10)]
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(rna, tmp_path / "DIAG", rna="X", atac=atac, atac_kind="peak",
                               labels="obs:predicted.id", category="diagonal")
-    assert ("multibench convert RNA_FILE OUT --rna X --labels obs:<its column> --category "
-            "diagonal, then multibench convert ATAC_FILE OUT --atac X --atac-kind peak "
-            "--labels obs:predicted.id --category diagonal --overwrite. ") in e.value.args[0]
+    assert e.value.args[0] == (
+        "--labels obs:predicted.id: column 'predicted.id' not in obs of the RNA object "
+        "(data); available: ['cell_type']. Convert each side with its own command and its "
+        "own --labels.")
+    assert "multibench convert" not in e.value.args[0]
 
 
 # ------------------------------------------------------- 6(a): the order line
@@ -503,8 +487,8 @@ def test_a_file_written_again_is_not_said_to_follow_itself(tmp_path, capsys):
     """The peak file is written again from an object in another row order.
     It keeps the row order of the file that it replaces, and the line says
     that, where it named ``atac_peak.h5`` as following ``atac_peak.h5``.
-    With another matrix file of the same cells in the folder, the line
-    names that file."""
+    A second file written in that order is counted, not named. With another
+    matrix file of the same cells in the folder, the line names that file."""
     rna, atac = _rna(log=False), _atac(log=False, cells=[f"a{i:03d}" for i in range(N)])
     out = ingest.export_dataset(rna, tmp_path / "D", rna="X", atac=atac, atac_kind="peak",
                                 labels="obs:celltype", category="diagonal")
@@ -515,20 +499,18 @@ def test_a_file_written_again_is_not_said_to_follow_itself(tmp_path, capsys):
     ingest.export_dataset(shuffled, out, rna=None, atac="X", atac_kind="peak",
                           category="diagonal", overwrite=True)
     assert capsys.readouterr().err == (
-        f"export_dataset: wrote the rows of atac_peak.h5 in the cell order that "
-        f"atac_peak.h5 had in {out} before this call.\n")
+        "export_dataset: wrote atac_peak.h5 in the cell order atac_peak.h5 had before.\n")
     assert list(ingest.read_canonical(out / "atac_peak.h5").obs_names) == order
     assert np.array_equal(_dense(out / "atac_peak.h5"), atac.X)
     ingest.export_dataset(shuffled, out, rna=None, atac="X", atac_kind="peak",
                           labels="obs:celltype", category="diagonal", overwrite=True)
     assert capsys.readouterr().err == (
-        f"export_dataset: wrote the rows of atac_peak.h5 and atac_cty.csv in the cell order "
-        f"that atac_peak.h5 had in {out} before this call.\n")
+        "export_dataset: wrote atac_peak.h5 and 1 more in the cell order atac_peak.h5 had "
+        "before.\n")
     assert (out / "atac_cty.csv").read_bytes() == labels
     gas = shuffled.copy()
     gas.var_names = [f"GENE{j}" for j in range(gas.n_vars)]
-    follows = (f"export_dataset: wrote the rows of atac_gas.h5 in the cell order of "
-               f"atac_peak.h5, which the files of {out} follow.\n")
+    follows = "export_dataset: wrote atac_gas.h5 in the cell order of atac_peak.h5.\n"
     ingest.export_dataset(gas, out, rna=None, atac="X", atac_kind="gene_activity",
                           category="diagonal")
     assert capsys.readouterr().err == follows
@@ -541,13 +523,13 @@ def test_a_file_written_again_is_not_said_to_follow_itself(tmp_path, capsys):
 
 # ---------------------------------------------------------- 6(b): no cell left
 def test_the_message_for_0_cells_names_both_causes(tmp_path):
+    """The 0.3.5 text names the filter only; the sentence about a label table
+    is gone."""
     rna = _rna(log=False)
     assert _refused(tmp_path, rna[rna.obs["celltype"] == "none"].copy(), rna="X") == (
-        "The data holds 0 cells, so there is nothing to write. A filter kept no cell, or "
-        "you kept the cells that have a label and no cell had one. For a filter, check "
-        "that its values are spelled as the data has them. For labels, check that the "
-        "barcodes of the label table are spelled as the cell names of the data (obs_names) "
-        "are, for example with the same -1 ending.") == ingest._NO_CELLS
+        "The data holds 0 cells, so there is nothing to write. Check the filter that selects "
+        "the cells.") == ingest._NO_CELLS
+    assert "label" not in ingest._NO_CELLS
 
 
 # ------------------------------------------------- 6(c): adt_names as a string
@@ -560,9 +542,8 @@ def test_adt_names_as_a_string_is_refused(tmp_path):
     for names, key in (("protein_ids", "protein_ids"), ("CD3", "<key>"),
                        ("12345678", "<key>"), ("protein_names", "<key>")):
         assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
-            f"adt_names={names!r} is one string, and adt_names= takes a list of the protein "
-            f"names, one for each column of the ADT matrix. For names that the object keeps, "
-            f"pass the list, for example adt_names=list(adata.uns[{key!r}]).")
+            f"adt_names={names!r} is one string. Pass a list of names, as "
+            f"adt_names=list(adata.uns[{key!r}]).")
     # the example of the message, and a list as before
     out = ingest.export_dataset(cite, tmp_path / "LIST", adt="obsm:protein",
                                 adt_names=list(cite.uns["protein_ids"]))

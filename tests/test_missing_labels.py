@@ -8,8 +8,8 @@ score 0.7814 on the cells below). Now:
   ``pd.NA``, blank text, and any text that the label reader itself reads back
   as missing (``NA``, ``None``, ``nan``, ...), with or without blanks around it;
 - ``missing_labels="error"`` (the default) raises and says how many cells and
-  how the missing values are written; ``"drop"`` scores the labelled cells
-  only, warns with the two counts, and records them;
+  one text that reads as missing, if any; ``"drop"`` scores the labelled
+  cells only, warns with the two counts, and records them;
 - complete labels score exactly as before.
 """
 import inspect
@@ -37,10 +37,10 @@ KEEP = ~np.isin(np.arange(N), GAPS)
 ASW_034 = 0.7814517904520452
 ASW_034_LABELLED = 0.7814125597558947
 
-NAN = "The missing value is written NaN."
-SEEN_NA = "The missing value is written 'NA'."
-RENAME_NA = (" A label file reads 'NA' as a missing value. If it is the name of a cell "
-             "type, rename it.")
+#: what the message adds for a text that a label file reads as missing
+EX_NA = ", for example 'NA'"
+#: the end of the message when no cell has a label
+NONE_FIX = " Pass the column or file that holds the cell types."
 
 
 def _cells():
@@ -70,11 +70,9 @@ def _adata(emb, **obs):
     return a
 
 
-def _e1(src="", seen=NAN, rename="", n=30, total=N):
-    return (f"labels{src}: {n} of the {total} cells have no label. {seen} A missing "
-            f"label is not a cell type, so evaluate does not score it. Give every cell "
-            f'a label, or pass missing_labels="drop" to score the {total - n} labelled '
-            f"cells only.{rename}")
+def _e1(src="", example="", n=30, total=N):
+    return (f"labels{src}: {n} of the {total} cells have no label{example}. Pass "
+            f'missing_labels="drop" to score the other {total - n}.')
 
 
 def _scored(rec):
@@ -256,29 +254,26 @@ def test_a_round_trip_that_loses_a_row_fails_loudly(monkeypatch):
 
 
 def test_seen_sentence_and_rename_sentence():
-    assert eio._missing_seen(["A", np.nan]) == NAN
-    assert eio._missing_seen(["A", " "]) == "The missing value is written ''."
-    assert eio._missing_seen(["A", "NA "]) == "The missing value is written 'NA'."
-    assert eio._missing_seen(["A", None, "NA"]) == \
-        "The missing values are written NaN and 'NA'."
-    assert eio._missing_seen(["A", None, "", "NA"]) == \
-        "The missing values are written NaN, '' and 'NA'."
+    """The two sentences are now one example (``_missing_example``): the
+    first text that a label file reads as missing, nothing for NaN or a blank."""
+    assert eio._missing_example(["A", np.nan]) == ""
+    assert eio._missing_example(["A", " "]) == ""
+    assert eio._missing_example(["A", "NA "]) == EX_NA
+    assert eio._missing_example(["A", None, "NA"]) == EX_NA
+    assert eio._missing_example(["A", None, "", "NA"]) == EX_NA
     many = ["NA", "None", "nan", "null", "N/A", "A"]
-    assert eio._missing_seen(many) == \
-        "The missing values are written 'N/A', 'NA', 'None' and 2 more."
-    assert eio._missing_seen(["A", "na", 0]) == ""
-    assert eio._missing_rename(["A", np.nan, ""]) == ""
-    assert eio._missing_rename(["A", " NA"]) == RENAME_NA
-    assert eio._missing_rename(["A", "NA", "None"]) == (
-        " A label file reads 'NA' and 'None' as missing values. If one of them is the "
-        "name of a cell type, rename it.")
+    assert eio._missing_example(many) == ", for example 'N/A'"
+    assert eio._missing_example(["A", "na", 0]) == ""
+    assert eio._missing_example(["A", np.nan, ""]) == ""
+    assert eio._missing_example(["A", " NA"]) == EX_NA
+    assert eio._missing_example(["A", "NA", "None"]) == EX_NA
 
 
 # ============================================================ "error"
 def _label_forms(tmp_path):
     """``{form: (output, labels, src)}``: 30 of 300 labels missing, each way
     of passing labels. A file that writes the missing labels as a word adds
-    the two sentences that name it, ``(..., seen, rename)``."""
+    the example that names one, ``(..., example)``."""
     emb, lab = _cells()
     nan, ids = _gaps(lab), [f"cell{i}" for i in range(N)]
     one = tmp_path / "cty.csv"                      # as export writes it
@@ -303,7 +298,7 @@ def _label_forms(tmp_path):
     words[0].parent.mkdir()
     for path, part in zip(words, (_gaps(lab, "NA")[:150], _gaps(lab, "N/A")[150:])):
         pd.DataFrame({"x": part}).to_csv(path, index=False)
-    na = (SEEN_NA, RENAME_NA)
+    na = (EX_NA,)
     return {
         "array": (emb, nan, ""),
         "list": (emb, list(nan), ""),
@@ -319,18 +314,12 @@ def _label_forms(tmp_path):
         "file list": (emb, [str(p) for p in halves], " (cty1.csv, cty2.csv)"),
         "labels_for dict": (emb, {"cty1": str(halves[0]), "cty2": str(halves[1])},
                             " (cty1.csv, cty2.csv)"),
-        "file of None": (emb, str(none), " (cty.csv)",
-                         "The missing value is written 'None'.",
-                         RENAME_NA.replace("'NA'", "'None'")),
+        "file of None": (emb, str(none), " (cty.csv)", ", for example 'None'"),
         "file with an empty field": (a, str(empty), " (empty.csv)"),
-        "id,label file of null": (a, null, " (null.tsv)",
-                                  "The missing value is written 'null'.",
-                                  RENAME_NA.replace("'NA'", "'null'")),
+        "id,label file of null": (a, null, " (null.tsv)", ", for example 'null'"),
+        # two words: the first one, in sorted order, is the example
         "file list of words": (
-            emb, [str(p) for p in words], " (cty1.csv, cty2.csv)",
-            "The missing values are written 'N/A' and 'NA'.",
-            " A label file reads 'N/A' and 'NA' as missing values. If one of them is "
-            "the name of a cell type, rename it."),
+            emb, [str(p) for p in words], " (cty1.csv, cty2.csv)", ", for example 'N/A'"),
     }
 
 
@@ -341,17 +330,17 @@ def _label_forms(tmp_path):
     "id,label file of null", "file list of words"])
 def test_evaluate_raises_on_missing_labels(form, tmp_path):
     output, labels, src, *said = _label_forms(tmp_path)[form]
-    # NaN, and an empty field of a file, are no word: nothing to rename
-    seen, rename = said or (NAN, "")
+    # NaN, and an empty field of a file, are no word: no example
+    (example,) = said or ("",)
     for kw in ({}, {"missing_labels": "error"}):
         with pytest.raises(ValueError) as e:
             mtb.evaluate(output, labels=labels, metrics=["ASW"], **kw)
-        assert str(e.value) == _e1(src, seen, rename), form
+        assert str(e.value) == _e1(src, example), form
 
 
 def test_a_label_file_names_the_word_it_holds_whole_message(tmp_path):
     """A cell type called None in a CSV: the reader reads NaN, and the message
-    names the word in the file, with the sentence that says to rename it."""
+    names the word in the file as its example. No sentence says to rename it."""
     emb, lab = _cells()
     path = tmp_path / "cty.csv"
     path.write_text("x\n" + "".join(f"{v}\n" for v in np.where(lab == "C", "None", lab)))
@@ -359,11 +348,9 @@ def test_a_label_file_names_the_word_it_holds_whole_message(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
     assert str(e.value) == (
-        "labels (cty.csv): 100 of the 300 cells have no label. The missing value is "
-        "written 'None'. A missing label is not a cell type, so evaluate does not score "
-        'it. Give every cell a label, or pass missing_labels="drop" to score the 200 '
-        "labelled cells only. A label file reads 'None' as a missing value. If it is "
-        "the name of a cell type, rename it.")
+        "labels (cty.csv): 100 of the 300 cells have no label, for example 'None'. "
+        'Pass missing_labels="drop" to score the other 200.')
+    assert "rename" not in str(e.value)
 
 
 def test_a_label_file_is_read_as_written_for_the_message_only(tmp_path):
@@ -390,10 +377,7 @@ def test_a_label_file_is_read_as_written_for_the_message_only(tmp_path):
     assert eio.as_vector([path, path], as_written=True).tolist() == shown.tolist() * 2
     with pytest.raises(ValueError) as e:
         mtb.evaluate(_adata(emb), labels=str(path), metrics=["ASW"])
-    assert str(e.value) == _e1(
-        " (obs.csv)", n=34, seen="The missing values are written NaN, '', 'NA' and 'None'.",
-        rename=(" A label file reads 'NA' and 'None' as missing values. If one of them "
-                "is the name of a cell type, rename it."))
+    assert str(e.value) == _e1(" (obs.csv)", EX_NA, n=34)
     # numbers stay numbers where nothing is missing, and a cluster number
     # next to NA is named as the file writes it
     numbers = tmp_path / "clusters.csv"
@@ -401,7 +385,7 @@ def test_a_label_file_is_read_as_written_for_the_message_only(tmp_path):
     assert eio.read_labels(numbers, as_written=True).dtype == np.int64
     numbers.write_text("x\n" + "".join(f"{v}\n" for v in _gaps(np.tile([1, 2, 3], 100), "NA")))
     assert eio.read_labels(numbers).dtype == np.float64
-    assert eio._missing_seen(eio.read_labels(numbers, as_written=True)) == SEEN_NA
+    assert eio._missing_example(eio.read_labels(numbers, as_written=True)) == EX_NA
 
 
 def test_a_file_read_twice_for_the_message_warns_once(tmp_path):
@@ -414,7 +398,7 @@ def test_a_file_read_twice_for_the_message_warns_once(tmp_path):
         warnings.simplefilter("always")
         with pytest.raises(ValueError) as e:
             mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
-    assert str(e.value) == _e1(" (obs.csv)", SEEN_NA, RENAME_NA)
+    assert str(e.value) == _e1(" (obs.csv)", EX_NA)
     assert [str(w.message) for w in rec] == [
         "The first column of obs.csv looks like cell ids, but the output has no cell "
         "ids. The file is matched by position. Check that its rows follow the rows of "
@@ -426,40 +410,39 @@ def test_evaluate_raises_on_missing_labels_whole_message():
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=_gaps(lab), metrics=["ASW"])
     assert str(e.value) == (
-        "labels: 30 of the 300 cells have no label. The missing value is written NaN. "
-        "A missing label is not a cell type, so evaluate does not score it. Give every "
-        'cell a label, or pass missing_labels="drop" to score the 270 labelled cells '
-        "only.")
+        'labels: 30 of the 300 cells have no label. Pass missing_labels="drop" to score '
+        "the other 270.")
 
 
-@pytest.mark.parametrize("fill, seen, rename", [
-    (None, NAN, ""),
-    (pd.NA, NAN, ""),
-    ("", "The missing value is written ''.", ""),
-    ("  ", "The missing value is written ''.", ""),
-    ("NA", "The missing value is written 'NA'.", RENAME_NA),
-    ("NA ", "The missing value is written 'NA'.", RENAME_NA),
-    (" NA", "The missing value is written 'NA'.", RENAME_NA),
-    ("None", "The missing value is written 'None'.", RENAME_NA.replace("'NA'", "'None'")),
-    ("nan", "The missing value is written 'nan'.", RENAME_NA.replace("'NA'", "'nan'")),
+@pytest.mark.parametrize("fill, example", [
+    (None, ""),
+    (pd.NA, ""),
+    ("", ""),
+    ("  ", ""),
+    ("NA", EX_NA),
+    ("NA ", EX_NA),
+    (" NA", EX_NA),
+    ("None", ", for example 'None'"),
+    ("nan", ", for example 'nan'"),
 ], ids=repr)
-def test_every_spelling_of_missing_raises_and_is_named(fill, seen, rename):
+def test_every_spelling_of_missing_raises_and_is_named(fill, example):
+    """A text that reads as missing is named as the example; NaN and a blank
+    are not named."""
     emb, lab = _cells()
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=_gaps(lab, fill), metrics=["ASW"])
-    assert str(e.value) == _e1(seen=seen, rename=rename)
+    assert str(e.value) == _e1(example=example)
 
 
 def test_several_spellings_are_listed_once_each():
+    """Of several spellings the message now names one, the first word."""
     emb, lab = _cells()
     lab = _gaps(lab)                       # 30 NaN
     lab[[0, 1]], lab[2], lab[3] = "NA", "None", " "
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=lab, metrics=["ASW"])
-    assert str(e.value) == _e1(
-        n=34, seen="The missing values are written NaN, '', 'NA' and 'None'.",
-        rename=(" A label file reads 'NA' and 'None' as missing values. If one of them "
-                "is the name of a cell type, rename it."))
+    assert str(e.value) == _e1(n=34, example=EX_NA)
+    assert "'None'" not in str(e.value)
 
 
 def test_a_text_numpy_made_of_nan_is_missing_too():
@@ -468,8 +451,7 @@ def test_a_text_numpy_made_of_nan_is_missing_too():
     assert text.dtype.kind == "U"
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=text, metrics=["ASW"])
-    assert str(e.value) == _e1(seen="The missing value is written 'nan'.",
-                               rename=RENAME_NA.replace("'NA'", "'nan'"))
+    assert str(e.value) == _e1(example=", for example 'nan'")
 
 
 def test_a_file_whose_missing_word_has_a_blank_is_named(tmp_path):
@@ -481,8 +463,7 @@ def test_a_file_whose_missing_word_has_a_blank_is_named(tmp_path):
     assert set(eio.read_labels(path)) == {"A", "B", "C", "NA "}
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
-    assert str(e.value) == _e1(" (cty.csv)", seen="The missing value is written 'NA'.",
-                               rename=RENAME_NA)
+    assert str(e.value) == _e1(" (cty.csv)", example=EX_NA)
 
 
 def test_counts_carry_thousands_separators():
@@ -494,13 +475,10 @@ def test_counts_carry_thousands_separators():
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=lab, metrics=["ASW"])
     assert str(e.value) == (
-        "labels: 100 of the 1,200 cells have no label. The missing value is written "
-        "NaN. A missing label is not a cell type, so evaluate does not score it. Give "
-        'every cell a label, or pass missing_labels="drop" to score the 1,100 labelled '
-        "cells only.")
+        'labels: 100 of the 1,200 cells have no label. Pass missing_labels="drop" to '
+        "score the other 1,100.")
     out, said = _drop(emb, labels=lab, metrics=["ASW"])
-    assert said == ["Scored the 1,100 labelled cells of 1,200. 100 cells have no label "
-                    "and were left out, so the scores describe the labelled cells only."]
+    assert said == ["Scored the 1,100 labelled cells of 1,200."]
     assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (1100, 1200)
     long = mtb.to_long(out, method="M")
     assert set(long["scored_with"]) == {f"none/none/{mtb.__version__}/1100 of 1200 cells"}
@@ -524,25 +502,22 @@ def test_evaluate_raises_when_every_label_is_missing(missing_labels, tmp_path):
     kw = dict(metrics=["ASW"], missing_labels=missing_labels)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=np.full(N, np.nan, dtype=object), **kw)
-    assert str(e.value) == ("labels: none of the 300 cells has a label, so there is "
-                            "nothing to score. The missing value is written NaN.")
+    assert str(e.value) == "labels: none of the 300 cells has a label." + NONE_FIX
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=["NA"] * N, **kw)
-    assert str(e.value) == ("labels: none of the 300 cells has a label, so there is "
-                            "nothing to score. The missing value is written 'NA'."
-                            + RENAME_NA)
+    assert str(e.value) == ("labels: none of the 300 cells has a label, for example "
+                            "'NA'." + NONE_FIX)
     path = tmp_path / "cty.csv"
     pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), **kw)
-    assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label, so "
-                            "there is nothing to score. The missing value is written 'NA'."
-                            + RENAME_NA)
+    assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label, for "
+                            "example 'NA'." + NONE_FIX)
     path.write_text("x\n" + '""\n' * N)                         # 300 empty fields
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), **kw)
-    assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label, so "
-                            "there is nothing to score. The missing value is written NaN.")
+    assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label."
+                            + NONE_FIX)
 
 
 @pytest.mark.parametrize("value", ["skip", "Drop", "", None, True, 0, ["drop"]], ids=repr)
@@ -569,18 +544,16 @@ def test_the_command_line_names_its_flags(tmp_path, monkeypatch):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
     assert str(e.value) == (
-        "--labels (cty.csv): 30 of the 300 cells have no label. The missing value is "
-        "written NaN. A missing label is not a cell type, so evaluate does not score "
-        "it. Give every cell a label, or pass --missing-labels drop to score the 270 "
-        "labelled cells only.")
+        "--labels (cty.csv): 30 of the 300 cells have no label. Pass --missing-labels "
+        "drop to score the other 270.")
     assert "missing_labels=" not in str(e.value)
     # no cell with a label: the same flag starts the message
     pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
     assert str(e.value) == (
-        "--labels (cty.csv): none of the 300 cells has a label, so there is nothing to "
-        "score. The missing value is written 'NA'." + RENAME_NA)
+        "--labels (cty.csv): none of the 300 cells has a label, for example 'NA'."
+        + NONE_FIX)
 
 
 def test_the_command_line_names_the_dataset_whose_label_files_it_read(tmp_path, monkeypatch):
@@ -595,16 +568,14 @@ def test_the_command_line_names_the_dataset_whose_label_files_it_read(tmp_path, 
         with pytest.raises(ValueError) as e:
             mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
         assert str(e.value) == (
-            "the label files of D11 (cty.csv): 30 of the 300 cells have no label. The "
-            "missing value is written 'NA'. A missing label is not a cell type, so "
-            "evaluate does not score it. Give every cell a label, or pass "
-            "--missing-labels drop to score the 270 labelled cells only." + RENAME_NA)
+            "the label files of D11 (cty.csv): 30 of the 300 cells have no label, for "
+            "example 'NA'. Pass --missing-labels drop to score the other 270.")
         pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
         with pytest.raises(ValueError) as e:
             mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
         assert str(e.value) == (
-            "the label files of D11 (cty.csv): none of the 300 cells has a label, so "
-            "there is nothing to score. The missing value is written 'NA'." + RENAME_NA)
+            "the label files of D11 (cty.csv): none of the 300 cells has a label, for "
+            "example 'NA'." + NONE_FIX)
     finally:
         pipeline._CLI_LABELS_FROM.reset(token)
     # in Python the dataset of an earlier command-line call starts nothing
@@ -669,9 +640,7 @@ def test_drop_warns_and_records_the_cell_counts():
     emb, lab = _cells()
     with pytest.warns(UserWarning) as rec:
         wide = mtb.evaluate(emb, labels=_gaps(lab), metrics=["ASW"], missing_labels="drop")
-    assert _scored(rec) == [
-        "Scored the 270 labelled cells of 300. 30 cells have no label and were left "
-        "out, so the scores describe the labelled cells only."]
+    assert _scored(rec) == ["Scored the 270 labelled cells of 300."]
     # the warning points at the line that called evaluate
     assert [Path(w.filename).name for w in rec
             if str(w.message).startswith("Scored the")] == [Path(__file__).name]
@@ -690,11 +659,12 @@ def test_drop_warns_and_records_the_cell_counts():
 
 
 def test_drop_of_one_cell_reads_in_the_singular():
+    """The warning no longer has the sentence about the cells left out, so
+    one cell left out reads like any other count."""
     emb, lab = _cells()
     lab[7] = None
     out, said = _drop(emb, labels=lab, metrics=["ASW"])
-    assert said == ["Scored the 299 labelled cells of 300. 1 cell has no label and was "
-                    "left out, so the scores describe the labelled cells only."]
+    assert said == ["Scored the 299 labelled cells of 300."]
     assert pipeline._scored_with(out.attrs).endswith("/299 of 300 cells")
 
 
@@ -736,26 +706,19 @@ def test_a_line_break_or_a_nul_in_a_name_changes_nothing(name):
 def test_drop_names_a_lost_batch(tmp_path):
     emb, lab = _cells()
     bat = _donors()
-    base = ("Scored the 200 labelled cells of 300. 100 cells have no label and were "
-            "left out, so the scores describe the labelled cells only.")
     kw = dict(metrics=["ASW", "ASW_batch"])
     # donor d3 has no labelled cell: two of the three batches are left
     _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), batch=bat, **kw)
-    assert said == [base + " The labelled cells come from 2 of the 3 batches."]
+    assert said == ["Scored the 200 labelled cells of 300, from 2 of the 3 batches."]
     # only donor d1 is labelled
     _, said = _drop(emb, labels=_gaps(lab, at=bat != "d1"), batch=bat, **kw)
-    assert said == [
-        "Scored the 100 labelled cells of 300. 200 cells have no label and were left "
-        "out, so the scores describe the labelled cells only. The labelled cells are "
-        "all in one batch, so no score changes with where the cells of the other "
-        "batches are placed, and the batch metrics do not measure mixing."]
+    assert said == ["Scored the 100 labelled cells of 300, all in one batch of 3."]
     # every batch keeps a labelled cell: nothing to add
     _, said = _drop(emb, labels=_gaps(lab), batch=bat, **kw)
-    assert said == ["Scored the 270 labelled cells of 300. 30 cells have no label and "
-                    "were left out, so the scores describe the labelled cells only."]
+    assert said == ["Scored the 270 labelled cells of 300."]
     # no batch vector is given: there are no batches to count
     _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), metrics=["ASW"])
-    assert said == [base]
+    assert said == ["Scored the 200 labelled cells of 300."]
 
 
 def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
@@ -764,18 +727,14 @@ def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
     pd.DataFrame({"x": lab[:150]}).to_csv(files[0], index=False)
     pd.DataFrame({"x": ["NA"] * 150}).to_csv(files[1], index=False)
     out, said = _drop(emb, labels=[str(p) for p in files])
-    assert said == [
-        "Scored the 150 labelled cells of 300. 150 cells have no label and were left "
-        "out, so the scores describe the labelled cells only. The labelled cells are "
-        "all in one batch, so no score changes with where the cells of the other "
-        "batches are placed, and the batch metrics do not measure mixing."]
+    assert said == ["Scored the 150 labelled cells of 300, all in one batch of 2."]
     assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (150, 300)
     _same(out, mtb.evaluate(emb[:150], labels=lab[:150], batch=np.ones(150, dtype=int),
                             metrics="all", verbose=False))
     # without the flag, the same files stop the call
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[str(p) for p in files])
-    assert str(e.value) == _e1(" (cty1.csv, cty2.csv)", SEEN_NA, RENAME_NA, n=150)
+    assert str(e.value) == _e1(" (cty1.csv, cty2.csv)", EX_NA, n=150)
 
 
 def test_one_labelled_batch_hides_the_other_batches_from_every_score(tmp_path):
@@ -787,40 +746,33 @@ def test_one_labelled_batch_hides_the_other_batches_from_every_score(tmp_path):
     one = _gaps(lab, at=bat != "d1")
     moved = emb.copy()
     moved[bat != "d1"] = np.random.default_rng(1).normal(size=(200, 8)) * 9
-    base = ("Scored the 100 labelled cells of 300. 200 cells have no label and were "
-            "left out, so the scores describe the labelled cells only.")
-    hidden = (" The labelled cells are all in one batch, so no score changes with where "
-              "the cells of the other batches are placed")
+    base = "Scored the 100 labelled cells of 300"
+    hidden = ", all in one batch of 3."
     kw = dict(labels=one, batch=bat, metrics="all")
     got, said = _drop(emb, **kw)
     other, said_other = _drop(moved, **kw)
     _same(got, other)
     assert got.index.tolist() == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
                                   "ASW_batch", "GC", "iLISI"]
-    assert said == said_other == [
-        base + hidden + ", and the batch metrics do not measure mixing."]
-    # no batch metric is scored: the sentence ends after the scores
+    assert said == said_other == [base + hidden]
+    # no batch metric is scored: the warning reads the same
     kw = dict(labels=one, batch=bat, metrics=["ASW"])
     got, said = _drop(emb, **kw)
     _same(got, _drop(moved, **kw)[0])
-    assert said == [base + hidden + "."]
+    assert said == [base + hidden]
     # labels in two of the three batches are counted without a batch metric too
     _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), batch=bat, metrics=["ASW"])
-    assert said == ["Scored the 200 labelled cells of 300. 100 cells have no label and "
-                    "were left out, so the scores describe the labelled cells only. The "
-                    "labelled cells come from 2 of the 3 batches."]
+    assert said == ["Scored the 200 labelled cells of 300, from 2 of the 3 batches."]
     # no batch vector: evaluate cannot tell which cells were left out
     got, said = _drop(emb, labels=one, metrics=["ASW"])
     _same(got, _drop(moved, labels=one, metrics=["ASW"])[0])
-    assert said == [base]
+    assert said == [base + "."]
     # the file of origin is a batch vector, also when no batch metric is scored
     files = [tmp_path / "cty1.csv", tmp_path / "cty2.csv"]
     pd.DataFrame({"x": lab[:150]}).to_csv(files[0], index=False)
     pd.DataFrame({"x": ["NA"] * 150}).to_csv(files[1], index=False)
     _, said = _drop(emb, labels=[str(p) for p in files], metrics=["ASW"])
-    assert said == ["Scored the 150 labelled cells of 300. 150 cells have no label and "
-                    "were left out, so the scores describe the labelled cells only."
-                    + hidden + "."]
+    assert said == ["Scored the 150 labelled cells of 300, all in one batch of 2."]
 
 
 # ============================================================ the reference

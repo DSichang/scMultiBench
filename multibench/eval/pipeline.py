@@ -327,10 +327,8 @@ def _column_without_obs(x, adata) -> bool:
 
 def _no_column_error(what: str, x: str) -> str:
     col = x[4:] if x.startswith("obs:") else x
-    return (f"{what}={x!r} is not a file, and the output is an array without obs "
-            f"columns, so there is no column to look up. Pass the values themselves, "
-            f"for example {what}=adata.obs[{col!r}], or pass the AnnData as the "
-            f"output with obsm=.")
+    return (f"{what}={x!r} is not a file, and the output has no obs. Pass the values, as "
+            f"{what}=adata.obs[{col!r}].")
 
 
 class _Table:
@@ -342,43 +340,31 @@ class _Table:
         self.name, self.moved = name, []
 
 
-def _examples(ix) -> str:
-    """`` (for example a, b and c)``: up to three of ``ix``; ``""`` for none."""
-    shown = [str(v) for v in list(ix[:3])]
-    return f" (for example {io._and(shown)})" if shown else ""
-
-
 def _same_cells(keys, ids, *, what: str, name: str, table: _Table, fix: str,
                 first: str | None = None, plural: bool = False) -> bool:
     """Whether ``keys``, the cell ids of a labels, batch or clustering
     argument, are in another order than ``ids``, the barcodes of the
     embedding file ``table``. ``ValueError`` when the two do not name the
-    same cells: the counts, three barcodes missing on each side, and ``fix``.
+    same cells: how many cells of the embedding the argument lacks, or, when
+    it lacks none, how many of its cells the embedding lacks, one barcode,
+    and ``fix``.
 
     ``name`` names the argument in the message (a file name, ``the labels
-    Series``); ``first`` is how its first mention reads when that differs,
-    and ``plural`` says that ``name`` is several files.
+    Series``); ``first`` and ``plural`` are not worded.
     """
     keys, ids = pd.Index([str(k) for k in keys]), pd.Index([str(i) for i in ids])
     extra = keys[~keys.isin(ids)].unique()
     missing = ids.difference(keys, sort=False)
     if len(extra) or len(missing):
-        def lacks(ix, a, b):
-            k = len(ix)
-            return (f"{'1 barcode' if k == 1 else f'{k:,} barcodes'} of {a} "
-                    f"{'is' if k == 1 else 'are'} not in {b}{_examples(ix)}.")
+        ix, a, b = (missing, table.name, name) if len(missing) else (extra, name, table.name)
         raise ValueError(
-            f"{what}: {first or name} and {table.name} do not hold the same cells. "
-            f"{table.name} has {len(ids):,} barcodes and {name} "
-            f"{'have' if plural else 'has'} {len(keys):,}. "
-            f"{lacks(missing, table.name, name)} {lacks(extra, name, table.name)} {fix}")
+            f"{what}: {len(ix):,} {'cell' if len(ix) == 1 else 'cells'} of {a} "
+            f"{'is' if len(ix) == 1 else 'are'} not in {b}, for example {ix[0]}. {fix}")
     return not keys.equals(ids)
 
 
 def _file_fix(name: str, table: _Table, plural: bool = False) -> str:
-    col = f"the barcode {'columns' if plural else 'column'} of {name}"
-    return (f"Write both for the same cells. If the rows already follow the rows of "
-            f"{table.name}, delete {col}: the rows are then matched by position.")
+    return "Write both for the same cells."
 
 
 def _file_carries_ids(first, ids) -> bool:
@@ -444,10 +430,8 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         if ids is not None:
             name = f"the {what} {type(x).__name__}"
             if table is not None and x.index.is_unique and pd.Index(ids).is_unique \
-                    and _same_cells(x.index, ids, what=what, name=name, table=table, fix=(
-                        f"Pass {what} for exactly the cells of {table.name}. If the "
-                        f"values already follow the rows of {table.name}, pass "
-                        f"{what}.to_numpy(): the values are then matched by position.")):
+                    and _same_cells(x.index, ids, what=what, name=name, table=table,
+                                    fix=f"Pass {what} for the cells of {table.name}."):
                 table.moved.append(name)
             return io.align_vector(x, ids, what=what, column=column)
         warnings.warn(
@@ -662,27 +646,19 @@ def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> s
     as ``nCount_RNA`` passed where the cell types belong is scored without
     any error. Names the column, the Series or the file(s) when known."""
     arg = config.hint("labels", "--labels")
+    files = [f.name for f in _label_files(given)]
     if adata is not None and isinstance(given, str) \
             and _obs_column_name(given, adata) is not None:
-        src = f"The obs column {_obs_column_name(given, adata)!r}, given as {arg},"
-    elif _label_files(given):
-        files = [f.name for f in _label_files(given)]
-        src = f"{arg} ({io._and(files)})"
+        src = config.hint(f"labels={given!r}", f"--labels {given}")
+    elif files:
+        src = f"{arg} ({files[0]}" + (f" and {len(files) - 1} more)" if len(files) > 1 else ")")
     elif isinstance(given, pd.Series) and given.name is not None:
-        src = f"The Series {str(given.name)!r}, given as {arg},"
+        src = f"The labels Series {str(given.name)!r}"
     else:
         src = arg
-    several = len(_label_files(given)) > 1
-    has = "have" if several else "has"
-    why = (f"{'hold' if several else 'holds'} numbers that are not whole numbers, with "
-           f"{distinct:,} different values for {cells:,} cells" if reason == "fraction"
-           else f"{has} {distinct:,} different labels for {cells:,} cells")
-    check = config.hint(
-        "Check that labels= is the column or the file with the cell types.",
-        "Check that --labels names the file with the cell types, and that --column, if "
-        "given, names their column.")
-    return (f"{src} {why}. That looks like a number measured for each cell, not like "
-            f"cell types, and the scores then say nothing about cell types. {check}")
+    why = ("holds numbers that are not whole numbers" if reason == "fraction"
+           else f"has {distinct:,} different labels for {cells:,} cells")
+    return f"{src} {why}. Check that it holds the cell types."
 
 
 def _no_label_error(shown, miss, given) -> str:
@@ -695,15 +671,13 @@ def _no_label_error(shown, miss, given) -> str:
     dataset = _CLI_LABELS_FROM.get()
     head = config.hint("labels", f"the label files of {dataset}" if dataset
                        else "--labels") + _src(given)
-    seen, rename = io._missing_seen(shown), io._missing_rename(shown)
+    example = io._missing_example(shown)
     if n == n_cells:
-        return (f"{head}: none of the {n_cells:,} cells has a label, so there is "
-                f"nothing to score. {seen}{rename}")
+        return (f"{head}: none of the {n_cells:,} cells has a label{example}. Pass the "
+                f"column or file that holds the cell types.")
     drop = config.hint('missing_labels="drop"', "--missing-labels drop")
-    return (f"{head}: {n:,} of the {n_cells:,} cells have no label. {seen} A missing "
-            f"label is not a cell type, so evaluate does not score it. Give every "
-            f"cell a label, or pass {drop} to score the {n_cells - n:,} labelled "
-            f"cells only.{rename}")
+    return (f"{head}: {n:,} of the {n_cells:,} cells have no label{example}. Pass {drop} "
+            f"to score the other {n_cells - n:,}.")
 
 
 def _no_batch_error(shown, miss, given) -> str:
@@ -711,10 +685,8 @@ def _no_batch_error(shown, miss, given) -> str:
     ``miss`` is true. ``shown`` is the vector as it is written
     (:func:`_as_written` for files)."""
     head = config.hint("batch", "--batch") + _src(given)
-    return (f"{head}: {int(miss.sum()):,} of the {len(miss):,} cells have no batch. "
-            f"{io._missing_seen(shown)} A missing batch is not a batch, so the batch "
-            f"metrics are not computed on it. Give every cell a batch, or leave these "
-            f"cells out.")
+    return (f"{head}: {int(miss.sum()):,} of the {len(miss):,} cells have no batch"
+            f"{io._missing_example(shown)}. Give every cell a batch.")
 
 
 def _n_batches(ba) -> int:
@@ -730,23 +702,16 @@ def _dropped_warning(n_scored: int, n_cells: int, batches=None,
     ``batches`` is ``(b, B)`` when a batch vector is known (``batch=``, or
     the file of origin of several label files): the batches that hold a
     labelled cell, of the batches given. A batch without one is left out of
-    every score, and the warning says so. ``batch_scored`` says that a batch
-    metric is scored: with one batch left, it does not measure mixing.
+    every score, and the warning gives the two numbers. ``batch_scored`` is
+    not worded.
     """
-    n = n_cells - n_scored
-    msg = (f"Scored the {n_scored:,} labelled cells of {n_cells:,}. {n:,} "
-           f"{'cell has' if n == 1 else 'cells have'} no label and "
-           f"{'was' if n == 1 else 'were'} left out, so the scores describe the "
-           f"labelled cells only.")
+    msg = f"Scored the {n_scored:,} labelled cells of {n_cells:,}"
     b, n_batches = batches or (0, 0)
     if b == 1 < n_batches:
-        msg += (" The labelled cells are all in one batch, so no score changes with "
-                "where the cells of the other batches are placed")
-        msg += (", and the batch metrics do not measure mixing." if batch_scored
-                else ".")
+        msg += f", all in one batch of {n_batches}"
     elif b < n_batches:
-        msg += f" The labelled cells come from {b} of the {n_batches} batches."
-    return msg
+        msg += f", from {b} of the {n_batches} batches"
+    return msg + "."
 
 
 def _batch_files(path: Path, n_cells: int) -> list:
@@ -806,10 +771,8 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         cli = (f"the label files of {dataset}{names} hold {n:,} labels for "
                f"{n_cells:,} cells in --output. ")
         if side and category == "diagonal":
-            cli += (f"They are the labels of the {side[0]} cells, and {dataset} has "
-                    f"no label file for the {side[1]} cells. --dataset scores a "
-                    f"diagonal folder only when both sides have a label file, and "
-                    f"--missing-labels drop does not change that.")
+            cli += (f'{dataset} labels the {side[0]} cells only, see the recipe '
+                    f'"No labels" in the docs.')
         else:
             cli += f"Check that --output holds the embedding of --method on {dataset}."
         return config.hint(escib.count_error(what, n, n_cells), cli)
@@ -821,12 +784,8 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         return msg
     batches = _batch_files(files[0], n_cells) if len(files) == 1 else []
     if side and not batches:
-        drop = config.hint('missing_labels="drop"', "--missing-labels drop")
-        return (f"{msg} {_and_list(f.name for f in files)} "
-                f"{'names' if len(files) == 1 else 'name'} the labels of {side[0]} "
-                f"cells. If the embedding also holds the {side[1]} cells of a diagonal "
-                f"folder, they have no entry here: {drop} leaves out cells whose label "
-                f"is missing, not cells without an entry.")
+        return (f'{msg} {files[0].name} labels the {side[0]} cells only, see the recipe '
+                f'"No labels" in the docs.')
     order = f" ({', '.join(f.name for f in batches)})" if batches else ""
     return msg + " " + config.hint(
         "For a folder with one label file per batch, pass "
@@ -1322,10 +1281,8 @@ def evaluate(
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
     if isinstance(labels, dict) and not labels:
         raise ValueError(
-            "labels is an empty dict, so there is nothing to score. mtb.labels_for "
-            "returns one for a dataset folder without label files (cty.csv, cty1.csv, "
-            "cty2.csv, ... for data in batches, or rna_cty.csv and atac_cty.csv for "
-            "diagonal data).")
+            "labels is an empty dict. Pass the cell types, as "
+            "labels=adata.obs['celltype'].")
     # a labels_for() dict becomes the list of paths in cell order first, so the
     # file-of-origin batch rule below sees it like any other list of files
     if isinstance(labels, dict):
@@ -1397,10 +1354,9 @@ def evaluate(
         ba = np.zeros(emb.shape[0], dtype=int)
     if table is not None and table.moved:
         import sys
-        one = len(table.moved) == 1
-        print(f"evaluate: {io._and(table.moved)} {'lists' if one else 'list'} the cells "
-              f"in another order than {table.name}. {'Its' if one else 'Their'} values "
-              f"were matched to the rows of {table.name} by barcode.",
+        moved = table.moved[0] + (f" and {len(table.moved) - 1} more"
+                                  if len(table.moved) > 1 else "")
+        print(f"evaluate: matched {moved} to the rows of {table.name} by barcode.",
               file=sys.stderr, flush=True)
 
     from . import scib as escib

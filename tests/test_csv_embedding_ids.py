@@ -29,8 +29,7 @@ BARS = [f"AAAC{i:04d}-1" for i in range(CELLS)]
 EMB = np.random.default_rng(0).normal(size=(CELLS, 5)) \
     + pd.Categorical(TYPES).codes[:, None] * 4.0
 PERM = np.random.default_rng(1).permutation(CELLS)
-MOVED = ("evaluate: {0} lists the cells in another order than emb.csv. Its values were "
-         "matched to the rows of emb.csv by barcode.\n")
+MOVED = "evaluate: matched {0} to the rows of emb.csv by barcode.\n"
 NO_IDS = ("The first column of {0} looks like cell ids, but the output has no cell ids. "
           "The file is matched by position. Check that its rows follow the rows of the "
           "output.")
@@ -165,8 +164,7 @@ def test_batch_and_clustering_files_and_a_series_are_matched_too(tmp_path, capsy
                      clustering=_labels(tmp_path, "clusters.csv", PERM, clusters,
                                         column="leiden"), metrics="all")
     assert capsys.readouterr().err == (
-        "evaluate: the labels Series, clusters.csv and batch.csv list the cells in "
-        "another order than emb.csv. Their values were matched to the rows of emb.csv by "
+        "evaluate: matched the labels Series and 2 more to the rows of emb.csv by "
         "barcode.\n")
     assert seen["labels"] == list(TYPES) and seen["batch"] == list(donors)
     assert seen["clustering"] == list(clusters)
@@ -181,8 +179,7 @@ def test_several_label_files_are_matched_by_their_barcodes(tmp_path, capsys, see
         warnings.simplefilter("error")
         mtb.evaluate(emb, labels=[first, second], metrics=["ARI"])
     assert capsys.readouterr().err == (
-        "evaluate: cty1.csv and cty2.csv list the cells in another order than emb.csv. "
-        "Their values were matched to the rows of emb.csv by barcode.\n")
+        "evaluate: matched cty1.csv and 1 more to the rows of emb.csv by barcode.\n")
     assert seen["labels"] == list(TYPES)
 
 
@@ -195,7 +192,7 @@ def test_the_command_line_matches_by_barcode(tmp_path, capsys):
                        _labels(tmp_path, "shuffled.csv", PERM), "--metrics", "ARI,NMI",
                        "--out", str(out)])
     assert rc == 0
-    assert MOVED.format("shuffled.csv") in capsys.readouterr().err
+    assert capsys.readouterr().err == MOVED.format("shuffled.csv")
     assert pd.read_csv(out, index_col=0)["Value"].tolist() == [1.0, 1.0]
 
 
@@ -207,12 +204,11 @@ def test_other_cells_are_an_error_with_counts_and_examples(tmp_path, seen):
         mtb.evaluate(emb, labels=_labels(tmp_path, values=TYPES[:59], bars=bars),
                      metrics=["ARI"])
     assert str(e.value) == (
-        "labels: labels.csv and emb.csv do not hold the same cells. emb.csv has 60 "
-        "barcodes and labels.csv has 59. 5 barcodes of emb.csv are not in labels.csv "
-        "(for example AAAC0055-1, AAAC0056-1 and AAAC0057-1). 4 barcodes of labels.csv "
-        "are not in emb.csv (for example TTTG0000-1, TTTG0001-1 and TTTG0002-1). Write "
-        "both for the same cells. If the rows already follow the rows of emb.csv, delete "
-        "the barcode column of labels.csv: the rows are then matched by position.")
+        "labels: 5 cells of emb.csv are not in labels.csv, for example AAAC0055-1. Write "
+        "both for the same cells.")
+    # the 4 barcodes that only labels.csv holds are not counted, and the
+    # message no longer says to delete the barcode column
+    assert "TTTG" not in str(e.value) and "by position" not in str(e.value)
     assert not seen
 
 
@@ -222,23 +218,16 @@ def test_a_file_with_fewer_cells_and_one_with_no_cell_in_common(tmp_path, seen):
         mtb.evaluate(emb, labels=_labels(tmp_path, values=TYPES[:59], bars=BARS[:59]),
                      metrics=["ARI"])
     assert str(e.value) == (
-        "labels: labels.csv and emb.csv do not hold the same cells. emb.csv has 60 "
-        "barcodes and labels.csv has 59. 1 barcode of emb.csv is not in labels.csv (for "
-        "example AAAC0059-1). 0 barcodes of labels.csv are not in emb.csv. Write both "
-        "for the same cells. If the rows already follow the rows of emb.csv, delete the "
-        "barcode column of labels.csv: the rows are then matched by position.")
+        "labels: 1 cell of emb.csv is not in labels.csv, for example AAAC0059-1. Write "
+        "both for the same cells.")
     # the same cells under other names: 0.3.4 scored this by position with a warning
     other = [b.replace("-1", "") for b in BARS]
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=TYPES, batch=_labels(tmp_path, "batch.csv", bars=other),
                      metrics="all")
     assert str(e.value) == (
-        "batch: batch.csv and emb.csv do not hold the same cells. emb.csv has 60 barcodes "
-        "and batch.csv has 60. 60 barcodes of emb.csv are not in batch.csv (for example "
-        "AAAC0000-1, AAAC0001-1 and AAAC0002-1). 60 barcodes of batch.csv are not in "
-        "emb.csv (for example AAAC0000, AAAC0001 and AAAC0002). Write both for the same "
-        "cells. If the rows already follow the rows of emb.csv, delete the barcode column "
-        "of batch.csv: the rows are then matched by position.")
+        "batch: 60 cells of emb.csv are not in batch.csv, for example AAAC0000-1. Write "
+        "both for the same cells.")
     assert not seen
 
 
@@ -247,12 +236,9 @@ def test_a_series_with_other_cells(tmp_path, seen):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=pd.Series(TYPES[:58], index=BARS[2:]), metrics=["ARI"])
     assert str(e.value) == (
-        "labels: the labels Series and emb.csv do not hold the same cells. emb.csv has 60 "
-        "barcodes and the labels Series has 58. 2 barcodes of emb.csv are not in the "
-        "labels Series (for example AAAC0000-1 and AAAC0001-1). 0 barcodes of the labels "
-        "Series are not in emb.csv. Pass labels for exactly the cells of emb.csv. If the "
-        "values already follow the rows of emb.csv, pass labels.to_numpy(): the values "
-        "are then matched by position.")
+        "labels: 2 cells of emb.csv are not in the labels Series, for example "
+        "AAAC0000-1. Pass labels for the cells of emb.csv.")
+    assert "to_numpy" not in str(e.value)
     assert not seen
 
 
@@ -264,12 +250,8 @@ def test_several_label_files_with_other_cells(tmp_path, seen):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[first, second], metrics=["ARI"])
     assert str(e.value) == (
-        "labels: the label files cty1.csv and cty2.csv and emb.csv do not hold the same "
-        "cells. emb.csv has 60 barcodes and the label files have 59. 1 barcode of emb.csv "
-        "is not in the label files (for example AAAC0059-1). 0 barcodes of the label "
-        "files are not in emb.csv. Write both for the same cells. If the rows already "
-        "follow the rows of emb.csv, delete the barcode columns of the label files: the "
-        "rows are then matched by position.")
+        "labels: 1 cell of emb.csv is not in the label files, for example AAAC0059-1. "
+        "Write both for the same cells.")
     assert not seen
 
 

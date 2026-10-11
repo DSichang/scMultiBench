@@ -22,15 +22,8 @@ from multibench.engine import ingest, runner
 ad = pytest.importorskip("anndata")
 
 GENES, PEAKS, PROTEINS = 800, 1200, 12
-LIST = "1,200 'Peaks' and 800 'Gene Expression'"
-HEAD = (f"2,000 features of 2 types: {LIST} (var['feature_types']). One file holds one "
-        f"modality.")
-RECIPE = 'The documentation has the steps as the recipe "A 10x .h5 file".'
-
-
-def _exit(kind, obj="adata"):
-    return (f"If all of them are {kind} features, delete the column from the object first, "
-            f"for example del {obj}.var['feature_types'].")
+HEAD = "features of 2 types, 'Peaks' and 'Gene Expression'."      # the larger type first
+RECIPE = 'See the recipe "A 10x .h5 file" in the docs.'
 
 
 def _mixed(types, n=20, seed=0):
@@ -74,29 +67,28 @@ def _raises(tmp_path, *args, **kw):
 def test_the_default_rna_selector_next_to_an_atac_filter(tmp_path):
     """The classic call: a filter for the ATAC, and rna left at its default."""
     msg = _raises(tmp_path, _arc(), atac="X[feature_types=Peaks]", atac_kind="peak")
-    assert msg == (f"rna='X' selects {HEAD} Add a filter, for example "
+    assert msg == (f"rna='X' selects {HEAD} Add a filter, as "
                    f"rna='X[feature_types=Gene Expression]'.")
 
 
 def test_a_layer_selector(tmp_path):
     msg = _raises(tmp_path, _arc(), rna="layer:counts")
-    assert msg == (f"rna='layer:counts' selects {HEAD} Add a filter, for example "
+    assert msg == (f"rna='layer:counts' selects {HEAD} Add a filter, as "
                    f"rna='layer:counts[feature_types=Gene Expression]'.")
 
 
 def test_adt_from_x_of_a_cite_seq_object(tmp_path):
     msg = _raises(tmp_path, _cite(), rna="X[feature_types=Gene Expression]", adt="X")
     assert msg == (
-        "adt='X' selects 812 features of 2 types: 800 'Gene Expression' and 12 'Antibody "
-        "Capture' (var['feature_types']). One file holds one modality. Add a filter, for "
-        "example adt='X[feature_types=Antibody Capture]'.")
+        "adt='X' selects features of 2 types, 'Gene Expression' and 'Antibody Capture'. Add "
+        "a filter, as adt='X[feature_types=Antibody Capture]'.")
 
 
 def test_a_mudata_modality_name(tmp_path):
     mudata = pytest.importorskip("mudata")
     mdata = mudata.MuData({"rna": _arc()})
     msg = _raises(tmp_path, mdata, rna="rna")
-    assert msg == (f"rna='rna' selects {HEAD} Add a filter, for example "
+    assert msg == (f"rna='rna' selects {HEAD} Add a filter, as "
                    f"rna='rna[feature_types=Gene Expression]'.")
     out = ingest.export_dataset(mdata, tmp_path / "MU",
                                 rna="rna[feature_types=Gene Expression]")
@@ -106,19 +98,19 @@ def test_a_mudata_modality_name(tmp_path):
 # ------------------------------------------- F2: another filter, or an object
 def test_a_selector_with_another_filter(tmp_path):
     msg = _raises(tmp_path, _arc(), rna="X[genome=GRCh38]")
-    assert msg == (f"rna='X[genome=GRCh38]' holds {HEAD} Pass the features of one type, for "
-                   f"example rna=adata[:, adata.var['feature_types'] == 'Gene Expression'].")
+    assert msg == (f"rna='X[genome=GRCh38]' holds {HEAD} Pass one type, as rna=adata[:, "
+                   f"adata.var['feature_types'] == 'Gene Expression'].")
 
 
 def test_an_object(tmp_path):
     arc = _arc()
     msg = _raises(tmp_path, None, rna=arc)
-    assert msg == (f"rna=AnnData holds {HEAD} Pass the features of one type, for example "
-                   f"rna=adata[:, adata.var['feature_types'] == 'Gene Expression'].")
+    assert msg == (f"rna=AnnData holds {HEAD} Pass one type, as rna=adata[:, "
+                   f"adata.var['feature_types'] == 'Gene Expression'].")
     genes = arc[:, arc.var["feature_types"] == "Gene Expression"]
     msg = _raises(tmp_path, genes, atac=arc, atac_kind="peak")
-    assert msg == (f"atac=AnnData holds {HEAD} Pass the features of one type, for example "
-                   f"atac=adata[:, adata.var['feature_types'] == 'Peaks'].")
+    assert msg == (f"atac=AnnData holds {HEAD} Pass one type, as atac=adata[:, "
+                   f"adata.var['feature_types'] == 'Peaks'].")
 
 
 # ----------------------------------------------- the example, or none at all
@@ -132,7 +124,7 @@ def test_the_example_in_the_message_works(tmp_path):
                        atac_kind="peak"), "atac", PEAKS),
             (cite, dict(rna="X[feature_types=Gene Expression]", adt="X"), "adt", PROTEINS)):
         msg = _raises(tmp_path, data, **kw)
-        arg, selector = re.search(r"for example (\w+)='([^']+)'\.", msg).groups()
+        arg, selector = re.search(r"Add a filter, as (\w+)='([^']+)'\.$", msg).groups()
         assert arg == role
         out = ingest.export_dataset(data, tmp_path / f"OK_{role}", **{**kw, arg: selector},
                                     category="vertical")
@@ -148,21 +140,18 @@ def test_no_example_is_guessed(tmp_path, types):
     of them, because the larger type need not be the modality asked for."""
     a = _mixed([(types[0], 30, "A"), (types[1], 50, "B")])
     msg = _raises(tmp_path, a, rna="X")
-    assert msg == (
-        f"rna='X' selects 80 features of 2 types: 50 {types[1]!r} and 30 {types[0]!r} "
-        f"(var['feature_types']). One file holds one modality. Add a filter that names the "
-        f"type holding the RNA features, as rna='X[feature_types=<type>]'. {_exit('RNA')}")
+    head = f"features of 2 types, {types[1]!r} and {types[0]!r}."
+    assert msg == f"rna='X' selects {head} Add a filter, as rna='X[feature_types=<type>]'."
     assert re.findall(r"feature_types=([^\]]*)\]", msg) == ["<type>"]
     msg = _raises(tmp_path, None, rna=a)
-    assert msg.endswith("Pass the features of one type, as rna=adata[:, "
-                        "adata.var['feature_types'] == '<type>']. " + _exit("RNA", obj="rna"))
+    assert msg == (f"rna=AnnData holds {head} Pass one type, as rna=adata[:, "
+                   f"adata.var['feature_types'] == '<type>'].")
 
 
 def test_a_10x_name_of_another_modality_is_no_example(tmp_path):
     """Genes and peaks, and adt= asked from X: neither type is the ADT one."""
     msg = _raises(tmp_path, _arc(), rna=None, adt="X")
-    assert msg == (f"adt='X' selects {HEAD} Add a filter that names the type holding the ADT "
-                   f"features, as adt='X[feature_types=<type>]'.")
+    assert msg == f"adt='X' selects {HEAD} Add a filter, as adt='X[feature_types=<type>]'."
 
 
 def test_peaks_are_no_example_for_gene_activity(tmp_path):
@@ -170,18 +159,18 @@ def test_peaks_are_no_example_for_gene_activity(tmp_path):
     atac_kind='gene_activity' is not filled in with the peaks."""
     msg = _raises(tmp_path, _arc(), rna="X[feature_types=Gene Expression]", atac="X",
                   atac_kind="gene_activity")
-    assert msg == (f"atac='X' selects {HEAD} Add a filter that names the type holding the "
-                   f"ATAC features, as atac='X[feature_types=<type>]'.")
+    assert msg == f"atac='X' selects {HEAD} Add a filter, as atac='X[feature_types=<type>]'."
     msg = _raises(tmp_path, _arc(), rna="X[feature_types=Gene Expression]", atac="X",
                   atac_kind="peak")
-    assert "for example atac='X[feature_types=Peaks]'." in msg
+    assert msg == f"atac='X' selects {HEAD} Add a filter, as atac='X[feature_types=Peaks]'."
 
 
 def test_many_types_are_counted(tmp_path):
+    """More than two types: their number, and the largest by name."""
     a = _mixed([(f"type{i}", 10 - i, f"T{i}_") for i in range(6)])
     msg = _raises(tmp_path, a, rna="X")
-    assert ("45 features of 6 types: 10 'type0', 9 'type1', 8 'type2', 7 'type3' and 2 more "
-            "(var['feature_types']).") in msg
+    assert msg == ("rna='X' selects features of 6 types, for example 'type0'. Add a filter, "
+                   "as rna='X[feature_types=<type>]'.")
 
 
 # ----------------------------------------------------------- calls that pass
@@ -218,15 +207,14 @@ def test_a_missing_type_is_a_type(tmp_path):
     a = _mixed([("Gene Expression", 30, "GENE")])
     a.var["feature_types"] = ["Gene Expression"] * 29 + [np.nan]
     msg = _raises(tmp_path, a, rna="X")
-    assert msg.startswith("rna='X' selects 30 features of 2 types: 29 'Gene Expression' and "
-                          "1 'nan' (var['feature_types']).")
+    assert msg == ("rna='X' selects features of 2 types, 'Gene Expression' and 'nan'. Add a "
+                   "filter, as rna='X[feature_types=Gene Expression]'.")
 
 
 # ------------------------------------------------- F3: to_canonical and mtb.run
 def _f3(example):
-    return (f"The matrix holds {HEAD} Pass the features of one type, for example adata[:, "
-            f"adata.var['feature_types'] == {example!r}], or use mtb.io.export_dataset, "
-            f"whose selectors take a filter such as 'X[feature_types={example}]'.")
+    return (f"The matrix holds {HEAD} Pass one type, as adata[:, "
+            f"adata.var['feature_types'] == {example!r}].")
 
 
 F3 = _f3("Gene Expression")
@@ -249,10 +237,7 @@ def test_to_canonical(tmp_path):
     # neither: no type is offered
     with pytest.raises(ValueError) as e:
         ingest.to_canonical(arc, tmp_path / "DIR" / "matrix.h5")
-    assert str(e.value) == (
-        f"The matrix holds {HEAD} Pass the features of one type, as adata[:, "
-        f"adata.var['feature_types'] == '<type>'], or use mtb.io.export_dataset, whose "
-        f"selectors take a filter such as 'X[feature_types=<type>]'.")
+    assert str(e.value) == _f3("<type>")
     assert not (tmp_path / "DIR").exists()
 
 
@@ -288,13 +273,12 @@ def test_convert_one_file_from_the_command_line(tmp_path, capsys):
     _arc().write_h5ad(src)
     rc, line = _cli(["convert", str(src), f"{tmp_path}/DIR/", "--modality", "rna"], capsys)
     assert rc == 1 and not (tmp_path / "DIR").exists()
-    assert line == (f"error: The matrix holds {HEAD} Write the dataset folder instead, for "
-                    f"example multibench convert SRC OUT --rna "
-                    f'"X[feature_types=Gene Expression]".')
+    assert line == (f"error: The matrix holds {HEAD} Write a dataset folder, as multibench "
+                    f'convert SRC OUT --rna "X[feature_types=Gene Expression]".')
     rc, line = _cli(["convert", str(src), f"{tmp_path}/DIR/", "--modality", "peak"], capsys)
-    assert rc == 1 and line.endswith(
-        'for example multibench convert SRC OUT --atac "X[feature_types=Peaks]" '
-        "--atac-kind peak.")
+    assert rc == 1 and line == (
+        f"error: The matrix holds {HEAD} Write a dataset folder, as multibench convert SRC "
+        f'OUT --atac "X[feature_types=Peaks]" --atac-kind peak.')
     # the command the message shows writes the folder
     rc, _ = _cli(["convert", str(src), str(tmp_path / "OUT"), "--atac",
                   "X[feature_types=Peaks]", "--atac-kind", "peak"], capsys)
@@ -310,12 +294,11 @@ def test_selectors_on_the_command_line(tmp_path, capsys):
     out = tmp_path / "OUT"
     rc, line = _cli(["convert", str(src), str(out), "--rna", "X"], capsys)
     assert rc == 1 and line == (
-        f"error: --rna X selects {HEAD} Add a filter, for example --rna "
+        f"error: --rna X selects {HEAD} Add a filter, as --rna "
         f'"X[feature_types=Gene Expression]".')
     rc, line = _cli(["convert", str(src), str(out), "--rna", "X[genome=GRCh38]"], capsys)
     assert rc == 1 and line == (
-        f"error: --rna X[genome=GRCh38] holds {HEAD} A selector takes one filter. Keep the "
-        f"features of one type in the file first. In Python: adata[:, "
+        f"error: --rna X[genome=GRCh38] holds {HEAD} Save one type first, as adata[:, "
         f"adata.var['feature_types'] == 'Gene Expression'].write_h5ad(\"one_type.h5ad\").")
     assert not out.exists()
 
@@ -336,7 +319,7 @@ def test_atac_from_is_checked(tmp_path, capsys, selector):
     rc, line = _cli(argv + (["--atac", selector] if selector else []), capsys)
     assert rc == 1 and not out.exists()
     assert line == (
-        f"error: --atac {spec} selects {HEAD} Add a filter, for example --atac "
+        f"error: --atac {spec} selects {HEAD} Add a filter, as --atac "
         f'"{spec}[feature_types=Peaks]".')
     rc, _ = _cli(argv + ["--atac", f"{spec}[feature_types=Peaks]"], capsys)
     assert rc == 0 and ingest.read_canonical(out / "atac_peak.h5").n_vars == PEAKS
@@ -369,10 +352,7 @@ def test_a_10x_file_is_named(tmp_path, capsys):
     with h5py.File(src, "r") as f:
         assert f["matrix/data"].ndim == 1 and "matrix/indptr" in f
     assert ingest._is_canonical_h5(src) is False
-    told = (f"{src} is a 10x Genomics file, not a multibench dataset file. Read it with "
-            f"scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
-            f"var['feature_types'] and write a dataset folder with mtb.io.export_dataset. "
-            f"{RECIPE}")
+    told = f"{src} is a 10x Genomics file. {RECIPE}"
     for call in (lambda: ingest.to_canonical(src, f"{tmp_path}/DIR/", modality="rna"),
                  lambda: ingest.to_canonical(str(src), tmp_path / "DIR" / "rna.h5"),
                  lambda: mtb.run("scMDC", "vertical", inputs={"rna": str(src), "adt": str(src)},
@@ -388,9 +368,7 @@ def test_a_10x_file_is_named(tmp_path, capsys):
         with pytest.raises(ValueError) as e:
             ingest.to_canonical(str(src), **kw)
         assert str(e.value) == told
-    cli_told = (f"error: {src} is a 10x Genomics file. multibench convert reads .h5ad files, "
-                f"not this file. Read it in Python with scanpy, save one .h5ad file per "
-                f"modality and convert those. {RECIPE}")
+    cli_told = f"error: {told}"
     for argv in (["convert", str(src), f"{tmp_path}/DIR/", "--modality", "rna"],
                  ["convert", str(src), str(tmp_path / "DIR"), "--rna", "X"]):
         rc, line = _cli(argv, capsys)
@@ -407,10 +385,7 @@ def test_read_canonical_names_a_10x_file(tmp_path):
         with pytest.raises(ValueError) as e:
             mtb.io.read_canonical(path)
         assert str(e.value) == ingest._tenx_message(path) == (
-            f"{src} is a 10x Genomics file, not a multibench dataset file. Read it with "
-            f"scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
-            f"var['feature_types'] and write a dataset folder with mtb.io.export_dataset. "
-            f"{RECIPE}")
+            f"{src} is a 10x Genomics file. {RECIPE}")
     # a dataset file, with its shape and names
     arc = _arc()
     made = ingest.to_canonical(arc[:, :GENES].copy(), tmp_path / "rna.h5")
@@ -486,7 +461,7 @@ def test_canonical_files_still_pass(tmp_path):
     assert ingest._is_canonical_h5(made) and ingest.to_canonical(made) == made
 
 
-# ------------------------- the way out by deleting the column, and the 10x names
+# ------------------------------------ no advice to delete the column of the types
 def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsys):
     """Deleting var['feature_types'] of a 10x object would write genes and
     peaks, or genes and antibodies, into one file. No message for the 10x
@@ -508,40 +483,37 @@ def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsy
     # one 10x name among other names is enough
     mixed = _mixed([("Gene Expression", 30, "GENE"), ("lncRNA", 50, "LNC")])
     assert _raises(tmp_path, mixed, rna="X") == (
-        "rna='X' selects 80 features of 2 types: 50 'lncRNA' and 30 'Gene Expression' "
-        "(var['feature_types']). One file holds one modality. Add a filter, for example "
-        "rna='X[feature_types=Gene Expression]'.")
+        "rna='X' selects features of 2 types, 'lncRNA' and 'Gene Expression'. Add a filter, "
+        "as rna='X[feature_types=Gene Expression]'.")
 
 
-def test_other_type_names_keep_the_advice_to_delete_the_column(tmp_path, capsys):
-    """Names such as protein_coding and lncRNA may all be RNA features: the
-    message still says how to write them as one file."""
+def test_other_type_names_get_the_same_advice(tmp_path, capsys):
+    """Names such as protein_coding and lncRNA may all be RNA features. The
+    message no longer says to delete the column for them: it is the one of
+    the 10x names, with ``<type>`` for the type. Without the column the
+    object is still written as one file."""
     a = _mixed([("protein_coding", 30, "A"), ("lncRNA", 50, "B")])
-    head = ("80 features of 2 types: 50 'lncRNA' and 30 'protein_coding' "
-            "(var['feature_types']). One file holds one modality.")
-    assert _raises(tmp_path, a, rna="X") == (
-        f"rna='X' selects {head} Add a filter that names the type holding the RNA features, "
-        f"as rna='X[feature_types=<type>]'. {_exit('RNA')}")
-    assert _raises(tmp_path, a, rna="X[genome=GRCh38]") == (
-        f"rna='X[genome=GRCh38]' holds {head} Pass the features of one type, as "
-        f"rna=adata[:, adata.var['feature_types'] == '<type>']. {_exit('RNA')}")
-    assert _raises(tmp_path, None, rna=a) == (
-        f"rna=AnnData holds {head} Pass the features of one type, as rna=adata[:, "
-        f"adata.var['feature_types'] == '<type>']. {_exit('RNA', obj='rna')}")
+    head = "features of 2 types, 'lncRNA' and 'protein_coding'."
+    texts = [_raises(tmp_path, a, rna="X"), _raises(tmp_path, a, rna="X[genome=GRCh38]"),
+             _raises(tmp_path, None, rna=a)]
+    assert texts == [
+        f"rna='X' selects {head} Add a filter, as rna='X[feature_types=<type>]'.",
+        f"rna='X[genome=GRCh38]' holds {head} Pass one type, as rna=adata[:, "
+        f"adata.var['feature_types'] == '<type>'].",
+        f"rna=AnnData holds {head} Pass one type, as rna=adata[:, "
+        f"adata.var['feature_types'] == '<type>']."]
     with pytest.raises(ValueError) as e:
         ingest.to_canonical(a, tmp_path / "DIR" / "rna.h5")
-    assert str(e.value) == (
-        f"The matrix holds {head} Pass the features of one type, as adata[:, "
-        f"adata.var['feature_types'] == '<type>'], or use mtb.io.export_dataset, whose "
-        f"selectors take a filter such as 'X[feature_types=<type>]'. {_exit('RNA')}")
+    assert str(e.value) == (f"The matrix holds {head} Pass one type, as adata[:, "
+                            f"adata.var['feature_types'] == '<type>'].")
     src = tmp_path / "typed.h5ad"
     a.write_h5ad(src)
     rc, line = _cli(["convert", str(src), str(tmp_path / "OUT"), "--rna", "X"], capsys)
     assert rc == 1 and line == (
-        f"error: --rna X selects {head} Add a filter that names the type holding the RNA "
-        f'features, as --rna "X[feature_types=<type>]". If all of them are RNA features, '
-        f"delete the var column feature_types in Python and save the file again.")
-    # following the advice writes the file
+        f'error: --rna X selects {head} Add a filter, as --rna "X[feature_types=<type>]".')
+    for text in texts + [str(e.value), line]:
+        assert "delete" not in text and "If all of them" not in text
+    # an object without the column is written as one file
     del a.var["feature_types"]
     out = ingest.export_dataset(a, tmp_path / "ONE", rna="X")
     assert ingest.read_canonical(out / "rna.h5").n_vars == 80

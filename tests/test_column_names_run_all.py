@@ -78,10 +78,8 @@ def cite(tmp_path, monkeypatch):
 
 
 def _c1(what, given, col):
-    return (f"{what}={given!r} is not a file. run_all and rescore read the dataset folder, "
-            "which holds no obs columns, so they cannot look a column up by name. Pass "
-            f"the column itself, for example {what}=adata.obs[{col!r}]. It is matched to "
-            "the cells by barcode.")
+    return (f"{what}={given!r} is not a file. Pass the column itself, as "
+            f"{what}=adata.obs[{col!r}].")
 
 
 @pytest.mark.parametrize("given", ["donor", "obs:donor"])

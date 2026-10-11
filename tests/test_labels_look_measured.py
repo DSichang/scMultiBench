@@ -27,9 +27,7 @@ N = 60
 TYPES = np.array(["T", "B", "NK"] * (N // 3))
 EMB = np.random.default_rng(0).normal(size=(N, 5)) + pd.Categorical(TYPES).codes[:, None] * 4.0
 COUNTS = np.arange(1000, 1000 + N)                    # one value per cell
-TAIL = ("That looks like a number measured for each cell, not like cell types, and the "
-        "scores then say nothing about cell types.")
-CHECK = "Check that labels= is the column or the file with the cell types."
+CHECK = "Check that it holds the cell types."
 
 
 @pytest.fixture(autouse=True)
@@ -77,36 +75,31 @@ def test_the_rule():
 # -------------------------------------------------------------------- Python
 def test_an_obs_column_of_counts():
     assert _warned(_adata(), labels="nCount_RNA") == [
-        f"The obs column 'nCount_RNA', given as labels, has 60 different labels for 60 "
-        f"cells. {TAIL} {CHECK}"]
+        f"labels='nCount_RNA' has 60 different labels for 60 cells. {CHECK}"]
     assert _warned(_adata(), labels="obs:nCount_RNA") == [
-        f"The obs column 'nCount_RNA', given as labels, has 60 different labels for 60 "
-        f"cells. {TAIL} {CHECK}"]
+        f"labels='obs:nCount_RNA' has 60 different labels for 60 cells. {CHECK}"]
 
 
 def test_an_obs_column_of_numbers_that_are_not_whole():
     assert _warned(_adata(), labels="percent_mt") == [
-        f"The obs column 'percent_mt', given as labels, holds numbers that are not whole "
-        f"numbers, with 3 different values for 60 cells. {TAIL} {CHECK}"]
+        f"labels='percent_mt' holds numbers that are not whole numbers. {CHECK}"]
 
 
 def test_a_series_an_array_and_a_file(tmp_path):
     a = _adata()
     assert _warned(EMB, labels=a.obs["nCount_RNA"].to_numpy()) == [
-        f"labels has 60 different labels for 60 cells. {TAIL} {CHECK}"]
+        f"labels has 60 different labels for 60 cells. {CHECK}"]
     assert _warned(a, labels=a.obs["nCount_RNA"]) == [
-        f"The Series 'nCount_RNA', given as labels, has 60 different labels for 60 cells. "
-        f"{TAIL} {CHECK}"]
+        f"The labels Series 'nCount_RNA' has 60 different labels for 60 cells. {CHECK}"]
     one = tmp_path / "counts.csv"
     pd.DataFrame({"x": COUNTS}).to_csv(one, index=False)
     assert _warned(EMB, labels=str(one)) == [
-        f"labels (counts.csv) has 60 different labels for 60 cells. {TAIL} {CHECK}"]
+        f"labels (counts.csv) has 60 different labels for 60 cells. {CHECK}"]
     two = tmp_path / "more.csv"
     pd.DataFrame({"x": COUNTS[:30] + 0.5}).to_csv(two, index=False)
     pd.DataFrame({"x": COUNTS[:30]}).to_csv(one, index=False)
     assert _warned(EMB, labels=[str(one), str(two)]) == [
-        f"labels (counts.csv and more.csv) hold numbers that are not whole numbers, with "
-        f"60 different values for 60 cells. {TAIL} {CHECK}"]
+        f"labels (counts.csv and 1 more) holds numbers that are not whole numbers. {CHECK}"]
 
 
 def test_cell_types_and_cluster_ids_do_not_warn(tmp_path):
@@ -141,10 +134,9 @@ def test_the_command_line_names_its_options(tmp_path, capsys, monkeypatch):
     assert cli.main(["evaluate", "--output", str(emb), "--labels", str(obs), "--column",
                      "nCount_RNA", "--metrics", "ARI"]) == 0
     err = capsys.readouterr().err
-    assert (
-        f"--labels (obs.csv) has 60 different labels for 60 cells. {TAIL} Check that "
-        f"--labels names the file with the cell types, and that --column, if given, names "
-        f"their column.") in err
+    assert err.splitlines()[-1] == (
+        f"warning: --labels (obs.csv) has 60 different labels for 60 cells. {CHECK}")
+    assert "--column" not in err
     assert config._CLI is False
     assert cli.main(["evaluate", "--output", str(emb), "--labels", str(obs), "--column",
                      "celltype", "--metrics", "ARI"]) == 0

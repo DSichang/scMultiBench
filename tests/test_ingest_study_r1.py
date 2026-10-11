@@ -113,15 +113,18 @@ def test_demo_folders_hold_raw_counts(root, ds, cat):
 # ------------------------------------------------------------------ L03 per-batch folders
 def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
     a = _cite()
-    for cat, read in (("vertical", "one rna.h5"), ("diagonal", "one rna.h5 and one ATAC file")):
-        with pytest.raises(ValueError, match=f"{cat.capitalize()} methods read {read}\\. "
-                                             r"Export without batch= and pass the batch "
-                                             r"column itself, such as "
-                                             r"adata\.obs\[\"donor\"\], to "
-                                             r"run_all\(batch=\.\.\.\) or "
-                                             r"evaluate\(batch=\.\.\.\)\.") as ei:
+    for cat, read, tail in (
+            ("vertical", "one rna.h5", 'For RNA+ADT batches, use category="cross".'),
+            ("diagonal", "one rna.h5 and one ATAC file",
+             "scJoint, GLUE, iNMF and online_iNMF also read several RNA and ATAC batches, "
+             "written one batch per call with batch_index=.")):
+        with pytest.raises(ValueError) as ei:
             ingest.export_dataset(a, tmp_path / cat, adt="obsm:protein", batch="obs:batch",
                                   category=cat)
+        assert str(ei.value) == (
+            "batch= writes per-batch files (rna1.h5, rna2.h5, ...). "
+            f"{cat.capitalize()} methods read {read}. Export without batch= and pass the "
+            f"column itself, as run_all(batch=adata.obs[\"donor\"]). {tail}")
         assert not (tmp_path / cat).exists()
         # cross is RNA+ADT: never offered to a diagonal (RNA+ATAC) user
         assert ('category="cross"' in str(ei.value)) == (cat == "vertical")

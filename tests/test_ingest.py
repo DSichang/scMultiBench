@@ -211,8 +211,7 @@ def test_the_layer_error_lists_layers_only(tmp_path):
     out = tmp_path / "OUT"
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(a, out, rna="layer:counts")
-    assert e.value.args[0] == ("layer 'counts' not found: the object has no layers, only the "
-                               "main matrix X.")
+    assert e.value.args[0] == "layer 'counts' not found, and the object has no layers."
     a.layers["raw"] = np.ones((3, 4))
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(a, out, rna="layer:counts")

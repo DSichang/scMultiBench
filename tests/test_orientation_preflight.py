@@ -83,16 +83,10 @@ def test_file_without_dimnames_is_not_rejected(tmp_path):
 # --- a 10x file, or a matrix without features or cells, under a dataset file name
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 #: what the folder check says of a 10x file after its subject ("<method> reads
-#: rna.h5 of <dataset>, which", in the reason column "rna.h5"): in Python, and
-#: on the command line
-TENX = ("is a 10x Genomics file, not a multibench dataset file. Read it with scanpy, "
-        "sc.read_10x_h5(path, gex_only=False), split it by var['feature_types'] and write "
-        "a dataset folder with mtb.io.export_dataset. The documentation has the steps as "
-        'the recipe "A 10x .h5 file".')
-TENX_CLI = ("is a 10x Genomics file, not a multibench dataset file. Read it in Python "
-            "with scanpy, save one .h5ad file per modality and convert those with "
-            "multibench convert. The documentation has the steps as the recipe "
-            '"A 10x .h5 file".')
+#: rna.h5 of <dataset>, which", in the reason column "rna.h5"): the same
+#: sentence in Python and on the command line
+TENX = 'is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
+TENX_CLI = TENX
 PEAKS = [f"chr1:{i * 1000 + 1}-{i * 1000 + 500}" for i in range(70)]
 
 
@@ -181,8 +175,7 @@ def test_a_10x_file_under_a_dataset_name_fails_the_file_check(
     assert not (tmp_path / "out").exists()
     # the way out is the one that to_canonical and mtb.run give for the file itself
     assert ingest._tenx_message("f.h5") == f"f.h5 {TENX}"
-    # on the command line: the same fact, then the command that writes a folder.
-    # The user ran scan, so it is not the sentence about what convert reads
+    # on the command line: the same sentence, which names the recipe
     with pytest.MonkeyPatch.context() as m:
         m.setattr(config, "_CLI", True)
         df = mtb.scan("TENX", "vertical", verbose=False, **kw)

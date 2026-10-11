@@ -25,11 +25,10 @@ N = 60
 DONORS = np.array(["d1", "d2", "d3"] * (N // 3))
 
 
-def _text(order, n=N):
-    return (f"batch is a Series whose index is the row numbers 0 to {n - 1}, not the cell "
-            f"barcodes, so it is matched to the cells by position. Check that its values "
-            f"follow {order}. To match by barcode, pass a Series indexed by barcode, such "
-            f'as adata.obs["donor"].')
+#: the same text from export_dataset, evaluate and run_all: it names neither
+#: the number of rows nor the order the values must follow
+TEXT = ("batch is a Series without barcodes and is matched to the cells by position. To "
+        'match by barcode, pass adata.obs["donor"].')
 
 
 def _adata(names=True):
@@ -57,7 +56,7 @@ def test_export_dataset_warns_and_takes_the_rows_in_order(tmp_path):
     kw = dict(rna="X", labels="obs:celltype", category="cross")
     out, said = _caught(lambda: ingest.export_dataset(
         a, tmp_path / "ROWS", batch=pd.Series(DONORS), **kw))
-    assert said == [_text("the cells of the data")]
+    assert said == [TEXT]
     # by position: batch 1 holds every third cell, starting with the first
     assert list(ingest.read_canonical(out / "rna1.h5").obs_names) == list(a.obs_names[::3])
 
@@ -92,7 +91,7 @@ def test_evaluate_warns_when_the_output_has_barcodes(tmp_path, no_scoring):
     for output in (a, frame, str(tmp_path / "emb.csv")):
         _, said = _caught(lambda: mtb.evaluate(output, labels=labels,
                                                batch=pd.Series(DONORS), metrics="all"))
-        assert said == [_text("the rows of the output")]
+        assert said == [TEXT]
 
 
 def test_evaluate_is_silent_for_the_usual_forms(no_scoring):
@@ -118,7 +117,7 @@ def test_run_all_warns_and_is_silent_for_a_series_with_barcodes(cite, tmp_path):
               verbose=False)
     res, said = _caught(lambda: mtb.run_all("MYCITE", "vertical", batch=pd.Series(batch),
                                             out_dir=tmp_path / "rows", **kw))
-    assert said == [_text("the order of mtb.labels_for('MYCITE')", CITE_N)]
+    assert said == [TEXT]
     assert res.summary.loc[0, "n_batches"] == 2
     cells = [f"c{i}" for i in range(CITE_N)]
     for i, value in enumerate((pd.Series(batch, index=cells), batch, list(batch))):

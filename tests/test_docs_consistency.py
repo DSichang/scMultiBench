@@ -1171,9 +1171,10 @@ def test_api_overview_names_both_cases_of_file_exists_error(tmp_path):
     # the second case: overwrite=True does not help, a new folder does
     other = cells("z", 30)
     for overwrite in (False, True):
-        with pytest.raises(FileExistsError, match="holds files of other data that this call "
-                                                  "does not write"):
+        with pytest.raises(FileExistsError) as left:
             mtb.io.export_dataset(other, out, overwrite=overwrite)
+        assert str(left.value) == (f"{out} holds cty.csv with another number of labels. "
+                                   f"Export to a new folder.")
     assert {p.name: p.read_bytes() for p in out.iterdir()} == held
     mtb.io.export_dataset(other, tmp_path / "OTHER")
 
@@ -1471,7 +1472,7 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
     emb = np.random.default_rng(0).normal(size=(300, 4))
     labels = np.array(["A", "B", "C"] * 100, dtype=object)
     labels[:30] = None
-    with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\. "):
+    with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\.$"):
         scores = mtb.evaluate(emb, labels=labels, metrics=["ASW"], missing_labels="drop",
                               verbose=False)
     assert (scores.attrs["cells_scored"], scores.attrs["cells_total"]) == (270, 300)
@@ -1535,12 +1536,14 @@ def test_changes_page_missing_values_are_those_of_the_package(tmp_path):
             "as missing, such as the text `NA`.") in changed
     cells = _own_cells()
     cells.obs["celltype"] = [padded, "T", "B"] * 40
-    with pytest.raises(ValueError, match="40 of the 120 labels .* reads as missing: 'NA'"):
+    with pytest.raises(ValueError, match=r"40 of the 120 labels .* \(NaN, None, '' or text such as 'NA'\)"):
         mtb.io.export_dataset(cells, tmp_path / "LABELS", labels="obs:celltype")
     emb = np.random.default_rng(0).normal(size=(120, 4))
-    with pytest.raises(ValueError, match=r"^labels: 40 of the 120 cells have no label\. The "
-                                         r"missing value is written 'NA'\."):
+    with pytest.raises(ValueError) as unlabelled:
         mtb.evaluate(emb, labels=cells.obs["celltype"].to_numpy(), verbose=False)
+    assert str(unlabelled.value) == (
+        "labels: 40 of the 120 cells have no label, for example 'NA'. Pass "
+        'missing_labels="drop" to score the other 80.')
     # as a batch
     assert ("`mtb.io.export_dataset(batch=...)` raises `ValueError` when a cell has no "
             "batch.") in changed
@@ -1549,10 +1552,12 @@ def test_changes_page_missing_values_are_those_of_the_package(tmp_path):
         cells.obs["donor"] = np.array([gap] * 5 + ["A"] * 35 + ["B"] * 40 + ["C"] * 40,
                                       dtype=object)
         with pytest.raises(ValueError, match=r"^batch='obs:donor': 5 of the 120 cells have no "
-                                             r"batch\."):
+                                             r"batch(, for example 'nan')?\. Give every cell "
+                                             r"a batch\.$"):
             mtb.io.export_dataset(cells, tmp_path / "BATCHES", adt="obsm:protein",
                                   batch="obs:donor", category="cross")
-        with pytest.raises(ValueError, match=r"^batch: 5 of the 120 cells have no batch\."):
+        with pytest.raises(ValueError, match=r"^batch: 5 of the 120 cells have no batch(, for example 'nan')?\. "
+                                             r"Give every cell a batch\.$"):
             mtb.evaluate(emb, labels=cells.obs["celltype"].to_numpy(),
                          batch=cells.obs["donor"].to_numpy(), verbose=False)
     assert sorted(p.name for p in tmp_path.iterdir()) == []
@@ -1581,11 +1586,13 @@ def test_changes_page_run_all_on_a_label_file_with_a_missing_label(linux_host, t
     labels.iloc[:12, 0] = float("nan")
     labels.to_csv("data/GAPS/cty.csv", index=False, na_rep="NA")
     linux_host.clear()
-    told = r"^The label files of GAPS have cells without a label: cty\.csv \(12 of 120\)\. "
+    told = "cty.csv of GAPS has 12 of 120 cells without a label, for example 'NA'"
+    fix = ". Write the folder again with a label for every cell."
 
     # run_all stops before it runs a method
-    with pytest.raises(ValueError, match=told):
+    with pytest.raises(ValueError) as stopped:
         mtb.run_all("GAPS", "vertical", methods=["sciPENN"], out_dir="out/A", **kw)
+    assert str(stopped.value) == told + fix
     assert linux_host == [] and not Path("out/A").exists()
     # "With evaluate=False the methods run without scores."
     assert "With `evaluate=False` the methods run without scores." in changed
@@ -1596,22 +1603,22 @@ def test_changes_page_run_all_on_a_label_file_with_a_missing_label(linux_host, t
     (reader,) = re.findall(r"A method that reads the label file as an input, such as (\w+), "
                            r"stops with `evaluate=False` too", changed)
     linux_host.clear()
-    with pytest.raises(ValueError, match=told + rf".*{reader} reads the label file as an input"):
+    with pytest.raises(ValueError) as stopped:
         mtb.run_all("GAPS", "vertical", methods=[reader], out_dir="out/C", evaluate=False, **kw)
+    assert str(stopped.value) == f"{told}, and {reader} reads the label files{fix}"
     assert linux_host == [] and not Path("out/C").exists()
     # the dry run in Python prints the fact and raises nothing
     assert "`mtb.run_all(..., dry_run=True)` prints the same fact and raises nothing." in changed
     capsys.readouterr()
     mtb.run_all("GAPS", "vertical", methods=["sciPENN"], data_path="data", out_dir="out/D",
                 dry_run=True)
-    assert ("[run_all] The label files of GAPS have cells without a label: cty.csv "
-            "(12 of 120).") in capsys.readouterr().out
+    assert f"[run_all] {told}{fix}\n" in capsys.readouterr().out
     # the command line: the exit code of the page, and a dry run that says nothing
     (code,) = re.findall(r"`multibench run-all` exits with `(\d+)`\.", changed)
     argv = ["run-all", "GAPS", "--category", "vertical", "--methods", "sciPENN",
             "--data-path", "data", "--out-dir", "out/E"]
     assert cli.main(argv) == int(code) == 1
-    assert "have cells without a label: cty.csv (12 of 120)." in capsys.readouterr().err
+    assert f"error: {told}{fix}\n" in capsys.readouterr().err
     assert ("`multibench run-all --dry-run` prints nothing about a label file with missing "
             "labels. `mtb.run_all(..., dry_run=True)` prints it, and the run without "
             "`--dry-run` stops.") in unsolved
@@ -1631,7 +1638,8 @@ def test_changes_page_run_all_on_a_label_file_with_a_missing_label(linux_host, t
     again = mtb.load_batch("out/SAVED").rescore()
     (record,) = again.records
     assert record["status"] == failed == "RUN_OK_EVAL_FAILED"
-    assert record["error"].startswith("ValueError: 12 of the 120 labels in cty.csv are missing.")
+    assert record["error"] == ("ValueError: 12 of the 120 labels in cty.csv are missing, for "
+                               "example 'NA'. Give every cell a label, then score again.")
     assert not record.get("metrics")
     assert on_disk.read_bytes() == before
     assert [r["status"] for r in json.loads(before)["records"]] == ["CHAIN_OK"]
@@ -1736,12 +1744,14 @@ def test_changes_page_names_what_an_export_does_not_look_at(tmp_path):
     first = {"adt": "obsm:protein", "labels": "obs:celltype", "batch_index": 1,
              "category": "cross", "overwrite": True}
     held = _folder_bytes(folder)
-    with pytest.raises(FileExistsError, match="adt1.h5 holds other cells than this call "
-                                              "writes. cty1.csv has another number of labels"):
+    with pytest.raises(FileExistsError) as left:
         mtb.io.export_dataset(other, folder, batch_index=1, category="cross", overwrite=True)
-    with pytest.raises(FileExistsError, match="belong to batch 3, and n_batches=2 says that "
-                                              "the data has 2 batches"):
+    assert str(left.value) == (f"{folder} holds adt1.h5 and 1 more file of other data. Export "
+                               f"to a new folder.")
+    with pytest.raises(FileExistsError) as left:
         mtb.io.export_dataset(other, folder, n_batches=2, **first)
+    assert str(left.value) == (f"{folder} holds rna3.h5 and 2 more files of batch 3, above "
+                               f"n_batches=2. Export to a new folder.")
     assert _folder_bytes(folder) == held
     mtb.io.export_dataset(other, folder, **first)
     now = _folder_bytes(folder)
@@ -1761,14 +1771,16 @@ def test_changes_page_names_what_an_export_does_not_look_at(tmp_path):
             assert _barcodes(folder / "rna.h5") == list(cells.obs_names)
             assert (folder / "cty.csv").read_bytes() == labels
         else:
-            with pytest.raises(FileExistsError, match="cty.csv has another number of labels "
-                                                      "than this call has cells"):
+            with pytest.raises(FileExistsError) as left:
                 mtb.io.export_dataset(cells, folder, overwrite=True)
+            assert str(left.value) == (f"{folder} holds cty.csv with another number of labels. "
+                                       f"Export to a new folder.")
             assert _barcodes(folder / "rna.h5") == list(mine.obs_names)
 
     # no cells, and an .h5 whose matrix/data is not the 2-D matrix of a dataset file
     assert "Data with 0 cells raises `ValueError`." in changed
-    with pytest.raises(ValueError, match="^The data holds 0 cells"):
+    with pytest.raises(ValueError, match=r"^The data holds 0 cells, so there is nothing to "
+                                         r"write\. Check the filter that selects the cells\.$"):
         mtb.io.export_dataset(mine[:0].copy(), tmp_path / "EMPTY")
     assert ("`to_canonical` also raises `ValueError` for another `.h5` file whose "
             "`matrix/data` is not 2-D. 0.3.4 returned the path of such a file.") in changed
@@ -1817,12 +1829,13 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
     kind = genes.var["feature_types"]
     rna, atac = quiet(genes[:, kind == "Gene Expression"].copy), genes[:, kind == "Peaks"].copy()
     assert (rna.shape, atac.shape) == ((40, len(GENES)), (40, 0))
-    with pytest.raises(ValueError, match=r"^The atac matrix holds 0 features for 40 cells, so "
-                                         r"there is nothing to write\. "):
+    advice = "For a 10x file, read it with gex_only=False."
+    with pytest.raises(ValueError) as empty:
         quiet(mtb.io.export_dataset, rna, "mydata/EMPTY", atac=atac, atac_kind="peak")
-    with pytest.raises(ValueError, match=r"^The matrix holds 0 features for 40 cells, so "
-                                         r"there is nothing to write\. "):
+    assert str(empty.value) == f"The atac matrix holds 0 features for 40 cells. {advice}"
+    with pytest.raises(ValueError) as empty:
         quiet(mtb.io.to_canonical, atac, "mydata/EMPTY/", modality="atac_peak")
+    assert str(empty.value) == f"The matrix holds 0 features for 40 cells. {advice}"
     assert not Path("mydata").exists()
 
     # a 10x file: read_canonical names it, and the dry run of mtb.run applies
@@ -1831,15 +1844,16 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
                          "`multibench convert` and `mtb.run`.")
     assert ("0.3.4 handed it on or copied it as a dataset file, which it is not. "
             "`mtb.io.read_canonical` names such a file too. The recipe") in entry
-    with pytest.raises(ValueError, match=r"^multiome\.h5 is a 10x Genomics file, not a "
-                                         r"multibench dataset file\. "):
+    with pytest.raises(ValueError) as tenx:
         mtb.io.read_canonical("multiome.h5")
+    assert str(tenx.value) == ('multiome.h5 is a 10x Genomics file. See the recipe '
+                               '"A 10x .h5 file" in the docs.')
     entry = _entry_0_3_5("A matrix whose `var[\"feature_types\"]` holds more than one type "
                          "raises `ValueError`")
     assert ("and the conversion that `mtb.run` does. The dry run of `mtb.run` applies the "
             "check as the run does. 0.3.4 wrote genes and peaks") in entry
     both = quiet(sc.read_10x_h5, "multiome.h5", gex_only=False)
-    with pytest.raises(ValueError, match="^The matrix holds 180 features of 2 types: ") as conv:
+    with pytest.raises(ValueError, match="^The matrix holds features of 2 types, ") as conv:
         quiet(mtb.io.to_canonical, both, "mydata/BOTH/", modality="rna")
     with pytest.raises(ValueError) as dry:
         quiet(mtb.run, "VIMCCA", "vertical", inputs={"rna": both, "atac": both},
@@ -1874,7 +1888,7 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
                 [c.encode() for c in cells.obs_names[:shape[1]]], dtype="S8"))
     kw = {"methods": ["totalVI"], "data_path": "data", "verbose": False}
     for dataset, name, what in (
-            ("TENX", "rna.h5", "is a 10x Genomics file, not a multibench dataset file."),
+            ("TENX", "rna.h5", "is a 10x Genomics file."),
             ("NOFEATURES", "adt.h5", "holds 0 features."),
             ("NOCELLS", "adt.h5", "holds 0 cells.")):
         problem = f"totalVI reads {name} of {dataset}, which {what} "
@@ -1905,9 +1919,10 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
     emb = np.random.default_rng(0).normal(size=(120, 4))
     for dataset, files, told in (
             ("ONESIDE", ["rna_cty.csv"],
-             r"^labels has 60 entries for 120 cells in the embedding\. rna_cty\.csv names "
-             r"the labels of RNA cells\. "),
-            ("NOLABELS", [], r"^labels is an empty dict, so there is nothing to score\. ")):
+             r"^labels has 60 entries for 120 cells in the embedding\. rna_cty\.csv labels "
+             r'the RNA cells only, see the recipe "No labels" in the docs\.$'),
+            ("NOLABELS", [], r"^labels is an empty dict\. Pass the cell types, as "
+                             r"labels=adata\.obs\['celltype'\]\.$")):
         labels = mtb.labels_for(dataset, "diagonal", "SCALEX", data_path="data")
         assert [Path(f).name for f in labels.values()] == files
         with pytest.raises(ValueError, match=told):
@@ -1949,7 +1964,7 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
     with pytest.raises(ValueError, match=r"^labels: 30 of the 300 cells have no label\. "):
         run(call, gaps)
     dropping = call[:-1] + f", {drop})"
-    with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\. "):
+    with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\.$"):
         dropped = run(dropping, gaps)
     assert dropped.equals(run(call, gaps[30:].copy())) and not dropped.equals(plain)
     # a whole batch without labels: the scores are the same wherever its
@@ -1960,19 +1975,19 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
     sides.obs.loc[sides.obs_names[150:], "celltype"] = np.nan
     moved = sides.copy()
     moved.obsm["X_pca"] = sides.obsm["X_pca"] + np.repeat([0.0, 100.0], 150)[:, None]
-    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\. "):
+    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\.$"):
         there = run(dropping, sides)
-    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\. "):
+    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\.$"):
         elsewhere = run(dropping, moved)
     assert there.equals(elsewhere) and there["Value"].notna().all()
-    with pytest.warns(UserWarning, match=r" The labelled cells are all in one batch, so no "
-                                         r"score changes with where the cells of the other "
-                                         r"batches are placed"):
+    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300, all in one "
+                                         r"batch of 2\.$"):
         run(dropping[:-1] + ', batch="side")', sides)
     # a missing batch
     donors = adata.copy()
     donors.obs["donor"] = np.array([np.nan] * 7 + ["A"] * 143 + ["B"] * 150, dtype=object)
-    with pytest.raises(ValueError, match=r"^batch: 7 of the 300 cells have no batch\. "):
+    with pytest.raises(ValueError, match=r"^batch: 7 of the 300 cells have no batch\. Give "
+                                         r"every cell a batch\.$"):
         run(call[:-1] + ', batch="donor")', donors)
     # scored_with: three parts, and a fourth after cells were left out
     assert ("`mtb.to_long` keeps the first three in its `scored_with` column, such as "

@@ -179,42 +179,11 @@ def missing_mask(values) -> np.ndarray:
     return null | (text == "").to_numpy() | text.isin(words).to_numpy()
 
 
-def _missing_shown(words: list) -> list:
-    """At most three of the missing words, quoted, then ``N more``."""
-    return [repr(w) for w in words[:3]] + (
-        [f"{len(words) - 3} more"] if len(words) > 3 else [])
-
-
-def _and(items: list) -> str:
-    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
-
-
-def _missing_seen(values) -> str:
-    """How the missing entries of ``values`` are written, as a sentence:
-    ``The missing values are written NaN and 'NA'.`` NaN stands for a value
-    pandas holds as missing and ``''`` for blank text. ``""`` when nothing
-    is missing."""
-    null, text = _null_and_text(values)
-    seen = (["NaN"] if null.any() else []) \
-        + (["''"] if ((text == "").to_numpy() & ~null).any() else []) \
-        + _missing_shown(missing_words(values))
-    if len(seen) < 2:
-        return f"The missing value is written {seen[0]}." if seen else ""
-    return f"The missing values are written {_and(seen)}."
-
-
-def _missing_rename(values) -> str:
-    """The sentence (with its leading space) for missing words that may be
-    cell types: a label file cannot hold them, so they need another name.
-    ``""`` when ``values`` holds no such word."""
+def _missing_example(values) -> str:
+    """``, for example 'NA'``: one text among ``values`` that a label file
+    reads as missing; ``""`` when the missing entries are NaN or blank."""
     words = missing_words(values)
-    if not words:
-        return ""
-    if len(words) == 1:
-        return (f" A label file reads {words[0]!r} as a missing value. If it is the "
-                f"name of a cell type, rename it.")
-    return (f" A label file reads {_and(_missing_shown(words))} as missing values. If "
-            f"one of them is the name of a cell type, rename it.")
+    return f", for example {words[0]!r}" if words else ""
 
 
 def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
@@ -224,7 +193,7 @@ def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
 
     An empty field stays NaN: it is how a CSV writes a missing value. The
     result is for the sentences that say how a missing value is written
-    (:func:`_missing_seen`, :func:`_missing_rename`); no score is computed
+    (:func:`_missing_example`); no score is computed
     from it.
     """
     vals, null = col.to_numpy(), col.isna().to_numpy()
@@ -518,8 +487,7 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
         if drop:
             from .. import config
             how = config.hint('missing_labels="drop"', "--missing-labels drop")
-            mark = (f" A cell without a label needs a row too, with an empty label; "
-                    f"{how} then leaves it out.")
+            mark = f" A row with an empty label and {how} leaves a cell out."
         raise ValueError(
             f"{what}: {name} has no row for {len(missing):,} of the {len(ids):,} "
             f"cells of {target} (first: {_first(missing, 3)}). Give a row for every "
@@ -752,9 +720,8 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
                     "(evaluate expects cells x dims), or indexed differently?")
         elif what == "labels" and not len(extra):
             # every id is a cell of the output, and some cells have none
-            hint = (" For cells without a label, pass labels.reindex(ids), where ids "
-                    "are the cell ids of the output (adata.obs_names for an AnnData), "
-                    'with missing_labels="drop".')
+            hint = (" For cells without a label, pass labels.reindex(adata.obs_names) "
+                    'and missing_labels="drop".')
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the output's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}) "
@@ -769,10 +736,8 @@ def _by_position(what: str, n: int, order: str) -> str:
     ``RangeIndex``) while the cells have barcodes: it is matched by
     position. ``order`` names the order its ``n`` values must follow.
     ``export_dataset``, ``evaluate`` and ``run_all`` say it with this."""
-    return (f"{what} is a Series whose index is the row numbers 0 to {n - 1}, not the "
-            f"cell barcodes, so it is matched to the cells by position. Check that its "
-            f"values follow {order}. To match by barcode, pass a Series indexed by "
-            f'barcode, such as adata.obs["donor"].')
+    return (f"{what} is a Series without barcodes and is matched to the cells by position. "
+            f'To match by barcode, pass adata.obs["donor"].')
 
 
 def _numbers_rows(x, ids) -> bool:

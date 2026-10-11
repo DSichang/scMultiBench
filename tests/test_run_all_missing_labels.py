@@ -25,8 +25,6 @@ from multibench.engine import envs, registry
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 N = 120
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
-RENAME = (" A label file reads 'NA' as a missing value. If it is the name of a cell type, "
-          "rename it.")
 
 
 def _quiet(fn, *a, **kw):
@@ -111,24 +109,26 @@ def _refused(data, tmp_path, methods, **kw):
     return str(e.value)
 
 
-HEAD = ("The label files of MYCITE have cells without a label: cty.csv (9 of 120). The "
-        "missing values are written NaN and 'NA'. ")
-M1 = (HEAD + "A missing label is not a cell type, so run_all stops before it runs a "
-      "method. Write the folder again with a label for every cell")
+HEAD = "cty.csv of MYCITE has 9 of 120 cells without a label, for example 'NA'"
+FIX = ". Write the folder again with a label for every cell."
+#: the whole message of a run that scores; it is the same for every method
+M1 = HEAD + FIX
+#: evaluate=False was passed: the message names a method that reads the label files
+M1_MATILDA = HEAD + ", and Matilda reads the label files" + FIX
 
 
 # ------------------------------------------------------------------ a real run
 def test_run_all_stops_before_any_method(cite, tmp_path, host):
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     before = {p.name: p.read_bytes() for p in (cite / "MYCITE").iterdir()}
-    assert _refused(cite, tmp_path, ["totalVI"]) == (
-        M1 + ", or pass evaluate=False to run the methods without scores." + RENAME)
+    assert _refused(cite, tmp_path, ["totalVI"]) == M1
     assert host == [] and not (tmp_path / "out").exists()
     assert {p.name: p.read_bytes() for p in (cite / "MYCITE").iterdir()} == before
     # every method of the category: the same stop
-    with pytest.raises(ValueError, match="have cells without a label: cty.csv"):
+    with pytest.raises(ValueError) as e:
         _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", data_path=cite,
                verbose=False)
+    assert str(e.value) == M1
     assert host == [] and not (tmp_path / "out").exists()
 
 
@@ -139,23 +139,24 @@ def test_complete_labels_run_as_before(cite, tmp_path, host):
     assert all(r["metrics"]["ARI"] > 0.9 for r in res.records)
 
 
-#: (the label of one cell, how the message says it is written, the rename sentence)
+#: (the label of one cell, the example the message gives of it): a text that
+#: reads as missing is named, NaN and a blank are not
 FORMS = [
-    (np.nan, "The missing value is written NaN.", ""),
-    ("", "The missing value is written NaN.", ""),          # an empty field of the file
-    ("NA", "The missing value is written 'NA'.", RENAME),
-    ("NA ", "The missing value is written 'NA'.", RENAME),
-    ("None", "The missing value is written 'None'.", RENAME.replace("'NA'", "'None'")),
-    ("nan", "The missing value is written 'nan'.", RENAME.replace("'NA'", "'nan'")),
+    (np.nan, ""),
+    ("", ""),                                               # an empty field of the file
+    ("NA", ", for example 'NA'"),
+    ("NA ", ", for example 'NA'"),
+    ("None", ", for example 'None'"),
+    ("nan", ", for example 'nan'"),
 ]
 
 
-@pytest.mark.parametrize("gap,seen,rename,with_ids", [
+@pytest.mark.parametrize("gap,example,with_ids", [
     *[(*form, False) for form in FORMS], *[(*form, True) for form in FORMS],
     # blank text: a file of barcodes and labels keeps it (see the next test)
-    (" ", "The missing value is written ''.", "", True)])
-def test_every_form_of_a_missing_label_stops_the_run(cite, tmp_path, host, gap, seen,
-                                                     rename, with_ids):
+    (" ", "", True)])
+def test_every_form_of_a_missing_label_stops_the_run(cite, tmp_path, host, gap, example,
+                                                     with_ids):
     lab = LABELS.copy()
     lab[5] = gap
     if with_ids:                # the obs-style export: barcodes, then the labels
@@ -164,10 +165,8 @@ def test_every_form_of_a_missing_label_stops_the_run(cite, tmp_path, host, gap, 
     else:
         _write(cite / "MYCITE" / "cty.csv", lab)
     assert _refused(cite, tmp_path, ["totalVI"]) == (
-        f"The label files of MYCITE have cells without a label: cty.csv (1 of 120). {seen} "
-        "A missing label is not a cell type, so run_all stops before it runs a method. "
-        "Write the folder again with a label for every cell, or pass evaluate=False to "
-        f"run the methods without scores.{rename}")
+        f"cty.csv of MYCITE has 1 of 120 cells without a label{example}. Write the "
+        "folder again with a label for every cell.")
     assert host == []
 
 
@@ -192,13 +191,13 @@ def test_labels_that_are_not_missing_run(cite, tmp_path, host):
 
 
 def test_the_way_out_follows_the_methods(cite, tmp_path, host):
+    """A run that scores prints one way out, the same whatever the methods:
+    write the folder again. It names neither evaluate=False nor a method."""
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     # Matilda reads cty.csv as an input; sciPENN and totalVI do not
-    assert _refused(cite, tmp_path, ["Matilda", "sciPENN"]) == (
-        M1 + ". Matilda reads the label file as an input, so evaluate=False does not help "
-        "for it." + RENAME)
-    assert _refused(cite, tmp_path, ["totalVI", "sciPENN"]) == (
-        M1 + ", or pass evaluate=False to run the methods without scores." + RENAME)
+    assert _refused(cite, tmp_path, ["Matilda", "sciPENN"]) == M1
+    assert _refused(cite, tmp_path, ["totalVI", "sciPENN"]) == M1
+    assert "evaluate=False" not in M1 and "Matilda" not in M1
     assert host == []
     plan, private = W._scan("MYCITE", "vertical", methods=["Matilda", "sciPENN"],
                             data_path=cite, verbose=False)
@@ -213,13 +212,9 @@ def test_two_methods_that_read_the_label_file(cite, tmp_path, host):
     _h5(d / "atac.h5", PEAKS, [f"c{i}" for i in range(N)])
     _write(d / "cty.csv", _with_gaps())
     methods = ["Matilda", "UnitedNet", "totalVI"]
-    assert _refused(cite, tmp_path, methods) == (
-        M1 + ". Matilda and UnitedNet read the label file as an input, so evaluate=False "
-        "does not help for them." + RENAME)
+    assert _refused(cite, tmp_path, methods) == M1
     assert _refused(cite, tmp_path, methods, evaluate=False) == (
-        HEAD + "Matilda and UnitedNet read the label file as an input, and a missing "
-        "label is not a cell type, so run_all stops before it runs a method. Write the "
-        "folder again with a label for every cell, or run without these methods." + RENAME)
+        HEAD + ", and Matilda and 1 more method read the label files" + FIX)
     assert host == [] and not (tmp_path / "out").exists()
 
 
@@ -227,25 +222,18 @@ def test_the_command_line_names_its_flags(cite, tmp_path, host, capsys, monkeypa
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     base = ["run-all", "MYCITE", "--category", "vertical", "--data-path", str(cite),
             "--out-dir", str(tmp_path / "out")]
-    head = "error: " + HEAD
+    # the message names no flag and no function now: it reads the same as in Python
     rc = _quiet(cli.main, base + ["--methods", "totalVI"])
     err = capsys.readouterr().err
-    assert rc == 1 and err.splitlines()[0] == (
-        head + "A missing label is not a cell type, so run-all stops before it runs a "
-        "method. Write the folder again with a label for every cell, or pass "
-        "--no-evaluate to run the methods without scores." + RENAME)
+    assert rc == 1 and err.splitlines()[0] == "error: " + M1
+    assert "evaluate" not in err and "run_all" not in err
     rc = _quiet(cli.main, base + ["--methods", "Matilda,totalVI"])
     err = capsys.readouterr().err
-    assert rc == 1 and err.splitlines()[0] == (
-        head + "A missing label is not a cell type, so run-all stops before it runs a "
-        "method. Write the folder again with a label for every cell. Matilda reads the "
-        "label file as an input, so --no-evaluate does not help for it." + RENAME)
+    assert rc == 1 and err.splitlines()[0] == "error: " + M1
+    assert "evaluate" not in err and "run_all" not in err
     rc = _quiet(cli.main, base + ["--methods", "Matilda,totalVI", "--no-evaluate"])
     err = capsys.readouterr().err
-    assert rc == 1 and err.splitlines()[0] == (
-        head + "Matilda reads the label file as an input, and a missing label is not a "
-        "cell type, so run-all stops before it runs a method. Write the folder again with "
-        "a label for every cell, or run without this method." + RENAME)
+    assert rc == 1 and err.splitlines()[0] == "error: " + M1_MATILDA
     assert "evaluate=False" not in err and "run_all" not in err
     assert host == [] and not (tmp_path / "out").exists()
     # without the method that reads the file, --no-evaluate runs
@@ -259,22 +247,13 @@ def test_dry_run_prints_the_same_fact(cite, tmp_path, host, capsys):
     kw = dict(data_path=cite, dry_run=True)
     plan = mtb.run_all("MYCITE", "vertical", methods=["Matilda", "sciPENN"], **kw)
     out = capsys.readouterr().out.splitlines()
-    stops = "A missing label is not a cell type, so a real run stops before it runs a method."
-    assert out[-1] == (
-        "[run_all] " + HEAD + stops + " Write the folder again with a label for every "
-        "cell. Matilda reads the label file as an input, so evaluate=False does not help "
-        "for it." + RENAME)
+    assert out[-1] == "[run_all] " + M1
     assert len(plan) == 2 and plan["runnable"].all() and host == []
     mtb.run_all("MYCITE", "vertical", methods=["totalVI"], **kw)
-    assert capsys.readouterr().out.splitlines()[-1] == (
-        "[run_all] " + HEAD + stops + " Write the folder again with a label for every "
-        "cell, or pass evaluate=False to run the methods without scores." + RENAME)
+    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1
     # evaluate=False: only a method that reads the file stops the run
     mtb.run_all("MYCITE", "vertical", methods=["Matilda", "sciPENN"], evaluate=False, **kw)
-    assert capsys.readouterr().out.splitlines()[-1] == (
-        "[run_all] " + HEAD + "Matilda reads the label file as an input, and a missing "
-        "label is not a cell type, so a real run stops before it runs a method. Write the "
-        "folder again with a label for every cell, or run without this method." + RENAME)
+    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1_MATILDA
     mtb.run_all("MYCITE", "vertical", methods=["totalVI"], evaluate=False, **kw)
     assert "without a label" not in capsys.readouterr().out
     # verbose=False prints nothing, and nothing is raised
@@ -299,9 +278,12 @@ def test_a_dry_run_off_linux_names_the_method_that_would_read_the_file(
     plan = mtb.run_all("MYCITE", "vertical", methods=["Matilda", "totalVI"], data_path=cite,
                        dry_run=True)
     assert not plan["runnable"].any()
-    assert capsys.readouterr().out.splitlines()[-1].endswith(
-        " Matilda reads the label file as an input, so evaluate=False does not help for "
-        "it." + RENAME)
+    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1
+    # the method is named when the run does not score
+    plan = mtb.run_all("MYCITE", "vertical", methods=["Matilda", "totalVI"], data_path=cite,
+                       dry_run=True, evaluate=False)
+    assert not plan["runnable"].any()
+    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1_MATILDA
 
 
 # ------------------------------------------------------------------ evaluate=False
@@ -315,10 +297,7 @@ def test_evaluate_false_runs_methods_that_do_not_read_labels(cite, tmp_path, hos
 
 def test_evaluate_false_stops_methods_that_read_labels(cite, tmp_path, host):
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
-    assert _refused(cite, tmp_path, ["Matilda", "sciPENN"], evaluate=False) == (
-        HEAD + "Matilda reads the label file as an input, and a missing label is not a "
-        "cell type, so run_all stops before it runs a method. Write the folder again with "
-        "a label for every cell, or run without this method." + RENAME)
+    assert _refused(cite, tmp_path, ["Matilda", "sciPENN"], evaluate=False) == M1_MATILDA
     assert host == [] and not (tmp_path / "out").exists()
 
 
@@ -338,11 +317,9 @@ def test_a_method_that_is_fed_the_folder_reads_its_label_files(tmp_path, host):
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run_all, "UNPAIRED", "diagonal", tmp_path / "out", evaluate=False, **kw)
     assert str(e.value) == (
-        "The label files of UNPAIRED have cells without a label: rna_cty.csv (3 of 60). "
-        "The missing value is written 'NA'. scBridge reads the label file as an input, and "
-        "a missing label is not a cell type, so run_all stops before it runs a method. "
-        "Write the folder again with a label for every cell, or run without this method."
-        + RENAME)
+        "rna_cty.csv of UNPAIRED has 3 of 60 cells without a label, for example 'NA', "
+        "and scBridge reads the label files. Write the folder again with a label for "
+        "every cell.")
     assert host == []
 
 
@@ -362,17 +339,15 @@ def test_only_the_files_a_method_reads_stop_a_run_without_scores(tmp_path, host)
     assert [r["status"] for r in res.records] == ["RUN_OK"]
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
-    assert str(e.value).startswith(
-        "The label files of DONORS have cells without a label: cty2.csv (3 of 40). The "
-        "missing value is written 'NA'. A missing label is not a cell type, so run_all "
-        "stops before it runs a method.")
+    assert str(e.value) == (
+        "cty2.csv of DONORS has 3 of 40 cells without a label, for example 'NA'. Write "
+        "the folder again with a label for every cell.")
     assert not (tmp_path / "out2").exists()
 
 
 # ------------------------------------------------------------------ rescore
-M2 = ("ValueError: 9 of the 120 labels in {files} are missing. The missing values are "
-      "written NaN and 'NA'. A missing label is not a cell type, so the embedding is not "
-      "scored. Give every cell a label, then score again.")
+M2 = ("ValueError: 9 of the 120 labels in {files} are missing, for example 'NA'. Give "
+      "every cell a label, then score again.")
 
 
 def test_rescore_records_the_error(cite, tmp_path, host, monkeypatch):
@@ -418,17 +393,16 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
     (rec,) = res.rescore().records
     assert rec["status"] == "RUN_OK_EVAL_FAILED" and ranked == []
     assert rec["error"] == (
-        "ValueError: 2 of the 120 labels in cty1.csv, cty2.csv and cty3.csv are missing. "
-        "The missing value is written 'None'. A missing label is not a cell type, so the "
-        "embedding is not scored. Give every cell a label, then score again.")
+        "ValueError: 2 of the 120 labels in cty1.csv, cty2.csv and cty3.csv are missing, "
+        "for example 'None'. Give every cell a label, then score again.")
     assert "label_order_candidates" not in rec and "metrics" not in rec
     # a real run on this folder stops before the method
     host.clear()
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
-    assert str(e.value).startswith("The label files of DONORS have cells without a label: "
-                                   "cty2.csv (2 of 40). The missing value is written "
-                                   "'None'. ")
+    assert str(e.value) == ("cty2.csv of DONORS has 2 of 40 cells without a label, for "
+                            "example 'None'. Write the folder again with a label for "
+                            "every cell.")
     assert host == []
 
 
@@ -441,7 +415,7 @@ def test_labels_passed_to_rescore(cite, tmp_path, host):
         (rec,) = res.rescore(labels=labels).records
         assert (rec["status"], rec["error"]) == ("RUN_OK_EVAL_FAILED", passed)
         assert "metrics" not in rec
-    # a file: its words are named
+    # a file: the same record
     sheet = tmp_path / "labels.csv"
     pd.DataFrame({"celltype": gaps}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
     (rec,) = res.rescore(labels=sheet).records
@@ -459,9 +433,8 @@ def test_labels_passed_to_rescore(cite, tmp_path, host):
 def test_the_error_of_a_record_counts_with_separators(tmp_path, host):
     cands = [(["cty.csv"], np.array(["A"] * 1200 + [None] * 1300, dtype=object), None)]
     assert W._unlabelled_error(cands, "X", tmp_path, user=True) == (
-        "ValueError: 1,300 of the 2,500 labels in the labels you passed are missing. The "
-        "missing value is written NaN. A missing label is not a cell type, so the "
-        "embedding is not scored. Give every cell a label, then score again.")
+        "ValueError: 1,300 of the 2,500 labels in the labels you passed are missing. "
+        "Give every cell a label, then score again.")
     assert W._unlabelled_error([(["cty.csv"], np.array(["A", "B"]), None)], "X", tmp_path,
                                user=True) is None
 

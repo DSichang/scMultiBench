@@ -29,22 +29,18 @@ METRICS = ["ASW", "ASW_batch", "GC"]
 #: multibench-sc 0.3.4 scored them
 SCORES_034 = {"ASW": 0.7603380351178893, "ASW_batch": 0.9207041314771548, "GC": 1.0}
 
-NAN = "The missing value is written NaN."
-
-
-def _bv1(src="", seen=NAN, n=30, total=N):
-    return (f"batch{src}: {n} of the {total} cells have no batch. {seen} A missing "
-            f"batch is not a batch, so the batch metrics are not computed on it. Give "
-            f"every cell a batch, or leave these cells out.")
+def _bv1(src="", example="", n=30, total=N):
+    return (f"batch{src}: {n} of the {total} cells have no batch{example}. Give every "
+            f"cell a batch.")
 
 
 @pytest.mark.parametrize("fill, seen", [
-    (np.nan, NAN),
-    (None, NAN),
-    (pd.NA, NAN),
-    ("", "The missing value is written ''."),
-    ("nan", "The missing value is written 'nan'."),
-    ("NA", "The missing value is written 'NA'."),
+    (np.nan, ""),
+    (None, ""),
+    (pd.NA, ""),
+    ("", ""),
+    ("nan", ", for example 'nan'"),
+    ("NA", ", for example 'NA'"),
 ], ids=repr)
 def test_evaluate_raises_on_a_missing_batch(fill, seen, tmp_path):
     emb, lab = _cells()
@@ -53,8 +49,9 @@ def test_evaluate_raises_on_a_missing_batch(fill, seen, tmp_path):
     path = tmp_path / "batch.csv"
     pd.DataFrame({"x": bat}).to_csv(path, index=False)
     # a file holds NaN, None and '' as an empty field, which the reader gives
-    # as NaN; a word that it reads as NaN is named as the file writes it
-    in_file = seen if isinstance(fill, str) and fill else NAN
+    # as NaN and the message does not name; a word that it reads as NaN is
+    # named as the file writes it
+    in_file = seen if isinstance(fill, str) and fill else ""
     forms = {"array": (emb, bat, "", seen), "list": (emb, list(bat), "", seen),
              "Series": (emb, pd.Series(bat), "", seen),
              "obs column": (a, "donor", "", seen), "obs: column": (a, "obs:donor", "", seen),
@@ -73,9 +70,7 @@ def test_evaluate_raises_on_a_missing_batch_whole_message():
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=lab, batch=donors, metrics=["ASW_batch"])
     assert str(e.value) == (
-        "batch: 30 of the 300 cells have no batch. The missing value is written NaN. "
-        "A missing batch is not a batch, so the batch metrics are not computed on it. "
-        "Give every cell a batch, or leave these cells out.")
+        "batch: 30 of the 300 cells have no batch. Give every cell a batch.")
     # a batch that no metric of the call reads is checked all the same
     with pytest.warns(UserWarning, match="batch= changes nothing here"):
         with pytest.raises(ValueError) as e:
@@ -103,22 +98,20 @@ def test_a_batch_file_names_the_word_it_holds(tmp_path):
         frac=1.0, random_state=2).to_csv(sheet)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(_adata(emb), labels=lab, batch=sheet, metrics=["ASW_batch"])
-    assert str(e.value) == _bv1(" (sheet.csv)", "The missing value is written 'None'.")
+    assert str(e.value) == _bv1(" (sheet.csv)", ", for example 'None'")
     halves = [tmp_path / "b1.csv", tmp_path / "b2.csv"]
     for path, part in zip(halves, (_gaps(_donors(), "NA")[:150], _gaps(_donors())[150:])):
         pd.DataFrame({"x": part}).to_csv(path, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=lab, batch=[str(p) for p in halves], metrics=["ASW_batch"])
-    assert str(e.value) == _bv1(" (b1.csv, b2.csv)",
-                                "The missing values are written NaN and 'NA'.")
+    assert str(e.value) == _bv1(" (b1.csv, b2.csv)", ", for example 'NA'")
     # a dict of one file, the last of the forms that name a file
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb[:150], labels=lab[:150], batch={"batch": halves[0]},
                      metrics=["ASW_batch"])
     assert str(e.value) == (
-        "batch (b1.csv): 15 of the 150 cells have no batch. The missing value is "
-        "written 'NA'. A missing batch is not a batch, so the batch metrics are not "
-        "computed on it. Give every cell a batch, or leave these cells out.")
+        "batch (b1.csv): 15 of the 150 cells have no batch, for example 'NA'. Give "
+        "every cell a batch.")
 
 
 def test_the_copy_of_a_batch_column_keeps_the_words_of_the_sheet(tmp_path, monkeypatch):
@@ -140,7 +133,7 @@ def test_the_copy_of_a_batch_column_keeps_the_words_of_the_sheet(tmp_path, monke
         assert first.tolist() == [f"cell{i}" for i in range(N)]
         with pytest.raises(ValueError) as e:
             mtb.evaluate(_adata(emb), labels=lab, batch=copy, metrics=["ASW_batch"])
-    assert str(e.value) == "--" + _bv1(" (sheet.csv)", "The missing value is written 'None'.")
+    assert str(e.value) == "--" + _bv1(" (sheet.csv)", ", for example 'None'")
 
 
 def test_a_complete_batch_changes_nothing(tmp_path):
@@ -179,8 +172,7 @@ def test_drop_checks_the_batch_of_the_cells_it_keeps():
     # the cells without a label are the cells without a batch: nothing is left to refuse
     got, said = _drop(emb, labels=nan, batch=_gaps(bat), **kw)
     _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], batch=bat[KEEP], **kw))
-    assert said == ["Scored the 270 labelled cells of 300. 30 cells have no label and "
-                    "were left out, so the scores describe the labelled cells only."]
+    assert said == ["Scored the 270 labelled cells of 300."]
     # without the flag the labels stop the call first
     with pytest.raises(ValueError, match=r"^labels: 30 of the 300 cells have no label\."):
         mtb.evaluate(emb, labels=nan, batch=_gaps(bat), **kw)
@@ -212,8 +204,7 @@ def test_drop_names_the_words_of_the_cells_it_keeps(tmp_path):
     pd.DataFrame({"x": bat}).to_csv(path, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, missing_labels="drop", **kw)
-    assert str(e.value) == _bv1(" (batch.csv)", "The missing value is written 'None'.",
-                                n=4, total=270)
+    assert str(e.value) == _bv1(" (batch.csv)", ", for example 'None'", n=4, total=270)
 
 
 def test_the_file_of_origin_is_not_checked(tmp_path, monkeypatch):

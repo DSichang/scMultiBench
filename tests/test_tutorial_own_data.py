@@ -541,10 +541,8 @@ def test_a_file_name_left_unchanged_is_visible(key, changed, cells, linux, tmp_p
 
 
 @pytest.mark.parametrize("key,files", [
-    ("diagonal_multi", "rna3.h5, atac_gas3.h5, rna_cty3.csv and atac_cty3.csv belong to batch 3, "
-                       "and n_batches=2 says that the data has 2 batches."),
-    ("cross_rna_adt", "rna3.h5, adt3.h5 and cty3.csv belong to batch 3, and this call writes "
-                      "batches 1-2."),
+    ("diagonal_multi", "rna3.h5 and 3 more files of batch 3, above n_batches=2."),
+    ("cross_rna_adt", "rna3.h5 and 2 more files of batch 3."),
 ])
 def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, monkeypatch):
     """A reader with two batches leaves ``NAME`` as it is. The folder holds
@@ -573,11 +571,7 @@ def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, m
         ns["adata"] = ns["adata"][ns["adata"].obs["batch"].astype(str) != "3"].copy()
     with pytest.raises(FileExistsError) as e:
         _run_cell(export, ns)
-    assert str(e.value) == (
-        f"{folder} holds files of other data that this call does not write. {files} A method "
-        f"would read them as part of this dataset. Export to a new folder, and use that "
-        f"folder name in scan and run_all too. To keep this folder, delete these files and "
-        f"run the export again.")
+    assert str(e.value) == f"{folder} holds {files} Export to a new folder."
     assert _bytes(folder) == before
     _run_cell(_renamed(export, key, "MINE"), ns)
     assert not [p.name for p in (Path("mydata") / "MINE").iterdir() if "3" in p.name]

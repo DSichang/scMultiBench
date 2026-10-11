@@ -196,24 +196,22 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=some, **kw)
     assert str(exc.value) == series.format("labels") + (
-        " For cells without a label, pass labels.reindex(ids), where ids are the cell "
-        "ids of the output (adata.obs_names for an AnnData), with "
+        " For cells without a label, pass labels.reindex(adata.obs_names) and "
         "missing_labels=\"drop\".")
     file = ("{}: some.csv has no row for 30 of the 90 cells of the output (first: "
             "['cell60', 'cell61', 'cell62']). Give a row for every cell.")
-    row = " A cell without a label needs a row too, with an empty label; "
+    row = " A row with an empty label and {} leaves a cell out."
     some.rename("x").to_frame().to_csv(tmp_path / "some.csv")
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=str(tmp_path / "some.csv"), **kw)
-    assert str(exc.value) == (file.format("labels") + row
-                              + "missing_labels=\"drop\" then leaves it out.")
+    assert str(exc.value) == file.format("labels") + row.format('missing_labels="drop"')
     # the command line names its own flag
     a.write_h5ad(tmp_path / "emb.h5ad")
     assert cli.main(["evaluate", "--output", str(tmp_path / "emb.h5ad"), "--labels",
                      str(tmp_path / "some.csv"), "--metrics", "ASW",
                      "--missing-labels", "drop"]) == 1
-    assert ("error: " + file.format("labels") + row
-            + "--missing-labels drop then leaves it out.\n") in capsys.readouterr().err
+    assert ("error: " + file.format("labels") + row.format("--missing-labels drop")
+            + "\n") in capsys.readouterr().err
     # both ways out score the 60 labelled cells, also for a DataFrame output
     some.reindex(ids).rename("x").to_frame().to_csv(tmp_path / "every.csv")
     frame = pd.DataFrame(emb, index=ids)

@@ -123,25 +123,19 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels="celltype", metrics=["ASW"])
     assert str(e.value) == (
-        "labels='celltype' is not a file, and the output is an array without obs "
-        "columns, so there is no column to look up. Pass the values themselves, for "
-        "example labels=adata.obs['celltype'], or pass the AnnData as the output with "
-        "obsm=.")
+        "labels='celltype' is not a file, and the output has no obs. Pass the values, as "
+        "labels=adata.obs['celltype'].")
     # the example names the column without its prefix
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels=lab, batch="obs:donor", metrics=METRICS)
     assert str(e.value) == (
-        "batch='obs:donor' is not a file, and the output is an array without obs "
-        "columns, so there is no column to look up. Pass the values themselves, for "
-        "example batch=adata.obs['donor'], or pass the AnnData as the output with "
-        "obsm=.")
+        "batch='obs:donor' is not a file, and the output has no obs. Pass the values, as "
+        "batch=adata.obs['donor'].")
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels=lab, clustering="obs:leiden", metrics=["ARI"])
     assert str(e.value) == (
-        "clustering='obs:leiden' is not a file, and the output is an array without "
-        "obs columns, so there is no column to look up. Pass the values themselves, "
-        "for example clustering=adata.obs['leiden'], or pass the AnnData as the output "
-        "with obsm=.")
+        "clustering='obs:leiden' is not a file, and the output has no obs. Pass the "
+        "values, as clustering=adata.obs['leiden'].")
     # a name that reads as a file keeps the text of a missing file
     cwd = Path.cwd()
     with pytest.raises(FileNotFoundError) as e:

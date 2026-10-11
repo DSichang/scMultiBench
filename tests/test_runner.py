@@ -211,17 +211,11 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
     for name, obj in (("unsplit", y), ("rna", rna), ("atac", atac)):
         files[name] = str(tmp_path / f"{name}.h5ad")
         obj.write_h5ad(files[name])
-    head = ("The matrix holds 120 features of 2 types: 70 'Peaks' and 50 'Gene Expression' "
-            "(var['feature_types']). One file holds one modality. Pass the features of one "
-            "type, ")
-    use = ", or use mtb.io.export_dataset, whose selectors take a filter such as "
-    texts = {
-        "rna": head + "for example adata[:, adata.var['feature_types'] == 'Gene Expression']"
-        + use + "'X[feature_types=Gene Expression]'.",
-        "atac": head + "for example adata[:, adata.var['feature_types'] == 'Peaks']"
-        + use + "'X[feature_types=Peaks]'.",
-        "atac_gas": head + "as adata[:, adata.var['feature_types'] == '<type>']"
-        + use + "'X[feature_types=<type>]'."}
+    head = ("The matrix holds features of 2 types, 'Peaks' and 'Gene Expression'. Pass one "
+            "type, as adata[:, adata.var['feature_types'] == ")
+    texts = {"rna": head + "'Gene Expression'].",
+             "atac": head + "'Peaks'].",
+             "atac_gas": head + "'<type>']."}
 
     out = tmp_path / "out"
     (tmp_path / "repo" / "tools_scripts").mkdir(parents=True)

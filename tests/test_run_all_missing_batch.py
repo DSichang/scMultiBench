@@ -84,18 +84,17 @@ def _donor(gap=None, n_gaps=5):
     return s
 
 
-def _bv2(n, seen, head="batch"):
-    return (f"{head}: {n} of the 120 cells of MYCITE have no batch. {seen} A missing batch "
-            "is not a batch, so the batch metrics are not computed on it. Give every cell "
-            "a batch, or write the dataset folder without these cells.")
+def _bv2(n, example, head="batch"):
+    return (f"{head}: {n} of the 120 cells of MYCITE have no batch{example}. Give every "
+            "cell a batch.")
 
 
-NAN = "The missing value is written NaN."
-FORMS = [(np.nan, NAN), (None, NAN), (pd.NA, NAN), ("", "The missing value is written ''."),
-         (" ", "The missing value is written ''."),
-         ("nan", "The missing value is written 'nan'."),
-         ("NA", "The missing value is written 'NA'."),
-         ("None", "The missing value is written 'None'.")]
+#: NaN and a blank are not named; a text that reads as missing is the example
+NAN = ""
+FORMS = [(np.nan, NAN), (None, NAN), (pd.NA, NAN), ("", ""), (" ", ""),
+         ("nan", ", for example 'nan'"),
+         ("NA", ", for example 'NA'"),
+         ("None", ", for example 'None'")]
 
 
 @pytest.mark.parametrize("gap,seen", FORMS, ids=[repr(g) for g, _ in FORMS])
@@ -133,7 +132,7 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     for batch in (sheet, str(sheet)):
         with pytest.raises(ValueError) as e:
             mtb.run_all("MYCITE", "vertical", batch=batch, **kw)
-        assert str(e.value) == _bv2(5, "The missing value is written 'NA'.")
+        assert str(e.value) == _bv2(5, ", for example 'NA'")
     _donor(np.nan).to_frame().to_csv(sheet)               # empty fields
     with pytest.raises(ValueError) as e:
         mtb.run_all("MYCITE", "vertical", batch=sheet, **kw)
@@ -141,7 +140,7 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     pd.DataFrame({"x": _donor("None", 2).to_numpy()}).to_csv(sheet, index=False)
     with pytest.raises(ValueError) as e:
         mtb.run_all("MYCITE", "vertical", batch=sheet, **kw)
-    assert str(e.value) == _bv2(2, "The missing value is written 'None'.")
+    assert str(e.value) == _bv2(2, ", for example 'None'")
     assert calls == []
 
 
@@ -155,7 +154,7 @@ def test_the_command_line_names_its_flag(cite, tmp_path, capsys):
         rc = _quiet(cli.main, base + extra)
         err = capsys.readouterr().err
         assert rc == 1 and err.splitlines()[-2] == "error: " + _bv2(
-            3, "The missing value is written 'NA'.", head="--batch")
+            3, ", for example 'NA'", head="--batch")
     assert calls == [] and not (tmp_path / "out").exists()
     # one column of a sheet with several
     wide = pd.DataFrame({"celltype": ["A"] * N, "donor": _donor(np.nan)}, index=BARS)
@@ -169,7 +168,7 @@ def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", methods=["totalVI"],
                  data_path=data, verbose=False)
     assert [r["status"] for r in res.records] == ["CHAIN_OK"]
-    for gap, seen in ((np.nan, NAN), ("nan", "The missing value is written 'nan'.")):
+    for gap, seen in ((np.nan, NAN), ("nan", ", for example 'nan'")):
         series = _donor(gap)
         for batch in (series, series.to_numpy()):
             with pytest.raises(ValueError) as e:
@@ -179,7 +178,7 @@ def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     _donor("NA").to_frame().to_csv(sheet)
     with pytest.raises(ValueError) as e:
         res.rescore(batch=sheet)
-    assert str(e.value) == _bv2(5, "The missing value is written 'NA'.")
+    assert str(e.value) == _bv2(5, ", for example 'NA'")
     # with labels in the rows of the embedding as well
     with pytest.raises(ValueError, match="5 of the 120 cells of MYCITE have no batch"):
         res.rescore(labels=np.array(["A"] * 60 + ["B"] * 60), batch=_donor(np.nan))

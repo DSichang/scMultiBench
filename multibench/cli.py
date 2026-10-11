@@ -1404,13 +1404,6 @@ def _leiden_flavor(flavor):
         config.DEFAULT.leiden_flavor = before
 
 
-#: the label files of a dataset folder, by category: what the error for a
-#: folder without label files names
-_LABEL_FILE_NAMES = {"vertical": "cty.csv", "diagonal": "rna_cty.csv and atac_cty.csv",
-                     "mosaic": "cty1.csv, cty2.csv, ...",
-                     "cross": "cty1.csv, cty2.csv, ..."}
-
-
 def _evaluate_labels(args, stack):
     """The ``labels=`` value of ``multibench evaluate``.
 
@@ -1419,7 +1412,7 @@ def _evaluate_labels(args, stack):
     ``mtb.evaluate(labels=[...])``). ``--column`` picks the column of every
     file. Without ``--labels``, ``--dataset/--method/--category`` read the
     dataset's label files in the method's cell order (``mtb.labels_for``);
-    a folder without label files is an error that names them.
+    a folder without label files is an error.
     """
     import multibench
     files = list(args.labels or [])
@@ -1444,8 +1437,7 @@ def _evaluate_labels(args, stack):
         if not labels:
             # before the line below, which would name no file
             raise ValueError(
-                f"{args.dataset} has no label file ({_LABEL_FILE_NAMES[args.category]}), "
-                f"so there is nothing to score. Pass a label file with --labels.")
+                f"{args.dataset} has no label file. Pass one with --labels.")
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
               f"{args.dataset}, in {args.method}'s cell order", file=sys.stderr)
         if args.column is None:

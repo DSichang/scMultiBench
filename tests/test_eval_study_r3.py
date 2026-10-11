@@ -132,22 +132,21 @@ def _cli_error(capsys, *argv):
     return lines[0][len("error: "):]
 
 
-def _one_side(file, side, other, drop):
-    return (f"{file} the labels of {side} cells. If the embedding also holds the "
-            f"{other} cells of a diagonal folder, they have no entry here: {drop} "
-            f"leaves out cells whose label is missing, not cells without an entry.")
+def _one_side(file, side):
+    return f'{file} labels the {side} cells only, see the recipe "No labels" in the docs.'
 
 
 def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
     """rna_cty.csv without atac_cty.csv: the 70 ATAC cells of the embedding
-    have no entry. The message says that. It does not blame the embedding or
-    name the call that was made, and missing_labels="drop" does not change it."""
+    have no entry. The message names the side that is labelled and a recipe.
+    It does not blame the embedding or name the call that was made, and
+    missing_labels="drop" does not change it."""
     emb = np.random.default_rng(0).normal(size=(150, 5))
     np.save(tmp_path / "emb.npy", emb)
     data = tmp_path / "data"
     d = _folder(data, "BRAIN", {"rna.h5": 80, "atac_gas.h5": 70}, {"rna_cty.csv": 80})
     py = ("labels has 80 entries for 150 cells in the embedding. "
-          + _one_side("rna_cty.csv names", "RNA", "ATAC", 'missing_labels="drop"'))
+          + _one_side("rna_cty.csv", "RNA"))
     found = mtb.labels_for("BRAIN", "diagonal", "SCALEX", data_path=data)
     assert list(found) == ["rna_cty"]
     for labels in (found, str(d / "rna_cty.csv")):
@@ -161,33 +160,32 @@ def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
     from_dataset = _cli_error(capsys, *out, *dataset, "--missing-labels", "drop")
     assert from_dataset == (
         "the label files of BRAIN (rna_cty.csv) hold 80 labels for 150 cells in "
-        "--output. They are the labels of the RNA cells, and BRAIN has no label file "
-        "for the ATAC cells. --dataset scores a diagonal folder only when both sides "
-        "have a label file, and --missing-labels drop does not change that.")
+        "--output. " + _one_side("BRAIN", "RNA"))
     # --column reads the same files
     assert _cli_error(capsys, *out, *dataset, "--column", "x") == from_dataset
     from_file = _cli_error(capsys, *out, "--labels", str(d / "rna_cty.csv"),
                            "--missing-labels", "drop")
     assert from_file == (
         "--labels gave 80 labels (rna_cty.csv) for 150 cells in --output. "
-        + _one_side("rna_cty.csv names", "RNA", "ATAC", "--missing-labels drop"))
+        + _one_side("rna_cty.csv", "RNA"))
     for msg in (py, from_dataset, from_file):
         assert "Check that --output holds" not in msg
         assert "pass mtb.labels_for(" not in msg
-    # the ATAC side alone reads the other way round, and two files in the plural
+    # the ATAC side alone reads the other way round, and of two files the
+    # first is named
     d = _folder(data, "ATAC", {}, {"atac_cty.csv": 70})
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(d / "atac_cty.csv"), metrics=["ASW"])
     assert str(e.value) == (
         "labels has 70 entries for 150 cells in the embedding. "
-        + _one_side("atac_cty.csv names", "ATAC", "RNA", 'missing_labels="drop"'))
+        + _one_side("atac_cty.csv", "ATAC"))
     d = _folder(data, "RNA2", {}, {"rna_cty1.csv": 40, "rna_cty2.csv": 40})
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[d / "rna_cty1.csv", d / "rna_cty2.csv"],
                      metrics=["ASW"])
     assert str(e.value) == (
-        "labels has 80 entries for 150 cells in the embedding. " + _one_side(
-            "rna_cty1.csv and rna_cty2.csv name", "RNA", "ATAC", 'missing_labels="drop"'))
+        "labels has 80 entries for 150 cells in the embedding. "
+        + _one_side("rna_cty1.csv", "RNA"))
 
 
 def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
@@ -227,12 +225,9 @@ def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
 
 def test_an_empty_labels_dict_has_nothing_to_score(tmp_path):
     """mtb.labels_for returns an empty dict for a folder without label files.
-    evaluate says that, not that the labels have 0 entries."""
+    evaluate says that the dict is empty, not that the labels have 0 entries."""
     emb, _ = _blobs()
-    text = ("labels is an empty dict, so there is nothing to score. mtb.labels_for "
-            "returns one for a dataset folder without label files (cty.csv, cty1.csv, "
-            "cty2.csv, ... for data in batches, or rna_cty.csv and atac_cty.csv for "
-            "diagonal data).")
+    text = "labels is an empty dict. Pass the cell types, as labels=adata.obs['celltype']."
     data = tmp_path / "data"
     _folder(data, "NOLAB", {"rna.h5": 50, "atac_gas.h5": 40}, {})
     _folder(data, "X_NOLAB", {f"{m}{i}.h5": 45 for m in ("rna", "adt") for i in (1, 2)},

@@ -556,11 +556,13 @@ def test_reason_row_choice(linux, monkeypatch, tmp_path):
 def test_per_method_needs_a_category(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.scan("D11", per_method=True)
-    assert str(e.value) == ("per_method=True needs a category, because a method can have "
-                            "variants in several categories.")
+    assert str(e.value) == ("per_method=True needs a category, as mtb.scan('D11', 'vertical', "
+                            "per_method=True).")
     # before anything is read
-    with pytest.raises(ValueError, match="needs a category"):
+    with pytest.raises(ValueError) as e:
         mtb.scan("NO_SUCH_FOLDER", per_method=True, data_path=tmp_path)
+    assert str(e.value) == ("per_method=True needs a category, as mtb.scan('NO_SUCH_FOLDER', "
+                            "'vertical', per_method=True).")
     assert mtb.scan("D11", per_method=False, verbose=False).columns.tolist() == W.SCAN_COLUMNS
 
 

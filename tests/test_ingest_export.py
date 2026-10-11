@@ -93,9 +93,8 @@ def test_export_dataset_selectors_and_errors(tmp_path):
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(a, tmp_path / "E", rna=None, adt="X")
     assert str(e.value) == (
-        "adt='X' takes X of this object, and the object also holds the obsm key 'protein'. "
-        "If one of them is the protein matrix, pass adt='obsm:<key>'. If X is the protein "
-        "matrix, delete it first, for example del adata.obsm['protein'].")
+        "adt='X' takes X, and the object also holds obsm['protein']. If that is the protein "
+        "matrix, pass adt='obsm:protein'.")
     assert not (tmp_path / "E").exists()
 
 

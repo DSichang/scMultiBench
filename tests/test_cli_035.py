@@ -86,19 +86,14 @@ def _embedding(tmp_path, n=300, gaps=30):
 
 def test_evaluate_missing_labels_flag(tmp_path, capsys):
     base = _embedding(tmp_path)
-    told = ("error: --labels (labels.csv): 30 of the 300 cells have no label. The missing "
-            "value is written 'NA'. A missing label is not a cell type, so evaluate does "
-            "not score it. Give every cell a label, or pass --missing-labels drop to score "
-            "the 270 labelled cells only. A label file reads 'NA' as a missing value. If it "
-            "is the name of a cell type, rename it.")
+    told = ("error: --labels (labels.csv): 30 of the 300 cells have no label, for example "
+            "'NA'. Pass --missing-labels drop to score the other 270.")
     for argv in (base, base + ["--missing-labels", "error"]):
         rc, out, err = _cli(argv, capsys)
         assert rc == 1 and out == "" and err.splitlines()[0] == told
     rc, out, err = _cli(base + ["--missing-labels", "drop"], capsys)
     assert rc == 0 and out.splitlines()[0].split() == ["Value"] and "ASW" in out
-    assert err.splitlines() == [
-        "warning: Scored the 270 labelled cells of 300. 30 cells have no label and were "
-        "left out, so the scores describe the labelled cells only."]
+    assert err.splitlines() == ["warning: Scored the 270 labelled cells of 300."]
     # complete labels: the flag changes nothing
     pd.DataFrame({"x": ["A"] * 150 + ["B"] * 150}).to_csv(tmp_path / "labels.csv",
                                                          index=False)
@@ -136,13 +131,10 @@ def test_evaluate_column_names_the_word_of_the_sheet(tmp_path, capsys):
     rc, _, err = _cli(base + ["--column", "celltype"], capsys)
     (told,) = [l for l in err.splitlines() if l.startswith("error: ")]
     assert rc == 1 and told == (
-        "error: --labels (labels.csv): 4 of the 300 cells have no label. The missing "
-        "value is written 'None'. A missing label is not a cell type, so evaluate does "
-        "not score it. Give every cell a label, or pass --missing-labels drop to score "
-        "the 296 labelled cells only. A label file reads 'None' as a missing value. If it "
-        "is the name of a cell type, rename it.")
+        "error: --labels (labels.csv): 4 of the 300 cells have no label, for example "
+        "'None'. Pass --missing-labels drop to score the other 296.")
     rc, _, err = _cli(base + ["--column", "celltype", "--missing-labels", "drop"], capsys)
-    assert rc == 0 and "warning: Scored the 296 labelled cells of 300. " in err
+    assert rc == 0 and "warning: Scored the 296 labelled cells of 300." in err.splitlines()
 
 
 @pytest.mark.parametrize("category,method,files,named", [
@@ -156,7 +148,9 @@ def test_evaluate_column_names_the_word_of_the_sheet(tmp_path, capsys):
 def test_evaluate_dataset_without_label_files(category, method, files, named, tmp_path,
                                               capsys):
     """A folder written without labels: the error named labels_for and an
-    empty dict, under a line '# labels:  from NOLAB'."""
+    empty dict, under a line '# labels:  from NOLAB'. The 0.3.5 text is the
+    same for every category and does not name the label files (``named``)."""
+    assert named
     d = tmp_path / "NOLAB"
     d.mkdir()
     for name in files:
@@ -173,8 +167,7 @@ def test_evaluate_dataset_without_label_files(category, method, files, named, tm
         rc, out, err = _cli(argv + extra, capsys)
         assert rc == 1 and out == ""
         assert err.splitlines() == [
-            f"error: NOLAB has no label file ({named}), so there is nothing to score. "
-            "Pass a label file with --labels.",
+            "error: NOLAB has no label file. Pass one with --labels.",
             "(set MULTIBENCH_DEBUG=1 for the full traceback)"]
     # with its label files the folder is read as before
     stems = {"vertical": ["cty"], "diagonal": ["rna_cty", "atac_cty"]}.get(
@@ -324,10 +317,8 @@ def test_run_all_batch_column_name(tmp_path, capsys, no_envs, monkeypatch):
     monkeypatch.chdir(tmp_path)
     base = ["run-all", "D11", "--category", "vertical", "--methods", "totalVI"]
     for given, col in (("donor", "donor"), ("obs:donor", "donor")):
-        told = (f"error: --batch {given} is not a file. run-all reads a dataset folder, "
-                "which holds no obs columns. Pass a CSV file with the cell barcodes in its "
-                f"first column. In Python, adata.obs[[{col!r}]].to_csv(\"batch.csv\") writes "
-                "one.")
+        told = (f"error: --batch {given} is not a file. Pass a CSV file, as "
+                f"adata.obs[[{col!r}]].to_csv(\"batch.csv\") writes in Python.")
         for extra in (["--dry-run"], ["--out-dir", str(tmp_path / "out")],
                       ["--dry-run", "--batch-column", "donor"]):
             rc, out, err = _cli(base + ["--batch", given, *extra], capsys)
@@ -369,15 +360,13 @@ def test_convert_n_batches(tmp_path, capsys):
     before = {p.name: p.read_bytes() for p in out.iterdir()}
     assert sorted(before) == ["cty1.csv", "cty2.csv", "cty3.csv", "rna1.h5", "rna2.h5",
                               "rna3.h5"]
-    # the reader has two batches: batch 3 of the example is named, nothing is written
+    # the reader has two batches: batch 3 of the example is named by its first file, and
+    # nothing is written
     rc, stdout, err = convert("me.h5ad", "--batch-index", "1", "--n-batches", "2",
                               "--overwrite")
     assert rc == 1 and stdout == "" and err.splitlines()[0] == (
-        f"error: {out} holds files of other data that this command does not write. "
-        "rna3.h5 and cty3.csv belong to batch 3, and --n-batches 2 says that the data has "
-        "2 batches. A method would read them as part of this dataset. Convert into a new "
-        "folder, and use that folder name in scan and run-all too. To keep this folder, "
-        "delete these files and run convert again.")
+        f"error: {out} holds rna3.h5 and 1 more file of batch 3, above --n-batches 2. "
+        "Convert into a new folder.")
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before
     # without --n-batches the call passes, as in 0.3.4
     rc, stdout, _ = convert("me.h5ad", "--batch-index", "1", "--overwrite")
@@ -387,9 +376,7 @@ def test_convert_n_batches(tmp_path, capsys):
     new = tmp_path / "NEW"
     for extra, told in (
             (["--n-batches", "2"],
-             "error: --n-batches goes with --batch-index. It says how many batches the "
-             "commands with --batch-index write in total. With --batch, the column gives "
-             "the number."),
+             "error: --n-batches goes with --batch-index only. Leave --n-batches out."),
             (["--batch-index", "3", "--n-batches", "2"],
              "error: --batch-index 3 is larger than --n-batches 2."),
             (["--batch-index", "1", "--n-batches", "0"],
@@ -433,10 +420,8 @@ def test_convert_refuses_a_10x_file(tmp_path, capsys):
         g.create_dataset("barcodes", data=np.array([f"c{i}-1" for i in range(12)], dtype="S"))
         g.create_group("features").create_dataset(
             "name", data=np.array([f"GENE{i}" for i in range(20)], dtype="S"))
-    told = (f"error: {src} is a 10x Genomics file. multibench convert reads .h5ad files, "
-            "not this file. Read it in Python with scanpy, save one .h5ad file per modality "
-            'and convert those. The documentation has the steps as the recipe "A 10x .h5 '
-            'file".')
+    told = (f'error: {src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the '
+            'docs.')
     out = tmp_path / "OUT"
     for argv in (["convert", str(src), f"{out}/", "--modality", "rna"],
                  ["convert", str(src), str(out / "rna.h5")],

@@ -3,13 +3,15 @@
 A 10x file names some genes twice, and scanpy reads them as they are. Every
 selector form wrote such names without a word: ``X``, a layer, a feature
 filter, an ``obsm`` entry, an object and a MuData modality. The names are
-still written as given; the warning gives their number, up to three of them
+still written as given; the warning gives their number, the first of them
 and the line that makes them unique for the form that was used.
 
 ``var_names_make_unique()`` is named for an object that holds these features
 alone. On an object with genes and antibodies it would also rename an
-antibody that has the name of a gene (the recipe "A 10x .h5 file").
+antibody that has the name of a gene: there the warning names the recipe
+"A 10x .h5 file", which splits the object first.
 """
+import re
 import warnings
 
 import numpy as np
@@ -24,9 +26,8 @@ ad = pytest.importorskip("anndata")
 N = 20
 GENES = ["G1", "G2", "G2", "G3", "G3", "G4"]
 PROTEINS = ["P1", "P2", "G1", "P3"]                  # an antibody named like a gene
-TWO = ("2 feature names occur more than once: G2 and G3. They are written as they are.")
-WHOLE = ("On the whole object, var_names_make_unique() also renames a feature of another "
-         "type that has the same name.")
+TWO = "has 2 repeated feature names, for example G2."
+SPLIT = 'Split the object first, as in the recipe "A 10x .h5 file" in the docs.'
 
 
 def _cite():
@@ -57,23 +58,21 @@ def _export(tmp_path, *args, **kw):
         warnings.simplefilter("always")
         out = ingest.export_dataset(*args[:1], tmp_path / "OUT", *args[1:], overwrite=True,
                                     **kw)
-    return out, [str(w.message) for w in rec if "feature name" in str(w.message)]
+    return out, [str(w.message) for w in rec
+                 if re.search("(feature|peak) name", str(w.message))]
 
 
 def test_a_feature_filter(tmp_path):
     out, said = _export(tmp_path, _cite(), rna="X[feature_types=Gene Expression]",
                         adt="X[feature_types=Antibody Capture]")
-    assert said == [
-        f"In rna='X[feature_types=Gene Expression]', {TWO} To make them unique, take these "
-        f"features into their own object first: part = adata[:, adata.var['feature_types'] "
-        f"== 'Gene Expression'].copy(). Then run part.var_names_make_unique() and pass "
-        f"rna=part. {WHOLE}"]
+    assert said == [f"rna='X[feature_types=Gene Expression]' {TWO} {SPLIT}"]
     # the names are written as they are, as before
     assert list(ingest.read_canonical(out / "rna.h5").var_names) == GENES
     assert list(ingest.read_canonical(out / "adt.h5").var_names) == PROTEINS
 
 
 def test_the_advice_for_a_feature_filter_works(tmp_path):
+    """The split of the recipe "A 10x .h5 file", which the warning names."""
     adata = _cite()
     part = adata[:, adata.var['feature_types'] == 'Gene Expression'].copy()
     part.var_names_make_unique()
@@ -89,19 +88,14 @@ def test_the_advice_for_a_feature_filter_works(tmp_path):
 
 def test_a_layer_with_a_feature_filter(tmp_path):
     _, said = _export(tmp_path, _cite(), rna="layer:counts[feature_types=Gene Expression]")
-    assert said == [
-        f"In rna='layer:counts[feature_types=Gene Expression]', {TWO} To make them unique, "
-        f"take these features into their own object first: part = adata[:, "
-        f"adata.var['feature_types'] == 'Gene Expression'].copy(). Then run "
-        f"part.var_names_make_unique(), set part.X = part.layers['counts'] and pass "
-        f"rna=part. {WHOLE}"]
+    assert said == [f"rna='layer:counts[feature_types=Gene Expression]' {TWO} {SPLIT}"]
 
 
 @pytest.mark.parametrize("selector", ["X", "layer:counts"])
 def test_x_and_a_layer(tmp_path, selector):
     out, said = _export(tmp_path, _genes(), rna=selector)
-    assert said == [f"In rna={selector!r}, {TWO} To make them unique, run "
-                    f"adata.var_names_make_unique() before the export."]
+    assert said == [f"rna={selector!r} {TWO} Run adata.var_names_make_unique() before "
+                    f"the export."]
     assert list(ingest.read_canonical(out / "rna.h5").var_names) == GENES
     adata = _genes()
     adata.var_names_make_unique()
@@ -111,8 +105,8 @@ def test_x_and_a_layer(tmp_path, selector):
 def test_an_object(tmp_path):
     rna = _genes()
     _, said = _export(tmp_path, None, rna=rna)
-    assert said == [f"In rna=AnnData, {TWO} To make them unique, run "
-                    f"rna.var_names_make_unique() before the export."]
+    assert said == [f"rna=AnnData {TWO} Run rna.var_names_make_unique() before the "
+                    f"export."]
     rna.var_names_make_unique()
     assert _export(tmp_path, None, rna=rna)[1] == []
 
@@ -124,7 +118,7 @@ def test_a_mudata_modality(tmp_path):
         mdata = mudata.MuData({"rna": _genes()})
     for selector in ("rna", "mod:rna"):
         _, said = _export(tmp_path, mdata, rna=selector)
-        assert said == [f"In rna={selector!r}, {TWO} To make them unique, run "
+        assert said == [f"rna={selector!r} {TWO} Run "
                         f"mdata.mod['rna'].var_names_make_unique() before the export."]
 
 
@@ -132,19 +126,18 @@ def test_an_obsm_entry_a_dataframe_and_adt_names(tmp_path):
     rna = _genes()
     rna.var_names_make_unique()
     values = np.random.default_rng(1).poisson(1.0, (N, 3)).astype(float)
-    one = ("1 feature name occurs more than once: CD3. It is written as it is. Give each "
-           "column its own name before the export, or pass unique names as adt_names=.")
+    one = "has 1 repeated feature name, for example CD3. Give each column its own name."
     rna.obsm["protein"] = pd.DataFrame(values, index=rna.obs_names,
                                        columns=["CD3", "CD3", "CD4"])
     out, said = _export(tmp_path, rna, rna="X", adt="obsm:protein")
-    assert said == [f"In adt='obsm:protein', {one}"]
+    assert said == [f"adt='obsm:protein' {one}"]
     assert list(ingest.read_canonical(out / "adt.h5").var_names) == ["CD3", "CD3", "CD4"]
     frame = pd.DataFrame(values, index=rna.obs_names, columns=["CD3", "CD3", "CD4"])
     del rna.obsm["protein"]
-    assert _export(tmp_path, rna, rna="X", adt=frame)[1] == [f"In adt=DataFrame, {one}"]
+    assert _export(tmp_path, rna, rna="X", adt=frame)[1] == [f"adt=DataFrame {one}"]
     rna.obsm["protein"] = values
     assert _export(tmp_path, rna, rna="X", adt="obsm:protein",
-                   adt_names=["CD3", "CD3", "CD4"])[1] == [f"In adt='obsm:protein', {one}"]
+                   adt_names=["CD3", "CD3", "CD4"])[1] == [f"adt='obsm:protein' {one}"]
     assert _export(tmp_path, rna, rna="X", adt="obsm:protein",
                    adt_names=["CD3", "CD4", "CD8"])[1] == []
 
@@ -159,23 +152,20 @@ def test_peaks_are_not_renamed(tmp_path):
         peaks.var_names = ["chr1:100-600", "chr1:100-600", "chr1:1000-1500",
                            "chr2:100-600"]
     _, said = _export(tmp_path, rna, rna="X", atac=peaks, atac_kind="peak")
-    assert said == [
-        "In atac=AnnData, 1 feature name occurs more than once: chr1:100-600. It is "
-        "written as it is. A peak name is a region, so do not rename it. Keep one column "
-        "for each peak before the export."]
+    # a peak name is a region: the advice does not rename it
+    assert said == ["atac=AnnData has 1 repeated peak name, for example chr1:100-600. Keep "
+                    "one column for each peak."]
 
 
-def test_many_names_show_three(tmp_path):
+def test_many_names_show_one(tmp_path):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         a = ad.AnnData(np.ones((N, 4000)))
         a.var_names = [f"GENE{i}" for i in range(2000)] * 2
     a.obs_names = [f"cell{i}-1" for i in range(N)]
     _, said = _export(tmp_path, a, rna="X")
-    assert said == [
-        "In rna='X', 2,000 feature names occur more than once, for example GENE0, GENE1 "
-        "and GENE2. They are written as they are. To make them unique, run "
-        "adata.var_names_make_unique() before the export."]
+    assert said == ["rna='X' has 2,000 repeated feature names, for example GENE0. Run "
+                    "adata.var_names_make_unique() before the export."]
 
 
 def test_unique_names_give_no_message(tmp_path):
@@ -194,13 +184,9 @@ def test_the_command_line(tmp_path, capsys):
     capsys.readouterr()
     assert cli.main(["convert", str(tmp_path / "cite.h5ad"), str(tmp_path / "A"), "--rna",
                      "X[feature_types=Gene Expression]"]) == 0
-    assert (
-        f"In --rna X[feature_types=Gene Expression], {TWO} To make them unique, keep these "
-        f"features in their own file first. In Python: part = adata[:, "
-        f"adata.var['feature_types'] == 'Gene Expression'].copy(), then "
-        f'part.var_names_make_unique() and part.write_h5ad("one_type.h5ad"). {WHOLE}'
-    ) in capsys.readouterr().err
+    assert (f"warning: --rna X[feature_types=Gene Expression] {TWO} {SPLIT}\n"
+            ) in capsys.readouterr().err
     assert cli.main(["convert", str(tmp_path / "genes.h5ad"), str(tmp_path / "B"), "--rna",
                      "X"]) == 0
-    assert (f"In --rna X, {TWO} To make them unique, run adata.var_names_make_unique() in "
-            f"Python and save the file again.") in capsys.readouterr().err
+    assert (f"warning: --rna X {TWO} Run adata.var_names_make_unique() in Python and "
+            f"save the file again.\n") in capsys.readouterr().err

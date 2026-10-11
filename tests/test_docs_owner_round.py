@@ -41,7 +41,7 @@ def test_changes_say_how_a_csv_embedding_is_matched(tmp_path, capsys, monkeypatc
             "0.3.4 dropped that column and matched by position, with a warning that the "
             "output has no cell ids.",
             "When the two do not name the same cells, `ValueError` gives the number of "
-            "barcodes of each side and three barcodes that each side lacks.",
+            "cells of the embedding that the other file lacks, and one of them.",
             "The first column of the embedding holds barcodes when it holds text: at least "
             "one of its values is not a number.",
             "A first column of numbers is read as in 0.3.4. Without a header it is left "
@@ -68,8 +68,9 @@ def test_changes_list_the_new_messages():
     names = sorted(set(ingest._TENX_TYPE.values()))
     assert names == ["Antibody Capture", "Gene Expression", "Peaks"]
     assert ("The error for a matrix with several feature types no longer ends with the "
-            "advice to delete `var[\"feature_types\"]` when one of the type names is a 10x "
-            "name: `Gene Expression`, `Antibody Capture` or `Peaks`.") in said
+            "advice to delete `var[\"feature_types\"]`. With the 10x names `Gene Expression`, "
+            "`Antibody Capture` or `Peaks`, following that advice wrote genes and peaks, or "
+            "genes and antibodies, into one file.") in said
     assert ("`mtb.io.export_dataset` and `multibench convert` warn when a matrix has a "
             "feature name more than once, as the genes of a 10x file can. The names are "
             "written as they are, as in 0.3.4, which wrote them without a message.") in said

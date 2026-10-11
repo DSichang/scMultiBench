@@ -1643,8 +1643,8 @@ def scan(dataset: str, category: str | None = None, *,
     mtb.inputs_for : the ``{role: path}`` resolution behind ``files_ok``.
     """
     if per_method and category is None:
-        raise ValueError("per_method=True needs a category, because a method can have "
-                         "variants in several categories.")
+        raise ValueError(f"per_method=True needs a category, as "
+                         f"mtb.scan({dataset!r}, 'vertical', per_method=True).")
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
                         data_path=data_path, out_dir=out_dir, params=params,
                         verbose=verbose and not per_method, assume_gpu=assume_gpu,
@@ -3641,13 +3641,10 @@ def _column_name_error(what: str, x: str) -> str:
     given the name of an obs column: a folder holds no such column."""
     col = x[4:] if x.startswith("obs:") else x
     return config.hint(
-        f"{what}={x!r} is not a file. run_all and rescore read the dataset folder, "
-        f"which holds no obs columns, so they cannot look a column up by name. Pass "
-        f"the column itself, for example {what}=adata.obs[{col!r}]. It is matched to "
-        f"the cells by barcode.",
-        f"--{what} {x} is not a file. run-all reads a dataset folder, which holds no "
-        f"obs columns. Pass a CSV file with the cell barcodes in its first column. In "
-        f'Python, adata.obs[[{col!r}]].to_csv("{what}.csv") writes one.')
+        f"{what}={x!r} is not a file. Pass the column itself, as "
+        f"{what}=adata.obs[{col!r}].",
+        f"--{what} {x} is not a file. Pass a CSV file, as "
+        f'adata.obs[[{col!r}]].to_csv("{what}.csv") writes in Python.')
 
 
 def _has_gap(values) -> bool:
@@ -3665,9 +3662,8 @@ def _check_batch(vec, dataset: str) -> None:
     miss = _eio.missing_mask(vec)
     raise ValueError(
         config.hint("batch", "--batch") + f": {int(miss.sum()):,} of the "
-        f"{len(miss):,} cells of {dataset} have no batch. {_eio._missing_seen(vec)} A "
-        f"missing batch is not a batch, so the batch metrics are not computed on it. "
-        f"Give every cell a batch, or write the dataset folder without these cells.")
+        f"{len(miss):,} cells of {dataset} have no batch{_eio._missing_example(vec)}. "
+        f"Give every cell a batch.")
 
 
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
@@ -3718,36 +3714,30 @@ def _missing_labels_problem(dataset: str, gaps: dict, readers: dict, *,
     ``gaps`` is :func:`_label_gaps` and ``readers`` the methods that would
     run and read such a file as an input (:func:`_label_readers`). With
     ``evaluate`` every gap stops the run: the scores would count a missing
-    label as a cell type. The way out depends on ``readers``, because for
-    them ``evaluate=False`` changes nothing: they would train on the missing
-    label as one more class. Without ``evaluate`` only they stop the run, and
-    the files named are the ones they read. ``dry_run`` words it as what a
-    real run does.
+    label as a cell type. For ``readers``, ``evaluate=False`` changes nothing:
+    they would train on the missing label as one more class. Without
+    ``evaluate`` only they stop the run: the files counted are the ones they
+    read, and the first of them is named. The message names the first file
+    with its count, counts the other files, and gives one action. ``dry_run``
+    is not worded.
     """
     if not gaps or not (evaluate or readers):
         return ""
     if not evaluate:
         read = set().union(*readers.values())
         gaps = {name: g for name, g in gaps.items() if name in read}
-    files = _resolve._and_list(f"{name} ({n:,} of {total:,})"
-                               for name, (n, total, _) in gaps.items())
-    shown = np.concatenate([v for _, _, v in gaps.values()])
-    head = (f"The label files of {dataset} have cells without a label: {files}. "
-            f"{_eio._missing_seen(shown)} ")
-    stops = (("a real run" if dry_run else config.hint("run_all", "run-all"))
-             + " stops before it runs a method")
-    fix = "Write the folder again with a label for every cell"
-    who, one = _resolve._and_list(list(readers)) if readers else "", len(readers) == 1
-    reads = f"{who} {'reads' if one else 'read'} the label file as an input"
-    rename = _eio._missing_rename(shown)
+    (name, (n, total, shown)), more = next(iter(gaps.items())), len(gaps) - 1
+    head = (f"{name} of {dataset} has {n:,} of {total:,} cells without a label"
+            f"{_eio._missing_example(shown)}")
+    if more:
+        head += f", and {more} more label {'file has' if more == 1 else 'files have'} some"
     if not evaluate:
-        return (f"{head}{reads}, and a missing label is not a cell type, so {stops}. "
-                f"{fix}, or run without {'this method' if one else 'these methods'}."
-                f"{rename}")
-    no_scores = config.hint("evaluate=False", "--no-evaluate")
-    tail = (f". {reads}, so {no_scores} does not help for {'it' if one else 'them'}."
-            if readers else f", or pass {no_scores} to run the methods without scores.")
-    return (f"{head}A missing label is not a cell type, so {stops}. {fix}{tail}{rename}")
+        # evaluate=False was passed, and the run stops for the methods that read the file
+        who, others = next(iter(readers)), len(readers) - 1
+        head += (f", and {who} reads the label files" if not others else
+                 f", and {who} and {others} more {'method' if others == 1 else 'methods'} "
+                 f"read the label files")
+    return f"{head}. Write the folder again with a label for every cell."
 
 
 def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
@@ -3768,8 +3758,7 @@ def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
             shown = np.concatenate([np.asarray(_eio.read_labels(folder / k, as_written=True),
                                                dtype=object) for k in names])
         return (f"ValueError: {int(miss.sum()):,} of the {len(miss):,} labels in {files} "
-                f"are missing. {_eio._missing_seen(shown)} A missing label is not a cell "
-                f"type, so the embedding is not scored. Give every cell a label, then "
+                f"are missing{_eio._missing_example(shown)}. Give every cell a label, then "
                 f"score again.")
     return None
 

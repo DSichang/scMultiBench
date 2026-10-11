@@ -12,7 +12,7 @@ Round 4 changed what the notebooks tell a reader in five places:
   runtime does not get a smaller build of every environment.
 - R4-13: a dry run's printed command alone fails in a job script when the
   method reads files that ``mtb.run`` writes first; and the batch advice
-  names ``run_all(batch=...)``, as the package's error does.
+  names ``run_all(batch=<column>)``, as the package's error does.
 
 Each prose test reads the committed notebooks and checks the same fact on the
 live package, so a later package change that makes the sentence untrue fails
@@ -197,8 +197,8 @@ def test_vertical_export_note_names_the_batch_call(key, obj):
 
 
 def test_the_package_gives_the_same_batch_advice(tmp_path):
-    """export_dataset(batch=) on a vertical dataset names run_all(batch=...),
-    and evaluate(batch=...) next to it."""
+    """export_dataset(batch=) on a vertical dataset names the run_all call of
+    the tutorials, with the column itself."""
     import anndata as ad
     import multibench as mtb
     rng = np.random.default_rng(0)
@@ -209,7 +209,10 @@ def test_the_package_gives_the_same_batch_advice(tmp_path):
     with pytest.raises(ValueError) as e:
         _quiet(mtb.io.export_dataset, a, tmp_path / "V", rna="X", adt="obsm:protein",
                labels="obs:celltype", batch="obs:batch", category="vertical")
-    assert "run_all(batch=...)" in str(e.value) and "evaluate(batch=...)" in str(e.value)
+    assert str(e.value) == (
+        "batch= writes per-batch files (rna1.h5, rna2.h5, ...). Vertical methods read one "
+        'rna.h5. Export without batch= and pass the column itself, as '
+        'run_all(batch=adata.obs["donor"]). For RNA+ADT batches, use category="cross".')
 
 
 # ------------------------------------------------ R4-01: named methods

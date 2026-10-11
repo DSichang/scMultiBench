@@ -77,12 +77,10 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 def _batch_column_advice() -> str:
     """Export without per-batch files, then where the batch column goes."""
-    return config.hint('export without batch= and pass the batch column itself, such '
-                       'as adata.obs["donor"], to run_all(batch=...) or '
-                       'evaluate(batch=...)',
-                       "convert without --batch and pass the batch of each cell to "
-                       "run-all --batch or evaluate --batch, as a CSV file with the "
-                       "barcodes in its first column")
+    return config.hint('export without batch= and pass the column itself, as '
+                       'run_all(batch=adata.obs["donor"])',
+                       "convert without --batch and pass a CSV file of barcode and batch "
+                       "to run-all --batch")
 
 
 def _and_list(names) -> str:
@@ -823,16 +821,9 @@ def _check_matrix_files(method, dataset, resolved):
         if p.suffix != ".h5" or not p.is_file():
             continue
         if not _is_canonical_h5(p) and _is_tenx_h5(p):
-            way = config.hint(
-                "Read it with scanpy, sc.read_10x_h5(path, gex_only=False), split it by "
-                "var['feature_types'] and write a dataset folder with "
-                "mtb.io.export_dataset.",
-                "Read it in Python with scanpy, save one .h5ad file per modality and "
-                "convert those with multibench convert.")
             raise ValueError(
-                f"{method} reads {p.name} of {dataset}, which is a 10x Genomics file, "
-                f"not a multibench dataset file. {way} The documentation has the steps "
-                f'as the recipe "A 10x .h5 file".')
+                f"{method} reads {p.name} of {dataset}, which is a 10x Genomics file. "
+                f'See the recipe "A 10x .h5 file" in the docs.')
         sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
         if sniff is not None and 0 in sniff[1:]:
             again = config.hint("mtb.io.export_dataset", "multibench convert")

@@ -458,15 +458,12 @@ def test_per_batch_hint_is_sentences(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
         mtb.inputs_for("MB", "vertical", "totalVI", data_path=tmp_path, check=True)
     msg = str(e.value)
-    assert msg.endswith(
-        "This folder holds per-batch files (adt1.h5, adt2.h5, ...). Vertical methods read "
-        "one adt.h5. Export without batch= and pass the batch column itself, such as "
-        'adata.obs["donor"], to run_all(batch=...) or evaluate(batch=...). For RNA+ADT '
-        'batches, use category="cross".') or msg.endswith(
-        "This folder holds per-batch files (rna1.h5, rna2.h5, ...). Vertical methods read "
-        "one rna.h5. Export without batch= and pass the batch column itself, such as "
-        'adata.obs["donor"], to run_all(batch=...) or evaluate(batch=...). For RNA+ADT '
-        'batches, use category="cross".'), msg
+    assert msg == (
+        f"totalVI (vertical) needs rna.h5 and adt.h5 in {d}. The folder holds adt1.h5, "
+        "adt2.h5, cty1.csv, cty2.csv, rna1.h5 and rna2.h5. This folder holds per-batch files "
+        "(rna1.h5, rna2.h5, ...). Vertical methods read one rna.h5. Export without batch= "
+        'and pass the column itself, as run_all(batch=adata.obs["donor"]). For RNA+ADT batches, '
+        'use category="cross".')
     assert " - " not in msg and "; " not in msg
 
 

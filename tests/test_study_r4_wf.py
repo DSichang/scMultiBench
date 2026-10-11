@@ -419,10 +419,8 @@ def test_arrays_lists_and_range_indexed_series_stay_positional(cite):
     with pytest.warns(UserWarning) as rec:
         assert list(W._batch_vector(pd.Series(batch), "MYCITE", data)) == list(batch)
     assert [str(w.message) for w in rec] == [
-        f"batch is a Series whose index is the row numbers 0 to {len(batch) - 1}, not the "
-        f"cell barcodes, so it is matched to the cells by position. Check that its values "
-        f"follow the order of mtb.labels_for('MYCITE'). To match by barcode, pass a Series "
-        f'indexed by barcode, such as adata.obs["donor"].']
+        "batch is a Series without barcodes and is matched to the cells by position. To "
+        'match by barcode, pass adata.obs["donor"].']
 
 
 def test_dataset_ids_follow_the_label_files_one_data_file_each(tmp_path):

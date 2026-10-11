@@ -25,11 +25,8 @@ from multibench.eval import io as eio
 
 ad = pytest.importorskip("anndata")
 
-NO_CELLS = ("The data holds 0 cells, so there is nothing to write. A filter kept no cell, or "
-            "you kept the cells that have a label and no cell had one. For a filter, check "
-            "that its values are spelled as the data has them. For labels, check that the "
-            "barcodes of the label table are spelled as the cell names of the data "
-            "(obs_names) are, for example with the same -1 ending.")
+NO_CELLS = ("The data holds 0 cells, so there is nothing to write. Check the filter that "
+            "selects the cells.")
 
 
 def _cite(n=60, seed=0):
@@ -88,20 +85,20 @@ def test_zero_cells_are_refused(tmp_path):
 
 def test_the_way_there_is_a_label_table_with_other_barcodes(tmp_path):
     """Labels joined by barcode from a table that spells them without -1:
-    no cell gets one, and keeping the labelled cells keeps none."""
+    no cell gets one, and keeping the labelled cells keeps none. The text is
+    the one of any data with 0 cells: it names the filter and no barcode."""
     a = _cite()
     table = pd.Series("T", index=[b[:-2] for b in a.obs_names])
     a.obs["celltype"] = table.reindex(a.obs_names)
     kept = a[a.obs["celltype"].notna()].copy()
     assert kept.n_obs == 0
     assert _value_error(tmp_path, kept, rna="X", labels="obs:celltype") == NO_CELLS
+    assert "barcode" not in NO_CELLS and "obs_names" not in NO_CELLS
 
 
 # ----------------------------------------------------------------- 0 features
-NO_FEATURES = ("The {what}matrix holds 0 features for 60 cells, so there is nothing to write. ")
-WHY = ("If the data came from sc.read_10x_h5, read the file with gex_only=False: without it "
-       "scanpy returns the genes alone. If you split it by var['feature_types'], compare the "
-       "type name in the split with adata.var['feature_types'].value_counts().")
+NO_FEATURES = "The {what}matrix holds 0 features for 60 cells. "
+WHY = "For a 10x file, read it with gex_only=False."
 
 
 def _split_without_peaks():
@@ -178,15 +175,11 @@ def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_pat
 def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
     """The command line reads files: it names no argument of export_dataset.
     The file it was given was saved after the split and holds no feature
-    type to count, so the text sends the reader to the data before the split."""
+    type to count, so the text sends the reader to the 10x file."""
     rna, none = _split_without_peaks()
     rna.write_h5ad(tmp_path / "rna.h5ad")
     none.write_h5ad(tmp_path / "none.h5ad")
     assert ad.read_h5ad(tmp_path / "none.h5ad").var["feature_types"].value_counts().sum() == 0
-    look = ("If the data came from sc.read_10x_h5, read the 10x file again with "
-            "gex_only=False: without it scanpy returns the genes alone. If it was split by "
-            "var['feature_types'] before it was saved, compare the type name in the split "
-            "with adata.var['feature_types'].value_counts() before the split.")
     src, out = str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT")
     for argv, what in (
             (["convert", str(tmp_path / "none.h5ad"), out, "--rna", "X"], "rna "),
@@ -199,27 +192,29 @@ def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
         err = capsys.readouterr().err
         assert rc == 1 and not (tmp_path / "OUT").exists()
         assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) \
-            == "error: " + NO_FEATURES.format(what=what) + look
+            == "error: " + NO_FEATURES.format(what=what) + WHY
 
 
 # ------------------------------------------------------------- a missing batch
 @pytest.mark.parametrize("gap,seen", [
-    (np.nan, "NaN"), (None, "NaN"), ("", "''"), ("  ", "''"), ("nan", "'nan'"),
-    ("NA", "'NA'"), ("None", "'None'")],
+    (np.nan, ""), (None, ""), ("", ""), ("  ", ""), ("nan", ", for example 'nan'"),
+    ("NA", ", for example 'NA'"), ("None", ", for example 'None'")],
     ids=["NaN", "None", "empty", "blank", "text nan", "text NA", "text None"])
 def test_a_batch_column_with_gaps_is_refused(tmp_path, gap, seen):
+    """A text that a label file reads as missing is shown; NaN and blank
+    text are not."""
     a = _cite()
     donor = a.obs["donor"].astype(object).to_numpy()
     donor[[3, 10, 41]] = gap
     a.obs["donor"] = donor
-    told = (f": 3 of the 60 cells have no batch. The missing value is written {seen}. Give "
-            f"every cell a batch, or leave these cells out first.")
+    told = f": 3 of the 60 cells have no batch{seen}. Give every cell a batch."
     kw = dict(rna="X", category="cross")
     assert _value_error(tmp_path, a, batch="obs:donor", **kw) == "batch='obs:donor'" + told
     assert _value_error(tmp_path, a, batch="donor", **kw) == "batch='donor'" + told
     assert _value_error(tmp_path, a, batch=a.obs["donor"], **kw) == "batch=Series" + told
     # a list of text and NaN becomes an array of text: its NaN is the text 'nan'
-    as_list = told.replace("written NaN", "written 'nan'") if isinstance(gap, float) else told
+    as_list = told.replace("no batch.", "no batch, for example 'nan'.") \
+        if isinstance(gap, float) else told
     assert _value_error(tmp_path, a, batch=list(donor), **kw) == "batch=list" + as_list
     # labels alone, split by the batch column
     assert _value_error(tmp_path, a, rna=None, labels="obs:ct", batch="obs:donor",
@@ -233,8 +228,8 @@ def test_several_spellings_of_a_missing_batch(tmp_path):
     donor[1:1201:2] = "NA"
     a.obs["donor"] = donor
     assert _value_error(tmp_path, a, rna="X", batch="obs:donor", category="cross") == (
-        "batch='obs:donor': 1,200 of the 2,000 cells have no batch. The missing values are "
-        "written NaN and 'NA'. Give every cell a batch, or leave these cells out first.")
+        "batch='obs:donor': 1,200 of the 2,000 cells have no batch, for example 'NA'. Give "
+        "every cell a batch.")
 
 
 def test_a_complete_batch_column_writes_every_cell(tmp_path):
@@ -257,8 +252,8 @@ def test_a_missing_batch_on_the_command_line(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 1 and not (tmp_path / "OUT").exists()
     assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) == (
-        "error: --batch obs:donor: 30 of the 60 cells have no batch. The missing value is "
-        "written NaN. Give every cell a batch, or leave these cells out first.")
+        "error: --batch obs:donor: 30 of the 60 cells have no batch. Give every cell a "
+        "batch.")
 
 
 # ------------------------------------------------------------- a missing label
@@ -275,20 +270,18 @@ def test_labels_that_read_back_as_missing_are_refused(tmp_path, word):
     a.obs["ct"] = ct
     shown = repr(word.strip())
     assert _value_error(tmp_path, a, rna="X", labels="obs:ct") == (
-        f"labels='obs:ct': 2 of the 60 {WHERE} (NaN, None, '' or text that a label file "
-        f"reads as missing: {shown}); {ADVICE}. If {shown} is the name of a cell type, "
-        f"rename it")
+        f"labels='obs:ct': 2 of the 60 {WHERE} (NaN, None, '' or text such as {shown}); "
+        f"{ADVICE}")
 
 
-def test_several_missing_words_are_listed(tmp_path):
+def test_several_missing_words_show_the_first(tmp_path):
     a = _cite()
     ct = a.obs["ct"].astype(object).to_numpy()
     ct[0], ct[1], ct[2], ct[3], ct[4] = "NA", "None", np.nan, "null", "n/a"
     a.obs["ct"] = ct
     assert _value_error(tmp_path, a, rna="X", labels=a.obs["ct"]) == (
         f"labels=Series: 5 of the 60 labels for the cells (the labels you passed) are "
-        f"missing (NaN, None, '' or text that a label file reads as missing: 'NA', 'None', "
-        f"'n/a' and 1 more); {ADVICE}. If one of them is the name of a cell type, rename it")
+        f"missing (NaN, None, '' or text such as 'NA'); {ADVICE}")
 
 
 @pytest.mark.parametrize("gap", [np.nan, None, "", "   "], ids=["NaN", "None", "empty", "blank"])
@@ -454,19 +447,24 @@ def test_adt_in_x_next_to_a_protein_matrix(tmp_path):
     a.obsm["protein"] = np.ones((a.n_obs, 4))
     a.obsm["X_umap"] = np.zeros((a.n_obs, 2))
     assert _value_error(tmp_path, a, rna=None, adt="X") == (
-        "adt='X' takes X of this object, and the object also holds the obsm key 'protein'. "
-        "If one of them is the protein matrix, pass adt='obsm:<key>'. If X is the protein "
-        "matrix, delete it first, for example del adata.obsm['protein'].")
+        "adt='X' takes X, and the object also holds obsm['protein']. If that is the protein "
+        "matrix, pass adt='obsm:protein'.")
     a.obsm["totalvi"] = np.ones((a.n_obs, 3))
     assert _value_error(tmp_path, _cite(), rna="X", adt=a) == (
-        "adt=AnnData takes X of this object, and the object also holds the obsm keys "
-        "'protein' and 'totalvi'. If one of them is the protein matrix, pass "
-        "adt='obsm:<key>'. If X is the protein matrix, delete them first, for example del "
-        "adata.obsm['protein'].")
-    # both ways out work
+        "adt=AnnData takes X, and the object also holds 2 obsm entries, for example "
+        "'protein'. If X is the protein matrix, delete them first, as del adt.obsm['protein'].")
+    # both ways out work: the key that the first message names
     ingest.export_dataset(a, tmp_path / "KEY", rna=None, adt="obsm:protein",
                           adt_names=["CD3", "CD4", "CD8", "CD19"])
-    del a.obsm["protein"], a.obsm["totalvi"]
+    # and the line of the second, once for each entry
+    adt = a
+    del adt.obsm['protein']
+    assert _value_error(tmp_path, _cite(), rna="X", adt=adt) == (
+        "adt=AnnData takes X, and the object also holds obsm['totalvi']. If X is the protein "
+        "matrix, run del adt.obsm['totalvi'] first.")
+    del adt.obsm['totalvi']
+    own = ingest.export_dataset(_cite(), tmp_path / "OWN", rna="X", adt=adt)
+    assert ingest.read_canonical(own / "adt.h5").n_vars == 20
     ingest.export_dataset(a, tmp_path / "X", rna=None, adt="X")
     assert ingest.read_canonical(tmp_path / "KEY" / "adt.h5").n_vars == 4
     assert ingest.read_canonical(tmp_path / "X" / "adt.h5").n_vars == 20
@@ -482,9 +480,8 @@ def test_adt_in_x_on_the_command_line(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 1 and not (tmp_path / "OUT").exists()
     assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) == (
-        "error: --adt X takes X of this object, and the object also holds the obsm key "
-        "'protein'. If one of them is the protein matrix, pass --adt obsm:<key>. If X is the "
-        "protein matrix, delete the obsm entries in Python and save the file again.")
+        "error: --adt X takes X, and the object also holds obsm['protein']. If that is the "
+        "protein matrix, pass --adt obsm:protein.")
 
 
 def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):
