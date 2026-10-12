@@ -990,6 +990,125 @@ def download_archive(urls: list[str], target: Path, *, label: str,
     return done
 
 
+_LAYERS_JSON = Path(__file__).resolve().parent / "packed_layers.json"
+
+#: Folder under the envs dir that holds the unpacked layers.
+LAYERS_DIR = ".layers"
+#: Written by ``tools/pack_layers.py`` into an env archive that needs layers.
+LAYER_MARKER = ".multibench_layers.json"
+#: Carried by a layer archive: its name, file count and digest.
+LAYER_INFO = ".multibench_layer.json"
+
+
+@functools.lru_cache(maxsize=1)
+def packed_layers() -> dict:
+    """The layers shipped as ``engine/packed_layers.json`` (``{}`` if absent).
+
+    A layer holds the files several env archives share (the torch and CUDA
+    libraries of the envs on one torch build). It is downloaded once and
+    hard-linked into each env that names it.
+
+    Returns
+    -------
+    dict
+        ``{layer: {"urls", "files", "digest", "archive_bytes",
+        "unpacked_bytes", "envs"}}``; ``envs`` lists the archive keys
+        (:func:`archive_key`) built on the layer.
+    """
+    try:
+        data = _json.loads(_LAYERS_JSON.read_text())
+    except Exception:  # noqa: BLE001 - absent or broken means "no layers"
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def layers_for(keys, *, layers: dict | None = None, envs_dir=None,
+               missing_only: bool = True) -> dict:
+    """The layers the archives ``keys`` need.
+
+    Parameters
+    ----------
+    keys : iterable of str
+        Archive keys (:func:`archive_key`).
+    layers : dict, keyword-only, optional
+        Stand-in for :func:`packed_layers`.
+    envs_dir : path, keyword-only, optional
+        Default :attr:`multibench.config.Config.envs_dir`.
+    missing_only : bool, keyword-only
+        Leave out the layers ``envs_dir`` already holds (nothing to download).
+
+    Returns
+    -------
+    dict
+        ``{layer: entry}``, each layer once however many of ``keys`` use it.
+    """
+    layers = packed_layers() if layers is None else layers
+    root = Path(envs_dir or config.DEFAULT.envs_dir) / LAYERS_DIR
+    keys = set(keys)
+    return {name: entry for name, entry in layers.items()
+            if keys & set(entry.get("envs", ()))
+            and not (missing_only and (root / name / LAYER_INFO).is_file())}
+
+
+def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
+    """``<envs_root>/.layers/<name>``, downloaded and unpacked on first use.
+
+    ``info`` is what the env archive says about its layer; a layer with
+    another digest raises ``RuntimeError``.
+    """
+    import tarfile
+    from ..data.fetch import safe_extract
+    dest = envs_root / LAYERS_DIR / name
+    if not (dest / LAYER_INFO).is_file():
+        entry = packed_layers().get(name)
+        if not entry or not entry.get("urls"):
+            raise RuntimeError(f"this multibench version does not list the layer {name}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tgz = dest.parent / f".{name}.tar.gz.download"
+        part = dest.with_name(name + ".partial")
+        try:
+            download_archive(list(entry["urls"]), tgz, label=f"{name} (shared layer)",
+                             total=entry.get("archive_bytes"))
+            print(f"[env] unpacking {name} -> {dest} ...", flush=True)
+            shutil.rmtree(part, ignore_errors=True)
+            shutil.rmtree(dest, ignore_errors=True)
+            part.mkdir(parents=True)
+            with tarfile.open(tgz) as t:
+                safe_extract(t, part)
+            part.rename(dest)
+        finally:
+            tgz.unlink(missing_ok=True)
+            shutil.rmtree(part, ignore_errors=True)
+    have = _json.loads((dest / LAYER_INFO).read_text())
+    if have.get("digest") != info.get("digest"):
+        raise RuntimeError(f"the layer {name} on disk is not the one this archive was "
+                           f"packed with; delete {dest} and install again")
+    return dest
+
+
+def _link_layer(layer: Path, prefix: Path, info: dict) -> None:
+    """Hard-link every file of ``layer`` into ``prefix`` (a copy where the
+    filesystem has no hard links). ``RuntimeError`` when a file is already
+    there or the count is not the layer's."""
+    n = 0
+    for dirpath, _dirs, files in os.walk(layer):
+        rel = Path(dirpath).relative_to(layer)
+        (prefix / rel).mkdir(parents=True, exist_ok=True)
+        for f in files:
+            if rel == Path(".") and f == LAYER_INFO:
+                continue
+            src, dst = Path(dirpath) / f, prefix / rel / f
+            if dst.exists():
+                raise RuntimeError(f"{rel / f} is in the env archive and in the layer")
+            try:
+                os.link(src, dst)
+            except OSError:
+                shutil.copy2(src, dst)
+            n += 1
+    if n != info.get("files"):
+        raise RuntimeError(f"the layer {layer.name} has {n} files, expected {info.get('files')}")
+
+
 def install_packed(env: str, *, envs_dir: Path | str | None = None,
                    conda: str | None = None, force: bool = False,
                    flavor: str = "auto") -> bool:
@@ -1086,6 +1205,11 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
             safe_extract(t, part)
         if not (part / "bin").is_dir():
             raise RuntimeError("archive did not contain bin/")
+        # the files this env shares with others: one download, hard links
+        marker = part / LAYER_MARKER
+        if marker.is_file():
+            for name, info in _json.loads(marker.read_text())["layers"].items():
+                _link_layer(_ensure_layer(name, info, envs_root), part, info)
         # the env must carry its final path before conda-unpack rewrites
         # prefixes, so move first, then unpack
         part.rename(dest)

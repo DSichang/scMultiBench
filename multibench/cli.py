@@ -1669,7 +1669,8 @@ def _cmd_evaluate(args) -> int:
 
 
 def _size_total_line(rows, sizes: dict, what: str = "download", *,
-                     flavor: str | None = None, manifest: dict | None = None) -> str:
+                     flavor: str | None = None, manifest: dict | None = None,
+                     layers: dict | None = None) -> str:
     """The ``# total`` lines for ``rows``: download and on-disk sums, then the builds.
 
     Every size known: ``# total for N envs: X GB download, Y GB on disk``. A
@@ -1701,6 +1702,10 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     manifest : dict, keyword-only, optional
         :func:`multibench.env.packed_manifest` (or a replacement in tests):
         an env without a ``'<env>-cpu'`` key there has a single build.
+    layers : dict, keyword-only, optional
+        The shared layers to add to the sums, each once; default
+        :func:`multibench.env.layers_for` of the rows' archives (the layers
+        not on disk yet). A last line names them.
 
     Returns
     -------
@@ -1713,9 +1718,11 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     n_cpu = n_gpu = n_single = 0
     no_dl, no_disk, disk_known = [], [], []
     manifest = envs.packed_manifest() if manifest is None else manifest
+    keys = []
     for r in rows:
         n += 1
         key = envs.archive_key(r["env"], r.get("flavor"))
+        keys.append(key)
         sz = sizes.get(key) or {}
         a, u = sz.get("archive_bytes"), sz.get("unpacked_bytes")
         if a is not None:
@@ -1735,6 +1742,11 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
             n_single += 1
         else:
             n_gpu += 1
+
+    layers = envs.layers_for(keys) if layers is None else layers
+    for entry in layers.values():
+        dl += entry.get("archive_bytes") or 0
+        disk += entry.get("unpacked_bytes") or 0
 
     def _envs(k: int) -> str:
         return f"{k} env{'s' if k != 1 else ''}"
@@ -1767,6 +1779,11 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
                      if n_disk else f"# The size on disk of {_named(no_disk)} is not measured.")
         lines.append("# Unpacked envs are larger than the download. Check with du after "
                      "the first install.")
+    for name, entry in layers.items():
+        k = len(set(keys) & set(entry.get("envs", ())))
+        lines.append(f"# The total includes {name} ({envs._gb(entry.get('archive_bytes'))}), "
+                     f"the libraries {_envs(k)} here share{'s' if k == 1 else ''}. "
+                     "It is downloaded once.")
     return "\n".join(lines)
 
 
@@ -1894,8 +1911,10 @@ def _cmd_env(args) -> int:
             print(f"{p['env']:18} [{tag:6}] {envs._gb(sz.get('archive_bytes')):>8} dl "
                   f"{envs._gb(sz.get('unpacked_bytes')):>8} disk <- {', '.join(p['methods'])}"
                   f"{_flavor_token(p.get('flavor'), p['env'])}")
-        print(_size_total_line(summed, sizes, flavor=flavor, manifest=manifest),
-              file=sys.stderr)
+        plan_layers = envs.layers_for(
+            [envs.archive_key(p["env"], p["flavor"]) for p in summed], missing_only=False)
+        print(_size_total_line(summed, sizes, flavor=flavor, manifest=manifest,
+                               layers=plan_layers), file=sys.stderr)
         note = envs.auto_flavor_note(flavor, planning=True)
         if note and any(p["flavor"] == "cpu" for p in summed):
             print(note, file=sys.stderr)

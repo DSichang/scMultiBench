@@ -94,8 +94,13 @@ def stored_on_fewer_batches(dataset):
 
 
 def _gb(rows):
+    import multibench as mtb
     known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
-    return ("" if len(known) == len(rows) else "at least ") + f"{sum(known) / 1e9:.1f} GB"
+    # a layer several of the envs share is downloaded once
+    shared = mtb.env.layers_for([mtb.env.archive_key(r["env"], r["flavor"]) for r in rows],
+                                missing_only=False)
+    total = sum(known) + sum(e["archive_bytes"] for e in shared.values())
+    return ("" if len(known) == len(rows) else "at least ") + f"{total / 1e9:.1f} GB"
 
 
 def env_size_text(category=None, methods=None):
