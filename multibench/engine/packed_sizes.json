@@ -60,10 +60,6 @@
     "archive_bytes": 916953088,
     "unpacked_bytes": null
   },
-  "scmb_scican": {
-    "archive_bytes": 4951744411,
-    "unpacked_bytes": null
-  },
   "scmb_scjoint": {
     "archive_bytes": 4225270409,
     "unpacked_bytes": null
@@ -71,10 +67,6 @@
   "scmb_scjoint-cpu": {
     "archive_bytes": 641368911,
     "unpacked_bytes": 2122277614
-  },
-  "scmb_scmdc": {
-    "archive_bytes": 4251894509,
-    "unpacked_bytes": null
   },
   "scmb_scmm2": {
     "archive_bytes": 1118430485,

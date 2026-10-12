@@ -433,7 +433,7 @@ def test_run_fills_the_provenance(tmp_path, monkeypatch):
     # a {cmd} template runs in the caller's own env: its build is not known
     assert res.env_flavor == "unknown"
     # the package's env: the flavour its install recorded
-    assert config.run_provenance("scmb_scmdc")["env_flavor"] == "cpu"
+    assert config.run_provenance("scmb_torch")["env_flavor"] == "cpu"
 
 
 def test_run_all_records_the_provenance(tmp_path, monkeypatch):

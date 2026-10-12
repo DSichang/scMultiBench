@@ -19,8 +19,6 @@ method_env:
   Cobolt: scmb_cobolt3             # numpy 1.21.6 (np.quantile(np.matrix) needs numpy<1.22)
   Matilda: matilda                 # torch 2.1.2; matilda-sc is installed by env_locks/matilda.post.sh
   scMM: scmb_scmm2                 # old stack: torch 1.7.1 + torchnet 0.0.4
-  scMDC: scmb_scmdc                # numpy<2 + torch + munkres
-  sciCAN: scmb_scican              # torch + tensorflow + easydl
   Multigrate: scmb_multigrate2     # multigrate==0.0.2 with torchmetrics<0.11, anndata<0.9, scanpy<1.10
   scJoint: scmb_scjoint            # numpy<1.24 (the scripts use np.float)
   VIPCCA: scmb_vipcca27            # vipcca==0.2.7

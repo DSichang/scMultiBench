@@ -47,22 +47,12 @@
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_multivi.tar.gz.003"
   ],
   "scmb_r": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_r.tar.gz",
-  "scmb_scican": [
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scican.tar.gz.001",
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scican.tar.gz.002",
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scican.tar.gz.003"
-  ],
   "scmb_scjoint": [
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scjoint.tar.gz.001",
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scjoint.tar.gz.002",
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scjoint.tar.gz.003"
   ],
   "scmb_scjoint-cpu": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scjoint-cpu.tar.gz",
-  "scmb_scmdc": [
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scmdc.tar.gz.001",
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scmdc.tar.gz.002",
-    "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scmdc.tar.gz.003"
-  ],
   "scmb_scmm2": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scmm2.tar.gz",
   "scmb_scmm2-cpu": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scmm2-cpu.tar.gz",
   "scmb_scmsi": "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/scmb_scmsi.tar.gz",

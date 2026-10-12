@@ -50,7 +50,8 @@ def test_every_runtime_read_file_is_packaged():
 def test_lockfiles_are_packaged():
     globs = _package_data_globs()
     locks = list((ROOT / "multibench/engine/env_locks").glob("*.yml"))
-    assert len(locks) >= 26
+    from multibench.engine import envs, registry
+    assert {p.stem for p in locks} == {envs.group_for(s.id) for s in registry.load()}
     for p in locks:
         rel = f"engine/env_locks/{p.name}"
         assert any(fnmatch.fnmatch(rel, g) for g in globs), rel
