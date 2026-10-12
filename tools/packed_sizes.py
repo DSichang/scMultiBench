@@ -8,7 +8,9 @@ publishing::
 
     python tools/packed_sizes.py                    # HEAD every URL in packed_urls.json
     python tools/packed_sizes.py --envs-dir /opt/conda/envs   # also measure unpacked sizes
-    python tools/packed_sizes.py --check            # exit 1 when the shipped file is stale
+    python tools/packed_sizes.py --check            # exit 1 when the shipped file is stale,
+                                                    # or a layer of packed_layers.json is
+                                                    # not published at its recorded size
 
 Only ``archive_bytes`` needs the network; ``unpacked_bytes`` needs the envs on
 disk (``--envs-dir``). An env that cannot be measured keeps ``null`` rather
@@ -27,6 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 URLS = ROOT / "multibench" / "engine" / "packed_urls.json"
 SIZES = ROOT / "multibench" / "engine" / "packed_sizes.json"
+LAYERS = ROOT / "multibench" / "engine" / "packed_layers.json"
 
 
 def head_content_length(url: str, opener=None) -> int | None:
@@ -93,6 +96,17 @@ def build(urls: dict, *, previous: dict | None = None, envs_dir: Path | None = N
     return out
 
 
+def stale_layers(layers: dict, opener=None) -> list[str]:
+    """The layers of ``packed_layers.json`` whose published parts do not add
+    up to the recorded ``archive_bytes`` (a part that does not answer counts)."""
+    out = []
+    for name, entry in sorted(layers.items()):
+        lengths = [head_content_length(u, opener=opener) for u in entry.get("urls", [])]
+        if not lengths or None in lengths or sum(lengths) != entry.get("archive_bytes"):
+            out.append(name)
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--envs-dir", type=Path, help="conda envs directory on a host that has "
@@ -112,6 +126,11 @@ def main(argv=None) -> int:
         new = {k: v for k, v in table.items() if k != "_meta"}
         if old != new:
             print("packed_sizes.json is stale - rerun tools/packed_sizes.py", file=sys.stderr)
+            return 1
+        layers = json.loads(LAYERS.read_text()) if LAYERS.is_file() else {}
+        if stale := stale_layers(layers):
+            print(f"packed_layers.json: {', '.join(stale)} is not published at the "
+                  "recorded size", file=sys.stderr)
             return 1
         return 0
     args.out.write_text(text)

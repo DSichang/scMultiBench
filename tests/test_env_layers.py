@@ -111,3 +111,28 @@ def test_total_line_adds_the_layer_once(published):
     assert text.splitlines()[-1] == ("# The total includes L (4.0 GB), the libraries 2 envs "
                                      "here share. It is downloaded once.")
     assert "includes" not in cli._size_total_line([{"env": "env_a"}], sizes, layers={})
+
+
+def test_size_tool_names_a_layer_not_published_at_its_size():
+    import sys
+    sys.path.insert(0, str(ROOT / "tools"))
+    import packed_sizes as tool
+
+    class _Resp:
+        headers = {"Content-Length": "60"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class _Opener:
+        def open(self, req):
+            if "missing" in req.full_url:
+                raise OSError("404")
+            return _Resp()
+    layers = {"ok": {"urls": ["https://x/a.001", "https://x/a.002"], "archive_bytes": 120},
+              "short": {"urls": ["https://x/b.001"], "archive_bytes": 120},
+              "gone": {"urls": ["https://x/missing"], "archive_bytes": 60}}
+    assert tool.stale_layers(layers, opener=_Opener()) == ["gone", "short"]
