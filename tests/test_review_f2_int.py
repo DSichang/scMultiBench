@@ -146,22 +146,15 @@ def test_summary_mode_names_the_tied_mean_rank_not_a_metric_value():
     for overall in ("rank", "mean_overall"):
         fig, msgs = _messages(mtb.plot.bubble, _trade_places(), aggregate="summary",
                               overall=overall)
-        notes = [t for t in _figure_texts(fig) if t.startswith("Grey fill")]
-        assert len(notes) == 1 and notes[0].startswith(
-            "Grey fill: every method has the same mean rank in "), notes
-        assert "1.500" not in notes[0] and "(1.5)" in notes[0]
+        assert [m for m in msgs if m.endswith("are grey.")] == grey
         plt.close(fig)
 
 
 def test_dataset_mode_keeps_the_metric_value():
-    import matplotlib.pyplot as plt
     df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6))
     df.loc[df["metric"] == "cLISI", "value"] = 0.0
     _, msgs = _messages(mtb.plot.build_table, df)
     assert "cLISI is 0.000 for every method. That column is grey." in msgs
-    fig, _ = _messages(mtb.plot.bubble, df)
-    assert "Grey fill: all rows equal in cLISI (0.000)." in _figure_texts(fig)
-    plt.close(fig)
 
 
 def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):

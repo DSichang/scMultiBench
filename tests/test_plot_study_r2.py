@@ -142,8 +142,6 @@ def test_one_method_figure_warns_and_is_grey():
     bars = [p for p in fig.axes[0].patches if isinstance(p, Rectangle)
             and p.get_zorder() == 3 and p.get_facecolor() == _grey()]
     assert len(bars) == 1                                 # the Overall bar too
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert "Grey fill: one method, nothing to compare." in texts
 
 
 def test_constant_column_warns_and_uses_the_neutral_fill():
@@ -156,8 +154,6 @@ def test_constant_column_warns_and_uses_the_neutral_fill():
     assert len(grey) == 3
     ilisi_x = {round(c.center[0], 3) for c in grey}
     assert len(ilisi_x) == 1                              # one column, three rows
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert "Grey fill: all rows equal in iLISI (0.000)." in texts
 
 
 def test_stored_demo_figures_are_unchanged():
@@ -232,26 +228,3 @@ def test_backend_warning_cli_spelling(monkeypatch):
     hit = [m for m in msgs if "igraph Leiden backend" in m]
     assert hit and hit[0].endswith("Score them with multibench evaluate "
                                    "--leiden-flavor leidenalg to compare them.")
-
-
-# --- M26: plain footnote and chip key ---------------------------------------
-
-def test_footnote_and_chip_key_are_plain_sentences():
-    assert B.CHIP_KEY == "Py / R = language · L = uses cell-type labels · " \
-                         "? = a name the package does not know · " \
-                         "DR = dimension reduction"
-    fig = B.render(B.build_table(_ilisi_tie()))
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert ("Overall: each method's mean rank over the metrics, scaled 0-1. "
-            "Rows: best mean Overall first.") in texts
-    assert not any("minmax(" in t or "rows ordered by" in t for t in texts)
-    two = pd.concat([_ilisi_tie().assign(dataset="D1"),
-                     _ilisi_tie().assign(dataset="D2")], ignore_index=True)
-    for basis in ("rank", "mean_overall"):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            fig = B.render(B.build_table(two, aggregate="summary", overall=basis))
-        texts = [t.get_text() for t in fig.axes[0].texts]
-        assert any(t.startswith(f"Overall (overall='{basis}'): ")
-                   and t.endswith("Rows: best mean Overall first.") for t in texts), texts
-        assert not any("minmax" in t for t in texts)

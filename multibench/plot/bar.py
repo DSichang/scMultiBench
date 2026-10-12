@@ -8,7 +8,7 @@ import pandas as pd
 
 from . import style
 from .. import config as _config
-from .style import compute_overall, minmax, rank_max
+from .style import compute_overall, minmax
 
 # scIB metric families, so a summary can be split the way the benchmark reports
 # it. They must agree with the groups eval.scib.compute() emits
@@ -136,7 +136,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     from ..data import catalog
 
     need = {"method", "metric", "value"}
-    have = set(getattr(long_df, "columns", []))
+    have = set(long_df.columns)
     if not need.issubset(have):
         raise ValueError(
             f"bar() needs a long table with columns ['method', 'metric', "
@@ -188,49 +188,54 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     per_ds = per_ds.reindex(mean.index)
 
     n = len(mean)
-    fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
-    if group == "batch":
-        cmap = "Greens"        # match the paper's family colours
-    colors = plt.get_cmap(cmap)(0.35 + 0.55 * minmax(mean.to_numpy()))
-    # error bar = SD across datasets; a method present in one dataset has no
-    # spread to show, so it gets a bar without a whisker rather than a fake one.
-    # Under overall="rank" the bar is not a mean of per-dataset scores, so no
-    # whisker/dots apply.
-    if overall == "mean_overall":
-        sd = per_ds.std(axis=1, ddof=0).reindex(mean.index)
-        nds_per = per_ds.notna().sum(axis=1).reindex(mean.index)
-        xerr = np.where(nds_per.to_numpy() > 1, sd.to_numpy(), np.nan)
-    else:
-        xerr = np.full(n, np.nan)
-    ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
-            linewidth=0.6, zorder=2,
-            xerr=np.where(np.isnan(xerr), 0.0, xerr),
-            error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
+    # matplotlib's own defaults, whatever the session's rcParams are:
+    # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
+    with plt.style.context("default"):
+        fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
+        if group == "batch":
+            cmap = "Greens"        # match the paper's family colours
+        colors = plt.get_cmap(cmap)(0.35 + 0.55 * minmax(mean.to_numpy()))
+        # error bar = SD across datasets; a method present in one dataset has no
+        # spread to show, so it gets a bar without a whisker rather than a fake one.
+        # Under overall="rank" the bar is not a mean of per-dataset scores, so no
+        # whisker/dots apply.
+        if overall == "mean_overall":
+            sd = per_ds.std(axis=1, ddof=0).reindex(mean.index)
+            nds_per = per_ds.notna().sum(axis=1).reindex(mean.index)
+            xerr = np.where(nds_per.to_numpy() > 1, sd.to_numpy(), np.nan)
+        else:
+            xerr = np.full(n, np.nan)
+        ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
+                linewidth=0.6, zorder=2, xerr=xerr,
+                error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
 
-    if show_datasets and overall == "mean_overall" and per_ds.shape[1] > 1:
-        for i, m in enumerate(mean.index):
-            vals = per_ds.loc[m].dropna().to_numpy()
-            ax.scatter(vals, np.full(len(vals), i), s=16, facecolor="white",
-                       edgecolor="#444", linewidth=0.7, zorder=3)
+        if show_datasets and overall == "mean_overall" and per_ds.shape[1] > 1:
+            for i, m in enumerate(mean.index):
+                vals = per_ds.loc[m].dropna().to_numpy()
+                ax.scatter(vals, np.full(len(vals), i), s=16, facecolor="white",
+                           edgecolor="#444", linewidth=0.7, zorder=3)
 
-    ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
-    nds = per_ds.shape[1]
-    if nds == 1:
-        xlabel = f"overall score ({per_ds.columns[0]})"
-    else:
-        how = ("mean of per-dataset overall" if overall == "mean_overall"
-               else "rank of mean ranks")
-        xlabel = f"overall score ({how}, {nds} datasets)"
-    ax.set_xlabel(xlabel, fontsize=9)
-    ax.set_xlim(0, 1.02)
-    ax.grid(axis="x", color="#e8e8e8", zorder=0)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ttl = title or (f"overall — {nds} dataset" + ("s" if nds != 1 else ""))
-    if group:
-        ttl += f"  ({group} metrics)"
-    ax.set_title(ttl, fontsize=11, loc="left")
-    fig.tight_layout()
-    if save:
-        fig.savefig(save, dpi=140, bbox_inches="tight")
+        ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
+        nds = per_ds.shape[1]
+        if nds == 1:
+            xlabel = f"overall score ({per_ds.columns[0]})"
+        else:
+            how = ("mean of per-dataset overall" if overall == "mean_overall"
+                   else "rank of mean ranks")
+            xlabel = f"overall score ({how}, {nds} datasets)"
+        ax.set_xlabel(xlabel, fontsize=9)
+        # the scores lie in [0, 1]; a whisker (mean +/- SD) can reach past either end
+        reach = np.nan_to_num(xerr)
+        ax.set_xlim(min(0, (mean.to_numpy() - reach).min() - 0.02),
+                    max(1, (mean.to_numpy() + reach).max()) + 0.02)
+        ax.grid(axis="x", color="#e8e8e8", zorder=0)
+        for side in ("top", "right", "left"):
+            ax.spines[side].set_visible(False)
+        ttl = title or (f"overall — {nds} dataset" + ("s" if nds != 1 else ""))
+        if group:
+            ttl += f"  ({group} metrics)"
+        ax.set_title(ttl, fontsize=11, loc="left")
+        fig.tight_layout()
+        if save:
+            fig.savefig(save, dpi=140, bbox_inches="tight")
     return fig

@@ -73,13 +73,10 @@ def test_export_dataset_takes_every_keyword_the_notebooks_pass():
 # ------------------------------------------------------- generated tutorials
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_plot_details_say_constant_columns_are_grey(name):
-    """M02: a column whose rows all hold one value is drawn grey and named in
-    the footnote; the Plot section says so, in the words the figure uses."""
+    """M02: a column whose rows all hold one value is drawn grey; the Plot
+    section says so."""
     md = _markdown(name, "## 4. Plot")
     assert "A column whose rows all hold the same value is drawn grey" in md
-    bubble = importlib.import_module("multibench.plot.bubble")      # the module, not the function
-    assert bubble._constant_note(["A"], {}).startswith("Grey fill")
-    assert bubble._constant_note(["A", "B"], {"iLISI": 0.0}).startswith("Grey fill: all rows equal in iLISI")
 
 
 def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_skips():

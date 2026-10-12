@@ -167,8 +167,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     method-level; the other four filters hold per variant. Two consequences:
 
     - ``find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)``
-      keeps scMoMaT: its vertical rna+adt variant takes no labels; only its
-      mosaic variant does.
+      looks at the label need of the vertical rna+adt variant alone, not at
+      the method's other variants.
     - ``find_methods('vertical', modalities=['rna', 'atac'])`` drops
       Multigrate: rna+atac exists only as a mosaic variant, so
       ``inputs_for(..., 'vertical', modalities=['rna', 'atac'])`` would raise.

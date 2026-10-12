@@ -433,7 +433,8 @@ methods:
           - {kind: graph, file: knn_dists.h5, dataset: data}
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
       # Mosaic integration. main_scMoMaT.py takes --path1/--path2/--path3 with
-      # nargs='+' plus --cty_path, so a per-batch modality pattern maps directly.
+      # nargs='+', so a per-batch modality pattern maps directly. --cty_path is
+      # not passed: its only use is commented out (main_scMoMaT.py:93).
       - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
         entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
         args:
@@ -442,7 +443,6 @@ methods:
           - {roles: [rna1, rna2, rna3], flag: "--path1"}
           - {roles: [adt1, "=None", "=None"], flag: "--path2"}
           - {roles: ["=None", atac2, "=None"], flag: "--path3"}
-          - {roles: [cty1, cty2, cty3], flag: "--cty_path"}
           - {role: out_dir, flag: "--save_path"}
         # scMoMaT's primary output is a kNN graph, not an embedding; the 2-D UMAP
         # is secondary. Same as its vertical/cross variants.
@@ -797,8 +797,9 @@ methods:
       # RNA + gene-activity ATAC with RNA labels (label transfer through a shared
       # encoder + KNN). Imports config/process_db/util as siblings -> cwd_at_script.
       # util/utils.py progress_bar reads os.popen('stty size') and crashes without a
-      # terminal -> pty (the runner wraps the command in `script -q -e -c`). Input
-      # size and class count are set from the data at run time. The shared encoder
+      # terminal -> pty (the runner wraps the command in `script -q -e -c`). The input
+      # size is set from the data at run time; the class count is fixed at 50
+      # (main_scJoint.py:91). The shared encoder
       # needs atac_gas gene-aligned to rna (same feature dimension): D28 is, D27 is
       # not. embedding.h5 holds the rna cells, then the atac cells. Intermediates go
       # to ./output/<name>_embeddings.txt in the script directory

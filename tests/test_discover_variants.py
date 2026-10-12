@@ -14,19 +14,14 @@ from multibench.engine import envs, registry, schema
 
 
 # ----------------------------------------------------------------- H1 per-variant
-def test_scmomat_is_unsupervised_in_its_vertical_variants():
-    ids = discover.find_methods(category="vertical", modalities=["rna", "adt"],
-                                needs_labels=False)
-    assert "scMoMaT" in ids
-    # the method-level flag is still 'any variant' (the mosaic variant takes cty1..3)
+def test_scmomat_is_unsupervised_in_every_variant():
+    # main_scMoMaT.py declares --cty_path and never reads it, so no variant passes it
     info = discover.method_info("scMoMaT")
-    assert info["needs_labels"] is True
-    per = {(s["category"], tuple(s["modalities"])): s["needs_labels"] for s in info["supports"]}
-    assert per[("vertical", ("rna", "adt"))] is False
-    assert per[("mosaic", ("rna1", "rna2", "rna3", "adt1", "atac2"))] is True
-    # and needs_labels=True for mosaic still finds it
-    assert "scMoMaT" in discover.find_methods(category="mosaic", needs_labels=True)
-    assert "scMoMaT" not in discover.find_methods(category="vertical", needs_labels=True)
+    assert info["needs_labels"] is False
+    assert not any(s["needs_labels"] for s in info["supports"])
+    for cat in ("vertical", "cross", "mosaic"):
+        assert "scMoMaT" in discover.find_methods(category=cat, needs_labels=False)
+        assert "scMoMaT" not in discover.find_methods(category=cat, needs_labels=True)
 
 
 def test_category_and_modalities_must_hold_on_one_variant():
@@ -117,7 +112,7 @@ def test_per_variant_semantics_on_a_synthetic_spec(monkeypatch):
 def test_find_methods_docstring_states_per_variant_rule():
     import inspect
     doc = inspect.getdoc(discover.find_methods)
-    assert "per variant" in doc and "scMoMaT" in doc
+    assert "per variant" in doc
     doc2 = inspect.getdoc(discover.method_info)
     assert "method-level" in doc2 and "any variant" in doc2
 

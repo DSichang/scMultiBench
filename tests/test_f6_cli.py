@@ -165,10 +165,7 @@ def _d11_emb(tmp_path):
     return emb
 
 
-def test_name_with_package_method_writes_needs_labels_and_bubble_badges(tmp_path):
-    import matplotlib
-    matplotlib.use("Agg")
-    from multibench.plot import bubble as B
+def test_name_with_package_method_writes_needs_labels(tmp_path):
     emb = _d11_emb(tmp_path)
     out = tmp_path / "m.csv"
     assert cli.main(["evaluate", "--output", str(emb), "--method", "Matilda", "--name",
@@ -183,19 +180,6 @@ def test_name_with_package_method_writes_needs_labels_and_bubble_badges(tmp_path
                      "--dataset", "D11", "--category", "vertical", "--data-path",
                      str(_DATA), "--metrics", "ASW", "--out", str(out2)]) == 0
     assert "needs_labels" not in pd.read_csv(out2).columns
-    # bubble badges the renamed row
-    df = pd.concat([mtb.load_results("vertical", dataset="D11", source="rerun"), mine],
-                   ignore_index=True)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tbl = B.build_table(df, na="skip")
-        fig = B.render(tbl)
-    assert tbl.needs_labels.get("Matilda_rerun") is True
-    from matplotlib.patches import Circle
-    badged = [tbl.methods[len(tbl.methods) - int(p.center[1] + 0.5)]
-              for p in fig.axes[0].patches
-              if isinstance(p, Circle) and abs(p.center[0] - (-0.38)) < 1e-6]
-    assert "Matilda_rerun" in badged and "Matilda" in badged
 
 
 def test_name_help_says_method_can_be_left_out():
@@ -314,9 +298,8 @@ def test_plot_messages_are_sentences(tmp_path, capsys):
         mtb.plot.build_table(pd.DataFrame(rows), aggregate="summary",
                              require_complete=True)
     (w,) = [str(r.message) for r in rec if "require_complete" in str(r.message)]
-    assert w == ("require_complete=True dropped 2 methods that lack a dataset: C and E "
-                 "lack D2. Pass require_complete=False to keep them. A missing dataset "
-                 "then scores rank 0 under overall='rank'.")
+    assert w == ("require_complete=True dropped 2 methods: C and E lack D2. "
+                 "Pass require_complete=False to keep them.")
     # A only on D1, C only on D2: no method has both
     part = pd.DataFrame([r for r in rows if r["method"] == "C"]
                         + [dict(r, dataset="D2", method="E") for r in rows
@@ -340,6 +323,5 @@ def test_cli_require_complete_warning_uses_the_flags(tmp_path, capsys):
     rc, err = _err(capsys, ["plot", "bubble", "--input", str(p), "--aggregate", "summary",
                             "--require-complete", "--out", str(tmp_path / "f.png")])
     assert rc == 0
-    assert ("warning: --require-complete dropped 1 method that lacks a dataset: C lacks "
-            "D2. Leave out --require-complete to keep them. A missing dataset then scores "
-            "rank 0 under --overall rank.") in err
+    assert ("warning: --require-complete dropped 1 method: C lacks D2. "
+            "Leave out --require-complete to keep them.") in err

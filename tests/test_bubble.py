@@ -283,8 +283,8 @@ def test_summary_require_complete_restricts_and_raises():
     # the drop is kept, but never silent: ONE warning names the dropped
     # method(s) and the dataset(s) each lacks (re-test round 3: a student's
     # own method on one dataset vanished from the notebook's summary figure)
-    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method that "
-                                         r"lacks a dataset: C lacks DS2\.") as rec:
+    with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method: "
+                                         r"C lacks DS2\.") as rec:
         tbl = bubble.build_table(long, aggregate="summary", require_complete=True)
     assert set(tbl.methods) == {"A", "B"}
     assert len([w for w in rec if "require_complete=True dropped" in str(w.message)]) == 1
@@ -332,40 +332,35 @@ def test_overall_basis_shared_with_bar():
     assert bubble.build_table(long, aggregate="summary").overall_basis == "rank"
     tbl = bubble.build_table(long, aggregate="summary", overall="mean_overall")
     assert tbl.overall_basis == "mean_overall"
-    fig = bubble.render(tbl)
-    assert any("mean_overall" in t.get_text() for t in fig.axes[0].texts)
 
 
-def test_nan_cell_drawn_as_dash_with_legend():
+def test_nan_cell_drawn_as_dash():
     import matplotlib; matplotlib.use("Agg")
     long = _three()
     long = long[~((long.method == "B") & (long.metric == "NMI"))]
     fig = bubble.render(bubble.build_table(long))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts.count(bubble.NA_MARK) == 1
-    assert any("n/a" in t for t in texts)
-    fig0 = bubble.render(bubble.build_table(_three()))
-    assert not any("n/a" in t.get_text() for t in fig0.axes[0].texts)
 
 
-def test_badges_unknown_and_supervised(monkeypatch):
+def test_chips_unknown_and_known(monkeypatch):
     import matplotlib; matplotlib.use("Agg")
     from matplotlib.patches import Circle
     # unknown (non-registry) methods get a '?' chip
     fig = bubble.render(bubble.build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts.count("?") == 3 and "L" not in texts
-    # a registry method that needs labels gets an 'L' badge next to the chip
+    # a registry method gets its language chip, and no badge for using labels
     from multibench.engine import registry
 
     class _Spec:
-        language = "python"; needs_labels = True
+        language = "python"; needs_labels = True; variants = []
     monkeypatch.setattr(registry, "get", lambda name: _Spec())
     fig = bubble.render(bubble.build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
-    assert texts.count("L") == 3 and texts.count("Py") == 3
+    assert "L" not in texts and texts.count("Py") == 3
     badges = [p for p in fig.axes[0].patches if isinstance(p, Circle) and p.center[0] < 0]
-    assert all(p.center[0] < 0 for p in badges) and len(badges) == 6
+    assert len(badges) == 3
 
 
 # --- P10: BubbleTable.ranks / .norm as the concatenation over blocks -------
@@ -411,17 +406,23 @@ def test_bubble_table_properties_are_not_dataclass_fields():
     assert "ranks" in bubble.BubbleTable.__doc__ and "n" in bubble.BubbleTable.ranks.__doc__
 
 
-# --- P18: on-figure key for the chips ---------------------------------------
+# --- the figure carries its legends and nothing under them -------------------
 
-def test_chip_key_drawn_with_language_chips():
+def test_figure_has_no_footnote_lines():
     import matplotlib; matplotlib.use("Agg")
-    fig = bubble.render(bubble.build_table(_three()))
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert B.CHIP_KEY in texts
-    assert B.CHIP_KEY.startswith("Py / R = language") and "L = uses cell-type labels" in B.CHIP_KEY
-    assert "? = a name the package does not know" in B.CHIP_KEY
-    fig2 = bubble.render(bubble.build_table(_three()), show_language=False)
-    assert B.CHIP_KEY not in [t.get_text() for t in fig2.axes[0].texts]
+    long = _three()
+    long = long[~((long.method == "B") & (long.metric == "NMI"))]   # an n/a cell
+    long.loc[long.metric == "ARI", "value"] = 0.5                   # a grey column
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        figs = [bubble.render(bubble.build_table(long)),
+                bubble.render(bubble.build_table(_three(datasets=("D1", "D2")),
+                                                 aggregate="summary"))]
+    for fig in figs:
+        ax = fig.axes[0]
+        below = [t.get_text() for t in ax.texts
+                 if t.get_position()[1] < 0 and t.get_gid() != "legend"]
+        assert below == []
 
 
 # --- P19: the missing-metric Overall rule is said out loud ------------------
@@ -470,13 +471,11 @@ def test_na_rule_in_summary_mode_is_rank_zero():
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 
 
-def test_bubble_passes_na_through_and_legend_states_the_rule():
+def test_bubble_passes_na_through():
     import matplotlib; matplotlib.use("Agg")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        fig = bubble(_with_gap(), na="skip")
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert any("Overall averages the metrics the method has" in t for t in texts)
+        bubble(_with_gap(), na="skip")
     with pytest.raises(ValueError, match="has no NMI"):
         bubble(_with_gap(), na="raise")
 
@@ -495,3 +494,18 @@ def test_radius_uses_methods_scored_in_the_column():
     best = max(c.radius for c in circles)
     assert best == pytest.approx(0.5 * 0.85 * 0.9)
     assert "methods scored in that column" in bubble.__doc__
+
+
+def test_circles_of_values_tied_by_rounding_have_one_size():
+    # tbl.ranks counts 0.0 and 2.2e-16 as a tie; the circle sizes must agree
+    import importlib
+    from matplotlib.patches import Circle
+    B = importlib.import_module("multibench.plot.bubble")
+    rows = [dict(metric=k, value=v, method=m, dataset="D1")
+            for m, ari, il in (("A", .5, 0.0), ("B", .6, 2.2e-16), ("C", .7, 4.4e-16))
+            for k, v in (("ARI", ari), ("iLISI", il))]
+    tbl = B.build_table(pd.DataFrame(rows))
+    x_ilisi = max(c.center[0] for c in B.render(tbl).axes[0].patches if isinstance(c, Circle))
+    radii = {round(c.radius, 6) for c in B.render(tbl).axes[0].patches
+             if isinstance(c, Circle) and c.center[0] == x_ilisi}
+    assert len(radii) == 1

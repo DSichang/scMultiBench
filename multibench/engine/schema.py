@@ -511,8 +511,7 @@ class MethodSpec:
         """True when any variant takes a cell-type-label role as input.
 
         Derived, not declared: registry.load() rejects a ``needs_labels`` key
-        in methods.yaml. Per-variant detail is on ``Variant.needs_labels``
-        (scMoMaT, for example, needs labels only in its mosaic variant).
+        in methods.yaml. Per-variant detail is on ``Variant.needs_labels``.
         """
         return any(v.needs_labels for v in self.variants)
 

@@ -23,7 +23,7 @@ def _tie_round(x) -> np.ndarray:
 
 
 def minmax(x: np.ndarray) -> np.ndarray:
-    """Scale to [0,1]; constant or all-NaN -> all ones (matches R behaviour).
+    """Scale to [0,1]; a constant vector -> ones (as in R); NaN stays NaN.
 
     Values are compared after rounding to :data:`TIE_DECIMALS` places, so a
     column that differs only by floating-point noise counts as constant.
@@ -31,10 +31,9 @@ def minmax(x: np.ndarray) -> np.ndarray:
     (:func:`constant_columns`); the numbers stay as in R.
     """
     x = _tie_round(x)
-    lo = np.nanmin(x) if np.isfinite(x).any() else np.nan
-    hi = np.nanmax(x) if np.isfinite(x).any() else np.nan
-    if not np.isfinite(lo) or lo == hi:
-        return np.ones_like(x)
+    if not np.isfinite(x).any() or np.nanmin(x) == np.nanmax(x):
+        return np.where(np.isnan(x), np.nan, 1.0)
+    lo, hi = np.nanmin(x), np.nanmax(x)
     return (x - lo) / (hi - lo)
 
 
@@ -110,8 +109,6 @@ def mean_rank_matrix(parts: dict) -> pd.DataFrame:
     datasets that have it.
     """
     mats = list(parts.values())
-    if not mats:
-        raise ValueError("no per-dataset rank matrices to average")
     idx = mats[0].index
     for q in mats[1:]:
         idx = idx.union(q.index)
@@ -281,10 +278,6 @@ def constant_columns(mat: pd.DataFrame) -> dict:
         if len(v) and (v == v[0]).all():
             out[col] = float(v[0])
     return out
-
-
-#: metrics whose value depends on the Leiden backend of the clustering sweep
-LEIDEN_METRICS = ("ARI", "NMI", "iF1")
 
 
 def backend_warning(df: pd.DataFrame) -> str | None:
