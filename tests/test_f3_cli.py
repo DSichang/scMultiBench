@@ -244,6 +244,7 @@ def _total_lines(err):
 def tables(monkeypatch):
     envs.packed_sizes.cache_clear()
     monkeypatch.setattr(envs, "packed_sizes", lambda: SIZES)
+    monkeypatch.setattr(envs, "packed_layers", lambda: {})
     monkeypatch.setattr(envs, "packed_manifest",
                         lambda: {k: f"https://x/{k}.tar.gz" for k in SIZES})
     monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)

@@ -5,7 +5,7 @@
   },
   "_meta": {
     "measured": "2026-09-03 (archive: HEAD on scmb_r, env_sciPENN, scmb_scvi; unpacked: SETUP.md du -sh figures for MOFA2_env, unitednet, scmb_torch_v2)",
-    "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json (a HEAD request); unpacked_bytes = size on disk after conda-unpack. null = not measured yet; rerun the tool after republishing an archive.",
+    "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json (a HEAD request); unpacked_bytes = size on disk after conda-unpack. null = not measured yet; rerun the tool after republishing an archive. An env built on a layer of packed_layers.json counts its own files only.",
     "written_by": "tools/packed_sizes.py"
   },
   "env_moETM": {
@@ -33,8 +33,8 @@
     "unpacked_bytes": 1880385956
   },
   "scmb_cobolt3": {
-    "archive_bytes": 4466945677,
-    "unpacked_bytes": null
+    "archive_bytes": 520155458,
+    "unpacked_bytes": 1290374632
   },
   "scmb_concerto": {
     "archive_bytes": 887587172,
@@ -49,20 +49,20 @@
     "unpacked_bytes": null
   },
   "scmb_multigrate2": {
-    "archive_bytes": 4411023372,
-    "unpacked_bytes": null
+    "archive_bytes": 458911917,
+    "unpacked_bytes": 1504795715
   },
   "scmb_multivi": {
-    "archive_bytes": 4383008901,
-    "unpacked_bytes": null
+    "archive_bytes": 431872416,
+    "unpacked_bytes": 1424315472
   },
   "scmb_r": {
     "archive_bytes": 916953088,
     "unpacked_bytes": null
   },
   "scmb_scjoint": {
-    "archive_bytes": 4225270409,
-    "unpacked_bytes": null
+    "archive_bytes": 280481966,
+    "unpacked_bytes": 887599395
   },
   "scmb_scjoint-cpu": {
     "archive_bytes": 641368911,
@@ -97,16 +97,16 @@
     "unpacked_bytes": 2292259616
   },
   "scmb_torch": {
-    "archive_bytes": 4537398808,
-    "unpacked_bytes": null
+    "archive_bytes": 587672367,
+    "unpacked_bytes": 1496194411
   },
   "scmb_torch-cpu": {
     "archive_bytes": 922099761,
     "unpacked_bytes": 2642831784
   },
   "scmb_torch_v2": {
-    "archive_bytes": 5963709861,
-    "unpacked_bytes": 9800000000
+    "archive_bytes": 1992173084,
+    "unpacked_bytes": 4535806331
   },
   "scmb_vimcca": {
     "archive_bytes": 725133485,

@@ -1,1 +1,20 @@
-{}
+{
+  "torch-2.8.0-cu12-py39": {
+    "urls": [
+      "https://github.com/DSichang/scMultiBench/releases/download/envs-v2/torch-2.8.0-cu12-py39.tar.gz.001",
+      "https://github.com/DSichang/scMultiBench/releases/download/envs-v2/torch-2.8.0-cu12-py39.tar.gz.002"
+    ],
+    "files": 11910,
+    "digest": "c59e25e92aa85eb600765fab78c6cb85a5410e7720cb33aabcb74efdb3cffc75",
+    "archive_bytes": 3898583137,
+    "unpacked_bytes": 6639940027,
+    "envs": [
+      "scmb_torch",
+      "scmb_torch_v2",
+      "scmb_cobolt3",
+      "scmb_multigrate2",
+      "scmb_multivi",
+      "scmb_scjoint"
+    ]
+  }
+}

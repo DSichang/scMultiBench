@@ -369,7 +369,7 @@ def test_strict_counts_are_labelled(monkeypatch, capsys):
 def test_env_plan_size_lines_name_the_envs():
     sizes = {"scmb_torch": {"archive_bytes": 9 * 10**8, "unpacked_bytes": 26 * 10**8},
              "scmb_r": {"archive_bytes": 9 * 10**8}}
-    text = cli._size_total_line([{"env": "scmb_torch"}, {"env": "scmb_r"}], sizes)
+    text = cli._size_total_line([{"env": "scmb_torch"}, {"env": "scmb_r"}], sizes, layers={})
     assert text.splitlines()[1:] == [
         "# 2.6 GB on disk for scmb_torch. scmb_r is not measured.",
         "# Unpacked envs are larger than the download. Check with du after the first "

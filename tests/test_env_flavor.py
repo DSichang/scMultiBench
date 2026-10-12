@@ -49,6 +49,7 @@ SIZES = {"matilda": {"archive_bytes": 3_000_000_000, "unpacked_bytes": 9_000_000
 
 @pytest.fixture
 def fake_tables(monkeypatch):
+    monkeypatch.setattr(envs, "packed_layers", lambda: {})
     monkeypatch.setattr(envs, "packed_manifest", lambda: dict(MANIFEST))
     monkeypatch.setattr(envs, "packed_sizes", lambda: {k: dict(v) for k, v in SIZES.items()})
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
