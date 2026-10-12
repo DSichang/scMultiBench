@@ -3285,3 +3285,14 @@ input:focus-visible,
   .md-typeset .api-summary table:not([class]) td:first-child { padding-bottom: 0; border-bottom: 0; }
   .md-typeset .api-summary table:not([class]) td + td { padding-top: 0.1em; }
 }
+
+/* Notebook pages: the anchor mark of a heading is out of the text flow, so
+   showing it on hover does not rewrap the heading. */
+.jupyter-wrapper :is(h1, h2, h3, h4, h5, h6) .anchor-link {
+  display: inline-block !important;
+  position: absolute;
+  margin-left: 0.4rem;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.jupyter-wrapper :is(h1, h2, h3, h4, h5, h6):hover .anchor-link { opacity: 1; }
