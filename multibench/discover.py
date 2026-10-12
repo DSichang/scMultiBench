@@ -438,8 +438,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
 
     **Labels.** ``needs_labels`` is the method-level flag: ``True`` when
     any variant takes a cell-type-label (``cty``) role as a required input.
-    It is not per category: scMoMaT is True because its mosaic variant takes
-    ``cty1..3``, while its vertical and cross variants take no labels. For
+    It is not per category. For
     the per-variant answer read ``supports[i]['needs_labels']``;
     ``find_methods(needs_labels=...)`` filters per variant.
 

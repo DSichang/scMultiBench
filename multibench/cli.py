@@ -1580,14 +1580,6 @@ def _unknown_method_message(method, name=None, files=()) -> str:
             "--labels, once per file, in your embedding's cell order.")
 
 
-def _labels_needed_by(method, category) -> bool:
-    """Whether ``method`` reads cell-type labels in ``category``: the ``L`` badge of bubble."""
-    from .engine import registry
-    spec = registry.get(method)
-    vs = [v for v in spec.variants if v.when.get("category") == category]
-    return any(v.needs_labels for v in vs) if vs else bool(spec.needs_labels)
-
-
 def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file.
 
@@ -1602,9 +1594,8 @@ def _cmd_evaluate(args) -> int:
     ``--name`` is the row name (``to_long(method=)``) and defaults to
     ``--method``. With ``--labels``, ``--name`` alone names the rows of your
     own embedding and no order check runs. Given both, ``--method`` must be
-    a package method: it sets the label order (``labels_for``), the
-    ``--labels`` order check and a ``needs_labels`` column (the ``L`` badge
-    of ``plot bubble``), as ``labels_for(..., 'SCALEX')`` and
+    a package method: it sets the label order (``labels_for``) and the
+    ``--labels`` order check, as ``labels_for(..., 'SCALEX')`` and
     ``to_long(method='SCALEX_rerun')`` do in Python. Without ``--name`` an
     unknown ``--method`` with ``--labels`` is only a row name, as before.
     """
@@ -1663,9 +1654,6 @@ def _cmd_evaluate(args) -> int:
     if long_mode:
         df = multibench.to_long(df, method=name or args.method, dataset=args.dataset,
                                 category=args.category)
-        if name is not None and args.method is not None:
-            # the L badge of plot bubble follows the method, not the row name
-            df["needs_labels"] = _labels_needed_by(args.method, args.category)
         if args.out:
             df.to_csv(args.out, index=False)
             print(f"wrote {args.out}")

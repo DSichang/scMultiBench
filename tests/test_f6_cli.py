@@ -4,8 +4,8 @@ R6-07: ``multibench evaluate --name`` is the row name in every case: with
 ``--labels`` it works without ``--method``. The errors for an unknown
 ``--method`` lead to the call that works; unknown-method and no-category
 messages are short sentences without '?;' or 'variant'. Rows written with
-``--name`` and a package ``--method`` carry ``needs_labels``, so bubble's
-``L`` badge follows the method.
+``--name`` and a package ``--method`` have the columns of every long table
+(the bubble figure has no ``L`` badge since 0.3.6).
 R6-08: bubble's duplicate-rows error says when your rows share a name with
 the stored table, and how to rename them.
 R6-09: ``run(dry_run=True)`` notes an input file that does not exist; the
@@ -165,7 +165,7 @@ def _d11_emb(tmp_path):
     return emb
 
 
-def test_name_with_package_method_writes_needs_labels(tmp_path):
+def test_name_with_package_method_writes_no_needs_labels(tmp_path):
     emb = _d11_emb(tmp_path)
     out = tmp_path / "m.csv"
     assert cli.main(["evaluate", "--output", str(emb), "--method", "Matilda", "--name",
@@ -173,13 +173,13 @@ def test_name_with_package_method_writes_needs_labels(tmp_path):
                      "--data-path", str(_DATA), "--metrics", "ASW", "--out", str(out)]) == 0
     mine = pd.read_csv(out)
     assert set(mine["method"]) == {"Matilda_rerun"}
-    assert mine["needs_labels"].tolist() == [True] * len(mine)
-    # the default long table is unchanged: no --name, no column
+    assert "needs_labels" not in mine.columns
+    # the same columns as the long table without --name
     out2 = tmp_path / "plain.csv"
     assert cli.main(["evaluate", "--output", str(emb), "--method", "Matilda",
                      "--dataset", "D11", "--category", "vertical", "--data-path",
                      str(_DATA), "--metrics", "ASW", "--out", str(out2)]) == 0
-    assert "needs_labels" not in pd.read_csv(out2).columns
+    assert list(pd.read_csv(out2).columns) == list(mine.columns)
 
 
 def test_name_help_says_method_can_be_left_out():

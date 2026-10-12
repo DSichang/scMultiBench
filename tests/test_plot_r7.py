@@ -85,7 +85,7 @@ def test_docstrings_use_the_key_wording():
         assert UNKNOWN in doc, fn.__name__
         assert "not a package method" not in doc, fn.__name__
     assert "sweep variant" not in inspect.getdoc(mtb.plot.bubble)
-    assert "add a boolean ``needs_labels`` column" in inspect.getdoc(mtb.to_long)
+    assert "needs_labels" not in inspect.getdoc(mtb.to_long)   # the figure reads no such column
 
 
 # --- R7-04: the legends and row labels fit the narrow figures -----------------

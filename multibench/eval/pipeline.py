@@ -156,9 +156,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     rows after ``pd.concat``. ``load_results(result_path=...)`` keeps the
     column when it reads the CSV back.
 
-    **Plot badges.** The bubble figure shows ``?`` for a name the package
-    does not know, such as your own or a renamed re-run. To badge such a row
-    as supervised, add a boolean ``needs_labels`` column.
+    **Plot chips.** The bubble figure shows ``?`` for a name the package
+    does not know, such as your own or a renamed re-run.
 
     **Errors.** All are ``ValueError``:
 
