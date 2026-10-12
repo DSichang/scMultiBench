@@ -92,6 +92,22 @@ def test_a_404_is_raised_at_once(monkeypatch, tmp_path):
     assert len(calls) == 1
 
 
+def test_a_server_error_is_retried(monkeypatch, tmp_path):
+    """GitHub answered 500 for the second part of a new release asset, twice."""
+    calls, data = [], b"x" * 100
+
+    def urlopen(req, timeout=None):
+        calls.append(req.full_url)
+        if len(calls) == 1:
+            raise urllib.error.HTTPError(req.full_url, 500, "Internal Server Error", {}, None)
+        return _Resp(data)
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    assert envs.download_archive(["https://u/p"], tmp_path / "x", label="p") == 100
+    assert len(calls) == 2 and (tmp_path / "x").read_bytes() == data
+
+
 def test_archive_urls_takes_one_url_or_a_list():
     assert envs.archive_urls("a", {"a": "https://h/a.tar.gz"}) == ["https://h/a.tar.gz"]
     assert envs.archive_urls("b", {"b": ["h/b.001", "h/b.002"]}) == ["h/b.001", "h/b.002"]

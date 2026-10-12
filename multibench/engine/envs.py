@@ -942,8 +942,8 @@ def download_archive(urls: list[str], target: Path, *, label: str,
     One line when the download starts and one per tenth of ``total`` (per
     500 MB when the size is unknown). A dropped or stalled connection
     (nothing for ``timeout`` seconds) resumes where it stopped, up to
-    ``attempts`` times per URL. ``urllib.error.HTTPError`` (such as a 404)
-    is raised at once. ``total`` only sizes the progress lines. Returns the
+    ``attempts`` times per URL, and so does a server error (HTTP 5xx). Any
+    other ``urllib.error.HTTPError`` (such as a 404) is raised at once. ``total`` only sizes the progress lines. Returns the
     number of bytes written.
     """
     import time
@@ -979,10 +979,10 @@ def download_archive(urls: list[str], target: Path, *, label: str,
                                 while mark <= done:
                                     mark += step
                     break
-                except urllib.error.HTTPError:
-                    raise
                 except (OSError, TimeoutError) as e:
-                    if attempt == attempts:
+                    # a 4xx (such as a 404) is final; a 5xx is the server's own fault
+                    final = isinstance(e, urllib.error.HTTPError) and e.code < 500
+                    if final or attempt == attempts:
                         raise
                     print(f"[env]   connection lost ({type(e).__name__}); resuming",
                           flush=True)
