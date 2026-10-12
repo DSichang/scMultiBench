@@ -2470,7 +2470,7 @@ lists every option. These are used most often:</p>
 <li><code>methods=[...]</code> keeps only these methods, before ranking.</li>
 <li><code>order=[...]</code> puts these methods first, in this order. The rest
   follow, best first.</li>
-<li><code>show_language=False</code> hides the language chips and the <code>L</code> badge.</li>
+<li><code>show_language=False</code> hides the language chips.</li>
 <li><code>na="skip"</code> silences the warning about missing metrics.</li>
 </ul>
 </details>
@@ -2485,13 +2485,12 @@ an Overall bar, and rows are ordered by the mean of those bars.</p>
 green columns the batch-correction metrics.</p>
 <p>A grey column holds the same value in every row. In a summary panel
 it holds the same mean rank. A figure with one method is grey in every
-column. A warning and the footnote name the grey columns.</p>
+column. A warning names the grey columns.</p>
 <p>A dash marks a metric not computed for that method. Its Overall
 averages the metrics it has, and a warning names each such method.</p>
 <p>The chips give each method's language, <code>Py</code> or <code>R</code>. <code>?</code> marks a name
 the package does not know, such as your own method or a renamed
-re-run. <code>L</code> marks a method that uses cell-type labels. Its scores are
-not comparable with the rows without labels.</p>
+re-run.</p>
 </details>
 <h3 id="individual-vs-summary-panels">Individual vs. summary panels<a class="headerlink" href="#individual-vs-summary-panels" title="Anchor link to this section">&para;</a></h3>
 <p><code>aggregate="dataset"</code>, the default, plots one dataset's values.
@@ -2570,8 +2569,6 @@ explains.</p>
 <summary>Details</summary>
 <p>Give your run a name the stored table does not use. Duplicate
 (method, dataset, metric) rows raise instead of being averaged.</p>
-<p>Add <code>mine["needs_labels"] = True</code> to show the <code>L</code> badge for a method
-that uses cell-type labels.</p>
 </details>
 <h3 id="try-it-with-a-pca-of-d11">Try it with a PCA of D11<a class="headerlink" href="#try-it-with-a-pca-of-d11" title="Anchor link to this section">&para;</a></h3>
 <p>To try the recipe without a method of your own, use a PCA of D11's <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>

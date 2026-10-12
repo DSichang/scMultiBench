@@ -2962,9 +2962,8 @@ such record. Its rows get <code>scored_with = "unknown"</code> and a
 <p>The stored tables have no <code>scored_with</code> column, so it is NaN for their
 rows after <code>pd.concat</code>. <code>load_results(result_path=...)</code> keeps the
 column when it reads the CSV back.</p>
-<p><strong>Plot badges.</strong> The bubble figure shows <code>?</code> for a name the package
-does not know, such as your own or a renamed re-run. To badge such a row
-as supervised, add a boolean <code>needs_labels</code> column.</p>
+<p><strong>Plot chips.</strong> The bubble figure shows <code>?</code> for a name the package
+does not know, such as your own or a renamed re-run.</p>
 <p><strong>Errors.</strong> All are <code>ValueError</code>:</p>
 <ul>
 <li>an already long frame (columns <code>metric, value, method</code>) - pass it to

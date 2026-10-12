@@ -2461,8 +2461,7 @@ the format, e.g. <code>.pdf</code>, <code>.png</code>, <code>.svg</code>.</p>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Draw the <code>Py</code> / <code>R</code> chip and the <code>L</code> (supervised) badge left of
-each row, plus a key line (Notes).</p>
+                <p>Draw the <code>Py</code> / <code>R</code> chip left of each row (Notes).</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2584,34 +2583,7 @@ stay silent, or raise.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>long_df</code> lacks <code>method</code> / <code>metric</code> / <code>value</code>, or <code>metrics</code> /
-<code>methods</code> / <code>order</code> names an absent value.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Duplicate <code>(method[, dataset], metric)</code> rows, or an invalid
-<code>aggregate</code> / <code>overall</code> / <code>na</code>.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>No method is complete under <code>require_complete=True</code>, or <code>n/a</code>
-cells under <code>na="raise"</code>.</p>
+                <p>As <code>mtb.plot.build_table</code>.</p>
               </div>
             </td>
           </tr>
@@ -2635,70 +2607,7 @@ cells under <code>na="raise"</code>.</p>
             </td>
             <td class="doc-warns-details">
               <div class="doc-md-description">
-                <p><code>n/a</code> cells under <code>na="warn"</code>, or several datasets under
-<code>aggregate="dataset"</code>.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p><code>aggregate="summary"</code> on an incomplete method x dataset matrix.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p><code>require_complete=True</code> dropped methods; each is named with the
-datasets it lacks.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p>A dataset holds one method, or no method spans two datasets.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p>A column has the same value in every row, or there is one method.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p>Rows scored with the igraph Leiden backend are shown with stored rows
-of their dataset.</p>
+                <p>As <code>mtb.plot.build_table</code>.</p>
               </div>
             </td>
           </tr>
@@ -2740,19 +2649,9 @@ order, input columns, name matching, errors and warnings.</p>
   <code>FamilyBlock.ranks</code> store max-ranks (<code>n</code> = best).</li>
 <li>Grey fill: every row of that column holds the same value, or the
   figure has one method, so there is nothing to compare.</li>
-<li>Footnote: the Overall formula in use, the grey columns, the <code>n/a</code>
-  rule when a dash is drawn, and the chip key.</li>
 </ul>
-<p><strong>Chips and badge</strong> (<code>show_language</code>).</p>
-<ul>
-<li>Chip: <code>Py</code> / <code>R</code> = language; <code>?</code> = a name the package does not
-  know, such as your own or a renamed re-run.</li>
-<li><code>L</code> badge: the method uses cell-type labels, and its clustering
-  scores are not comparable with unsupervised rows. A <code>needs_labels</code>
-  column decides first. Otherwise the badge follows the frame's
-  <code>category</code>: scMoMaT has it in mosaic only. With several categories,
-  it shows when the method uses labels in any of them.</li>
-</ul>
+<p><strong>Chips</strong> (<code>show_language</code>). <code>Py</code> / <code>R</code> = language; <code>?</code> = a name
+the package does not know, such as your own or a renamed re-run.</p>
 </details>
 
 <details class="see-also">
@@ -3214,7 +3113,7 @@ mtb.load_results : stored metric tables as a long frame.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Long table with <code>method</code>, <code>metric</code>, <code>value</code> columns; optional
-<code>dataset</code>, <code>category</code> and <code>needs_labels</code> columns (Notes).</p>
+<code>dataset</code> column (Notes).</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -3592,35 +3491,6 @@ the same frame.</p>
 sorted best first with a stable sort, so tied methods keep alphabetical
 order. Ranks and scores always come from the whole filtered frame;
 <code>order</code> only moves rows.</p>
-<p><strong>Bubble and bar.</strong> <code>mtb.plot.bar</code> uses the same formulas and
-tie-break. With <code>aggregate="summary"</code>, the same <code>overall=</code> and the
-metrics of one family (e.g. against <code>bar(group="clustering")</code>), both
-figures order methods identically. Across both families they can
-differ: bubble averages the family Overalls, bar scores all metrics
-together.</p>
-<p><strong>require_complete.</strong> One <code>UserWarning</code> names each dropped method and
-the datasets it lacks (<code>"require_complete=True dropped 1 method ...:
-MyRandom lacks D52s."</code>). It has no effect under
-<code>aggregate="dataset"</code>.</p>
-<p><strong>A new dataset.</strong> A figure compares methods only where they share a
-dataset, and the stored tables hold only the demo datasets. A
-<code>UserWarning</code> names a dataset that holds one method, and says so when
-no method spans two of the datasets. Plot such a dataset on its own, or
-score your method on the demo dataset of its category and add that row.</p>
-<p>A method alone on its dataset gets an Overall of 1.0 there under
-<code>"mean_overall"</code>. Under <code>"dataset"</code>, the several-datasets warning
-suggests <code>aggregate="summary"</code> only when every method has rows in at
-least two datasets and no dataset holds a single method.</p>
-<p><strong>No comparison.</strong> A column whose rows all hold the same value, and
-every column of a one-method figure, compares nothing: one
-<code>UserWarning</code> names the columns, and the figure draws them in grey.
-Ranks and scores stay as computed.</p>
-<p><strong>Leiden backend.</strong> The stored tables were clustered with leidenalg; the
-igraph default can move ARI by up to about 0.1. When rows whose
-<code>scored_with</code> starts with <code>igraph/</code> meet stored rows of the same
-dataset, and ARI, NMI or iF1 is shown, one <code>UserWarning</code> names those
-methods and the fix: set <code>mtb.config.DEFAULT.leiden_flavor =
-"leidenalg"</code> before <code>mtb.evaluate</code>.</p>
 <p><strong>Input columns.</strong> Only <code>method</code>, <code>metric</code> and <code>value</code> are
 required.</p>
 <ul>
@@ -3628,11 +3498,6 @@ required.</p>
   dataset) and is part of the duplicate-row key. A <code>"dataset"</code> figure
   that mixes datasets averages them per method and adds a dataset cue to
   each row label (<code>Name · D11</code> or <code>Name · 3 ds</code>).</li>
-<li><code>category</code> - a single value makes the <code>L</code> badge follow that
-  category's variants.</li>
-<li><code>needs_labels</code> (bool) - overrides the <code>L</code> badge per method; the
-  only way to badge a method the package does not know.
-  NaN = no override.</li>
 <li>Rows whose <code>metric</code> is NaN are dropped.</li>
 </ul>
 <p>To draw your own runs next to the stored table, concatenate the frames:
@@ -3643,12 +3508,6 @@ frame exactly, by canonical form (<code>"ari"</code> -&gt; <code>"ARI"</code>) o
 case-insensitively; the frame's own spelling is kept. The family blocks
 always stay in paper order; metrics outside the two paper families form
 a neutral purple "Other" block.</p>
-<p><strong>Errors.</strong> A frame that looks like <code>mtb.evaluate</code>'s wide output gets a
-hint to convert it with <code>mtb.to_long</code> first; an unknown name gets a
-did-you-mean hint and the values present. Duplicate rows raise
-<code>ValueError</code>. Remove them, or rename each version (as <code>mtb.sweep</code>
-does). A method with both <code>True</code> and <code>False</code>
-<code>needs_labels</code> rows, or an empty frame, also raises <code>ValueError</code>.</p>
 </details>
 
 <details class="see-also">
@@ -3685,10 +3544,8 @@ mtb.plot.BubbleTable : what is returned, field by field.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">datasets</span><span class="p">:</span> <span class="n"><span title="tuple">tuple</span></span> <span class="o">=</span> <span class="p">(),</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">coverage</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">method_datasets</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">needs_labels</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">na_cells</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">na_cells</span><span class="p">:</span> <span class="n"><span title="object">object</span></span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -3858,36 +3715,6 @@ else <code>None</code>.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="multibench.plot.bubble.BubbleTable.category">category</span></code></td>
-            <td class="doc-attribute-details">
-              <div class="doc-md-description">
-                <p>The frame's single <code>category</code> value, else <code>None</code> (mixed or
-absent); drives the supervised <code>L</code> badge.</p>
-              </div>
-              <p>
-                  <span class="doc-attribute-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> or None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><span title="multibench.plot.bubble.BubbleTable.needs_labels">needs_labels</span></code></td>
-            <td class="doc-attribute-details">
-              <div class="doc-md-description">
-                <p><code>{method: bool}</code> from an optional <code>needs_labels</code> column, empty
-without it; overrides the package's own flag for the <code>L</code> badge.</p>
-              </div>
-              <p>
-                  <span class="doc-attribute-annotation">
-                    <b>type</b>
-                      <code><span title="dict">dict</span> or None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
             <td><code><span title="multibench.plot.bubble.BubbleTable.na_cells">na_cells</span></code></td>
             <td class="doc-attribute-details">
               <div class="doc-md-description">
@@ -3928,8 +3755,8 @@ therefore ties with <code>0.0</code>.</p>
 <p><strong>Scaled values.</strong> <code>matrix</code> and <code>norm</code> are per-column min-max values
 in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
 The figure draws a column whose rows all hold one value in grey, not at
-the <code>High</code> end of the Score legend, and names it in the footnote. Every
-column of a one-method figure is grey.</p>
+the <code>High</code> end of the Score legend. Every column of a one-method
+figure is grey.</p>
 <p><strong>Blocks.</strong> Paper order: DR and clustering (blues), batch correction
 (greens), then "Other" (purples) for any metric outside the two.</p>
 </details>
@@ -3975,33 +3802,7 @@ mtb.plot.bubble : builds the table and draws the figure in one call.</p>
 
     <div class="doc doc-contents ">
 
-        <p>All families' per-column min-max values, in figure order.</p>
-<p>An alias of <code>matrix</code>: rows are <code>methods</code>, columns the metrics in
-the order the figure draws them.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="pandas.DataFrame">DataFrame</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>Method x metric values scaled to [0, 1] per column.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
+        <p>All families' per-column min-max values; an alias of <code>matrix</code>.</p>
 
     </div>
 
@@ -4025,34 +3826,7 @@ the order the figure draws them.</p>
 
     <div class="doc doc-contents ">
 
-        <p>All families' per-column max-ranks, in figure order.</p>
-<p>Rows are <code>methods</code>, columns the metrics in the order the figure
-draws them; the class Notes give the max-rank convention.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="pandas.DataFrame">DataFrame</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>Method x metric max-ranks: <code>n</code> = best, NaN where the method has
-no value for that metric.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
+        <p>All families' per-column max-ranks (<code>n</code> = best), in figure order.</p>
 
     </div>
 

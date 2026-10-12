@@ -1996,6 +1996,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-036" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.6
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-035" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2320,6 +2331,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-036" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.6
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-035" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2635,6 +2657,22 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-036">New in 0.3.6<a class="headerlink" href="#new-in-036" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>The bubble figure has no <code>L</code> badge and no note lines under its legends.
+  Warnings still name the grey columns and the missing metrics.</li>
+<li>A method with no score in a metric family gets no Overall bar there.
+  Before, it could get a full bar.</li>
+<li>Tied ranks share one circle size.</li>
+<li>Figures no longer depend on matplotlib's <code>rcParams</code>. A figure drawn after
+  <code>mtb.evaluate</code> looks the same as one drawn before.</li>
+<li>Matilda accepts every parameter of its parameter file in
+  <code>mtb.run(params=...)</code>, such as <code>batch_size</code>.</li>
+<li>scMoMaT reads no label file in mosaic runs. Its <code>needs_labels</code> is <code>False</code>
+  in every category.</li>
+<li><code>multibench evaluate --name</code> no longer writes a <code>needs_labels</code> column.</li>
+<li>The install cell of the tutorials asks for <code>multibench-sc&gt;=0.3.6</code>.</li>
+</ul>
 <h2 id="new-in-035">New in 0.3.5<a class="headerlink" href="#new-in-035" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>The section "Your own data" of each task tutorial starts from your own

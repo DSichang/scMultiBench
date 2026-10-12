@@ -2699,8 +2699,8 @@ token that contradicts <code>atac</code>.</p>
 method-level; the other four filters hold per variant. Two consequences:</p>
 <ul>
 <li><code>find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)</code>
-  keeps scMoMaT: its vertical rna+adt variant takes no labels; only its
-  mosaic variant does.</li>
+  looks at the label need of the vertical rna+adt variant alone, not at
+  the method's other variants.</li>
 <li><code>find_methods('vertical', modalities=['rna', 'atac'])</code> drops
   Multigrate: rna+atac exists only as a mosaic variant, so
   <code>inputs_for(..., 'vertical', modalities=['rna', 'atac'])</code> would raise.</li>
@@ -2936,8 +2936,7 @@ record (repository, version, paper) and the observed runtime.</p>
 <p>Use them to set <code>run_all(timeout=...)</code>.</p>
 <p><strong>Labels.</strong> <code>needs_labels</code> is the method-level flag: <code>True</code> when
 any variant takes a cell-type-label (<code>cty</code>) role as a required input.
-It is not per category: scMoMaT is True because its mosaic variant takes
-<code>cty1..3</code>, while its vertical and cross variants take no labels. For
+It is not per category. For
 the per-variant answer read <code>supports[i]['needs_labels']</code>;
 <code>find_methods(needs_labels=...)</code> filters per variant.</p>
 <p><strong>Status.</strong> <code>status</code> says how the method was checked. <code>'verified'</code>

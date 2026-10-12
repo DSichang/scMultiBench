@@ -2367,9 +2367,9 @@ rna+adt+atac row is not kept for <code>["rna", "atac"]</code>. A representation
 token keeps every row whose method reads it, so <code>"atac_peak"</code> also
 keeps MultiMAP and Seurat_v3.</p>
 <p><code>needs_labels</code> is judged per variant. <code>method_info(m)["needs_labels"]</code>
-is <code>True</code> when any variant needs labels: for scMoMaT only its mosaic
-variant does. <code>tunable=True</code> keeps the methods whose command line
-exposes at least one hyperparameter for <code>run(params=...)</code>.</p>
+is <code>True</code> when any variant needs labels. <code>tunable=True</code> keeps the
+methods whose command line exposes at least one hyperparameter for
+<code>run(params=...)</code>.</p>
 <p>An unknown token raises <code>ValueError</code> listing the valid values. A bare
 string such as <code>modalities="rna"</code> raises <code>TypeError</code>.</p>
 </details>
@@ -2472,8 +2472,7 @@ no ranked dataset measured.</p>
 only shorten the list, so a filtered list can start below 1 and end
 above 0.</p>
 <p><code>metrics=</code> picks the metric family. The default ranks on the
-clustering metrics. <code>needs_labels</code> follows the category's variants:
-scMoMaT is <code>False</code> in a vertical ranking.</p>
+clustering metrics. <code>needs_labels</code> follows the category's variants.</p>
 </details>
 <hr />
 <h2 id="the-full-benchmark-catalog">The full benchmark catalog<a class="headerlink" href="#the-full-benchmark-catalog" title="Anchor link to this section">&para;</a></h2>
