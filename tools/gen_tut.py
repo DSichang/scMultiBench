@@ -1112,8 +1112,8 @@ PLOT_DETAILS = (
     "Metrics are grouped by family: blue for dimension reduction and clustering, "
     "green for batch correction. Each family starts with an `Overall` bar. Its "
     "length and colour both show the family score.",
-    "A column whose rows all hold the same value is drawn grey, and the note under "
-    "the figure names it. A figure of one method is grey everywhere.")
+    "A column whose rows all hold the same value is drawn grey, and a warning "
+    "names it. A figure of one method is grey everywhere.")
 
 
 def build_tutorial(key):

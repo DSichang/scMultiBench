@@ -1188,9 +1188,10 @@ def _changes_0_3_5():
     """The two 0.3.5 sections of the Changes page, each on one line."""
     page = (_docs_root() / "changes.md").read_text()
     heads = re.findall(r"^## (.+)$", page, re.M)
-    assert heads[:3] == ["New in 0.3.5", "Behaviour changes in 0.3.5", "New in 0.3.4"]
+    i = heads.index("New in 0.3.5")
+    assert heads[i:i + 3] == ["New in 0.3.5", "Behaviour changes in 0.3.5", "New in 0.3.4"]
     return [" ".join(page.split(f"## {h}\n", 1)[1].split("\n## ", 1)[0].split())
-            for h in heads[:2]]
+            for h in heads[i:i + 2]]
 
 
 def _entry_0_3_5(start):
