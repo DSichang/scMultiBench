@@ -20,9 +20,8 @@ downloads the layer once and hard-links it into each env
 A slim archive names its layer in ``.multibench_layers.json``, and its
 ``bin/conda-unpack`` no longer lists the layer's files: conda-unpack opens
 every listed file for writing, and the layer's files are shared between envs.
-They hold no env path - the archives were packed from different prefixes, so
-a file with its prefix inside cannot be identical in all of them. The tool
-stops when two archives share a prefix, because that argument then fails.
+The tool stops when a shared file holds a prefix conda-unpack would rewrite
+in it.
 """
 from __future__ import annotations
 
@@ -92,14 +91,14 @@ def _sha(fh) -> str:
     return h.hexdigest()
 
 
-def scan(archive: Path, roots=ROOTS) -> tuple[dict, set, set]:
-    """``({path: (sha256, mode)}, link targets, prefixes)`` of one archive.
+def scan(archive: Path, roots=ROOTS) -> tuple[dict, set, dict]:
+    """``({path: (sha256, mode)}, link targets, {path: prefix})`` of one archive.
 
     The first maps every regular file under ``roots``; the second holds the
-    targets of the archive's hard links; the third the prefixes its
-    ``bin/conda-unpack`` rewrites.
+    targets of the archive's hard links; the third the prefix its
+    ``bin/conda-unpack`` rewrites in each file it lists.
     """
-    files, targets, prefixes = {}, set(), set()
+    files, targets, prefixes = {}, set(), {}
     with _read(archive) as tar:
         for m in tar:
             name = _name(m)
@@ -109,7 +108,7 @@ def scan(archive: Path, roots=ROOTS) -> tuple[dict, set, set]:
                 files[name] = (_sha(tar.extractfile(m)), m.mode)
             elif m.isreg() and name == UNPACK:
                 text = tar.extractfile(m).read().decode()
-                prefixes = {r["prefix"] for line in text.splitlines()
+                prefixes = {r["path"]: r["prefix"] for line in text.splitlines()
                             if (r := _RECORD.match(line))}
     return files, targets, prefixes
 
@@ -118,15 +117,9 @@ def shared(scans: dict) -> dict:
     """``{path: sha256}`` of the files every scanned archive holds alike."""
     first, *rest = (files for files, _, _ in scans.values())
     common = {p: v[0] for p, v in first.items() if all(o.get(p) == v for o in rest)}
-    seen = {}
-    for archive, (_, targets, prefixes) in scans.items():
+    for archive, (_, targets, _) in scans.items():
         if linked := sorted(targets & common.keys())[:3]:
             raise SystemExit(f"{archive}: hard links point at shared files {linked}")
-        for prefix in prefixes:
-            if prefix in seen:
-                raise SystemExit(f"{archive} and {seen[prefix]} were packed from one "
-                                 f"prefix ({prefix}); identical files may hold it")
-            seen[prefix] = archive
     return common
 
 
@@ -142,15 +135,23 @@ def _add(tar: tarfile.TarFile, name: str, data: bytes, like: tarfile.TarInfo | N
     tar.addfile(info, io.BytesIO(data))
 
 
-def write_layer(archive: Path, layer: dict, info: dict, out: Path) -> None:
-    """The layer archive: the shared files of ``archive`` and ``LAYER_INFO``."""
+def write_layer(archive: Path, layer: dict, info: dict, out: Path, prefixes: dict) -> None:
+    """The layer archive: the shared files of ``archive`` and ``LAYER_INFO``.
+
+    ``prefixes`` maps a path to the prefixes conda-unpack would rewrite in
+    it, one per scanned archive; a shared file that holds one stops the tool.
+    """
     left = set(layer)
     with _read(archive) as src, _write(out) as dst:
         _add(dst, LAYER_INFO, json.dumps(info).encode())
         for m in src:
-            if _name(m) in left:
-                left.discard(_name(m))
-                dst.addfile(m, src.extractfile(m))
+            name = _name(m)
+            if name in left:
+                left.discard(name)
+                data = src.extractfile(m).read()
+                if held := [p for p in prefixes.get(name, ()) if p.encode() in data]:
+                    raise SystemExit(f"{name} is shared and holds the prefix {held[0]}")
+                dst.addfile(m, io.BytesIO(data))
     if left:
         raise SystemExit(f"{archive}: {len(left)} shared files not found on the second read")
 
@@ -194,7 +195,8 @@ def main(argv=None) -> int:
         raise SystemExit("the archives share no file under the roots")
     info = {"name": args.name, "files": len(layer), "digest": digest(layer)}
     target = args.out / f"{args.name}.tar.gz"
-    write_layer(args.archives[0], layer, info, target)
+    prefixes = {p: {s[2][p] for s in scans.values() if p in s[2]} for p in layer}
+    write_layer(args.archives[0], layer, info, target, prefixes)
     print(f"layer {target.name}: {len(layer)} files, {target.stat().st_size / 1e9:.2f} GB",
           flush=True)
     envs = []

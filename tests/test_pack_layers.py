@@ -32,14 +32,14 @@ def _members(path):
         return {m.name: tar.extractfile(m).read() for m in tar if m.isreg()}
 
 
-def _two(tmp_path, **kw):
+def _two(tmp_path):
     common = {f"{SP}/torch/lib/libtorch.so": b"T" * 100, f"{SP}/nvidia/cublas/lib.so": b"N" * 50}
     a = _archive(tmp_path / "env_a.tar.gz", "env_a", {
         **common, f"{SP}/torch/__pycache__/x.pyc": b"/build/envs/env_a", "bin/python": b"py",
         f"{SP}/numpy/core.so": b"same"})
     b = _archive(tmp_path / "env_b.tar.gz", "env_b", {
         **common, f"{SP}/torch/__pycache__/x.pyc": b"/build/envs/env_b", "bin/python": b"py",
-        f"{SP}/numpy/core.so": b"same", f"{SP}/nvidia/cudnn/extra.so": b"only b"}, **kw)
+        f"{SP}/numpy/core.so": b"same", f"{SP}/nvidia/cudnn/extra.so": b"only b"})
     return a, b, common
 
 
@@ -64,7 +64,9 @@ def test_layer_and_slim_archives(tmp_path):
     assert entry["archive_bytes"] == (out / "L.tar.gz").stat().st_size
 
 
-def test_archives_packed_from_one_prefix_are_refused(tmp_path):
-    a, b, _ = _two(tmp_path, prefix="/build/envs/env_a")
-    with pytest.raises(SystemExit, match="one prefix"):
+def test_a_shared_file_that_holds_its_prefix_is_refused(tmp_path):
+    files = {f"{SP}/torch/config.py": b"home = '/build/envs/one'", "bin/python": b"py"}
+    a = _archive(tmp_path / "env_a.tar.gz", "env_a", files, prefix="/build/envs/one")
+    b = _archive(tmp_path / "env_b.tar.gz", "env_b", files, prefix="/build/envs/one")
+    with pytest.raises(SystemExit, match="holds the prefix /build/envs/one"):
         PL.main(["--name", "L", "--out", str(tmp_path / "out"), str(a), str(b)])
