@@ -28,7 +28,7 @@ DONORS = np.array(["d1", "d2", "d3"] * (N // 3))
 #: the same text from export_dataset, evaluate and run_all: it names neither
 #: the number of rows nor the order the values must follow
 TEXT = ("batch is a Series without barcodes and is matched to the cells by position. To "
-        'match by barcode, pass adata.obs["donor"].')
+        "match by barcode, pass a Series indexed by barcode.")
 
 
 def _adata(names=True):
@@ -57,8 +57,16 @@ def test_export_dataset_warns_and_takes_the_rows_in_order(tmp_path):
     out, said = _caught(lambda: ingest.export_dataset(
         a, tmp_path / "ROWS", batch=pd.Series(DONORS), **kw))
     assert said == [TEXT]
+    assert "adata" not in TEXT and "donor" not in TEXT   # no name of the caller is guessed
     # by position: batch 1 holds every third cell, starting with the first
     assert list(ingest.read_canonical(out / "rna1.h5").obs_names) == list(a.obs_names[::3])
+    # as it says: the same values indexed by barcode, in another row order
+    turned = pd.Series(DONORS, index=a.obs_names).iloc[::-1]
+    by_barcode, said = _caught(lambda: ingest.export_dataset(
+        a, tmp_path / "BARCODES", batch=turned, **kw))
+    assert said == []
+    assert list(ingest.read_canonical(by_barcode / "rna1.h5").obs_names) \
+        == list(a.obs_names[::3])
 
 
 def test_export_dataset_is_silent_for_the_usual_forms(tmp_path):

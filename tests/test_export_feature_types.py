@@ -24,6 +24,8 @@ ad = pytest.importorskip("anndata")
 GENES, PEAKS, PROTEINS = 800, 1200, 12
 HEAD = "features of 2 types, 'Peaks' and 'Gene Expression'."      # the larger type first
 RECIPE = 'See the recipe "A 10x .h5 file" in the docs.'
+#: the action for type names of which none is a 10x name, in Python
+DELETE = "delete the column var['feature_types'] first."
 
 
 def _mixed(types, n=20, seed=0):
@@ -137,15 +139,16 @@ def test_the_example_in_the_message_works(tmp_path):
                                    ("protein_coding", "lncRNA")])
 def test_no_example_is_guessed(tmp_path, types):
     """Type names that are not the 10x ones: the message does not pick one
-    of them, because the larger type need not be the modality asked for."""
+    of them, because the larger type need not be the modality asked for. Its
+    one action is to delete the column, for features that are all RNA."""
     a = _mixed([(types[0], 30, "A"), (types[1], 50, "B")])
     msg = _raises(tmp_path, a, rna="X")
     head = f"features of 2 types, {types[1]!r} and {types[0]!r}."
-    assert msg == f"rna='X' selects {head} Add a filter, as rna='X[feature_types=<type>]'."
-    assert re.findall(r"feature_types=([^\]]*)\]", msg) == ["<type>"]
+    assert msg == f"rna='X' selects {head} If all are RNA features, {DELETE}"
+    assert "feature_types=" not in msg and "<type>" not in msg
     msg = _raises(tmp_path, None, rna=a)
-    assert msg == (f"rna=AnnData holds {head} Pass one type, as rna=adata[:, "
-                   f"adata.var['feature_types'] == '<type>'].")
+    assert msg == (f"rna=AnnData holds {head} If all are RNA features, run del "
+                   f"rna.var['feature_types'] first.")
 
 
 def test_a_10x_name_of_another_modality_is_no_example(tmp_path):
@@ -168,6 +171,11 @@ def test_peaks_are_no_example_for_gene_activity(tmp_path):
 def test_many_types_are_counted(tmp_path):
     """More than two types: their number, and the largest by name."""
     a = _mixed([(f"type{i}", 10 - i, f"T{i}_") for i in range(6)])
+    msg = _raises(tmp_path, a, rna="X")
+    assert msg == ("rna='X' selects features of 6 types, for example 'type0'. If all are "
+                   f"RNA features, {DELETE}")
+    # one 10x name among them: the features are of several modalities
+    a = _mixed([(f"type{i}", 10 - i, f"T{i}_") for i in range(5)] + [("Peaks", 3, "P")])
     msg = _raises(tmp_path, a, rna="X")
     assert msg == ("rna='X' selects features of 6 types, for example 'type0'. Add a filter, "
                    "as rna='X[feature_types=<type>]'.")
@@ -487,33 +495,66 @@ def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsy
         "as rna='X[feature_types=Gene Expression]'.")
 
 
-def test_other_type_names_get_the_same_advice(tmp_path, capsys):
-    """Names such as protein_coding and lncRNA may all be RNA features. The
-    message no longer says to delete the column for them: it is the one of
-    the 10x names, with ``<type>`` for the type. Without the column the
-    object is still written as one file."""
+def test_other_type_names_get_the_advice_to_delete_the_column(tmp_path, capsys):
+    """Names such as protein_coding and lncRNA may all be RNA features. None
+    of them is a 10x name, so the one action is to delete the column: the
+    object is then written as one file. The object is named where the
+    modality came as its own object, and the command line names no object."""
     a = _mixed([("protein_coding", 30, "A"), ("lncRNA", 50, "B")])
     head = "features of 2 types, 'lncRNA' and 'protein_coding'."
     texts = [_raises(tmp_path, a, rna="X"), _raises(tmp_path, a, rna="X[genome=GRCh38]"),
-             _raises(tmp_path, None, rna=a)]
+             _raises(tmp_path, None, rna=a),
+             _raises(tmp_path, _mixed([("Gene Expression", 5, "G")]), adt=a),
+             _raises(tmp_path, _mixed([("Gene Expression", 5, "G")]), atac=a,
+                     atac_kind="gene_activity")]
     assert texts == [
-        f"rna='X' selects {head} Add a filter, as rna='X[feature_types=<type>]'.",
-        f"rna='X[genome=GRCh38]' holds {head} Pass one type, as rna=adata[:, "
-        f"adata.var['feature_types'] == '<type>'].",
-        f"rna=AnnData holds {head} Pass one type, as rna=adata[:, "
-        f"adata.var['feature_types'] == '<type>']."]
+        f"rna='X' selects {head} If all are RNA features, {DELETE}",
+        f"rna='X[genome=GRCh38]' holds {head} If all are RNA features, {DELETE}",
+        f"rna=AnnData holds {head} If all are RNA features, run del "
+        f"rna.var['feature_types'] first.",
+        f"adt=AnnData holds {head} If all are ADT features, run del "
+        f"adt.var['feature_types'] first.",
+        f"atac=AnnData holds {head} If all are ATAC features, run del "
+        f"atac.var['feature_types'] first."]
     with pytest.raises(ValueError) as e:
         ingest.to_canonical(a, tmp_path / "DIR" / "rna.h5")
-    assert str(e.value) == (f"The matrix holds {head} Pass one type, as adata[:, "
-                            f"adata.var['feature_types'] == '<type>'].")
+    assert str(e.value) == f"The matrix holds {head} If all are RNA features, {DELETE}"
+    with pytest.raises(ValueError) as e:                 # no modality to name
+        ingest.to_canonical(a, tmp_path / "DIR" / "matrix.h5")
+    assert str(e.value) == (
+        f"The matrix holds {head} If all are features of one modality, {DELETE}")
     src = tmp_path / "typed.h5ad"
     a.write_h5ad(src)
+    saved = "delete the var column feature_types in Python and save the file again."
     rc, line = _cli(["convert", str(src), str(tmp_path / "OUT"), "--rna", "X"], capsys)
     assert rc == 1 and line == (
-        f'error: --rna X selects {head} Add a filter, as --rna "X[feature_types=<type>]".')
+        f"error: --rna X selects {head} If all are RNA features, {saved}")
+    rc, line = _cli(["convert", str(src), f"{tmp_path}/DIR/", "--modality", "rna"], capsys)
+    assert rc == 1 and line == (
+        f"error: The matrix holds {head} If all are RNA features, {saved}")
+    assert not (tmp_path / "OUT").exists() and not (tmp_path / "DIR").exists()
     for text in texts + [str(e.value), line]:
-        assert "delete" not in text and "If all of them" not in text
-    # an object without the column is written as one file
-    del a.var["feature_types"]
-    out = ingest.export_dataset(a, tmp_path / "ONE", rna="X")
+        assert "feature_types=" not in text and "adata" not in text
+
+
+def test_the_advice_to_delete_the_column_works(tmp_path, capsys):
+    """Each form of the advice, done as written: one file with every feature."""
+    a = _mixed([("protein_coding", 30, "A"), ("lncRNA", 50, "B")])
+    src = tmp_path / "typed.h5ad"
+    a.write_h5ad(src)
+    # a selector: the column of the object that is exported
+    data = a.copy()
+    del data.var['feature_types']
+    out = ingest.export_dataset(data, tmp_path / "ONE", rna="X")
     assert ingest.read_canonical(out / "rna.h5").n_vars == 80
+    # the modality as its own object: the line of the message, with its name
+    rna = a.copy()
+    del rna.var['feature_types']
+    out = ingest.export_dataset(None, tmp_path / "TWO", rna=rna)
+    assert ingest.read_canonical(out / "rna.h5").n_vars == 80
+    # the command line: in Python, and the file saved again
+    saved = ad.read_h5ad(src)
+    del saved.var["feature_types"]
+    saved.write_h5ad(src)
+    assert _cli(["convert", str(src), str(tmp_path / "CLI"), "--rna", "X"], capsys)[0] == 0
+    assert ingest.read_canonical(tmp_path / "CLI" / "rna.h5").n_vars == 80

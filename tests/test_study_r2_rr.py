@@ -271,8 +271,8 @@ def test_adt_hint_for_a_layer_stays_layer_counts(tmp_path):
     with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "L", adt=prot)
     assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [
-        "The adt values are not whole numbers, so they look log-normalised. Set adt.X = "
-        "adt.layers[\"counts\"] first."]
+        "The adt values are not whole numbers, so they look log-normalised. Put the raw "
+        "counts in adt.X first."]
     with pytest.warns(UserWarning, match=r"for example with adt='layer:counts'\."):
         mtb.io.export_dataset(prot, tmp_path / "S", rna=None, adt="X")
 

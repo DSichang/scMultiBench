@@ -289,8 +289,11 @@ def _cell_ids(output):
 
     An AnnData carries ``obs_names``; a DataFrame carries its index unless that
     index is a plain ``RangeIndex`` (the default, i.e. no ids). Everything else
-    (ndarray, sparse matrix, file path) has no ids, so labels can only be
-    matched positionally.
+    that reaches this function (ndarray, sparse matrix, ``.h5`` or ``.npy``
+    path) has no ids, so labels can only be matched positionally.
+    ``evaluate`` reads an ``.h5ad`` path as an AnnData first, and takes the
+    ids of a ``.csv`` / ``.tsv`` path from its first column
+    (:func:`multibench.eval.io._read_csv_embedding`).
     """
     if io._is_anndata(output):
         return pd.Index(output.obs_names)
@@ -344,15 +347,21 @@ def _same_cells(keys, ids, *, what: str, name: str, table: _Table, fix: str,
                 first: str | None = None, plural: bool = False) -> bool:
     """Whether ``keys``, the cell ids of a labels, batch or clustering
     argument, are in another order than ``ids``, the barcodes of the
-    embedding file ``table``. ``ValueError`` when the two do not name the
-    same cells: how many cells of the embedding the argument lacks, or, when
-    it lacks none, how many of its cells the embedding lacks, one barcode,
-    and ``fix``.
+    embedding file ``table``. ``ValueError`` when some of the ids are cells
+    of the embedding and the two do not name the same cells: how many cells
+    of the embedding the argument lacks, or, when it lacks none, how many of
+    its cells the embedding lacks, one barcode, and ``fix``.
+
+    Ids of which none is a cell of the embedding are not an order: ``False``,
+    and the caller matches by position with a warning, as it does for the
+    ``obs_names`` of an AnnData (:func:`_shares_no_id`).
 
     ``name`` names the argument in the message (a file name, ``the labels
     Series``); ``first`` and ``plural`` are not worded.
     """
     keys, ids = pd.Index([str(k) for k in keys]), pd.Index([str(i) for i in ids])
+    if not keys.isin(ids).any():
+        return False
     extra = keys[~keys.isin(ids)].unique()
     missing = ids.difference(keys, sort=False)
     if len(extra) or len(missing):
@@ -363,8 +372,14 @@ def _same_cells(keys, ids, *, what: str, name: str, table: _Table, fix: str,
     return not keys.equals(ids)
 
 
+def _shares_no_id(keys, ids) -> bool:
+    """No id of ``keys`` is one of ``ids``: the two are written differently
+    (barcodes with and without ``-1``), or they are other cells."""
+    return not pd.Index([str(k) for k in keys]).isin([str(i) for i in ids]).any()
+
+
 def _file_fix(name: str, table: _Table, plural: bool = False) -> str:
-    return "Write both for the same cells."
+    return "Write them for the same cells." if plural else "Write both for the same cells."
 
 
 def _file_carries_ids(first, ids) -> bool:
@@ -377,7 +392,7 @@ def _file_carries_ids(first, ids) -> bool:
 
 
 def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
-                   table=None):
+                   table=None, cells=None):
     """Coerce one label-like argument to a 1-D array in the output's cell order.
 
     * a ``str`` naming an obs column of ``adata``, with or without the
@@ -398,9 +413,13 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
     (:func:`multibench.eval.io.read_labels_ids`); the cell order is the same.
 
     ``table`` is given when ``ids`` are the barcodes of a ``.csv`` / ``.tsv``
-    embedding: an argument with cell ids must then name exactly those cells
-    (:func:`_same_cells`), and one in another order is noted in
-    ``table.moved``.
+    embedding: an argument with cell ids of which some are cells of the
+    embedding must then name exactly those cells (:func:`_same_cells`), and
+    one in another order is noted in ``table.moved``. A Series of which no
+    id is a cell of the embedding is matched by position, with a
+    ``UserWarning``, as a file is (:func:`multibench.eval.io.by_id_column`).
+
+    ``cells`` words the error of :func:`multibench.eval.io._align_vector`.
     """
     if adata is not None and isinstance(x, str):
         col = _obs_column_name(x, adata)
@@ -427,17 +446,20 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             target="the output", order="the rows of the output",
             no_ids=_no_ids(ids), stacklevel=5, drop=what == "labels")[0]
     if _carries_ids(x):
-        if ids is not None:
+        other = table is not None and _shares_no_id(x.index, ids)
+        if ids is not None and not other:
             name = f"the {what} {type(x).__name__}"
             if table is not None and x.index.is_unique and pd.Index(ids).is_unique \
                     and _same_cells(x.index, ids, what=what, name=name, table=table,
                                     fix=f"Pass {what} for the cells of {table.name}."):
                 table.moved.append(name)
-            return io.align_vector(x, ids, what=what, column=column)
+            return io._align_vector(x, ids, what=what, column=column, cells=cells)
         warnings.warn(
-            f"The {what} {type(x).__name__} is matched by position, because the "
-            f"embedding has no cell ids. Check that it follows the embedding rows, "
-            f"or pass an AnnData whose obs_names are the barcodes.",
+            f"The {what} {type(x).__name__} is matched by position, because "
+            + (f"none of its ids is a cell of {table.name}. Check that it follows the "
+               f"rows of {table.name}." if other else
+               "the embedding has no cell ids. Check that it follows the embedding rows, "
+               "or pass an AnnData whose obs_names are the barcodes."),
             # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
             UserWarning, stacklevel=4)
     if what == "batch" and io._numbers_rows(x, ids):
@@ -1004,7 +1026,9 @@ def evaluate(
         ``mtb.labels_for`` dict (Notes).
     verbose : bool
         ``True`` prints one stderr line when the Leiden sweep starts on more
-        than 2,000 cells; ``False`` never prints.
+        than 2,000 cells, and one when labels, batches or clusters are put
+        in the row order of a ``.csv`` / ``.tsv`` output by barcode;
+        ``False`` never prints.
     missing_labels : {"error", "drop"}
         What to do when a cell has no label. ``"error"`` raises. ``"drop"``
         scores the labelled cells only and warns how many (Notes).
@@ -1208,10 +1232,13 @@ def evaluate(
 
     The first column of a ``.csv`` / ``.tsv`` output holds the barcodes when
     it holds text, that is, when at least one of its values is not a
-    number. Labels, batches and clusters with cell ids must then name
-    exactly those cells: another row order is matched by barcode, and a
-    line on stderr says so; other cells raise ``ValueError`` with the
-    number of cells that are missing and one of them. A first column of numbers
+    number. Labels, batches and clusters with cell ids are then matched as
+    they are for an AnnData. Another row order is matched by barcode, and a
+    line on stderr says so unless ``verbose=False``. Ids of which none is
+    a cell of the output are matched by position, with a ``UserWarning``;
+    this holds for a Series too, which raises for an AnnData. Ids of which
+    only some are cells of the output raise ``ValueError`` with the number
+    of cells that are missing and one of them. A first column of numbers
     without a header (row numbers) is left out and gives no ids, and one
     with a header is a column of the embedding.
 
@@ -1298,6 +1325,9 @@ def evaluate(
         metrics, has_batch=batch is not None or batch_from_files,
         batch_given=batch is not None)
 
+    # the caller holds an object whose obs_names are the cell ids: named in
+    # the error for a Series that lacks some cells
+    cells = "adata.obs_names" if io._is_anndata(output) else None
     if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
         import anndata as ad      # read once; keeps obs_names and obs columns
         output = ad.read_h5ad(output)
@@ -1320,7 +1350,7 @@ def evaluate(
         ct, origin = _stack_label_files(labels, ids, table=table)
     else:
         ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids,
-                                    table=table), None
+                                    table=table, cells=cells), None
     # Orient to cells x dims. read_embedding() already does this for h5 inputs;
     # do the same for everything else so a caller can pass run().output (dims x
     # cells for many methods) directly. Transpose only when the label count
@@ -1342,9 +1372,11 @@ def evaluate(
             raise FileNotFoundError(_no_column_error("clustering", clustering))
         cl = io.read_clustering(clustering)        # the benchmark's h5 layout
     else:
-        cl = _obs_or_vector(clustering, adata, what="clustering", ids=ids, table=table)
+        cl = _obs_or_vector(clustering, adata, what="clustering", ids=ids, table=table,
+                            cells=cells)
     if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table)
+        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table,
+                            cells=cells)
     elif batch_from_files and group in {"batch", "all"}:
         # batch = which label file each cell came from (1-based, as run_all)
         ba = origin
@@ -1352,7 +1384,7 @@ def evaluate(
         # clustering metrics need a batch_key but it is a no-op there, so a
         # constant vector is acceptable when no batch labels are supplied.
         ba = np.zeros(emb.shape[0], dtype=int)
-    if table is not None and table.moved:
+    if verbose and table is not None and table.moved:
         import sys
         moved = table.moved[0] + (f" and {len(table.moved) - 1} more"
                                   if len(table.moved) > 1 else "")

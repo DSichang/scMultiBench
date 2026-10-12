@@ -102,6 +102,30 @@ def test_the_warning_for_an_object_names_its_own_x(tmp_path):
         LOOKS.format(what="atac") + "Set atac.X = atac.layers[\"counts\"] first."]
 
 
+def test_the_layer_is_named_only_for_an_object_that_has_it(tmp_path):
+    """Without a layer called counts the line of 0.3.5 raised KeyError. The
+    warning then says what is needed, and names no layer."""
+    adt, atac = _adt(), _atac()
+    del adt.layers["counts"], atac.layers["counts"]
+    atac.layers["raw"] = np.round(np.expm1(atac.X))
+    kw = dict(rna="X", atac_kind="peak", labels="obs:celltype")
+    msgs = _warned(ingest.export_dataset, _rna(log=False), tmp_path / "A", adt=adt, atac=atac,
+                   **kw)
+    assert msgs == [LOOKS.format(what="adt") + "Put the raw counts in adt.X first.",
+                    LOOKS.format(what="atac") + "Put the raw counts in atac.X first."]
+    with pytest.raises(KeyError):
+        adt.X = adt.layers["counts"]                     # the line 0.3.5 gave
+    adt.X = np.round(np.expm1(adt.X))                    # as the warning says
+    atac.X = atac.layers["raw"]
+    assert _warned(ingest.export_dataset, _rna(log=False), tmp_path / "B", adt=adt, atac=atac,
+                   **kw) == []
+    # with the layer, the line of the warning works as written
+    adt = _adt()
+    adt.X = adt.layers["counts"]
+    assert _warned(ingest.export_dataset, _rna(log=False), tmp_path / "C", rna="X",
+                   adt=adt) == []
+
+
 def test_the_warning_for_a_table_has_no_layer_to_name(tmp_path):
     a = _adt()
     table = pd.DataFrame(np.asarray(a.X), index=a.obs_names, columns=a.var_names)
@@ -178,7 +202,17 @@ def test_the_refusal_on_the_command_line(tmp_path, monkeypatch):
     assert _refused(tmp_path, _rna(), rna="layer:counts", atac="layer:counts",
                     atac_kind="peak") == (
         "--rna layer:counts and --atac layer:counts name the same matrix. Name where the "
+        "ATAC is in SRC, with --atac.")
+    # the filter is shown for a file whose features have that type
+    arc = _rna()
+    arc.var["feature_types"] = ["Gene Expression"] * 30 + ["Peaks"] * 10
+    assert _refused(tmp_path, arc, rna="layer:counts", atac="layer:counts",
+                    atac_kind="peak") == (
+        "--rna layer:counts and --atac layer:counts name the same matrix. Name where the "
         "ATAC is, as --atac \"X[feature_types=Peaks]\".")
+    arc.var["feature_types"] = ["Gene Expression"] * 30 + ["Antibody Capture"] * 10
+    assert _refused(tmp_path, arc, rna="layer:counts", atac="layer:counts",
+                    atac_kind="peak").endswith("Name where the ATAC is in SRC, with --atac.")
 
 
 def test_convert_refuses_one_matrix_twice_and_writes_nothing(tmp_path, capsys):
@@ -621,7 +655,8 @@ def test_the_changes_page_names_the_new_refusals_and_texts(linux, tmp_path, caps
     assert f"`{pm['reason'][0]}` 0.3.4 wrote one sentence per file." in messages
     assert ("A cross folder written with `atac_kind=\"gene_activity\"` holds `atac_gas1.h5`, "
             "`atac_gas2.h5` and so on") in checks
-    assert "for example `adt.X = adt.layers[\"counts\"]`." in messages
+    assert ("It gives the line `adt.X = adt.layers[\"counts\"]` when the object has a "
+            "layer called `counts`.") in messages
     assert "On the command line, convert each side with its own command and its own " \
            "`--labels`, into the same folder." in messages
     assert open_.startswith("- The check does not compare the feature names of two batches.")

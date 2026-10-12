@@ -420,7 +420,7 @@ def test_arrays_lists_and_range_indexed_series_stay_positional(cite):
         assert list(W._batch_vector(pd.Series(batch), "MYCITE", data)) == list(batch)
     assert [str(w.message) for w in rec] == [
         "batch is a Series without barcodes and is matched to the cells by position. To "
-        'match by barcode, pass adata.obs["donor"].']
+        "match by barcode, pass a Series indexed by barcode."]
 
 
 def test_dataset_ids_follow_the_label_files_one_data_file_each(tmp_path):

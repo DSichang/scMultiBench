@@ -198,6 +198,14 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     assert str(exc.value) == series.format("labels") + (
         " For cells without a label, pass labels.reindex(adata.obs_names) and "
         "missing_labels=\"drop\".")
+    # an output that is no AnnData object: the caller has no adata to name
+    a.write_h5ad(tmp_path / "named.h5ad")
+    for output in (pd.DataFrame(emb, index=ids), str(tmp_path / "named.h5ad")):
+        with pytest.raises(ValueError) as exc:
+            evaluate(output, labels=some, obsm="X_emb", **kw)
+        assert str(exc.value) == series.format("labels") + (
+            " For cells without a label, give them the label NaN and pass "
+            "missing_labels=\"drop\".")
     file = ("{}: some.csv has no row for 30 of the 90 cells of the output (first: "
             "['cell60', 'cell61', 'cell62']). Give a row for every cell.")
     row = " A row with an empty label and {} leaves a cell out."

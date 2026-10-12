@@ -1148,8 +1148,8 @@ def test_api_overview_names_both_cases_of_file_exists_error(tmp_path):
     assert ("- `FileExistsError`: `mtb.io.export_dataset` or `multibench convert` would "
             "replace a file, or the folder holds files of other data that the call does not "
             "write. For the first, pass `overwrite=True`, or `--overwrite` on the command "
-            "line. For the second, export to a new folder, or delete the files the message "
-            "names.") in api
+            "line. For the second, export to a new folder.") in api
+    assert "delete the files" not in api                 # the message names one file and a count
     ad = pytest.importorskip("anndata")
     import numpy as np
     import multibench as mtb
@@ -1823,13 +1823,19 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
     assert entry == (
         "A matrix with 0 features raises `ValueError` in `export_dataset` and `to_canonical`. "
         "0.3.4 wrote a file without features, for example the ATAC part of a 10x file read "
-        "without `gex_only=False`.")
+        "without `gex_only=False`. When the object has a `var[\"feature_types\"]` column, "
+        "the message says to check the feature type that was selected. The names are in "
+        "that column of the object before the split. When `Peaks` or `Antibody Capture` is "
+        "not among them, the 10x file was read without `gex_only=False`.")
     genes = quiet(sc.read_10x_h5, "multiome.h5")
     quiet(genes.var_names_make_unique)
     kind = genes.var["feature_types"]
     rna, atac = quiet(genes[:, kind == "Gene Expression"].copy), genes[:, kind == "Peaks"].copy()
     assert (rna.shape, atac.shape) == ((40, len(GENES)), (40, 0))
-    advice = "For a 10x file, read it with gex_only=False."
+    advice = ("Check the feature type you selected: var['feature_types'] of the whole "
+              "object lists the names.")
+    # as it says: the names of the object before the split show genes alone
+    assert sorted(set(genes.var["feature_types"])) == ["Gene Expression"]
     with pytest.raises(ValueError) as empty:
         quiet(mtb.io.export_dataset, rna, "mydata/EMPTY", atac=atac, atac_kind="peak")
     assert str(empty.value) == f"The atac matrix holds 0 features for 40 cells. {advice}"

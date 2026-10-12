@@ -118,11 +118,16 @@ def _counts_of_object_advice(what: str, spec) -> str | None:
     A selector reads the object passed as ``data``, so ``adt='layer:counts'``
     after ``adt=<AnnData>`` would write a layer of the first object as
     ``adt.h5``. The command line gives ``--atac-from`` an object and takes
-    the selector for it in ``--atac``, so its hint stays."""
+    the selector for it in ``--atac``, so its hint stays.
+
+    The layer ``counts`` is named only for an object that has a layer of
+    that name: the line fails on any other object."""
     if isinstance(spec, str) or config._CLI:
         return None
-    if _is_anndata(spec):
+    if _is_anndata(spec) and "counts" in getattr(spec, "layers", {}):
         return f"Set {what}.X = {what}.layers[\"counts\"] first."
+    if _is_anndata(spec):
+        return f"Put the raw counts in {what}.X first."
     return f"Pass the raw counts as {what}=."
 
 
@@ -210,9 +215,13 @@ def _check_one_matrix_each(data, specs, given) -> None:
         elif what == "adt":
             how = "Pass the ADT as its own object, as adt=<AnnData>."
         else:
+            # the filter is shown only for a file whose features have that type
+            types = getattr(data, "var", {}).get("feature_types", ())
             how = config.hint(
                 "Pass the ATAC as its own object, as atac=<AnnData>.",
-                f"Name where the ATAC is, as --atac \"X[feature_types={_TENX_TYPE[what]}]\".")
+                f"Name where the ATAC is, as --atac \"X[feature_types={_TENX_TYPE[what]}]\"."
+                if _TENX_TYPE[what] in set(map(str, types)) else
+                "Name where the ATAC is in SRC, with --atac.")
         raise ValueError(f"{pair} name the same matrix. {how}")
 
 
@@ -480,9 +489,14 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
     neither and gives the modality as ``role``. They only word the message.
 
     The message names the two types, or the number of types and the most
-    frequent one, and the one action that keeps a file to one type. It does
-    not offer to delete the column: with 10x Genomics type names that writes
-    genes and peaks into one file.
+    frequent one, and one action. When one of the type names is a 10x
+    Genomics name (``Gene Expression``, ``Antibody Capture``, ``Peaks``) the
+    features are of several modalities, and the action keeps a file to one
+    type: without the column, genes and peaks would be written into one
+    file. When none is, as with ``protein_coding`` and ``lncRNA``, the
+    action is to delete the column, for a reader whose features are all of
+    one modality. The object is named only where the modality came as its
+    own object.
     """
     var = getattr(adata, "var", None)
     if var is None or "feature_types" not in var.columns:
@@ -500,6 +514,18 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
         example = None                          # a 10x file has no gene-activity type
     one = example or "<type>"
     subset = "adata[:, adata.var['feature_types'] == " + repr(one) + "]"
+    if not set(counts.index) & set(_TENX_TYPE.values()):
+        kind = f"{family.upper()} features" if family else "features of one modality"
+        where = (config.hint(f"{arg}={_shown(spec) if spec is not None else type(adata).__name__}",
+                             f"--{arg} {spec}") + (" selects" if spec is not None and
+                                                   _split_var_filter(spec)[1] is None
+                                                   else " holds")
+                 if arg is not None else "The matrix holds")
+        own = arg is not None and spec is None and not config._CLI
+        raise ValueError(f"{where} {head} If all are {kind}, " + config.hint(
+            f"run del {arg}.var['feature_types'] first." if own else
+            "delete the column var['feature_types'] first.",
+            "delete the var column feature_types in Python and save the file again."))
     if arg is None:                             # to_canonical, and what mtb.run converts
         flags = f'--{family or "rna"} "X[feature_types={one}]"'
         if family == "atac":                    # --atac does not go without its kind
@@ -600,6 +626,10 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
     it also renames a feature of another type that has the same name, so a
     feature filter gets the recipe that splits the object first. A peak name
     is a region and is not renamed.
+
+    A selector reads the object passed as ``data``, whose variable name is
+    not known here: the message calls it the object you export. A modality
+    passed as its own object is named by its keyword (``rna=rna``).
     """
     import pandas as pd
 
@@ -619,20 +649,21 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
         # a peak name is a region: no advice that renames one
         return f"{head} Keep one column for each peak."
     base, flt = _split_var_filter(sel) if isinstance(sel, str) else (None, None)
-    obj = "adata"
+    obj = "the object"
     if base is not None and base.startswith("mod:"):
         name, _, base = base[4:].partition(".")
-        obj, base = f"mdata.mod[{name!r}]", base or "X"
+        obj, base = f"mod[{name!r}] of the object", base or "X"
     elif mudata and base is not None:
         mod, _, rest = base.partition(".")
-        obj, base = f"mdata.mod[{mod!r}]", rest or "X"
+        obj, base = f"mod[{mod!r}] of the object", rest or "X"
     if obsm is not None or (base or "").startswith("obsm:") \
             or not (isinstance(spec, str) or _is_anndata(spec)):
         return f"{head} Give each column its own name."
     if not isinstance(spec, str) and not config._CLI:
         return f"{head} Run {arg}.var_names_make_unique() {when}."
     if flt is None:
-        return f"{head} Run {obj}.var_names_make_unique() {when}."
+        return f"{head} Run var_names_make_unique() on {obj} " + config.hint(
+            "you export.", "in Python and save the file again.")
     # on the whole object the call also renames a feature of another type
     return f'{head} Split the object first, as in the recipe "A 10x .h5 file" in the docs.'
 
@@ -994,7 +1025,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
                             names_arg="feature_names",
                             role=modality or _layout_family(out.name))
     if feats is not None and len(feats) == 0:
-        raise ValueError(_no_features_message(len(adata.obs_names)))
+        raise ValueError(_no_features_message(
+            len(adata.obs_names), typed=obsm is None and _has_feature_types(adata, None)))
     bars = [str(v) for v in adata.obs_names]
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
@@ -1308,16 +1340,13 @@ def _select_obs(data, spec, *, what):
         return data.obs[spec]
     if _is_file_name(spec):
         raise ValueError(_file_name_message(spec, what))
-    import difflib
-
-    # a column is named only when its name is close to what was written
-    near = difflib.get_close_matches(spec, [str(c) for c in data.obs.columns], n=1)
-    col, how = (near[0], "for example") if near else ("<col>", "as")
+    cols = [str(c) for c in data.obs.columns]
     raise ValueError(
         config.hint(f"{what}={spec!r}", f"--{what} {spec}") + " is not a column of "
         + config.hint("mdata.obs" if mu else "data.obs", "the obs of SRC")
-        + f". Pass one of its columns, {how} "
-        + config.hint(f"{what}='obs:{col}'", f"--{what} obs:{col}") + ".")
+        + (f". Columns: {', '.join(cols[:5])}"
+           f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
+           if cols else ", which has no columns."))
 
 
 def _is_file_name(spec: str) -> bool:
@@ -1952,7 +1981,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                     arg=what, spec=given[what]
                                     if isinstance(given[what], str) else None)
             if feats is not None and len(feats) == 0:
-                raise ValueError(_no_features_message(len(a.obs_names), what))
+                raise ValueError(_no_features_message(
+                    len(a.obs_names), what,
+                    typed=not kw.get("obsm") and _has_feature_types(a, given[what])))
             if feats is not None:
                 repeated = _duplicate_names_warning(
                     feats, arg=what, spec=given[what], role=role, obsm=kw.get("obsm"),
@@ -2057,21 +2088,40 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     return out
 
 
+def _has_feature_types(adata, spec) -> bool:
+    """The features of ``X`` or of a layer were selected by type: the object
+    has a var column ``feature_types``, or the selector ``spec`` filters on
+    it. A matrix in ``obsm`` has no var, so the caller leaves it out."""
+    flt = _split_var_filter(spec)[1] if isinstance(spec, str) else None
+    return "feature_types" in getattr(getattr(adata, "var", None), "columns", ()) \
+        or bool(flt and flt[0] == "feature_types")
+
+
 #: Z1: nothing to write
 _NO_CELLS = ("The data holds 0 cells, so there is nothing to write. Check the filter that "
              "selects the cells.")
 
 
-def _no_features_message(n_cells: int, what: str | None = None) -> str:
+def _no_features_message(n_cells: int, what: str | None = None, *,
+                         typed: bool = False) -> str:
     """Z2: a selected matrix without a feature, which would be written as a
     file of barcodes alone. ``what`` is the modality argument (``'atac'``);
-    ``to_canonical`` has none. A 10x Genomics file read without
-    ``gex_only=False`` gives such a matrix when it is split by feature type.
-    The command line reads a file that was saved after the split, which holds
-    no feature type to look at: its text sends the reader to the data before
-    the split."""
+    ``to_canonical`` has none.
+
+    ``typed`` says that the object has a var column ``feature_types``: its
+    features were selected by type, and no feature has the type that was
+    written. The action is then to check that name against the object
+    before the split: the column of the object that came here has no row
+    left, and the command line reads a file that was saved after the split.
+    A 10x Genomics file read without ``gex_only=False`` gives such a matrix
+    too, and the type names then show genes alone: the two cases cannot be
+    told apart here, and the names are the first thing to look at in both.
+    Without the column nothing says how the features were selected, and the
+    text keeps the advice for a 10x file."""
     return (f"The {what + ' ' if what else ''}matrix holds 0 features for {n_cells:,} cells. "
-            f"For a 10x file, read it with gex_only=False.")
+            + ("Check the feature type you selected: var['feature_types'] of the whole "
+               "object lists the names." if typed
+               else "For a 10x file, read it with gex_only=False."))
 
 
 def _check_batch_complete(vals, *, spec) -> None:

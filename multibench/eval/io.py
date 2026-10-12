@@ -680,8 +680,18 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
         lacks. The message names the first few offenders and the positional
         escape hatch (``{what}.to_numpy()``). For labels that only lack some
         of the output's cells, it also says how to pass the cells without a
-        label (``labels.reindex(ids)`` with ``missing_labels="drop"``).
+        label: with ``missing_labels="drop"``, as
+        ``labels.reindex(adata.obs_names)``.
     """
+    return _align_vector(x, ids, what=what, column=column, cells="adata.obs_names")
+
+
+def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
+    """:func:`align_vector` for ``evaluate``. ``cells`` is the expression
+    that gives the output's cell ids when the output is an AnnData object
+    (``adata.obs_names``), and ``None`` for any other output, where the
+    caller has no object of that name: the sentence for the cells without a
+    label then names no variable."""
     if isinstance(x, pd.DataFrame):
         if column is not None:
             if column not in x.columns:
@@ -720,8 +730,10 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
                     "(evaluate expects cells x dims), or indexed differently?")
         elif what == "labels" and not len(extra):
             # every id is a cell of the output, and some cells have none
-            hint = (" For cells without a label, pass labels.reindex(adata.obs_names) "
-                    'and missing_labels="drop".')
+            hint = (f" For cells without a label, pass labels.reindex({cells}) "
+                    'and missing_labels="drop".' if cells else
+                    " For cells without a label, give them the label NaN and pass "
+                    'missing_labels="drop".')
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the output's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}) "
@@ -737,7 +749,7 @@ def _by_position(what: str, n: int, order: str) -> str:
     position. ``order`` names the order its ``n`` values must follow.
     ``export_dataset``, ``evaluate`` and ``run_all`` say it with this."""
     return (f"{what} is a Series without barcodes and is matched to the cells by position. "
-            f'To match by barcode, pass adata.obs["donor"].')
+            f"To match by barcode, pass a Series indexed by barcode.")
 
 
 def _numbers_rows(x, ids) -> bool:

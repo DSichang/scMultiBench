@@ -75,15 +75,15 @@ def test_a_column_whose_name_looks_like_a_file_is_a_column(tmp_path):
 def test_a_name_that_is_no_column(tmp_path):
     a = _cells()
     assert _value_error(tmp_path, a, rna="X", labels="nope") == (
-        "labels='nope' is not a column of data.obs. Pass one of its columns, as "
-        "labels='obs:<col>'.")
+        "labels='nope' is not a column of data.obs. Columns: celltype, donor.")
     assert _value_error(tmp_path, a, rna="X", batch="sample", category="cross") == (
-        "batch='sample' is not a column of data.obs. Pass one of its columns, as "
-        "batch='obs:<col>'.")
-    # a column with a name close to the one written is named
+        "batch='sample' is not a column of data.obs. Columns: celltype, donor.")
+    # no column is guessed from the spelling: the columns are listed
     assert _value_error(tmp_path, a, rna="X", labels="cell_type") == (
-        "labels='cell_type' is not a column of data.obs. Pass one of its columns, for example "
-        "labels='obs:celltype'.")
+        "labels='cell_type' is not a column of data.obs. Columns: celltype, donor.")
+    # a column of the list, as it is written there
+    out = ingest.export_dataset(a, tmp_path / "LISTED", rna="X", labels="celltype")
+    assert pd.read_csv(out / "cty.csv")["x"].tolist() == list(a.obs["celltype"])
     # with the prefix: the error of 0.3.4, word for word
     out = tmp_path / "OUT"
     with pytest.raises(KeyError) as e:
@@ -91,6 +91,23 @@ def test_a_name_that_is_no_column(tmp_path):
     assert e.value.args[0] == ("labels='obs:nope': column 'nope' not in obs: searched "
                                "data.obs; available: ['celltype', 'donor']")
     assert not out.exists()
+
+
+def test_at_most_five_columns_are_listed(tmp_path):
+    a = _cells()
+    for i in range(3):
+        a.obs[f"qc{i}"] = i
+    assert _value_error(tmp_path, a, rna="X", labels="nope") == (
+        "labels='nope' is not a column of data.obs. Columns: celltype, donor, qc0, qc1, "
+        "qc2.")
+    for i in range(3, 1203):
+        a.obs[f"qc{i}"] = i
+    assert _value_error(tmp_path, a, rna="X", labels="nope") == (
+        "labels='nope' is not a column of data.obs. Columns: celltype, donor, qc0, qc1, "
+        "qc2 and 1,200 more.")
+    a.obs = pd.DataFrame(index=a.obs_names)
+    assert _value_error(tmp_path, a, rna="X", labels="nope") == (
+        "labels='nope' is not a column of data.obs, which has no columns.")
 
 
 def _cli_error(argv, capsys):
@@ -124,8 +141,7 @@ def test_a_file_name_gets_its_own_message(tmp_path, capsys, monkeypatch):
     assert "labels=" not in line
     rc, line = _cli_error(argv + ["--labels", "nope"], capsys)
     assert rc == 1 and line == (
-        "error: --labels nope is not a column of the obs of SRC. Pass one of its columns, "
-        "as --labels obs:<col>.")
+        "error: --labels nope is not a column of the obs of SRC. Columns: celltype, donor.")
     assert not (tmp_path / "OUT").exists()
     rc = cli.main(argv + ["--labels", "celltype"])
     assert rc == 0 and (tmp_path / "OUT" / "cty.csv").is_file()
@@ -310,8 +326,7 @@ def test_mudata_spellings_are_unchanged(tmp_path):
         ingest.export_dataset(m, out, rna="rna", labels="mod:rna.celltype")
     with pytest.raises(ValueError) as err:
         ingest.export_dataset(m, out, rna="rna", labels="nope")
-    assert str(err.value) == ("labels='nope' is not a column of mdata.obs. Pass one of its "
-                              "columns, as labels='obs:<col>'.")
+    assert str(err.value) == "labels='nope' is not a column of mdata.obs. Columns: site."
     assert not out.exists()
     # a missing label of a column read by its bare name names mdata.obs
     site = m.obs["site"].astype(object).to_numpy()

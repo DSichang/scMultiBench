@@ -489,7 +489,7 @@ CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it list
               "method.")
 LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
             "cells that the call does not write. `overwrite=True` does not remove them. Give "
-            "`NAME` a new value, or delete the files that the message names.")
+            "`NAME` a new value.")
 LEFTOVER_BATCH = ("After `batch=`, the files of batch numbers that the call does not write "
                   "count as well.")
 LEFTOVER_INDEX = ("A call with `batch_index=` checks the files of its own batch number. Files "

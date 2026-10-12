@@ -99,6 +99,9 @@ def test_the_way_there_is_a_label_table_with_other_barcodes(tmp_path):
 # ----------------------------------------------------------------- 0 features
 NO_FEATURES = "The {what}matrix holds 0 features for 60 cells. "
 WHY = "For a 10x file, read it with gex_only=False."
+#: the object has var['feature_types']: its features were selected by type
+TYPE = ("Check the feature type you selected: var['feature_types'] of the whole object "
+        "lists the names.")
 
 
 def _split_without_peaks():
@@ -118,19 +121,19 @@ def test_a_matrix_without_features_is_refused(tmp_path):
     rna, none = _split_without_peaks()
     with warnings.catch_warnings():
         warnings.simplefilter("error")          # nothing about peak names before the refusal
-        assert _value_error(tmp_path, none, rna="X") == NO_FEATURES.format(what="rna ") + WHY
+        assert _value_error(tmp_path, none, rna="X") == NO_FEATURES.format(what="rna ") + TYPE
         assert _value_error(tmp_path, rna, rna="X", adt=none) \
-            == NO_FEATURES.format(what="adt ") + WHY
+            == NO_FEATURES.format(what="adt ") + TYPE
         for kind in ("peak", "gene_activity"):
             assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind=kind,
-                                labels="obs:ct") == NO_FEATURES.format(what="atac ") + WHY
+                                labels="obs:ct") == NO_FEATURES.format(what="atac ") + TYPE
         assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak",
                             labels="obs:ct", category="diagonal") \
-            == NO_FEATURES.format(what="atac ") + WHY
+            == NO_FEATURES.format(what="atac ") + TYPE
         for modality in ("atac_peak", "rna", None):
             with pytest.raises(ValueError) as e:
                 ingest.to_canonical(none, tmp_path / "OUT" / "atac_peak.h5", modality=modality)
-            assert str(e.value) == NO_FEATURES.format(what="") + WHY
+            assert str(e.value) == NO_FEATURES.format(what="") + TYPE
         assert not (tmp_path / "OUT").exists()
     # a folder that is there keeps every file as it was
     out = ingest.export_dataset(rna, tmp_path / "HERE", rna="X", labels="obs:ct")
@@ -138,14 +141,49 @@ def test_a_matrix_without_features_is_refused(tmp_path):
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(rna, out, rna="X", atac=none, atac_kind="peak", labels="obs:ct",
                               overwrite=True)
-    assert str(e.value) == NO_FEATURES.format(what="atac ") + WHY
+    assert str(e.value) == NO_FEATURES.format(what="atac ") + TYPE
     with pytest.raises(ValueError) as e:
         ingest.to_canonical(none, out, modality="atac_peak")
-    assert str(e.value) == NO_FEATURES.format(what="") + WHY
+    assert str(e.value) == NO_FEATURES.format(what="") + TYPE
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before
     # one feature is a matrix to write
     one = ingest.export_dataset(rna, tmp_path / "ONE", rna="X", adt=rna[:, :1].copy())
     assert ingest.read_canonical(one / "adt.h5").shape == (60, 1)
+
+
+def test_the_advice_for_a_wrong_type_name_works(tmp_path):
+    """A 10x object with genes and peaks, split with ``'Peak'`` for
+    ``'Peaks'``: the reader of 0.3.5 was sent to ``gex_only=False``, which
+    the file was read with. The names of the whole object show the type."""
+    a = _cite()
+    a.var["feature_types"] = ["Gene Expression"] * 12 + ["Peaks"] * 8
+    a.var_names = [f"GENE{i}" for i in range(12)] + [f"chr1:{i}00-{i}50" for i in range(8)]
+    kind = a.var["feature_types"]
+    rna, none = a[:, kind == "Gene Expression"].copy(), a[:, kind == "Peak"].copy()
+    kw = dict(rna="X", atac_kind="peak", labels="obs:ct")
+    assert _value_error(tmp_path, rna, atac=none, **kw) \
+        == NO_FEATURES.format(what="atac ") + TYPE
+    names = sorted(set(a.var["feature_types"]))          # of the whole object
+    assert names == ["Gene Expression", "Peaks"]
+    out = ingest.export_dataset(rna, tmp_path / "OK", atac=a[:, kind == names[1]].copy(), **kw)
+    assert ingest.read_canonical(out / "atac.h5").n_vars == 8
+
+
+def test_an_object_without_feature_types_keeps_the_advice_for_a_10x_file(tmp_path):
+    """Nothing says how the features were selected: the text of before."""
+    rna = _cite()
+    assert "feature_types" not in rna.var.columns
+    none = rna[:, :0].copy()
+    assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak") \
+        == NO_FEATURES.format(what="atac ") + WHY
+    with pytest.raises(ValueError) as e:
+        ingest.to_canonical(none, tmp_path / "OUT" / "atac_peak.h5")
+    assert str(e.value) == NO_FEATURES.format(what="") + WHY
+    # a matrix in obsm has no var: the column of the object says nothing about it
+    rna.var["feature_types"] = "Gene Expression"
+    rna.obsm["protein"] = np.zeros((60, 0))
+    assert _value_error(tmp_path, rna, rna="X", adt="obsm:protein") \
+        == NO_FEATURES.format(what="adt ") + WHY
 
 
 def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_path):
@@ -175,7 +213,7 @@ def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_pat
 def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
     """The command line reads files: it names no argument of export_dataset.
     The file it was given was saved after the split and holds no feature
-    type to count, so the text sends the reader to the 10x file."""
+    type to count, so the text sends the reader to the object before it."""
     rna, none = _split_without_peaks()
     rna.write_h5ad(tmp_path / "rna.h5ad")
     none.write_h5ad(tmp_path / "none.h5ad")
@@ -192,7 +230,7 @@ def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
         err = capsys.readouterr().err
         assert rc == 1 and not (tmp_path / "OUT").exists()
         assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) \
-            == "error: " + NO_FEATURES.format(what=what) + WHY
+            == "error: " + NO_FEATURES.format(what=what) + TYPE
 
 
 # ------------------------------------------------------------- a missing batch
