@@ -2400,10 +2400,14 @@ modality:</p>
 <ul>
 <li>10x Multiome samples: use <code>vertical</code>. Keep all cells in one folder and
   pass each cell's sample as <code>batch=</code> to <code>run_all</code> or <code>evaluate</code>.</li>
-<li><abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr> donors: use <code>vertical</code> in the same way. The <code>cross</code> category
-  also fits three donors, one file each: see the
+<li><abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr> donors: use <code>vertical</code> in the same way. It takes any number of
+  donors. For <code>run_all</code>, <code>batch=</code> takes the donor column itself, such as
+  <code>batch=adata.obs["donor"]</code>, not its name. The <code>cross</code> category integrates
+  the donors as batches and reads a fixed number of them, three for
+  <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>: see the
   <a href="../tutorials/run/#one-file-per-batch">One file per batch</a>
-  tab.</li>
+  tab. With another number of donors, use <code>vertical</code>, as in the recipe
+  <a href="../tutorials/run/#recipe-donors">Another number of donors</a>.</li>
 </ul>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
@@ -2564,6 +2568,11 @@ The printed table shows how far apart they are.</p>
 </span></code></pre></div>
 <p><code>run_all</code> runs every method that <code>scan</code> marks runnable, scores each
 output and saves the results under <code>out_dir</code>.</p>
+<p>With several donors or samples in the file, add
+<code>batch=adata.obs["donor"]</code> to <code>run_all</code>. The summary then has the batch
+metrics. The recipe
+<a href="../tutorials/run/#recipe-donors">Another number of donors</a> has the
+steps.</p>
 </div>
 </div>
 </div>

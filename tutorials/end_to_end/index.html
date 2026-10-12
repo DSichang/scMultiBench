@@ -3090,10 +3090,12 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </clipboard-copy>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">multibench</span><span class="o">-</span><span class="n">sc</span> <span class="n">numpy</span><span class="o">==</span><span class="p">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="p">}</span> <span class="n">pandas</span><span class="o">==</span><span class="p">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="p">}</span>
+<span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.3.5"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
-%pip install -q multibench-sc numpy=={numpy.__version__} pandas=={pandas.__version__}</div>
+pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
+%pip install -q "multibench-sc&gt;=0.3.5" {pins}</div>
 </div>
 </div>
 </div>
@@ -3293,9 +3295,9 @@ inputs</div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
 <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[4]:</div>
 <div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
-<pre>{'rna': '/tmp/mbtut7/home/.cache/multibench/data/D11/rna.h5',
- 'adt': '/tmp/mbtut7/home/.cache/multibench/data/D11/adt.h5',
- 'cty': '/tmp/mbtut7/home/.cache/multibench/data/D11/cty.csv'}</pre>
+<pre>{'rna': '/tmp/mbtut12/home/.cache/multibench/data/D11/rna.h5',
+ 'adt': '/tmp/mbtut12/home/.cache/multibench/data/D11/adt.h5',
+ 'cty': '/tmp/mbtut12/home/.cache/multibench/data/D11/cty.csv'}</pre>
 </div>
 </div>
 </div>
@@ -3336,7 +3338,7 @@ labels</div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
 <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[5]:</div>
 <div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
-<pre>{'cty': '/tmp/mbtut7/home/.cache/multibench/data/D11/cty.csv'}</pre>
+<pre>{'cty': '/tmp/mbtut12/home/.cache/multibench/data/D11/cty.csv'}</pre>
 </div>
 </div>
 </div>
@@ -3461,77 +3463,77 @@ pd.DataFrame(envs)[["env", "methods", "state"]]</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   0.3 GB of 3.0 GB (90 MB/s)
+<pre>[env]   0.3 GB of 3.0 GB (27 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   0.6 GB of 3.0 GB (97 MB/s)
+<pre>[env]   0.6 GB of 3.0 GB (29 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   0.9 GB of 3.0 GB (100 MB/s)
+<pre>[env]   0.9 GB of 3.0 GB (29 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   1.2 GB of 3.0 GB (102 MB/s)
+<pre>[env]   1.2 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   1.5 GB of 3.0 GB (103 MB/s)
+<pre>[env]   1.5 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   1.8 GB of 3.0 GB (103 MB/s)
+<pre>[env]   1.8 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   2.1 GB of 3.0 GB (101 MB/s)
+<pre>[env]   2.1 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   2.4 GB of 3.0 GB (101 MB/s)
+<pre>[env]   2.4 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   2.7 GB of 3.0 GB (101 MB/s)
+<pre>[env]   2.7 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   3.0 GB of 3.0 GB (101 MB/s)
+<pre>[env]   3.0 GB of 3.0 GB (30 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env] unpacking matilda -&gt; /tmp/mbtut7/home/.cache/multibench/envs/matilda ...
+<pre>[env] unpacking matilda -&gt; /tmp/mbtut12/home/.cache/multibench/envs/matilda ...
 </pre>
 </div>
 </div>
@@ -3631,7 +3633,7 @@ emb.shape</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Fetching the method scripts from PYangLab/scMultiBench into /tmp/mbtut7/home/.cache/multibench/scMultiBench_ref ...
+<pre>Fetching the method scripts from PYangLab/scMultiBench into /tmp/mbtut12/home/.cache/multibench/scMultiBench_ref ...
 </pre>
 </div>
 </div>

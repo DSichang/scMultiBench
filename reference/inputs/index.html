@@ -2575,6 +2575,9 @@ and says when the folder holds per-batch files.</p>
 <p><strong>Content checks</strong> (<code>check=True</code>). The same checks <code>mtb.scan</code>
 reports per row as <code>files_ok</code> / <code>files_reason</code>:</p>
 <ul>
+<li>dataset files: <code>ValueError</code> when a matrix file is a 10x Genomics
+  <code>.h5</code> under the name of a dataset file, or holds 0 features or 0
+  cells;</li>
 <li>orientation: <code>ValueError</code> when <code>matrix/data</code> is stored cells x
   features;</li>
 <li>label length: <code>ValueError</code> when a label CSV has a different number of
@@ -2969,8 +2972,9 @@ did-you-mean hint for a method. Either one alone changes nothing.</p>
 holds <code>rna1.h5</code>, <code>rna2.h5</code> ... and <code>cty1.csv</code>, <code>cty2.csv</code> ....
 Vertical and diagonal methods read one <code>rna.h5</code> and one label file.
 With such a <code>category</code>, <code>check=None</code> warns and <code>check=True</code> raises.
-Export without <code>batch=</code> and pass the batch column to
-<code>mtb.run_all(batch=...)</code> or <code>mtb.evaluate(batch=...)</code>.</p>
+Export without <code>batch=</code> and pass the batch column itself, such as
+<code>adata.obs["donor"]</code>, to <code>mtb.run_all(batch=...)</code> or
+<code>mtb.evaluate(batch=...)</code>.</p>
 <p><strong>Diagonal data in several batches.</strong> A folder with <code>rna&lt;i&gt;.h5</code>,
 <code>atac_gas&lt;i&gt;.h5</code> or <code>atac_peak&lt;i&gt;.h5</code>, <code>rna_cty&lt;i&gt;.csv</code> and
 <code>atac_cty&lt;i&gt;.csv</code> is what a few diagonal methods read

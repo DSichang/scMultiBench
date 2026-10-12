@@ -2667,6 +2667,10 @@ In <code>mtb.io</code>, <code>mod</code> names a MuData modality and <code>modal
 <td><a href="../reference/data/#multibench.data.results.fetchable"><code>mtb.data.fetchable</code></a></td>
 <td>The dataset ids <code>fetch</code> can download.</td>
 </tr>
+<tr>
+<td><a href="../reference/data/#multibench.data.examples.write_example"><code>mtb.data.write_example</code></a></td>
+<td>Write the example files of a tutorial dataset as <code>.h5ad</code> files.</td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -2941,8 +2945,10 @@ values or the fix.</p>
 <li><code>FileNotFoundError</code>: missing dataset folder or file. The message lists
   the folders that exist, or the path and the working directory.</li>
 <li><code>FileExistsError</code>: <code>mtb.io.export_dataset</code> or <code>multibench convert</code>
-  would replace a file. Pass <code>overwrite=True</code>, or <code>--overwrite</code> on the
-  command line.</li>
+  would replace a file, or the folder holds files of other data that
+  the call does not write. For the first, pass <code>overwrite=True</code>, or
+  <code>--overwrite</code> on the command line. For the second, export to a new
+  folder.</li>
 <li><a href="../reference/config/#multibench.engine.schema.AmbiguousVariantError"><code>mtb.AmbiguousVariantError</code></a>:
   a method with several variants that neither <code>modalities=</code> nor the
   dataset's files select. It is a <code>ValueError</code> and also a <code>KeyError</code>.</li>

@@ -2267,7 +2267,8 @@ x cells, the layout the methods read.</p>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">adt_names</span><span class="p">:</span> <span class="n"><span title="list">list</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">batch_index</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">overwrite</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">n_batches</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -2410,9 +2411,9 @@ needs <code>atac_kind</code>. <code>None</code> = no <abbr title="Assay for Tran
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Cell-type labels: <code>'obs:&lt;col&gt;'</code> (a MuData's global <code>.obs</code>),
-<code>'&lt;mod&gt;:&lt;col&gt;'</code> (<code>mdata[mod].obs</code>), a Series indexed by barcode, or
-a sequence.</p>
+                <p>Cell-type labels: a column, named <code>'obs:&lt;col&gt;'</code> or <code>'&lt;col&gt;'</code> (a
+MuData's global <code>.obs</code>), <code>'&lt;mod&gt;:&lt;col&gt;'</code> (<code>mdata[mod].obs</code>), a
+Series indexed by barcode, or a sequence.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2433,7 +2434,8 @@ a sequence.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Batch per cell, same forms as <code>labels</code>; splits the files per batch
-(<code>rna1.h5</code>, <code>rna2.h5</code>, ...) for mosaic or cross.</p>
+(<code>rna1.h5</code>, <code>rna2.h5</code>, ...) for mosaic or cross. Every cell
+needs a batch.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2571,6 +2573,27 @@ before writing anything.</p>
               </p>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>n_batches</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>With <code>batch_index</code>: how many batches the calls write in total.
+Files of a higher batch number in <code>dataset_dir</code> are refused.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="int">int</span> or None</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>None</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2639,7 +2662,7 @@ before writing anything.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>A file this call would write exists and <code>overwrite</code> is <code>False</code>.</p>
+                <p>A file this call would write exists and <code>overwrite</code> is <code>False</code>, or the folder holds files of other data.</p>
               </div>
             </td>
           </tr>
@@ -2713,19 +2736,29 @@ and peaks in one <code>X</code>:</p>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                      <span class="n">atac</span><span class="o">=</span><span class="s2">"X[feature_types=Peaks]"</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
 </span></code></pre></div>
+<p>Without a filter on such data, <code>export_dataset</code> raises <code>ValueError</code>.</p>
 <p><strong>Raw counts.</strong> Methods normalise the data themselves; give raw counts. A
 <code>UserWarning</code> says when sampled <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or peak values are not whole
 numbers (log-normalised data). <code>rna='layer:counts'</code> usually selects the
-counts. Gene-activity scores are not checked.</p>
+counts. A selector reads <code>data</code>: for a modality passed as its own
+object, put the counts into its <code>X</code> first
+(<code>adt.X = adt.layers["counts"]</code>). Gene-activity scores are not checked.</p>
 <p><strong>MuData.</strong> A bare modality name selects <code>mdata.mod[name].X</code>
 (<code>rna='rna'</code>); a full <code>'mod:&lt;name&gt;'</code> selector works too. The default
 <code>rna='X'</code> raises for a MuData: pass <code>rna=&lt;mod name&gt;</code> or <code>rna=None</code>.</p>
 <p><code>labels</code> / <code>batch</code> read <code>'obs:&lt;col&gt;'</code> from the global <code>mdata.obs</code>.
 <code>'&lt;mod&gt;:&lt;col&gt;'</code> reads <code>mdata[mod].obs</code>, then muon's copy
 <code>mdata.obs['&lt;mod&gt;:&lt;col&gt;']</code>; <code>'mod:&lt;mod&gt;.obs:&lt;col&gt;'</code> works too.</p>
+<p><strong>Column names.</strong> <code>"obs:&lt;column&gt;"</code> and <code>"&lt;column&gt;"</code> name a column of
+the object you pass. <code>export_dataset</code> and <code>evaluate</code> take both.
+<code>run_all</code> and <code>rescore</code> are given a folder, not the object, so they
+take the column itself, for example <code>batch=adata.obs["donor"]</code>.</p>
 <p><strong>Master cell order.</strong> Every modality is re-indexed by barcode to one
 order: <code>data.obs_names</code>, or the first modality's <code>obs_names</code> when
-<code>data</code> is not given.</p>
+<code>data</code> is not given. A call that writes labels only and is given no
+object takes its cells from the index of the <code>labels</code> / <code>batch</code>
+Series. An index of numbers that names no cell of the folder is taken
+as row numbers: the values are written row by row, as a list is.</p>
 <ul>
 <li>the same barcodes in another order are reordered;</li>
 <li>a barcode set that differs raises <code>ValueError</code> naming the strays;</li>
@@ -2745,6 +2778,11 @@ come from different cells. <code>rna</code> is written as <code>rna.h5</code> an
 as <code>atac_peak.h5</code> or <code>atac_gas.h5</code>. <code>labels</code> is read from each
 object's own <code>.obs</code> into <code>rna_cty.csv</code> and <code>atac_cty.csv</code>. A call
 that writes one modality writes only that modality's label file.</p>
+<p>Each side keeps the row order of its own object. When <code>rna</code> and
+<code>atac</code> hold the same cells in two orders, a later paired export of
+these cells into the same folder (<code>category='vertical'</code>, or no
+<code>category</code>) raises <code>ValueError</code>: write the paired files first, or
+use another folder.</p>
 <p>Diagonal data in several batches is one call per batch with
 <code>batch_index=N</code>: <code>rna&lt;N&gt;.h5</code>, <code>atac_gas&lt;N&gt;.h5</code> or
 <code>atac_peak&lt;N&gt;.h5</code>, <code>rna_cty&lt;N&gt;.csv</code> and <code>atac_cty&lt;N&gt;.csv</code>.</p>
@@ -2756,8 +2794,9 @@ have different names, export <abbr title="Ribonucleic Acid, here, scRNA-seq coun
 and numbered files are written: <code>rna1.h5</code>, <code>rna2.h5</code> ...,
 <code>adt1.h5</code> ..., <code>cty1.csv</code> ... (the layout of the shipped D52). Only
 cross and mosaic methods read numbered files. For a vertical folder,
-export without <code>batch</code> and pass the batch column to
-<code>mtb.run_all(batch=...)</code> or <code>mtb.evaluate(batch=...)</code>.</p>
+export without <code>batch</code> and pass the batch column itself, such as
+<code>adata.obs["donor"]</code>, to <code>mtb.run_all(batch=...)</code> or
+<code>mtb.evaluate(batch=...)</code>.</p>
 <p><code>batch_index=N</code> writes the whole object as batch <code>N</code>. A mosaic
 delivery of one file per batch (the D46 pattern: <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>, Multiome,
 <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> only) is one call per file:</p>
@@ -2769,7 +2808,9 @@ delivery of one file per batch (the D46 pattern: <abbr title="Cellular Indexing 
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna_only</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>mtb.describe_layout('mosaic')</code> lists the batch patterns the methods
-read.</p>
+read. <code>n_batches=3</code> in these calls says that the data has three
+batches: a file of batch 4 in the folder is then refused (<em>Existing
+files</em>).</p>
 <p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> Vertical methods read <code>atac.h5</code>;
 <code>method_info(m)['atac']</code> says whether it must hold peaks or gene
 activity. Diagonal methods read <code>atac_peak.h5</code> (peaks) and
@@ -2792,7 +2833,13 @@ method gives a wrong embedding.</p>
 <p><strong>Existing files.</strong> Every check runs before <code>dataset_dir</code> is created;
 a failed call writes nothing. When a file the call would write already
 exists, <code>FileExistsError</code> lists it; pass <code>overwrite=True</code> to replace
-it. Other files in the folder are kept.</p>
+it. A call also raises <code>FileExistsError</code> when the folder holds files of
+other data that it does not write: files with other cells, files of
+other batch numbers after <code>batch=</code>, and with <code>batch_index=</code> files of
+a batch number above <code>n_batches</code>. <code>overwrite=True</code> does not remove
+them. Files that are not part of the dataset layout are never touched. A
+file written for cells that the folder already holds follows the cell
+order of the files in the folder.</p>
 <p><strong>Errors.</strong> <code>ValueError</code> is raised for:</p>
 <ul>
 <li>nothing to export (<code>rna</code>, <code>adt</code>, <code>atac</code> and <code>labels</code> all <code>None</code>);</li>
@@ -2800,18 +2847,33 @@ it. Other files in the folder are kept.</p>
 <li>an unknown <code>category</code>;</li>
 <li>a selector string with <code>data=None</code>, a malformed selector, or a
   feature filter that matches nothing;</li>
+<li><code>X</code> or a layer with several values in <code>var['feature_types']</code> and
+  no filter that keeps one;</li>
+<li><code>adt</code> taking <code>X</code> of an object that also holds an <code>obsm</code> matrix
+  under a key that does not start with <code>X_</code>;</li>
+<li>two modalities that name the same matrix of the same object
+  (<code>rna='X', adt='X'</code>): one file holds one modality;</li>
+<li><code>adt_names</code> given as a string instead of a list;</li>
+<li>data with 0 cells, or a matrix with 0 features;</li>
 <li>a bare array whose cell order cannot be checked (no barcodes anywhere)
   or with the wrong row count;</li>
 <li>a modality whose barcodes differ from the master order (the message
   names the strays);</li>
 <li>a <code>labels</code> / <code>batch</code> Series missing cells, or a sequence of the
   wrong length;</li>
-<li>a label that is missing (NaN, None or <code>''</code>): <code>mtb.evaluate</code> would
-  score it as one more cell type;</li>
+<li><code>labels</code> / <code>batch</code> naming a file or a column the object does not
+  have;</li>
+<li>a label that is missing (NaN, None, <code>''</code> or text that a label file
+  reads as missing, such as <code>'NA'</code>): <code>mtb.evaluate</code> does not score a
+  missing label;</li>
+<li>a batch that is missing, by the same definition;</li>
 <li><code>batch</code> with <code>category='vertical'</code> or <code>'diagonal'</code>, or together
   with <code>batch_index</code>;</li>
 <li><code>batch_index</code> that is not a positive integer, or without
   <code>category='mosaic'</code> / <code>'cross'</code> / <code>'diagonal'</code>;</li>
+<li><code>n_batches</code> without <code>batch_index</code>, not a positive integer, or
+  smaller than <code>batch_index</code>;</li>
+<li>cells that the folder already holds in two different row orders;</li>
 <li><code>category='diagonal'</code> with labels but no matrix, or with a plain
   label sequence for both <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</li>
 </ul>
@@ -2821,6 +2883,10 @@ it. Other files in the folder are kept.</p>
 <li><abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or peak values that are not whole numbers;</li>
 <li>feature names that contradict <code>atac_kind</code>, or none at all
   (<code>feature_0..</code> is written; for <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> pass <code>adt_names</code>);</li>
+<li>feature names that occur more than once in one matrix: they are
+  written as they are, and the message says how to make them unique;</li>
+<li>a <code>batch</code> Series whose index is the row numbers <code>0..n-1</code> while the
+  cells have barcodes: it is matched by position;</li>
 <li>non-unique barcodes (paired positionally);</li>
 <li>a dense <code>matrix/data</code> over 1 GB;</li>
 <li><code>batch</code> with <code>atac</code> and no <code>category</code>: only mosaic methods read
@@ -3185,7 +3251,7 @@ columns; the way to name a bare <code>obsm</code> array.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Invalid or conflicting arguments, or a non-canonical <code>.h5</code> (full list in Notes).</p>
+                <p>Invalid or conflicting arguments, a non-canonical <code>.h5</code>, or features of several types (full list in Notes).</p>
               </div>
             </td>
           </tr>
@@ -3284,7 +3350,9 @@ names look like peaks (<code>chr1:100-200</code>, <code>chr1_100_200</code>,
 <p><strong><abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> matrices.</strong> With <code>modality='adt'</code> on an AnnData that has
 <code>obsm</code> keys, <code>obsm=</code> or <code>layer=</code> must say where the protein matrix
 is; otherwise <code>adata.X</code> (usually the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>) would be written as
-<code>adt.h5</code>, so it raises. <code>layer</code> and <code>obsm</code> are mutually exclusive.
+<code>adt.h5</code>, so it raises. Keys that start with <code>X_</code> (<code>X_pca</code>,
+<code>X_umap</code>) hold embeddings and do not count. <code>layer</code> and <code>obsm</code> are
+mutually exclusive.
 The feature names of an <code>obsm</code> matrix come from the first of:</p>
 <ol>
 <li><code>feature_names</code>;</li>
@@ -3321,6 +3389,12 @@ For <code>modality</code> <code>'rna'</code>, <code>'adt'</code> or <code>'atac_
 <code>UserWarning</code> says when sampled values are not whole numbers
 (log-normalised data); <code>layer='counts'</code> usually holds the counts, and
 for an <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> matrix taken with <code>obsm=</code>, another <code>obsm</code> key.</p>
+<p><strong>One feature type.</strong> One file holds one modality. When
+<code>var['feature_types']</code> of the object names several types, as in a 10x
+Genomics file read with <code>gex_only=False</code>, <code>X</code> or a layer would be
+written with genes and peaks together, so it raises. Pass the features
+of one type, or use <code>mtb.io.export_dataset</code>, whose selectors take a
+filter.</p>
 <p><strong>Streaming.</strong> Sparse matrices (CSR/CSC, in memory or inside an
 <code>.h5ad</code>/<code>.h5mu</code>) are converted to CSC and written <code>block</code> features
 at a time, without densifying the whole matrix. The defaults (gzip,
@@ -3339,11 +3413,14 @@ read (as double in R).</p>
 <li><code>convert=False</code> on a non-canonical input;</li>
 <li>an <code>.h5</code> without <code>matrix/data</code> (the message lists the keys it does
   hold - a top-level <code>data</code> dataset is a method output, not an input);</li>
+<li>a 10x Genomics <code>.h5</code> file;</li>
 <li>an unsupported suffix;</li>
 <li><code>mod</code> missing for a MuData, or given for anything else;</li>
 <li><code>layer</code> and <code>obsm</code> together;</li>
 <li><code>modality='adt'</code> on an AnnData with <code>obsm</code> keys but no <code>obsm=</code> /
   <code>layer=</code>;</li>
+<li><code>X</code> or a layer with several values in <code>var['feature_types']</code>;</li>
+<li>a matrix with 0 features;</li>
 <li>a feature-name or barcode count that does not match the matrix.</li>
 </ul>
 <p>The <code>FileNotFoundError</code> message names the path and the current
@@ -3474,6 +3551,18 @@ has them.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>path</code> is a 10x Genomics <code>.h5</code> file; the message says how to read it.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -3497,7 +3586,9 @@ sparsity decision, so memory peaks at the dense size (features x cells
 x 8 bytes) even when the result is CSR. It is meant for the shipped
 benchmark inputs and for what <code>to_canonical</code> writes, not for a
 100k-cell peak matrix.</p>
-<p><strong>No validation.</strong> A file without <code>matrix/data</code> raises h5py's
+<p><strong>Other files.</strong> A 10x Genomics <code>.h5</code> file (a sparse matrix, with
+<code>matrix/indptr</code>) raises <code>ValueError</code>: read it with scanpy. Nothing
+else is checked. A file without <code>matrix/data</code> raises h5py's
 <code>KeyError</code>. <code>matrix/features</code> and <code>matrix/barcodes</code> are optional;
 without them AnnData's default names (<code>'0'</code>, <code>'1'</code>, ...) are kept.</p>
 </details>

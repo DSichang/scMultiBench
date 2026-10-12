@@ -2321,6 +2321,12 @@ the accepted forms.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># embedding and labels in one AnnData</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"celltype"</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">"X_pca"</span><span class="p">)</span>
 </span></code></pre></div>
+<p>A column is named with or without <code>obs:</code>, so <code>labels="obs:celltype"</code> is the
+same.</p>
+<p>A missing label is not a cell type. <code>evaluate</code> raises when a label is
+missing. <code>missing_labels="drop"</code> scores the labelled cells only and says
+how many it scored. When a whole modality or batch has no labels, these
+scores do not show where its cells are. A missing batch raises as well.</p>
 <details class="note">
 <summary>Details</summary>
 <p>With an AnnData, <code>labels</code> and <code>batch</code> can name <code>.obs</code> columns, and
@@ -2329,7 +2335,9 @@ joint embedding in its <code>.obsm</code>.</p>
 <p>A <code>Series</code> indexed by cell id is aligned by id when the output has
 cell ids: an AnnData, an <code>.h5ad</code> file, or a DataFrame indexed by cell
 id. A CSV whose first column holds the cell ids is aligned the same
-way. When the output is a bare array, the Series and the CSV are
+way. A CSV embedding whose first column holds the barcodes has cell
+ids too. A label file whose cell ids name no cell of the output is
+matched by position, with a warning. When the output is a bare array, the Series and the CSV are
 matched by position, with a warning. Plain arrays, lists and other
 label files are matched by position.</p>
 </details>
@@ -2479,7 +2487,9 @@ types confined to few batches. The re-run tables use the same rule.</p>
 <p><code>metrics.attrs</code> records how the scores were computed: the Leiden
 backend, where the clusters came from, and the multibench and scib
 versions. <code>mtb.to_long</code> keeps the first three in its <code>scored_with</code>
-column, such as <code>leidenalg/sweep/0.3.2</code>.</p>
+column, such as <code>leidenalg/sweep/0.3.2</code>. When <code>missing_labels="drop"</code>
+left cells out, a fourth part gives the cells scored, such as
+<code>270 of 300 cells</code>.</p>
 </details>
 <hr />
 <p>Next: draw it next to the stored tables in

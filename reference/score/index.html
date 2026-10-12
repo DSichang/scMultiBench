@@ -2211,7 +2211,8 @@ selector.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">obsm</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"X_emb"</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">label_order</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">verbose</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">missing_labels</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"error"</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -2251,8 +2252,8 @@ columns), or file path (Notes).</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Cell types, one per cell (required): CSV path(s), a
-<code>mtb.labels_for</code> dict, a 1-D array-like, or an <code>.obs</code> column name
-(forms in Notes).</p>
+<code>mtb.labels_for</code> dict, a 1-D array-like, or an <code>.obs</code> column
+name, with or without the <code>obs:</code> prefix (forms in Notes).</p>
               </div>
               <p>
                   <span class="doc-param-default">
@@ -2291,7 +2292,8 @@ otherwise unused (the metrics do not depend on it). Lets a call mirror
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Batch labels, one per cell, in the forms <code>labels</code> accepts; needed
-for the batch metrics unless <code>labels</code> lists two or more files.</p>
+for the batch metrics unless <code>labels</code> lists two or more files.
+Every cell needs a batch.</p>
               </div>
               <p>
                   <span class="doc-param-default">
@@ -2389,7 +2391,9 @@ subset selects those files. <code>None</code> works for an unchanged
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p><code>True</code> prints one stderr line when the Leiden sweep starts on more
-than 2,000 cells; <code>False</code> never prints.</p>
+than 2,000 cells, and one when labels, batches or clusters are put
+in the row order of a <code>.csv</code> / <code>.tsv</code> output by barcode;
+<code>False</code> never prints.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2399,6 +2403,27 @@ than 2,000 cells; <code>False</code> never prints.</p>
                   <span class="doc-param-default">
                     <b>default</b>
                       <code>True</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>missing_labels</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p>What to do when a cell has no label. <code>"error"</code> raises. <code>"drop"</code>
+scores the labelled cells only and warns how many (Notes).</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code>(&#39;error&#39;, &#39;drop&#39;)</code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>&#34;error&#34;</code>
                   </span>
               </p>
             </td>
@@ -2450,7 +2475,9 @@ scores were computed (Notes).</p>
             <td class="doc-raises-details">
               <div class="doc-md-description">
                 <p>Missing or misaligned labels, an unknown category or metric, or batch
-metrics without batch labels.</p>
+metrics without batch labels. A cell without a label (unless
+<code>missing_labels="drop"</code>), no cell with a label, or a cell without a
+batch in <code>batch</code>.</p>
               </div>
             </td>
           </tr>
@@ -2462,7 +2489,8 @@ metrics without batch labels.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>An <code>output</code> or label path does not exist.</p>
+                <p>An <code>output</code> or label path does not exist, or a column is named
+for an <code>output</code> that has no <code>.obs</code>.</p>
               </div>
             </td>
           </tr>
@@ -2507,8 +2535,13 @@ metrics without batch labels.</p>
 <li>a 1-D <code>ndarray</code> / <code>Series</code> / <code>Categorical</code> / list, or a
   single-column DataFrame;</li>
 <li>when <code>output</code> is an AnnData or MuData, the name of an <code>.obs</code>
-  column.</li>
+  column, with or without the <code>obs:</code> prefix (<code>"celltype"</code> or
+  <code>"obs:celltype"</code>).</li>
 </ul>
+<p><code>"obs:&lt;column&gt;"</code> and <code>"&lt;column&gt;"</code> name a column of the object you
+pass. <code>export_dataset</code> and <code>evaluate</code> take both. <code>run_all</code> and
+<code>rescore</code> are given a folder, not the object, so they take the column
+itself, for example <code>batch=adata.obs["donor"]</code>.</p>
 <p>A multi-column CSV / DataFrame raises: pass the one column
 (<code>df["celltype"]</code>) itself. <code>batch</code> and <code>clustering</code> take the same
 forms except a multi-entry dict; for <code>clustering</code>, a path that is not
@@ -2525,6 +2558,25 @@ forms except a multi-entry dict; for <code>clustering</code>, a path that is not
 <li><code>label_order=list(d)</code> trusts the dict's own order. A one-entry dict
   needs no <code>label_order</code>.</li>
 </ul>
+<p><strong>Missing labels.</strong> A label is missing when it is NaN, <code>None</code>,
+<code>pd.NA</code>, blank text, or text that a label file reads as missing:
+<code>NA</code>, <code>None</code>, <code>nan</code>, <code>null</code>, <code>N/A</code> and the like, with or
+without blanks around them. A missing label is not a cell type, so it
+is never scored as one. A cell type that really has such a name needs
+another name.</p>
+<ul>
+<li><code>missing_labels="error"</code> raises <code>ValueError</code>. The message says
+  how many cells have no label and how the missing values are written;</li>
+<li><code>missing_labels="drop"</code> leaves those cells out of the embedding,
+  the labels, <code>batch</code> and <code>clustering</code>, and scores the rest. The
+  scores equal those of a call with the labelled cells only. A
+  <code>UserWarning</code> gives the two cell counts, and says when the labelled
+  cells come from fewer batches;</li>
+<li>when no cell has a label, both raise.</li>
+</ul>
+<p>The values of <code>batch</code> are missing by the same rule. A missing batch
+always raises <code>ValueError</code>; with <code>"drop"</code>, only the cells that are
+scored need a batch.</p>
 <p><strong>Metric selection.</strong> <code>None</code> computes the clustering family (<code>ARI,
 NMI, ASW, iASW, iF1, cLISI</code>), plus <code>ASW_batch, GC, iLISI</code> when a batch
 vector is available (<code>batch=</code> or a list of label files). kBET is never
@@ -2602,8 +2654,9 @@ batch, the same rule <code>mtb.run_all</code> applies. <code>batch=</code> given
 <p><strong>Cell order.</strong> Arrays, lists and label files without a cell-id column
 are matched by position to the rows of <code>output</code>. A <code>Series</code> /
 <code>DataFrame</code> with a non-default index is aligned by cell id when
-<code>output</code> carries ids (an AnnData, or a DataFrame with a non-default
-index): rows are reindexed to the output's order, and a missing or
+<code>output</code> carries ids (an AnnData, a DataFrame with a non-default
+index, or a <code>.csv</code> / <code>.tsv</code> file whose first column holds the
+barcodes): rows are reindexed to the output's order, and a missing or
 extra id raises <code>ValueError</code> naming the first ones.</p>
 <p>A CSV whose first column holds the output's cell ids, as
 <code>obs[["batch"]].to_csv(path)</code> writes it, is aligned by that column in
@@ -2616,6 +2669,17 @@ cell ids.</p>
 <p>When <code>output</code> is a bare array there is nothing to align against: the
 Series, or a CSV with text in its first column, is matched positionally
 and a <code>UserWarning</code> says so.</p>
+<p>The first column of a <code>.csv</code> / <code>.tsv</code> output holds the barcodes when
+it holds text, that is, when at least one of its values is not a
+number. Labels, batches and clusters with cell ids are then matched as
+they are for an AnnData. Another row order is matched by barcode, and a
+line on stderr says so unless <code>verbose=False</code>. Ids of which none is
+a cell of the output are matched by position, with a <code>UserWarning</code>;
+this holds for a Series too, which raises for an AnnData. Ids of which
+only some are cells of the output raise <code>ValueError</code> with the number
+of cells that are missing and one of them. A first column of numbers
+without a header (row numbers) is left out and gives no ids, and one
+with a header is a column of the embedding.</p>
 <p><strong>Result shape.</strong> The frame has the <code>metric.csv</code> shape: index =
 metric, one column <code>Value</code>, never empty. <code>mtb.to_long</code> makes the
 long frame (lowercase <code>value</code>) that <code>load_results</code> returns.</p>
@@ -2627,7 +2691,10 @@ long frame (lowercase <code>value</code>) that <code>load_results</code> returns
   <code>"sweep"</code> or <code>"user"</code>; <code>None</code> without ARI and NMI;</li>
 <li><code>multibench_version</code> and <code>scib_version</code> - the installed versions.</li>
 </ul>
-<p><code>mtb.to_long</code> writes the first three to a <code>scored_with</code> column.</p>
+<p><code>mtb.to_long</code> writes the first three to a <code>scored_with</code> column.
+When <code>missing_labels="drop"</code> left cells out, <code>attrs</code> also holds
+<code>cells_scored</code> and <code>cells_total</code>, and <code>scored_with</code> ends with
+them (<code>.../270 of 300 cells</code>).</p>
 <p><strong>Output formats.</strong> A file path may be <code>.h5</code> (dataset <code>data</code>, the
 benchmark's <code>embedding.h5</code>), <code>.h5ad</code> (read as an AnnData),
 <code>.npy</code>, or <code>.csv</code> / <code>.tsv</code>. A dims x cells array is transposed
@@ -2636,6 +2703,9 @@ against the label count, with a warning.</p>
 <ul>
 <li>missing labels, or a batch metric / family requested without batch
   labels;</li>
+<li>a cell without a label, or without a batch in <code>batch</code>
+  (<strong>Missing labels.</strong>), and a <code>missing_labels</code> that is neither
+  <code>"error"</code> nor <code>"drop"</code>;</li>
 <li>an unknown category, <code>metrics</code> token or code;</li>
 <li>a count that differs from the embedding's cells (<code>'labels has M
   entries for N cells in the embedding.'</code>), and cell-id mismatches when
@@ -2647,6 +2717,8 @@ against the label count, with a warning.</p>
 <li>an <code>.h5</code> output without dataset <code>data</code>.</li>
 </ul>
 <p><code>FileNotFoundError</code> names the missing path and the working directory.
+A column name passed with an array or DataFrame <code>output</code> raises it
+too: there is no <code>.obs</code> to look the column up in.
 <code>TypeError</code> covers unsupported input types (non-array <code>labels</code>,
 <code>label_order</code> with non-dict <code>labels</code>, ...).</p>
 <p><strong>Retired keywords.</strong> <code>task=</code>, <code>family=</code> and <code>only=</code> still work
@@ -2928,6 +3000,9 @@ category column. The published tables use
 backend, where the clusters came from (<code>sweep</code> or <code>user</code>) and the
 package version; <code>none</code> fills a part that did not apply. The same
 three values and <code>scib_version</code> are in <code>attrs</code>.</p>
+<p>Scores of the labelled cells only (<code>missing_labels="drop"</code> left cells
+out) have a fourth part, such as <code>"igraph/sweep/0.3.5/270 of 300
+cells"</code>, and <code>cells_scored</code> and <code>cells_total</code> in <code>attrs</code>.</p>
 <p>Any other frame, such as a hand-made one or a wide CSV read back, has no
 such record. Its rows get <code>scored_with = "unknown"</code> and a
 <code>UserWarning</code>. To keep the record, save the long table:

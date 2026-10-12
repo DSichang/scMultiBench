@@ -1996,6 +1996,111 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-035" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.5
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behaviour-changes-in-035" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes in 0.3.5
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behaviour changes in 0.3.5">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-labels-and-batches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing labels and batches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cell-order-in-evaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cell order in evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-folders-and-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset folders and exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scan-and-dry-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scan and dry runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-solved-in-035" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not solved in 0.3.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-034" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2213,6 +2318,111 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-035" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.5
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behaviour-changes-in-035" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes in 0.3.5
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behaviour changes in 0.3.5">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-labels-and-batches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing labels and batches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cell-order-in-evaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cell order in evaluate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dataset-folders-and-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset folders and exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scan-and-dry-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scan and dry runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Messages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tutorials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tutorials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-solved-in-035" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not solved in 0.3.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#new-in-034" class="md-nav__link">
@@ -2473,6 +2683,373 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-035">New in 0.3.5<a class="headerlink" href="#new-in-035" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>The section "Your own data" of each task tutorial starts from your own
+  <code>.h5ad</code> files. It reads them, writes a dataset folder, checks the folder
+  and runs the methods on it. The install cell of the tutorials asks for
+  <code>multibench-sc&gt;=0.3.5</code>.</li>
+<li><code>mtb.data.write_example(dataset)</code> writes the example files that this
+  section reads, so that the notebook runs before your own files are in
+  place. It prints one line per file. A file of your own with one of those
+  names is left as it is.</li>
+<li>Four <a href="../tutorials/run/#own-data-recipes">recipes for your own data</a> cover
+  other starting points:
+  <a href="../tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>,
+  <a href="../tutorials/run/#recipe-labels-csv">labels in a CSV file</a>,
+  <a href="../tutorials/run/#recipe-no-labels">no labels</a> and
+  <a href="../tutorials/run/#recipe-donors">another number of donors</a>.</li>
+<li><code>mtb.scan(..., per_method=True)</code> returns one row per method, with the
+  columns <code>method</code>, <code>runnable</code> and <code>reason</code>. It prints what the folder holds
+  and how many cells each matrix file has. It needs a <code>category</code>.</li>
+<li><code>mtb.scan(..., modalities="all")</code> and <code>mtb.run_all(..., modalities="all")</code>
+  list every variant of the category, as 0.3.4 did by default.
+  <code>multibench scan --modalities all</code> and
+  <code>multibench run-all --modalities all</code> do the same.</li>
+<li>The table of <code>mtb.scan</code> has three <code>attrs</code> keys: <code>held</code>, the modalities the
+  folder holds, <code>not_listed</code>, the number of rows left out, and <code>not_held</code>,
+  the modalities those rows lack. With <code>per_method=True</code> it has a fourth,
+  <code>cells</code>, the number of cells of each matrix file.</li>
+<li><code>mtb.evaluate(..., missing_labels="drop")</code> scores the labelled cells only.
+  A <code>UserWarning</code> says how many it scored. The <code>attrs</code> of the result hold
+  <code>cells_scored</code> and <code>cells_total</code>, and the <code>scored_with</code> column of
+  <code>mtb.to_long</code> ends with them, such as <code>270 of 300 cells</code>.
+  <code>multibench evaluate --missing-labels drop</code> does the same.</li>
+<li><code>mtb.io.export_dataset(..., batch_index=N, n_batches=M)</code> says how many
+  batches the data has. A file of a higher batch number in the folder is
+  then refused. <code>multibench convert --n-batches M</code> does the same.</li>
+<li>A column of the object you pass is named <code>"obs:&lt;column&gt;"</code> or <code>"&lt;column&gt;"</code>.
+  <code>mtb.io.export_dataset</code> and <code>mtb.evaluate</code> take both, for <code>labels=</code> and
+  for <code>batch=</code>. In 0.3.4, <code>export_dataset</code> took only the first and <code>evaluate</code>
+  only the second. <code>mtb.evaluate(..., clustering="obs:leiden")</code> works too.
+  <code>run_all</code> and <code>rescore</code> are given a folder, not the object, so they take
+  the column itself, such as <code>batch=adata.obs["donor"]</code>.</li>
+</ul>
+<h2 id="behaviour-changes-in-035">Behaviour changes in 0.3.5<a class="headerlink" href="#behaviour-changes-in-035" title="Anchor link to this section">&para;</a></h2>
+<p>These changes can stop a 0.3.4 script or change its result. Each entry says
+what 0.3.4 did.</p>
+<h3 id="missing-labels-and-batches">Missing labels and batches<a class="headerlink" href="#missing-labels-and-batches" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>A label or a batch is missing when it is NaN, <code>None</code>, blank, or text that
+  a label file reads as missing, such as <code>NA</code>, <code>N/A</code>, <code>None</code>, <code>nan</code> and
+  <code>null</code>. The blanks around a text are removed first, so <code>'NA '</code> is missing
+  too. A cell type, donor or sample that is really called <code>NA</code> or <code>None</code>
+  needs another name. The messages name the text they found.</li>
+<li><code>mtb.evaluate</code> raises <code>ValueError</code> when a cell has no label. 0.3.4 scored
+  the cells without a label as one more cell type, so its scores were
+  wrong. Give every cell a label, or pass <code>missing_labels="drop"</code>.</li>
+<li><code>mtb.run_all</code> raises <code>ValueError</code> before it runs a method when a label
+  file of the dataset folder has a missing label. 0.3.4 ran the methods and
+  scored the missing label as a cell type. With <code>evaluate=False</code> the
+  methods run without scores. A method that reads the label file as an
+  input, such as Matilda, stops with <code>evaluate=False</code> too: 0.3.4 gave it
+  the missing label as a cell type. <code>mtb.run_all(..., dry_run=True)</code> prints
+  the same fact and raises nothing. <code>multibench run-all</code> exits with <code>1</code>.</li>
+<li><code>BatchResult.rescore</code> records a method that it would score against such a
+  label file as <code>RUN_OK_EVAL_FAILED</code>, with the reason in <code>error</code> and no
+  scores. 0.3.4 scored it. A saved <code>batch_result.json</code> keeps its old
+  scores: <code>rescore</code> returns a new result, and <code>.save()</code> writes it.</li>
+<li><code>mtb.io.export_dataset</code> raises <code>ValueError</code> for a label that a label file
+  reads as missing, such as the text <code>NA</code>. 0.3.4 wrote it, and the label
+  file then read back with a missing label. NaN, <code>None</code> and <code>''</code> raised
+  before.</li>
+<li><code>mtb.evaluate(batch=...)</code>, <code>mtb.run_all(batch=...)</code> and
+  <code>BatchResult.rescore(batch=...)</code> raise <code>ValueError</code> when a cell has no
+  batch. 0.3.4 counted the cells without a batch as one more batch, so its
+  batch metrics were wrong, without a warning. <code>run_all</code> raises before any
+  method runs, in a dry run too.</li>
+<li><code>mtb.io.export_dataset(batch=...)</code> raises <code>ValueError</code> when a cell has no
+  batch. 0.3.4 left the cells with a NaN batch out of the folder and wrote
+  a batch without cells, and it wrote the text <code>nan</code> as a batch of its own.</li>
+</ul>
+<h3 id="cell-order-in-evaluate">Cell order in evaluate<a class="headerlink" href="#cell-order-in-evaluate" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.evaluate</code> and <code>multibench evaluate</code> keep the barcodes of an embedding
+  in a <code>.csv</code> or <code>.tsv</code> file whose first column holds them. Labels, batches
+  and clusters that carry barcodes are then matched by barcode, as they are
+  for an <code>.h5ad</code> file. 0.3.4 dropped that column and matched by position,
+  with a warning that the output has no cell ids. A label file in another
+  row order then gave other scores.</li>
+<li>A label file, batch file or Series in another order than such an
+  embedding is put in the order of the embedding, and a line on stderr says
+  so, such as
+  <code>evaluate: matched labels.csv to the rows of emb.csv by barcode.</code>
+  With <code>verbose=False</code> the line is not printed.</li>
+<li>When some of the barcodes of the labels, batches or clusters are cells of
+  the embedding and the two do not name the same cells, <code>ValueError</code> gives
+  the number of cells of the embedding that the other file lacks, and one of
+  them. 0.3.4 scored such a call by position when the number of rows was
+  the same.</li>
+<li>When none of them is a cell of the embedding, the rows are matched by
+  position, with a warning, as in 0.3.4. This is the case when both hold the
+  same cells and the barcodes are written differently, for example without
+  the <code>-1</code> ending. A label file is matched in the same way for an <code>.h5ad</code>
+  file. A Series with such an index is matched by position for a <code>.csv</code> or
+  <code>.tsv</code> embedding only: for an AnnData it raises <code>ValueError</code>, as in 0.3.4.
+  With another number of rows than the embedding has, the count error
+  follows the warning.</li>
+<li>An embedding file that repeats a barcode has no cell ids. A label file is
+  then matched by position, with a warning, as in 0.3.4. A Series indexed by
+  barcode raises <code>ValueError</code> for such a file, as it does for an AnnData
+  with repeated <code>obs_names</code>. 0.3.4 matched it by position. Pass
+  <code>labels.to_numpy()</code> to match by position.</li>
+<li>The first column of the embedding holds barcodes when it holds text: at
+  least one of its values is not a number. A first column of numbers is
+  read as in 0.3.4. Without a header it is left out as row numbers, and
+  with a header it is a column of the embedding. Labels without barcodes
+  are matched by position, as before.</li>
+<li>The scores of <code>run_all</code> and <code>rescore</code> do not change. The methods write
+  <code>embedding.h5</code>, which holds no cell ids, so the label files are read in
+  file order as before.</li>
+</ul>
+<h3 id="dataset-folders-and-exports">Dataset folders and exports<a class="headerlink" href="#dataset-folders-and-exports" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.io.export_dataset</code> and <code>multibench convert</code> raise <code>FileExistsError</code>
+  when the folder holds files of other data that the call does not write.
+  These are matrix files with other cells, label files with another number
+  of labels, and after <code>batch=</code> the files of other batch numbers. A call
+  with <code>batch_index=</code> looks at the files of its own batch number, and at
+  those of a batch number above <code>n_batches=</code>. The call writes nothing, and
+  <code>overwrite=True</code> does not remove these files. 0.3.4 wrote its files next
+  to them, and a method then read both as one dataset. Export to a new
+  folder.</li>
+<li>A file written for cells that the folder already holds follows the cell
+  order of the files in the folder, and a line on stderr says so. 0.3.4
+  wrote the rows in the order of the object. Labels added later from an
+  object in another row order then sat on the wrong cells.</li>
+<li>A call raises <code>ValueError</code> when two matrix files of the folder hold the
+  cells it writes in different orders, and it writes nothing. A diagonal
+  export of <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> of the same cells in two orders leaves such a
+  folder. 0.3.4 wrote into it. A paired export without <code>category=</code> replaced
+  both matrix files, which were then in one order. A label file that the
+  diagonal export had written for the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells kept its old order. A
+  paired export with <code>category="vertical"</code>, or a call that wrote one file
+  only, such as the labels, left matrix files of the same cells in two
+  orders, and a method that reads two of them row by row could pair the
+  wrong cells. 0.3.5 refuses both forms. Export this data again in one
+  call, into a new folder.</li>
+<li>Data with 0 cells raises <code>ValueError</code>. 0.3.4 wrote files without a cell.</li>
+<li>A matrix with 0 features raises <code>ValueError</code> in <code>export_dataset</code> and
+  <code>to_canonical</code>. 0.3.4 wrote a file without features, for example the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
+  part of a 10x file read without <code>gex_only=False</code>. When the object has a
+  <code>var["feature_types"]</code> column, the message says to check the feature type
+  that was selected. The names are in that column of the object before the
+  split. When <code>Peaks</code> or <code>Antibody Capture</code> is not among them, the 10x file
+  was read without <code>gex_only=False</code>.</li>
+<li>A matrix whose <code>var["feature_types"]</code> holds more than one type raises
+  <code>ValueError</code> unless a feature filter selects one type. This applies to an
+  AnnData and to an <code>.h5ad</code> file, in <code>export_dataset</code>, <code>to_canonical</code>,
+  <code>multibench convert</code> and the conversion that <code>mtb.run</code> does. The dry run
+  of <code>mtb.run</code> applies the check as the run does. 0.3.4 wrote genes and
+  peaks, or genes and antibodies, into one file, and <code>scan</code> reported the
+  file as present. With 10x type names the message shows the filter to add.</li>
+<li>A 10x Genomics <code>.h5</code> file raises <code>ValueError</code> in <code>to_canonical</code>,
+  <code>multibench convert</code> and <code>mtb.run</code>. 0.3.4 handed it on or copied it as a
+  dataset file, which it is not. <code>mtb.io.read_canonical</code> names such a file
+  too. The recipe
+  <a href="../tutorials/run/#recipe-10x-h5">A 10x <code>.h5</code> file</a> reads such a file.
+  <code>to_canonical</code> also raises <code>ValueError</code> for another <code>.h5</code> file whose
+  <code>matrix/data</code> is not 2-D. 0.3.4 returned the path of such a file.</li>
+<li><code>export_dataset</code> and <code>to_canonical</code> take <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> from <code>X</code> of an object that
+  also holds <code>obsm</code> entries named <code>X_...</code>, such as <code>X_umap</code> or <code>X_pca</code>.
+  0.3.4 raised <code>ValueError</code> for any <code>obsm</code> entry, so such a file could not
+  be exported. Another <code>obsm</code> entry still raises, because it may be the
+  protein matrix.</li>
+<li><code>mtb.io.export_dataset</code> and <code>multibench convert</code> raise <code>ValueError</code> when
+  two modalities name the same matrix of the same object, such as
+  <code>rna="X", adt="X"</code> or <code>rna="layer:counts", atac="layer:counts"</code>, or one
+  object passed for two modalities. The call writes nothing. 0.3.4 wrote
+  the matrix twice: <code>adt.h5</code>, or the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file, was a copy of <code>rna.h5</code>, and
+  no message said so. Pass the second modality as its own object, or name
+  its own place in the object, such as <code>adt="obsm:protein"</code>. Two feature
+  filters on one <code>X</code> select two matrices and are written as before.</li>
+<li><code>export_dataset</code> raises <code>ValueError</code> when <code>adt_names=</code> is a string. 0.3.4
+  took each character as one name, so a string with as many characters as
+  the matrix has proteins was written as the protein names. Pass a list,
+  such as <code>adt_names=list(adata.uns["protein_names"])</code>.</li>
+</ul>
+<h3 id="scan-and-dry-runs">scan and dry runs<a class="headerlink" href="#scan-and-dry-runs" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li><code>mtb.scan</code>, <code>mtb.run_all(..., dry_run=True)</code>, <code>multibench scan</code> and
+  <code>multibench run-all --dry-run</code> list the variants whose modalities the
+  folder holds. 0.3.4 listed every variant of the category.
+  <code>mtb.scan("D11", "vertical")</code> has 14 rows, where 0.3.4 had 33: D11 holds
+  <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>, and the 19 rows that read <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> are left out. The table of
+  0.3.4 was not wrong. <code>modalities="all"</code>, or <code>--modalities all</code>, gives it
+  back. A list of modalities selects as before.</li>
+<li>Only rows whose input files are missing are left out. The rows with
+  <code>files_ok</code> true are the same, and a real run tries the same methods.</li>
+<li>The counts follow the listed rows: in the count line of <code>scan</code>, in the dry
+  run, in the <code>No method can run</code> error and in the text of <code>scan --strict</code>.
+  The exit codes of <code>scan --strict</code> are unchanged. The count line says
+  <code>methods</code> when each listed method has one row. On D11 it now reads
+  <code>14 of 14 methods have their input files.</code></li>
+<li>When rows are left out, the count line of <code>scan</code> says so, such as
+  <code>D11 holds RNA and ADT. 19 rows that read ATAC are not listed. modalities="all" lists them.</code>
+  <code>multibench scan</code> prints it on stderr, after the table, and names
+  <code>--modalities all</code>. With <code>verbose=False</code> nothing is printed, and only the
+  <code>attrs</code> keys <code>not_listed</code> and <code>not_held</code> of the table say that rows were
+  left out.</li>
+<li>A real <code>run_all</code> logs fewer lines. The line
+  <code>N more rows need files this folder does not have. mtb.scan shows them.</code>
+  counts the listed rows only, and a named method that is skipped gets a
+  <code>skipping</code> line for its listed variants only.</li>
+<li><code>scan</code>, <code>run_all</code> and <code>inputs_for(check=True)</code> report a 10x Genomics <code>.h5</code>
+  file under a dataset file name, and a matrix file with 0 features or 0
+  cells, as a file problem: <code>files_ok</code> is false and the reason names the
+  file. 0.3.4 reported a folder of 10x files named <code>rna.h5</code> and <code>adt.h5</code>,
+  and a file with 0 features, as present.</li>
+<li>An <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file under a name that no method of the category reads counts as
+  <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> that the folder holds. A cross folder written with
+  <code>atac_kind="gene_activity"</code> holds <code>atac_gas1.h5</code>, <code>atac_gas2.h5</code> and so
+  on, and the cross methods read <code>atac1.h5</code> or <code>atac_peak1.h5</code>. <code>scan</code>
+  lists the rows that read <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> for such a folder, and
+  <code>scan(per_method=True)</code> says that it holds <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>. None of these
+  rows has its files, so a run tries the same methods as before: none.</li>
+</ul>
+<h3 id="messages">Messages<a class="headerlink" href="#messages" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>Some errors have a new text and the same exception class. In
+  <code>export_dataset</code>: a <code>labels=</code> or <code>batch=</code> value that names no column, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>
+  read from <code>X</code> next to an <code>obsm</code> matrix, and <code>batch=</code> in a vertical or
+  diagonal export. The error for a value that names no column lists the
+  columns of <code>obs</code>, five at most. In <code>evaluate</code>, <code>run_all</code> and <code>rescore</code>: the
+  <code>FileNotFoundError</code> for a column name where no column can be looked up.
+  In <code>evaluate</code>: the count error for the label files of one diagonal side,
+  and for a folder without label files. The <code>KeyError</code> for a diagonal side
+  without the label column ends with one more sentence.</li>
+<li>When that side has other <code>obs</code> columns, the sentence says how to keep the
+  labels. In Python, give the object a column of the same name, such as
+  <code>atac.obs["cell_type"] = atac.obs["predicted.id"]</code>. On the command line,
+  convert each side with its own command and its own <code>--labels</code>, into the
+  same folder. When the side has no <code>obs</code> column, the sentence says to
+  leave <code>labels=</code> out.</li>
+<li>The warning for values that are not whole numbers follows the argument.
+  For a modality passed as its own object, such as <code>adt=adt</code>, it says to
+  put the raw counts into the <code>X</code> of that object. It gives the line
+  <code>adt.X = adt.layers["counts"]</code> when the object has a layer called
+  <code>counts</code>. For the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> or the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> read from <code>obsm</code>,
+  such as <code>atac="obsm:peaks"</code>, it says to name the <code>obsm</code> entry that holds
+  the raw counts. For a feature filter it names the layer with the same filter,
+  such as <code>adt="layer:counts[feature_types=Antibody Capture]"</code>. 0.3.4 named
+  <code>adt='layer:counts'</code> or <code>atac='layer:counts'</code> in all three cases. A
+  selector reads the object passed as <code>data</code>, and a layer belongs to its
+  <code>X</code>. So that call wrote a layer of the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> object as <code>adt.h5</code> or as the
+  <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file, and after a feature filter it wrote the features of every
+  modality. 0.3.5 no longer gives that advice for an object, an <code>obsm</code> entry
+  or a feature filter. The call itself is refused only when another
+  modality names the same matrix, as described under
+  <em>Dataset folders and exports</em>. Otherwise it still passes: see
+  <em>Not solved in 0.3.5</em>.</li>
+<li>The error for a matrix with several feature types names the types and
+  gives one action, which depends on the type names. With a 10x name among
+  them, <code>Gene Expression</code>, <code>Antibody Capture</code> or <code>Peaks</code>, it shows the
+  filter to add, and it does not say to delete <code>var["feature_types"]</code>:
+  following that advice wrote genes and peaks, or genes and antibodies, into
+  one file. When none of the names is a 10x name, such as <code>protein_coding</code>
+  and <code>lncRNA</code>, the features may all be of one modality. The error then says
+  to delete the column before the export, as <code>del rna.var["feature_types"]</code>
+  for a modality passed as its own object.</li>
+<li><code>mtb.io.export_dataset</code> and <code>multibench convert</code> warn when a matrix has a
+  feature name more than once, as the genes of a 10x file can. The names
+  are written as they are, as in 0.3.4, which wrote them without a message.
+  The warning gives the number of repeated names, one of them, and the
+  call that makes them unique: <code>var_names_make_unique()</code> on the object you
+  export, or <code>rna.var_names_make_unique()</code> for a modality passed as its own
+  object. For a feature filter it points to the recipe
+  <a href="../tutorials/run/#recipe-10x-h5">A 10x <code>.h5</code> file</a>, which takes the
+  features into their own object first: on the whole object that call also
+  renames an antibody that has the name of a gene. A repeated peak name is
+  not to be renamed: the warning says to keep one column for each peak.</li>
+<li><code>mtb.evaluate</code> and <code>multibench evaluate</code> warn when the labels look like a
+  number measured for each cell and not like cell types. There are two
+  signs. With 20 cells or more, there are more distinct labels than half of
+  the cells. Or the labels are numbers and some are not whole numbers. A
+  column such as <code>nCount_RNA</code> given as <code>labels=</code> was scored without a
+  message. The scores are computed as before. The warning names the column
+  or the file, and <code>run_all</code> gives it for the label files of a folder.
+  Cluster numbers and cell-type names give no warning.</li>
+<li><code>export_dataset</code>, <code>evaluate</code> and <code>run_all</code> warn when <code>batch=</code> is a Series
+  whose index is the row numbers <code>0</code> to <code>n-1</code> while the cells have
+  barcodes. Such a Series, for example <code>pd.Series(donors)</code>, is matched by
+  position, as before, and the warning says to pass a Series indexed by
+  barcode. A
+  column of the object, such as <code>adata.obs["donor"]</code>, a list and an array
+  give no warning.</li>
+<li><code>multibench evaluate --help</code> says that <code>--labels</code> and <code>--batch</code> can name
+  a column of the <code>obs</code> of an <code>.h5ad</code> output, as <code>celltype</code> or
+  <code>obs:celltype</code>, and that the barcodes of a <code>.csv</code> output are kept.</li>
+<li>In the <code>reason</code> of <code>scan</code>, numbered <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files that the folder holds in
+  the other form share one sentence, such as
+  <code>StabMap needs peak ATAC (atac1.h5, atac2.h5, atac3.h5), and the folder has gene activity (atac_gas1.h5, atac_gas2.h5, atac_gas3.h5).</code>
+  0.3.4 wrote one sentence per file.</li>
+</ul>
+<h3 id="tutorials">Tutorials<a class="headerlink" href="#tutorials" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>Ten tutorials write the folder of their section "Your own data" under a
+  new name, one name per tutorial. <code>MYDIAG</code> became <code>MYDIAG_RNA_ATAC</code> and
+  <code>MYDIAG_BATCHES</code>. <code>MYMOSAIC</code> became <code>MYMOSAIC_RNA_ADT</code>,
+  <code>MYMOSAIC_RNA_ATAC</code>, <code>MYMOSAIC_SHARED</code> and <code>MYMOSAIC_UNSHARED</code>. <code>MYCROSS</code>
+  became <code>MYCROSS_RNA_ADT</code>, <code>MYCROSS_RNA_ATAC</code>, <code>MYCROSS_ADT_ATAC</code> and
+  <code>MYCROSS_TRI</code>. <code>MYCITE</code>, <code>MYMULTIOME</code> and <code>MYTRI</code> are unchanged. In 0.3.4,
+  tutorials that shared a name wrote different layouts into one folder when
+  they ran in the same working directory. The name is now the variable
+  <code>NAME</code> of the export cell, and the check cell and the run cell use it.</li>
+</ul>
+<h3 id="not-solved-in-035">Not solved in 0.3.5<a class="headerlink" href="#not-solved-in-035" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>The check does not compare the feature names of two batches. scMoMaT
+  takes the features of two batches by position, so the batches need the
+  same genes, proteins and peaks in the same order. <code>export_dataset</code> with
+  <code>batch_index=</code> writes each batch as it is given, and <code>scan</code> reports the
+  folder as complete when its files are there. Compare the <code>var_names</code> of
+  your batches before the export. The mosaic tutorials say so in their
+  section 5.</li>
+<li>A selector for <code>adt=</code> or <code>atac=</code> that names a layer or the <code>X</code> of the
+  object that holds the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> writes <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> values as that modality.
+  <code>export_dataset(rna, out, rna="X", adt="layer:counts")</code> writes the layer
+  of the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> object as <code>adt.h5</code>, and no message says so. For the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, only
+  <code>atac_kind="peak"</code> warns, because gene names do not look like peaks. The
+  two modalities name two matrices there, so the refusal for one matrix
+  named twice does not apply. <code>export_dataset</code> does not compare the
+  features of two modalities. Read a file back with <code>mtb.io.read_canonical</code>
+  and look at its <code>var_names</code>.</li>
+<li><code>mtb.io.to_canonical</code>, <code>multibench convert --modality</code> and the conversion
+  of an <code>.h5ad</code> input that <code>mtb.run</code> does write a feature name that occurs
+  more than once without a message of their own. <code>export_dataset</code> warns,
+  and so does <code>multibench convert</code> when it writes a folder. Check with
+  <code>adata.var_names.is_unique</code>.</li>
+<li>A <code>labels=</code> Series whose index is the row numbers <code>0</code> to <code>n-1</code> is matched
+  by position without a message. Only <code>batch=</code> warns.</li>
+<li>An export with <code>batch_index=</code> and without <code>n_batches=</code> does not look at
+  the files of other batch numbers. When the folder already holds more
+  batches than your data has, the extra batches stay, and the methods read
+  them. <code>n_batches=</code> finds a batch number above it, not a leftover batch
+  with a lower number. With or without <code>n_batches=</code>, such an export does
+  not look at the files without a batch number either, and an export
+  without batch numbers does not look at the label files that have one. A
+  new folder name avoids all of these.</li>
+<li>When you change only some of the file names in the read cell of a
+  tutorial, the export writes your cells next to cells of the example, and
+  no error says so. The check cell prints the number of cells of each
+  file. Compare them with your data.</li>
+<li>Diagonal data with cell types for one side only cannot be scored through
+  <code>run_all</code>. Leave <code>labels=</code> out and pass <code>evaluate=False</code>, as in the recipe
+  <a href="../tutorials/run/#recipe-no-labels">No labels</a>.
+  <code>mtb.evaluate(..., missing_labels="drop")</code> scores the labelled side alone
+  there, which does not compare methods.</li>
+<li>A label file left from other cells is found by its number of labels. One
+  with the same number as your data has cells stays in the folder when the
+  export writes no labels.</li>
+<li><code>multibench run-all --dry-run</code> prints nothing about a label file with
+  missing labels. <code>mtb.run_all(..., dry_run=True)</code> prints it, and the run
+  without <code>--dry-run</code> stops.</li>
+<li><code>run_all</code> still prints
+  <code>N more rows need files this folder does not have. mtb.scan shows them.</code>
+  in five tutorials: <code>diagonal_rna_atac</code>, <code>diagonal_multi</code>, <code>mosaic_shared</code>,
+  <code>mosaic_unshared</code> and <code>cross_rna_adt_atac</code>. Their folders hold the
+  modalities of variants that need other files.</li>
+</ul>
 <h2 id="new-in-034">New in 0.3.4<a class="headerlink" href="#new-in-034" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>One tutorial per integration task, for the 13 tasks of the benchmark

@@ -2472,14 +2472,15 @@ only on Linux. On macOS and Windows, <code>dry_run=True</code> shows the command
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">methods</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">modalities</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">modalities</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">data_path</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">out_dir</span><span class="o">=</span><span class="s2">"&lt;out_dir&gt;"</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">params</span><span class="p">:</span> <span class="n"><span title="dict">dict</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">verbose</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">assume_gpu</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">allow_atac_mismatch</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">per_method</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -2560,12 +2561,13 @@ only on Linux. On macOS and Windows, <code>dry_run=True</code> shows the command
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Modality tokens of one combination, e.g. <code>["rna", "adt"]</code>; <code>None</code> =
-every combination.</p>
+the combinations whose modalities the folder holds; <code>"all"</code> = every
+combination.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
                     <b>type</b>
-                      <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+                      <code><span title="list">list</span>[<span title="str">str</span>] | <span title="str">str</span> | None</code>
                   </span>
                   <span class="doc-param-default">
                     <b>default</b>
@@ -2700,6 +2702,27 @@ representation or peak names the method cannot read.</p>
               </p>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>per_method</code>
+            </td>
+            <td class="doc-param-details">
+              <div class="doc-md-description">
+                <p><code>True</code> = one row per method with the columns <code>method</code>,
+<code>runnable</code> and <code>reason</code>; needs <code>category</code>.</p>
+              </div>
+              <p>
+                  <span class="doc-param-annotation">
+                    <b>type</b>
+                      <code><span title="bool">bool</span></code>
+                  </span>
+                  <span class="doc-param-default">
+                    <b>default</b>
+                      <code>False</code>
+                  </span>
+              </p>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2722,7 +2745,9 @@ representation or peak names the method cannot read.</p>
               <div class="doc-md-description">
                 <p>One row per (method, category, modalities) variant, runnable rows
 first. Read <code>df[["method", "modalities", "runnable", "reason"]]</code>;
-all 18 columns are listed in Notes.</p>
+all 18 columns are listed in Notes. <code>df.attrs</code> holds <code>held</code>,
+<code>not_listed</code> and <code>not_held</code>, and with <code>per_method=True</code> also
+<code>cells</code> (Notes).</p>
               </div>
             </td>
           </tr>
@@ -2777,6 +2802,18 @@ all 18 columns are listed in Notes.</p>
           <tr class="doc-section-item">
             <td>
               <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>per_method=True</code> without <code>category</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
                   <code><span title="KeyError">KeyError</span></code>
               </span>
             </td>
@@ -2794,7 +2831,8 @@ all 18 columns are listed in Notes.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>methods</code> or <code>modalities</code> given as a bare string.</p>
+                <p><code>methods</code> given as a bare string, or <code>modalities</code> as a string
+other than <code>"all"</code>.</p>
               </div>
             </td>
           </tr>
@@ -2847,6 +2885,10 @@ all 18 columns are listed in Notes.</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">files_ok</span><span class="p">,</span> <span class="s2">"command"</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># the line the run executes</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">],</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="gp">... </span>         <span class="n">data_path</span><span class="o">=</span><span class="s2">"/path/to/data"</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="s2">"all"</span><span class="p">)</span>   <span class="c1"># every combination</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># one row per method: can it run on this folder?</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"totalVI"</span><span class="p">],</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="gp">... </span>         <span class="n">data_path</span><span class="o">=</span><span class="s2">"/path/to/data"</span><span class="p">,</span> <span class="n">per_method</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span></code></pre></div>
 
 
@@ -2875,15 +2917,48 @@ all 18 columns are listed in Notes.</p>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>command             the shell line the variant would run; "" if the
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                    inputs do not resolve
 </span></code></pre></div>
+<p><strong>Listed rows.</strong> By default the frame lists the variants whose
+modalities the folder holds: on a folder with <code>rna.h5</code> and <code>adt.h5</code>
+the variants that read <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> are left out. A variant whose input files
+are all there is always listed, so the rows with <code>files_ok</code> are the
+same as with <code>modalities="all"</code>, which lists every variant. A method
+named in <code>methods</code> keeps its rows when none of them would be listed.
+When the folder holds no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file, or no row would be
+left, every variant is listed. A list of <code>modalities</code> selects as
+before. <code>df.attrs</code> says what was left out:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>held        the modalities the folder holds, e.g. ['rna', 'adt']
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>not_listed  how many variants are not listed
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>not_held    the modalities those variants read and the folder does not
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>            hold, e.g. ['atac']
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>cells       per_method=True only: {file name: cells} of the matrix
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            files in the folder; None for a file that cannot be read
+</span></code></pre></div>
+<p>The printed line names them too. With <code>verbose=False</code> these keys are
+the only sign that variants were left out.</p>
+<p><strong>One row per method.</strong> <code>per_method=True</code> answers one question per
+method: can it run on this folder? <code>runnable</code> is <code>True</code> when one of
+the method's listed variants is runnable, which is when <code>run_all</code>
+with the same arguments tries the method. <code>reason</code> is empty for those.
+Otherwise it is the <code>reason</code> of one variant: one whose input files are
+all in the folder, else one that reads the modalities the folder holds,
+else the one that lacks the fewest files. Runnable methods come first,
+then by name. Three things are printed above the
+table: the counts with the modalities and batches the folder holds, the
+cells of each matrix file, and the full reason of each method that
+cannot run. A note on the folder that a method which would run carries
+in <code>caveat</code> (it reads fewer batches than the folder holds) is printed
+too. Leave <code>per_method</code> out for the commands and every column.</p>
 <p><strong>Two checks.</strong> Every row carries two independent checks, each a flag
 plus a reason; <code>runnable</code> needs both:</p>
 <ul>
 <li><code>files_ok</code> / <code>files_reason</code> - the method's script is present, the
-  input files resolve on disk and are oriented features x cells, every
-  label CSV has one row per cell of the modality it labels, and a
-  <code>data_dir</code> method (scBridge) finds the files it names. Seurat_v5's
-  <code>rna.h5</code> and <code>atac_peak.h5</code> must hold the same cells. A diagonal
-  <code>atac_gas.h5</code> must list the cells of <code>atac_peak.h5</code> in its order.</li>
+  input files resolve on disk and are oriented features x cells, no
+  matrix file is a 10x Genomics <code>.h5</code> under the name of a dataset file
+  or holds 0 features or 0 cells, every label CSV has one row per cell
+  of the modality it labels, and a <code>data_dir</code> method (scBridge) finds
+  the files it names. Seurat_v5's <code>rna.h5</code> and <code>atac_peak.h5</code> must
+  hold the same cells. A diagonal <code>atac_gas.h5</code> must list the cells of
+  <code>atac_peak.h5</code> in its order.</li>
 <li><code>env_ok</code> / <code>env_reason</code> - the method's conda env exists on this
   machine; the reason names the env and the one-method install command
   (<code>multibench env install --methods X --packed --run</code>). On macOS
@@ -2972,8 +3047,8 @@ files (scBridge). For it, pass no <code>modalities</code> at all.</p>
   (<code>'d52'</code> on macOS) is replaced by the on-disk spelling, with a
   <code>UserWarning</code>.</li>
 </ul>
-<p><strong>Modality tokens.</strong> <code>modalities</code> names one combination, in any
-order. Base tokens keep a row whose modalities are exactly that
+<p><strong>Modality tokens.</strong> A list of <code>modalities</code> names one combination, in
+any order. Base tokens keep a row whose modalities are exactly that
 combination. Representation tokens select by what the method reads.
 <code>mtb.find_methods</code> keeps every method that reads at least the named
 modalities, so the two can list different methods.</p>
@@ -3428,7 +3503,8 @@ and env wrap as a real run. It creates nothing: no <code>out_dir</code>, no
 through. An AnnData or any other file becomes
 <code>&lt;out_dir&gt;/inputs/&lt;role&gt;.h5</code>, and a peak role the method renames
 becomes <code>&lt;out_dir&gt;/inputs/&lt;role&gt;_normpeaks.h5</code>. Input-format errors,
-such as an <code>.h5mu</code> file, are raised by the dry run too.</p>
+such as an <code>.h5mu</code> file or a matrix with features of several types,
+are raised by the dry run too.</p>
 <p>The dry run prints to stderr what the real run would need first: the
 method's <code>setup_hint</code> (<code>method_info(m)['setup_hint']</code>), a note when
 the method scripts are not on this machine yet or not at
@@ -3672,12 +3748,14 @@ unless <code>dry_run=True</code>.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Modality tokens of one combination, e.g. <code>["rna", "adt"]</code>; <code>None</code> =
-every combination.</p>
+every combination. <code>"all"</code> runs the same methods; its dry run and
+messages also list the combinations whose modalities the folder
+does not hold, as <code>mtb.scan(modalities="all")</code> does.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
                     <b>type</b>
-                      <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+                      <code><span title="list">list</span>[<span title="str">str</span>] | <span title="str">str</span> | None</code>
                   </span>
                   <span class="doc-param-default">
                     <b>default</b>
@@ -3837,8 +3915,8 @@ method, to resume an interrupted sweep.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Batch ids, cells in the order of <code>mtb.labels_for(dataset)</code>; a Series
-or a barcode-indexed CSV is aligned by barcode. <code>None</code> = each cell's
-label file.</p>
+or a barcode-indexed CSV is aligned by barcode. Every cell needs a
+batch. <code>None</code> = each cell's label file.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -3946,6 +4024,18 @@ With <code>dry_run=True</code>, the <code>mtb.scan</code> frame.</p>
           <tr class="doc-section-item">
             <td>
               <span class="doc-raises-annotation">
+                  <code><span title="FileNotFoundError">FileNotFoundError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>batch</code> is the name of an obs column, such as <code>"donor"</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
                   <code><span title="ValueError">ValueError</span></code>
               </span>
             </td>
@@ -3971,6 +4061,31 @@ mismatched <code>out_dir</code>, or conflicting arguments (Notes).</p>
           <tr class="doc-section-item">
             <td>
               <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>A cell has no batch in <code>batch</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p>A real run on a folder whose label files have a cell without a label
+(<strong>Missing labels.</strong>).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
                   <code><span title="KeyError">KeyError</span></code>
               </span>
             </td>
@@ -3988,8 +4103,8 @@ mismatched <code>out_dir</code>, or conflicting arguments (Notes).</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>A real run without <code>out_dir</code>; <code>methods</code> or <code>modalities</code> given as
-a bare string.</p>
+                <p>A real run without <code>out_dir</code>; <code>methods</code> given as a bare string, or
+<code>modalities</code> as a string other than <code>"all"</code>.</p>
               </div>
             </td>
           </tr>
@@ -4062,7 +4177,10 @@ a bare string.</p>
 their <code>reason</code>, and <code>command</code> is rendered for <code>out_dir</code> (or the
 literal <code>'&lt;out_dir&gt;'</code> placeholder). <code>plan[plan.runnable]</code> lists what
 will run. <code>len(plan)</code> also counts blocked rows.
-<code>multibench run-all --dry-run --format csv</code> writes the same frame.</p>
+<code>multibench run-all --dry-run --format csv</code> writes the same frame.
+Like <code>mtb.scan</code>, it lists the combinations whose modalities the folder
+holds, and every combination with <code>modalities="all"</code>. The methods a
+real run tries are the same either way.</p>
 <p><strong>Several rows of one method.</strong> Without <code>modalities</code>, a method whose
 runnable rows are nested runs once, on the row with the most modalities:
 on a folder with <code>rna.h5</code>, <code>adt.h5</code> and <code>atac.h5</code>, scMoMaT runs
@@ -4112,9 +4230,26 @@ as <code>mtb.sweep</code> does:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/lr"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"Multigrate"</span><span class="p">],</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>            <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"Multigrate"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"lr"</span><span class="p">:</span> <span class="mf">1e-3</span><span class="p">}})</span>
 </span></code></pre></div>
+<p><strong>Missing labels.</strong> A missing label is not a cell type. A real run
+stops with <code>ValueError</code> before its first method when a label file of
+the folder has a cell without a label: NaN, blank text, or text that a
+label file reads as missing, such as <code>NA</code> or <code>None</code>. Write the
+folder again with a label for every cell. <code>evaluate=False</code> runs the
+methods without scores, unless one of them reads the label file as an
+input (Matilda does): that method would train on the missing label, so
+the run stops as well. A dry run prints the same fact and raises
+nothing. <code>mtb.evaluate(missing_labels="drop")</code> scores one embedding
+on its labelled cells only; <code>run_all</code> and <code>rescore</code> have no such
+option.</p>
 <p><strong>Batch vector.</strong> By default the batch metrics use the label file each
 cell came from (<code>cty1.csv</code> -&gt; 1 ...); <code>batch=</code> replaces that rule and
 is recorded as <code>batch_source='user'</code>.</p>
+<p><code>"obs:&lt;column&gt;"</code> and <code>"&lt;column&gt;"</code> name a column of the object you
+pass. <code>export_dataset</code> and <code>evaluate</code> take both. <code>run_all</code> and
+<code>rescore</code> are given a folder, not the object, so they take the column
+itself, for example <code>batch=adata.obs["donor"]</code>. A cell without a batch
+(NaN, blank text, or text such as <code>NA</code>) raises <code>ValueError</code>, in a
+dry run too.</p>
 <p>Give <code>batch</code> in the cell order of <code>mtb.labels_for(dataset)</code>.
 <code>run_all</code> puts it in each method's cell order, as it does the labels,
 and keeps only the cells of the batches a method reads. A vector as long
@@ -4160,7 +4295,10 @@ and <code>atac_gas</code> does not, unless <code>methods=</code> names them.</p>
   and lists every requested variant. Without <code>methods</code>, it gives the
   first 3 of N. It never lists the reasons of methods you did not ask
   for. On macOS or Windows, its second line says that methods run only
-  on Linux, and it lists only the rows something else also blocks.</li>
+  on Linux, and it lists only the rows something else also blocks. Its
+  last line names the <code>mtb.scan</code> call that shows the rows. When
+  combinations are not listed because the folder does not hold their
+  modalities, the line before says so.</li>
 <li>An <code>out_dir</code> that holds a saved result of another dataset or
   category: <code>ValueError</code>, before any method runs.</li>
 <li><code>skip_existing=True</code> with <code>params</code>, or <code>assume_gpu=True</code> in a
@@ -5540,8 +5678,8 @@ scale. Check the values in <code>summary</code>.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Batch ids in the order of <code>mtb.labels_for(dataset)</code>, or a
-barcode-indexed Series or CSV. <code>None</code> = the batch <code>run_all</code> was
-given, else each cell's label file.</p>
+barcode-indexed Series or CSV. Every cell needs a batch. <code>None</code> =
+the batch <code>run_all</code> was given, else each cell's label file.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -5663,7 +5801,21 @@ to persist it.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>labels</code> or <code>batch</code> holds ids that are not cells of the dataset.</p>
+                <p><code>labels</code> or <code>batch</code> holds ids that are not cells of the dataset,
+or a cell has no batch.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
+                  <code><span title="FileNotFoundError">FileNotFoundError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>labels</code> or <code>batch</code> is the name of an obs column, such as
+<code>"donor"</code>. Pass the column itself: <code>batch=adata.obs["donor"]</code>.</p>
               </div>
             </td>
           </tr>
@@ -5734,6 +5886,13 @@ file is gone becomes <code>RUN_OK_EVAL_FAILED</code>, with the reason in
 <code>error</code>. So does a record whose new scoring fails, for example on a
 <code>batch</code> of the wrong length (<code>batch has N entries, embedding has M
 cells</code>).</p>
+<p><strong>Missing labels.</strong> A missing label is not a cell type. A record
+whose labels have a cell without one (NaN, blank text, or text that
+a label file reads as missing, such as <code>NA</code>) is not scored: it
+becomes <code>RUN_OK_EVAL_FAILED</code>, and its <code>error</code> counts the missing
+labels and names the files. This holds for the label files of the
+folder and for <code>labels=</code>. Give every cell a label, then score
+again.</p>
 <p><strong>Other hosts.</strong> When the dataset folder has moved, pass the folder
 that now holds it as <code>mtb.load_batch(data_path=)</code>. When the dataset
 folder is not found, <code>labels=None</code> gives <code>RUN_OK_NO_LABEL_MATCH</code>

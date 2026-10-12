@@ -702,6 +702,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#own-data-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipes for your own data
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2167,6 +2178,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#own-data-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipes for your own data
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2447,6 +2469,9 @@ unchanged. It needs paths: an in-memory <code>AnnData</code> raises <code>ValueE
 <h3 id="your-own-data-as-a-dataset-folder">Your own data as a dataset folder<a class="headerlink" href="#your-own-data-as-a-dataset-folder" title="Anchor link to this section">&para;</a></h3>
 <p><code>mtb.io.export_dataset</code> writes an AnnData or MuData as a dataset folder,
 which <code>scan</code>, <code>run_all</code> and <code>inputs_for</code> read.</p>
+<p>For a Cell Ranger <code>.h5</code> file, labels in a CSV file, data without labels or
+another number of donors, see
+<a href="#own-data-recipes">Recipes for your own data</a>.</p>
 <p>Give raw counts for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and peaks. The methods normalise the data
 themselves. The folder stores each matrix dense, so drop genes or peaks
 you do not need first.</p>
@@ -2537,10 +2562,17 @@ per cell, for example
 <p>A 10x Multiome AnnData read with <code>gex_only=False</code> holds genes and
 peaks in one <code>X</code>. Select each part with a feature filter:
 <code>rna="X[feature_types=Gene Expression]"</code> and
-<code>atac="X[feature_types=Peaks]"</code>.</p>
+<code>atac="X[feature_types=Peaks]"</code>. Without a filter on such data,
+<code>export_dataset</code> raises <code>ValueError</code>. The recipe
+<a href="#recipe-10x-h5">A 10x <code>.h5</code> file</a> reads the file and splits it.</p>
 <p>Running an export again raises <code>FileExistsError</code> for the files already
 in the folder. <code>overwrite=True</code> replaces them. A call that fails
-writes nothing.</p>
+writes nothing. An export also raises <code>FileExistsError</code> when the
+folder holds files of other data that it does not write: files with
+other cells, and after <code>batch=</code> files of other batch numbers. With
+<code>batch_index=</code>, a call checks its own batch number, and <code>n_batches=</code>
+says how many batches the data has. The message names the first file.
+<code>overwrite=True</code> does not remove them.</p>
 <p><code>mtb.scan</code> checks the folder for each method. Its <code>caveat</code> column
 flags values that are not whole numbers. When an expected file is
 missing, <code>scan</code> and <code>inputs_for</code> name the file they found instead.</p>
@@ -2564,15 +2596,264 @@ does not check its <abbr title="Assay for Transposase-Accessible Chromatin (sequ
 line, the flag is <code>--allow-atac-mismatch</code>. <code>run_all</code> then runs the
 method, and its caveat stays in the log and in the summary.</p>
 </details>
+<h3 id="own-data-recipes">Recipes for your own data<a class="headerlink" href="#own-data-recipes" title="Anchor link to this section">&para;</a></h3>
+<p>Each task tutorial has a section "Your own data". It reads <code>.h5ad</code> files
+that hold the cell types in <code>obs</code>, writes a dataset folder and runs the
+methods on it. These recipes cover four other starting points. Run them in
+the tutorial notebook of your task: <code>mtb</code> is imported, <code>METHODS</code> is the
+list of methods from its section 2, and its check cell and <code>run_all</code> cell
+use <code>NAME</code>, the folder name that a recipe sets. The recipes write to
+<code>mydata/</code> and call the cell-type column <code>celltype</code>, as the tutorials do.</p>
+<h4 id="recipe-10x-h5">A 10x <code>.h5</code> file<a class="headerlink" href="#recipe-10x-h5" title="Anchor link to this section">&para;</a></h4>
+<p>Cell Ranger writes <code>filtered_feature_bc_matrix.h5</code>. One file holds one
+sample of cells measured in two modalities, which is the data of a
+vertical task. <code>scan</code>, <code>run_all</code> and <code>multibench convert</code> do not read this
+file. Read it with scanpy first.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">read_10x_h5</span><span class="p">(</span><span class="s2">"filtered_feature_bc_matrix.h5"</span><span class="p">,</span>   <span class="c1"># &lt;- your file</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>                       <span class="n">gex_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s2">"feature_types"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+</span></code></pre></div>
+<p><code>gex_only=False</code> keeps the peaks or the antibody counts. Without it, scanpy
+returns the genes alone. The printout lists the feature types of the file.
+A 10x Multiome file holds <code>Gene Expression</code> and <code>Peaks</code>, and a <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>
+file holds <code>Gene Expression</code> and <code>Antibody Capture</code>.</p>
+<p>scanpy warns that variable names are not unique, here and in the next
+steps. Do not call <code>var_names_make_unique</code> on <code>adata</code>: on the whole object
+it also renames an antibody that has the name of a gene. The split below
+calls it on the genes only.</p>
+<p>The file holds no cell types. Add them to <code>adata</code> now, before the split,
+so that every part carries them. The lines are those of
+<a href="#recipe-labels-csv">Labels in a CSV file</a>, which explains them. Without
+cell types, skip the next two blocks and leave the <code>labels=</code> line out of
+the export below, as in <a href="#recipe-no-labels">No labels</a>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">ann</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"annotation.csv"</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>               <span class="c1"># &lt;- your file, barcodes first</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">lab</span> <span class="o">=</span> <span class="n">ann</span><span class="p">[</span><span class="s2">"cluster_annotation"</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>        <span class="c1"># &lt;- your column</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span> <span class="o">=</span> <span class="n">lab</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="o">~</span><span class="n">lab</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">""</span><span class="p">,</span> <span class="s2">"NA"</span><span class="p">,</span> <span class="s2">"nan"</span><span class="p">]))</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="s2">"of"</span><span class="p">,</span> <span class="n">adata</span><span class="o">.</span><span class="n">n_obs</span><span class="p">,</span> <span class="s2">"cells have a label"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>When it prints 0, or fewer cells than you expect, stop here and compare
+<code>ann.index[:3]</code> with <code>adata.obs_names[:3]</code>. When the barcodes of the CSV
+lack the <code>-1</code> ending that the cell names have, put the next line into the
+block above, after the line that reads the CSV, and run the block again.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">ann</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">ann</span><span class="o">.</span><span class="n">index</span> <span class="o">+</span> <span class="s2">"-1"</span>
+</span></code></pre></div>
+<p>Then keep the labelled cells.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span></code></pre></div>
+<p>Split <code>adata</code> into one AnnData per modality and write the folder. For
+10x Multiome, in the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">kind</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s2">"feature_types"</span><span class="p">]</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Gene Expression"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">rna</span><span class="o">.</span><span class="n">var_names_make_unique</span><span class="p">()</span>     <span class="c1"># the gene names only</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">atac</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Peaks"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MY10X"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>                      <span class="n">atac</span><span class="o">=</span><span class="n">atac</span><span class="p">,</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>For <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>, in the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> tutorial:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">kind</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s2">"feature_types"</span><span class="p">]</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Gene Expression"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">rna</span><span class="o">.</span><span class="n">var_names_make_unique</span><span class="p">()</span>     <span class="c1"># the gene names only</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="n">adt</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Antibody Capture"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MY10X"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>                      <span class="n">adt</span><span class="o">=</span><span class="n">adt</span><span class="p">,</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>When <code>export_dataset</code> says that a matrix holds 0 features, compare the type
+name in the split with the feature types printed above. A type that is not
+printed is not in <code>adata</code>: read the file again with <code>gex_only=False</code>.</p>
+<p>Then run the check cell and the <code>run_all</code> cell of that tutorial. They use
+<code>NAME</code>, so they work on this folder:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"mydata"</span><span class="p">,</span> <span class="n">per_method</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>For 10x Multiome the check lists <code>atac.h5</code> and <code>atac_peak.h5</code>: one matrix
+under two names. Diagonal methods read the second.</p>
+<p>Each matrix is stored dense and read dense: features × cells × 8 bytes of
+memory. 150,000 peaks and 10,000 cells take 12 GB. Keep the genes and
+peaks you need before the export. <code>export_dataset</code> raises <code>ValueError</code>
+when a modality would hold two feature types, for example <code>rna="X"</code> on the
+object before the split.</p>
+<h4 id="recipe-labels-csv">Labels in a CSV file<a class="headerlink" href="#recipe-labels-csv" title="Anchor link to this section">&para;</a></h4>
+<p><code>export_dataset</code> reads the cell types from <code>obs</code>, not from a file. Read the
+CSV with pandas and add the column. The barcodes in the CSV must be unique:
+a duplicated barcode stops the block with the pandas error
+<code>cannot reindex on an axis with duplicate labels</code>. For diagonal data, do
+the recipe once for <code>rna</code> and once for <code>atac</code>.</p>
+<p>In the code, <code>adata</code> is the object that holds your cells. In a tutorial
+that reads one object, it is <code>adata</code>. In the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorials it is
+<code>rna</code>, and the name <code>adata</code> does not exist there: write <code>rna</code> for <code>adata</code>
+in every line of this recipe. With another name, such as <code>adt</code> or <code>rna1</code>,
+write the object whose cells the CSV lists.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">ann</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"annotation.csv"</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>               <span class="c1"># &lt;- your file, barcodes first</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">lab</span> <span class="o">=</span> <span class="n">ann</span><span class="p">[</span><span class="s2">"cluster_annotation"</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>        <span class="c1"># &lt;- your column</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span> <span class="o">=</span> <span class="n">lab</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="o">~</span><span class="n">lab</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">""</span><span class="p">,</span> <span class="s2">"NA"</span><span class="p">,</span> <span class="s2">"nan"</span><span class="p">]))</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="s2">"of"</span><span class="p">,</span> <span class="n">adata</span><span class="o">.</span><span class="n">n_obs</span><span class="p">,</span> <span class="s2">"cells have a label"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>pandas matches the rows by barcode, so the CSV may be in any order. The
+third line turns a blank label and the text <code>NA</code> into a missing value,
+because a label file reads them as missing. When <code>export_dataset</code> names
+another such text, add it to that list.</p>
+<p>The last line counts the cells that got a label. When it prints 0, or
+fewer cells than you expect, stop here. Some barcodes of the CSV are then
+spelled differently from <code>adata.obs_names</code>, often by an ending such as
+<code>-1</code>. Compare <code>ann.index[:3]</code> with <code>adata.obs_names[:3]</code>, and do not go on
+until the number is right.</p>
+<p>When the barcodes of the CSV lack the <code>-1</code> ending that the cell names have,
+put the next line into the block above, after the line that reads the CSV,
+and run the block again. The line that reads the CSV comes first, so that a
+second run does not add the ending twice.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">ann</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">ann</span><span class="o">.</span><span class="n">index</span> <span class="o">+</span> <span class="s2">"-1"</span>
+</span></code></pre></div>
+<p>A cell without a label cannot be scored, and <code>export_dataset</code> refuses it.
+When some cells have no label, keep the labelled cells.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span></code></pre></div>
+<p>A second object of the same cells, such as <code>atac</code>, needs the same cells:
+<code>atac = atac[adata.obs_names].copy()</code>. Then go on with the export cell and
+<code>labels="obs:celltype"</code>.</p>
+<h4 id="recipe-no-labels">No labels<a class="headerlink" href="#recipe-no-labels" title="Anchor link to this section">&para;</a></h4>
+<p>Cell types are used for the scores. A few methods also read them as an
+input. The check names those methods: their <code>reason</code> says
+<code>cty.csv is missing.</code> The label file that it names depends on the layout.
+For diagonal data it is <code>rna_cty.csv</code>, for some methods together with
+<code>atac_cty.csv</code>: the reason then holds <code>rna_cty.csv is missing.</code> or
+<code>rna_cty.csv, atac_cty.csv are missing.</code> Without cell types, leave <code>labels=</code>
+out of the export and pass <code>evaluate=False</code> to <code>run_all</code>.</p>
+<p>The two blocks below are those of the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> tutorial. In
+another tutorial, do the same by removing the <code>labels=</code> line of that
+tutorial's export cell, and pass <code>evaluate=False</code> in its <code>run_all</code> cell.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MYDATA"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>              <span class="c1"># &lt;- where the RNA counts are</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>                      <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>   <span class="c1"># &lt;- where the proteins (ADT) are</span>
+</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"mydata"</span><span class="p">,</span> <span class="n">per_method</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"mydata"</span><span class="p">,</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>                   <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">mine</span><span class="o">.</span><span class="n">summary</span><span class="p">[[</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">]]</span>
+</span></code></pre></div>
+<p>The status <code>RUN_OK</code> means that the method ran and nothing was scored.
+<code>SKIPPED</code> marks a method that needs cell types as an input. Each method
+that ran has a folder in <code>out/MYDATA/</code>. For most methods the embedding is
+the file <code>embedding.h5</code> in it. Without <code>evaluate=False</code> the methods run as
+well, and the status <code>RUN_OK_NO_LABEL_MATCH</code> says that nothing was scored.</p>
+<p>Diagonal data with cell types for the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells only is the same case.
+<code>run_all</code> scores a diagonal folder only when both sides have labels. Leave
+<code>labels=</code> out and pass <code>evaluate=False</code>. No score compares methods on such
+data. <code>missing_labels="drop"</code> would score the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells alone, and those
+scores do not change with where a method puts the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells.</p>
+<p>When you have cell types later, add them to the folder and score the saved
+embeddings. No method runs again. Here <code>adata</code> is the object whose cells
+the folder holds. In the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial it is <code>rna</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">)</span><span class="o">.</span><span class="n">rescore</span><span class="p">()</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="n">mine</span><span class="o">.</span><span class="n">summary</span>
+</span></code></pre></div>
+<p><code>export_dataset</code> writes the labels in the cell order of the files already
+in the folder, whatever the row order of <code>adata</code> is by then. It refuses
+labels for other cells.</p>
+<p>This line is for a folder without batch numbers that holds one set of
+cells, as the vertical tutorials write it. For cross, mosaic and diagonal
+data it does not apply: run the export cell of your tutorial again with its
+<code>labels=</code> line, and then the <code>rescore</code> line above. The files keep their
+cell order. Diagonal data needs the column in both files.</p>
+<p>With cell types for some of the cells only, keep the labelled cells before
+the export, as in the recipe above. An embedding that you hold in an
+AnnData can be scored on its labelled cells, when every modality and every
+batch has labelled cells:
+<code>mtb.evaluate(adata, labels="obs:celltype", obsm="X_emb", missing_labels="drop")</code>.
+It says how many cells it scored. Without <code>missing_labels="drop"</code>,
+<code>evaluate</code> raises when a label is missing.</p>
+<h4 id="recipe-donors">Another number of donors<a class="headerlink" href="#recipe-donors" title="Anchor link to this section">&para;</a></h4>
+<p>A batch is a donor, a sample or an experiment. A cross method reads a fixed
+number of batches: three for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, where UINMF also
+reads two, and two for <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.
+<code>mtb.describe_layout("cross")</code> lists them. With another number of donors,
+treat the data as a vertical task: keep all cells in one folder and give
+<code>run_all</code> the donor of each cell.</p>
+<p>Do this in the vertical tutorial of your modalities, not in the cross
+tutorial. Its <code>METHODS</code> are vertical methods, and its section 2 installs
+their environments. StabMap, a cross method, does not run on vertical
+data. <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> has no vertical task: for that data, keep two donors, as
+shown further down, with two names in the list.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MYDONORS"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>                <span class="c1"># &lt;- where the RNA counts are</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>                      <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>     <span class="c1"># &lt;- where the proteins (ADT) are</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>  <span class="c1"># &lt;- the cell-type column</span>
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>         <span class="c1"># no batch= here</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"mydata"</span><span class="p">,</span>
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>                   <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>                   <span class="n">batch</span><span class="o">=</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">])</span>  <span class="c1"># &lt;- your donor column</span>
+</span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="n">mine</span><span class="o">.</span><span class="n">summary</span>
+</span></code></pre></div>
+<p><code>batch=</code> takes the column itself, not its name. <code>run_all</code> reads the folder,
+and the folder holds no <code>obs</code> columns. The values are matched to the cells
+by barcode. Every cell needs a donor: <code>run_all</code> stops when one is missing.
+The summary then has the batch metrics <code>ASW_batch</code>, <code>GC</code> and <code>iLISI</code>, which
+say how well the donors mix. The methods do not read <code>batch=</code>.</p>
+<p>To use the cross tutorial instead, keep as many donors as its methods read.
+First print the donor names of your file. This block changes nothing.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>   <span class="c1"># the names in your file</span>
+</span></code></pre></div>
+<p>Write three of the printed names into the list of the next block, in place
+of <code>A</code>, <code>B</code> and <code>C</code>. Then run it.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">])]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>   <span class="c1"># &lt;- three donors</span>
+</span></code></pre></div>
+<p>Write the names of the donors you keep in the list, as printed. When none
+of them is in the file, no cell is kept, and the export stops:
+<code>The data holds 0 cells, so there is nothing to write.</code> When one name is
+wrong, the cells of the other donors are kept, and the check names the
+files of the batch that is not there.</p>
+<p>When the list holds a name that is not in the file, <code>adata</code> ends with fewer
+cells or with none, and a corrected list does not bring them back. Run the
+read cell of the tutorial again to get the data back, and then this block.</p>
+<p>In a cross folder with more batches than a method reads, the method reads
+the first ones, and the check says so:
+<code>StabMap reads batches 1-3 of 5. Batches 4-5 are not used.</code> With fewer, it
+names the files that are not there: <code>rna3.h5, adt3.h5 are missing.</code> The
+batches are numbered in the sorted order of the donor names, read as text,
+so <code>10</code> comes before <code>2</code>.</p>
+<details class="note">
+<summary>From the command line</summary>
+<p><code>multibench convert</code> reads <code>.h5ad</code> files, not a 10x <code>.h5</code> file. Save
+the objects first, for example with <code>rna.write_h5ad("my_rna.h5ad")</code>.
+Without cell types, leave <code>--labels</code> out and run without scores. For
+two files of other cells (diagonal data):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>multibench convert my_rna.h5ad mydata/MYDATA --rna X --atac-from my_atac.h5ad \
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>    --atac-kind gene_activity --category diagonal
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>multibench run-all MYDATA --category diagonal --data-path mydata \
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>    --out-dir out/MYDATA --no-evaluate
+</span></code></pre></div>
+<p><code>multibench run-all --batch donor.csv</code> takes the file that
+<code>adata.obs[["donor"]].to_csv("donor.csv")</code> writes.</p>
+</details>
 <hr />
 <h2 id="gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?<a class="headerlink" href="#gpu-or-cpu" title="Anchor link to this section">&para;</a></h2>
 <p>Most methods also run without a <abbr title="Graphics Processing Unit">GPU</abbr>, only slower. Six need an NVIDIA
 <abbr title="Graphics Processing Unit">GPU</abbr>. On a host without one, <code>run</code> refuses them with <code>OSError</code> before
 starting, and <code>scan</code> and <code>run_all</code> mark them not runnable.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span> <span class="k">if</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">m</span><span class="p">)[</span><span class="s2">"requires_gpu"</span><span class="p">]]</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="p">[</span><span class="s1">'scBridge'</span><span class="p">,</span> <span class="s1">'moETM'</span><span class="p">,</span> <span class="s1">'SMILE'</span><span class="p">,</span> <span class="s1">'sciCAN'</span><span class="p">,</span> <span class="s1">'UnitedNet'</span><span class="p">,</span> <span class="s1">'iPOLNG'</span><span class="p">]</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"scJoint"</span><span class="p">)[</span><span class="s2">"cpu_params"</span><span class="p">]</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="p">{</span><span class="s1">'use_cuda'</span><span class="p">:</span> <span class="s1">''</span><span class="p">}</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span> <span class="k">if</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">m</span><span class="p">)[</span><span class="s2">"requires_gpu"</span><span class="p">]]</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="p">[</span><span class="s1">'scBridge'</span><span class="p">,</span> <span class="s1">'moETM'</span><span class="p">,</span> <span class="s1">'SMILE'</span><span class="p">,</span> <span class="s1">'sciCAN'</span><span class="p">,</span> <span class="s1">'UnitedNet'</span><span class="p">,</span> <span class="s1">'iPOLNG'</span><span class="p">]</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="o">&gt;&gt;&gt;</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"scJoint"</span><span class="p">)[</span><span class="s2">"cpu_params"</span><span class="p">]</span>
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="p">{</span><span class="s1">'use_cuda'</span><span class="p">:</span> <span class="s1">''</span><span class="p">}</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
@@ -2615,24 +2896,24 @@ the environment yourself.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="2:4"><input checked="checked" id="slurm-job-step" name="__tabbed_2" type="radio" /><input id="explicit-conda-env" name="__tabbed_2" type="radio" /><input id="singularity--apptainer" name="__tabbed_2" type="radio" /><input id="run-in-the-current-env" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="slurm-job-step">Slurm job step</label><label for="explicit-conda-env">Explicit conda env</label><label for="singularity--apptainer">Singularity / Apptainer</label><label for="run-in-the-current-env">Run in the current env</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"srun --gres=gpu:1 </span><span class="si">{env_cmd}</span><span class="s2">"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"srun --gres=gpu:1 </span><span class="si">{env_cmd}</span><span class="s2">"</span><span class="p">)</span>
 </span></code></pre></div>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>atac_gas.h5<span class="w"> </span>--out-dir<span class="w"> </span>runs/scalex<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span>--runner<span class="w"> </span><span class="s2">"srun --gres=gpu:1 {env_cmd}"</span>
-</span></code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>SCALEX<span class="w"> </span>--category<span class="w"> </span>diagonal<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">atac_gas</span><span class="o">=</span>atac_gas.h5<span class="w"> </span>--out-dir<span class="w"> </span>runs/scalex<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">    </span>--runner<span class="w"> </span><span class="s2">"srun --gres=gpu:1 {env_cmd}"</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"singularity exec multibench.sif </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"conda run -n scmb_torch </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># no wrapper: the active interpreter runs the script</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"</span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"singularity exec multibench.sif </span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># no wrapper: the active interpreter runs the script</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"</span><span class="si">{cmd}</span><span class="s2">"</span><span class="p">)</span>
 </span></code></pre></div>
 </div>
 </div>

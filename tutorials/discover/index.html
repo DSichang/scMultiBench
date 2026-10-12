@@ -2549,6 +2549,9 @@ instead.
 <h2 id="before-running">Before running<a class="headerlink" href="#before-running" title="Anchor link to this section">&para;</a></h2>
 <p>Check your folder with <code>mtb.scan("MYDATA", category)</code>. It reports
 <code>files_ok</code> and <code>env_ok</code> per method. Then run them with <code>run_all</code>.</p>
+<p>By default <code>scan</code> lists the variants whose modalities the folder holds.
+<code>modalities="all"</code> lists every variant, and <code>per_method=True</code> gives one
+row per method.</p>
 <hr />
 <p>Next: run a chosen method in <a href="../run/">Run a method</a>, score it in
 <a href="../evaluate/">Evaluate a run</a>, and compare methods in

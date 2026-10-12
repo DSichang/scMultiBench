@@ -555,10 +555,19 @@
     if (weight) t.setAttribute('font-weight', weight);
     t.textContent = str; return t;
   };
+  /* seeded PRNG (mulberry32): a scene drawn twice from one seed is identical,
+     and every visit sees the same frame */
+  const tfRng = (seed) => () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
   /* organic blob path (smooth closed curve around a centre) */
-  const tfBlob = (cx, cy, rx, ry) => {
+  const tfBlob = (cx, cy, rx, ry, rnd) => {
+    rnd = rnd || Math.random;
     const n = 12, pts = [];
-    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const k = 0.93 + Math.random() * 0.12; pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]); }
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const k = 0.93 + rnd() * 0.12; pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]); }
     let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} `;
     for (let i = 0; i < n; i++) {
       const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
@@ -634,7 +643,7 @@
     const mk = tfMk, label = tfLabel;
     const CT = ['#3b82f6', '#10b981', '#ef4444'];
 
-    const reg = (arr, el, from, to, dur, delay) => arr.push({ el, from, to, dur: dur || 1.3, delay: delay || 0 });
+    const reg = (arr, el, from, to, dur, delay, ease) => arr.push({ el, from, to, dur: dur || 1.3, delay: delay || 0, ease });
 
     /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        Scene sets. Each builder returns a fresh `scenes[]` array; the active set
@@ -644,120 +653,187 @@
 
     /* ══════════════════════════ scMultiBench ══════════════════════════
        run → evaluate → plot, the scIB-style benchmark pipeline.
-       Choreography (polish pass): no static arrows — a selection ring picks the
-       method and a flowing dashed wire carries the run "signal" (m3 wire idiom);
-       integration is SHOWN (grey scatter drifts into coloured clusters), every
-       metric bar reports its value, and the bubble table ends on its signature
-       move: whole rows glide into overall-rank order. */
+       Choreography: the three scenes are joined by the objects they hand over,
+       not by cross-fades. The embedding panel of ① shrinks into the input
+       thumbnail of ②; the five metric bars of ② contract into the five bubbles
+       of one row of ③. Each scene has one lead action with a complete arc:
+       ① the picked chip lifts, lands, and the landing sends the run signal;
+       ② every bar carries its value at its tip while it grows;
+       ③ rows glide into overall-rank order and one outline is drawn round the
+          top row. No static arrows, and every landed state rests before the
+          next move. */
     BUILDERS.multibench = () => {
     const scenes = [];
     const VIO = '#7c3aed', VIO_DEEP = '#6d28d9', VIO_SOFT = '#a78bfa', COLB = '#0ea5e9';
     const CHIP_BG = '#eef2f7', INK_MUT = '#475569', GREY_CELL = '#cbd5e1';
+    const appear = (m, el, delay, dur) => { el.setAttribute('opacity', 0); reg(m, el, { opacity: 0 }, { opacity: 1 }, dur || 0.3, delay || 0, 'power2.out'); };
 
-    /* ① Run — the registry list cascades in, a selection ring drops onto SCALEX
-       (the docs' worked example), and the signal flowing down the wire turns a
-       grey unintegrated scatter into three coloured clusters. */
+    /* The embedding panel is drawn twice from one seed: animated in ① and, in
+       its finished state, as the thumbnail of ②. ① ends by moving its panel
+       onto THUMB, so the cut between the scenes swaps identical pixels. */
+    const PANEL = { x: 250, y: 34, w: 186, h: 150 };
+    const THUMB = { k: 0.42, x: 22, y: 66 };
+    const THUMB_TX = THUMB.x - PANEL.x * THUMB.k, THUMB_TY = THUMB.y - PANEL.y * THUMB.k;
+    const T_ARRIVE = 3.2;                       // ①: the run signal reaches the panel
+    const buildEmbedding = (m) => {
+      const rnd = tfRng(11);
+      const emb = mk('g', {});
+      emb.appendChild(mk('rect', { x: PANEL.x, y: PANEL.y, width: PANEL.w, height: PANEL.h, rx: 8, fill: 'none', stroke: 'currentColor', 'stroke-opacity': 0.2, 'stroke-width': 1.4 }));
+      const clusters = [
+        { col: CT[0], cx: 296, cy: 72 },
+        { col: CT[1], cx: 392, cy: 86 },
+        { col: CT[2], cx: 338, cy: 146 },
+      ];
+      clusters.forEach((cl) => {
+        const blob = mk('path', { d: tfBlob(cl.cx, cl.cy, 34, 27, rnd), fill: cl.col, opacity: m ? 0 : 0.13 });
+        emb.appendChild(blob);
+        if (m) reg(m, blob, { opacity: 0 }, { opacity: 0.13 }, 0.5, T_ARRIVE + 0.6, 'power2.out');
+      });
+      clusters.forEach((cl) => {
+        for (let i = 0; i < 9; i++) {
+          const ang = (i / 9) * Math.PI * 2 + rnd() * 0.6;
+          const rr = 4 + Math.sqrt(rnd()) * 14;
+          const tx = cl.cx + Math.cos(ang) * rr * 1.25, ty = cl.cy + Math.sin(ang) * rr * 0.9;
+          const sx = PANEL.x + 14 + rnd() * (PANEL.w - 28), sy = PANEL.y + 14 + rnd() * (PANEL.h - 28);
+          const tIn = 0.35 + rnd() * 0.45, tGo = T_ARRIVE + rnd() * 0.27;
+          if (!m) { emb.appendChild(mk('circle', { cx: tx, cy: ty, r: 5, fill: cl.col })); continue; }
+          // unintegrated: a grey scatter. Each cell then travels to its cluster
+          // and takes its cell-type colour, so one cell can be followed.
+          const d = mk('circle', { cx: sx, cy: sy, r: 5, fill: GREY_CELL, opacity: 0 });
+          emb.appendChild(d);
+          reg(m, d, { opacity: 0 }, { opacity: 0.9 }, 0.4, tIn, 'power2.out');
+          reg(m, d, {}, { x: tx - sx, y: ty - sy, attr: { fill: cl.col }, opacity: 1 }, 0.75, tGo, 'back.out(1.3)');
+        }
+      });
+      if (m) {
+        // the panel answers the arriving signal once, before the cells move
+        const ping = mk('rect', { x: PANEL.x, y: PANEL.y, width: PANEL.w, height: PANEL.h, rx: 8, fill: 'none', stroke: VIO, 'stroke-width': 1.8, opacity: 0 });
+        emb.appendChild(ping);
+        reg(m, ping, { opacity: 0 }, { opacity: 0.9 }, 0.12, T_ARRIVE - 0.04, 'power2.out');
+        reg(m, ping, {}, { opacity: 0 }, 0.5, T_ARRIVE + 0.1, 'power2.out');
+      }
+      return emb;
+    };
+
+    /* ① Run — the registry list cascades in, a selection ring stops on SCALEX
+       (the docs' worked example), the picked chip lifts off the list and lands;
+       the landing sends the run signal down the wire, and the grey scatter in
+       the panel regroups into three coloured clusters. */
     (() => {
-      const g = tfScene(); const m = [];
-      g.appendChild(label(34, 40, '36 methods', 'start', 9, 'currentColor', '700'));
+      const g = tfScene(); const m = []; const ex = [];
+      const defs = mk('defs', {});
+      const blur = mk('filter', { id: 'tf-soft', x: '-30%', y: '-200%', width: '160%', height: '500%' });
+      blur.appendChild(mk('feGaussianBlur', { stdDeviation: 2.2 }));
+      defs.appendChild(blur); g.appendChild(defs);
+
+      const list = mk('g', {});
+      g.appendChild(list);
+      list.appendChild(label(34, 40, '36 methods', 'start', 9, 'currentColor', '700'));
       // real registry methods only (no tools the benchmark does not cover)
       const names = ['totalVI', 'Multigrate', 'SCALEX', 'Seurat WNN', 'MOFA2', '+ 31 more'];
       const SEL = 2;                                  // SCALEX — the tutorials' worked example
       const rw = 108, rh = 19, rgap = 5, rx = 34, ry0 = 50;
       const rowY = (i) => ry0 + i * (rh + rgap);
-      const selCY = rowY(SEL) + rh / 2;
+      const selCY = rowY(SEL) + rh / 2, selCX = rx + rw / 2;
+      const T_PICK = 1.6, T_LAND = 2.25, T_RUN = 2.5;
+
+      // contact shadow of the lifted chip: it stays on the list while the chip rises
+      const shadow = mk('ellipse', { cx: selCX, cy: rowY(SEL) + rh + 2.5, rx: rw * 0.4, ry: 3, fill: '#0f172a', filter: 'url(#tf-soft)', opacity: 0 });
+      list.appendChild(shadow);
+      reg(m, shadow, { opacity: 0, scaleX: 0.8, svgOrigin: selCX + ' ' + (rowY(SEL) + rh + 2.5) }, { opacity: 0.3, scaleX: 1.12 }, 0.33, T_PICK, 'power3.out');
+      reg(m, shadow, {}, { opacity: 0, scaleX: 0.8 }, 0.25, T_LAND, 'power2.in');
+
+      // the list arrives faster and faster (shrinking gaps), then rests
+      const tIn = [0.05, 0.16, 0.25, 0.32, 0.37, 0.40];
+      let selRow = null;
       names.forEach((nm, i) => {
         const y = rowY(i), sel = (i === SEL);
-        const chip = mk('rect', { x: rx, y, width: rw, height: rh, rx: 4, fill: CHIP_BG, opacity: 0 });
-        g.appendChild(chip);
+        const row = mk('g', { opacity: 0 });
+        const chip = mk('rect', { x: rx, y, width: rw, height: rh, rx: 4, fill: CHIP_BG });
         const txt = label(rx + 10, y + 13, nm, 'start', 9, INK_MUT, '500');
-        txt.setAttribute('opacity', 0);
-        g.appendChild(txt);
-        // beat 1 — the list cascades in, every chip still neutral
-        reg(m, chip, { opacity: 0, x: -8 }, { opacity: 1, x: 0 }, 0.45, 0.05 + i * 0.07);
-        reg(m, txt, { opacity: 0, x: -8 }, { opacity: 1, x: 0 }, 0.4, 0.12 + i * 0.07);
-        // beat 2 — the pick lands: SCALEX fills violet, the rest recede
+        row.appendChild(chip); row.appendChild(txt);
+        if (!sel) list.appendChild(row); else selRow = row;
+        const from = { opacity: 0, x: -10 };
+        if (sel) { from.y = 0; from.scale = 1; from.svgOrigin = selCX + ' ' + selCY; }
+        reg(m, row, from, { opacity: 1, x: 0 }, 0.4, tIn[i], 'power3.out');
         if (sel) {
-          reg(m, chip, {}, { attr: { fill: VIO } }, 0.35, 1.4);
-          reg(m, txt, {}, { attr: { fill: '#fff', 'font-weight': 700 } }, 0.35, 1.4);
+          // the pick: the chip takes the brand colour as it leaves the list …
+          reg(m, chip, {}, { attr: { fill: VIO } }, 0.25, T_PICK, 'power2.out');
+          reg(m, txt, {}, { attr: { fill: '#fff', 'font-weight': 700 } }, 0.25, T_PICK, 'power2.out');
+          reg(m, row, {}, { y: -5, scale: 1.06 }, 0.33, T_PICK, 'power3.out');
+          // … hovers, and lands with a small press
+          reg(m, row, {}, { y: 0, scale: 0.985 }, 0.25, T_LAND, 'power2.in');
+          reg(m, row, {}, { scale: 1 }, 0.2, T_RUN, 'power3.out');
         } else {
-          reg(m, chip, {}, { opacity: 0.45 }, 0.35, 1.4);
-          reg(m, txt, {}, { opacity: 0.55 }, 0.35, 1.4);
+          reg(m, row, {}, { opacity: 0.55 }, 0.3, T_PICK, 'power2.out');
         }
       });
-      // the selection ring drops down the list and stops on the picked row
+      list.appendChild(selRow);                       // the lifted chip paints above its neighbours
+
+      // the selection ring comes down the list and brakes on the picked row
       const ring = mk('rect', { x: rx - 3, y: rowY(0) - 3, width: rw + 6, height: rh + 6, rx: 6, fill: 'none', stroke: VIO, 'stroke-width': 1.8, opacity: 0 });
-      g.appendChild(ring);
-      reg(m, ring, { opacity: 0 }, { opacity: 1 }, 0.25, 0.6);
-      reg(m, ring, {}, { y: rowY(SEL) - rowY(0) }, 0.55, 0.85);
-      reg(m, ring, {}, { opacity: 0 }, 0.35, 1.75);     // hand over to the filled chip
-      // flowing wire — the run signal leaves the picked chip …
-      const wire = mk('path', { d: `M ${rx + rw + 4} ${selCY} C 200 ${selCY}, 214 105, 246 105`, fill: 'none', stroke: VIO, 'stroke-width': 1.8, 'stroke-dasharray': '5 5', opacity: 0 });
+      list.appendChild(ring);
+      reg(m, ring, { opacity: 0, y: 0 }, { opacity: 1 }, 0.2, 0.8, 'power2.out');
+      reg(m, ring, {}, { y: rowY(SEL) - rowY(0) }, 0.55, 0.95, 'power3.inOut');
+      reg(m, ring, {}, { opacity: 0 }, 0.25, T_PICK, 'power2.out');   // hands over to the filled chip
+
+      // the landing sends the run signal: a line drawn by a visible head
+      const wx0 = rx + rw + 5, wx1 = PANEL.x - 3, wLen = wx1 - wx0;
+      const wire = mk('line', { x1: wx0, y1: selCY, x2: wx1, y2: selCY, stroke: VIO, 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-dasharray': wLen, 'stroke-dashoffset': wLen, opacity: 0 });
       g.appendChild(wire);
-      reg(m, wire, { opacity: 0, attr: { 'stroke-dashoffset': 60 } }, { opacity: 0.85, attr: { 'stroke-dashoffset': 0 } }, 0.8, 1.5);
-      reg(m, wire, {}, { attr: { 'stroke-dashoffset': -60 } }, 0.9, 2.3);   // keep the current flowing
-      // … and three signal dots ride it into the embedding
-      for (let k = 0; k < 3; k++) {
-        const dot = mk('circle', { cx: rx + rw + 6, cy: selCY, r: 2.6, fill: VIO, opacity: 0 });
-        g.appendChild(dot);
-        reg(m, dot, { opacity: 0 }, { opacity: 1 }, 0.15, 1.6 + k * 0.22);
-        reg(m, dot, {}, { x: 96, y: 105 - selCY, opacity: 0 }, 0.7, 1.75 + k * 0.22);
-      }
-      // the payoff: an unintegrated grey scatter DRIFTS into three clusters and
-      // takes its cell-type colour — integration made visible, not implied
-      const clusters = [
-        { col: CT[0], cx: 296, cy: 70 },
-        { col: CT[1], cx: 394, cy: 84 },
-        { col: CT[2], cx: 336, cy: 148 },
-      ];
-      clusters.forEach((cl) => {
-        const blob = mk('path', { d: tfBlob(cl.cx, cl.cy, 34, 27), fill: cl.col, opacity: 0 });
-        g.appendChild(blob);
-        reg(m, blob, { opacity: 0 }, { opacity: 0.13 }, 0.5, 3.1);
-        for (let i = 0; i < 6; i++) {
-          const ang = (i / 6) * Math.PI * 2 + Math.random() * 0.5;
-          const rr2 = 5 + Math.random() * 14;
-          const tx = cl.cx + Math.cos(ang) * rr2 * 1.25, ty = cl.cy + Math.sin(ang) * rr2 * 0.9;
-          const sx = 262 + Math.random() * 170, sy = 42 + Math.random() * 138;
-          const d = mk('circle', { cx: sx, cy: sy, r: 5, fill: GREY_CELL, opacity: 0 });
-          g.appendChild(d);
-          reg(m, d, { opacity: 0 }, { opacity: 0.9 }, 0.4, 0.5 + Math.random() * 0.4);
-          reg(m, d, {}, { x: tx - sx, y: ty - sy, attr: { fill: cl.col }, opacity: 1 }, 1.0, 2.45 + Math.random() * 0.25);
-        }
-      });
-      const cap = label(340, 196, 'Integrated embedding', 'middle', 9, 'currentColor', '600');
+      reg(m, wire, { opacity: 0, attr: { 'stroke-dashoffset': wLen } }, { opacity: 1 }, 0.05, T_RUN, 'none');
+      reg(m, wire, {}, { attr: { 'stroke-dashoffset': 0 } }, T_ARRIVE - T_RUN, T_RUN, 'power2.inOut');
+      reg(m, wire, {}, { opacity: 0.45 }, 0.5, T_ARRIVE + 0.1, 'power2.out');
+      const head = mk('circle', { cx: wx0, cy: selCY, r: 3.2, fill: VIO, opacity: 0 });
+      g.appendChild(head);
+      reg(m, head, { opacity: 0, x: 0 }, { opacity: 1 }, 0.05, T_RUN, 'none');
+      reg(m, head, {}, { x: wLen }, T_ARRIVE - T_RUN, T_RUN, 'power2.inOut');
+      reg(m, head, {}, { opacity: 0 }, 0.12, T_ARRIVE, 'power2.out');
+
+      const emb = buildEmbedding(m);
+      emb.setAttribute('opacity', 0);
+      g.appendChild(emb);
+      reg(m, emb, { opacity: 0, x: 0, y: 0, scale: 1, svgOrigin: '0 0' }, { opacity: 1 }, 0.4, 0.3, 'power2.out');
+      const cap = label(PANEL.x + PANEL.w / 2, 200, 'Integrated embedding', 'middle', 9, 'currentColor', '600');
       cap.setAttribute('opacity', 0);
       g.appendChild(cap);
-      reg(m, cap, { opacity: 0 }, { opacity: 1 }, 0.5, 3.2);
-      scenes.push({ num: 1, title: 'Run a method', g, morphs: m });
+      reg(m, cap, { opacity: 0 }, { opacity: 1 }, 0.5, T_ARRIVE + 0.7, 'power2.out');
+
+      // hand-over to ②: the list and wire clear, and the panel itself travels
+      // to the thumbnail slot (position and size on one curve, 3% past, settle)
+      [list, wire, cap].forEach((el) => ex.push({ el, to: { opacity: 0 }, dur: 0.3, delay: 0, ease: 'power2.in' }));
+      const O = 1.03;
+      ex.push({ el: emb, to: { x: THUMB_TX * O, y: THUMB_TY * O, scale: 1 + (THUMB.k - 1) * O }, dur: 0.8, delay: 0.1, ease: 'power2.inOut' });
+      ex.push({ el: emb, to: { x: THUMB_TX, y: THUMB_TY, scale: THUMB.k }, dur: 0.3, delay: 0.9, ease: 'power3.out' });
+      scenes.push({ num: 1, title: 'Run a method', g, morphs: m, exits: ex, hold: 2.8 });
     })();
 
-    /* ② Evaluate — the scene-① embedding feeds the scIB panel; each metric bar
-       grows and reports its value as it lands. */
+    /* Bubble table of ③, shared with ②'s hand-over. One score per method and
+       metric; the overall score is their mean and sets the final row order, so
+       the order the rows glide into is the order the bubbles show. */
+    const TBL = { x0: 150, y0: 62, cw: 33, ch: 25, ovX: 118 };
+    const T_METRICS = ['iLISI', 'kBET', 'ASW', 'ARI', 'NMI', 'cLISI'];
+    const T_SCORES = [
+      [0.78, 0.61, 0.85, 0.72, 0.89, 0.80],   // Method 1 — the scores ② reports
+      [0.66, 0.52, 0.74, 0.60, 0.70, 0.72],
+      [0.90, 0.82, 0.92, 0.86, 0.93, 0.88],
+      [0.84, 0.70, 0.88, 0.80, 0.86, 0.84],
+      [0.45, 0.40, 0.58, 0.42, 0.55, 0.50],
+    ];
+    const bubR = (s) => 2.5 + (s - 0.35) * 11.5;
+
+    /* ② Evaluate — the embedding of ① is the input; each metric bar grows with
+       its value counting at its tip. */
     (() => {
-      const g = tfScene(); const m = [];
-      // input glyph: the integrated embedding, miniaturised (continuity with ①)
-      const mini = [
-        { col: CT[0], cx: 46, cy: 84 },
-        { col: CT[1], cx: 78, cy: 92 },
-        { col: CT[2], cx: 58, cy: 118 },
-      ];
-      mini.forEach((cl, ci) => {
-        for (let i = 0; i < 5; i++) {
-          const ang = (i / 5) * Math.PI * 2;
-          const cx = cl.cx + Math.cos(ang) * 9, cy = cl.cy + Math.sin(ang) * 7.5;
-          const d = mk('circle', { cx, cy, r: 3.4, fill: cl.col, opacity: 0 });
-          g.appendChild(d);
-          reg(m, d, { opacity: 0, scale: 0, svgOrigin: cx + ' ' + cy }, { opacity: 1, scale: 1, svgOrigin: cx + ' ' + cy }, 0.4, 0.1 + ci * 0.08 + i * 0.03);
-        }
-      });
-      const glab = label(62, 148, 'Embedding', 'middle', 8.5, 'currentColor', '600');
-      glab.setAttribute('opacity', 0); g.appendChild(glab);
-      reg(m, glab, { opacity: 0 }, { opacity: 1 }, 0.4, 0.4);
-      // wire into the metric panel
-      const wire = mk('path', { d: 'M 96 100 C 116 100, 122 100, 140 100', fill: 'none', stroke: '#94a3b8', 'stroke-width': 1.6, 'stroke-dasharray': '4 4', opacity: 0 });
-      g.appendChild(wire);
-      reg(m, wire, { opacity: 0, attr: { 'stroke-dashoffset': 32 } }, { opacity: 0.9, attr: { 'stroke-dashoffset': 0 } }, 0.6, 0.5);
+      const g = tfScene(); const m = []; const ex = [];
+      const fades = [];                               // everything that clears at the hand-over to ③
+      const thumb = buildEmbedding(null);
+      thumb.setAttribute('transform', `translate(${THUMB_TX} ${THUMB_TY}) scale(${THUMB.k})`);
+      g.appendChild(thumb); fades.push(thumb);
+      const tcx = THUMB.x + PANEL.w * THUMB.k / 2, tcy = THUMB.y + PANEL.h * THUMB.k / 2;
+      const glab = label(tcx, THUMB.y + PANEL.h * THUMB.k + 15, 'Embedding', 'middle', 8.5, 'currentColor', '600');
+      g.appendChild(glab); appear(m, glab, 0.05); fades.push(glab);
+
       const metrics = [
         { name: 'iLISI', v: 0.78, kind: 'batch' },
         { name: 'kBET',  v: 0.61, kind: 'batch' },
@@ -766,82 +842,139 @@
         { name: 'NMI',   v: 0.89, kind: 'bio' },
       ];
       const x0 = 186, y0 = 44, bh = 15, gap = 11, maxW = 156;
+      // the embedding feeds the panel
+      const wx0 = THUMB.x + PANEL.w * THUMB.k + 5, wx1 = x0 - 38, wLen = wx1 - wx0;
+      const wire = mk('line', { x1: wx0, y1: tcy, x2: wx1, y2: tcy, stroke: '#94a3b8', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-dasharray': wLen, 'stroke-dashoffset': wLen });
+      g.appendChild(wire); fades.push(wire);
+      reg(m, wire, { attr: { 'stroke-dashoffset': wLen } }, { attr: { 'stroke-dashoffset': 0 } }, 0.4, 0.15, 'power2.inOut');
+
+      const bars = [];
       metrics.forEach((mt, i) => {
         const y = y0 + i * (bh + gap), col = mt.kind === 'batch' ? COLB : VIO;
-        g.appendChild(label(x0 - 8, y + bh - 4, mt.name, 'end', 9, 'currentColor', '600'));
-        g.appendChild(mk('rect', { x: x0, y, width: maxW, height: bh, rx: 3, fill: CHIP_BG }));
+        const w = Math.round(maxW * mt.v), del = 0.55 + i * 0.12;
+        const name = label(x0 - 8, y + bh - 4, mt.name, 'end', 9, 'currentColor', '600');
+        const track = mk('rect', { x: x0, y, width: maxW, height: bh, rx: 3, fill: CHIP_BG });
+        g.appendChild(name); g.appendChild(track);
+        appear(m, name, 0.1 + i * 0.04); appear(m, track, 0.1 + i * 0.04);
+        fades.push(name, track);
         const bar = mk('rect', { x: x0, y, width: 0, height: bh, rx: 3, fill: col });
         g.appendChild(bar);
-        const del = 0.7 + i * 0.14;
-        reg(m, bar, { attr: { width: 0 } }, { attr: { width: Math.round(maxW * mt.v) } }, 0.8, del);
-        // the value lands with its bar
-        const val = label(x0 + Math.round(maxW * mt.v) + 6, y + bh - 4, mt.v.toFixed(2), 'start', 8, col, '700');
+        reg(m, bar, { attr: { x: x0, y, width: 0, height: bh, rx: 3, fill: col }, opacity: 1 }, { attr: { width: w } }, 0.7, del, 'power3.out');
+        // the value rides inside the bar's tip and counts up with it (on the bar
+        // colour it reads the same in the light and the dark theme)
+        const val = label(x0 + w - 5, y + bh - 4, mt.v.toFixed(2), 'end', 8, '#fff', '700');
         val.setAttribute('opacity', 0);
-        g.appendChild(val);
-        reg(m, val, { opacity: 0, x: -6 }, { opacity: 1, x: 0 }, 0.35, del + 0.8);
+        g.appendChild(val); fades.push(val);
+        reg(m, val, { opacity: 0 }, { opacity: 1 }, 0.2, del + 0.12, 'power2.out');
+        reg(m, val, { textContent: 0, attr: { x: x0 - 5 } }, { textContent: mt.v, attr: { x: x0 + w - 5 }, modifiers: { textContent: (v) => (+v).toFixed(2) } }, 0.7, del, 'power3.out');
+        bars.push(bar);
       });
       // a faded extra row + ellipsis — only a few of the metrics scMultiBench computes
       const eY = y0 + metrics.length * (bh + gap);
-      g.appendChild(mk('rect', { x: x0, y: eY, width: Math.round(maxW * 0.45), height: bh, rx: 3, fill: CHIP_BG, opacity: 0.6 }));
-      g.appendChild(label(x0 - 8, eY + bh - 4, '…', 'end', 12, 'currentColor', '700'));
-      tfLegend(m, g, 356, 72, [
+      const more = mk('g', {});
+      more.appendChild(mk('rect', { x: x0, y: eY, width: Math.round(maxW * 0.45), height: bh, rx: 3, fill: CHIP_BG, opacity: 0.6 }));
+      more.appendChild(label(x0 - 8, eY + bh - 4, '…', 'end', 12, 'currentColor', '700'));
+      g.appendChild(more); appear(m, more, 0.3); fades.push(more);
+      const leg = tfLegend(m, g, 356, 72, [
         { title: 'scIB metrics' },
         { swatch: 'sq', color: COLB, text: 'Batch removal' },
         { swatch: 'sq', color: VIO, text: 'Bio conservation' },
       ]);
-      scenes.push({ num: 2, title: 'Evaluate (scIB)', g, morphs: m });
+      fades.push(leg);
+
+      // hand-over to ③: the panel clears and each bar becomes the bubble of its
+      // metric in the first table row (same order, so no paths cross)
+      fades.forEach((el) => ex.push({ el, to: { opacity: 0 }, dur: 0.3, delay: 0, ease: 'power2.in' }));
+      bars.forEach((bar, j) => {
+        const r = bubR(T_SCORES[0][j]), cx = TBL.x0 + j * TBL.cw, cy = TBL.y0;
+        const yMid = y0 + j * (bh + gap) + bh / 2;
+        // first the bar closes up to a bubble where it stands, then the bubble travels
+        ex.push({ el: bar, to: { attr: { y: yMid - r, width: 2 * r, height: 2 * r, rx: r, fill: VIO_SOFT }, opacity: 0.8 }, dur: 0.35, delay: 0.15 + j * 0.04, ease: 'power2.inOut' });
+        ex.push({ el: bar, to: { attr: { x: cx - r, y: cy - r } }, dur: 0.5, delay: 0.55 + j * 0.05, ease: 'power2.inOut' });
+      });
+      scenes.push({ num: 2, title: 'Evaluate (scIB)', g, morphs: m, exits: ex, enter: 'cut', hold: 2.8 });
     })();
 
-    /* ③ Plot — the bubble table lands row by row, then makes its signature
-       move: whole rows glide into overall-rank order; the Overall column and
-       the winner's band arrive last. */
+    /* ③ Plot — the first row arrives from ②, the other rows land around it,
+       then whole rows glide into overall-rank order. The Overall column
+       follows, and one outline is drawn round the top row. */
     (() => {
       const g = tfScene(); const m = [];
       // generic method labels — scMultiBench is a neutral benchmark
       const methods = ['Method 1', 'Method 2', 'Method 3', 'Method 4', 'Method 5'];
-      const rank = [2, 3, 0, 1, 4];             // rank[i] = final slot; Method 3 wins
-      const BEST = 2;
-      const metrics = ['ARI', 'NMI', 'ASW', 'iLISI', 'kBET', 'cLISI'];
-      const nMet = metrics.length, x0 = 150, y0 = 62, cw = 33, ch = 25, ovX = 118;
-      // winner band sits BEHIND the rows (appended first), lands after the sort
-      const band = mk('rect', { x: 56, y: y0 - 12, width: 304, height: 24, rx: 6, fill: VIO, opacity: 0 });
+      const overall = T_SCORES.map((r) => r.reduce((a, b) => a + b, 0) / r.length);
+      const order = overall.map((_, i) => i).sort((a, b) => overall[b] - overall[a]);
+      const rank = overall.map((_, i) => order.indexOf(i));     // rank[i] = final slot
+      const BEST = order[0];
+      const { x0, y0, cw, ch, ovX } = TBL;
+      const nMet = T_METRICS.length;
+      const T_SORT = 1.9, T_OVERALL = 2.75, T_TRACE = 3.4, T_CLOSE = 4.5;
+      // winner band sits BEHIND the rows (appended first), lands with the outline
+      const bx = 48, by = y0 - 12, bw = 308, bhh = 24, brx = 6;
+      const band = mk('rect', { x: bx, y: by, width: bw, height: bhh, rx: brx, fill: VIO, opacity: 0 });
       g.appendChild(band);
-      reg(m, band, { opacity: 0 }, { opacity: 0.07 }, 0.45, 2.2);
-      g.appendChild(label(x0 + (nMet - 1) * cw / 2, 30, 'Metrics', 'middle', 9, 'currentColor', '700'));
-      metrics.forEach((mt, j) => g.appendChild(label(x0 + j * cw, y0 - 16, mt, 'middle', 7.5, 'currentColor', '600')));
+      reg(m, band, { opacity: 0 }, { opacity: 0.08 }, 0.4, T_CLOSE, 'power2.out');
+      const title = label(x0 + (nMet - 1) * cw / 2, 30, 'Metrics', 'middle', 9, 'currentColor', '700');
+      g.appendChild(title); appear(m, title, 0.05);
+      T_METRICS.forEach((mt, j) => { const h = label(x0 + j * cw, y0 - 16, mt, 'middle', 7.5, 'currentColor', '600'); g.appendChild(h); appear(m, h, 0.05 + j * 0.03); });
       const ovHead = label(ovX, y0 - 16, 'Overall', 'middle', 7.5, VIO_DEEP, '700');
-      ovHead.setAttribute('opacity', 0); g.appendChild(ovHead);
-      reg(m, ovHead, { opacity: 0 }, { opacity: 1 }, 0.4, 2.25);
+      g.appendChild(ovHead); appear(m, ovHead, T_OVERALL, 0.35);
+      // rows arrive faster and faster, then the full grid rests before the sort
+      const tRow = [0, 0.35, 0.55, 0.71, 0.83];
       methods.forEach((nm, i) => {
         const row = mk('g', {});
-        row.appendChild(label(94, y0 + i * ch + 3, nm, 'end', 8, 'currentColor', i === BEST ? '700' : '500'));
+        const cy = y0 + i * ch, best = (i === BEST);
+        const name = label(94, cy + 3, nm, 'end', 8, 'currentColor', '500');
+        row.appendChild(name); appear(m, name, tRow[i] + 0.1);
         for (let j = 0; j < nMet; j++) {
-          const cx = x0 + j * cw, cy = y0 + i * ch;
-          const score = 0.35 + ((i * 7 + j * 3) % 10) / 15;
-          const rr = 3.5 + score * 6.5;
-          const c = mk('circle', { cx, cy, r: rr, fill: i === BEST ? VIO_DEEP : VIO_SOFT, opacity: i === BEST ? 1 : 0.8 });
+          const cx = x0 + j * cw;
+          const c = mk('circle', { cx, cy, r: bubR(T_SCORES[i][j]), fill: VIO_SOFT, opacity: 0.8 });
           row.appendChild(c);
-          reg(m, c, { opacity: 0, scale: 0, svgOrigin: cx + ' ' + cy }, { opacity: i === BEST ? 1 : 0.8, scale: 1, svgOrigin: cx + ' ' + cy }, 0.45, 0.15 + (i * nMet + j) * 0.02);
+          // row 0's first five bubbles are the bars of ② — already in place at the cut
+          if (i > 0 || j >= 5) reg(m, c, { opacity: 0, scale: 0, svgOrigin: cx + ' ' + cy }, { opacity: 0.8, scale: 1 }, 0.4, (i === 0 ? 0.3 : tRow[i]) + j * 0.025, 'back.out(1.7)');
+          if (best) reg(m, c, {}, { attr: { fill: VIO_DEEP }, opacity: 1 }, 0.3, T_CLOSE, 'power2.out');
         }
-        // Overall bubble appears AFTER the sort, sized by final rank
-        const ocy = y0 + i * ch, orr = 9 - rank[i] * 1.4;
-        const oc = mk('circle', { cx: ovX, cy: ocy, r: orr, fill: i === BEST ? VIO_DEEP : VIO_SOFT, opacity: 0 });
+        // Overall bubble appears AFTER the sort, in rank order, sized by the mean score
+        const oc = mk('circle', { cx: ovX, cy, r: bubR(overall[i]), fill: VIO_SOFT, opacity: 0 });
         row.appendChild(oc);
-        reg(m, oc, { opacity: 0, scale: 0, svgOrigin: ovX + ' ' + ocy }, { opacity: i === BEST ? 1 : 0.85, scale: 1, svgOrigin: ovX + ' ' + ocy }, 0.4, 2.3 + rank[i] * 0.07);
+        reg(m, oc, { opacity: 0, scale: 0, svgOrigin: ovX + ' ' + cy }, { opacity: 0.85, scale: 1 }, 0.4, T_OVERALL + 0.05 + rank[i] * 0.07, 'back.out(1.7)');
+        if (best) {
+          reg(m, oc, {}, { attr: { fill: VIO_DEEP }, opacity: 1 }, 0.3, T_CLOSE, 'power2.out');
+          reg(m, name, {}, { attr: { 'font-weight': 700 } }, 0.2, T_CLOSE, 'power2.out');
+        }
         g.appendChild(row);
         // the signature move — the whole row glides to its overall-rank slot
-        if (rank[i] !== i) reg(m, row, {}, { y: (rank[i] - i) * ch }, 0.85, 1.35);
+        if (rank[i] !== i) reg(m, row, { y: 0 }, { y: (rank[i] - i) * ch }, 0.6, T_SORT + i * 0.05, 'power2.inOut');
       });
       // ellipsis column — many more scIB metrics than the six shown
       const eX = x0 + nMet * cw;
-      g.appendChild(label(eX, y0 - 16, '…', 'middle', 12, 'currentColor', '700'));
-      for (let i = 0; i < methods.length; i++) g.appendChild(mk('circle', { cx: eX, cy: y0 + i * ch, r: 4, fill: VIO_SOFT, opacity: 0.3 }));
-      tfLegend(m, g, 368, 64, [
+      const more = mk('g', {});
+      more.appendChild(label(eX, y0 - 16, '…', 'middle', 12, 'currentColor', '700'));
+      for (let i = 0; i < methods.length; i++) more.appendChild(mk('circle', { cx: eX, cy: y0 + i * ch, r: 4, fill: VIO_SOFT, opacity: 0.3 }));
+      g.appendChild(more); appear(m, more, 0.9);
+      const leg = tfLegend(m, g, 374, 64, [
         { title: 'Bubble = score' },
-        { swatch: 'dot', color: VIO_DEEP, text: 'Top method' },
         { swatch: 'dot', color: VIO_SOFT, text: 'Others' },
+        { swatch: 'dot', color: VIO_DEEP, text: 'Top method' },
       ]);
-      scenes.push({ num: 3, title: 'Rank & plot results', g, morphs: m });
+      // the deep colour is explained when the top row takes it, not before
+      [leg.children[3], leg.children[4]].forEach((el) => appear(m, el, T_CLOSE, 0.3));
+      // one outline drawn round the top row by a visible pen head; it closes
+      // with a short thickening, then hands over to the band and the deep colour
+      const P = 2 * (bw + bhh) - 8 * brx + 2 * Math.PI * brx, PEN = 0.05 * P;
+      const outline = { x: bx, y: by, width: bw, height: bhh, rx: brx, fill: 'none', stroke: VIO, 'stroke-linecap': 'round' };
+      const trace = mk('rect', Object.assign({ 'stroke-width': 1.6, 'stroke-dasharray': P, 'stroke-dashoffset': P, opacity: 0 }, outline));
+      const pen = mk('rect', Object.assign({ 'stroke-width': 3, 'stroke-dasharray': PEN + ' ' + (P - PEN), 'stroke-dashoffset': PEN, opacity: 0 }, outline));
+      g.appendChild(trace); g.appendChild(pen);
+      reg(m, trace, { opacity: 0, attr: { 'stroke-dashoffset': P, 'stroke-width': 1.6 } }, { opacity: 1 }, 0.05, T_TRACE, 'none');
+      reg(m, trace, {}, { attr: { 'stroke-dashoffset': 0 } }, T_CLOSE - T_TRACE, T_TRACE, 'power2.inOut');
+      reg(m, trace, {}, { attr: { 'stroke-width': 2.8 } }, 0.07, T_CLOSE, 'none');
+      reg(m, trace, {}, { attr: { 'stroke-width': 1.6 } }, 0.2, T_CLOSE + 0.07, 'power1.out');
+      reg(m, trace, {}, { opacity: 0 }, 0.35, T_CLOSE + 0.3, 'power2.out');
+      reg(m, pen, { opacity: 0, attr: { 'stroke-dashoffset': PEN } }, { opacity: 1 }, 0.05, T_TRACE, 'none');
+      reg(m, pen, {}, { attr: { 'stroke-dashoffset': PEN - P } }, T_CLOSE - T_TRACE, T_TRACE, 'power2.inOut');
+      reg(m, pen, {}, { opacity: 0 }, 0.08, T_CLOSE - 0.04, 'none');
+      scenes.push({ num: 3, title: 'Rank & plot results', g, morphs: m, enter: 'cut', hold: 3.2 });
     })();
 
     return scenes;
@@ -884,16 +1017,34 @@
     scenes.forEach((s, idx) => {
       startTimes[idx] = master.duration();   // current end = this scene's start time
       const st = gsap.timeline();
+      /* enter 'cut': the previous scene has moved its own elements onto this
+         scene's first frame, so the scene appears at once and builds round them */
+      const cut = s.enter === 'cut';
+      const lead = cut ? 0 : 0.45;
       st.call(() => setHead(idx), null, 0);
-      st.set(s.g, { opacity: 0 }, 0);
+      st.set(s.g, { opacity: cut ? 1 : 0 }, 0);
       s.morphs.forEach((mo) => st.set(mo.el, mo.from, 0));
-      st.to(s.g, { opacity: 1, duration: 0.4, ease: 'power2.out' }, 0);
-      let maxEnd = 0.45;
+      if (!cut) st.to(s.g, { opacity: 1, duration: 0.4, ease: 'power2.out' }, 0);
+      let maxEnd = lead;
       s.morphs.forEach((mo) => {
-        st.to(mo.el, Object.assign({ duration: mo.dur, ease: 'power2.inOut', delay: mo.delay }, mo.to), 0.45);
-        maxEnd = Math.max(maxEnd, 0.45 + mo.delay + mo.dur);
+        st.to(mo.el, Object.assign({ duration: mo.dur, ease: mo.ease || 'power2.inOut', delay: mo.delay }, mo.to), lead);
+        maxEnd = Math.max(maxEnd, lead + mo.delay + mo.dur);
       });
-      st.to(s.g, { opacity: 0, duration: 0.45, ease: 'power2.in' }, maxEnd + 3.3); /* +2s hold */
+      /* the finished frame rests, then the scene either hands its elements to
+         the next one (exits) or fades as a whole */
+      const tExit = maxEnd + (s.hold || 3);
+      if (s.exits && s.exits.length) {
+        let exitEnd = tExit;
+        // the hand-over already belongs to the next step: retitle the card as it starts
+        st.call(() => setHead((idx + 1) % scenes.length), null, tExit + 0.1);
+        s.exits.forEach((mo) => {
+          st.to(mo.el, Object.assign({ duration: mo.dur, ease: mo.ease || 'power2.inOut' }, mo.to), tExit + mo.delay);
+          exitEnd = Math.max(exitEnd, tExit + mo.delay + mo.dur);
+        });
+        st.set(s.g, { opacity: 0 }, exitEnd);
+      } else {
+        st.to(s.g, { opacity: 0, duration: 0.45, ease: 'power2.in' }, tExit);
+      }
       builtAt[idx] = startTimes[idx] + maxEnd;
       master.add(st);
     });
@@ -910,7 +1061,9 @@
        rebuilt on every render(), so handlers are wired fresh each switch
        (old dot elements — and their listeners — are discarded). */
     dots.forEach((dot, i) => {
-      dot.addEventListener('click', () => { setHead(i); master.seek(startTimes[i]).play(); });
+      /* a hair past the scene's start: a scene that has never played does not
+         render its first frame at exactly its own time 0 */
+      dot.addEventListener('click', () => { setHead(i); master.seek(startTimes[i] + 0.001).play(); });
     });
     };  /* end render() */
 
