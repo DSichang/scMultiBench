@@ -3046,11 +3046,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.3.6"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.3.7"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.3.6" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.3.7" {pins}</div>
 </div>
 </div>
 </div>
@@ -3076,7 +3076,7 @@ pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2-download-the-data-and-the-environments">2. Download the data and the environments<a class="anchor-link" href="#2-download-the-data-and-the-environments">¶</a></h2><p><code>mtb.data.fetch</code> downloads <code>D49mini</code> (5 MB) once. Each method runs in its own environment. <code>mtb.env.install</code> downloads the environments for StabMap and scMoMaT, with no conda needed. The download is 1.8 GB on a computer without a GPU and 5.5 GB on one with a GPU.</p>
+<h2 id="2-download-the-data-and-the-environments">2. Download the data and the environments<a class="anchor-link" href="#2-download-the-data-and-the-environments">¶</a></h2><p><code>mtb.data.fetch</code> downloads <code>D49mini</code> (5 MB) once. Each method runs in its own environment. <code>mtb.env.install</code> downloads the environments for StabMap and scMoMaT, with no conda needed. The download is 1.8 GB on a computer without a GPU and 5.4 GB on one with a GPU.</p>
 <details>
 <summary>Details</summary>
 <p><code>state</code> is <code>PACKED</code> for an environment downloaded now and <code>have</code> for one that was already there. Without <code>dry_run=False</code>, <code>mtb.env.install</code> downloads nothing and returns the plan with its sizes.</p>
@@ -3132,7 +3132,7 @@ mtb.data.fetch("D49mini")</div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
 <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
 <div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
-<pre>PosixPath('/tmp/mbtut13/home/.cache/multibench/data')</pre>
+<pre>PosixPath('/tmp/mbtut14/home/.cache/multibench/data')</pre>
 </div>
 </div>
 </div>
@@ -3182,161 +3182,245 @@ pd.DataFrame(envs)[["env", "methods", "state"]]</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   92 MB of 917 MB (68 MB/s)
+<pre>[env]   92 MB of 917 MB (75 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   184 MB of 917 MB (83 MB/s)
+<pre>[env]   184 MB of 917 MB (89 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   276 MB of 917 MB (89 MB/s)
+<pre>[env]   276 MB of 917 MB (94 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   367 MB of 917 MB (93 MB/s)
+<pre>[env]   367 MB of 917 MB (97 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   459 MB of 917 MB (95 MB/s)
+<pre>[env]   459 MB of 917 MB (98 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   551 MB of 917 MB (94 MB/s)
+<pre>[env]   551 MB of 917 MB (97 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   643 MB of 917 MB (95 MB/s)
+<pre>[env]   643 MB of 917 MB (97 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   734 MB of 917 MB (96 MB/s)
+<pre>[env]   734 MB of 917 MB (99 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   826 MB of 917 MB (97 MB/s)
+<pre>[env]   826 MB of 917 MB (99 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   917 MB of 917 MB (98 MB/s)
+<pre>[env]   917 MB of 917 MB (100 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env] unpacking scmb_r -&gt; /tmp/mbtut13/home/.cache/multibench/envs/scmb_r ...
+<pre>[env] unpacking scmb_r -&gt; /tmp/mbtut14/home/.cache/multibench/envs/scmb_r ...
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env] downloading scmb_torch (gpu build) 4.5 GB ...
+<pre>[env] downloading scmb_torch (gpu build) 588 MB ...
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   0.5 GB of 4.5 GB (92 MB/s)
+<pre>[env]   60 MB of 588 MB (65 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   0.9 GB of 4.5 GB (98 MB/s)
+<pre>[env]   118 MB of 588 MB (81 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   1.4 GB of 4.5 GB (99 MB/s)
+<pre>[env]   177 MB of 588 MB (88 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   1.8 GB of 4.5 GB (98 MB/s)
+<pre>[env]   236 MB of 588 MB (90 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   2.3 GB of 4.5 GB (96 MB/s)
+<pre>[env]   295 MB of 588 MB (93 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   2.7 GB of 4.5 GB (95 MB/s)
+<pre>[env]   353 MB of 588 MB (94 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   3.2 GB of 4.5 GB (94 MB/s)
+<pre>[env]   412 MB of 588 MB (95 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   3.6 GB of 4.5 GB (93 MB/s)
+<pre>[env]   471 MB of 588 MB (95 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   4.1 GB of 4.5 GB (92 MB/s)
+<pre>[env]   530 MB of 588 MB (96 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   4.5 GB of 4.5 GB (93 MB/s)
+<pre>[env]   588 MB of 588 MB (97 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env] unpacking scmb_torch -&gt; /tmp/mbtut13/home/.cache/multibench/envs/scmb_torch ...
+<pre>[env] unpacking scmb_torch -&gt; /tmp/mbtut14/home/.cache/multibench/envs/scmb_torch ...
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env] downloading torch-2.8.0-cu12-py39 (shared layer) 3.9 GB ...
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   0.4 GB of 3.9 GB (95 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   0.8 GB of 3.9 GB (101 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   1.2 GB of 3.9 GB (102 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   1.6 GB of 3.9 GB (102 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   1.9 GB of 3.9 GB (103 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   2.3 GB of 3.9 GB (99 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   2.7 GB of 3.9 GB (98 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   3.1 GB of 3.9 GB (98 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   3.5 GB of 3.9 GB (98 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env]   3.9 GB of 3.9 GB (98 MB/s)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>[env] unpacking torch-2.8.0-cu12-py39 -&gt; /tmp/mbtut14/home/.cache/multibench/envs/.layers/torch-2.8.0-cu12-py39 ...
 </pre>
 </div>
 </div>
@@ -3457,14 +3541,14 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Fetching the method scripts from PYangLab/scMultiBench into /tmp/mbtut13/home/.cache/multibench/scMultiBench_ref ...
+<pre>Fetching the method scripts from PYangLab/scMultiBench into /tmp/mbtut14/home/.cache/multibench/scMultiBench_ref ...
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (20.2s) ARI 0.369
+<pre>[run_all]   -&gt; CHAIN_OK (21.2s) ARI 0.369
 </pre>
 </div>
 </div>
@@ -3478,7 +3562,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (84.0s) ARI 0.423
+<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (81.9s) ARI 0.423
 </pre>
 </div>
 </div>
@@ -3531,7 +3615,7 @@ res.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>20.2</td>
+<td>21.2</td>
 <td>embedding</td>
 <td>[4500, 50]</td>
 <td>0</td>
@@ -3555,7 +3639,7 @@ res.summary</div>
 <th>1</th>
 <td>scMoMaT</td>
 <td>CHAIN_OK_GRAPH_METHOD</td>
-<td>84.0</td>
+<td>81.9</td>
 <td>graph</td>
 <td>[4500, 2]</td>
 <td>0</td>
@@ -4029,7 +4113,7 @@ mine.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (10.9s) ARI 0.310
+<pre>[run_all]   -&gt; CHAIN_OK (10.8s) ARI 0.310
 </pre>
 </div>
 </div>
@@ -4043,7 +4127,7 @@ mine.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (79.3s) ARI 0.399
+<pre>[run_all]   -&gt; CHAIN_OK_GRAPH_METHOD (79.6s) ARI 0.399
 </pre>
 </div>
 </div>
@@ -4096,7 +4180,7 @@ mine.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>10.9</td>
+<td>10.8</td>
 <td>embedding</td>
 <td>[3000, 50]</td>
 <td>0</td>
@@ -4120,7 +4204,7 @@ mine.summary</div>
 <th>1</th>
 <td>scMoMaT</td>
 <td>CHAIN_OK_GRAPH_METHOD</td>
-<td>79.3</td>
+<td>79.6</td>
 <td>graph</td>
 <td>[3000, 2]</td>
 <td>0</td>
@@ -4222,7 +4306,7 @@ mine.summary</div>
 </tr>
 </tbody>
 </table>
-<p>To run them all, set <code>METHODS</code> to these names in section 2 and run the notebook again. That downloads 3 envs, 6.3 GB to download on a CPU host, 9.9 GB on a GPU host. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_unshared_all.ipynb">This notebook</a> does the same in Colab.</p>
+<p>To run them all, set <code>METHODS</code> to these names in section 2 and run the notebook again. That downloads 3 envs, 6.2 GB to download on a CPU host, 5.9 GB on a GPU host. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_unshared_all.ipynb">This notebook</a> does the same in Colab.</p>
 </div>
 </div>
 </div>

@@ -1996,6 +1996,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-037" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.7
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-036" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2331,6 +2342,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-037" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.7
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-036" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2657,6 +2679,25 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-037">New in 0.3.7<a class="headerlink" href="#new-in-037" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>The method environments are smaller to download. All 24 environments
+  are 53.5 GB on a computer with a <abbr title="Graphics Processing Unit">GPU</abbr>. In 0.3.6, 26 environments were
+  82.5 GB.</li>
+<li>Six environments use torch 2.8.0: <code>scmb_torch</code>, <code>scmb_torch_v2</code>,
+  <code>scmb_cobolt3</code>, <code>scmb_multigrate2</code>, <code>scmb_multivi</code> and <code>scmb_scjoint</code>.
+  Their torch and CUDA libraries are now one download of 3.9 GB,
+  <code>torch-2.8.0-cu12-py39</code>. It is downloaded with the first of these
+  environments and shared by the others. On disk the six take 17.5 GB
+  instead of 49.3 GB.</li>
+<li><code>multibench env plan</code> and the dry run of <code>multibench env install --packed</code>
+  add this download once to their total. A last line names it.</li>
+<li>scMDC and sciCAN run in <code>scmb_torch</code>. The environments <code>scmb_scmdc</code> and
+  <code>scmb_scican</code> are no longer used. You can delete them.</li>
+<li>A download that gets a server error (HTTP 500 to 599) is tried again, up
+  to four times.</li>
+<li>The install cell of the tutorials asks for <code>multibench-sc&gt;=0.3.7</code>.</li>
+</ul>
 <h2 id="new-in-036">New in 0.3.6<a class="headerlink" href="#new-in-036" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>The bubble figure has no <code>L</code> badge and no note lines under its legends.

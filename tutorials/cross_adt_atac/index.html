@@ -3046,11 +3046,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.3.6"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.3.7"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.3.6" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.3.7" {pins}</div>
 </div>
 </div>
 </div>
@@ -3132,7 +3132,7 @@ mtb.data.fetch("D58mini")</div>
 <div class="jp-OutputArea-child jp-OutputArea-executeResult">
 <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
 <div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
-<pre>PosixPath('/tmp/mbtut13/home/.cache/multibench/data')</pre>
+<pre>PosixPath('/tmp/mbtut14/home/.cache/multibench/data')</pre>
 </div>
 </div>
 </div>
@@ -3182,28 +3182,28 @@ pd.DataFrame(envs)[["env", "methods", "state"]]</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   92 MB of 917 MB (25 MB/s)
+<pre>[env]   92 MB of 917 MB (28 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   184 MB of 917 MB (24 MB/s)
+<pre>[env]   184 MB of 917 MB (26 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   276 MB of 917 MB (25 MB/s)
+<pre>[env]   276 MB of 917 MB (26 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   367 MB of 917 MB (26 MB/s)
+<pre>[env]   367 MB of 917 MB (27 MB/s)
 </pre>
 </div>
 </div>
@@ -3224,7 +3224,7 @@ pd.DataFrame(envs)[["env", "methods", "state"]]</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   643 MB of 917 MB (26 MB/s)
+<pre>[env]   643 MB of 917 MB (25 MB/s)
 </pre>
 </div>
 </div>
@@ -3238,21 +3238,21 @@ pd.DataFrame(envs)[["env", "methods", "state"]]</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   826 MB of 917 MB (27 MB/s)
+<pre>[env]   826 MB of 917 MB (26 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env]   917 MB of 917 MB (27 MB/s)
+<pre>[env]   917 MB of 917 MB (26 MB/s)
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[env] unpacking scmb_r -&gt; /tmp/mbtut13/home/.cache/multibench/envs/scmb_r ...
+<pre>[env] unpacking scmb_r -&gt; /tmp/mbtut14/home/.cache/multibench/envs/scmb_r ...
 </pre>
 </div>
 </div>
@@ -3359,7 +3359,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Fetching the method scripts from PYangLab/scMultiBench into /tmp/mbtut13/home/.cache/multibench/scMultiBench_ref ...
+<pre>Fetching the method scripts from PYangLab/scMultiBench into /tmp/mbtut14/home/.cache/multibench/scMultiBench_ref ...
 </pre>
 </div>
 </div>
@@ -3373,7 +3373,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (19.2s) ARI 0.502
+<pre>[run_all]   -&gt; CHAIN_OK (18.4s) ARI 0.502
 </pre>
 </div>
 </div>
@@ -3387,7 +3387,7 @@ res.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (16.7s) ARI 0.769
+<pre>[run_all]   -&gt; CHAIN_OK (16.9s) ARI 0.769
 </pre>
 </div>
 </div>
@@ -3440,7 +3440,7 @@ res.summary</div>
 <th>0</th>
 <td>StabMap</td>
 <td>CHAIN_OK</td>
-<td>19.2</td>
+<td>18.4</td>
 <td>embedding</td>
 <td>[3000, 50]</td>
 <td>0</td>
@@ -3464,7 +3464,7 @@ res.summary</div>
 <th>1</th>
 <td>UINMF</td>
 <td>CHAIN_OK</td>
-<td>16.7</td>
+<td>16.9</td>
 <td>embedding</td>
 <td>[3000, 30]</td>
 <td>0</td>
@@ -3934,7 +3934,7 @@ mine.summary</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>[run_all]   -&gt; CHAIN_OK (14.7s) ARI 0.605
+<pre>[run_all]   -&gt; CHAIN_OK (14.9s) ARI 0.605
 </pre>
 </div>
 </div>
@@ -4011,7 +4011,7 @@ mine.summary</div>
 <th>1</th>
 <td>UINMF</td>
 <td>CHAIN_OK</td>
-<td>14.7</td>
+<td>14.9</td>
 <td>embedding</td>
 <td>[1800, 30]</td>
 <td>0</td>
@@ -4123,7 +4123,7 @@ mine.summary</div>
 </tr>
 </tbody>
 </table>
-<p>To run them all, set <code>METHODS</code> to these names in section 2 and run the notebook again. That downloads 4 envs, 15.9 GB to download on a CPU host, 19.5 GB on a GPU host. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_cross_adt_atac_all.ipynb">This notebook</a> does the same in Colab.</p>
+<p>To run them all, set <code>METHODS</code> to these names in section 2 and run the notebook again. That downloads 4 envs, 15.8 GB to download on a CPU host, 15.5 GB on a GPU host. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_cross_adt_atac_all.ipynb">This notebook</a> does the same in Colab.</p>
 </div>
 </div>
 </div>
