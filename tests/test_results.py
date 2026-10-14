@@ -142,7 +142,8 @@ def test_metrics_filters_by_family(result_dir):
     c = results.load_results("diagonal", dataset="D28", metrics="clustering", result_path=result_dir)
     assert set(c.metric) <= set(mtb.plot.CLUSTERING_METRICS) and len(c)
     assert len(b) + len(c) == len(full)      # the two families partition the frame
-    with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\. Pass 'all', 'clustering' or 'batch'"):
+    with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\. Pass 'all', "
+                                         r"'clustering', 'batch' or 'classification'"):
         results.load_results("diagonal", dataset="D28", metrics="bogus", result_path=result_dir)
     # a list_tasks() token in the metrics slot is explained, not just rejected
     with pytest.raises(ValueError, match="selects a metric family, not a task of mtb.list_tasks"):

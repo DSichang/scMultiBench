@@ -27,7 +27,8 @@ def _toy_long():
 
 def test_plot_all_and_dir_are_the_contract():
     assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-                                "CLUSTERING_METRICS", "BATCH_METRICS"]
+                                "CLUSTERING_METRICS", "BATCH_METRICS",
+                                "CLASSIFICATION_METRICS"]
     listed = [n for n in dir(mtb.plot) if not n.startswith("__")]
     assert sorted(listed) == sorted(mtb.plot.__all__)
     # importable, just not listed

@@ -84,7 +84,8 @@ def test_evaluate_takes_a_mudata_with_obs_keys():
 _ACRONYMS = {"ARI", "NMI", "ASW", "GC", "LISI", "CSV", "TSV", "SD", "DR", "API",
              "PCR", "PATH", "README", "PEP", "OK", "RNA", "ADT", "ATAC", "UMAP",
              "PCA", "HVG", "GPU", "CPU", "ID", "IDS", "URL", "R", "DDDDDD", "NA",
-             "SINFONIA"}    # the clustering tool the benchmark scripts use
+             "SINFONIA",    # the clustering tool the benchmark scripts use
+             "OCA", "ACA"}  # classification metric codes
 
 
 def _user_visible_strings(path: Path):

@@ -62,7 +62,8 @@ def test_metric_selection_is_one_vocabulary():
         metric_selection(["ARI", "ari"])
     with pytest.raises(ValueError, match="A single code goes in a list: metrics=\\[.ARI.\\]"):
         metric_selection("ARI")
-    with pytest.raises(TypeError, match="takes None, 'all', 'clustering', 'batch' or a list"):
+    with pytest.raises(TypeError, match="takes None, 'all', 'clustering', 'batch', "
+                                        "'classification' or a list"):
         metric_selection(3)
 
 

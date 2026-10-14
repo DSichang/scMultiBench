@@ -729,8 +729,9 @@ def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
     out, said = _drop(emb, labels=[str(p) for p in files])
     assert said == ["Scored the 150 labelled cells of 300, all in one batch of 2."]
     assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (150, 300)
+    # the default set: "all" would add the classification family, NaN for one batch
     _same(out, mtb.evaluate(emb[:150], labels=lab[:150], batch=np.ones(150, dtype=int),
-                            metrics="all", verbose=False))
+                            verbose=False))
     # without the flag, the same files stop the call
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[str(p) for p in files])
@@ -752,8 +753,10 @@ def test_one_labelled_batch_hides_the_other_batches_from_every_score(tmp_path):
     got, said = _drop(emb, **kw)
     other, said_other = _drop(moved, **kw)
     _same(got, other)
+    # "all": classification too, NaN for the one batch with labels
     assert got.index.tolist() == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-                                  "ASW_batch", "GC", "iLISI"]
+                                  "ASW_batch", "GC", "iLISI",
+                                  "OCA", "ACA", "Spec", "Sens", "F1"]
     assert said == said_other == [base + hidden]
     # no batch metric is scored: the warning reads the same
     kw = dict(labels=one, batch=bat, metrics=["ASW"])

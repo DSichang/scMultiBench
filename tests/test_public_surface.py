@@ -27,7 +27,7 @@ MTB_ALL = {
     "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",
 }
 PLOT_ALL = {"bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-            "CLUSTERING_METRICS", "BATCH_METRICS"}
+            "CLUSTERING_METRICS", "BATCH_METRICS", "CLASSIFICATION_METRICS"}
 IO_ALL = {"export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"}
 ENV_ALL = {"status", "plan", "install", "doctor", "recipe"}
 CONFIG_ALL = {"Config", "DEFAULT"}

@@ -66,12 +66,14 @@ def test_batch_metric_without_batch_labels_raises_not_empty():
 
 
 def test_metrics_none_computes_every_applicable_family():
-    from multibench.plot import BATCH_METRICS, CLUSTERING_METRICS
+    from multibench.plot import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
     emb, ct, bat, _ = _toy()
     clu = evaluate(emb, labels=ct)                       # no batch: clustering family
     assert set(clu.index) == set(CLUSTERING_METRICS)
-    both = evaluate(emb, labels=ct, batch=bat)           # batch given: both families
-    assert set(both.index) == set(CLUSTERING_METRICS) | (set(BATCH_METRICS) - {"kBET"})
+    # batches given: the batch family, and classification (no category: any)
+    both = evaluate(emb, labels=ct, batch=bat)
+    assert set(both.index) == (set(CLUSTERING_METRICS) | (set(BATCH_METRICS) - {"kBET"})
+                               | set(CLASSIFICATION_METRICS))
 
 
 def test_kbet_is_computed_only_when_named():
@@ -384,7 +386,8 @@ def test_label_order_validation_messages(tmp_path):
 
 
 # ------------------------------------ I4: canonical names end to end
-_CANONICAL = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "GC", "iLISI", "kBET"]
+_CANONICAL = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "GC", "iLISI", "kBET",
+              "OCA", "ACA", "Spec", "Sens", "F1"]
 
 
 def test_evaluate_emits_canonical_metric_names_only():
