@@ -1109,16 +1109,25 @@ def _install(md, code):
     code(INSTALL_CELL)
 
 
+#: what run_all scores besides the scIB metrics on data in several batches
+SCORED_TOO = " and the classification scores (OCA, ACA, Spec, Sens, F1)"
+
 PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size shows the rank "
              "within a column, and bigger is better. The fill compares a value with the "
              "other rows in the same column.")
-PLOT_DETAILS = (
-    "The lightest fill is the lowest value in this figure, not zero.",
-    "Metrics are grouped by family: blue for dimension reduction and clustering, "
-    "green for batch correction. Each family starts with an `Overall` bar. Its "
-    "length and colour both show the family score.",
-    "A column whose rows all hold the same value is drawn grey, and a warning "
-    "names it. A figure of one method is grey everywhere.")
+
+
+def plot_details(cat):
+    """The collapsed paragraphs under the plot of a ``cat`` tutorial: data in
+    several batches (every category but vertical) has the classification family."""
+    pink = ", pink for classification" if cat != "vertical" else ""
+    return (
+        "The lightest fill is the lowest value in this figure, not zero.",
+        "Metrics are grouped by family: blue for dimension reduction and clustering, "
+        f"green for batch correction{pink}. Each family starts with an `Overall` bar. "
+        "Its length and colour both show the family score.",
+        "A column whose rows all hold the same value is drawn grey, and a warning "
+        "names it. A figure of one method is grey everywhere.")
 
 
 def build_tutorial(key):
@@ -1184,7 +1193,7 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
     ]
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run_all` runs each method on `{ds}` and scores its output with the scIB metrics. `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
+`run_all` runs each method on `{ds}` and scores its output with the scIB metrics{SCORED_TOO if cat != "vertical" else ""}. `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
 
 """ + details(*run_notes))
     code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
@@ -1192,7 +1201,7 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
 res.summary''')
 
     # ------------------------------------------------------------------- plot
-    md("## 4. Plot\n\n" + PLOT_TEXT + "\n\n" + details(*PLOT_DETAILS))
+    md("## 4. Plot\n\n" + PLOT_TEXT + "\n\n" + details(*plot_details(cat)))
     code("res.plot()")
 
     # --------------------------------------------------------------- own data
