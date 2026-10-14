@@ -2160,14 +2160,37 @@ def _needs_sweep(metrics) -> bool:
 
 
 def _names_batch_metric(metrics) -> bool:
-    """Whether ``metrics=`` is ``None`` or names a metric of the batch family."""
-    from .plot.bar import BATCH_METRICS
+    """Whether ``metrics=`` is ``None`` or names a metric that needs the
+    batches: one of the batch or the classification family."""
+    from .plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS
     codes = _metric_codes(metrics)
-    return codes is None or any(c in BATCH_METRICS for c in codes)
+    return codes is None or any(c in BATCH_METRICS + CLASSIFICATION_METRICS
+                                for c in codes)
+
+
+def _without_classification(metrics, multi_batch: bool):
+    """``metrics=`` for an output that is not an embedding (the UMAP a graph
+    method writes): the same selection without the classification family,
+    which needs an embedding. ``None`` when nothing else is left."""
+    from .plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
+    if metrics is None or metrics == "all":
+        # the default set, or "all": the batch family when there are batches
+        # to score; else what run_all asked for before classification
+        if multi_batch:
+            return CLUSTERING_METRICS + [c for c in BATCH_METRICS if c != "kBET"]
+        return "clustering" if metrics is None else metrics
+    codes = _metric_codes(metrics)
+    if codes is None:
+        return metrics                     # evaluate rejects it with its message
+    left = [c for c in codes if c not in CLASSIFICATION_METRICS]
+    if len(left) == len(codes):
+        return metrics
+    return left or None
 
 
 def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
-                         user_batch=False, batch_given=True, on_rank=None):
+                         user_batch=False, batch_given=True, on_rank=None,
+                         embedding=True):
     """Score each candidate label order, keep the best, return the full spread.
 
     ``batch`` (optional, one entry per cell in embedding order) replaces the
@@ -2181,6 +2204,8 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
     ``rescore``), goes to ``evaluate`` only when ``metrics`` can use it, so
     that ``evaluate`` does not warn about a batch the caller never gave.
     ``on_rank(orders, cells)`` is called before several orders are ranked.
+    ``embedding=False`` (the UMAP of a graph method) leaves out the
+    classification family, which needs a method's own embedding.
     """
     user_batch = user_batch or batch is not None
     use_batch = (user_batch and batch_given) or _names_batch_metric(metrics)
@@ -2190,12 +2215,13 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
         # real batch structure, so ask for both metric families; else clustering.
         if batch is not None:
             bat = np.asarray(batch)
-        grp = ("all" if use_batch and len(set(np.asarray(bat).tolist())) > 1
-               else "clustering")
+        multi = use_batch and len(set(np.asarray(bat).tolist())) > 1
+        # metrics=None is evaluate's own default, with the batches when there
+        # are several
+        chosen = metrics if embedding else _without_classification(metrics, multi)
         return _evaluate(emb, category=category, labels=lab,
-                                verbose=False, batch=(bat if grp == "all" else None),
-                                clustering=clustering,
-                                metrics=(grp if metrics is None else metrics))
+                         verbose=False, batch=(bat if multi else None),
+                         clustering=clustering, metrics=chosen)
 
     if len(cands) == 1:
         # nothing to disambiguate - do not pay for a screening pass
@@ -2498,7 +2524,8 @@ class BatchResult:
 
         **Graph methods.** scMoMaT also writes a UMAP, which is scored:
         ``CHAIN_OK_GRAPH_METHOD``. Seurat_WNN writes only a neighbour graph:
-        ``RUN_OK_NO_EMBEDDING``, and its ``emb_shape`` is ``None``.
+        ``RUN_OK_NO_EMBEDDING``, and its ``emb_shape`` is ``None``. Neither
+        has classification metrics, which need the method's own embedding.
 
         **Batch columns.** ``batch_source`` / ``n_batches`` say which batch
         vector the batch metrics (ASW_batch, GC, iLISI ...) were computed
@@ -2821,8 +2848,9 @@ class BatchResult:
             aligned by barcode. ``None`` = search the dataset's label files
             again.
         metrics : str | list[str] | None
-            Metric family (``"clustering"``, ``"batch"``, ``"all"``) or metric
-            codes; ``None`` = every metric the batch structure allows.
+            Metric family (``"clustering"``, ``"batch"``, ``"classification"``,
+            ``"all"``) or metric codes; ``None`` = every metric the batch
+            structure allows, as in ``mtb.evaluate``.
         verbose : bool
             Print one line per method, and one before each label-order ranking.
 
@@ -3932,6 +3960,10 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     stored_used = rec.get("labels_used")
     _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
+    embedding = variant.output.kind == "embedding"
+    if not embedding and _without_classification(metrics, True) is None:
+        raise ValueError(f"{rec.get('method')} writes a graph, not an embedding, so it "
+                         f"has no classification scores. Pass other metrics=.")
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
@@ -4009,7 +4041,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
                                               user_batch=batch is not None,
                                               batch_given=batch_given,
-                                              on_rank=on_rank)
+                                              on_rank=on_rank, embedding=embedding)
     if val is None:
         rec["status"] = "RUN_OK_EVAL_FAILED"
         errs = [s["error"] for s in spread if isinstance(s, dict) and s.get("error")]
@@ -4032,8 +4064,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     else:
         rec["batch_source"], rec["n_batches"] = ("file_of_origin" if nb > 1 else None), nb
     rec["_long"] = _to_long(val, method=rec["method"], dataset=dataset, category=category)
-    rec["status"] = ("CHAIN_OK" if variant.output.kind == "embedding"
-                     else "CHAIN_OK_GRAPH_METHOD")
+    rec["status"] = "CHAIN_OK" if embedding else "CHAIN_OK_GRAPH_METHOD"
     return rec
 
 
@@ -4228,7 +4259,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     **Batch vector.** By default the batch metrics use the label file each
     cell came from (``cty1.csv`` -> 1 ...); ``batch=`` replaces that rule and
-    is recorded as ``batch_source='user'``.
+    is recorded as ``batch_source='user'``. With two or more batches outside
+    ``vertical``, the classification metrics are scored too, as
+    ``mtb.evaluate`` scores them by default.
 
     ``"obs:<column>"`` and ``"<column>"`` name a column of the object you
     pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and
