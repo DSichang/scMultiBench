@@ -255,17 +255,18 @@ def _name_or_blank(v) -> bool:
     return isinstance(v, str) or (pd.api.types.is_scalar(v) and pd.isna(v))
 
 
-def _metric_families() -> tuple[list, list]:
-    """``(CLUSTERING_METRICS, BATCH_METRICS)`` - the two scIB families evaluate()
-    can produce, in the canonical spelling ``load_results``/``to_long`` use."""
+def _metric_families() -> tuple[list, list, list]:
+    """``(CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS)`` - the
+    three families evaluate() can produce, in the canonical spelling
+    ``load_results``/``to_long`` use."""
     # the plotting layer owns the metric families
-    from ..plot.bar import BATCH_METRICS, CLUSTERING_METRICS
-    return list(CLUSTERING_METRICS), list(BATCH_METRICS)
+    from ..plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
+    return list(CLUSTERING_METRICS), list(BATCH_METRICS), list(CLASSIFICATION_METRICS)
 
 
 def _known_metrics() -> list:
-    clu, bat = _metric_families()
-    return clu + bat
+    clu, bat, cls = _metric_families()
+    return clu + bat + cls
 
 
 def _validate_category(category):
@@ -833,9 +834,13 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
     Returns
     -------
     tuple
-        ``(group, only, slow)`` - the compute group (``"clustering"`` /
-        ``"batch"`` / ``"all"``), the set of codes to compute (``None`` =
-        every metric of the group) and whether kBET is among them.
+        ``(group, only, slow, cls)`` - the compute group (``"clustering"`` /
+        ``"batch"`` / ``"all"``, ``None`` for no scIB metric), the set of
+        scIB codes to compute (``None`` = every metric of the group), whether
+        kBET is among them, and the classification request: ``None``, or
+        ``(how, codes)`` with ``how`` ``"default"`` (``metrics=None``: scored
+        when the data allow it), ``"all"`` (NaN with a warning when they do
+        not) or ``"explicit"`` (an error when they do not).
 
     Raises
     ------
@@ -843,16 +848,17 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         A family token / code that needs batch labels when none are
         available, or a code evaluate() cannot compute (``PCR``).
     """
-    clu, bat = _metric_families()
+    clu, bat, cls = _metric_families()
     # a family token computes kBET only when it is named
     family_bat = [c for c in bat if c != "kBET"]
     sel = catalog.metric_selection(metrics)
+    want_cls = None
     if sel.explicit:
-        outside = [c for c in sel.codes if c not in clu and c not in bat]
+        outside = [c for c in sel.codes if c not in clu + bat + cls]
         if outside:
             raise ValueError(
-                f"evaluate() cannot compute {outside}; it computes the scIB "
-                f"families only: {clu + bat}")
+                f"evaluate() cannot compute {outside}; it computes "
+                f"{clu + bat + cls}")
         want_bat = [c for c in sel.codes if c in bat]
         want_clu = [c for c in sel.codes if c in clu]
         if want_bat and not has_batch:
@@ -863,13 +869,19 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
                               "files. Each file then counts as one batch.",
                               "Pass --batch CSV, or two or more --labels files. Each "
                               "file then counts as one batch."))
-        group = "all" if (want_bat and want_clu) else ("batch" if want_bat else "clustering")
-        only, slow = set(sel.codes), "kBET" in sel.codes
+        codes = [c for c in cls if c in sel.codes]        # in family order, as scIB's
+        if codes:
+            want_cls = ("explicit", codes)
+        group = ("all" if (want_bat and want_clu) else "batch" if want_bat
+                 else "clustering" if want_clu else None)
+        only, slow = set(sel.codes) - set(cls), "kBET" in sel.codes
     elif sel.family == "all":
         if metrics is None:
             # every applicable metric: the batch family joins in when a batch
-            # vector exists to score it against
+            # vector exists to score it against, classification when the
+            # data allow it (evaluate decides)
             group = "all" if has_batch else "clustering"
+            want_cls = ("default", cls) if has_batch else None
         else:
             if not has_batch:
                 raise ValueError(
@@ -877,7 +889,7 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
                     f"{_and_list(family_bat)}. "
                     + config.hint("Pass batch=<vector>, or metrics='clustering'.",
                                   "Pass --batch CSV, or --metrics clustering."))
-            group = "all"
+            group, want_cls = "all", ("all", cls)
         only, slow = None, False
     elif sel.family == "batch":
         if not has_batch:
@@ -888,9 +900,13 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
                               "more files.",
                               "Pass --batch CSV, or two or more --labels files."))
         group, only, slow = "batch", None, False
+    elif sel.family == "classification":
+        group, only, slow, want_cls = None, None, False, ("explicit", cls)
     else:
         group, only, slow = "clustering", None, False
-    if group == "clustering" and batch_given:
+    if want_cls and want_cls[0] == "explicit" and not has_batch:
+        raise ValueError(_classification_error(metrics, "no batch"))
+    if group == "clustering" and batch_given and not want_cls:
         warnings.warn(
             config.hint("batch= changes nothing here, because ",
                         "--batch changes nothing here, because ")
@@ -899,7 +915,91 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
             + config.hint(", or pass metrics='all'.",
                           " to --metrics, or pass --metrics all."),
             UserWarning, stacklevel=4)
-    return group, only, slow
+    return group, only, slow, want_cls
+
+
+def _classification_error(metrics, why: str, what: str = "output") -> str:
+    """evaluate()'s error when the classification codes ``metrics`` names
+    cannot be computed: ``why`` is ``"no batch"`` (no batch vector),
+    ``"one batch"``, ``"not embedding"`` (``what`` is a graph or labels) or
+    ``"none scored"`` (no batch could serve as the reference)."""
+    head = _metrics_spelling(metrics)
+    if why == "not embedding":
+        return f"{head} needs an embedding; {what} is not one. Pass the method's embedding file."
+    if why == "none scored":
+        return (f"{head} found no batch to learn from: each needs two cell types that "
+                f"another batch has. Check labels and batch.")
+    fix = config.hint("Pass batch=<vector>, or labels as a list of two or more files.",
+                      "Pass --batch CSV, or two or more --labels files.")
+    if why == "one batch":
+        return f"{head} needs two or more batches; every cell is in one batch. {fix}"
+    return f"{head} needs two or more batches. {fix}"
+
+
+def _classification_warning(why: str, what: str = "output") -> str:
+    """evaluate()'s one warning when the classification scores it was not
+    explicitly asked for cannot be computed; they are NaN."""
+    head = "OCA, ACA, Spec, Sens and F1 are NaN"
+    if why == "not embedding":
+        return f"{head}: {what} is not an embedding. Pass the method's embedding file."
+    if why == "none scored":
+        return (f"{head}: no batch has two cell types that another batch has. "
+                f"Check labels and batch.")
+    return f"{head}: every cell is in one batch. " + config.hint(
+        "Pass batch= with two or more batches.", "Pass --batch with two or more batches.")
+
+
+def _classification_scores(request, emb, ct, cb, *, category, not_embedding, metrics):
+    """The classification rows of evaluate(): ``{code: value}`` for the codes
+    of ``request`` (``(how, codes)`` from :func:`_plan_metrics`), or ``{}``
+    when they are left out.
+
+    ``cb`` is the batch of each scored cell (``None``: one batch);
+    ``not_embedding`` names an output that is a graph or labels. Under
+    ``metrics=None`` the family is scored only for two or more batches and
+    a category other than ``"vertical"``, as in the benchmark. When it cannot
+    be computed, an explicit request raises ``ValueError`` and any other
+    gives NaN and one ``UserWarning``. The values are the ``mean`` row of
+    ``classification_metrics(classify(...))`` with seed 0.
+    """
+    how, codes = request
+    n_batches = 0 if cb is None else _n_batches(cb)
+    if how == "default" and (n_batches < 2 or category == "vertical"):
+        return {}
+    if emb.ndim == 2 and emb.shape[0] == emb.shape[1]:
+        not_embedding = not_embedding or "output"          # cells x cells: a graph
+    why = ("not embedding" if not_embedding else "one batch" if n_batches < 2 else None)
+    mean = None
+    if why is None:
+        from .classify import classification_metrics, classify
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            pred = classify(emb, labels=np.asarray(ct, dtype=object),
+                            batch=np.array([str(b) for b in cb], dtype=object), seed=0)
+        table = classification_metrics(pred)
+        if "mean" in table.index:
+            mean = table.loc["mean"]
+            for w in caught:      # a skipped reference batch: said once, as classify says it
+                warnings.warn(w.message, w.category, stacklevel=4)
+        else:
+            why = "none scored"
+    if why is not None:
+        if how == "explicit":
+            raise ValueError(_classification_error(metrics, why, not_embedding or "output"))
+        # evaluate <- its keyword wrapper <- the caller
+        warnings.warn(_classification_warning(why, not_embedding or "output"),
+                      UserWarning, stacklevel=4)
+        return {c: float("nan") for c in codes}
+    return {c: float(mean[c]) for c in codes}
+
+
+def _origin_names(labels, origin):
+    """The batch of each cell when several label files give it: the file's
+    name (``cty1``, ...), as ``mtb.classify`` names it, else its number."""
+    stems = [Path(p).stem for p in labels]
+    names = stems if len(set(stems)) == len(stems) else \
+        [str(i + 1) for i in range(len(labels))]
+    return np.asarray(names, dtype=object)[np.asarray(origin) - 1]
 
 
 def _metrics_spelling(metrics) -> str:
@@ -959,9 +1059,9 @@ def _legacy_evaluate_kwargs(kw: dict) -> dict:
             codes = sorted(codes)          # a set has no order to preserve
         _compat.warn("evaluate(only=...)", f"metrics={codes!r}", stacklevel=4)
         if token not in (None, "all"):
-            clu, bat = _metric_families()
-            fam = clu if token == "clustering" else bat
-            bad = [c for c in codes if c in (clu + bat) and c not in fam]
+            clu, bat, cls = _metric_families()
+            fam = {"clustering": clu, "batch": bat, "classification": cls}.get(token, [])
+            bad = [c for c in codes if c in (clu + bat + cls) and c not in fam]
             if bad:
                 raise ValueError(
                     f"{', '.join(bad)} not in the {token!r} family: pass "
@@ -986,7 +1086,7 @@ def evaluate(
     verbose: bool = True,
     missing_labels: str = "error",
 ) -> pd.DataFrame:
-    """Compute scIB metrics for a run output (an embedding) against cell-type labels.
+    """Compute the benchmark's metrics for a run output (an embedding) against cell-type labels.
 
     Pass the embedding a run produced and one label per cell. Reshape the
     result with ``mtb.to_long`` to plot it or combine it with
@@ -1012,7 +1112,8 @@ def evaluate(
         Every cell needs a batch.
     metrics : None, str or list of str
         ``None`` = every applicable metric except kBET; or ``"clustering"``,
-        ``"batch"``, ``"all"``, or a list of codes such as ``["ARI", "NMI"]``.
+        ``"batch"``, ``"classification"``, ``"all"``, or a list of codes such
+        as ``["ARI", "NMI"]``.
     clustering
         Precomputed cluster assignment, in the forms ``labels`` accepts or an
         ``.h5`` path; ``None`` = derive one with the Leiden sweep.
@@ -1043,7 +1144,7 @@ def evaluate(
     ------
     ValueError
         Missing or misaligned labels, an unknown category or metric, or batch
-        metrics without batch labels. A cell without a label (unless
+        or classification metrics without batch labels. A cell without a label (unless
         ``missing_labels="drop"``), no cell with a label, or a cell without a
         batch in ``batch``.
     FileNotFoundError
@@ -1123,17 +1224,21 @@ def evaluate(
 
     **Metric selection.** ``None`` computes the clustering family (``ARI,
     NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, GC, iLISI`` when a batch
-    vector is available (``batch=`` or a list of label files). kBET is never
-    included by default: it shells out to R and takes hours on large
-    datasets.
+    vector is available (``batch=`` or a list of label files), plus the
+    classification family (``OCA, ACA, Spec, Sens, F1``) when the cells are
+    in two or more batches and ``category`` is not ``"vertical"``, as in the
+    benchmark. kBET is never included by default: it shells out to R and
+    takes hours on large datasets.
 
-    - ``"clustering"`` / ``"batch"`` - that family; ``"all"`` - both
-      (``"batch"`` and ``"all"`` need the batch vector or raise);
+    - ``"clustering"`` / ``"batch"`` / ``"classification"`` - that family;
+      ``"all"`` - all three (``"batch"``, ``"classification"`` and ``"all"``
+      need the batch vector or raise);
     - a list of codes - exactly those (case/alias tolerant, ``["ari"]``
       works); the Leiden sweep runs only when one of them needs it (ARI,
       NMI, iF1), and ``"kBET"`` in the list turns kBET on.
 
-    Valid codes: ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS``.
+    Valid codes: ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS +
+    mtb.plot.CLASSIFICATION_METRICS``.
     An unknown code raises ``ValueError`` listing the valid ones; a bare
     code string (``metrics="ARI"``) raises and points at the list form.
 
@@ -1207,6 +1312,13 @@ def evaluate(
     ``metrics`` selection that has no batch metric changes nothing, and a
     ``UserWarning`` says so.
 
+    **Classification.** The five values are the ``mean`` row of
+    ``mtb.classification_metrics(mtb.classify(...))`` with seed 0: each batch
+    in turn is the reference. They need an embedding and two or more
+    batches. When they cannot be computed, ``"classification"`` or a list
+    of their codes raises ``ValueError``; ``"all"``, and ``None`` with two
+    or more batches, give NaN and one ``UserWarning``.
+
     **Cell order.** Arrays, lists and label files without a cell-id column
     are matched by position to the rows of ``output``. A ``Series`` /
     ``DataFrame`` with a non-default index is aligned by cell id when
@@ -1265,8 +1377,9 @@ def evaluate(
 
     **Errors.** ``ValueError`` covers:
 
-    - missing labels, or a batch metric / family requested without batch
-      labels;
+    - missing labels, or a batch or classification metric requested
+      without batch labels; classification requested where it cannot be
+      computed (**Classification.**);
     - a cell without a label, or without a batch in ``batch``
       (**Missing labels.**), and a ``missing_labels`` that is neither
       ``"error"`` nor ``"drop"``;
@@ -1320,9 +1433,12 @@ def evaluate(
             f"{type(labels).__name__} - pass the files as a list in that order "
             f"instead")
     batch_from_files = batch is None and _is_label_path_list(labels) and len(labels) > 1
-    group, only, slow = _plan_metrics(
+    group, only, slow, want_cls = _plan_metrics(
         metrics, has_batch=batch is not None or batch_from_files,
         batch_given=batch is not None)
+    if want_cls:
+        from .classify import _not_embedding
+        not_embedding = _not_embedding(output)     # a graph or labels file
 
     # the caller holds an object whose obs_names are the cell ids: named in
     # the error for a Series that lacks some cells
@@ -1383,6 +1499,12 @@ def evaluate(
         # clustering metrics need a batch_key but it is a no-op there, so a
         # constant vector is acceptable when no batch labels are supplied.
         ba = np.zeros(emb.shape[0], dtype=int)
+    # the batches classification learns from and predicts: batch=, else the
+    # label file of each cell
+    cb = None
+    if want_cls:
+        cb = ba if batch is not None else \
+            _origin_names(labels, origin) if batch_from_files else None
     if verbose and table is not None and table.moved:
         import sys
         moved = table.moved[0] + (f" and {len(table.moved) - 1} more"
@@ -1413,6 +1535,7 @@ def evaluate(
             _n_batches(np.asarray(known)[keep]), _n_batches(known))
         emb, ct, ba = emb[keep], np.asarray(ct)[keep], np.asarray(ba)[keep]
         cl = None if cl is None else np.asarray(cl)[keep]
+        cb = None if cb is None else np.asarray(cb)[keep]
         dropped = (int(keep.sum()), n_cells, batches, group in {"batch", "all"})
     if batch is not None:
         # after the drop: only the cells that are scored need a batch
@@ -1425,8 +1548,20 @@ def evaluate(
     if odd:
         # evaluate <- its keyword wrapper <- the caller
         warnings.warn(_measured_warning(labels, adata, *odd), UserWarning, stacklevel=3)
-    out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
-                        verbose=None if verbose else False)
+    if group is None:           # classification only: no scIB metric
+        out = pd.DataFrame(columns=["Value"], dtype=float)
+        out.attrs = {"leiden_flavor": None, "clustering": None}
+    else:
+        out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
+                            verbose=None if verbose else False)
+    if want_cls:
+        rows = _classification_scores(want_cls, emb, ct, cb, category=category,
+                                      not_embedding=not_embedding, metrics=metrics)
+        if rows:
+            attrs = out.attrs
+            out = pd.concat([out, pd.DataFrame({"Value": rows})]) if len(out) \
+                else pd.DataFrame({"Value": rows})
+            out.attrs = attrs
     # compute() already emits canonical names; canonicalise anyway, so a frame
     # concatenated with the published tables never carries a second spelling
     # of a metric

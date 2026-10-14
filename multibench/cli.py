@@ -1589,7 +1589,8 @@ def _cmd_evaluate(args) -> int:
     ``metric,value,method,dataset,category,clustering,source,scored_with`` table that
     ``plot --input`` reads and ``load_results`` returns. Without
     ``--metrics`` the metric set is Python's default: clustering, plus the
-    batch family when ``--batch`` or several ``--labels`` are given.
+    batch family when ``--batch`` or several ``--labels`` are given, plus
+    classification for two or more batches outside ``vertical``.
 
     ``--name`` is the row name (``to_long(method=)``) and defaults to
     ``--method``. With ``--labels``, ``--name`` alone names the rows of your
@@ -2095,7 +2096,7 @@ _FORCE_HELP = ("try anyway on a computer that is not Linux (method environments 
                "only on Linux; without --force the command refuses there before any "
                "download)")
 #: the family tokens ``--metrics`` accepts besides a comma list of codes
-_METRIC_FAMILIES = ("clustering", "batch", "all")
+_METRIC_FAMILIES = ("clustering", "batch", "classification", "all")
 _BATCH_COLUMN_HELP = "the column to read in the --batch CSV when it has several columns"
 
 
@@ -2431,7 +2432,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="bubble only: a metric not computed for a method is drawn as "
                          "a dash; warn = name those cells (default), skip = draw "
                          "without the warning, raise = refuse an incomplete table")
-    pp.add_argument("--group", choices=["clustering", "batch"],
+    pp.add_argument("--group", choices=["clustering", "batch", "classification"],
                     help="bar only: metric family shorthand (overrides --metrics)")
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")
     pp.add_argument("--title", help="figure title (default: '<category> <dataset>')")
@@ -2550,7 +2551,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- evaluate
     pe = sub.add_parser(
-        "evaluate", help="scIB metrics for an embedding against labels (mtb.evaluate)",
+        "evaluate", help="the benchmark's metrics for an embedding against labels "
+                         "(mtb.evaluate)",
         description="Compute the benchmark's metrics for one embedding file. Prints "
                     "the metric table (or writes it with --out). With --method or --name, "
                     "--dataset and --category the table is written in the long "
@@ -2594,12 +2596,14 @@ def build_parser() -> argparse.ArgumentParser:
                          "(iF1 still sweeps unless --metrics leaves it out). "
                          "--cluster is an alias")
     pe.add_argument("--metrics", help="what to compute (mtb.evaluate(metrics=)): a family "
-                                      "(clustering | batch | all) or a comma-separated "
-                                      "list of metric codes (e.g. ARI,NMI); a list "
-                                      "skips everything else, including the Leiden "
-                                      "sweep when no listed metric needs it. Default: "
-                                      "clustering, plus batch when --batch or several "
-                                      "--labels are given")
+                                      "(clustering | batch | classification | all) or a "
+                                      "comma-separated list of metric codes (e.g. "
+                                      "ARI,NMI); a list skips everything else, including "
+                                      "the Leiden sweep when no listed metric needs it. "
+                                      "Default: clustering, plus batch when --batch or "
+                                      "several --labels are given, plus classification "
+                                      "when there are two or more batches and "
+                                      "--category is not vertical")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                     help="Leiden backend of the clustering sweep (default: shown by "
                          "multibench config). leidenalg matches both stored tables, "

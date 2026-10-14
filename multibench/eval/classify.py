@@ -217,10 +217,20 @@ _NOT_EMBEDDING = ("classify needs an embedding; {what} is not one. "
 def _check_embedding(output) -> None:
     """``ValueError`` for an output that is a graph or labels, not an embedding:
     a file a method writes as its graph or label output, or a list of labels."""
+    what = _not_embedding(output)
+    if what is not None:
+        raise ValueError(_NOT_EMBEDDING.format(what=what))
+
+
+def _not_embedding(output) -> str | None:
+    """The name of an output that is a graph or labels, not an embedding
+    (``"output"`` for a list, the file name for a graph or label file);
+    ``None`` for anything else."""
     if isinstance(output, (list, tuple)):
-        raise ValueError(_NOT_EMBEDDING.format(what="output"))
+        return "output"
     if isinstance(output, (str, Path)) and Path(output).name in _other_outputs():
-        raise ValueError(_NOT_EMBEDDING.format(what=Path(output).name))
+        return Path(output).name
+    return None
 
 
 def _other_outputs() -> set:
