@@ -1,8 +1,8 @@
 """Paper-style bubble table: methods as rows, metrics as columns, grouped by task.
 
 Layout follows the benchmark paper's figures: each task family (DR & clustering,
-batch correction) is a colour-banded block - blues and greens respectively -
-preceded by an *Overall* column drawn as a horizontal bar whose length and
+batch correction, classification) is a colour-banded block - blues, greens and
+pinks respectively - preceded by an *Overall* column drawn as a horizontal bar whose length and
 colour both encode the family score. With ``aggregate="summary"`` (several
 datasets, the paper's panel c) every metric marker becomes such a bar too - the
 value is then the metric's rank averaged across datasets; with a single dataset
@@ -24,6 +24,7 @@ from .. import config as _config
 FAMILIES = [
     ("DR and clustering", ["cLISI", "ARI", "ASW", "iASW", "iF1", "NMI"], "Blues"),
     ("Batch correction", ["ASW_batch", "GC", "iLISI", "kBET"], "Greens"),
+    ("Classification", ["OCA", "ACA", "Spec", "Sens", "F1"], style.PINKS),
 ]
 
 #: glyph drawn in a cell whose metric was not computed for that method
@@ -123,7 +124,8 @@ class BubbleTable:
     figure is grey.
 
     **Blocks.** Paper order: DR and clustering (blues), batch correction
-    (greens), then "Other" (purples) for any metric outside the two.
+    (greens), classification (pinks), then "Other" (purples) for any metric
+    outside the three.
 
     See Also
     --------
@@ -350,8 +352,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     **Name matching.** ``metrics``, ``methods`` and ``order`` match the
     frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
     case-insensitively; the frame's own spelling is kept. The family blocks
-    always stay in paper order; metrics outside the two paper families form
-    a neutral purple "Other" block.
+    always stay in paper order; metrics outside the three families form a
+    neutral purple "Other" block.
 
     See Also
     --------
@@ -859,8 +861,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
     fig = Figure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
-    mappers = {fi: cm.ScalarMappable(norm=norm01,
-                                     cmap=(cmap if (fi == 0 and cmap) else b.cmap))
+    mappers = {fi: cm.ScalarMappable(norm=norm01, cmap=style.colormap(
+                   cmap if (fi == 0 and cmap) else b.cmap))
                for fi, b in enumerate(tbl.blocks)}
 
     # ---- alternating row stripes (#DDDDDD, like the Shiny output) ---------
@@ -1117,8 +1119,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         within-dataset ranks averaged across datasets, drawn as bars (the
         paper's panel c).
     cmap : str | None
-        Matplotlib colormap for the first family; ``None`` = blues, greens
-        and purples per family.
+        Matplotlib colormap for the first family; ``None`` = blues, greens,
+        pinks and purples per family.
     title : str | None
         Figure title; ``None`` = no title.
     save : str or path-like | None

@@ -258,9 +258,10 @@ def _():
 @check("plot.__all__ / dir (render, FamilyBlock importable but unlisted)")
 def _():
     assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-                                "CLUSTERING_METRICS", "BATCH_METRICS"], mtb.plot.__all__
+                                "CLUSTERING_METRICS", "BATCH_METRICS",
+                                "CLASSIFICATION_METRICS"], mtb.plot.__all__
     assert "render" not in dir(mtb.plot) and callable(mtb.plot.render)
-    return "seven names"
+    return "eight names"
 
 @check("plot.bubble(save=)")
 def _():

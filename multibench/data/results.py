@@ -626,7 +626,8 @@ def load_results(
         -> ``MOFA2``, ``"totalvi"`` -> ``totalVI``); ``None`` = every method.
     metrics : None, str or list of str
         ``None`` / ``"all"`` = every metric; or ``"clustering"``,
-        ``"batch"``, or a list of codes such as ``["ARI", "NMI"]``.
+        ``"batch"``, ``"classification"``, or a list of codes such as
+        ``["ARI", "NMI"]``.
     clustering : {"default", "louvain", "kmeans"}
         Clustering variant of the published tables: ``metric.csv``,
         ``metric_louvain.csv`` or ``metric_kmeans.csv``.
@@ -722,6 +723,10 @@ def load_results(
     - ``"clustering"`` - ``mtb.plot.CLUSTERING_METRICS`` (ARI, NMI, ASW,
       iASW, iF1, cLISI);
     - ``"batch"`` - ``mtb.plot.BATCH_METRICS`` (ASW_batch, GC, iLISI, kBET);
+    - ``"classification"`` - ``mtb.plot.CLASSIFICATION_METRICS`` (OCA, ACA,
+      Spec, Sens, F1). The stored tables have none, so the frame is empty,
+      as for ``"batch"`` on a single-batch dataset; a long CSV of your own
+      (``result_path=``) can hold them;
     - a list - exactly those codes (alias tolerant, ``["ari"]`` -> ARI).
 
     Every code must be one of ``mtb.catalog.known_metrics()`` or present in
@@ -1291,7 +1296,8 @@ def recommend(
         themselves; ``None`` = every method.
     metrics : None, str or list of str
         ``None`` = the ``"clustering"`` family (the benchmark's main
-        ranking); or ``"batch"``, ``"all"``, or a list of codes.
+        ranking); or ``"batch"``, ``"classification"``, ``"all"``, or a
+        list of codes.
     long_df : pandas.DataFrame
         Frame to score (``metric, value, method, dataset``) instead of the
         stored tables, e.g. ``pd.concat([published, mine])``.

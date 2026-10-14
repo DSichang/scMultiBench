@@ -148,6 +148,12 @@ _METRIC_CANON = {
     "gc": "GC",
     "asw_batch": "ASW_batch",
     "pcr": "PCR",
+    # the classification family (mtb.classification_metrics)
+    "oca": "OCA",
+    "aca": "ACA",
+    "spec": "Spec",
+    "sens": "Sens",
+    "f1": "F1",
     # raw scIB long-names -> canonical codes (some metric.csv use these)
     "ari_cluster/label": "ARI",
     "nmi_cluster/label": "NMI",
@@ -164,7 +170,8 @@ def known_metrics() -> list[str]:
     -------
     list of str
         The clustering / bio-conservation codes (``mtb.plot.CLUSTERING_METRICS``),
-        the batch-correction codes (``mtb.plot.BATCH_METRICS``), then ``PCR``
+        the batch-correction codes (``mtb.plot.BATCH_METRICS``), the
+        classification codes (``mtb.plot.CLASSIFICATION_METRICS``), then ``PCR``
         (principal-component regression, in some published tables).
 
     Examples
@@ -172,7 +179,7 @@ def known_metrics() -> list[str]:
     >>> import multibench as mtb
     >>> mtb.catalog.known_metrics()
     ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI',
-     'kBET', 'PCR']
+     'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1', 'PCR']
 
     See Also
     --------
@@ -184,7 +191,7 @@ def known_metrics() -> list[str]:
         if v not in seen:
             seen.append(v)
     order = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-             "ASW_batch", "GC", "iLISI", "kBET"]
+             "ASW_batch", "GC", "iLISI", "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]
     return order + sorted(v for v in seen if v not in order)
 
 
@@ -252,14 +259,14 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
 
 # --- the one ``metrics=`` selector -----------------------------------------
 #: family tokens the ``metrics=`` knob accepts (besides None and a list of codes)
-_METRIC_TOKENS = ("all", "clustering", "batch")
+_METRIC_TOKENS = ("all", "clustering", "batch", "classification")
 
 
 class MetricSelection:
     """What a ``metrics=`` argument resolved to (see :func:`metric_selection`).
 
-    ``family`` is ``"all"``, ``"clustering"`` or ``"batch"``: the token that
-    was given, or - for an explicit list - the smallest family holding every
+    ``family`` is ``"all"``, ``"clustering"``, ``"batch"`` or
+    ``"classification"``: the token that was given, or - for an explicit list - the smallest family holding every
     code. ``codes`` is ``None`` for "no restriction" (``None`` / ``"all"``)
     and otherwise the canonical codes selected, in request order. ``explicit``
     is ``True`` when a list of codes was given.
@@ -280,7 +287,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     ----------
     metrics
         ``None`` (no restriction), a family token (``"clustering"``,
-        ``"batch"``, ``"all"``) or a list of metric codes (case/alias
+        ``"batch"``, ``"classification"``, ``"all"``) or a list of metric codes (case/alias
         tolerant: ``["ari", "kbet"]`` -> ``ARI, kBET``).
     extra : collection of str
         Codes accepted on top of :func:`known_metrics` - the metrics present
@@ -297,16 +304,16 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     ------
     ValueError
         A string that is not a family token (``"Unknown metrics= token
-        ARI. Pass 'all', 'clustering' or 'batch', or a list of metric codes
-        ..."``; a :func:`multibench.list_tasks` token gets an extra sentence
+        ARI. Pass 'all', 'clustering', 'batch' or 'classification', or a list
+        of metric codes ..."``; a :func:`multibench.list_tasks` token gets an extra sentence
         saying the slot selects a metric family), an unknown code in a list
         (listing the valid codes), an empty list, or a list that names the
         same metric twice after canonicalisation.
     TypeError
         Anything that is neither ``None``, a string nor a collection.
     """
-    from ..plot.bar import BATCH_METRICS, CLUSTERING_METRICS   # families live in plot
-    fams = {"clustering": list(CLUSTERING_METRICS), "batch": list(BATCH_METRICS)}
+    from ..plot.bar import FAMILY_METRICS            # families live in plot
+    fams = {k: list(v) for k, v in FAMILY_METRICS.items()}
     if metrics is None or (isinstance(metrics, str) and metrics == "all"):
         return MetricSelection("all", None, False)
     if isinstance(metrics, str):
@@ -321,17 +328,17 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         if metrics in tasks:
             hint = (f" {kw}= selects a metric family, not a task of mtb.list_tasks(). "
                     f"The tasks dimension_reduction and clustering both use the "
-                    f"clustering family. Only the scIB families are computed.")
+                    f"clustering family.")
         elif canonical_metric(metrics) in known_metrics():
             hint = f" A single code goes in a list: {kw}=[{canonical_metric(metrics)!r}]."
         raise ValueError(
-            f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering' or 'batch', "
-            f"or a list of metric codes such as {kw}=['ARI', 'NMI'].{hint}")
+            f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering', 'batch' or "
+            f"'classification', or a list of metric codes such as {kw}=['ARI', 'NMI'].{hint}")
     if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
         got = type(metrics).__name__
         raise TypeError(
-            f"{kw}= takes None, 'all', 'clustering', 'batch' or a list of metric "
-            f"codes. It got {'an' if got[:1] in 'aeiou' else 'a'} {got}.")
+            f"{kw}= takes None, 'all', 'clustering', 'batch', 'classification' or "
+            f"a list of metric codes. It got {'an' if got[:1] in 'aeiou' else 'a'} {got}.")
     wanted = list(metrics)
     if not wanted:
         raise ValueError(
@@ -354,11 +361,9 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     if dup:
         raise ValueError(
             f"{kw}= names the same metric twice after canonicalisation: {dup}")
-    in_clu = any(c in fams["clustering"] for c in codes)
-    in_bat = any(c in fams["batch"] for c in codes)
-    family = "all" if (in_clu and in_bat) or not (in_clu or in_bat) else (
-        "clustering" if in_clu else "batch")
-    return MetricSelection(family, codes, True)
+    # the one family holding every code, else "all"
+    holding = [f for f, members in fams.items() if all(c in members for c in codes)]
+    return MetricSelection(holding[0] if holding else "all", codes, True)
 
 
 # --- tables ----------------------------------------------------------------

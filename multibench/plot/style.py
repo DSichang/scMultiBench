@@ -338,3 +338,21 @@ def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
         return compute_overall(mean_rank_matrix(parts))
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     return per_ds.mean(axis=1)
+
+
+#: colour ramp names the package defines itself, on top of matplotlib's
+PINKS = "Pinks"
+
+
+def colormap(name):
+    """The matplotlib colormap ``name``, or ``"Pinks"``: the pink half of
+    ColorBrewer's PiYG, from near-white to deep magenta, which is the
+    classification family's ramp as blues and greens are the other two
+    families'. A colormap object is returned as it is."""
+    from matplotlib import colormaps, colors
+    if not isinstance(name, str):
+        return name
+    if name == PINKS:
+        ramp = colormaps["PiYG"](np.linspace(0.5, 0.0, 256))
+        return colors.ListedColormap(ramp, name=PINKS)
+    return colormaps[name]

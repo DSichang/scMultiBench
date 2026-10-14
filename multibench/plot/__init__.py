@@ -13,7 +13,7 @@ from . import bubble as _bubble_module
 from . import style
 from .bubble import (bubble, plot_bubble, build_table, render, BubbleTable,
                      FamilyBlock, FAMILIES)
-from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS
+from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS
 
 # back-compat: ``bubble`` was a callable namespace object, so
 # ``mtb.plot.bubble.build_table(...)`` / ``.render(...)`` worked. It is a plain
@@ -27,7 +27,7 @@ bubble.__module__ = "multibench.plot"
 del _n
 
 __all__ = ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-           "CLUSTERING_METRICS", "BATCH_METRICS"]
+           "CLUSTERING_METRICS", "BATCH_METRICS", "CLASSIFICATION_METRICS"]
 
 
 def __dir__() -> list[str]:
