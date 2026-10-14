@@ -29,7 +29,7 @@ from .data import catalog
 from .data.results import (load_results, available_datasets, results_coverage, recommend,
                            DegenerateRerunWarning)
 from .eval.pipeline import evaluate, to_long
-from .eval.classify import classify
+from .eval.classify import classify, classification_metrics
 from .engine.runner import run
 from .engine.registry import list_tasks
 from .engine.schema import AmbiguousVariantError
@@ -54,7 +54,7 @@ __all__ = [
     # run
     "scan", "run", "run_all", "sweep", "load_batch", "BatchResult",
     # score
-    "evaluate", "to_long", "classify",
+    "evaluate", "to_long", "classify", "classification_metrics",
     # compare
     "load_results", "available_datasets", "results_coverage", "recommend",
     "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",

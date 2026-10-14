@@ -22,7 +22,7 @@ MTB_ALL = {
     "list_tasks", "list_categories",
     "inputs_for", "labels_for",
     "scan", "run", "run_all", "sweep", "load_batch", "BatchResult",
-    "evaluate", "to_long", "classify",
+    "evaluate", "to_long", "classify", "classification_metrics",
     "load_results", "available_datasets", "results_coverage", "recommend",
     "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",
 }

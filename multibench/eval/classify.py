@@ -1,4 +1,5 @@
-"""classify(): predict the cell type of each query cell from a reference batch."""
+"""classify(): predict the cell type of each query cell from a reference batch;
+classification_metrics(): score those predictions."""
 from __future__ import annotations
 
 import warnings
@@ -248,3 +249,104 @@ def _mlp(x, y, seed: int):
         # 10 epochs is the benchmark's setting, not an unfinished fit
         warnings.simplefilter("ignore", ConvergenceWarning)
         return clf.fit(np.asarray(x, dtype=float), y)
+
+
+#: the columns of the frame classification_metrics() returns, in the article's order
+METRICS = ["OCA", "ACA", "Spec", "Sens", "F1"]
+
+
+def classification_metrics(predictions) -> pd.DataFrame:
+    """Score the predicted cell types of ``mtb.classify`` with the benchmark's metrics.
+
+    Parameters
+    ----------
+    predictions : pandas.DataFrame
+        The frame ``mtb.classify`` returns, or any frame with the columns
+        ``label`` (true cell type) and ``predicted``; with a ``reference``
+        column, each reference batch is scored on its own.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per reference batch (index ``reference``, in input order)
+        and a last row ``mean``, the mean over the references; a frame
+        without ``reference`` gives one row. The columns, in [0, 1]:
+
+        - ``OCA``: overall classification accuracy, the fraction of cells
+          predicted correctly.
+        - ``ACA``: average classification accuracy, the fraction of the
+          cells of a type predicted correctly, averaged over the types.
+        - ``Spec``: specificity, the fraction of the cells of other types
+          not predicted as a type, averaged over the types.
+        - ``Sens``: sensitivity, the fraction of the cells of a type
+          predicted as that type, averaged over the types.
+        - ``F1``: F1-score, 2 x the cells correctly predicted as a type /
+          (its cells + the cells predicted as it), averaged over the types.
+
+    Raises
+    ------
+    TypeError
+        ``predictions`` is not a DataFrame.
+    ValueError
+        ``predictions`` lacks ``label`` or ``predicted``.
+
+    Examples
+    --------
+    >>> labels = mtb.labels_for("D52", "cross", "StabMap")
+    >>> pred = mtb.classify(res.output, labels=labels)    # res = mtb.run(...)
+    >>> mtb.classification_metrics(pred)
+
+    Notes
+    -----
+    The types are those true or predicted in a reference's query. ``ACA``
+    and ``Sens`` average over the types that are true, ``Spec`` and ``F1``
+    over all of them, so ``Spec`` is NaN when a query has one true type; the
+    ``mean`` row is then NaN too. A row with a missing ``label`` or
+    ``predicted`` is left out. The numbers are those of the benchmark's R
+    code.
+    """
+    if not isinstance(predictions, pd.DataFrame):
+        raise TypeError("classification_metrics needs a DataFrame. "
+                        "Pass the frame mtb.classify returns.")
+    missing = [c for c in ("label", "predicted") if c not in predictions.columns]
+    if missing:
+        raise ValueError(
+            f"predictions has no {' and no '.join(missing)} column. "
+            f"Pass the frame mtb.classify returns.")
+    if "reference" not in predictions.columns:
+        return pd.DataFrame([_metrics(predictions)], columns=METRICS)
+    codes, refs = pd.factorize(predictions["reference"], use_na_sentinel=False)
+    table = pd.DataFrame([_metrics(predictions[codes == i]) for i in range(len(refs))],
+                         index=pd.Index(refs, name="reference"), columns=METRICS)
+    if len(table):
+        table.loc["mean"] = table.mean(skipna=False)
+    return table
+
+
+def _metrics(frame: pd.DataFrame) -> list:
+    """The five metrics of one query, as the benchmark's R code
+    computes them from ``table(truth, predicted)``."""
+    keep = ~(io.missing_mask(frame["label"].to_numpy(dtype=object))
+             | io.missing_mask(frame["predicted"].to_numpy(dtype=object)))
+    truth = frame["label"].to_numpy(dtype=object)[keep]
+    pred = frame["predicted"].to_numpy(dtype=object)[keep]
+    codes, levels = pd.factorize(np.concatenate([truth, pred]))
+    k, n = len(levels), len(truth)
+    cm = np.bincount(codes[:n] * k + codes[n:], minlength=k * k).reshape(k, k).astype(float)
+    tp = np.diag(cm)
+    fp = cm.sum(axis=0) - tp
+    fn = cm.sum(axis=1) - tp
+    tn = cm.sum() - tp - fp - fn
+    with np.errstate(divide="ignore", invalid="ignore"):
+        oca = tp.sum() / cm.sum()
+        aca = np.diag(cm / cm.sum(axis=1, keepdims=True))     # NaN: never true
+        sens = tp / (tp + fn)                                  # NaN: never true
+        spec = tn / (tn + fp)
+        f1 = 2 * tp / (2 * tp + fp + fn)
+    return [float(oca), _mean(aca[~np.isnan(aca)]), _mean(spec),
+            _mean(sens[~np.isnan(sens)]), _mean(f1)]
+
+
+def _mean(x) -> float:
+    """``mean(x)`` as in R: NaN for no value or a NaN value."""
+    return float(np.mean(x)) if len(x) else float("nan")

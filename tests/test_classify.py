@@ -185,3 +185,83 @@ def test_labels_for_dict_in_a_method_order(tmp_path):
     out2 = mtb.classify(emb, labels=plain, label_order=["cty3", "cty1", "cty2"],
                         reference="cty3")
     pd.testing.assert_frame_equal(out, out2)
+
+
+# --- classification_metrics -------------------------------------------------
+
+METRICS = ["OCA", "ACA", "Spec", "Sens", "F1"]
+#: truth and prediction of three queries, and the five numbers the benchmark's
+#: R code (compute_metrics in classification_metrics.Rmd) gives for each
+R_CASES = {
+    # D is predicted but never true: left out of ACA and Sens, F1 0 in the mean
+    "r1": ("AABBC", "ABBDC",
+           [0.59999999999999998, 0.66666666666666663, 0.8666666666666667,
+            0.66666666666666663, 0.54166666666666663]),
+    # C is true but never predicted: Sens 0, Spec 1 for C
+    "r2": ("AABBCC", "AABBBB",
+           [0.66666666666666663, 0.66666666666666663, 0.83333333333333337,
+            0.66666666666666663, 0.55555555555555558]),
+    # one true cell type: no true negative for A, so Spec is NaN
+    "r3": ("AAAAA", "AAABA",
+           [0.80000000000000004, 0.80000000000000004, np.nan,
+            0.80000000000000004, 0.44444444444444442]),
+}
+
+
+def _pred(refs):
+    """A classify-shaped frame of the queries ``refs`` of R_CASES."""
+    parts = []
+    for r in refs:
+        truth, predicted, _ = R_CASES[r]
+        parts.append(pd.DataFrame({"reference": r, "batch": "q", "cell": range(len(truth)),
+                                   "label": list(truth), "predicted": list(predicted)}))
+    return pd.concat(parts, ignore_index=True)
+
+
+def test_metrics_equal_the_r_code():
+    out = mtb.classification_metrics(_pred(["r1", "r2", "r3"]))
+    assert list(out.columns) == METRICS and out.index.name == "reference"
+    assert out.index.tolist() == ["r1", "r2", "r3", "mean"]
+    for r in ("r1", "r2", "r3"):
+        np.testing.assert_allclose(out.loc[r].to_numpy(float), R_CASES[r][2],
+                                   rtol=0, atol=1e-12)
+
+
+def test_mean_row_is_the_mean_over_references():
+    out = mtb.classification_metrics(_pred(["r2", "r1"]))
+    assert out.index.tolist() == ["r2", "r1", "mean"]    # input order
+    np.testing.assert_allclose(
+        out.loc["mean"].to_numpy(float),
+        np.mean([R_CASES["r1"][2], R_CASES["r2"][2]], axis=0), rtol=0, atol=1e-12)
+    # a NaN of one reference is not averaged away
+    out = mtb.classification_metrics(_pred(["r1", "r3"]))
+    assert np.isnan(out.loc["mean", "Spec"]) and not out.loc["mean"].drop("Spec").isna().any()
+
+
+def test_a_frame_without_reference_gives_one_row():
+    # labels that are numbers, as the R code reads them: 1, 2, 3, 10
+    pred = pd.DataFrame({"label": [1, 2, 10, 2, 1, 10, 3],
+                         "predicted": [1, 10, 10, 2, 2, 10, 1]})
+    out = mtb.classification_metrics(pred)
+    assert list(out.columns) == METRICS and len(out) == 1
+    np.testing.assert_allclose(out.iloc[0].to_numpy(float),
+                               [0.5714285714285714, 0.5, 0.85000000000000009, 0.5,
+                                0.45000000000000001], rtol=0, atol=1e-12)
+
+
+def test_metrics_of_classify(three):
+    emb, labels, paths = three
+    out = mtb.classification_metrics(mtb.classify(emb, labels=list(paths.values())))
+    assert out.index.tolist() == ["cty1", "cty2", "cty3", "mean"]
+    assert (out == 1.0).all().all()                      # well separated types
+
+
+def test_missing_column_is_an_error():
+    with pytest.raises(ValueError) as e:
+        mtb.classification_metrics(pd.DataFrame({"label": ["A"]}))
+    assert str(e.value) == ("predictions has no predicted column. "
+                            "Pass the frame mtb.classify returns.")
+    with pytest.raises(ValueError) as e:
+        mtb.classification_metrics(pd.DataFrame({"cell": [0]}))
+    assert str(e.value) == ("predictions has no label and no predicted column. "
+                            "Pass the frame mtb.classify returns.")
