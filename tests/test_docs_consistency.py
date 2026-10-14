@@ -481,6 +481,7 @@ REFERENCE = {
     "mtb.BatchResult": ("run.md", "multibench.workflow.BatchResult"),
     "mtb.evaluate": ("score.md", "multibench.eval.pipeline.evaluate"),
     "mtb.to_long": ("score.md", "multibench.eval.pipeline.to_long"),
+    "mtb.classify": ("score.md", "multibench.eval.classify.classify"),
     "mtb.load_results": ("compare.md", "multibench.data.results.load_results"),
     "mtb.available_datasets": ("compare.md", "multibench.data.results.available_datasets"),
     "mtb.results_coverage": ("compare.md", "multibench.data.results.results_coverage"),
