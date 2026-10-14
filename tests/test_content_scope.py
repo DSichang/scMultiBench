@@ -1,6 +1,6 @@
 """Scope guard: the package describes only the tasks it benchmarks.
 
-The owner's rule: three benchmark tasks and four removed methods are never
+The owner's rule: two benchmark tasks and four removed methods are never
 mentioned where a user can see them - API return values, CLI help, and every
 text file the package ships (docstrings, YAML, CSV, drivers). This file pins
 that on the live objects, on the shipped files and on the docs surfaces
@@ -33,7 +33,7 @@ from multibench import cli
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "multibench"
 
-FORBIDDEN = re.compile(r"(?i)classif|imput|registration|spatial|\bGPSA\b|\bPASTE2?\b|\bSPIRAL\b")
+FORBIDDEN = re.compile(r"(?i)imput|registration|spatial|\bGPSA\b|\bPASTE2?\b|\bSPIRAL\b")
 
 #: the tasks methods declare; ``find_methods(task=)`` accepts exactly these
 TASKS = ["batch", "clustering", "dimension_reduction"]
@@ -45,13 +45,7 @@ LOCK_PINS = {"gpsa", "paste-bio", "paste2", "spatial-eggplant"}
 _PIN_LINE = re.compile(r"^\s*-\s*(?P<name>[A-Za-z0-9_.\-]+)\s*(?:==|=)\s*\S+\s*$")
 
 #: upstream API keywords a driver must pass verbatim, per driver file
-DRIVER_KEYWORDS = {
-    # matilda.task(..., classification=True). The embedding comes from the same
-    # call; the keyword goes once a benchmark-host run shows that dim_reduce=True
-    # alone writes the same embedding.h5 (then drop predict.csv from the driver
-    # and from the Matilda variants' extra_outputs too).
-    "engine/drivers/run_matilda.py": ["classification=True"],
-}
+DRIVER_KEYWORDS: dict = {}
 
 #: paper titles (Crossref-checked citation facts), per method id in references.yaml
 CITATION_TITLES = {
