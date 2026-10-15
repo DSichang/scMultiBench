@@ -1262,8 +1262,8 @@ def scan(dataset: str, category: str | None = None, *,
     ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists;
     ``env_reason`` names it and the one-method install command (``multibench
     env install --methods X --packed --run``), or on macOS and Windows says
-    it runs only on Linux; ``multibench env doctor`` checks every env. And,
-    for a method with ``requires_gpu``, the host has an NVIDIA GPU. Without
+    it runs only on Linux (``multibench env doctor`` checks every env). For
+    a method with ``requires_gpu``, the host also needs an NVIDIA GPU. Without
     one, ``env_reason`` is the sentence ``run`` would raise: ``"<method>
     needs an NVIDIA GPU, and this computer has none. See ..."``. With
     ``assume_gpu=True`` the row's ``caveat`` says ``This check assumes the
@@ -3960,7 +3960,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
 
 def _params_for_method(method, category, modalities):
-    """The variant's tunable keys, or ``None`` on any exception (several variants)."""
+    """The variant's tunable keys, or ``None`` when ``params_for`` raises."""
     try:
         from .discover import params_for
         return params_for(method, category,
