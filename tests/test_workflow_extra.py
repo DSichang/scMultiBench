@@ -242,16 +242,15 @@ def test_sweep_validates_method_id():
         mtb.sweep("D11", "cross", "Stabmap", "k", [1, 2], out_dir="/tmp/unused")
 
 
-def test_read_cty_is_the_shared_label_reader(tmp_path):
-    from multibench import workflow as W
+def test_read_labels_reads_cty_and_obs_exports(tmp_path):
     from multibench.eval import io
     p = tmp_path / "cty.csv"
     p.write_text("x\nA\nB\nA\n")
-    assert list(W._read_cty(p)) == list(io.read_labels(p)) == ["A", "B", "A"]
+    assert list(io.read_labels(p)) == ["A", "B", "A"]
     # the obs-style export (barcode index + label column) now also reads
     q = tmp_path / "obs.csv"
     q.write_text(",celltype\nc1,T\nc2,B\n")
-    assert list(W._read_cty(q)) == ["T", "B"]
+    assert list(io.read_labels(q)) == ["T", "B"]
 
 
 def test_batch_result_plot_docstring_mentions_order():

@@ -402,19 +402,16 @@ def test_evaluate_clustering_h5_path_reads_like_the_str(tmp_path):
     assert float(as_path.loc["ARI", "Value"]) == float(as_str.loc["ARI", "Value"])
 
 
-def test_read_cty_and_io_read_labels_agree_on_benchmark_style_files(tmp_path):
-    """workflow._read_cty and eval.io.read_labels are the package's two label
-    readers; they must return the same thing on the benchmark's cty layout
-    (single column, header "x") or run_all and evaluate() score different
-    vectors. (Unifying them onto io.read_labels is a workflow.py change.)"""
-    from multibench import workflow as W
+def test_read_labels_reads_benchmark_style_files(tmp_path):
+    """eval.io.read_labels is the label reader of run_all and evaluate() alike; it
+    reads the benchmark's cty layout (single column, header "x")."""
     p = tmp_path / "cty.csv"
     vals = ["mDC.Lung", "T.CD.EM", "B", "T.CD.EM"]
     _write_cty(p, vals)
-    assert list(W._read_cty(p)) == list(io.read_labels(p)) == vals
-    # and on the shipped reference datasets, when present
+    assert list(io.read_labels(p)) == vals
+    # and the shipped reference datasets, when present
     root = Path(__file__).resolve().parent.parent / "data"
     for f in sorted(root.glob("D*/*cty*.csv")) if root.is_dir() else []:
         if "scjoint" in f.name.lower():
             continue
-        np.testing.assert_array_equal(W._read_cty(f), io.read_labels(f))
+        io.read_labels(f)

@@ -1610,11 +1610,6 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
 
 
 # ------------------------------------------------------------------- label order
-def _read_cty(path):
-    """Read a label CSV (``eval.io.read_labels``)."""
-    return _eio.read_labels(path)
-
-
 #: "no deadline armed"; not None, which signal.signal returns for a handler
 #: that was not installed from Python
 _NOT_ARMED = object()
@@ -1677,7 +1672,7 @@ def _label_candidates(dataset, n, data_path=None):
     by_file = {}
     for p in _label_files(dataset, data_path):
         try:
-            by_file[p.name] = _read_cty(p)
+            by_file[p.name] = _eio.read_labels(p)
         except Exception:
             pass
     cands = [([k], v) for k, v in by_file.items()]
@@ -2856,7 +2851,7 @@ def _label_file_sizes(dataset, category=None, method=None, *, modalities=None,
     try:
         files = _resolve.labels_for(dataset, category, method, modalities=modalities,
                                     data_path=data_path, check=False)
-        return [(Path(p).name, len(_read_cty(p))) for p in files.values()]
+        return [(Path(p).name, len(_eio.read_labels(p))) for p in files.values()]
     except Exception:  # noqa: BLE001 - no label files: nothing to compare against
         return []
 
@@ -2975,7 +2970,7 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     try:
         files = _resolve.labels_for(dataset, data_path=data_path, check=False)
         for p in map(Path, files.values()):
-            n = len(_read_cty(p))
+            n = len(_eio.read_labels(p))
             bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(p))
                          if b is not None and len(b) == n), None)
             if bars is None:
@@ -3102,7 +3097,7 @@ def _label_gaps(dataset, data_path) -> dict:
     gaps = {}
     for p in _label_files(dataset, data_path):
         try:
-            labels = _read_cty(p)
+            labels = _eio.read_labels(p)
         except Exception:  # noqa: BLE001 - not a readable label file
             continue
         if not _has_gap(labels):

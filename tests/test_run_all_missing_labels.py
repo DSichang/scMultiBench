@@ -21,6 +21,7 @@ import multibench as mtb
 from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, registry
+from multibench.eval import io as eio
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 N = 120
@@ -176,7 +177,7 @@ def test_a_blank_line_of_a_one_column_file_is_no_row(cite, tmp_path, host):
     lab = LABELS.copy()
     lab[5] = " "
     _write(cite / "MYCITE" / "cty.csv", lab)
-    assert len(W._read_cty(cite / "MYCITE" / "cty.csv")) == N - 1
+    assert len(eio.read_labels(cite / "MYCITE" / "cty.csv")) == N - 1
     assert W._label_gaps("MYCITE", cite) == {}
     res = _run(cite, tmp_path, ["totalVI"])
     assert [r["status"] for r in res.records] == ["RUN_OK_NO_LABEL_MATCH"]

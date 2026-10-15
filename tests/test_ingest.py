@@ -304,16 +304,15 @@ def test_read_canonical_sparse_flag(tmp_path):
 
 def test_write_labels_roundtrip(tmp_path):
     import pandas as pd
-    from multibench import workflow
     from multibench.eval import io as eio
     p = ingest._write_labels(["A", "B", "A"], tmp_path / "sub" / "cty.csv")
     assert p.exists()
-    assert list(workflow._read_cty(p)) == ["A", "B", "A"]
+    assert list(eio.read_labels(p)) == ["A", "B", "A"]
     assert len(eio.read_labels(p)) == 3
     assert pd.read_csv(p).columns.tolist() == ["x"]
     # pandas Categorical / Series input
     ingest._write_labels(pd.Series(pd.Categorical(["T", "B"])), tmp_path / "c2.csv")
-    assert list(workflow._read_cty(tmp_path / "c2.csv")) == ["T", "B"]
+    assert list(eio.read_labels(tmp_path / "c2.csv")) == ["T", "B"]
     with pytest.raises(ValueError, match="1-D"):
         ingest._write_labels(np.ones((2, 2)), tmp_path / "bad.csv")
 
