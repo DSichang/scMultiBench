@@ -20,15 +20,9 @@ __all__ = ["Config", "DEFAULT"]
 
 
 def __dir__() -> list[str]:
-    """``dir(mtb.config)`` lists the public names (PEP 562).
-
-    ``category_folder`` / ``metric_set_dir`` stay importable for the package's
-    own modules but are internal token maps, not user-facing API, so tab
-    completion does not advertise them.
-    """
+    """``dir(mtb.config)`` lists the public names only (PEP 562)."""
     return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
 
-# token -> on-disk space-named folder
 _CATEGORY_FOLDERS = {
     "vertical": "vertical integration",
     "diagonal": "diagonal integration",
@@ -36,16 +30,13 @@ _CATEGORY_FOLDERS = {
     "cross": "cross integration",
 }
 
-# metric-set token -> top-level result dir; only the scIB metric set exists
 _METRIC_SET_DIRS = {
     "scib": "scib_metric",
 }
 
 _ROOT = Path(__file__).resolve().parent.parent
-# Large client-side artefacts (datasets, the upstream clone) sit next to the
-# package in a repository checkout or editable install. In a wheel install
-# _ROOT is inside site-packages, which must not accumulate them, so they go to
-# a per-user cache dir.
+# datasets and the scripts clone sit next to the package in a checkout; a wheel
+# install keeps them out of site-packages, in a per-user cache
 _IN_REPO = (_ROOT / "pyproject.toml").is_file()
 _CACHE = (Path(_os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
           / "multibench")
@@ -68,16 +59,13 @@ _CLI = False
 
 
 def hint(py: str, cli: str) -> str:
-    """The ``cli`` spelling while the command line runs a command, else ``py`` (internal).
-
-    Messages that tell the user what to call next use it, e.g.
-    ``hint("mtb.env.doctor()", "multibench env doctor")``.
-    """
+    """The ``cli`` spelling while the command line runs a command, else ``py``,
+    e.g. ``hint("mtb.env.doctor()", "multibench env doctor")``."""
     return cli if _CLI else py
 
 
 def _from_env(var: str) -> Path | None:
-    """The path in environment variable ``var`` (``~`` expanded), or ``None`` when unset or empty."""
+    """The path in environment variable ``var`` (``~`` expanded), or ``None`` if unset or empty."""
     value = _os.environ.get(var)
     return Path(value).expanduser() if value else None
 
@@ -94,12 +82,8 @@ def _default_repo_path() -> Path:
 
 @functools.lru_cache(maxsize=1)
 def _conda_envs_dir() -> Path | None:
-    """The first writable envs dir of the conda/mamba on PATH, or ``None``.
-
-    One ``info --json`` subprocess per process (cached), run only when
-    :attr:`Config.envs_dir` is first read without ``MULTIBENCH_ENVS_DIR`` set.
-    Tests that fake or hide conda clear this cache.
-    """
+    """The first writable envs dir of the conda/mamba on PATH, or ``None``; one
+    ``info --json`` subprocess per process (tests that fake conda clear the cache)."""
     exe = _shutil.which("mamba") or _shutil.which("conda")
     if exe is None:
         return None
@@ -119,19 +103,9 @@ def _default_envs_dir() -> Path:
 
 
 class _LazyPath:
-    """Descriptor behind a path field whose default is resolved on read.
-
-    ``envs_dir`` uses it with ``cache=True``: a plain ``default_factory``
-    would run ``conda info --json`` every time a ``Config`` is built,
-    including ``config.DEFAULT`` at import, so the probe runs on the first
-    read only and its answer is kept. ``data_path`` / ``repo_path`` use
-    ``cache=False``: their environment variable is read again on every read
-    until a value is assigned.
-
-    The field stays settable (``cfg.data_path = "/scratch/data"``); a string
-    is converted to ``pathlib.Path`` and ``None`` returns the field to its
-    default.
-    """
+    """A path field whose default is resolved on read: ``cache=True`` keeps the first
+    answer (``envs_dir``: a ``default_factory`` would probe conda at import), ``cache=False``
+    re-reads the environment variable until a value is assigned; ``None`` resets it."""
 
     def __init__(self, resolve, *, cache: bool):
         self._resolve = resolve
@@ -142,7 +116,7 @@ class _LazyPath:
 
     def __get__(self, obj, objtype=None):
         if obj is None:
-            return self          # the dataclass default: "unset", see __set__
+            return self          # the dataclass default, i.e. "unset"
         value = obj.__dict__.get(self._slot)
         if value is None:
             value = self._resolve()
@@ -158,24 +132,8 @@ class _LazyPath:
 
 
 def category_folder(token: str) -> str:
-    """Map a category token to its space-named result folder (internal).
-
-    Parameters
-    ----------
-    token : str
-        ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``.
-
-    Returns
-    -------
-    str
-        The on-disk folder name, e.g. ``"vertical integration"``.
-
-    Raises
-    ------
-    ValueError
-        Unknown token; the message lists the valid ones (this is the
-        validator ``registry.check_category`` delegates to).
-    """
+    """``"vertical"`` -> ``"vertical integration"`` (internal); ``ValueError`` listing
+    the valid tokens for an unknown one (``registry.check_category`` relies on it)."""
     try:
         return _CATEGORY_FOLDERS[token]
     except KeyError:
@@ -185,23 +143,8 @@ def category_folder(token: str) -> str:
 
 
 def metric_set_dir(token: str) -> str:
-    """Map a metric-set token to its top-level result dir name (internal).
-
-    Parameters
-    ----------
-    token : str
-        Only ``"scib"`` is available.
-
-    Returns
-    -------
-    str
-        The directory name under the result root (``"scib_metric"``).
-
-    Raises
-    ------
-    ValueError
-        Unknown token, listing the valid ones.
-    """
+    """``"scib"`` -> ``"scib_metric"``, the dir under the result root (internal);
+    ``ValueError`` listing the valid tokens for an unknown one."""
     try:
         return _METRIC_SET_DIRS[token]
     except KeyError:
@@ -289,10 +232,6 @@ class Config:
     --json`` (once per process, not at import); assigning a value skips
     the probe.
 
-    **Leiden backends.** ``"igraph"`` is scanpy's igraph implementation,
-    several times faster; ``"leidenalg"`` is the backend both stored
-    sources (published and re-run) were computed with.
-
     **Method scripts.** The first run fetches them from GitHub into
     ``repo_path`` (``multibench fetch --scripts`` does it ahead). Set
     ``MULTIBENCH_SCRIPTS_REF`` to a commit or tag to fetch that version
@@ -315,23 +254,21 @@ class Config:
     envs_dir: Path = _LazyPath(_default_envs_dir, cache=True)
 
 
-# module-level default instance; callers may replace its fields
 DEFAULT = Config()
 
 
 def _base_source() -> str:
-    """Where ``<base>`` is, in words (see the Config Notes)."""
+    """Where ``<base>`` is, in words."""
     return "the repository checkout" if _IN_REPO else f"the user cache {_CACHE}"
 
 
 def scripts_present(cfg: Config | None = None) -> bool:
-    """Whether :func:`ensure_repo` would find the method scripts without a download (internal)."""
+    """Whether :func:`ensure_repo` would find the method scripts without a download."""
     return _scripts_checkout(cfg) is not None
 
 
 def _scripts_checkout(cfg: Config | None = None) -> Path | None:
-    """The folder holding ``tools_scripts/`` that :func:`ensure_repo` would use, or
-    ``None`` when the scripts are not on this machine (no fetch)."""
+    """The folder holding ``tools_scripts/`` that :func:`ensure_repo` would use, or ``None``."""
     cfg = DEFAULT if cfg is None else cfg
     for p in (Path(cfg.repo_path), _ROOT):
         if (p / "tools_scripts").is_dir():
@@ -351,14 +288,8 @@ def _git_dir(repo: Path) -> Path | None:
 
 
 def scripts_commit(repo=None) -> str | None:
-    """The commit of the method-scripts checkout, or ``None`` (internal).
-
-    ``repo`` = the folder holding ``tools_scripts/``; ``None`` = the one
-    :func:`ensure_repo` would use, without fetching. The answer is
-    ``git rev-parse HEAD``'s, read from the checkout's own ``.git`` (no git
-    process, so it also works where git is absent). ``None`` when the folder
-    is not the root of a git checkout, e.g. a copy of the scripts.
-    """
+    """``git rev-parse HEAD`` of the scripts folder ``repo`` (default: the one
+    :func:`ensure_repo` would use), read from ``.git`` without git; ``None`` if not a checkout."""
     repo = _scripts_checkout() if repo is None else Path(repo)
     if repo is None:
         return None
@@ -392,15 +323,10 @@ _REF_RECORD = "multibench-scripts-ref"
 
 def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR,
                   folder: bool = False) -> str | None:
-    """The sentence saying the scripts in ``repo`` are not at ``ref``, or ``None`` (internal).
+    """The sentence saying the scripts in ``repo`` are not at ``ref``, or ``None``.
 
-    Accepted: ``ref`` is the checkout's commit or a prefix of it (7+ hex
-    digits), the ref this package fetched there, or what ``git rev-parse``
-    resolves it to. A folder that is not a git checkout cannot be checked and
-    is accepted. ``source`` is where ``ref`` came from: the environment
-    variable, or ``"--ref"`` (``multibench fetch --scripts --ref``).
-    ``folder=True`` names ``repo`` in the sentence (the error of a real run).
-    """
+    ``ref`` matches a commit prefix (7+ hex), the ref fetched there, or its ``git
+    rev-parse``; a folder that is not a checkout passes. ``source``: the variable or ``--ref``."""
     import subprocess
     head = scripts_commit(repo)
     if head is None or (_re.fullmatch(r"[0-9a-fA-F]{7,40}", ref)
@@ -431,22 +357,15 @@ def _ref_mismatch(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR,
 
 
 def _check_ref(repo: Path, ref: str, *, source: str = SCRIPTS_REF_VAR) -> None:
-    """``RuntimeError`` with :func:`_ref_mismatch`'s sentence when the scripts
-    in ``repo`` are not at ``ref`` (internal)."""
+    """``RuntimeError`` with :func:`_ref_mismatch`'s sentence."""
     problem = _ref_mismatch(repo, ref, source=source, folder=True)
     if problem:
         raise RuntimeError(problem)
 
 
 def scripts_ref_problem(repo=None) -> str | None:
-    """Why the method scripts do not match ``$MULTIBENCH_SCRIPTS_REF``, or ``None`` (internal).
-
-    ``repo`` = the folder holding ``tools_scripts/``; ``None`` = the one
-    :func:`ensure_repo` would use, without fetching. ``None`` also when the
-    variable is unset or no scripts are on this machine yet: the first fetch
-    then checks out that ref. ``mtb.scan``, the dry runs and ``multibench
-    config`` report this sentence; a real run raises it (:func:`ensure_repo`).
-    """
+    """Why the method scripts do not match ``$MULTIBENCH_SCRIPTS_REF``, or ``None``
+    (also when it is unset or no scripts are here yet: the first fetch checks it out)."""
     ref = _os.environ.get(SCRIPTS_REF_VAR) or None
     repo = _scripts_checkout() if repo is None else Path(repo)
     if ref is None or repo is None or not (repo / "tools_scripts").is_dir():
@@ -455,13 +374,8 @@ def scripts_ref_problem(repo=None) -> str | None:
 
 
 def run_provenance(env: str | None, repo=None) -> dict:
-    """``scripts_commit``, ``env_flavor`` and ``hostname`` for a run record (internal).
-
-    ``env_flavor`` is ``'cpu'`` / ``'gpu'`` / ``'single'`` from the
-    environment's install record (``mtb.env.install`` of a packed archive),
-    else ``'unknown'``
-    (built from a lockfile, not installed, or ``env=None``).
-    """
+    """``scripts_commit``, ``env_flavor`` (from the env's install record, else
+    ``'unknown'``) and ``hostname`` for a run record."""
     flavor = None
     if env:
         try:
@@ -474,15 +388,8 @@ def run_provenance(env: str | None, repo=None) -> dict:
 
 
 def _sources(cfg: Config | None = None) -> list[dict]:
-    """Each setting of ``cfg`` with its resolved value and where it came from (internal).
-
-    Backs ``multibench config``. Returns one dict per setting, in the order
-    ``data_path``, ``envs_dir``, ``repo_path``, ``scripts_commit`` (the
-    commit of the method scripts in ``repo_path``), ``scripts_ref`` (only
-    when ``$MULTIBENCH_SCRIPTS_REF`` is set: the ref and whether the scripts
-    match it), ``result_path``, ``leiden_flavor``, with the keys ``name``,
-    ``value`` and ``source``.
-    """
+    """``{name, value, source}`` per setting of ``cfg``, for ``multibench config``
+    (``scripts_ref`` only when ``$MULTIBENCH_SCRIPTS_REF`` is set)."""
     cfg = DEFAULT if cfg is None else cfg
     rows = []
 
@@ -544,11 +451,7 @@ def _sources(cfg: Config | None = None) -> list[dict]:
 
 
 def scripts_line(repo) -> str:
-    """``'method scripts: <repo>/tools_scripts at <commit>'`` (internal).
-
-    Printed by ``multibench fetch --scripts``; ``multibench config`` shows the
-    commit as its ``scripts_commit`` row.
-    """
+    """``'method scripts: <repo>/tools_scripts at <commit>'``, for ``multibench fetch --scripts``."""
     sha = scripts_commit(repo)
     where = Path(repo) / "tools_scripts"
     return (f"method scripts: {where} at {sha}" if sha else
@@ -560,11 +463,8 @@ _PARTIAL = ".multibench-fetch.partial"
 
 
 def _fillable(p: Path) -> bool:
-    """Whether a fetch may put the method scripts at ``p`` (internal).
-
-    ``True`` when ``p`` does not exist or is an empty folder. A folder that
-    holds only the leftover of an interrupted fetch counts as empty.
-    """
+    """Whether a fetch may put the method scripts at ``p``: absent, or empty but for
+    the leftover of an interrupted fetch."""
     if not p.exists():
         return True
     try:
@@ -574,15 +474,8 @@ def _fillable(p: Path) -> bool:
 
 
 def scripts_folder_problem(repo=None) -> str | None:
-    """Why a fetch refuses the scripts folder ``repo``, or ``None`` (internal).
-
-    ``repo`` = the configured ``repo_path`` when ``None``. The sentence is
-    for a folder that holds other files and no ``tools_scripts/``, while the
-    package root holds no scripts either. It has no final period: ``mtb.scan``
-    joins it into its reason column with ``"; "`` and blocks every row with it.
-    The dry runs and ``multibench config`` show it; a real run raises it
-    (:func:`ensure_repo`).
-    """
+    """Why a fetch refuses the scripts folder ``repo`` (default ``repo_path``): it holds
+    other files. No final period: ``mtb.scan`` joins it into its reason column."""
     p = Path(DEFAULT.repo_path if repo is None else repo)
     if any((q / "tools_scripts").is_dir() for q in (p, _ROOT)) or _fillable(p):
         return None
