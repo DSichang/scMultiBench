@@ -12,7 +12,9 @@ from . import io
 from .. import _compat, config
 from ..config import _and_list
 from ..data import catalog
-from ..data.results import COLUMNS as LONG_COLUMNS
+from ..data.results import COLUMNS as _RESULT_COLUMNS
+
+LONG_COLUMNS = list(_RESULT_COLUMNS)  # own copy: a caller that edits one list must not change the other
 
 #: the ``attrs`` keys evaluate() sets and to_long() joins into ``scored_with``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
