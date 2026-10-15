@@ -399,9 +399,9 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         raise ValueError("no rows left after applying methods=/metrics= filters")
 
     keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
-    dmask = df.duplicated(keys, keep=False)
-    if dmask.any():
-        raise ValueError(_duplicate_rows_message(df[dmask], keys))
+    repeated = df.duplicated(keys, keep=False)
+    if repeated.any():
+        raise ValueError(_duplicate_rows_message(df[repeated], keys))
 
     datasets = (tuple(sorted(map(str, df["dataset"].dropna().unique())))
                 if "dataset" in df.columns else ())
@@ -411,30 +411,30 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                            for m, g in df.groupby("method")}
 
     stored = style.stored_datasets(df)
-    cov = None
+    datasets_per_method = None
     parts = None
     if aggregate == "summary":
         parts = style.per_dataset_ranks(df)
         n = len(parts)
-        cov = style.coverage(parts)
+        datasets_per_method = style.coverage(parts)
         if require_complete:
-            keep = cov[cov == n].index
+            keep = datasets_per_method[datasets_per_method == n].index
             if len(keep) == 0:
                 raise ValueError(
                     f"No method has results on all {n} datasets "
                     f"({', '.join(map(str, parts))}). "
                     + _config.hint("Pass require_complete=False.",
                                    "Leave out --require-complete."))
-            if len(keep) < len(cov):
-                dropped = cov[cov < n].sort_values()
+            if len(keep) < len(datasets_per_method):
+                dropped = datasets_per_method[datasets_per_method < n].sort_values()
                 groups = {}
                 for m in dropped.index:
                     lacks = tuple(ds for ds, mat in parts.items() if m not in mat.index)
                     groups.setdefault(lacks, []).append(str(m))
-                k = len(dropped)
+                n_dropped = len(dropped)
                 warnings.warn(
                     _config.hint("require_complete=True", "--require-complete")
-                    + f" dropped {k} method{'' if k == 1 else 's'}: "
+                    + f" dropped {n_dropped} method{'' if n_dropped == 1 else 's'}: "
                     + " ".join(f"{_and(ms)} lack{'s' if len(ms) == 1 else ''} "
                                f"{_and(ds)}." for ds, ms in groups.items())
                     + " " + _config.hint("Pass require_complete=False",
@@ -443,7 +443,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     UserWarning, stacklevel=2)
                 df = df[df["method"].isin(keep)]
                 parts = style.per_dataset_ranks(df)
-                cov = style.coverage(parts)
+                datasets_per_method = style.coverage(parts)
         for msg in style.coverage_warnings(
                 parts, basis=overall,
                 incomplete_fix=_config.hint(
@@ -469,19 +469,20 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
     def _block(label, cmap, raw):
         if aggregate == "summary" and overall == "mean_overall":
-            sub = {}
+            family_ranks = {}
             for ds, p in parts.items():
-                cols_p = [c for c in raw.columns if c in p.columns]
-                if cols_p:
-                    sub[ds] = p[cols_p]
-            ov = style.overall_by_basis(sub, "mean_overall").reindex(raw.index)
+                shared = [c for c in raw.columns if c in p.columns]
+                if shared:
+                    family_ranks[ds] = p[shared]
+            family_overall = style.overall_by_basis(family_ranks, "mean_overall")
+            family_overall = family_overall.reindex(raw.index)
         else:
-            ov = style.compute_overall(raw)
+            family_overall = style.compute_overall(raw)
         return FamilyBlock(
             label=label, cmap=cmap, raw=raw,
             norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
             ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
-            overall=ov,
+            overall=family_overall,
         )
 
     blocks = []
@@ -510,15 +511,15 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
     if order is not None:
         order = _resolve(order, raw_all.index.tolist(), "method", catalog.canonical_id)
-        idx = order + [m for m in ranked if m not in order]
+        rows = order + [m for m in ranked if m not in order]
     else:
-        idx = ranked
+        rows = ranked
 
     for b in blocks:
-        b.raw = b.raw.reindex(idx)
-        b.norm = b.norm.reindex(idx)
-        b.ranks = b.ranks.reindex(idx)
-        b.overall = b.overall.reindex(idx)
+        b.raw = b.raw.reindex(rows)
+        b.norm = b.norm.reindex(rows)
+        b.ranks = b.ranks.reindex(rows)
+        b.overall = b.overall.reindex(rows)
 
     na_cells = _na_report(blocks, parts, aggregate)
     if na_cells and na != "skip":
@@ -528,20 +529,20 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         warnings.warn(msg, UserWarning, stacklevel=2)
 
     drawn = pd.concat([b.raw for b in blocks], axis=1)
-    msg = _no_comparison_message(idx, style.constant_columns(drawn), aggregate,
+    msg = _no_comparison_message(rows, style.constant_columns(drawn), aggregate,
                                  partial=set(drawn.columns[drawn.isna().any()]))
     if msg:
         warnings.warn(msg, UserWarning, stacklevel=2)
 
     return BubbleTable(
-        methods=idx, blocks=blocks,
+        methods=rows, blocks=blocks,
         matrix=pd.concat([b.norm for b in blocks], axis=1),
         raw=pd.concat([b.raw for b in blocks], axis=1),
-        overall=combined.loc[idx],
+        overall=combined.loc[rows],
         aggregate=aggregate,
         overall_basis=overall,
         datasets=datasets,
-        coverage=cov,
+        coverage=datasets_per_method,
         method_datasets=method_datasets,
         na_cells=na_cells,
     )
@@ -827,16 +828,16 @@ def _draw(tbl, cmap, title, show_language, gaps):
     ROW_H, R_MAX = 1.0, 0.5          # row height; circle max radius = row/2
 
     # ---- x layout: per family [overall][metrics...] with a family gap -----
-    xs, col_meta = 0.0, []
+    x_next, layout = 0.0, []
     for fi, b in enumerate(tbl.blocks):
         if fi:
-            xs += 0.5 + gaps[fi - 1]
-        col_meta.append((xs, fi, "overall", "Overall"))
-        xs += 1.5                                     # bar column is wider
+            x_next += 0.5 + gaps[fi - 1]
+        layout.append((x_next, fi, "overall", "Overall"))
+        x_next += 1.5                                 # bar column is wider
         for mname in b.raw.columns:
-            col_meta.append((xs, fi, "metric", mname))
-            xs += 1.1
-    total_w = xs
+            layout.append((x_next, fi, "metric", mname))
+            x_next += 1.1
+    total_w = x_next
 
     # ---- legend geometry: the legends under a table of few metrics are wider
     # than the table, so the axes end at the right edge of the widest one ----
@@ -848,10 +849,11 @@ def _draw(tbl, cmap, title, show_language, gaps):
     legend_right = RAMP_X0 + (len(tbl.blocks) - 1) * RAMP_STEP + RAMP_W + 0.12 + HIGH_W
     if tbl.aggregate != "summary":
         # at most 5 legend circles, sized as the plot's own: 0.85 * sqrt(rank / n)
-        n_bub = min(5, n_rows)
-        rr = np.maximum(0.85 * np.sqrt(np.linspace(1, n_rows, n_bub) / n_rows), 0.12)
+        n_legend = min(5, n_rows)
+        legend_radii = np.maximum(
+            0.85 * np.sqrt(np.linspace(1, n_rows, n_legend) / n_rows), 0.12)
         legend_right = max(legend_right,
-                           RANK_X0 + (n_bub - 1) * 1.0 + R_MAX * rr[-1] * 0.9 + 0.15)
+                           RANK_X0 + (n_legend - 1) * 1.0 + R_MAX * legend_radii[-1] * 0.9 + 0.15)
     x_right = max(total_w + 0.45, legend_right)
 
     # the width follows the x-range: 0.6 inch per unit past the table's own
@@ -873,13 +875,13 @@ def _draw(tbl, cmap, title, show_language, gaps):
         for i, m in enumerate(methods):
             lang = _method_language(m)
             if not lang:
-                label, colr = "?", "#aaaaaa"
+                label, colour = "?", "#aaaaaa"
             elif lang.startswith("py"):
-                label, colr = "Py", "#3572A5"
+                label, colour = "Py", "#3572A5"
             else:
-                label, colr = "R", "#777777"
+                label, colour = "R", "#777777"
             y = n_rows - i - 0.5
-            ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colr,
+            ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colour,
                                 edgecolor="none", zorder=3))
             ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
                     fontsize=6.4, fontweight="bold", color="white")
@@ -888,8 +890,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
         """radius = 0.85 * sqrt(rank / n), n = methods scored in the column."""
         n = colvals.notna().sum()
         r = style.rank_max(colvals.to_numpy()) / n
-        rad = 0.85 * np.sqrt(r)
-        return pd.Series(np.maximum(rad, 0.12), index=colvals.index)
+        radii = 0.85 * np.sqrt(r)
+        return pd.Series(np.maximum(radii, 0.12), index=colvals.index)
 
     # ---- markers -----------------------------------------------------------
     # a column whose rows all hold one value gets the neutral fill
@@ -897,13 +899,13 @@ def _draw(tbl, cmap, title, show_language, gaps):
     flat_overall = {fi for fi, b in enumerate(tbl.blocks)
                     if style.constant_columns(b.overall.to_frame("o"))}
 
-    def _fill(mp, value, flat):
-        return colors.to_rgba(CONSTANT_FILL) if flat else mp.to_rgba(value)
+    def _fill(mapper, value, flat):
+        return colors.to_rgba(CONSTANT_FILL) if flat else mapper.to_rgba(value)
 
     floor = min(0.30, 1.2 / n_rows)      # shortest bar, visible with few methods
 
-    for x, fi, kind, name in col_meta:
-        b, mp = tbl.blocks[fi], mappers[fi]
+    for x, fi, kind, name in layout:
+        b, mapper = tbl.blocks[fi], mappers[fi]
         if kind == "overall":
             vals = b.overall
             # bar length: family Overall min-max scaled across the rows
@@ -913,24 +915,24 @@ def _draw(tbl, cmap, title, show_language, gaps):
                 if pd.isna(v):
                     continue
                 y0 = n_rows - i - 1
-                L = 1.24 * max(floor, float(length[i]))
-                ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), L, ROW_H - 0.24,
-                                       facecolor=_fill(mp, float(v), fi in flat_overall),
+                bar_len = 1.24 * max(floor, float(length[i]))
+                ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), bar_len, ROW_H - 0.24,
+                                       facecolor=_fill(mapper, float(v), fi in flat_overall),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
 
         elif tbl.aggregate == "summary":
-            normv = b.norm[name]
+            scaled_values = b.norm[name]
             # a summary table has no empty cell: a missing score is rank 0
             for i, m in enumerate(methods):
                 y0 = n_rows - i - 1
-                L = 0.95 * max(floor, float(normv.loc[m]))
-                ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), L, ROW_H - 0.32,
-                                       facecolor=_fill(mp, float(normv.loc[m]),
+                bar_len = 0.95 * max(floor, float(scaled_values.loc[m]))
+                ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), bar_len, ROW_H - 0.32,
+                                       facecolor=_fill(mapper, float(scaled_values.loc[m]),
                                                        name in constant),
                                        edgecolor="#333333", linewidth=0.4, zorder=3))
         else:
-            vals, normv = b.raw[name], b.norm[name]
-            rad = rank_radius(vals)
+            vals, scaled_values = b.raw[name], b.norm[name]
+            radii = rank_radius(vals)
             for i, m in enumerate(methods):
                 v = vals.loc[m]
                 if pd.isna(v):
@@ -938,24 +940,24 @@ def _draw(tbl, cmap, title, show_language, gaps):
                             ha="center", va="center", fontsize=7, zorder=3)
                     continue
                 y = n_rows - i - 0.5
-                ax.add_patch(Circle((x + 0.55, y), R_MAX * float(rad.loc[m]) * 0.9,
-                                    facecolor=_fill(mp, float(normv.loc[m]),
+                ax.add_patch(Circle((x + 0.55, y), R_MAX * float(radii.loc[m]) * 0.9,
+                                    facecolor=_fill(mapper, float(scaled_values.loc[m]),
                                                     name in constant),
                                     edgecolor="#333333", linewidth=0.4, zorder=3))
 
     # ---- column titles: slanted 30deg above the table, with tick marks -----
-    for x, fi, kind, name in col_meta:
-        cx = x + (0.7 if kind == "overall" else 0.55)
-        ax.plot([cx, cx], [n_rows + 0.05, n_rows + 0.22], color="#333333",
+    for x, fi, kind, name in layout:
+        tick_x = x + (0.7 if kind == "overall" else 0.55)
+        ax.plot([tick_x, tick_x], [n_rows + 0.05, n_rows + 0.22], color="#333333",
                 linewidth=0.6, zorder=2)
-        ax.text(cx - 0.05, n_rows + 0.30, name, rotation=30, ha="left",
+        ax.text(tick_x - 0.05, n_rows + 0.30, name, rotation=30, ha="left",
                 va="bottom", fontsize=8, rotation_mode="anchor")
 
     # ---- family bands above the slanted titles ----------------------------
     band_y = n_rows + 2.05
     for fi, b in enumerate(tbl.blocks):
-        xs_f = [x for x, f, k, _ in col_meta if f == fi]
-        x0, x1 = xs_f[0], xs_f[-1] + 1.1
+        family_xs = [x for x, f, k, _ in layout if f == fi]
+        x0, x1 = family_xs[0], family_xs[-1] + 1.1
         # gid="family" marks the pill and its header; render widens a pill
         # that is narrower than its header (_fit_pills)
         ax.add_patch(FancyBboxPatch((x0 + 0.05, band_y), x1 - x0 - 0.35, 0.6,
@@ -968,34 +970,34 @@ def _draw(tbl, cmap, title, show_language, gaps):
 
     # ---- legends: Score ramps + Rank size, under the table (scIB layout) ---
     # gid="legend" marks every artist of the Score and Rank legends
-    ly = -1.1
-    ax.text(-0.9, ly, "Score", fontsize=8, fontweight="bold", va="center",
+    score_y = -1.1
+    ax.text(-0.9, score_y, "Score", fontsize=8, fontweight="bold", va="center",
             gid="legend")
-    ax.text(-0.9, ly - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
+    ax.text(-0.9, score_y - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
             gid="legend")
     for fi, b in enumerate(tbl.blocks):
         xoff = RAMP_X0 + fi * RAMP_STEP
         for k in range(40):
-            ax.add_patch(Rectangle((xoff + k * 0.07, ly - 0.28), 0.07, 0.56,
+            ax.add_patch(Rectangle((xoff + k * 0.07, score_y - 0.28), 0.07, 0.56,
                                    facecolor=mappers[fi].to_rgba(k / 39),
                                    edgecolor="none", zorder=2, gid="legend"))
-        ax.text(xoff - 0.12, ly, "Low", fontsize=6.6, ha="right", va="center",
+        ax.text(xoff - 0.12, score_y, "Low", fontsize=6.6, ha="right", va="center",
                 gid="legend")
-        ax.text(xoff + RAMP_W + 0.12, ly, "High", fontsize=6.6, ha="left",
+        ax.text(xoff + RAMP_W + 0.12, score_y, "High", fontsize=6.6, ha="left",
                 va="center", gid="legend")
     if tbl.aggregate != "summary":
-        ly2 = ly - 1.35
-        ax.text(-0.9, ly2, "Rank", fontsize=8, fontweight="bold", va="center",
+        rank_y = score_y - 1.35
+        ax.text(-0.9, rank_y, "Rank", fontsize=8, fontweight="bold", va="center",
                 gid="legend")
         xoff = RANK_X0
-        for k, r in enumerate(rr):
-            ax.add_patch(Circle((xoff + k * 1.0, ly2), R_MAX * r * 0.9,
+        for k, r in enumerate(legend_radii):
+            ax.add_patch(Circle((xoff + k * 1.0, rank_y), R_MAX * r * 0.9,
                                 facecolor="#bbbbbb", edgecolor="#333333",
                                 linewidth=0.4, zorder=2, gid="legend"))
-        if n_bub > 1:
-            ax.text(xoff, ly2 - 0.62, str(n_rows), fontsize=6.6,
+        if n_legend > 1:
+            ax.text(xoff, rank_y - 0.62, str(n_rows), fontsize=6.6,
                     ha="center", gid="legend")
-        ax.text(xoff + (n_bub - 1) * 1.0, ly2 - 0.62, "1", fontsize=6.6,
+        ax.text(xoff + (n_legend - 1) * 1.0, rank_y - 0.62, "1", fontsize=6.6,
                 ha="center", gid="legend")
 
     # room under the legends: the Rank labels, or the Score legend's note
@@ -1004,9 +1006,9 @@ def _draw(tbl, cmap, title, show_language, gaps):
     # ---- row labels: add a dataset cue when one figure mixes datasets -----
     labels = list(methods)
     if tbl.aggregate == "dataset" and len(tbl.datasets) > 1:
-        md = tbl.method_datasets
-        labels = [f"{m} \u00b7 {md[m][0]}" if len(md[m]) == 1
-                  else f"{m} \u00b7 {len(md[m])} ds" for m in methods]
+        datasets_of = tbl.method_datasets
+        labels = [f"{m} \u00b7 {datasets_of[m][0]}" if len(datasets_of[m]) == 1
+                  else f"{m} \u00b7 {len(datasets_of[m])} ds" for m in methods]
 
     ax.set_xlim(-1.35, x_right)
     ax.set_ylim(y_bottom, band_y + 1.0)

@@ -166,14 +166,14 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
             raise ValueError(f"group must be 'clustering', 'batch' or 'classification', "
                              f"got {group!r}")
         metrics = fam[group]
-        avail = set(long_df["metric"].unique())
-        if not (set(metrics) & avail):
+        present = set(long_df["metric"].unique())
+        if not (set(metrics) & present):
             why = ("The stored tables have none. "
                    + _config.hint("mtb.evaluate", "multibench evaluate")
                    + " computes them on multi-batch data." if group == "classification" else
                    "Batch metrics need a multi-batch dataset - a single-batch design "
                    "has none to compute.")
-            raise ValueError(f"no {group!r} metrics present. Found {sorted(avail)}. {why}")
+            raise ValueError(f"no {group!r} metrics present. Found {sorted(present)}. {why}")
     if overall not in style.OVERALL_BASES:
         raise ValueError(
             f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
@@ -215,8 +215,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         # whisker/dots apply.
         if overall == "mean_overall":
             sd = per_ds.std(axis=1, ddof=0).reindex(mean.index)
-            nds_per = per_ds.notna().sum(axis=1).reindex(mean.index)
-            xerr = np.where(nds_per.to_numpy() > 1, sd.to_numpy(), np.nan)
+            n_scored = per_ds.notna().sum(axis=1).reindex(mean.index)
+            xerr = np.where(n_scored.to_numpy() > 1, sd.to_numpy(), np.nan)
         else:
             xerr = np.full(n, np.nan)
         ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
@@ -230,13 +230,13 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
                            edgecolor="#444", linewidth=0.7, zorder=3)
 
         ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
-        nds = per_ds.shape[1]
-        if nds == 1:
+        n_datasets = per_ds.shape[1]
+        if n_datasets == 1:
             xlabel = f"overall score ({per_ds.columns[0]})"
         else:
             how = ("mean of per-dataset overall" if overall == "mean_overall"
                    else "rank of mean ranks")
-            xlabel = f"overall score ({how}, {nds} datasets)"
+            xlabel = f"overall score ({how}, {n_datasets} datasets)"
         ax.set_xlabel(xlabel, fontsize=9)
         # the scores lie in [0, 1]; a whisker (mean +/- SD) can reach past either end
         reach = np.nan_to_num(xerr)
@@ -245,10 +245,11 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         ax.grid(axis="x", color="#e8e8e8", zorder=0)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
-        ttl = title or (f"overall — {nds} dataset" + ("s" if nds != 1 else ""))
+        heading = title or (f"overall — {n_datasets} dataset"
+                            + ("s" if n_datasets != 1 else ""))
         if group:
-            ttl += f"  ({group} metrics)"
-        ax.set_title(ttl, fontsize=11, loc="left")
+            heading += f"  ({group} metrics)"
+        ax.set_title(heading, fontsize=11, loc="left")
         fig.tight_layout()
         if save:
             fig.savefig(save, dpi=140, bbox_inches="tight")

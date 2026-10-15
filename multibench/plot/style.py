@@ -80,16 +80,16 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     is treated as one dataset named ``"all"``. Datasets whose pivot is empty
     are skipped.
     """
-    d = long_df.copy()
+    rows = long_df.copy()
     if metrics:
-        d = d[d["metric"].isin(metrics)]
-    if d.empty:
+        rows = rows[rows["metric"].isin(metrics)]
+    if rows.empty:
         raise ValueError("no rows left after filtering to metrics=%r" % (metrics,))
-    if "dataset" not in d.columns:
-        d = d.assign(dataset="all")
+    if "dataset" not in rows.columns:
+        rows = rows.assign(dataset="all")
     out = {}
-    for ds, g in d.groupby("dataset", sort=True):
-        mat = g.pivot_table(index="method", columns="metric", values="value",
+    for ds, group in rows.groupby("dataset", sort=True):
+        mat = group.pivot_table(index="method", columns="metric", values="value",
                             aggfunc="mean")
         mat = mat.dropna(axis=1, how="all")
         if mat.empty:
@@ -153,8 +153,8 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
     them.
     """
     n = len(parts)
-    cov = coverage(parts)
-    if not (n > 1 and len(cov) and (cov <= 1).all()):
+    per_method = coverage(parts)
+    if not (n > 1 and len(per_method) and (per_method <= 1).all()):
         return None
     names = [str(ds) for ds in parts]
     stored = [ds for ds in names if ds in set(map(str, stored))]
@@ -208,14 +208,14 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
     from .. import config
     out = []
     n = len(parts)
-    cov = coverage(parts)
+    per_method = coverage(parts)
     none_shared = _no_overlap_message(parts, stored)
     if none_shared:
         out.append(none_shared)
-    elif n > 1 and (cov < n).any():
-        part = cov[cov < n].sort_values()
+    elif n > 1 and (per_method < n).any():
+        partial = per_method[per_method < n].sort_values()
         by_count: dict = {}
-        for m, c in part.items():
+        for m, c in partial.items():
             by_count.setdefault(int(c), []).append(str(m))
         seen = " ".join(
             f"{_and(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
