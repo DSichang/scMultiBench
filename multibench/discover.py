@@ -167,8 +167,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     ``peak`` / ``peaks`` and ``gene_activity`` / ``gene-activity`` / ``gas``,
     in any case.
 
-    **Labels.** ``needs_labels`` here is per variant.
-    ``method_info(m)['needs_labels']`` is the method-level flag (any variant
+    **Labels.** ``method_info(m)['needs_labels']`` is the method-level flag (any variant
     needs labels); the per-variant answer is
     ``method_info(m)['supports'][i]['needs_labels']``.
 
@@ -255,7 +254,8 @@ def list_methods(category: str | None = None) -> list[str]:
     ValueError
         Unknown ``category``; the message lists the valid ones.
     TypeError
-        A keyword other than ``category``; see **Other keywords** in Notes.
+        A keyword other than ``category``. For a ``find_methods`` filter such as
+        ``task=`` the message names the call to use: ``find_methods(category, task=...)``.
 
     Examples
     --------
@@ -265,14 +265,9 @@ def list_methods(category: str | None = None) -> list[str]:
 
     Notes
     -----
-    **Category membership.** A method is listed under a category when it has
-    a variant for that category - the same set ``scan``, ``run_all``
-    and ``find_methods(category=)`` dispatch.
-
-    **Other keywords.** A ``find_methods`` filter such as ``task=`` or
-    ``runnable=`` raises a ``TypeError`` that names the call to use
-    instead: ``find_methods(category, task=...)``. Any other keyword raises
-    Python's own ``unexpected keyword argument`` message.
+    A method is listed under a category when it has a variant for that
+    category - the same set ``scan``, ``run_all`` and
+    ``find_methods(category=)`` dispatch.
 
     See Also
     --------
