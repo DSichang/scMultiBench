@@ -1,13 +1,9 @@
 """multibench driver for Matilda, using its object API (`matilda-sc`).
 
-Wiring the upstream `tools_scripts/Matilda/main_matilda_train.py` alone runs only
-the train stage, which writes no embedding. Matilda's documented API
-(https://pyanglab.github.io/Matilda/) is the object API: `matilda.train()` fits
-the shared model, then `matilda.task()` runs any combination of tasks on it.
-
-The driver trains once, then runs Matilda's task step once on the trained model
-(the model loads once), writing:
-  <save_path>/embedding.h5   dataset "data"  -> the integrated latent space (cells x z_dim)
+The upstream `tools_scripts/Matilda/main_matilda_train.py` runs only the train
+stage, which writes no embedding. The driver trains once with `matilda.train()`
+and runs `matilda.task()` on the trained model, writing:
+  <save_path>/embedding.h5   dataset "data"  -> the latent space (cells x z_dim)
   <save_path>/predict.csv                    -> per-cell predictions (when available)
 
 Matilda picks the mode from the modalities passed: rna+adt = CITE-seq,
@@ -43,16 +39,15 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--device", default="auto")
-    # the other knobs of main_matilda_train.py (params.yaml lists them); unset
-    # leaves matilda's own default
-    shape = ("batch_size", "z_dim", "hidden_rna", "hidden_adt", "hidden_atac")
-    for k in shape:
+    # the other knobs of main_matilda_train.py; unset leaves matilda's default
+    shape_keys = ("batch_size", "z_dim", "hidden_rna", "hidden_adt", "hidden_atac")
+    for k in shape_keys:
         p.add_argument(f"--{k}", type=int)
     p.add_argument("--lr", type=float)
     # on by default; the runner drops a Python False, so "False" turns it off
     p.add_argument("--augmentation", nargs="?", const="True", default="True")
     a = p.parse_args()
-    shape = {k: getattr(a, k) for k in shape if getattr(a, k) is not None}
+    shape = {k: getattr(a, k) for k in shape_keys if getattr(a, k) is not None}
     fit_kw = dict(shape, augmentation=a.augmentation != "False")
     if a.lr is not None:
         fit_kw["lr"] = a.lr
@@ -78,7 +73,7 @@ def main() -> None:
     os.makedirs(out, exist_ok=True)
 
     latent = res.latent
-    if hasattr(latent, "values"):          # DataFrame -> ndarray
+    if hasattr(latent, "values"):          # a DataFrame
         latent = latent.values
     latent = np.asarray(latent, dtype=np.float64)
     with h5py.File(os.path.join(out, "embedding.h5"), "w") as f:

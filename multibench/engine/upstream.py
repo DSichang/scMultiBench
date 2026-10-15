@@ -16,18 +16,14 @@ from __future__ import annotations
 import functools
 from pathlib import Path
 
+import yaml
+
 _DATA = Path(__file__).parent / "upstream_knobs.yaml"
 
 
 @functools.lru_cache(maxsize=1)
 def _table() -> dict:
-    if not _DATA.is_file():
-        return {}
-    import yaml
-    try:
-        return yaml.safe_load(_DATA.read_text()) or {}
-    except Exception:  # noqa: BLE001 - a malformed table must not break discovery
-        return {}
+    return yaml.safe_load(_DATA.read_text()) or {}
 
 
 def knobs_for(method: str) -> dict:
@@ -45,8 +41,3 @@ def knobs_for(method: str) -> dict:
         "upstream_url": entry.get("upstream_url") or None,
         "notes": entry.get("notes") or None,
     }
-
-
-def audited_methods() -> list[str]:
-    """Methods the upstream-knob audit covers."""
-    return sorted(_table())

@@ -26,24 +26,15 @@ class AmbiguousVariantError(ValueError, KeyError):
 
     Notes
     -----
-    **When it fires.** ``category=`` / ``modalities=`` leave more than one
-    variant - e.g. Matilda has an rna+adt and an rna+atac ``vertical``
-    variant, so ``params_for("Matilda")`` cannot pick:
+    ``mtb.inputs_for`` (without ``modalities=``) and
+    ``mtb.params_for(dataset=)`` (without ``category=`` or ``modalities=``)
+    first let the dataset folder decide, and raise only when it settles
+    nothing. ``mtb.labels_for`` never raises it; it falls back to the default
+    label order.
 
-    - ``mtb.inputs_for`` (without ``modalities=``) and
-      ``mtb.params_for(dataset=)`` (without ``category=`` or ``modalities=``)
-      first let the dataset folder decide, and raise only when it settles
-      nothing;
-    - ``mtb.labels_for`` never raises it; it falls back to the default label
-      order.
-
-    **What to do.** Pass ``modalities=`` (and ``category=``) exactly as the
-    message shows.
-
-    **Catching it.** It is a ``ValueError`` and also a ``KeyError``, so
-    ``except KeyError`` catches it too. The package uses ``KeyError`` for
-    unknown ids, such as a mistyped method name. ``str(exc)`` is the plain
-    message, without ``KeyError`` quoting.
+    It is a ``ValueError`` and also a ``KeyError``, so ``except KeyError``
+    catches it too. ``str(exc)`` is the plain message, without ``KeyError``
+    quoting.
 
     See Also
     --------
@@ -53,9 +44,8 @@ class AmbiguousVariantError(ValueError, KeyError):
     def __str__(self) -> str:
         return str(self.args[0]) if self.args else ""
 
-# Roles that are not modalities: never counted when deriving what a variant
-# consumes. Counterpart of runner._AUX_ROLES (label roles are covered by
-# is_label_role); kept here so the data model does not import the runner.
+
+# input roles that hold no modality (label roles: is_label_role)
 _NON_MODALITY_ROLES = {"data_dir", "source_data", "target_data", "out_dir",
                        "reference", "batch_num", "num"}
 
@@ -63,10 +53,7 @@ _NON_MODALITY_ROLES = {"data_dir", "source_data", "target_data", "out_dir",
 def is_label_role(role: str) -> bool:
     """True for a cell-type-label role (``cty``, ``rna_cty``, ``cty1``, ``label``...).
 
-    This is the one predicate shared by the runner (which treats these roles as
-    auxiliary, never converting them to .h5), the resolver (which looks for
-    ``.csv``) and ``MethodSpec.needs_labels`` - so "needs labels" means exactly
-    "the runner will demand a label file".
+    The one predicate the runner, the resolver and ``needs_labels`` share.
     """
     return ("cty" in role) or ("label" in role)
 
@@ -79,12 +66,8 @@ def _batch_of(role: str) -> int | None:
 
 
 def base_modality(role: str) -> str:
-    """Map an arg role to its base modality type (``rna``/``adt``/``atac``/...).
-
-    ``atac_gas`` / ``atac_peak`` -> ``atac`` (explicit representation prefix);
-    ``rna1`` / ``atac2`` -> ``rna`` / ``atac`` (one trailing batch digit stripped);
-    anything else is returned unchanged.
-    """
+    """Base modality of a role: ``atac_gas`` -> ``atac``, ``rna1`` -> ``rna``;
+    anything else unchanged (one trailing batch digit is stripped)."""
     for prefix in ("rna", "adt", "atac"):
         if role.startswith(prefix + "_"):
             return prefix
@@ -97,13 +80,9 @@ def modality_family(role: str) -> str:
     """Collapse the ATAC representation roles onto their base token.
 
     ``atac_gas`` / ``atac_peak`` -> ``atac``; ``atac_gas2`` -> ``atac2`` (the
-    batch digit is kept, so mosaic variants stay distinct); every other token
-    (``rna``, ``adt1``, ``atac``, ``atac3``) is returned unchanged. This is the
-    equivalence ``inputs_for`` / ``params_for`` use so that a caller may say
-    ``modalities=['rna', 'atac']`` for a variant declared as
-    ``[rna, atac_gas]`` - the ATAC file on disk is the same ``atac.h5`` either
-    way, and the representation the method wants is ``method_info(m)['atac']``,
-    not the role name.
+    batch digit is kept); every other token is returned unchanged. So
+    ``modalities=['rna', 'atac']`` selects a variant declared ``[rna, atac_gas]``:
+    both read the same ``atac.h5``.
     """
     for rep in ("atac_gas", "atac_peak"):
         if role == rep:
@@ -113,46 +92,22 @@ def modality_family(role: str) -> str:
     return role
 
 
-#: the per-method keys of the GPU/CPU contract in methods.yaml (see MethodSpec)
-GPU_FIELDS = ("cpu_params", "requires_gpu", "gpu_evidence", "gpu_use")
-#: every value of ``MethodSpec.gpu`` (``method_info(m)['gpu']``), in that order
-GPU_USE_VALUES = ("required", "used when present", "not used", "unknown")
 #: the values ``gpu_use`` may declare; ``required`` and ``unknown`` are derived
 GPU_USE_DECLARED = ("used when present", "not used")
-#: what a ``cpu_params`` value may be: a command-line token (``""`` included -
-#: scJoint's ``--use_cuda ""``), a number, or ``True`` for a bare flag
+#: a ``cpu_params`` value: a command-line token (``""`` included), a number,
+#: or ``True`` for a bare flag
 _CPU_PARAM_VALUE_TYPES = (str, int, float, bool)
 
 
 def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence,
                         gpu_use="") -> None:
-    """Check the GPU/CPU contract of one method (``methods.yaml`` keys).
+    """Check the GPU/CPU keys of one method in ``methods.yaml``.
 
-    Parameters
-    ----------
-    method_id : str
-        The method the keys belong to (named in every message).
-    cpu_params : the ``cpu_params`` value - a mapping ``{flag: value}`` whose
-        keys are non-empty strings and whose values are strings (``""``
-        allowed), numbers or ``True``.
-    requires_gpu : the ``requires_gpu`` value - a bool.
-    gpu_evidence : the ``gpu_evidence`` value - a ``"<file>:<line>"`` string
-        naming the unconditional CUDA call, or several joined by ``", "``
-        (one per script, e.g. moETM's two); required when ``requires_gpu``
-        is True and forbidden otherwise.
-    gpu_use : the ``gpu_use`` value - ``""`` (not declared), or one of
-        :data:`GPU_USE_DECLARED`, read from the script or its environment.
-        Forbidden with ``requires_gpu`` (then it is ``required``); with
-        ``cpu_params`` only ``"used when present"`` fits.
-
-    Raises
-    ------
-    ValueError
-        With ``"<method>: ..."`` naming the offending key, when a value has
-        the wrong shape, when ``requires_gpu`` and ``cpu_params`` are both
-        set (a script cannot both need a GPU and have a switch that turns
-        CUDA off), when ``gpu_evidence`` and ``requires_gpu`` disagree, or
-        when ``gpu_use`` contradicts them.
+    ``cpu_params`` maps a flag to a command-line value; ``requires_gpu`` is a
+    bool; ``gpu_evidence`` is ``"<file>:<line>"`` (several joined by ``", "``),
+    set exactly when ``requires_gpu``; ``gpu_use`` is ``""`` or one of
+    :data:`GPU_USE_DECLARED`. Raises ``ValueError`` naming the method and the
+    key on a wrong shape or a contradiction between the keys.
     """
     if not isinstance(cpu_params, dict):
         raise ValueError(
@@ -214,18 +169,12 @@ def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence,
 class ArgSpec:
     role: str = ""          # input role (e.g. 'rna') or 'out_dir'
     flag: str | None = None # None -> positional
-    # Collect several input roles under one flag, in order, e.g.
-    #   {roles: [rna1, rna2, rna3], flag: "--path1"}  ->  --path1 r1.h5 r2.h5 r3.h5
-    # This is how the upstream scripts take multi-batch (cross) input; their
-    # argparse declares nargs='+' on the path arguments.
-    # An entry written "=VALUE" emits VALUE literally instead of resolving an
-    # input role, e.g. {roles: [adt1, "=None", "=None"], flag: "--path2"} ->
-    # --path2 adt1.h5 None None. Upstream scripts that take one slot per batch
-    # need this to mark batches lacking a modality (scMoMaT documents `None`).
+    # several input roles under one flag, in order (nargs='+'); an entry
+    # "=VALUE" emits VALUE, e.g. [adt1, "=None"] -> --path2 adt1.h5 None
     roles: list = field(default_factory=list)
     repeat: bool = False    # value may be a list (nargs='+')
     eq: bool = False        # emit as --flag=value
-    const: str | None = None  # literal value to emit, ignoring `values` (e.g. 'NULL')
+    const: str | None = None  # literal value to emit (e.g. 'NULL')
 
     @property
     def is_positional(self) -> bool:
@@ -237,11 +186,8 @@ class OutputSpec:
     kind: str               # embedding | graph | labels (io.load_output also accepts markers)
     file: str               # filename written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
-    # Order of the cells in the output's rows, for a script that does not
-    # stack them in argument order (see Variant.stacked_roles): a list of
-    # input roles, first block first (roles left out follow in argument
-    # order), or "reference_first" - the batch the `reference` const names
-    # (data<N>) first, the others in argument order. None = argument order.
+    # the order of the output's rows when it is not argument order:
+    # Variant.stacked_roles
     cell_order: list | str | None = None
 
 
@@ -253,30 +199,24 @@ class Variant:
     args: list[ArgSpec]
     output: OutputSpec
     params: dict = field(default_factory=dict)        # default hyperparams emitted on the command line
-    tunable: dict = field(default_factory=dict)       # doc-only: hyperparams the upstream script accepts,
-                                                      # {name: {default,type}}; never emitted - surfaced by discover.params_for
-    run_env: dict = field(default_factory=dict)        # per-method env overrides (e.g. CUDA_VISIBLE_DEVICES)
-    cwd_at_script: bool = False        # if True, run with cwd=script's parent dir (for scripts that source/import local files)
-    pty: bool = False                  # if True, run the command under a pseudo-tty (script -q -e -c ...), for scripts that read the terminal size (os.popen('stty size')) to draw a progress bar and crash without a tty (scJoint)
-    driver: str | None = None          # package-relative R/py wrapper that source()s the (unmodified) upstream entrypoint then calls its function; see engine/drivers/
-    normalize_peaks: list = field(default_factory=list)  # roles whose .h5 ATAC peak names get normalized to chr:start-end before the run
+    tunable: dict = field(default_factory=dict)       # {name: {default, type}} the script accepts; never emitted
+    run_env: dict = field(default_factory=dict)       # environment variables the method needs
+    cwd_at_script: bool = False        # run in the script's folder (it imports local files)
+    pty: bool = False                  # run under a pseudo-tty (scJoint reads the terminal size)
+    driver: str | None = None          # package-side wrapper in engine/drivers/ that runs the script
+    normalize_peaks: list = field(default_factory=list)  # roles whose peak names become chr:start-end
     extra_outputs: list[OutputSpec] = field(default_factory=list)
-    helpers: list = field(default_factory=list)     # local modules the entrypoint imports from its own dir that upstream does not ship (MIRA's logger.py); copied from engine/helpers/<method>/ before a run, else scan reports the script blocked
-    size_hint: str = ""                # what the method needs from the data's size, when a small dataset fails (scan shows it as a caveat); starts with the method name
-    downloads: list = field(default_factory=list)   # [{file, url}]: files the script reads from its own dir that the first run downloads (GLUE's GENCODE annotation)
+    helpers: list = field(default_factory=list)     # modules upstream does not ship, from engine/helpers/<method>/
+    size_hint: str = ""                # what the method needs from the data's size; starts with the method name
+    downloads: list = field(default_factory=list)   # [{file, url}] the first run downloads next to the script
 
     def matches(self, category: str, modalities: set[str]) -> bool:
         return (self.when.get("category") == category
                 and set(self.when.get("modalities", [])) == set(modalities))
 
     def roles(self) -> list[str]:
-        """Every input role this variant resolves, in argument order.
-
-        Includes single (``a.role``) and grouped (``a.roles``) roles; excludes
-        ``out_dir``, ``"=LITERAL"`` placeholders and empty entries. ``const`` args
-        are kept (scBridge's label files are const bare names, but they are still
-        inputs the script reads).
-        """
+        """Every input role this variant resolves, in argument order: no
+        ``out_dir``, no ``"=LITERAL"`` entries; ``const`` args are kept."""
         out: list[str] = []
         for a in self.args:
             for r in (a.roles or [a.role]):
@@ -328,8 +268,8 @@ class Variant:
         return list(order) + [r for r in mods if r not in order]
 
     def _reference_batch(self, mods: list[str]) -> int:
-        """Batch number ``N`` of the ``reference`` const ``data<N>``, checked
-        against the slots StabMap's util.R numbers (see :meth:`stacked_roles`)."""
+        """Batch ``N`` of the ``reference`` const ``data<N>``, checked against
+        the slots StabMap's util.R numbers."""
         refs = [a for a in self.args if a.role == "reference" and a.const]
         if len(refs) != 1:
             raise ValueError(
@@ -362,25 +302,16 @@ class Variant:
 
     @property
     def needs_labels(self) -> bool:
-        """True when a cell-type-label role is among this variant's inputs.
-
-        Derived from the declared roles with the runner's own label predicate
-        (:func:`is_label_role`), so it can never disagree with what ``run`` will
-        actually demand.
-        """
+        """True when a cell-type-label role is among this variant's inputs."""
         return any(is_label_role(r) for r in self.roles())
 
     @property
     def modality_types(self) -> set[str]:
         """Base modality types (``rna``/``adt``/``atac``) this variant consumes.
 
-        Derived from the input roles, plus the ``const`` bare filenames on the
-        ``source_data`` / ``target_data`` roles: scBridge takes the dataset
-        directory and names its matrices ``rna.h5`` / ``atac_gas.h5`` as
-        constants, so its only resolved role is ``data_dir`` and the role-based
-        answer alone would be empty (mirrors :attr:`consumes_atac`). A role
-        whose argument is another constant is a placeholder, not an input:
-        Seurat_WNN's rna+adt variant passes ``NULL`` for ``atac``.
+        Also counts the ``const`` file names of ``source_data`` /
+        ``target_data`` (scBridge names its matrices that way). Another const
+        role is a placeholder, not an input (Seurat_WNN's ``NULL`` atac).
         """
         placeholders = {a.role for a in self.args
                         if a.const and a.role not in ("source_data", "target_data")}
@@ -396,17 +327,14 @@ class Variant:
 
     @property
     def takes_data_dir(self) -> bool:
-        """True when this variant is fed a directory (a ``data_dir`` role) -
-        scBridge - rather than one file per modality. Such variants declare no
-        modalities (``when.modalities`` is empty or absent)."""
+        """True when this variant reads a folder (``data_dir``, scBridge), not
+        one file per modality; it declares no modalities."""
         return any(a.role == "data_dir" for a in self.args)
 
     @property
     def consumes_atac(self) -> bool:
         """True when this variant takes an ATAC input (an ``atac*`` role, or a
-        ``const`` bare filename naming an atac file - scBridge's
-        ``atac_gas.h5``). The per-variant half of ``MethodSpec.consumes_atac``,
-        so ``find_methods(atac=...)`` can judge each variant on its own."""
+        ``const`` file name such as scBridge's ``atac_gas.h5``)."""
         if "atac" in self.modality_types:
             return True
         return any(a.const and "atac" in str(a.const) for a in self.args)
@@ -416,38 +344,20 @@ class Variant:
 class MethodSpec:
     id: str
     language: str
-    # Categories this method is wired for. Left empty by registry.load() and
-    # derived in __post_init__ from the variants' `when.category` (methods.yaml
-    # may not declare it; see registry._parse_method). A value passed
-    # explicitly (tests, ad-hoc specs) is kept.
+    # derived from the variants in __post_init__ unless given
     categories: list[str] = field(default_factory=list)
     tasks: list[str] = field(default_factory=list)
-    # ATAC representation the upstream method expects: "peak" | "gene_activity"
-    # | None. This is deliberately an explicit key, not derived from role names:
-    # moETM/scMM/iPOLNG declare role `atac_gas` (a resolver alias for atac.h5)
-    # yet consume peak matrices. registry.load() refuses a spec that consumes
-    # atac without it (see MethodSpec.consumes_atac).
+    # "peak" | "gene_activity" | None; declared, not derived from role names:
+    # moETM/scMM/iPOLNG declare role `atac_gas` yet read peak matrices
     atac: str | None = None
     setup_hint: str = ""
     status: str = "declared"            # declared | verified
     variants: list[Variant] = field(default_factory=list)
-    # reproducible environment recipe (see multibench.engine.envs); keys:
-    # python_version, conda_channels, conda_packages, pip_packages, pip_git,
-    # package_source, difficulty, verified_working, caveats
-    env_spec: dict = field(default_factory=dict)
-    # curated provenance (engine/references.yaml): repo_url, version, summary,
-    # reference {doi, title, authors, journal, year}
-    reference: dict = field(default_factory=dict)
-    # GPU/CPU contract of the upstream script (per method, not per variant;
-    # keys in `GPU_FIELDS`, shapes checked by validate_gpu_fields).
-    # `cpu_params`: command-line params that turn CUDA off, emitted like
-    # `params` and merged by runner.cpu_params_for on a host without a GPU.
-    # `requires_gpu`: the script calls CUDA unconditionally; `gpu_evidence` is
-    # the `file:line` of that call, quoted in the refusal. A method may not
-    # carry both. Described for users in mtb.method_info (Notes).
-    # `gpu_use`: whether the script uses a GPU when one is present, read from
-    # its source or its environment ("used when present" / "not used"); ""
-    # = not checked. The public value is the derived `gpu` property.
+    env_spec: dict = field(default_factory=dict)      # the env recipe (env_specs.yaml)
+    reference: dict = field(default_factory=dict)     # provenance (references.yaml)
+    # GPU/CPU keys, checked by validate_gpu_fields: the flags that turn CUDA
+    # off (merged by runner.cpu_params_for on a host without a GPU), or a
+    # script that calls CUDA unconditionally (with the file:line of the call)
     cpu_params: dict = field(default_factory=dict)
     requires_gpu: bool = False
     gpu_evidence: str = ""
@@ -461,12 +371,9 @@ class MethodSpec:
 
     @property
     def gpu(self) -> str:
-        """How the method uses an NVIDIA GPU: one of :data:`GPU_USE_VALUES`.
-
-        ``required`` when ``requires_gpu``; else the declared ``gpu_use``;
-        else ``used when present`` for a method with ``cpu_params`` (its
-        script has CUDA on by default); else ``unknown``.
-        """
+        """How the method uses an NVIDIA GPU: ``required`` when
+        ``requires_gpu``; else the declared ``gpu_use``; else ``used when
+        present`` for a method with ``cpu_params``; else ``unknown``."""
         if self.requires_gpu:
             return "required"
         if self.gpu_use:
@@ -477,20 +384,9 @@ class MethodSpec:
 
     @property
     def requires_gpu_reason(self) -> str:
-        """Why this method cannot run on a host without an NVIDIA GPU, or
-        ``""`` when ``requires_gpu`` is False.
-
-        The one text the runner's ``OSError`` and ``scan``'s ``env_reason``
-        share, so a tutorial and a traceback read the same sentence. The
-        pointer names ``method_info`` in Python and ``multibench info`` on the
-        command line (``config.hint``); the ``file:line`` evidence stays in
-        ``method_info(m)["gpu_evidence"]``. For example:
-
-        ```text
-        scBridge needs an NVIDIA GPU, and this computer has none.
-        See method_info("scBridge")["requires_gpu"].
-        ```
-        """
+        """Why this method cannot run without an NVIDIA GPU (``""`` when
+        ``requires_gpu`` is False); the runner's ``OSError`` and ``scan``'s
+        ``env_reason`` both use it."""
         if not self.requires_gpu:
             return ""
         from .. import config
@@ -500,19 +396,13 @@ class MethodSpec:
 
     @property
     def wired_categories(self) -> list[str]:
-        """The distinct ``when.category`` of the variants, in declaration order
-        - what ``scan`` / ``run_all`` / ``find_methods`` can actually dispatch.
-        ``categories`` equals this for every registry-loaded spec."""
+        """The distinct ``when.category`` of the variants, in declaration order."""
         return [c for c in dict.fromkeys(v.when.get("category") for v in self.variants)
                 if c]
 
     @property
     def needs_labels(self) -> bool:
-        """True when any variant takes a cell-type-label role as input.
-
-        Derived, not declared: registry.load() rejects a ``needs_labels`` key
-        in methods.yaml. Per-variant detail is on ``Variant.needs_labels``.
-        """
+        """True when any variant takes a cell-type-label role as input."""
         return any(v.needs_labels for v in self.variants)
 
     @property
@@ -525,42 +415,17 @@ class MethodSpec:
 
     @property
     def consumes_atac(self) -> bool:
-        """True when some variant takes an ATAC input.
-
-        Counts ``atac*`` roles and ``const`` file names (scBridge passes
-        ``atac_gas.h5`` as a const bare filename rather than a resolved role).
-        """
+        """True when some variant takes an ATAC input."""
         return any(v.consumes_atac for v in self.variants)
 
     def select(self, category: str, modalities: set[str], *,
                loose: bool = False) -> Variant:
         """The variant declared for ``(category, modalities)``.
 
-        Parameters
-        ----------
-        category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross``.
-        modalities : the variant's modality tokens as a set (``set()`` for the
-            ``data_dir`` variants).
-        loose : keyword-only, default ``False`` (exact token match).
-            ``True`` additionally accepts the ATAC representation roles under
-            their base name - ``{'rna', 'atac'}`` selects a variant declared
-            ``[rna, atac_gas]`` or ``[rna, atac_peak]`` (see
-            :func:`modality_family`) - when exactly one variant of the category
-            matches that way.
-
-        Returns
-        -------
-        Variant
-
-        Raises
-        ------
-        KeyError
-            No variant matches (the message lists the declared
-            ``(category, modalities)`` pairs).
-        AmbiguousVariantError
-            ``loose=True`` and several variants match under the family rule
-            (e.g. one ``atac_gas`` and one ``atac_peak`` variant in the same
-            category) - pass the exact role tokens.
+        ``loose=True`` also accepts ``atac`` for ``atac_gas`` / ``atac_peak``
+        (:func:`modality_family`) when exactly one variant matches that way,
+        and raises :class:`AmbiguousVariantError` when several do. No match
+        raises ``KeyError`` listing the declared ``(category, modalities)``.
         """
         for v in self.variants:
             if v.matches(category, modalities):
