@@ -181,12 +181,8 @@ def igraph_flavor_available() -> bool:
     if _igraph_support is None:
         try:
             import igraph  # noqa: F401
-            from importlib.metadata import version
-            from packaging.version import Version
-            # by version, not by signature: tests replace sc.tl.leiden with
-            # recorders whose signature says nothing about the real backend
-            _igraph_support = Version(version("scanpy")) >= Version("1.10")
-        except Exception:  # noqa: BLE001 - any import/probe failure means "no"
+            _igraph_support = _scanpy_has_flavor_kw()
+        except Exception:  # noqa: BLE001 - an igraph that fails to import means "no"
             _igraph_support = False
     return _igraph_support
 
@@ -203,6 +199,8 @@ def _scanpy_has_flavor_kw() -> bool:
         try:
             from importlib.metadata import version
             from packaging.version import Version
+            # by version, not by signature: tests replace sc.tl.leiden with
+            # recorders whose signature says nothing about the real backend
             _flavor_kw = Version(version("scanpy")) >= Version("1.10")
         except Exception:  # noqa: BLE001
             _flavor_kw = False
