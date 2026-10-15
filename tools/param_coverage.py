@@ -7,7 +7,6 @@ upstream limitation rather than a wrapper gap.
 """
 import json
 import re
-import sys
 
 import multibench as mtb
 from multibench.engine import registry

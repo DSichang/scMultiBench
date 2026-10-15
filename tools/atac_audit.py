@@ -5,7 +5,6 @@ Role names do not tell (D12/D13's atac.h5 holds peaks such as
 reads the feature names in it.
 """
 import re
-from collections import defaultdict
 
 import h5py
 
