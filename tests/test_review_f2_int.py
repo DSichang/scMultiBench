@@ -279,6 +279,19 @@ def test_reused_output_copies_the_earlier_record(tmp_path, monkeypatch):
     assert saved[0]["hostname"] == "gpu-node-7"
 
 
+def test_reused_output_next_to_a_record_without_a_method_still_runs(tmp_path, monkeypatch):
+    # BatchResult.save writes whatever records it was given, also one without a method
+    earlier = {"status": "CHAIN_OK", "metrics": {"ARI": 0.5}}
+    rec = _reused_matilda(tmp_path, monkeypatch, earlier)
+    assert rec["reused"] is True and rec["env_flavor"] == "unknown"
+    saved = json.loads((tmp_path / "batch_result.json").read_text())["records"]
+    assert sorted(str(r.get("method")) for r in saved) == ["Matilda", "None"]
+    for records in (None, {"a": 1}, [None, "x", 3]):
+        (tmp_path / "batch_result.json").write_text(json.dumps(
+            {"dataset": "D11", "category": "vertical", "records": records}))
+        assert W._earlier_provenance(tmp_path) == {}
+
+
 def _git_repo(path):
     (path / "tools_scripts").mkdir(parents=True)
     (path / "tools_scripts" / "x.py").write_text("print(1)\n")
@@ -338,8 +351,8 @@ def test_glue_d28_caveat_names_the_rename_call(tmp_path):
 
 def test_caveat_clauses_join_as_sentences():
     # R6-10: the caveat parts are sentences, joined with a space
-    assert W._join_clauses(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
-    assert W._join_clauses(["Only one."]) == "Only one."
+    assert W._join_sentences(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
+    assert W._join_sentences(["Only one."]) == "Only one."
 
 
 # ====================================================================== M13

@@ -607,13 +607,11 @@ def test_reference_entries_lose_their_justification_tails():
 
 
 def test_modality_token_notes_say_what_atac_peak_alone_keeps(pinned):
-    for fn in (mtb.scan, mtb.run_all):
-        flat = " ".join(inspect.getdoc(fn).split())
-        assert ("Base tokens keep a row whose modalities are exactly that combination"
-                in flat), fn.__name__
-        assert "Representation tokens select by what the method reads" in flat
-        assert "A row is kept when its modalities are exactly" not in flat
     flat = " ".join(inspect.getdoc(mtb.scan).split())
+    assert "Base tokens keep a row whose modalities are exactly that combination" in flat
+    assert "Representation tokens select by what the method reads" in flat
+    assert "A row is kept when its modalities are exactly" not in flat
+    assert "selects as in ``mtb.scan``" in " ".join(inspect.getdoc(mtb.run_all).split())
     assert ("``atac_peak`` alone also keeps MultiMAP and Seurat_v3, which read both "
             "files") in flat
     assert "``atac_peak`` together with ``atac_gas`` keeps only those two" in flat
