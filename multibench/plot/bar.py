@@ -168,8 +168,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         metrics = fam[group]
         avail = set(long_df["metric"].unique())
         if not (set(metrics) & avail):
-            why = ("The stored tables have none. mtb.evaluate computes them on "
-                   "multi-batch data." if group == "classification" else
+            why = ("The stored tables have none. "
+                   + _config.hint("mtb.evaluate", "multibench evaluate")
+                   + " computes them on multi-batch data." if group == "classification" else
                    "Batch metrics need a multi-batch dataset - a single-batch design "
                    "has none to compute.")
             raise ValueError(f"no {group!r} metrics present. Found {sorted(avail)}. {why}")

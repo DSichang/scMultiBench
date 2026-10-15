@@ -526,8 +526,9 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
             raise ValueError(msg)
         warnings.warn(msg, UserWarning, stacklevel=2)
 
-    msg = _no_comparison_message(idx, style.constant_columns(
-        pd.concat([b.raw for b in blocks], axis=1)), aggregate)
+    drawn = pd.concat([b.raw for b in blocks], axis=1)
+    msg = _no_comparison_message(idx, style.constant_columns(drawn), aggregate,
+                                 partial=set(drawn.columns[drawn.isna().any()]))
     if msg:
         warnings.warn(msg, UserWarning, stacklevel=2)
 
@@ -545,16 +546,17 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     )
 
 
-def _no_comparison_message(methods, constant: dict,
-                           aggregate: str = "dataset") -> str | None:
+def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
+                           partial=frozenset()) -> str | None:
     """The warning for a figure whose fill and rank compare nothing somewhere.
 
     One method: every column. Several: the columns in ``constant`` (from
     :func:`multibench.plot.style.constant_columns`), as ``'cLISI is 1.000 for
     every method. That column is grey.'``; under ``aggregate="summary"`` the
     value is the mean rank, as ``'Every method has mean rank 1.5 in ARI and
-    NMI. Those columns are grey.'``. ``render`` draws those fills in
-    :data:`CONSTANT_FILL`.
+    NMI. Those columns are grey.'``. A column in ``partial`` has no value
+    for some methods: its value is the same ``for every method with a
+    value``. ``render`` draws those fills in :data:`CONSTANT_FILL`.
     """
     if len(methods) == 1:
         return (f"Only one method, {methods[0]}, is in this figure. With nothing "
@@ -572,8 +574,13 @@ def _no_comparison_message(methods, constant: dict,
         same = " ".join(f"Every method has mean rank {v} in {_both(cs)}."
                         for v, cs in groups.items())
         return f"{same} {which} grey."
-    same = _both([f"{c} is {v:.3f}" for c, v in constant.items()])
-    return f"{same} for every method. {which} grey."
+    sentences = []
+    for cols, who in (([c for c in constant if c not in partial], "every method"),
+                      ([c for c in constant if c in partial], "every method with a value")):
+        if cols:
+            sentences.append(_both([f"{c} is {constant[c]:.3f}" for c in cols])
+                             + f" for {who}.")
+    return f"{' '.join(sentences)} {which} grey."
 
 
 def _na_report(blocks, parts, aggregate: str) -> list:
