@@ -1848,9 +1848,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             # labels alone, for a folder that may be written with a category
             held = _matrices_of(out, masters.get("rna"), len(labels_by_side["rna"]),
                                 skip={name for names in found for name in names})
-        raise FileExistsError(_leftover_message(
-            out, found, written=[int(number) for number, _ in groups if number],
-            n_batches=n_batches, replace=bool(existing) and not overwrite, held=held))
+        raise FileExistsError(_leftover_message(out, found, n_batches=n_batches, held=held))
     if existing and not overwrite:
         from .resolve import _and_list
         raise FileExistsError(
@@ -2064,8 +2062,7 @@ def _matrices_of(out: Path, cells, n: int, *, skip) -> list:
     return held
 
 
-def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
-                      held=()) -> str:
+def _leftover_message(out: Path, found, *, n_batches, held=()) -> str:
     """The error for the leftovers ``found`` by :func:`_leftovers`. With
     ``held`` (:func:`_matrices_of`) the leftovers are likely the rest of the
     same dataset, so the advice is to rerun the export with labels."""
