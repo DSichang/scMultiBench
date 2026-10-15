@@ -24,12 +24,9 @@ methods of the task (one where it has one) that are fast and need no GPU,
 with the smallest environments. ``run_all`` gets the dataset, the category,
 the methods and the output folder, and no other argument: where the dataset
 also holds the files of a smaller variant of a method, ``run_all`` runs the
-variant with the most modalities. ``check_task`` stops the generation when
-that call would not run every method of the task once, on the task's variant
-and on every batch. It also runs the cells of section 5 in a temporary folder
-and stops when they warn, or when the folder they write lacks the input files
-of the notebook's methods. Every size quoted comes from the dry-run plans at
-generation time, never a hand-written figure.
+variant with the most modalities. ``check_task`` and ``check_own`` stop the
+generation when a notebook would not run as written. Every size quoted comes
+from the dry-run plans at generation time, never a hand-written figure.
 
 Prose has two layers. Visible: 1-3 short sentences per section - what the
 step does and what the reader must do or decide - then the code. A fact
@@ -76,7 +73,6 @@ def details(*paras, label="Details"):
 def stored_method_counts(cat, dataset):
     """``(n_published, n_rerun)``: methods each stored source holds for the
     dataset, counted from ``results_coverage`` at generation time."""
-    import multibench as mtb
     cov = mtb.results_coverage(cat)
     cov = cov[cov.dataset == dataset]
     return (cov[cov.source == "published"].method.nunique(),
@@ -94,7 +90,6 @@ def stored_on_fewer_batches(dataset):
 
 
 def _gb(rows):
-    import multibench as mtb
     known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
     # a layer several of the envs share is downloaded once
     shared = mtb.env.layers_for([mtb.env.archive_key(r["env"], r["flavor"]) for r in rows],
@@ -107,7 +102,6 @@ def env_size_text(category=None, methods=None):
     """``"<n> envs, <x> GB to download on a CPU host, <y> GB on a GPU host"``
     for a category / method set, from the dry-run plans ``mtb.env.install(...)``
     returns at generation time for each archive flavour."""
-    import multibench as mtb
     # dry_run=True (the default): nothing is built
     rows = {f: mtb.env.install(methods, category=category, flavor=f) for f in ("cpu", "gpu")}
     n = len(rows["cpu"])
@@ -119,7 +113,6 @@ def env_download_sentence(methods):
     """The visible download-size sentence of section 2. The GPU builds carry
     the CUDA libraries, so the two flavours differ unless every env has one
     archive only."""
-    import multibench as mtb
     cpu = _gb(mtb.env.install(methods, flavor="cpu"))
     gpu = _gb(mtb.env.install(methods, flavor="gpu"))
     if cpu == gpu:
@@ -143,7 +136,6 @@ def atac_forms(cat):
     ATAC form they read, from ``find_methods(cat, atac=...)`` and each
     variant's modalities at generation time. ``both`` read peaks and gene
     activity together (``atac_peak`` and ``atac_gas`` in one variant)."""
-    import multibench as mtb
     gas = sorted(mtb.find_methods(cat, atac="gene_activity"))
     peak = sorted(mtb.find_methods(cat, atac="peak"))
     both = [m for m in peak
@@ -161,7 +153,6 @@ def diagonal_atac_sentence():
     gas, peak_only, both = atac_forms("diagonal")
     if not (peak_only and both and len(gas) > len(peak_only) + len(both)):
         raise SystemExit("diagonal ATAC forms changed: reword the diagonal title cell")
-    import multibench as mtb
     if "same cells" not in mtb.method_info("Seurat_v5")["setup_hint"]:
         raise SystemExit("Seurat_v5's setup hint changed: reword the diagonal title cell")
     layout = [ln.strip() for ln in mtb.describe_layout("diagonal").splitlines()]
@@ -176,10 +167,8 @@ def diagonal_atac_sentence():
             f"method's ATAC files.")
 
 
-# The one install cell every notebook shares; the module docstring says why
-# numpy and pandas are pinned. IPython expands the {pins} in the %pip line.
-# The requirement is in quotes because the line goes through a shell, where a
-# bare > redirects the output.
+# The install cell of every notebook (the module docstring says why it pins numpy
+# and pandas). The requirement is quoted: in the shell a bare > redirects output.
 INSTALL_CELL = ('import numpy, pandas\n'
                 'pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"\n'
                 f'%pip install -q "multibench-sc>={mtb.__version__}" {{pins}}')
@@ -355,7 +344,6 @@ def would_run(key, methods, dataset=None, **where):
     input files that nothing but the environment blocks, less the rows inside
     a larger one of the same method."""
     import warnings
-    import multibench as mtb
     from multibench import workflow
     t = TASKS[key]
     with warnings.catch_warnings():
@@ -372,7 +360,6 @@ def check_task(key):
     of the task once, on the task's variant, when a method reads only some
     batches of the dataset, or when section 5 does not work as it stands
     (``check_own``)."""
-    import multibench as mtb
     t = TASKS[key]
     everyone = task_methods(key)
     for m in t["methods"]:
@@ -397,7 +384,6 @@ def check_task(key):
 
 def labels_for_ds(key, method="UINMF"):
     """The label files ``method`` reads on the task's dataset."""
-    import multibench as mtb
     return list(mtb.labels_for(TASKS[key]["ds"], TASKS[key]["cat"], method))
 
 
@@ -1143,16 +1129,15 @@ def plot_details(cat):
 
 
 def build_tutorial(key):
-    C = []
-    md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
-    code = lambda t: C.append(nbf.v4.new_code_cell(t))
+    cells = []
+    md = lambda t: cells.append(nbf.v4.new_markdown_cell(t))
+    code = lambda t: cells.append(nbf.v4.new_code_cell(t))
     check_task(key)
     t = TASKS[key]
     cat, ds, methods = t["cat"], t["ds"], t["methods"]
     names = and_list(methods)
     everyone = task_methods(key)
 
-    # ------------------------------------------------------------------ title
     title = _title(key) + "\n\n" + t["blurb"].format(methods=names)
     if key == "diagonal_rna_atac":
         title += "\n\n" + diagonal_atac_sentence()
@@ -1163,7 +1148,6 @@ def build_tutorial(key):
     md(title)
     _install(md, code)
 
-    # ------------------------------------------------------ data and envs
     md(f"""## 2. Download the data and the environments
 
 `mtb.data.fetch` downloads `{ds}` ({download_size([ds])}) once. Each method runs in its own environment. `mtb.env.install` downloads the environment{'s' if len(methods) > 1 else ''} for {names}, with no conda needed. {env_download_sentence(methods)}
@@ -1184,7 +1168,6 @@ mtb.data.fetch("{ds}")''')
 envs = mtb.env.install(METHODS, dry_run=False)
 pd.DataFrame(envs)[["env", "methods", "state"]]''')
 
-    # -------------------------------------------------------------------- run
     run_notes = [
         f"Each method writes an embedding: a table of numbers with one row per cell. "
         f"`run_all` scores it against the cell-type labels of `{ds}`.",
@@ -1212,62 +1195,58 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
                   out_dir="out/{ds}")
 res.summary''')
 
-    # ------------------------------------------------------------------- plot
     md("## 4. Plot\n\n" + PLOT_TEXT + "\n\n" + details(*plot_details(cat)))
     code("res.plot()")
 
-    # --------------------------------------------------------------- own data
     for kind, src in own_cells(key):
         (md if kind == "markdown" else code)(src)
 
-    # ------------------------------------------------------------ stored scores
-    n_sec = 6
-    sds = t.get("stored_ds")
-    if sds:
-        n_pub, n_rerun = stored_method_counts(cat, sds)
+    section = 6
+    stored_ds = t.get("stored_ds")
+    if stored_ds:
+        n_pub, n_rerun = stored_method_counts(cat, stored_ds)
         stored_notes = []
-        if sds != ds and sds in ds:
-            stored_notes.append(f"The stored scores are for the full `{sds}`, the benchmark "
+        if stored_ds != ds and stored_ds in ds:
+            stored_notes.append(f"The stored scores are for the full `{stored_ds}`, the benchmark "
                                 f"dataset `{ds}` is drawn from.")
-        elif sds != ds:
-            stored_notes.append(f"There are no stored scores for `{ds}`. `{sds}` is another "
+        elif stored_ds != ds:
+            stored_notes.append(f"There are no stored scores for `{ds}`. `{stored_ds}` is another "
                                 f"benchmark dataset of the same task.")
         stored_notes.append(
             f"`source=\"rerun\"` reads the package's own runs of the methods. "
             + (f"`source=\"published\"`, the default, reads the published scIB tables, which "
-               f"hold {n_pub} method{'s' if n_pub != 1 else ''} for `{sds}`."
+               f"hold {n_pub} method{'s' if n_pub != 1 else ''} for `{stored_ds}`."
                if n_pub else
                f"There is no published scIB table for {cat}, so `source=\"published\"`, "
                f"the default, raises `FileNotFoundError`."))
-        fewer, n_few, n_all = stored_on_fewer_batches(sds)
+        fewer, n_few, n_all = stored_on_fewer_batches(stored_ds)
         if fewer:
             if fewer != ["UINMF"] or (n_few, n_all) != (2, 3) or len(labels_for_ds(key)) != 3:
                 raise SystemExit(f"{key}: stored scores of {fewer} read {n_few} of {n_all} "
                                  f"batches: reword the stored-scores note")
             stored_notes.append(
                 f"The stored scores of UINMF are from its two-batch variant, which read "
-                f"batches 1 and 2 of `{sds}`. `run_all` on `{ds}` runs its three-batch "
+                f"batches 1 and 2 of `{stored_ds}`. `run_all` on `{ds}` runs its three-batch "
                 f"variant.")
         stored_notes.append(
             "The stored scores used the `leidenalg` backend for Leiden clustering, and "
             "`run_all` uses `igraph` by default. The two backends can move ARI by up to "
             "about 0.1. To compare your runs with these scores, set "
             "`mtb.config.DEFAULT.leiden_flavor = \"leidenalg\"` before `run_all`.")
-        md(f"""## {n_sec}. Stored scores
+        md(f"""## {section}. Stored scores
 
-The package ships stored scores for {n_rerun} methods on `{sds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
+The package ships stored scores for {n_rerun} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
 
 """ + details(*stored_notes))
-        code(f'''long = mtb.load_results("{cat}", dataset="{sds}", source="rerun")
+        code(f'''long = mtb.load_results("{cat}", dataset="{stored_ds}", source="rerun")
 mtb.plot.bubble(long)''')
-        n_sec += 1
+        section += 1
 
-    # ------------------------------------------------------------ every method
     more = not_wrapped_sentence(key)
     more = "\n\n" + more if more else ""
     colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) does the same in Colab."
                  if has_all(key) else "")
-    md(f"""## {n_sec}. Every method of this task
+    md(f"""## {section}. Every method of this task
 
 {len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for {t['cat']} {t['label']}. Each ran on `{ds}` in the package's own check, on a server with a GPU:
 
@@ -1275,7 +1254,6 @@ mtb.plot.bubble(long)''')
 
 To run them all, set `METHODS` to these names in section 2 and run the notebook again. That downloads {env_size_text(methods=everyone)}.{colab_all}{more}""")
 
-    # -------------------------------------------------------- troubleshooting
     md("""## Troubleshooting
 
 `res.failures` lists each method that failed or was skipped. Its `error` column ends with the method's error output.
@@ -1298,7 +1276,7 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 - The other tutorials: {", ".join(f"[{TASKS[k]['cat']} {TASKS[k]['label']}]({SITE}tutorials/{k}/)" for k in TASKS if k != key)}.
 - The guides: [run]({SITE}tutorials/run/), [evaluate]({SITE}tutorials/evaluate/), [plot]({SITE}tutorials/plot/) and [discover methods]({SITE}tutorials/discover/).
 - The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has the full benchmark's rankings, with no install needed.""")
-    return C
+    return cells
 
 
 def has_all(key):
@@ -1339,9 +1317,9 @@ def graph_methods(key):
 
 def build_all_methods(key):
     """The run of every method of a task on its dataset: install, run, plot."""
-    C = []
-    md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
-    code = lambda t: C.append(nbf.v4.new_code_cell(t))
+    cells = []
+    md = lambda t: cells.append(nbf.v4.new_markdown_cell(t))
+    code = lambda t: cells.append(nbf.v4.new_code_cell(t))
     t = TASKS[key]
     cat, ds = t["cat"], t["ds"]
     everyone = task_methods(key)
@@ -1381,13 +1359,13 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
 res.summary''')
     md("## 4. Plot\n\n" + PLOT_TEXT)
     code("res.plot()")
-    return C
+    return cells
 
 
 def build_colab_quickstart():
-    C = []
-    md = lambda t: C.append(nbf.v4.new_markdown_cell(t))
-    code = lambda t: C.append(nbf.v4.new_code_cell(t))
+    cells = []
+    md = lambda t: cells.append(nbf.v4.new_markdown_cell(t))
+    code = lambda t: cells.append(nbf.v4.new_code_cell(t))
     md("""# scMultiBench API quickstart (Colab)
 
 This notebook installs `multibench-sc`, looks up methods and draws the stored benchmark results. It runs no method, so it downloads nothing else. The integration tutorials install the method environments and run the methods.""")
@@ -1433,7 +1411,7 @@ mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
        + ", ".join(f"[{t['cat']} {t['label']}]({COLAB}tutorial_{k}.ipynb)" for k, t in TASKS.items())
        + ".\n- The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has "
          "the full benchmark's rankings.")
-    return C
+    return cells
 
 
 if __name__ == "__main__":
