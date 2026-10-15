@@ -989,7 +989,7 @@ def _renamed_peak_roles(method: str | None, category: str | None, resolved) -> l
     try:
         mods = {r for r in resolved if not is_label_role(r) and r not in _NON_MODALITY_ROLES}
         variant = registry.get(method).select(category, mods)
-    except Exception:  # noqa: BLE001 - a caveat check never raises
+    except KeyError:    # no such method or variant
         return []
     return [r for r in variant.normalize_peaks if r in resolved]
 
@@ -1391,12 +1391,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     1. ``cty`` (one file, cells already paired) first;
     2. numbered ``cty1, cty2, ..., cty10``, in numeric order (batch
        order);
-    3. modality-named files in the canonical modality order **rna, adt, atac**
-       (``peak_cty`` counts as atac) - the diagonal methods other than uniPort
-       and Seurat_v5 emit the RNA cells first, then the ATAC cells. Diagonal
-       data in several batches follows the same rule, by number within a
-       modality: ``rna_cty1, rna_cty2, rna_cty3, atac_cty1, atac_cty2,
-       atac_cty3``;
+    3. modality-named files in the order **rna, adt, atac** (``peak_cty``
+       counts as atac), then by number: ``rna_cty1, rna_cty2, atac_cty1,
+       atac_cty2``. The diagonal methods other than uniPort and Seurat_v5
+       emit the RNA cells first;
     4. any other ``*cty*`` file, alphabetically, last.
 
     **Per-method order.** With ``category`` and ``method``, each file goes
