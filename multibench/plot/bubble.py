@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from . import style
+from .style import _and
 from .. import _compat
 from .. import config as _config
 
@@ -571,14 +572,14 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
         for c, v in constant.items():
             groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
         # one sentence per mean rank
-        same = " ".join(f"Every method has mean rank {v} in {_both(cs)}."
+        same = " ".join(f"Every method has mean rank {v} in {_and(cs)}."
                         for v, cs in groups.items())
         return f"{same} {which} grey."
     sentences = []
     for cols, who in (([c for c in constant if c not in partial], "every method"),
                       ([c for c in constant if c in partial], "every method with a value")):
         if cols:
-            sentences.append(_both([f"{c} is {constant[c]:.3f}" for c in cols])
+            sentences.append(_and([f"{c} is {constant[c]:.3f}" for c in cols])
                              + f" for {who}.")
     return f"{' '.join(sentences)} {which} grey."
 
@@ -656,11 +657,6 @@ def _either(codes) -> str:
     return codes[0] if len(codes) == 1 else ", ".join(codes[:-1]) + " or " + codes[-1]
 
 
-def _both(names) -> str:
-    """``'D24, D25 and D28'``."""
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
-
-
 #: most rows the ``n/a`` warning names before it counts the rest
 NA_ROWS_SHOWN = 3
 
@@ -699,7 +695,7 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
             by_codes: dict = {}
             for ds, codes in per_ds:
                 by_codes.setdefault(tuple(codes), []).append(str(ds))
-            what = ", and no ".join(f"{_either(codes)} on {_both(dss)}"
+            what = ", and no ".join(f"{_either(codes)} on {_and(dss)}"
                                     for codes, dss in by_codes.items())
         else:
             what = _either(dict.fromkeys(c for _, codes in per_ds for c in codes))
@@ -724,12 +720,6 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         sentences.append(_config.hint("Pass na='skip' to hide this message.",
                                       "Pass --na skip to hide this message."))
     return " ".join(sentences)
-
-
-def _and(values) -> str:
-    """``'A'``, ``'A and B'``, ``'A, B and C'``: the distinct values, in first-seen order."""
-    v = list(dict.fromkeys(map(str, values)))
-    return v[0] if len(v) == 1 else ", ".join(v[:-1]) + " and " + v[-1]
 
 
 def _duplicate_rows_message(dup, keys) -> str:

@@ -173,8 +173,8 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
 
 
 def _and(names) -> str:
-    """``'A'``, ``'A and B'``, ``'A, B and C'``."""
-    names = [str(n) for n in names]
+    """``'A'``, ``'A and B'``, ``'A, B and C'``: the distinct names, in first-seen order."""
+    names = list(dict.fromkeys(map(str, names)))
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
