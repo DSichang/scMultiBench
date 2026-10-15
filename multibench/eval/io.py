@@ -30,18 +30,15 @@ import h5py
 import numpy as np
 import pandas as pd
 
-#: Suffixes that mark a path as a CSV-like label file. evaluate() reads a
-#: clustering= path (str or Path) with any other suffix as an h5
-#: (read_clustering), and as_vector() takes a list of strings without these
-#: suffixes as label values.
+#: suffixes of a CSV-like label file; evaluate() reads a clustering= path with
+#: another suffix as an h5, and as_vector() takes other strings as label values
 _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 
 
 def _require_file(path: Path | str, what: str = "file") -> Path:
     """``Path(path)`` when it is an existing file; else ``FileNotFoundError``
-    naming ``what``, the path and, for a relative path, the working directory
-    and where the path resolves from there (a relative path that resolves
-    from the repository but not from a notebook's cwd is the usual cause)."""
+    naming ``what``, the path and, for a relative path, where it resolves from the
+    working directory (a notebook's cwd is the usual surprise)."""
     p = Path(path)
     where = ("" if p.is_absolute() else
              f" From the working directory {Path.cwd()}, the path resolves to "
@@ -108,30 +105,26 @@ def _sep_for(path: Path) -> str:
 
 
 def _read_table(src, sep):
-    """The one pandas call of the label reader. :func:`missing_words` runs
-    the same call, so what counts as missing follows what a label file
-    reads as missing, whatever the pandas version."""
+    """The one pandas call of the label reader; :func:`missing_words` runs it
+    too, so what counts as missing follows the pandas version."""
     return pd.read_csv(src, sep=sep)
 
 
 def _read_text(src, sep):
-    """The same table as the text the file holds: nothing is read as missing
-    and no number is parsed. Messages name the word that
-    :func:`_read_table` read as missing with it; no value is taken from it."""
+    """The same table as text: nothing read as missing, no number parsed. For
+    messages only."""
     return pd.read_csv(src, sep=sep, dtype=str, na_filter=False)
 
 
 def _null_and_text(values):
-    """``(null, text)`` of per-cell values: where pandas already holds a
-    missing value (NaN, ``None``, ``pd.NA``), and every value as text
-    without the blanks around it."""
+    """``(null, text)``: where pandas holds a missing value, and every value as
+    stripped text."""
     s = pd.Series(np.asarray(values, dtype=object))
     return s.isna().to_numpy(), s.astype(str).str.strip()
 
 
 def _csv_field(text: str) -> str:
-    """``text`` as one field of a CSV row: as it is, or in quotes (with its
-    own quotes doubled) when it holds a comma, a quote or a line break."""
+    """``text`` as one CSV field, quoted when it holds a comma, quote or line break."""
     if any(c in text for c in ',"\r\n'):
         return '"' + text.replace('"', '""') + '"'
     return text
@@ -151,14 +144,12 @@ def missing_words(values) -> list[str]:
     uniq = sorted(set(text[text != ""].tolist()))
     if not uniq:
         return []
-    # written here, not by DataFrame.to_csv, whose csv writer follows the
-    # Python version: up to 3.10 it leaves a lone carriage return bare, which
-    # the reader takes for the end of a row, and 3.10 refuses a NUL
+    # not DataFrame.to_csv: up to Python 3.10 its writer leaves a lone carriage
+    # return bare (read as a row end), and 3.10 refuses a NUL
     buf = _io.StringIO("x\n" + "".join(f"{_csv_field(u)}\n" for u in uniq))
     back = _read_table(buf, ",")
     if len(back) != len(uniq):
-        # one text, one row. If a reader ever splits or joins rows, the
-        # answers below would belong to other texts, so give none
+        # rows split or joined: the answers would belong to other texts
         raise RuntimeError(
             f"Cannot tell which of {len(uniq):,} distinct values a label file reads "
             f"as missing: written to a CSV and read back, they are {len(back):,} rows.")
@@ -180,28 +171,21 @@ def missing_mask(values) -> np.ndarray:
 
 
 def _missing_example(values) -> str:
-    """``, for example 'NA'``: one text among ``values`` that a label file
-    reads as missing; ``""`` when the missing entries are NaN or blank."""
+    """``, for example 'NA'``: one text among ``values`` that a label file reads
+    as missing; ``""`` when the missing entries are NaN or blank."""
     words = missing_words(values)
     return f", for example {words[0]!r}" if words else ""
 
 
 def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
-    """A column of the frame ``d`` that :func:`_read_table` read from
-    ``path``, with each value it read as missing replaced by the word the
-    file holds there (``'NA'``, ``'None'``, ...).
-
-    An empty field stays NaN: it is how a CSV writes a missing value. The
-    result is for the sentences that say how a missing value is written
-    (:func:`_missing_example`); no score is computed
-    from it.
-    """
+    """Column ``col`` of the frame ``d`` read from ``path``, with each value read
+    as missing replaced by the word the file holds there; an empty field stays
+    NaN. For messages only."""
     vals, null = col.to_numpy(), col.isna().to_numpy()
     if not null.any():
         return vals
     text = _read_text(path, _sep_for(path))
     if text.shape != d.shape:
-        # not the same rows and columns: no word can be told from another
         return vals
     text = text.iloc[:, d.columns.get_loc(col.name)].str.strip()
     named = null & text.isin(missing_words(text[null])).to_numpy()
@@ -211,9 +195,8 @@ def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
 
 
 def _names_no_file(x) -> bool:
-    """A string that is not a file and does not look like one: not an
-    existing file, no label-file suffix, no path separator. ``"donor"`` and
-    ``"obs:donor"`` are such strings; ``"missing.csv"`` is not."""
+    """A string that is not a file and does not look like one (``"donor"``,
+    ``"obs:donor"``; not ``"missing.csv"``)."""
     return (isinstance(x, str) and not Path(x).is_file()
             and Path(x).suffix.lower() not in _LABEL_FILE_SUFFIXES
             and "/" not in x and os.sep not in x)
@@ -223,11 +206,9 @@ def read_labels(path: Path | str, column: str | None = None, *,
                 as_written: bool = False) -> np.ndarray:
     """Read a cell-type (or batch) label vector from a CSV/TSV with a header row.
 
-    The benchmark's label files (``cty.csv``, ``rna_cty.csv``, ``cty1.csv`` ...)
-    are one column with header ``"x"`` - R's ``write.csv(x)`` layout, possibly
-    with a leading row-number column. This reader also accepts the pandas
-    ``obs``-style export, i.e. ``adata.obs[["celltype"]].to_csv(p)`` (barcode
-    index column + label column).
+    The benchmark's label files (``cty.csv``, ``cty1.csv`` ...) are R's
+    ``write.csv(x)`` layout: column ``"x"``, possibly after a row-number
+    column. ``adata.obs[["celltype"]].to_csv(p)`` (barcodes + labels) works too.
 
     Column choice, in order:
 
@@ -279,17 +260,11 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     rule 4 dropped the first of two columns; it may hold cell ids. Otherwise
     ``first`` is ``None``.
 
-    ``what`` ("labels", "batch", "clustering") starts the messages of the
-    errors. ``pick`` ends an ambiguous file's error: a sentence, or a
-    function of the Python expression that reads one column of the file as
-    a Series (:func:`_series_example`), for callers that have no ``column``
-    argument (default: pass ``column=``).
-
-    ``as_written`` is for a message that says how the missing values are
-    written. The reader reads ``NA``, ``None``, ``null`` and the like as
-    NaN; with ``as_written=True`` such a value comes back as the word the
-    file holds there, and an empty field stays NaN. Nothing is scored from
-    these values.
+    ``what`` ("labels", "batch", "clustering") starts the error messages.
+    ``pick`` ends an ambiguous file's error: a sentence, or a function of the
+    pandas call that reads one column as a Series (default: pass ``column=``).
+    ``as_written=True`` returns each value read as missing (``NA``, ``None``,
+    ...) as the word the file holds, for messages only.
     """
     from .. import config
     path = _require_file(path, config.hint(f"{what} file", f"--{what} file")
@@ -318,7 +293,6 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
         return values(d.iloc[:, 0]), None
     no_header = _no_header(d.columns[0])
     if d.shape[1] == 2 and first.is_unique:
-        # index/barcode column + one label column: the obs-style export
         return values(d.iloc[:, -1]), first
     # barcodes with a repeat, not a sample or batch column: an index written
     # without a header (pandas' and R's to_csv), or text that is 90% distinct
@@ -329,11 +303,9 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
             f"{what or path}: the first column of {path.name} repeats "
             f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
     if d.shape[1] == 2 and no_header and _stacked_row_numbers(first):
-        # the RangeIndex of each frame of pd.concat([...]).to_csv(path),
-        # 0..k-1 again and again: the rows are in file order
         return values(d.iloc[:, -1]), first
     if d.shape[1] == 2 and no_header and pd.api.types.is_integer_dtype(first):
-        # the same, with the rows reordered after the concat
+        # stacked row numbers, reordered after the concat
         raise ValueError(f"{head} has row numbers that repeat out of order, so its rows "
                          f"may not follow the cells. Save it in cell order.")
     kind, names = _data_columns(d)
@@ -346,9 +318,8 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
 
 
 def _stacked_row_numbers(col: pd.Series) -> bool:
-    """Runs of ``0, 1, ..., k-1``: the row numbers of several frames that
-    ``pd.concat([...]).to_csv(path)`` writes one after another. Numbers in
-    any other order (rows sorted after the concat) are not."""
+    """Runs of ``0, 1, ..., k-1``: the row numbers ``pd.concat([...]).to_csv``
+    writes. Numbers in any other order are not."""
     if not pd.api.types.is_integer_dtype(col) or not len(col):
         return False
     v = col.to_numpy()
@@ -361,14 +332,9 @@ def _no_header(name) -> bool:
 
 
 def _data_columns(d: pd.DataFrame) -> tuple[str | None, list]:
-    """The columns of a per-cell file that may hold values, for messages.
-
-    Returns ``(kind, names)``. When the first column is an index (no
-    header, or unique text such as a barcode column), ``kind`` says what it
-    holds (``"cell ids"`` or ``"row numbers"``) and ``names`` are the
-    columns after it; otherwise ``kind`` is ``None`` and ``names`` are all
-    the columns. pandas' ``Unnamed: <i>`` is not listed.
-    """
+    """``(kind, names)``: the columns of a per-cell file that may hold values,
+    for messages; ``kind`` is ``"cell ids"`` / ``"row numbers"`` when the first
+    column is an index, else ``None``."""
     cols = [str(c) for c in d.columns]
     first = d.iloc[:, 0]
     ids = _looks_like_ids(first)
@@ -386,9 +352,8 @@ _COLUMN_HINTS = {"labels": ("celltype", "cell_type", "cell type", "label", "cty"
 
 
 def _series_example(path: Path, names: list, *, index: bool, what: str | None) -> str:
-    """The pandas call that reads one column of ``path`` as a Series:
-    ``pd.read_csv("obs.csv", index_col=0)["sample"]``. The column is the
-    first of ``names`` whose name suggests ``what``, else the last one."""
+    """The pandas call that reads one column of ``path`` as a Series, the
+    column whose name suggests ``what``, else the last."""
     hints = _COLUMN_HINTS.get(what or "", ())
     col = next((n for n in names if any(h in n.lower() for h in hints)), names[-1])
     args = [json.dumps(str(path), ensure_ascii=False)]
@@ -405,8 +370,8 @@ def _n_ids(n: int) -> str:
 
 
 def _looks_like_ids(col: pd.Series) -> bool:
-    """Text that is not a number: R's row numbers ``1..n`` and pandas'
-    ``0..n-1`` do not look like cell ids."""
+    """Text that is not a number: R's ``1..n`` and pandas' ``0..n-1`` row
+    numbers are not cell ids."""
     if pd.api.types.is_numeric_dtype(col) or pd.api.types.is_bool_dtype(col):
         return False
     return bool(pd.to_numeric(col, errors="coerce").isna().any())
@@ -433,7 +398,7 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     - numbers: R's row numbers ``1..n`` or pandas' ``0..n-1``. They align
       the file only when they are exactly the target's ids in some order
       (an AnnData with the default ``obs_names``); otherwise the file is
-      matched by position, silently, as before.
+      matched by position, silently.
 
     ``n_files`` > 1 when ``name`` names several stacked files: the warnings
     then speak of them in the plural.
@@ -528,7 +493,6 @@ def read_clustering(path: Path | str) -> np.ndarray:
     return np.asarray(decoded).astype(int)
 
 
-# ------------------------------------------------------------------ coercers
 def _is_label_file(e) -> bool:
     if isinstance(e, Path):
         return True
@@ -550,12 +514,9 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
     * ``list``/``tuple`` of paths (every element a ``Path`` or a ``str`` ending
       in ``.csv``/``.tsv``/``.txt``) - read each and concatenate in the given
       order, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
-    * ``dict`` with one entry (what :func:`multibench.labels_for` returns for a
-      single-label dataset) - that file. Several entries raise here, because
-      this coercer does not know the method's cell order; pass the paths
-      as a list in that order. (:func:`multibench.evaluate` takes a
-      multi-entry dict as is when it is an unchanged ``labels_for`` dict or
-      in the default order, and needs ``label_order=`` otherwise.)
+    * ``dict`` with one entry (:func:`multibench.labels_for` for a
+      single-label dataset) - that file. Several entries raise: this
+      coercer does not know the method's cell order.
     * ``numpy.ndarray`` (1-D, or ``(n, 1)``), ``pandas.Series``,
       ``pandas.Categorical``, ``pandas.Index``, or a list/tuple of scalars;
     * a single-column ``pandas.DataFrame`` (or a wider one with ``column=``).
@@ -617,15 +578,8 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
 
 
 def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
-    """The error for a ``{name: path}`` dict with several entries.
-
-    A dict fixes no cell order, and the order is the method's cell order -
-    the order in which the method concatenated its input cells - which is not
-    alphabetical: for most methods ``cty1 < cty2 < ...`` numerically, and
-    ``rna`` before ``atac``. A wrong order raises no error and invalidates
-    every score, so the message names the keys, states the rule and points
-    at the helper that returns the files in that order.
-    """
+    """The error for a ``{name: path}`` dict with several entries: a dict fixes
+    no cell order, and a wrong order invalidates every score without an error."""
     keys = [str(k) for k in d]
     fix = (f"pass label_order=[...] with these keys in that order (label_order="
            f"list(d) trusts the dict's order)" if label_order_hint
@@ -687,11 +641,8 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
 
 
 def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
-    """:func:`align_vector` for ``evaluate``. ``cells`` is the expression
-    that gives the output's cell ids when the output is an AnnData object
-    (``adata.obs_names``), and ``None`` for any other output, where the
-    caller has no object of that name: the sentence for the cells without a
-    label then names no variable."""
+    """:func:`align_vector` for ``evaluate``. ``cells`` is the expression for
+    the output's cell ids (``adata.obs_names``), ``None`` when there is none."""
     if isinstance(x, pd.DataFrame):
         if column is not None:
             if column not in x.columns:
@@ -708,7 +659,7 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
                 f"df['celltype']) or column=<name>")
     ids = pd.Index(ids)
     if len(x.index) == len(ids) and x.index.equals(ids):
-        return np.asarray(pd.Series(x).to_numpy())       # same order already
+        return np.asarray(pd.Series(x).to_numpy())
     if not x.index.is_unique:
         dup = x.index[x.index.duplicated()]
         raise ValueError(
@@ -729,7 +680,6 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
             hint = (" The two id sets are disjoint: is the output transposed "
                     "(evaluate expects cells x dims), or indexed differently?")
         elif what == "labels" and not len(extra):
-            # every id is a cell of the output, and some cells have none
             hint = (f" For cells without a label, pass labels.reindex({cells}) "
                     'and missing_labels="drop".' if cells else
                     " For cells without a label, give them the label NaN and pass "
@@ -744,18 +694,15 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
 
 
 def _by_position(what: str, n: int, order: str) -> str:
-    """The warning for a ``batch`` Series that numbers its rows (a plain
-    ``RangeIndex``) while the cells have barcodes: it is matched by
-    position. ``order`` names the order its ``n`` values must follow.
-    ``export_dataset``, ``evaluate`` and ``run_all`` say it with this."""
+    """The warning for a ``batch`` Series with a plain ``RangeIndex`` matched by
+    position to cells that have barcodes."""
     return (f"{what} is a Series without barcodes and is matched to the cells by position. "
             f"To match by barcode, pass a Series indexed by barcode.")
 
 
 def _numbers_rows(x, ids) -> bool:
-    """``x`` is a Series with a plain ``RangeIndex`` and ``ids``, the cell
-    ids it is matched to by position, are barcodes: not ``None`` and not the
-    row numbers ``'0'``, ``'1'``, ... themselves."""
+    """``x`` is a Series with a plain ``RangeIndex`` and ``ids`` are barcodes,
+    not ``None`` and not the row numbers themselves."""
     if not isinstance(x, pd.Series) or not isinstance(x.index, pd.RangeIndex) \
             or ids is None:
         return False
@@ -763,19 +710,9 @@ def _numbers_rows(x, ids) -> bool:
 
 
 def _labels_look_measured(values) -> tuple[str, int, int] | None:
-    """Why per-cell labels look like a number measured for each cell and not
-    like a cell type, as ``(reason, distinct, cells)``; ``None`` when they
-    do not.
-
-    Two signs, either is enough:
-
-    - ``"distinct"``: there are at least 20 cells and more distinct labels
-      than half of the cells, so almost every cell has a label of its own;
-    - ``"fraction"``: the labels are numbers and some are not whole numbers
-      (``0.37``); text such as ``'0.5'`` is not a number here.
-
-    Whole-number cluster ids with few distinct values give ``None``.
-    """
+    """``(reason, distinct, cells)`` when labels look like a number measured
+    per cell: ``"distinct"`` (20+ cells, more labels than half the cells) or
+    ``"fraction"`` (numbers that are not whole); else ``None``."""
     vals = np.asarray(values)
     n = len(vals)
     if not n:
@@ -811,29 +748,19 @@ def _anndata_matrix(adata, obsm: str) -> np.ndarray:
 def _read_csv_embedding(path: Path):
     """A ``.csv`` / ``.tsv`` embedding as ``(matrix, ids)``.
 
-    The first column is left out of the matrix when the file has two or more
-    columns and that column has no header (pandas' ``Unnamed: 0``, the index
-    ``DataFrame.to_csv`` writes) or holds text. This is the rule of 0.3.4.
-
-    ``ids`` are that column's values when it holds text, that is, when at
-    least one of its values is not a number: the cell barcodes, in file
-    order. Row numbers without a header are left out and give no ids
-    (``None``), and a first column of numbers with a header is data.
+    A first column without a header (``Unnamed: 0``) or of text is not part
+    of the matrix; its values are the ids when one is not a number, else
+    ``None``. A first column of numbers with a header is data.
     """
     path = Path(path)
     d = pd.read_csv(path, sep=_sep_for(path))
     ids = None
     if d.shape[1] > 1 and (str(d.columns[0]).startswith("Unnamed")
                            or d.iloc[:, 0].dtype == object):
-        # a written index (pandas' default "Unnamed: 0" or a barcode column)
         if _looks_like_ids(d.iloc[:, 0]):
             ids = pd.Index(d.iloc[:, 0].astype(str))
         d = d.iloc[:, 1:]
     return d.to_numpy(dtype=float), ids
-
-
-def _read_csv_matrix(path: Path) -> np.ndarray:
-    return _read_csv_embedding(path)[0]
 
 
 def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
@@ -888,7 +815,7 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
         if suf == ".npy":
             return np.asarray(np.load(p), dtype=float)
         if suf in {".csv", ".tsv"}:
-            return _read_csv_matrix(p)
+            return _read_csv_embedding(p)[0]
         if h5py.is_hdf5(p):
             return read_embedding(p)
         raise ValueError(
