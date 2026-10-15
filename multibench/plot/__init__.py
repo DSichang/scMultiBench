@@ -15,10 +15,7 @@ from .bubble import (bubble, plot_bubble, build_table, render, BubbleTable,
                      FamilyBlock, FAMILIES)
 from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS
 
-# back-compat: ``bubble`` was a callable namespace object, so
-# ``mtb.plot.bubble.build_table(...)`` / ``.render(...)`` worked. It is a plain
-# function now (help()/inspect.signature show its real parameters); the old
-# attribute paths stay as attributes on the function until 0.4.
+# the 0.2.x attribute paths (``mtb.plot.bubble.build_table`` ...) until 0.4
 for _n in ("build_table", "render", "plot_bubble", "BubbleTable", "FamilyBlock",
            "FAMILIES", "NA_MARK", "_resolve"):
     setattr(bubble, _n, getattr(_bubble_module, _n))
@@ -31,7 +28,5 @@ __all__ = ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
 
 
 def __dir__() -> list[str]:
-    """``dir(mtb.plot)`` lists the public names and the dunders only (PEP
-    562): ``render``, ``FamilyBlock``, ``style`` and the deprecated
-    ``plot_bubble`` stay accessible but out of the listing."""
+    """Only the public names and dunders (PEP 562); the other imports stay reachable."""
     return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})

@@ -157,9 +157,8 @@ class BubbleTable:
 
 
 def _unknown_names(unknown, available, kind: str) -> str:
-    """The error for ``unknown`` names of ``kind`` (``"method"``, ``"metric"``)
-    that the table does not have: a suggestion from the table's names (for a
-    method also the registry's), then the names the table has."""
+    """The error for ``unknown`` names of ``kind``: a did-you-mean from the
+    table (for a method also from the registry), then the names the table has."""
     import difflib
     pool = [str(a) for a in available]
     hints = []
@@ -177,15 +176,8 @@ def _unknown_names(unknown, available, kind: str) -> str:
 
 
 def _resolve(requested, available, kind: str, canon) -> list:
-    """Map user-supplied selector names onto the frame's own spellings.
-
-    Resolution order per requested name: exact match -> same canonical form
-    (``catalog.canonical_metric`` / ``catalog.canonical_id``) -> case-
-    insensitive match. The frame's spelling is always returned, so a frame
-    built with ``to_long(method="Seurat v4")`` keeps its own label. Unknown
-    names raise ``ValueError`` with a did-you-mean hint and the list of values
-    present in the frame; a name listed twice (after canonicalisation) raises.
-    """
+    """The frame's own spelling of each requested name, matched exactly, by
+    ``canon`` form, then case-insensitively; unknown or repeated names raise."""
     requested = [requested] if isinstance(requested, str) else list(requested)
     available = list(available)
     by_exact = set(available)
@@ -506,8 +498,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         raise ValueError("no known metrics found in long_df")
 
     combined = pd.concat([b.overall for b in blocks], axis=1).mean(axis=1)
-    # stable sort: tied methods keep index (alphabetical) order, the same
-    # tie-break plot.bar uses
+    # stable sort: tied methods keep alphabetical order, as in plot.bar
     ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
     if order is not None:
         order = _resolve(order, raw_all.index.tolist(), "method", catalog.canonical_id)
@@ -550,16 +541,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
 
 def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
                            partial=frozenset()) -> str | None:
-    """The warning for a figure whose fill and rank compare nothing somewhere.
-
-    One method: every column. Several: the columns in ``constant`` (from
-    :func:`multibench.plot.style.constant_columns`), as ``'cLISI is 1.000 for
-    every method. That column is grey.'``; under ``aggregate="summary"`` the
-    value is the mean rank, as ``'Every method has mean rank 1.5 in ARI and
-    NMI. Those columns are grey.'``. A column in ``partial`` has no value
-    for some methods: its value is the same ``for every method with a
-    value``. ``render`` draws those fills in :data:`CONSTANT_FILL`.
-    """
+    """The warning for grey fills: one method, or the ``constant`` columns
+    (``partial`` ones lack some values); ``None`` when there is none."""
     if len(methods) == 1:
         return (f"Only one method, {methods[0]}, is in this figure. With nothing "
                 f"to rank it against, the fills are grey. Plot it with methods "
@@ -572,7 +555,6 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
         groups = {}
         for c, v in constant.items():
             groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
-        # one sentence per mean rank
         same = " ".join(f"Every method has mean rank {v} in {_and(cs)}."
                         for v, cs in groups.items())
         return f"{same} {which} grey."
@@ -586,12 +568,8 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
 
 
 def _na_report(blocks, parts, aggregate: str) -> list:
-    """The ``na_cells`` lines: one per family and method with n/a cells.
-
-    ``aggregate="dataset"``: ``"<method>: <family> Overall over k of n metrics
-    (<codes> n/a)"`` per family block. ``"summary"``: ``"<method>: <codes> n/a
-    in <dataset> -> rank 0 there"`` from the per-dataset rank matrices.
-    """
+    """The ``na_cells`` lines: one per family and method with n/a cells (per
+    dataset and method under ``"summary"``)."""
     lines = []
     if aggregate == "summary":
         for ds, mat in parts.items():
@@ -611,21 +589,17 @@ def _na_report(blocks, parts, aggregate: str) -> list:
             elif na:
                 whole.append(str(m))
         if whole:
-            # a family absent for a method (a frame mixing single-batch and
-            # multi-batch datasets): no Overall bar there, one line for all
+            # methods with no metric of the family (single- next to multi-batch
+            # datasets) get no Overall bar: one line for all
             lines.append(f"no {b.label} metric (no {b.label} Overall) for: "
                          f"{', '.join(whole)}")
     return lines
 
 
 def _na_missing(blocks, parts, aggregate: str) -> list:
-    """The ``n/a`` cells per figure row, in row order.
-
-    ``[(method, [(dataset, [codes])], [families])]``: under ``"dataset"`` one
-    ``(None, codes)`` pair per method, and the families the method has no
-    value in at all; under ``"summary"`` one pair per dataset with ``n/a``
-    cells. Codes follow the figure's column order.
-    """
+    """The n/a cells per row, in row order, as ``[(method, [(dataset, codes)],
+    families)]``: dataset ``None`` under ``"dataset"``, where ``families`` are
+    those the method has no value in; codes in column order."""
     columns = [c for b in blocks for c in b.raw.columns]
     pos = {c: i for i, c in enumerate(columns)}
 
@@ -664,17 +638,8 @@ NA_ROWS_SHOWN = 3
 
 def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
                 na: str = "warn") -> str:
-    """The ``na="warn"`` / ``na="raise"`` text: one short sentence per row.
-
-    A row is ``The stored row`` when all its rows come from a stored table,
-    ``Your row`` when none do, else ``Row``; the dataset(s) and the stored
-    source follow in parentheses. The rank rule is stated once in the
-    Notes of ``build_table``; the message says only what the reader acts on.
-    Under ``"dataset"`` a sentence says the Overall uses the metrics a row
-    has, left out under ``"raise"``, which draws no figure.
-    The last sentence names the other policy: ``na="skip"`` under
-    ``"warn"``, ``na="warn"`` under ``"raise"`` (an error cannot be hidden).
-    """
+    """The ``na="warn"`` / ``na="raise"`` text: one sentence per row (at most
+    ``NA_ROWS_SHOWN``), the rule the figure applies, then the other policy."""
     stored_sources = set(style.STORED_SOURCES)
     has_ds = "dataset" in df.columns
     sentences = []
@@ -724,11 +689,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
 
 
 def _duplicate_rows_message(dup, keys) -> str:
-    """The error for rows that repeat the same ``keys`` (method, metric, dataset).
-
-    When your rows (not ``published`` / ``rerun``) collide with stored rows,
-    the message says so and names the fix; otherwise it names one repeat.
-    """
+    """The error for rows that repeat ``keys``: the fix when your rows collide
+    with stored ones, else one example repeat."""
     stored = (dup["source"].astype("string").str.match(r"^(published|rerun)").fillna(False)
               if "source" in dup.columns else pd.Series(False, index=dup.index))
     mixed = dup.assign(_st=stored.to_numpy()).groupby(keys)["_st"].agg(
@@ -797,13 +759,9 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
 
 @functools.cache
 def _figure_class():
-    """A matplotlib ``Figure`` that shows itself in a notebook.
-
-    The figure is built without pyplot, so it is never shown twice. Without
-    ``%matplotlib inline`` a notebook would then print only
-    ``<Figure size ...>``; ``_repr_png_`` gives it the image. When the inline
-    backend is active, its own printer is used and the image appears once.
-    """
+    """A ``Figure`` with ``_repr_png_``. Built without pyplot, the figure is
+    never shown twice, and a notebook without ``%matplotlib inline`` still
+    shows the image rather than ``<Figure size ...>``."""
     from matplotlib.figure import Figure
 
     class BubbleFigure(Figure):
@@ -958,8 +916,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     for fi, b in enumerate(tbl.blocks):
         family_xs = [x for x, f, k, _ in layout if f == fi]
         x0, x1 = family_xs[0], family_xs[-1] + 1.1
-        # gid="family" marks the pill and its header; render widens a pill
-        # that is narrower than its header (_fit_pills)
+        # gid="family": _fit_pills finds the pill and its header
         ax.add_patch(FancyBboxPatch((x0 + 0.05, band_y), x1 - x0 - 0.35, 0.6,
                                     boxstyle=f"round,pad={PILL_BOX_PAD},rounding_size=0.18",
                                     facecolor=mappers[fi].to_rgba(0.30),
@@ -1034,14 +991,9 @@ PILL_PAD_PT, PILL_GAP_PT = 3.0, 2.0
 
 
 def _fit_pills(fig, ax, pad_pt=PILL_PAD_PT, gap_pt=PILL_GAP_PT) -> list:
-    """Widen each family pill of ``ax`` that is narrower than its header.
-
-    Such a pill (a family of one metric) is widened about its own centre until
-    the header plus ``pad_pt`` on each side fits; the other pills keep their
-    size. Returns, per pair of neighbouring families, the data units the gap
-    between them lacks for the two pills to stay ``gap_pt`` apart (zeros when
-    they do). Call it on a finished layout: it measures the drawn header.
-    """
+    """Widen, about its centre, each family pill narrower than its header; return
+    per pair of neighbouring pills the data units their gap lacks (0 when none).
+    It measures the drawn headers, so call it on a finished layout."""
     fig.draw_without_rendering()
     pills = [p for p in ax.patches if p.get_gid() == "family"]
     heads = [t for t in ax.texts if t.get_gid() == "family"]
@@ -1065,13 +1017,9 @@ def _fit_pills(fig, ax, pad_pt=PILL_PAD_PT, gap_pt=PILL_GAP_PT) -> list:
 
 
 def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
-    """Widen ``fig`` until the texts of ``ax`` lie inside it; the height stays.
-
-    ``tight_layout`` alone cannot do it: the axes keeps an equal aspect, so in
-    a figure of one to three metrics the legends and the row labels are
-    wider than the table and ran past the figure edges, cut off by a plain
-    ``fig.savefig``. A figure whose texts already fit keeps its size.
-    """
+    """Widen ``fig`` until the texts of ``ax`` fit; the height stays. With the
+    axes' equal aspect, ``tight_layout`` alone leaves the legends and row labels
+    of a figure of few metrics past the figure edges."""
     pad = pad_pt * fig.dpi / 72.0
     for _ in range(rounds):
         fig.draw_without_rendering()
@@ -1206,11 +1154,6 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         fig.savefig(save, bbox_inches="tight")
     return fig
 
-
-# The `overall` parameter text is style.OVERALL_DOC, written out verbatim in
-# the docstrings of bubble and bar (a runtime splice is invisible to the
-# static docs build); tests/test_bubble.py and tests/test_bar.py pin parity.
-# The two formulas are in the Notes of build_table and in style.overall_by_basis.
 
 #: deprecated 0.2.x name of :func:`bubble` (DeprecationWarning; removed in 0.4)
 plot_bubble = _compat.deprecated_alias("mtb.plot.plot_bubble", "mtb.plot.bubble", bubble)

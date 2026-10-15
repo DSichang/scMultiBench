@@ -61,8 +61,8 @@ def compute_overall(mat: pd.DataFrame) -> pd.Series:
 #: in overall_by_basis
 OVERALL_BASES = ("rank", "mean_overall")
 
-#: the ``overall`` parameter entry written out verbatim in the docstrings of
-#: plot.bubble and plot.bar (tests/test_bubble.py and tests/test_bar.py pin it)
+#: the ``overall`` parameter entry, written out in the docstrings of plot.bubble
+#: and plot.bar (the static docs build cannot see a runtime splice); tests pin it
 OVERALL_DOC = """\
     overall : {"rank", "mean_overall"}
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
@@ -144,14 +144,9 @@ def stored_datasets(df: pd.DataFrame) -> tuple:
 
 
 def _no_overlap_message(parts: dict, stored=()) -> str | None:
-    """The message for datasets that share no method, else ``None``.
-
-    With stored rows in some datasets and a user's rows in others, the
-    remedy names the stored dataset(s) to score the user's method on. With
-    no stored rows at all, the datasets may be two folders of the same cells
-    (a peak run and a gene-activity run), so one sentence says how to merge
-    them.
-    """
+    """The message for datasets that share no method, else ``None``. Without
+    stored rows the datasets may be two folders of the same cells, so it says
+    how to merge them."""
     n = len(parts)
     per_method = coverage(parts)
     if not (n > 1 and len(per_method) and (per_method <= 1).all()):
@@ -192,18 +187,11 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
                       stored=()) -> list:
     """The warnings a cross-dataset summary of ``parts`` needs, as messages.
 
-    ``parts`` is the dict from :func:`per_dataset_ranks`; ``basis`` the
-    ``overall=`` in use; ``incomplete_fix`` the last sentence of the
-    incomplete-matrix message (it names the caller's own remedy);
+    ``parts`` is the dict from :func:`per_dataset_ranks`, ``basis`` the
+    ``overall=`` in use, ``incomplete_fix`` the caller's remedy sentence and
     ``stored`` the datasets holding stored rows (:func:`stored_datasets`).
-    Shared by ``plot.build_table`` (``aggregate="summary"``) and ``plot.bar``.
-
-    - no method is scored on two of several datasets: one message that the
-      figure ranks unrelated rows (it replaces the incomplete-matrix one);
-    - otherwise, a method missing from some dataset: the incomplete-matrix
-      message;
-    - a dataset that holds one method while the frame holds several: one
-      message per such dataset, since that method is ranked against nothing.
+    One message when no method spans two datasets, else one when a method
+    misses a dataset; plus one per dataset that holds a single method.
     """
     from .. import config
     out = []
@@ -321,7 +309,7 @@ def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
     """Across-dataset Overall per method under the given ``basis``.
 
     ``parts`` is the dict from :func:`per_dataset_ranks`. The two formulas
-    (spelled out again in the Notes of ``plot.build_table``):
+    (also in the Notes of ``plot.build_table``):
 
     - ``"rank"``: ``minmax(mean over metrics of max-rank(mean over datasets
       of within-dataset max-rank))``; a method absent from a dataset scores
