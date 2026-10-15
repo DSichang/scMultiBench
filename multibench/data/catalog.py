@@ -18,16 +18,11 @@ __all__ = ["methods", "datasets", "metrics", "canonical_id", "canonical_metric",
 
 
 def __dir__() -> list[str]:
-    """Tab completion (``dir(mtb.catalog)``) shows the public API and the
-    underscore names, not the module-level imports (``pd``, ``Path``, ``re``,
-    ``config``, the ``annotations`` future-feature object).
-
-    Every attribute stays accessible; only the listing changes (PEP 562).
-    """
+    """``dir(mtb.catalog)`` lists the public API and the underscore names, not
+    the module's imports (PEP 562)."""
     return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
 
-# --- canonical method id + aliases -----------------------------------------
-# Canonical id = the registry token. Map known display / result-dir spellings.
+#: display and result-folder spellings -> method id
 _ALIASES = {
     "seurat v3": "Seurat_v3",
     "seurat_v3": "Seurat_v3",
@@ -51,12 +46,9 @@ _ALIASES = {
 
 
 def _registry_ids() -> list[str]:
-    """Registry method ids (empty when the registry cannot be loaded)."""
-    try:
-        from ..engine import registry as _registry     # lazy: registry imports config
-        return [s.id for s in _registry.load()]
-    except Exception:       # a broken registry must not break name folding
-        return []
+    """The registry's method ids."""
+    from ..engine import registry     # lazy: registry imports config
+    return [s.id for s in registry.load()]
 
 
 def canonical_id(name: str, *, strict: bool = False) -> str:
@@ -130,11 +122,9 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
         from ..engine import registry
         hint = difflib.get_close_matches(folded, ids, n=1, cutoff=0.6)
         raise KeyError(registry.unknown_method_message(name, hint[0] if hint else ""))
-    # default: collapse separators to underscore, keep original casing token
     return folded
 
 
-# --- metric code canonicalization ------------------------------------------
 _METRIC_CANON = {
     "kbet": "kBET",
     "ifi": "iF1",
@@ -148,13 +138,12 @@ _METRIC_CANON = {
     "gc": "GC",
     "asw_batch": "ASW_batch",
     "pcr": "PCR",
-    # the classification family (mtb.classification_metrics)
     "oca": "OCA",
     "aca": "ACA",
     "spec": "Spec",
     "sens": "Sens",
     "f1": "F1",
-    # raw scIB long-names -> canonical codes (some metric.csv use these)
+    # scIB's long names, in some published metric.csv
     "ari_cluster/label": "ARI",
     "nmi_cluster/label": "NMI",
     "asw_label": "ASW",
@@ -257,20 +246,15 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
     return out
 
 
-# --- the one ``metrics=`` selector -----------------------------------------
 #: family tokens the ``metrics=`` knob accepts (besides None and a list of codes)
 _METRIC_TOKENS = ("all", "clustering", "batch", "classification")
 
 
 class MetricSelection:
-    """What a ``metrics=`` argument resolved to (see :func:`metric_selection`).
-
-    ``family`` is ``"all"``, ``"clustering"``, ``"batch"`` or
-    ``"classification"``: the token that was given, or - for an explicit list - the smallest family holding every
-    code. ``codes`` is ``None`` for "no restriction" (``None`` / ``"all"``)
-    and otherwise the canonical codes selected, in request order. ``explicit``
-    is ``True`` when a list of codes was given.
-    """
+    """What a ``metrics=`` argument resolved to: ``family`` (the token, or for
+    a list the family holding every code, else ``"all"``), ``codes`` (``None``
+    = no restriction, else the canonical codes in request order) and
+    ``explicit`` (a list was given)."""
     __slots__ = ("family", "codes", "explicit")
 
     def __init__(self, family: str, codes, explicit: bool):
@@ -320,12 +304,8 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         if metrics in fams:
             return MetricSelection(metrics, fams[metrics], False)
         hint = ""
-        try:
-            from ..engine.registry import list_tasks
-            tasks = list_tasks()
-        except Exception:
-            tasks = []
-        if metrics in tasks:
+        from ..engine.registry import list_tasks
+        if metrics in list_tasks():
             hint = (f" {kw}= selects a metric family, not a task of mtb.list_tasks(). "
                     f"The tasks dimension_reduction and clustering both use the "
                     f"clustering family.")
@@ -361,12 +341,10 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     if dup:
         raise ValueError(
             f"{kw}= names the same metric twice after canonicalisation: {dup}")
-    # the one family holding every code, else "all"
     holding = [f for f, members in fams.items() if all(c in members for c in codes)]
     return MetricSelection(holding[0] if holding else "all", codes, True)
 
 
-# --- tables ----------------------------------------------------------------
 def _split_multivalue(cell: object) -> list[str]:
     if pd.isna(cell):
         return []
@@ -428,7 +406,6 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "method.csv")
-    # normalize column access by stripping whitespace/newlines
     cols = {c: c.strip().replace("\n", " ").strip() for c in raw.columns}
     raw = raw.rename(columns=cols)
     out = pd.DataFrame()
@@ -443,9 +420,9 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     )
     out["categories"] = raw["Integration Categories"].map(_split_multivalue)
     out["tasks"] = raw["Task Categories"].map(_split_multivalue)
-    # registry overlay: the derived / validated values win over the CSV prose
-    from ..engine import registry as _registry
-    specs = {s.id: s for s in _registry.load()}
+    # the registry's values win over the CSV prose
+    from ..engine import registry
+    specs = {s.id: s for s in registry.load()}
     atac_col = out["atac"].astype(object)
     for i, cid in enumerate(out["canonical_id"]):
         spec = specs.get(cid)
@@ -468,9 +445,8 @@ def _dataset_sort_key(ds: str):
     return (m.group(1).upper(), int(m.group(2)), m.group(3))
 
 
-#: descriptive columns of dataset.csv, to be transcribed from the paper's
-#: supplementary dataset table. The shipped file leaves them empty, and
-#: datasets() returns only the ones a CSV fills (files/README_PROVENANCE.txt).
+#: descriptive columns of dataset.csv (the paper's dataset table); the shipped
+#: file leaves them empty, and datasets() returns only the filled ones
 PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 
@@ -551,14 +527,12 @@ def datasets(files_dir: Path | str | None = None, *,
     name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
     raw = raw.assign(**{name_col: raw[name_col].astype(str).str.strip()})
 
-    # result-tree-derived columns are filled at call time, so the table never
-    # lists fewer datasets than load_results can serve; ids with results that
-    # dataset.csv lacks are appended with the paper columns empty
-    from . import results as _results
+    # from the result tree at each call, so no dataset load_results serves is missing
+    from . import results
     cat_of: dict[str, list[str]] = {}
     for cat in ("cross", "diagonal", "mosaic", "vertical"):
         try:
-            for ds in _results.available_datasets(cat, source="both"):
+            for ds in results.available_datasets(cat, source="both"):
                 cat_of.setdefault(ds, []).append(cat)
         except Exception:       # a broken/absent tree must not break the catalog
             continue
@@ -569,13 +543,11 @@ def datasets(files_dir: Path | str | None = None, *,
 
     out = pd.DataFrame()
     out["dataset"] = raw[name_col].astype(str).str.strip()
-    out["dataset name"] = out["dataset"]          # back-compat alias (one release)
+    out["dataset name"] = out["dataset"]
     out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
     out["has_results"] = out["dataset"].isin(cat_of.keys())
 
-    # a descriptive column is shown only when the CSV fills it: the shipped
-    # file leaves all five empty
     for col in PAPER_COLUMNS:
         if col in raw.columns and raw[col].notna().any():
             out[col] = raw[col].values

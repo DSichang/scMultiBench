@@ -37,7 +37,7 @@ EXAMPLES: dict[str, tuple[str, ...]] = {
 #: HDF5 root attribute of an example file; its value is ``<dataset>@<version>``
 _MARK = "multibench_example"
 
-# what the printed line says X holds
+#: what the printed line says X holds
 _RNA = "RNA counts in X"
 _RNA_ADT = 'RNA counts in X, protein counts in obsm["protein"]'
 _ADT = "protein counts in X"
@@ -45,10 +45,9 @@ _PEAK = "ATAC peak counts in X"
 _GAS = "ATAC gene-activity scores in X"
 
 
-# The builders below make the objects of the 0.3.4 tutorials' data cells, with
-# the same subsample fractions and seeds, [:n] cuts and concat arguments, so
-# the folder a tutorial exports from the example files is the one it exported
-# before. Each returns [(file name, AnnData, what X holds)].
+# Each builder returns [(file name, AnnData, what X holds)]. The subsample
+# fractions, seeds, cuts and concat arguments fix the folder a tutorial
+# exports from the example files: change none of them.
 
 def _labels(path):
     import pandas as pd
@@ -56,8 +55,8 @@ def _labels(path):
 
 
 def _with_obs_of(a, main):
-    """``a``, which holds the cells of ``main`` in the same order, with its
-    cell-type and batch columns."""
+    """``a`` (the cells of ``main``, in its order) with ``main``'s cell-type and
+    batch columns."""
     for col in ("celltype", "batch"):
         if col in main.obs:
             a.obs[col] = main.obs[col].values
@@ -332,8 +331,7 @@ def write_example(dataset: str, folder: Path | str = ".", *,
                                 f"mtb.data.fetch({dataset!r}) first.")
     folder = Path(folder)
     mark = f"{dataset}@{__version__}"
-    # what is there decides before anything is built: a file without the
-    # marker is the reader's, and this dataset's own example is not rewritten
+    # a file without the marker is the reader's; this dataset's example is kept
     state = {}
     for name in EXAMPLES[dataset]:
         target = folder / name
@@ -363,7 +361,7 @@ def write_example(dataset: str, folder: Path | str = ".", *,
         else:
             a, what = built[name]
             if "protein" in a.obsm:
-                # an array and its names: what a file from another tool holds
+                # an array and its names, as a file from another tool holds them
                 import numpy as np
 
                 df = a.obsm["protein"]

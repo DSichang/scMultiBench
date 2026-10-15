@@ -23,7 +23,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-# Metrics that shell out to scib's prebuilt LISI helper binary.
+#: metrics that run scib's prebuilt LISI helper binary
 _LISI_METRICS = ("cLISI", "iLISI")
 
 #: C++ compilers tried, in order, when the shipped LISI helper cannot execute
@@ -32,8 +32,8 @@ _CXX_CANDIDATES = ("g++", "c++", "clang++")
 #: the flags of the build line in scib's ``knn_graph/README.md``
 _CXX_FLAGS = ("-std=c++11", "-O3")
 
-#: embeddings above this many cells announce the Leiden sweep on stderr when
-#: ``verbose`` is None (the sweep then takes long enough to look like a hang)
+#: above this many cells the Leiden sweep is announced on stderr (``verbose=None``):
+#: it then takes long enough to look like a hang
 _SWEEP_NOTICE_CELLS = 2000
 
 
@@ -48,13 +48,8 @@ def _find_cxx() -> str | None:
 
 
 def _probe_lisi_binary(exe) -> str | None:
-    """Run scib's LISI helper once with no arguments; None when it starts.
-
-    Returns the problem as a string otherwise. ``"cannot be executed"`` marks
-    an ``OSError`` at exec time (``Exec format error``: the shipped binary is
-    Linux x86-64 and this is macOS or another architecture) - the case a
-    rebuild from source fixes.
-    """
+    """Run scib's LISI helper once with no arguments: None when it starts, else
+    the problem (``"cannot be executed"`` for an ``OSError`` at exec time)."""
     import os
     import subprocess
 
@@ -69,11 +64,8 @@ def _probe_lisi_binary(exe) -> str | None:
         return f"{exe} cannot be executed here ({type(exc).__name__}: {exc})"
     except subprocess.TimeoutExpired:
         return None                      # it started, which is all the probe checks
-    # It ran if it exited cleanly or wrote anything to stdout (a bare
-    # invocation prints the usage line). Matching the usage text instead would
-    # turn a wording change into a false alarm that drops two metrics; this
-    # test still catches a loader failure (exit 127, stderr only) and a silent
-    # crash (non-zero, no output).
+    # a bare call prints the usage line; matching its text would turn a wording
+    # change into two NaN metrics. A loader failure writes stderr only.
     if p.returncode == 0 or (p.stdout or "").strip():
         return None
     err = (p.stderr or "").strip().splitlines()
@@ -81,12 +73,8 @@ def _probe_lisi_binary(exe) -> str | None:
 
 
 def _rebuild_lisi_binary(exe, cpp, cxx: str) -> str | None:
-    """Compile ``cpp`` to ``exe`` in place with ``cxx``; None on success, else why.
-
-    This is scib's own build line (``g++ -std=c++11 -O3 -o knn_graph.o
-    knn_graph.cpp``) run once, writing into scib's own ``knn_graph/`` folder
-    so scib finds the binary where it looks for it.
-    """
+    """Compile ``cpp`` to ``exe`` in place with scib's own build line; None on
+    success, else why. scib looks for the binary in its own ``knn_graph/``."""
     import subprocess
     import sys
 
@@ -104,12 +92,12 @@ def _rebuild_lisi_binary(exe, cpp, cxx: str) -> str | None:
 
 
 def _lisi_fallback_message(name: str, problem: str) -> str:
-    """The warning for a LISI metric recorded as NaN: the cause and the manual
-    build line (scib's own ``g++`` command), for when the automatic rebuild
-    could not run or failed."""
-    import pathlib as _pl
-    import scib as _scib
-    kg = _pl.Path(_scib.__file__).parent / "knn_graph"
+    """The warning for a LISI metric recorded as NaN: the cause and scib's own
+    ``g++`` build line."""
+    from pathlib import Path
+
+    import scib
+    kg = Path(scib.__file__).parent / "knn_graph"
     return (f"scib metric {name!r} needs scib's LISI helper binary, which "
             f"cannot run here: {problem}. Recording NaN. To fix it, rebuild the "
             f"binary from the source scib ships (needs a C++ compiler):\n"
@@ -120,25 +108,11 @@ def _lisi_fallback_message(name: str, problem: str) -> str:
 def _lisi_helper_problem() -> str | None:
     """Why scib's LISI helper cannot run here, or None when it can.
 
-    scib runs a prebuilt C++ binary with neither ``check=True`` nor any capture
-    of its stderr, so a binary that fails to start is discovered much later - as
-    a FileNotFoundError on an output file that was never written, once per
-    metric, with the actual cause discarded. A loader failure (an older
-    libstdc++ ahead of the system one, a foreign architecture) is invisible that
-    way. Probing the binary once turns it into one message naming the cause.
-
-    When the binary does not start - it cannot be executed at all (``Exec
-    format error``: scib ships a Linux x86-64 executable, so every macOS
-    install), or the loader rejects it (scib 1.1.7 is linked against glibc
-    2.38; Colab's Ubuntu 22.04 has 2.35) - a C++ compiler is on PATH
-    (``g++`` / ``c++`` / ``clang++``) and scib ships ``knn_graph.cpp`` next
-    to it, the helper is rebuilt in place once with scib's own build line
-    and probed again; cLISI/iLISI then compute instead of recording NaN. If the rebuild fails, the original problem is returned
-    with the compiler's error appended, and the caller's warning still
-    prints the ``g++`` line for a manual fix.
-
-    A healthy binary exits 0 and prints its usage line when called with no
-    arguments.
+    scib runs the prebuilt binary without checking it, so a binary that does
+    not start (scib ships a Linux x86-64 executable linked against glibc 2.38)
+    surfaces only as a missing output file, once per metric. One probe names
+    the cause; with a C++ compiler and the shipped ``knn_graph.cpp`` the
+    helper is rebuilt once in place and probed again.
     """
     from pathlib import Path
 
@@ -173,19 +147,15 @@ LEIDEN_FLAVORS = ("igraph", "leidenalg")
 #: family, graph connectivity); ``compute`` clips them to that range
 BOUNDED_METRICS = ("ASW", "iASW", "cLISI", "ASW_batch", "GC", "iLISI")
 
-#: distance from 0 (and, for BOUNDED_METRICS, from 1) below which a metric
-#: value is floating-point residue and recorded as the bound itself
+#: distance from 0 (and, for BOUNDED_METRICS, from 1) below which a value is
+#: floating-point residue and recorded as the bound: an iLISI of 2.2e-16 next to
+#: 0.0 would otherwise rank as a real difference
 _SNAP = 1e-12
 
 
 def _tidy_value(name: str, value) -> float:
-    """``value`` as a float, with floating-point residue at the bounds removed.
-
-    ``|value| < 1e-12`` becomes ``0.0``; a metric in :data:`BOUNDED_METRICS`
-    is clipped to [0, 1] and a value within ``1e-12`` of 1 becomes ``1.0``.
-    NaN passes through. Without this, an iLISI of ``2.2e-16`` next to
-    ``0.0`` would rank as a real difference in the plots.
-    """
+    """``value`` as a float, ``|value| < 1e-12`` as ``0.0``, and a
+    :data:`BOUNDED_METRICS` value clipped to [0, 1] with ``1 - 1e-12`` as ``1.0``."""
     v = float(value)
     if np.isnan(v):
         return v
@@ -226,13 +196,8 @@ _flavor_kw: bool | None = None
 
 
 def _scanpy_has_flavor_kw() -> bool:
-    """Does this scanpy accept ``sc.tl.leiden(flavor=...)`` at all (>= 1.10)?
-
-    Older releases forward the unknown keyword to leidenalg's partition class
-    (``TypeError: ... unexpected keyword argument 'flavor'``). Where the keyword
-    exists it is spelled out, so a future change of scanpy's default backend to
-    igraph cannot switch the backend silently. Probed once.
-    """
+    """Does this scanpy accept ``sc.tl.leiden(flavor=...)`` (>= 1.10)? Probed
+    once. Older ones fail on the keyword."""
     global _flavor_kw
     if _flavor_kw is None:
         try:
@@ -245,16 +210,8 @@ def _scanpy_has_flavor_kw() -> bool:
 
 
 def _resolve_flavor(flavor) -> str:
-    """The Leiden backend that will actually run: ``flavor`` itself, else the
-    configured default, downgraded to ``"leidenalg"`` when this scanpy cannot
-    run the igraph backend.
-
-    ``None`` reads ``config.DEFAULT.leiden_flavor``. Anything outside
-    :data:`LEIDEN_FLAVORS` raises rather than silently running the slow
-    backend under a misspelt name. ``"igraph"`` on a scanpy older than 1.10
-    (or without the igraph package) falls back to ``"leidenalg"`` with one
-    ``UserWarning`` per process - the metrics are the same, only slower.
-    """
+    """The Leiden backend that will run: ``flavor``, else the configured
+    default, downgraded to ``"leidenalg"`` (one warning) where igraph cannot run."""
     global _fallback_warned
     if flavor is None:
         from .. import config
@@ -264,9 +221,9 @@ def _resolve_flavor(flavor) -> str:
             f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
     if flavor == "igraph" and not igraph_flavor_available():
         if not _fallback_warned:
-            from importlib.metadata import version as _v
+            from importlib.metadata import version
             warnings.warn(
-                f"scanpy {_v('scanpy')} cannot run flavor='igraph' "
+                f"scanpy {version('scanpy')} cannot run flavor='igraph' "
                 f"(needs scanpy>=1.10 and the igraph package); using leidenalg for "
                 f"this process - same metrics, slower sweep", UserWarning, stacklevel=3)
             _fallback_warned = True
@@ -275,13 +232,8 @@ def _resolve_flavor(flavor) -> str:
 
 
 def _neighbors(adata, rep: str) -> None:
-    """``sc.pp.neighbors`` on ``adata.obsm[rep]``.
-
-    scanpy edits the kNN matrix in place, and on some embeddings (the 2-D
-    UMAP of a graph method) scipy answers with a ``SparseEfficiencyWarning``
-    per call. It says nothing about the result, so only that warning is
-    silenced here.
-    """
+    """``sc.pp.neighbors`` on ``adata.obsm[rep]``, silencing the
+    ``SparseEfficiencyWarning`` scipy raises on some embeddings."""
     import scanpy as sc
     from scipy.sparse import SparseEfficiencyWarning
     with warnings.catch_warnings():
@@ -290,49 +242,33 @@ def _neighbors(adata, rep: str) -> None:
 
 
 def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
-    """One Leiden clustering, on the backend ``flavor`` names.
-
-    ``"igraph"`` is scanpy's igraph backend (``n_iterations=2``,
-    ``directed=False`` - the settings scanpy documents for it; several times
-    faster than leidenalg). ``"leidenalg"`` is the classic backend
-    scib's own ``cluster_optimal_resolution`` runs. Both write the labels to
-    ``adata.obs[key_added]``.
-    """
+    """One Leiden clustering into ``adata.obs[key_added]``: scanpy's igraph
+    backend with its documented settings, or leidenalg as scib runs it."""
     import scanpy as sc
     if flavor == "igraph":
         sc.tl.leiden(adata, resolution=resolution, key_added=key_added,
                      flavor="igraph", n_iterations=2, directed=False)
         return
     with warnings.catch_warnings():
-        # scanpy warns on every leidenalg call that igraph is the future
-        # default; leidenalg is an explicit choice here
-        # (config.DEFAULT.leiden_flavor / flavor=), so only that message is
-        # silenced
+        # leidenalg is an explicit choice here: silence scanpy's notice that
+        # igraph is the future default (a FutureWarning from scanpy 1.11)
         warnings.filterwarnings("ignore", message=".*igraph.*implementation of leiden.*",
                                 category=UserWarning)
-        # scanpy >= 1.11 emits it as a FutureWarning, explicit flavor or not
         warnings.filterwarnings("ignore", message=".*default backend for leiden will be igraph.*",
                                 category=FutureWarning)
-        # spell the backend out where scanpy understands it (see
-        # _scanpy_has_flavor_kw)
+        # spelled out, so a change of scanpy's default cannot switch the backend
         kw = {"flavor": "leidenalg"} if _scanpy_has_flavor_kw() else {}
         sc.tl.leiden(adata, resolution=resolution, key_added=key_added, **kw)
 
 
 def _build_adata(emb, celltype, cluster, batch):
-    # anndata is an evaluation-only dependency: importing it lazily keeps
-    # `import multibench` working where anndata is not installed and only
-    # discovery + plotting are used
-    import anndata as ad
+    import anndata as ad      # lazily: an evaluation-only dependency
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
     adata.obs["celltype"] = pd.Categorical(np.asarray(celltype).astype(str))
     if cluster is not None:
         adata.obs["cluster"] = pd.Categorical(np.asarray(cluster))
-    # kBET converts this to an R factor via rpy2, which refuses non-string
-    # categories ("Converting pandas Category series to R factor is only
-    # possible when categories are strings"), so integer batch ids are
-    # coerced here
+    # as strings: rpy2 turns this into an R factor for kBET and refuses other categories
     adata.obs["batch"] = pd.Categorical(np.asarray(batch).astype(str))
     return adata
 
@@ -340,11 +276,9 @@ def _build_adata(emb, celltype, cluster, batch):
 def leiden_sweep(emb, *, flavor=None):
     """Run the scIB optimal-resolution Leiden sweep once, for reuse.
 
-    ``cluster_optimal_resolution`` clusters the embedding at 10 resolutions and
-    keeps whichever maximises NMI against a label vector. The clustering at a
-    given resolution depends only on the embedding - the label vector enters
-    solely through the argmax - so ranking N candidate label orderings needs one
-    sweep, not N.
+    The clustering at each of the 10 resolutions depends only on the
+    embedding; labels enter only through the argmax NMI, so ranking N label
+    orderings needs one sweep, not N.
 
     Parameters
     ----------
@@ -373,7 +307,7 @@ def leiden_sweep(emb, *, flavor=None):
     from scib.metrics.clustering import get_resolutions
 
     flavor = _resolve_flavor(flavor)
-    import anndata as ad      # lazily, as in _build_adata
+    import anndata as ad
     adata = ad.AnnData(np.asarray(emb, dtype=float))
     adata.obsm["X_emb"] = adata.X
     _neighbors(adata, "X_emb")
@@ -388,19 +322,12 @@ def leiden_sweep(emb, *, flavor=None):
 
 def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
                         precomputed_keys=None, flavor=None):
-    """Isolated-label F1, identical to scib's but without the per-label re-clustering.
+    """scib's isolated-label F1 without its per-label re-clustering.
 
-    ``scib.metrics.isolated_labels_f1`` calls ``cluster_optimal_resolution`` once
-    per isolated label, and every call recomputes the kNN graph and a full Leiden
-    resolution sweep. The clustering at a given resolution does not depend on
-    which label is being scored - only the F1 target does. Under this package's
-    convention that every label is isolated, scib therefore repeats the same 10
-    clusterings once per label: on a 28-label dataset that is 280 Leiden runs
-    where 10 suffice.
-
-    Each resolution is clustered once here, then each label takes its max F1 over
-    all resolutions - the same quantity scib's per-label optimisation returns.
-    ``tests/test_eval_isolated_f1.py`` pins this to scib's own result.
+    scib re-runs the same 10-resolution sweep for every label; the clustering
+    does not depend on the label, so each resolution is clustered once here and
+    each label takes its best F1 over them (pinned to scib's result in
+    ``tests/test_eval_isolated_f1.py``).
     """
     from sklearn.metrics import f1_score
     from scib.metrics.clustering import get_resolutions
@@ -412,10 +339,9 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
         return float("nan")
 
     if precomputed_keys:
-        # the caller already ran the identical 10-resolution sweep on this
-        # adata (same graph, same resolutions): reuse it
+        # the caller's identical sweep on this adata
         keys = list(precomputed_keys)
-        _owned = False
+        owned = False
     else:
         flavor = _resolve_flavor(flavor)
         _neighbors(adata, embed)
@@ -425,7 +351,7 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
             key = f"_mb_isof1_{res}"
             _leiden(adata, res, key, flavor)
             keys.append(key)
-        _owned = True
+        owned = True
 
     try:
         scores = []
@@ -435,14 +361,13 @@ def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
             for key in keys:
                 col = adata.obs[key]
                 for cluster in col.unique():
-                    # argument order mirrors scib's max_f1 exactly; F1 is
-                    # symmetric under swapping y_true/y_pred, but match it anyway
+                    # the argument order of scib's max_f1
                     f1 = f1_score((col == cluster).values, y_true)
                     if f1 > best:
                         best = f1
             scores.append(best)
     finally:
-        if _owned:
+        if owned:
             for key in keys:
                 if key in adata.obs:
                     del adata.obs[key]
@@ -480,11 +405,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     slow_metrics : bool
         Also compute kBET (shells out to R).
     only : collection of str, optional
-        Restrict the computation to the named metrics, e.g. ``only={"ARI"}``.
-        Everything not named is skipped rather than computed and discarded,
-        and the Leiden sweep is skipped too when no requested metric needs it
-        (ARI, NMI, iF1 do). Ranking candidate label orderings, for one, needs
-        ARI alone.
+        Compute only the named metrics, e.g. ``only={"ARI"}``; the Leiden
+        sweep runs only when one of them needs it (ARI, NMI, iF1).
     verbose : bool, keyword-only, optional
         Print one stderr line when the Leiden sweep starts. ``None``
         (default): only for embeddings with more than 2,000 cells; ``True``
@@ -524,7 +446,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         ) from e
 
     n = np.asarray(emb).shape[0]
-    # named after evaluate()'s arguments, which the user passed
+    # named after evaluate()'s arguments
     for what, values in (("labels", celltype), ("clustering", cluster),
                          ("batch", batch)):
         if values is not None and len(np.asarray(values)) != n:
@@ -533,37 +455,30 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     adata = _build_adata(emb, celltype, cluster, batch)
     _neighbors(adata, "X_emb")
 
-    # Without a precomputed clustering, ARI/NMI score the scIB optimal-
-    # resolution Leiden assignment derived from the embedding below; this is
-    # what lets evaluate() run directly on a method's embedding output.
-    _needs_clustering = only is None or bool(only & {"ARI", "NMI"})
-    _needs_isof1 = group in ("clustering", "all") and (only is None or "iF1" in only)
-    _sweep_keys = []
+    needs_clustering = only is None or bool(only & {"ARI", "NMI"})
+    needs_isof1 = group in ("clustering", "all") and (only is None or "iF1" in only)
+    sweep_keys = []
     if group in ("clustering", "all") and (
-            (cluster is None and _needs_clustering) or _needs_isof1):
-        # One 10-resolution Leiden sweep serves both consumers: the optimal-
-        # resolution cluster choice (argmax NMI vs the labels - the same
-        # protocol as scib.cluster_optimal_resolution) and the isolated-label
-        # F1, which needs every resolution's assignment. stdout and warnings
-        # are muted: scanpy reports each resolution otherwise.
+            (cluster is None and needs_clustering) or needs_isof1):
+        # one sweep serves the cluster choice (argmax NMI, as
+        # scib.cluster_optimal_resolution) and iF1; scanpy's per-resolution
+        # output is muted
         from scib.metrics.clustering import get_resolutions
         flavor = _resolve_flavor(flavor)
         if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
             import sys
-            # a clustering that was passed in already serves ARI/NMI; the
-            # sweep then runs for iF1 alone
             needs = [m for m in ("ARI", "NMI")
                      if cluster is None and (only is None or m in only)] \
-                + (["iF1"] if _needs_isof1 else [])
+                + (["iF1"] if needs_isof1 else [])
             names = (needs[0] if len(needs) == 1
                      else ", ".join(needs[:-1]) + " and " + needs[-1])
-            from .. import config as _config
+            from .. import config
             # clustering= spares the sweep only when iF1 does not need it
-            skip = (_config.hint(f"metrics= without {names}",
-                                 f"--metrics without {names}")
+            skip = (config.hint(f"metrics= without {names}",
+                                f"--metrics without {names}")
                     if "iF1" in needs else
-                    _config.hint(f"clustering=, or metrics= without {names}",
-                                 f"--clustering, or --metrics without {names}"))
+                    config.hint(f"clustering=, or metrics= without {names}",
+                                f"--clustering, or --metrics without {names}"))
             print(f"Clustering {n:,} cells at 10 resolutions for {names}, with "
                   f"the {flavor} Leiden backend. This takes from seconds to a few "
                   f"minutes. To skip it, pass {skip}.",
@@ -573,10 +488,10 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             for res in get_resolutions(n=10, max=2):
                 key = f"_mb_res_{res}"
                 _leiden(adata, res, key, flavor)
-                _sweep_keys.append(key)
-            if cluster is None and _needs_clustering:
+                sweep_keys.append(key)
+            if cluster is None and needs_clustering:
                 best_key, best_nmi = None, -1.0
-                for k in _sweep_keys:
+                for k in sweep_keys:
                     v = float(me.nmi(adata, cluster_key=k, label_key="celltype"))
                     if v > best_nmi:
                         best_nmi, best_key = v, k
@@ -584,13 +499,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     out: dict[str, float] = {}
 
     def _safe(name, fn):
-        """Compute one metric; record NaN (with a warning) if it fails.
-
-        Some scib metrics (notably the LISI graph metrics) rely on a prebuilt
-        binary that may not load on every platform (macOS arm64, older glibc).
-        evaluate() then still returns every metric that does compute, instead
-        of failing on one.
-        """
+        """Compute one metric; NaN with a warning when it fails (the LISI binary
+        does not load on every platform)."""
         if only is not None and name not in only:
             return
         if name in _LISI_METRICS:
@@ -600,10 +510,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
                 out[name] = float("nan")
                 return
         try:
-            # scib prints per-chunk progress from inside some metrics (the LISI
-            # family especially) and emits third-party deprecation warnings;
-            # neither carries information for the caller, so both are swallowed
-            # here. The could-not-compute warning below stays visible.
+            # scib's progress prints and third-party deprecation warnings
             with contextlib.redirect_stdout(io.StringIO()), \
                     warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -622,33 +529,28 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         _safe("ARI", lambda: me.ari(adata, cluster_key="cluster", label_key="celltype"))
         _safe("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
         _safe("ASW", lambda: me.silhouette(adata, label_key="celltype", embed="X_emb"))
-        # Isolated-label convention: treat every cell type as isolated and score
-        # them all. scib's default picks only types confined to few batches, and
-        # returns nothing when every type appears in every batch (it short-circuits
-        # on iso_threshold == n_batches), so a well-balanced dataset would get no
-        # iASW/iF1. n_batches + 1 clears that check and admits every label.
-        _iso = int(adata.obs["batch"].nunique()) + 1
+        # every cell type counts as isolated: scib's default scores none when
+        # every type is in every batch, and n_batches + 1 clears its check
+        iso_threshold = int(adata.obs["batch"].nunique()) + 1
         _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="celltype",
-                                                     embed="X_emb", iso_threshold=_iso))
+                                                     embed="X_emb", iso_threshold=iso_threshold))
         _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
                                                  batch_key="batch", embed="X_emb",
-                                                 iso_threshold=_iso,
-                                                 precomputed_keys=_sweep_keys or None,
+                                                 iso_threshold=iso_threshold,
+                                                 precomputed_keys=sweep_keys or None,
                                                  flavor=flavor))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
         _safe("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
         _safe("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="embed", use_rep="X_emb"))
-        # kBET shells out to R and dominates the runtime (hours per dataset at
-        # 10-30k cells), so it is opt-in: slow_metrics=True computes it.
+        # opt-in: kBET runs in R and takes hours at 10-30k cells
         if slow_metrics:
             _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))
 
     frame = pd.DataFrame.from_dict(out, orient="index", columns=["Value"])
-    # how the clustering metrics were scored, for evaluate()'s provenance
     scored_clusters = want_clu and any(m in out for m in ("ARI", "NMI"))
-    frame.attrs["leiden_flavor"] = flavor if _sweep_keys else None
+    frame.attrs["leiden_flavor"] = flavor if sweep_keys else None
     frame.attrs["clustering"] = (None if not scored_clusters
                                  else "user" if cluster is not None else "sweep")
     return frame

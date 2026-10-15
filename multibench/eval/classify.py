@@ -249,9 +249,8 @@ def _not_embedding(output) -> str | None:
 
 
 def _graph_writer(output) -> str | None:
-    """The method that writes ``output`` when it is the path of a file only
-    graph methods write (their graph, or the UMAP scMoMaT writes beside it);
-    ``"output"`` when several do; ``None`` for anything else."""
+    """The method that writes ``output`` when it is a file only graph methods
+    write; ``"output"`` when several do; ``None`` for anything else."""
     if not isinstance(output, (str, Path)):
         return None
     methods = _graph_files().get(Path(output).name)
@@ -279,20 +278,15 @@ def _label_outputs() -> set:
 
 
 def _graph_files() -> dict:
-    """``{file name: [method, ...]}`` for the files that only variants whose
-    output is a graph write; a name an embedding variant also writes is not
-    in it."""
+    """``{file name: [method, ...]}`` for files that only graph variants write."""
     return {f: sorted({m for _, _, m in uses}) for f, uses in _registry_files().items()
             if all(vk == "graph" for _, vk, _ in uses)}
 
 
 def _is_neighbour_index(emb) -> bool:
-    """Whether ``emb`` (cells x columns) is a nearest-neighbour index matrix,
-    the graph a method such as scMoMaT writes, and not an embedding: two or
-    more columns but fewer than cells, every value a whole number from 0 to
-    the number of cells (row numbers counted from 0 or from 1), and no value
-    twice in a row. An embedding holds values that are not whole numbers, so
-    it never matches."""
+    """Whether ``emb`` is a nearest-neighbour index (scMoMaT's graph), not an
+    embedding: fewer columns than cells, whole numbers from 0 to the number of
+    cells, no value twice in a row. Embedding values are not whole numbers."""
     a = np.asarray(emb)
     if a.ndim != 2 or not 2 <= a.shape[1] < a.shape[0]:
         return False
@@ -308,10 +302,8 @@ def _is_neighbour_index(emb) -> bool:
 
 
 def _mlp(x, y, seed: int):
-    """The benchmark's classifier, a multilayer perceptron, fitted on ``x``
-    (cells x dims) and ``y``: Linear(dims, 128), ReLU, Linear(128, types);
-    cross-entropy, Adam with learning rate 0.01, batches of 64 cells,
-    shuffled, 10 epochs, no weight decay."""
+    """The benchmark's classifier fitted on ``x`` and ``y``: Linear(dims, 128),
+    ReLU, Linear(128, types); Adam, learning rate 0.01, batches of 64, 10 epochs."""
     from sklearn.exceptions import ConvergenceWarning
     from sklearn.neural_network import MLPClassifier
     clf = MLPClassifier(hidden_layer_sizes=(128,), activation="relu", solver="adam",
@@ -396,9 +388,8 @@ def classification_metrics(predictions) -> pd.DataFrame:
 
 
 def _metrics(frame: pd.DataFrame) -> list:
-    """The five metrics of one query, from the confusion table of the
-    true and the predicted cell types (rows and columns: every type true or
-    predicted)."""
+    """The five metrics of one query, from the confusion table of every type
+    true or predicted."""
     keep = ~(io.missing_mask(frame["label"].to_numpy(dtype=object))
              | io.missing_mask(frame["predicted"].to_numpy(dtype=object)))
     truth = frame["label"].to_numpy(dtype=object)[keep]
