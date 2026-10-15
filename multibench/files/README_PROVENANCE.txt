@@ -32,11 +32,14 @@ dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
                dataset. Ids with stored results but no CSV row (D24, D11s,
                ...) are appended.
 
-metric_full.csv - one row per scIB metric of the clustering and batch
-  families, with a short description that states the range and that higher
-  is better. The descriptions follow what multibench.evaluate computes
-  (multibench/eval/scib.py): Leiden clusters from the optimal-resolution
+metric_full.csv - one row per metric of the clustering, batch and
+  classification families, with a short description that states the range
+  and that higher is better. The descriptions follow what
+  multibench.evaluate computes: for the scIB metrics
+  (multibench/eval/scib.py), Leiden clusters from the optimal-resolution
   sweep for ARI/NMI/iF1, every cell type counted as an isolated label for
-  iASW/iF1. PCR, which catalog.known_metrics() also lists, has no row.
+  iASW/iF1; for OCA, ACA, Spec, Sens and F1 (multibench/eval/classify.py),
+  the mean over the reference batches. PCR, which catalog.known_metrics()
+  also lists, has no row.
 
 An official scMultiBench file with the same columns can replace any of these.
