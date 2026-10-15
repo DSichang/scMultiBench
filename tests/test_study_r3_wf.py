@@ -121,10 +121,9 @@ def test_gene_activity_near_miss_states_the_vertical_rule(tmp_path):
 
 
 def test_modality_token_notes_state_the_exception():
-    for fn in (mtb.scan, mtb.run_all):
-        flat = " ".join(inspect.getdoc(fn).split())
-        assert ("moETM, scMM and iPOLNG read peaks through a role named ``atac_gas``, so "
-                "``atac_peak`` selects them and ``atac_gas`` does not") in flat, fn.__name__
+    flat = " ".join(inspect.getdoc(mtb.scan).split())
+    assert ("moETM, scMM and iPOLNG read peaks through a role named ``atac_gas``, so "
+            "``atac_peak`` selects them and ``atac_gas`` does not") in flat
 
 
 # ----------------------------------------------------------------- R3-02

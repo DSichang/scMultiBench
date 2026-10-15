@@ -299,12 +299,10 @@ def test_the_cli_scan_gives_the_same_sentence(no_envs, labmos, capsys):
 
 
 def test_the_docstrings_say_a_method_without_a_variant_raises():
-    assert "A method in ``methods`` has no variant in ``category`` or ``modalities``." \
-        in _doc(W.scan)
-    assert ("A named method with no variant under ``category`` or ``modalities`` raises "
-            "``ValueError``, even when other named methods have one.") in _doc(W.scan)
-    assert ("A named method or a selection with no variant: ``ValueError`` before "
-            "anything runs, dry run included") in _doc(W.run_all)
+    assert ("A method in ``methods`` has no variant in ``category`` or ``modalities``, "
+            "even when other named methods have one.") in _doc(W.scan)
+    assert ("a named method or a selection with no variant, before anything runs, "
+            "dry run included") in _doc(W.run_all)
 
 
 # ============================================================ R8-05

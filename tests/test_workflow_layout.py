@@ -126,13 +126,11 @@ def test_overview_keeps_every_category_and_the_full_table():
     assert "mtb.scan('MYDATA', '<category>')" in txt
 
 
-def test_one_atac_rule_in_run_all_and_describe_layout():
+def test_one_atac_rule_in_describe_layout():
     rule = ("Vertical reads ``atac.h5``; ``method_info(m)[\"atac\"]`` says whether it "
             "must hold peaks or gene activity. Diagonal reads ``atac_peak.h5`` (peaks) "
             "and ``atac_gas.h5`` (gene activity). Mosaic reads ``atac<i>.h5`` (peaks). "
             "``peak.h5``, and ``atac.h5`` for gene activity, are accepted as older names.")
-    for fn in (mtb.run_all, mtb.describe_layout):
-        flat = " ".join(inspect.getdoc(fn).split())
-        assert rule in flat, fn.__name__
+    assert rule in " ".join(inspect.getdoc(mtb.describe_layout).split())
     flat = " ".join(inspect.getdoc(mtb.run_all).split())
     assert "plausible" not in flat and "peaks are ``peak.h5``" not in flat

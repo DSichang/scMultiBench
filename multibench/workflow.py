@@ -1,21 +1,16 @@
 """High-level workflow: point at a dataset, run everything that applies, get metrics and a figure.
 
-The low-level API (``inputs_for`` -> ``run`` -> ``evaluate`` -> ``plot``) requires
-a method's name, its integration category and its exact modality combination.
-This module works from the dataset instead:
+The low-level API (``inputs_for`` -> ``run`` -> ``evaluate`` -> ``plot``) needs a
+method, its category and its modality combination; this module starts from the dataset:
 
-    mtb.scan("D11")                     # what can I run on this data?
-    res = mtb.run_all("D11", "vertical", out_dir="out/")  # run all of it, with metrics
-    res.plot()                            # one figure
+    mtb.scan("D11")                                       # what can run on this data?
+    res = mtb.run_all("D11", "vertical", out_dir="out/")  # run it all, with metrics
+    res.plot()                                            # one figure
 
-It also handles two common mistakes that give wrong numbers without an error:
-
-* **output kind** - not every method returns an embedding. A method that
-  writes a graph is recorded as such, not scored with embedding metrics
-  (scoring a KNN index matrix gives ARI ~ 0).
-* **label order** - ``evaluate`` needs labels in the embedding's cell order,
-  and length alone cannot tell two orders apart. Candidate orders are scored,
-  the best is kept, and the scores of all of them are recorded.
+Two mistakes that give wrong numbers without an error are handled here. A method
+that writes a graph is recorded as such, not scored with embedding metrics (a kNN
+index matrix scores ARI ~ 0). Labels must follow the embedding's cell order, which
+length alone cannot tell: every candidate order is scored and the best is kept.
 """
 from __future__ import annotations
 
@@ -83,20 +78,15 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
 
     Notes
     -----
-    **Files read.** ``batch_result.json`` holds the per-method records.
-    ``long.csv``, written when the run produced metrics, restores each
-    method's unrounded long table; without it ``BatchResult.long`` is rebuilt
-    from the records' rounded ``metrics``.
+    ``long.csv`` restores each method's unrounded long table; without it
+    ``BatchResult.long`` is rebuilt from the records' rounded ``metrics``.
+    ``methods=`` only filters: records keep the order the tree ran them.
 
-    **Record order.** ``methods=`` only filters: the kept records stay in the
-    order the tree ran them, not the order of ``methods``.
-
-    **Moved folders.** A record whose ``out_dir`` does not exist is pointed
-    at the folder of the same name next to ``batch_result.json``. The
-    dataset folder is looked up under ``data_path=``, the recorded
-    ``data_path`` and then ``data_root``, and the one found is recorded as
-    an absolute path. So a ``fetch_outputs`` tree or a copied ``run_all``
-    folder can be re-scored.
+    A record whose ``out_dir`` does not exist is pointed at the folder of the
+    same name next to ``batch_result.json``. The dataset folder is looked up
+    under ``data_path=``, the recorded ``data_path`` and then ``data_root``,
+    and the one found is recorded as an absolute path. So a ``fetch_outputs``
+    tree or a copied ``run_all`` folder can be re-scored.
 
     See Also
     --------
@@ -228,22 +218,20 @@ def describe_layout(category: str | None = None) -> str:
 
     Notes
     -----
-    **What the text covers.** For one category: the files its methods read,
-    one name per file, as ``mtb.io.export_dataset`` writes them. It also
-    gives the ATAC representation each method needs, the ``.h5`` and label
-    formats, and the install command. For mosaic and cross it lists each
-    batch pattern the methods accept. ``multibench layout`` prints the same
-    text, with ``multibench`` commands in place of the Python calls.
+    For one category the text gives the files its methods read, as
+    ``mtb.io.export_dataset`` writes them, the ATAC representation each
+    method needs, the ``.h5`` and label formats, the install command and, for
+    mosaic and cross, each batch pattern the methods accept. The lists are
+    read from the method registry at call time. ``multibench layout`` prints
+    the same text with ``multibench`` commands.
 
-    **One rule for ATAC files.** Vertical reads ``atac.h5``;
-    ``method_info(m)["atac"]`` says whether it must hold peaks or gene
-    activity. Diagonal reads ``atac_peak.h5`` (peaks) and ``atac_gas.h5``
-    (gene activity). Mosaic reads ``atac<i>.h5`` (peaks). ``peak.h5``, and
-    ``atac.h5`` for gene activity, are accepted as older names.
+    Vertical reads ``atac.h5``; ``method_info(m)["atac"]`` says whether it
+    must hold peaks or gene activity. Diagonal reads ``atac_peak.h5`` (peaks)
+    and ``atac_gas.h5`` (gene activity). Mosaic reads ``atac<i>.h5`` (peaks).
+    ``peak.h5``, and ``atac.h5`` for gene activity, are accepted as older names.
 
-    **Several batches.** Mosaic and cross use one numbered file per batch in
-    the same folder, not sub-folders and not one concatenated matrix. The
-    file number is the batch; there is no batch column:
+    Mosaic and cross use one numbered file per batch in one folder, not
+    sub-folders or one concatenated matrix. The file number is the batch:
 
     ```text
     <data_path>/COREBATCH/
@@ -251,10 +239,6 @@ def describe_layout(category: str | None = None) -> str:
         rna2.h5   adt2.h5   cty2.csv     # batch 2
         rna3.h5   adt3.h5   cty3.csv     # batch 3
     ```
-
-    **Source of the lists.** The methods per ATAC representation and the
-    batch patterns are read from the package's method list at call time, so they
-    agree with ``method_info`` and ``mtb.find_methods``.
 
     See Also
     --------
@@ -510,12 +494,8 @@ def _layout_block(category: str, *, full: bool) -> list[str]:
 
 # --------------------------------------------------------------------------- scan
 def _installed_envs() -> frozenset:
-    """Envs present on this machine, read on every call (see mtb.env.doctor()).
-
-    Not cached: an env installed after a first scan() in the same session
-    must count at once. The conda listing underneath is cached and cleared
-    by the installs, so a call is a directory listing.
-    """
+    """The envs on this machine, read on every call so that an env installed
+    mid-session counts at once; empty when the probe fails."""
     try:
         return frozenset(envs.installed_envs())
     except Exception:      # an env probe must not break discovery
@@ -523,30 +503,8 @@ def _installed_envs() -> frozenset:
 
 
 def _missing_script(variant, *, method: str | None = None) -> str:
-    """Why this variant's script is unreachable here, or "" when it is fine.
-
-    A method whose script is absent must not be reported runnable: the run
-    would fail minutes later with a shell error instead of here, instantly.
-    Two cases are checked:
-
-    * an entrypoint missing from a reference checkout that is present. When
-      no checkout exists at all, nothing is reported: `run` and `run_all`
-      fetch it on first use, and flagging every method as broken before that
-      first fetch would be wrong;
-    * a local helper module the entrypoint imports from its own directory
-      (``variant.helpers``, e.g. MIRA's ``logger.py``) that the public
-      repository does not ship - the script would ``ImportError`` at start.
-
-    A checkout at another commit than ``$MULTIBENCH_SCRIPTS_REF`` is not a
-    file problem: ``scan`` blocks every row with its own reason.
-
-    Parameters
-    ----------
-    variant : Variant
-        The variant whose ``entrypoint`` / ``helpers`` are checked.
-    method : str, keyword-only, optional
-        The method id, named in the helper message.
-    """
+    """Why this variant's script or a helper module it imports is missing from
+    the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
     entry = Path(variant.entrypoint)
     helpers = getattr(variant, "helpers", None) or []     # test stubs lack the field
     for root in (Path(config.DEFAULT.repo_path), Path(config.__file__).resolve().parent.parent):
@@ -577,15 +535,13 @@ def _missing_script(variant, *, method: str | None = None) -> str:
 
 
 def _rows_word(df: "pd.DataFrame", k: int) -> str:
-    """What ``k`` counts in a count line over the scan frame ``df``:
-    ``methods`` when each method has one row, else ``rows`` (singular for 1)."""
+    """``method(s)`` when each method of the scan frame has one row, else ``row(s)``."""
     noun = "method" if len(df) and df["method"].is_unique else "row"
     return noun if k == 1 else noun + "s"
 
 
 def _have_their(k: int, n: int) -> str:
-    """The verb after ``k of n <rows>``: ``has its`` when ``k`` or ``n`` is 1
-    (``0 of 1 method has its``), else ``have their`` (``3 of 14 rows have their``)."""
+    """The verb after ``k of n <rows>``: ``has its`` when ``k`` or ``n`` is 1."""
     return "has its" if 1 in (k, n) else "have their"
 
 
@@ -616,14 +572,8 @@ OUT_DIR_PLACEHOLDER = "<out_dir>"
 
 
 def _env_hint(env: str, method: str, category: str | None) -> str:
-    """The env_reason text: names the env, the method-specific install command
-    and then the category-wide alternative. The command comes first, so a
-    clipped reason still holds it.
-
-    Off Linux the install command refuses, so the reason only names the
-    environment and says it cannot be installed here; the scan summary line
-    says what this computer can do instead.
-    """
+    """The ``env_reason`` text: the install command first, so a clipped reason
+    still holds it; off Linux only the platform sentence."""
     if _runner.linux_only_sentence():
         return f"Environment {env} runs only on Linux, not on this computer."
     alt = (f" Use --category {category} to install the environments of every "
@@ -646,8 +596,7 @@ LINUX_ONLY_SUMMARY = (f"{LINUX_ONLY_CHECK} The commands use this computer's path
 
 
 def _first_sentence(text: str) -> str:
-    """The first sentence of ``text`` (up to a '.', '!' or '?' followed by a
-    space or the end); a dotted file name does not end it."""
+    """The first sentence of ``text``; a dotted file name does not end it."""
     m = re.match(r"(.+?[.!?])(\s|$)", text.strip(), re.S)
     return (m.group(1) if m else text).strip()
 
@@ -669,19 +618,8 @@ def _atac_kind_of(path: Path) -> str:
 
 def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str,
                           data_path) -> str:
-    """The ``reason`` text for input files that are not on disk, or ``""``.
-
-    Built from the resolved paths, not from the exception text, so no path
-    is ever cut. An ATAC file leads with what the method needs and what the
-    folder holds instead: ``SCALEX needs gene-activity ATAC (atac_gas.h5),
-    and the folder has peaks (atac_peak.h5).`` Other files follow as
-    ``adt.h5 is missing.``, then the per-batch hint of ``inputs_for`` when
-    the folder holds ``rna1.h5, rna2.h5, ...`` for a vertical or diagonal
-    method. Each part is a sentence with its own subject. Numbered ATAC
-    files that are missing in the same way share one sentence: ``StabMap needs peak
-    ATAC (atac1.h5, atac2.h5), and the folder has gene activity
-    (atac_gas1.h5, atac_gas2.h5).``
-    """
+    """The ``reason`` for input files that are not on disk, or ``""``: ``SCALEX needs
+    gene-activity ATAC (atac_gas.h5), and the folder has peaks (atac_peak.h5).``"""
     try:
         paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
                                     data_path=data_path, check=False)
@@ -750,8 +688,7 @@ _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
 
 
 def _dropped_dirs_message(modalities, dropped: list) -> str:
-    """The warning of ``scan(modalities=...)`` for the methods that read a
-    folder (scBridge): no modality token selects them."""
+    """The warning of ``scan(modalities=...)`` for the methods that read a folder."""
     one = len(dropped) == 1
     mods = _resolve._and_list([str(m) for m in modalities])
     head = (f"The modality {mods} leaves" if len(modalities) == 1
@@ -766,21 +703,8 @@ def _dropped_dirs_message(modalities, dropped: list) -> str:
 
 
 def _short_reason(text: str, method: str, dataset: str, category: str | None) -> str:
-    """The ``reason`` column form of a ``files_reason``: what is missing, no noise.
-
-    ``text`` is one part of ``files_reason``: a missing-script sentence, or
-    the verbatim exception text (``FileNotFoundError: SCALEX (diagonal)
-    needs atac_gas.h5 in /path/to/data/LUNG. ...``), which keeps the full
-    path because that is what a user greps for. ``reason`` is what the scan
-    frame, the CLI table and the "No method can run" error show, so it drops
-    what every row repeats: the exception class, the absolute directory
-    (each path becomes its basename) and the ``<method> reads <file> of
-    <dataset>, which`` opening of a cell check, which leaves the file as the
-    subject (``atac_gas.h5 lists the ATAC cells in another order than
-    atac_peak.h5. ...``). The 80-character column then keeps the fact that
-    differs. The env half of ``reason`` is untouched - it carries the
-    copy-pasteable install command.
-    """
+    """A ``files_reason`` part as the ``reason`` column shows it: without the
+    exception class, directories, or the ``<method> reads <file> of <dataset>`` opening."""
     if not text:
         return text
     part = _EXC_PREFIX_RE.sub("", text)
@@ -812,14 +736,8 @@ def _blocking_caveats(caveats) -> list[str]:
 
 
 def _wrong_atac_reason(method: str, caveats) -> str:
-    """The ``reason`` of a row whose ATAC file the method cannot read, or "".
-
-    Two caveats block: the file holds the other representation, or the peak
-    file of GLUE / Seurat_v3 holds names that are not chr:start-end (the
-    script casts their parts to int). ``scan`` marks such a row not runnable
-    unless ``allow_atac_mismatch=True``, so ``run_all`` skips it by default
-    (the one rule of both). The reason gives the fix first, the override last.
-    """
+    """The ``reason`` of a row whose ATAC file the method cannot read (the other
+    representation, or peak names it cannot parse), or ""; the override comes last."""
     anyway = (", or pass " + config.hint(_ATAC_OVERRIDE[0], _ATAC_OVERRIDE[1])
               + f" to run {method} anyway.")
     for text in _blocking_caveats(caveats):
@@ -842,9 +760,8 @@ def _is_wrong_atac(reason) -> "pd.Series | bool":
 
 
 def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
-    """The blocking caveats (:func:`_blocking_caveats`) of the files in a
-    ``run`` call's ``inputs``; ``[]`` when there are none or they cannot be
-    read. In-memory inputs are not checked."""
+    """The blocking caveats of the files in a ``run`` call's ``inputs``; ``[]`` when
+    none or unreadable. In-memory inputs are not checked."""
     try:
         spec = registry.get(method)
         paths = {r: str(p) for r, p in inputs.items()
@@ -856,8 +773,8 @@ def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
 
 
 def _run_caveat(caveat) -> str:
-    """A scan ``caveat`` without the notes on starting the method, which
-    ``run_all`` does itself: what its log and records keep of the caveat."""
+    """A scan ``caveat`` without the trailing notes on starting the method
+    (scripts not here, a prepared input), which ``run_all`` handles itself."""
     text = str(caveat or "")
     cuts = [i for i in (text.find(_runner.SCRIPTS_NOT_HERE), _runner._prepared_at(text))
             if i >= 0]
@@ -880,25 +797,15 @@ def _would_run(row) -> bool:
 
 
 def _scripts_ref_note() -> str | None:
-    """The sentence a dry run prints under its count line when the method
-    scripts are not at ``$MULTIBENCH_SCRIPTS_REF``, or their folder cannot be
-    filled; ``None`` otherwise."""
+    """The dry-run note that the method scripts are not at
+    ``$MULTIBENCH_SCRIPTS_REF`` or their folder cannot be filled, else ``None``."""
     note = config.scripts_ref_problem() or config.scripts_folder_problem()
     return _join_sentences([note]) if note else None
 
 
 def _dry_run_notes(plan: "pd.DataFrame", modalities=None) -> tuple:
-    """What a dry run prints under its count line: ``(scripts_note, [(method, caveat)])``.
-
-    ``scripts_note`` is the note that the method scripts are not on this
-    machine yet, once, or ``None``. The list holds the caveat of each row
-    the sweep would run - runnable, or blocked only by its env - without the
-    notes on starting the method (:func:`_run_caveat`); rows with nothing
-    left are not listed. Without ``modalities``, a row inside a larger one of
-    the same method is not run (:func:`_nested_rows`), so its caveat is left
-    out: UINMF's two-batch row says it skips batch 3, and on three batches
-    the three-batch row is the one that runs.
-    """
+    """``(scripts_note, [(method, caveat)])``: the note that the method scripts are
+    not here yet, and the caveat of each row the sweep would run (nested rows out)."""
     scripts = None
     lines = []
     left_out = set()
@@ -917,13 +824,8 @@ def _dry_run_notes(plan: "pd.DataFrame", modalities=None) -> tuple:
 
 
 def _variant_consumes_atac(variant) -> bool:
-    """Whether this variant takes an ATAC input.
-
-    Judged on the declared modalities, not on every argument: Seurat_WNN's
-    rna+adt variant passes its unused ATAC slot as a constant ``NULL``. A
-    variant fed a folder (scBridge) declares none; its constant file names
-    decide.
-    """
+    """Whether this variant takes an ATAC input, judged on its declared modalities
+    (Seurat_WNN's rna+adt variant passes ``NULL`` to its ATAC slot)."""
     mods = variant.when.get("modalities") or []
     if mods:
         return any(_schema_base(m) == "atac" for m in mods)
@@ -931,29 +833,8 @@ def _variant_consumes_atac(variant) -> bool:
 
 
 def _modality_matcher(modalities, named=None):
-    """A test ``(spec, variant_modalities) -> bool`` for ``scan(modalities=)``.
-
-    A method in ``named`` (``scan(methods=)``) keeps a variant whose roles
-    the list spells exactly as ``scan`` and ``method_info`` show them.
-    Otherwise one representation token (``atac_peak`` / ``peak``,
-    ``atac_gas`` / ``gas`` / ``gene_activity``) first drops every variant
-    whose ``method_info(m)['atac']`` is the other representation, as
-    ``find_methods(atac=...)`` does: moETM, scMM and iPOLNG read peaks
-    through a role named ``atac_gas``. Then a list that names a variant's
-    roles exactly (a scan row's ``modalities`` split on ``+``) keeps that
-    variant. Otherwise the tokens name one
-    combination: a base token (``rna``, ``adt`` / ``protein``, ``atac``)
-    matches every role of that base (``atac`` matches ``atac``, ``atac_gas``,
-    ``atac_peak`` and the numbered ``atac2``); a representation token
-    (``atac_peak`` / ``peak``, ``atac_gas`` / ``gene_activity``) matches the
-    ATAC roles of a method whose ``method_info(m)['atac']`` is that
-    representation; a numbered token (``rna1``) matches that role. A variant
-    matches when every token matches one of its roles and every role is
-    matched. Both representation tokens together therefore keep only the
-    variants with both roles (MultiMAP, Seurat_v3). ``[]`` matches only the
-    variants fed a folder. Unknown tokens raise ``ValueError`` as in
-    ``find_methods``.
-    """
+    """A test ``(spec, variant_modalities) -> bool`` for ``scan(modalities=)``; the
+    rules are those of the scan docstring. ``named`` are the ``methods=`` ids."""
     from .discover import _modality_filter
     from .engine.schema import modality_family
     _modality_filter(modalities, None)      # ValueError / TypeError as in find_methods
@@ -996,8 +877,7 @@ _REP_WORDS = {"peak": "peaks", "gene_activity": "gene activity"}
 
 
 def _token_reps(modalities) -> set:
-    """The ATAC representations (``peak``, ``gene_activity``) the tokens name,
-    as :func:`_modality_matcher` reads them; empty for ``atac`` or no ATAC token."""
+    """The ATAC representations (``peak``, ``gene_activity``) the tokens name."""
     out = set()
     for given in modalities or ():
         token = registry.MODALITY_ALIASES.get(str(given).lower(), str(given))
@@ -1008,12 +888,8 @@ def _token_reps(modalities) -> set:
 
 
 def _representation_note(category, methods, modalities) -> str:
-    """Why a representation token dropped every row of the named ``methods``, or "".
-
-    For each named method that the list would select with ``atac`` in place
-    of the representation token: what it reads, the role named after the
-    other representation (moETM's ``atac_gas``), and the list to pass.
-    """
+    """Why a representation token dropped the named ``methods`` (what each reads,
+    and the list to pass), or ""."""
     if not methods or not modalities:
         return ""
     tokens = [registry.MODALITY_ALIASES.get(str(t).lower(), str(t).lower())
@@ -1042,14 +918,8 @@ def _representation_note(category, methods, modalities) -> str:
 
 
 def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
-    """The ``ValueError`` of named methods that have no row, or of a selection
-    that matches no variant: what does not run, then why.
-
-    A named method with no variant under ``category`` gets its own sentence
-    (``totalVI does not run on mosaic data. Its categories: vertical,
-    cross.``). The named methods that ``modalities`` dropped share one
-    sentence, then the representation note or where to look.
-    """
+    """The ``ValueError`` for named methods without a row, or a selection that
+    matches no variant: what does not run, then why."""
     from .engine.schema import no_category_message
     from .plot.bubble import _and
     where = f"{category} data" if category else "any category"
@@ -1077,12 +947,8 @@ def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
 
 def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset: str,
                   params: dict | None, gpu: bool | None = None) -> tuple[str, list[str]]:
-    """The shell line ``run`` would execute for one scan row (``shlex``-joined),
-    and the note when that line reads files ``run`` writes first.
-
-    ``(no preview: ...)`` when building it failed - a preview must never
-    abort the scan.
-    """
+    """The shell line ``run`` would execute for one scan row, and the notes on
+    files that ``run`` writes first; ``(no preview: ...)`` when it cannot be built."""
     try:
         # runner.preview, not _run: a preview is not a dispatch
         argv, notes = _runner.preview(method, category, inputs=inputs,
@@ -1103,9 +969,8 @@ _FAMILY_WORDS = {"rna": "RNA", "adt": "ADT", "atac": "ATAC"}
 
 
 def _every_combination(modalities) -> tuple:
-    """``(every, modalities)`` of a ``modalities=`` argument: ``"all"`` asks
-    for every combination and selects none, so it becomes ``(True, None)``.
-    Another bare string is left for the ``TypeError`` of the id-list check."""
+    """``(every, modalities)``: ``"all"`` becomes ``(True, None)``; another bare
+    string is left for the id-list check to reject."""
     if isinstance(modalities, str) and modalities == "all":
         return True, None
     return False, modalities
@@ -1117,36 +982,19 @@ def _row_modalities(text) -> list:
 
 
 def _family(role) -> str:
-    """The modality family of a role: ``rna2`` -> ``rna``, ``atac_peak`` ->
-    ``atac``."""
+    """The modality family of a role: ``rna2`` -> ``rna``, ``atac_peak`` -> ``atac``."""
     return _schema_base(str(role)).rstrip("0123456789")
 
 
 def _row_families(modalities) -> set:
-    """The families a scan row reads, from its ``modalities``; none for a
-    row that reads a folder."""
+    """The families a scan row reads; none for a row that reads a folder."""
     roles = _row_modalities(modalities)
     return {_family(r) for r in roles} & set(_FAMILIES)
 
 
 def _role_files(ds_dir: Path, category: str | None) -> dict:
-    """``{file name: family}`` of the matrix files that are in the folder
-    and that a role of some variant of ``category`` (``None``: of any)
-    resolves to.
-
-    The resolver decides (``_resolve._resolve_variant_inputs``, the paths
-    ``inputs_for`` returns), so an older name such as ``peak.h5`` counts, a
-    vertical folder with ``atac_peak.h5`` and ``atac_gas.h5`` gives the one
-    each method reads, and no second list of file names exists. Every
-    variant is asked, not only the rows of one scan: what a folder holds does
-    not depend on the methods a caller names.
-
-    An ATAC role whose file is absent counts the ATAC file of the same batch
-    under another name of the layout (``_resolve._ATAC_FILE_BASES``): a cross
-    folder written with gene activity holds ``atac_gas1.h5`` where the role
-    reads ``atac1.h5``. The folder holds ATAC, in the form the methods do not
-    read, and the reason of each row says so (:func:`_missing_files_reason`).
-    """
+    """``{file name: family}`` of the matrix files a role of some variant of
+    ``category`` resolves to; an absent ATAC role counts its batch's other ATAC name."""
     from .engine.schema import is_label_role
     files = {}
     for spec, v, *_ in _variant_rows(category):
@@ -1166,22 +1014,14 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
 
 
 def _held_families(ds_dir: Path, category: str | None) -> list:
-    """The families the folder holds a file of: a family is held when one of
-    its roles resolves to a file that is there (:func:`_role_files`)."""
+    """The families the folder holds a file of (:func:`_role_files`)."""
     held = set(_role_files(ds_dir, category).values())
     return [f for f in _FAMILIES if f in held]
 
 
 def _listed(df: "pd.DataFrame", need, held, methods) -> list:
-    """Which rows a scan without ``modalities`` lists, as one flag per row.
-
-    A row is listed when the folder holds every family it reads (``need``,
-    one set per row), or when its input files are all there. So only rows
-    without their files are left out, and a row that reads a folder always
-    stays. A method named in ``methods`` keeps all its rows when none would
-    be listed. When the folder holds no family, or no row would be left,
-    every row is listed.
-    """
+    """One flag per row: whether a scan without ``modalities`` lists it (the rule
+    of the scan docstring, Listed rows). ``need`` is each row's families."""
     keep = [n <= set(held) or bool(ok) for n, ok in zip(need, df["files_ok"])]
     if methods:
         left = set(df["method"][keep])
@@ -1192,9 +1032,7 @@ def _listed(df: "pd.DataFrame", need, held, methods) -> list:
 
 
 def _tenx_files(ds_dir: Path, files: dict) -> list:
-    """The names in ``files`` (:func:`_role_files`) that are 10x Genomics
-    files, as the folder check tells them (``_resolve._check_matrix_files``),
-    by batch number, then RNA, ADT, ATAC."""
+    """The names in ``files`` that are 10x Genomics files, by batch, then RNA, ADT, ATAC."""
     from .engine.ingest import _is_canonical_h5, _is_tenx_h5
 
     def order(name):
@@ -1205,18 +1043,8 @@ def _tenx_files(ds_dir: Path, files: dict) -> list:
 
 
 def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = None) -> str:
-    """``D11 holds RNA and ADT.``; with numbered files ``D52 holds RNA and
-    ADT, in batches 1-3.`` ``held`` are the families of ``category``
-    (:func:`_held_families`).
-
-    A 10x Genomics file among their files is named as that and does not
-    count for its family: ``MY holds ADT. rna.h5 is a 10x Genomics file
-    under the name of a dataset file.`` When every one is: ``MY holds no
-    dataset file: rna.h5 and atac.h5 are 10x Genomics files under the names
-    of dataset files.`` With no family held, matrix files under other names
-    (:func:`_cells_per_file`) are told from none: ``D1 holds no RNA, ADT or
-    ATAC file under a name that a vertical method reads.``
-    """
+    """``D52 holds RNA and ADT, in batches 1-3.``; a 10x Genomics file is named as
+    such and does not count for its family."""
     if not held:
         if not _cells_per_file(ds_dir):
             return f"{dataset} holds no RNA, ADT or ATAC file."
@@ -1246,16 +1074,13 @@ def _all_spelling() -> str:
 
 
 def _lacking(families) -> str:
-    """``ATAC``, ``ADT or ATAC``: the families some rows read and the folder
-    does not hold."""
+    """``ATAC``, ``ADT or ATAC``: the families as words."""
     return _or([_FAMILY_WORDS[f] for f in families])
 
 
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
                      category: str | None = None) -> str:
-    """What the folder holds and how many rows are not listed for it, with
-    the way to list them: the sentences after the counts of a scan of
-    ``category``."""
+    """What the folder holds, how many rows are not listed, and how to list them."""
     d, one = df.attrs["not_listed"], df.attrs["not_listed"] == 1
     return (f"{_holds_sentence(dataset, ds_dir, df.attrs['held'], category)} {d} "
             f"{'row that reads' if one else 'rows that read'} "
@@ -1265,9 +1090,8 @@ def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
 
 def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
                category: str | None = None) -> str:
-    """:func:`_not_listed_note` for a caller that holds the scan frame, and
-    the dataset and the category as they were typed (the command line);
-    ``""`` when every row is listed."""
+    """:func:`_not_listed_note` from a scan frame and the dataset as typed (the
+    command line); ``""`` when every row is listed."""
     if not df.attrs.get("not_listed"):
         return ""
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
@@ -1342,7 +1166,8 @@ def scan(dataset: str, category: str | None = None, *,
     ValueError
         Unknown ``category`` or modality token.
     ValueError
-        A method in ``methods`` has no variant in ``category`` or ``modalities``.
+        A method in ``methods`` has no variant in ``category`` or ``modalities``,
+        even when other named methods have one.
     ValueError
         ``per_method=True`` without ``category``.
     KeyError
@@ -1375,13 +1200,14 @@ def scan(dataset: str, category: str | None = None, *,
 
     Notes
     -----
-    **Column reference.** The full frame has 18 columns:
+    **Columns.**
 
     ```text
     method              method id
     category            integration category of the variant
-    modalities          '+'-joined string ("rna+adt"); "(data_dir)" for a
-                        directory-fed variant
+    modalities          '+'-joined roles ("rna+adt"); run_all and inputs_for take
+                        a list, so split on "+". "(data_dir)" marks a variant
+                        that reads a whole folder (scBridge): pass no modalities
     env                 the conda env the method runs in
     output_kind         embedding / graph
     n_tunable           number of command-line hyperparameters
@@ -1389,7 +1215,7 @@ def scan(dataset: str, category: str | None = None, *,
     observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
     caveat              what the run needs besides the files, or ""
     runnable            both checks pass and nothing below blocks it
-    reason              short form of the non-empty reasons, as sentences
+    reason              short form of the non-empty reasons; "" when runnable
     files_ok            the inputs resolve, are oriented and labelled
     files_reason        full file-check text, full paths
     env_ok              the env exists (and a GPU, when the script needs one)
@@ -1401,15 +1227,13 @@ def scan(dataset: str, category: str | None = None, *,
                         inputs do not resolve
     ```
 
-    **Listed rows.** By default the frame lists the variants whose
-    modalities the folder holds: on a folder with ``rna.h5`` and ``adt.h5``
-    the variants that read ATAC are left out. A variant whose input files
-    are all there is always listed, so the rows with ``files_ok`` are the
-    same as with ``modalities="all"``, which lists every variant. A method
-    named in ``methods`` keeps its rows when none of them would be listed.
-    When the folder holds no RNA, ADT or ATAC file, or no row would be
-    left, every variant is listed. A list of ``modalities`` selects as
-    before. ``df.attrs`` says what was left out:
+    **Listed rows.** Without ``modalities`` the frame lists the variants
+    whose modalities the folder holds, and every variant whose input files
+    are all there, so the ``files_ok`` rows are those of
+    ``modalities="all"``. A method named in ``methods`` keeps its rows when
+    none would be listed. When the folder holds no RNA, ADT or ATAC file, or
+    no row would be left, every variant is listed. ``df.attrs`` says what was
+    left out:
 
     ```text
     held        the modalities the folder holds, e.g. ['rna', 'adt']
@@ -1420,79 +1244,39 @@ def scan(dataset: str, category: str | None = None, *,
                 files in the folder; None for a file that cannot be read
     ```
 
-    The printed line names them too. With ``verbose=False`` these keys are
-    the only sign that variants were left out.
+    **One row per method.** With ``per_method=True``, ``runnable`` is
+    ``True`` when one of the method's listed variants is runnable, which is
+    when ``run_all`` tries the method. Otherwise ``reason`` is that of one
+    variant: one whose input files are all in the folder, else one that
+    reads the modalities the folder holds, else the one that lacks the
+    fewest files. The printout adds the cells of each matrix file and the
+    full reason of each method that cannot run.
 
-    **One row per method.** ``per_method=True`` answers one question per
-    method: can it run on this folder? ``runnable`` is ``True`` when one of
-    the method's listed variants is runnable, which is when ``run_all``
-    with the same arguments tries the method. ``reason`` is empty for those.
-    Otherwise it is the ``reason`` of one variant: one whose input files are
-    all in the folder, else one that reads the modalities the folder holds,
-    else the one that lacks the fewest files. Runnable methods come first,
-    then by name. Three things are printed above the
-    table: the counts with the modalities and batches the folder holds, the
-    cells of each matrix file, and the full reason of each method that
-    cannot run. A note on the folder that a method which would run carries
-    in ``caveat`` (it reads fewer batches than the folder holds) is printed
-    too. Leave ``per_method`` out for the commands and every column.
+    **The two checks.** ``files_ok``: the method's script is present, the
+    input files resolve on disk and are oriented features x cells, no
+    matrix file is a 10x Genomics ``.h5`` under the name of a dataset file
+    or holds 0 features or 0 cells, every label CSV has one row per cell of
+    the modality it labels, and a ``data_dir`` method (scBridge) finds the
+    files it names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must hold
+    the same cells; a diagonal ``atac_gas.h5`` must list the cells of
+    ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists
+    (on macOS and Windows ``env_reason`` says it runs only on Linux) and,
+    for a method with ``requires_gpu``, the host has an NVIDIA GPU. Without
+    one, ``env_reason`` is the sentence ``run`` would raise: ``"<method>
+    needs an NVIDIA GPU, and this computer has none. See ..."``. With
+    ``assume_gpu=True`` the row's ``caveat`` says ``This check assumes the
+    job runs on a GPU node.`` and ``command`` leaves out the CPU flags.
 
-    **Two checks.** Every row carries two independent checks, each a flag
-    plus a reason; ``runnable`` needs both:
-
-    - ``files_ok`` / ``files_reason`` - the method's script is present, the
-      input files resolve on disk and are oriented features x cells, no
-      matrix file is a 10x Genomics ``.h5`` under the name of a dataset file
-      or holds 0 features or 0 cells, every label CSV has one row per cell
-      of the modality it labels, and a ``data_dir`` method (scBridge) finds
-      the files it names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must
-      hold the same cells. A diagonal ``atac_gas.h5`` must list the cells of
-      ``atac_peak.h5`` in its order.
-    - ``env_ok`` / ``env_reason`` - the method's conda env exists on this
-      machine; the reason names the env and the one-method install command
-      (``multibench env install --methods X --packed --run``). On macOS
-      and Windows it says the environment runs only on Linux.
-    - ``env_ok`` on a GPU-only method - when the upstream script calls CUDA
-      unconditionally, ``env_ok`` also checks for an NVIDIA GPU
-      (``mtb.env.host_has_gpu()``). Without one, ``env_reason`` gives the
-      sentence ``run`` would raise: ``"<method> needs an NVIDIA GPU, and
-      this computer has none. See ..."``. ``method_info(m)`` shows
-      ``requires_gpu`` and the code line in ``gpu_evidence``.
-    - ``assume_gpu=True`` (``multibench scan --assume-gpu``) skips that GPU
-      test, for a check on a login node before a GPU-node job. The row's
-      ``caveat`` then says ``This check assumes the job runs on a GPU node.``,
-      and ``command`` leaves out the CPU flags.
-
-    The file check runs whether or not any conda env is installed.
-
-    **Reason columns.** ``reason`` joins the non-empty reasons as sentences
-    and is empty only when the row is runnable. It is the short form. A
-    missing ATAC file leads with what the method needs and what the folder
-    holds (``SCALEX needs gene-activity ATAC (atac_gas.h5), and the folder
-    has peaks (atac_peak.h5).``). Other missing files read ``adt.h5 is
-    missing.``
-
-    File names are never cut. ``files_reason`` / ``env_reason`` keep the
-    full text with full paths; read them for a row you are debugging.
-
-    **The caveat column.** ``caveat`` lists what a row with ``files_ok``
-    still needs, or what may go wrong without an error:
-
-    - an ATAC file that holds the other representation (a peak matrix where
-      the method needs gene activity), or peak names the method cannot read;
-    - an RNA, ADT or peak file whose values are not whole numbers: the
-      methods expect raw counts;
-    - diagonal: a folder whose only label file is ``cty.csv``; diagonal
-      needs ``rna_cty.csv`` and ``atac_cty.csv``;
-    - a method that reads fewer numbered batches than the folder holds
-      (``UINMF reads batches 1-2 of 3. Batch 3 is not used.``);
-    - a step the user must do first, the first sentence of
-      ``method_info(m)['setup_hint']`` (GLUE's GENCODE annotation file);
-    - method scripts that are not on this machine yet: the first real run
-      clones them with ``git``; on a host without network, fetch them first
-      with ``multibench fetch --scripts``;
-    - a command that reads a file ``mtb.run`` writes first (see the command
-      column below).
+    **Caveats.** ``caveat`` lists what a row with ``files_ok`` still needs,
+    or what may go wrong without an error: an ATAC file that holds the other
+    representation, or peak names the method cannot read; values that are
+    not whole numbers (the methods expect raw counts); a diagonal folder
+    whose only label file is ``cty.csv``; a method that reads fewer
+    numbered batches than the folder holds; a step to do first (the first
+    sentence of ``method_info(m)['setup_hint']``); method scripts not on
+    this machine yet (``multibench fetch --scripts`` fetches them); a
+    command that reads a file ``mtb.run`` writes first, so start that
+    method with ``mtb.run``.
 
     A row given the other ATAC representation is not runnable, also when
     ``methods=`` names the method, and ``run_all`` skips it. So is a GLUE or
@@ -1502,84 +1286,28 @@ def scan(dataset: str, category: str | None = None, *,
     scripts, or a ``repo_path`` that holds other files and no method
     scripts, no row is runnable.
 
-    **The command column.**
-
-    - ``command`` is ``run(..., dry_run=True)``, ``shlex``-joined, writing
-      under ``<out_dir>/<method>_<dataset>/`` exactly like ``run_all`` - the
-      literal ``'<out_dir>'`` placeholder unless ``out_dir`` is given.
-    - Paths are absolute: a relative ``out_dir``, the placeholder included,
-      is resolved against the working directory.
-    - ``params`` are merged in the way ``run_all(params=)`` merges them.
-    - On a GPU-less host the command already carries each method's
-      ``cpu_params``, the flags that turn CUDA off where a switch exists.
-    - A row blocked only by ``env_ok`` still shows its command. Put it in a
-      job script once the environment is built.
-    - Some commands read a file that ``mtb.run`` writes first under
-      ``inputs/`` (Seurat_v3's renamed peak file, a converted input). The
-      ``caveat`` names the file; start such a method with ``mtb.run`` or
-      ``multibench run`` instead of the shell line.
-
-    **The modalities column.** ``modalities`` is a ``+``-joined string here
-    (``"rna+adt"``); ``run_all`` / ``inputs_for`` take a list
-    (``["rna", "adt"]``), so split on ``"+"``. The sentinel ``"(data_dir)"``
-    marks a method that reads a whole folder rather than named modality
-    files (scBridge). For it, pass no ``modalities`` at all.
-
-    **Sizing a sweep.** ``runtime_tier`` / ``observed_worst_sec`` (see
-    ``method_info(m)['runtime']``) let you size a sweep before launching it.
-
-    **Selection and input checks.**
-
-    - ``category`` - a typo raises ``ValueError`` listing the four valid
-      values.
-    - ``methods`` - an unknown id raises ``KeyError`` with a did-you-mean
-      hint; blocked rows of the selected methods are kept, with their reason.
-      A named method with no variant under ``category`` or ``modalities``
-      raises ``ValueError``, even when other named methods have one.
-    - ``params`` - a key no variant of that method accepts raises
-      ``KeyError`` naming the accepted keys.
-    - ``dataset`` - a spelling that differs from the folder only in case
-      (``'d52'`` on macOS) is replaced by the on-disk spelling, with a
-      ``UserWarning``.
+    **Commands.** ``command`` is ``run(..., dry_run=True)``, ``shlex``-joined,
+    writing under ``<out_dir>/<method>_<dataset>/`` as ``run_all`` does, with
+    absolute paths, ``params`` merged and, on a host without a GPU, each
+    method's ``cpu_params``. A row blocked only by ``env_ok`` still shows its
+    command.
 
     **Modality tokens.** A list of ``modalities`` names one combination, in
     any order. Base tokens keep a row whose modalities are exactly that
-    combination. Representation tokens select by what the method reads.
-    ``mtb.find_methods`` keeps every method that reads at least the named
+    combination. They are ``rna``, ``adt`` (or ``protein``) and ``atac``,
+    which matches every ATAC role (``atac_gas``, ``atac_peak``, ``atac2`` ...).
+    Representation tokens select by what the method reads: ``atac_peak`` /
+    ``peak`` and ``atac_gas`` / ``gas`` / ``gene_activity`` keep the methods
+    whose ``method_info(m)['atac']`` is that representation, like
+    ``find_methods(atac=...)``. ``atac_peak`` alone also keeps MultiMAP and
+    Seurat_v3, which read both files; ``atac_peak`` together with
+    ``atac_gas`` keeps only those two. moETM, scMM and iPOLNG read peaks
+    through a role named ``atac_gas``, so ``atac_peak`` selects them and
+    ``atac_gas`` does not, unless ``methods=`` names them. A numbered token (``rna1``) matches that
+    role only. ``modalities=[]`` selects the variants that read a folder.
+    Other lists drop them, with a ``UserWarning`` unless the tokens already
+    exclude their ATAC representation. ``mtb.find_methods`` keeps every method that reads at least the named
     modalities, so the two can list different methods.
-
-    - a list that spells a row's modalities keeps that row, with one
-      exception: moETM, scMM and iPOLNG read peaks through a role named
-      ``atac_gas``, so ``atac_peak`` selects them and ``atac_gas`` does not,
-      unless ``methods=`` names them;
-    - a base token (``rna``, ``adt`` or its alias ``protein``, ``atac``)
-      matches every role of that base: ``atac`` matches ``atac``,
-      ``atac_gas``, ``atac_peak`` and numbered roles such as ``atac2``;
-    - a representation token (``atac_peak`` / ``peak``, ``atac_gas`` /
-      ``gas`` / ``gene_activity``) keeps the methods whose
-      ``method_info(m)['atac']`` is that representation, like
-      ``find_methods(atac=...)``. ``atac_peak`` alone also keeps MultiMAP
-      and Seurat_v3, which read both files;
-    - ``atac_peak`` together with ``atac_gas`` keeps only those two;
-    - a numbered token (``rna1``) matches that role only;
-    - an unknown token raises ``ValueError`` listing the vocabulary.
-
-    A variant that reads a whole folder (scBridge) has no modality roles.
-    ``modalities=[]`` selects exactly those. Other lists drop them, with a
-    ``UserWarning`` unless the tokens already exclude their ATAC
-    representation.
-
-    **Choosing a category.** A CITE-seq folder (``rna.h5`` + ``adt.h5`` +
-    ``cty.csv``) is ``vertical`` with modalities ``["rna", "adt"]``; RNA and
-    ATAC from different cells is ``diagonal``. See ``mtb.list_categories``
-    and ``mtb.describe_layout``.
-
-    **Environments and CLI.** Each method runs in its own conda environment,
-    on Linux. List them with ``multibench env doctor``; install one with
-    ``multibench env install --methods X --packed --run``. Off Linux the
-    summary line says what this computer can do. ``multibench scan`` prints
-    a compact view by default; ``--columns all`` adds the rest, including
-    ``command``.
 
     See Also
     --------
@@ -1609,31 +1337,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
           verbose: bool = True, assume_gpu: bool = False,
           allow_atac_mismatch: bool = False,
           stacklevel: int = 2) -> "tuple[pd.DataFrame, pd.DataFrame]":
-    """:func:`scan`'s frame, and what the package keeps of each row besides.
-
-    The second frame is aligned with the first. Its columns:
-
-    * ``_other``: the row's reason without the platform sentence. Off Linux,
-      the environment part of ``reason`` is the Linux-only sentence of
-      :func:`_env_hint`; ``_other`` leaves it out and keeps what else blocks
-      the row (files, a GPU, the ATAC representation, the scripts). On Linux
-      it equals ``reason``. run_all's "No method can run" error lists it
-      under its one platform line.
-    * ``_label_inputs``: the names of the dataset's label files
-      (:func:`_label_files`) that the row reads as inputs.
-    * ``_folder_caveat``: the part of ``caveat`` that depends on the folder
-      (``_resolve._preflight_caveats``), without the notes on the method
-      (``runner.script_notes``).
-
-    Its ``attrs`` hold the dataset as the folder spells it (``dataset``), the
-    folder (``folder``), the ``category`` argument and ``(method, families
-    it lacks)`` of each row that is not listed (``unlisted``).
-
-    Without ``modalities`` the frames hold the rows of :func:`_listed`;
-    ``modalities="all"`` and a list are not filtered. Either way the first
-    frame's ``attrs`` say what the folder holds and what is not listed.
-    ``stacklevel`` makes scan's warnings point at the caller.
-    """
+    """:func:`scan`'s frame, and a second frame aligned with it: ``_other`` (the
+    reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
     registry.check_category(category)
     registry.check_id_list(methods, "methods")
     every, modalities = _every_combination(modalities)
@@ -1799,8 +1504,7 @@ def _row_paths(row, dataset, data_path) -> dict:
 
 
 def _missing_inputs(row, dataset, data_path) -> int:
-    """How many input files of a scan row are not in the folder; a row that
-    does not resolve counts as lacking all of them."""
+    """How many input files of a scan row are not in the folder."""
     if row["files_ok"]:
         return 0
     try:
@@ -1811,9 +1515,8 @@ def _missing_inputs(row, dataset, data_path) -> int:
 
 
 def _cells_per_file(ds_dir: Path) -> dict:
-    """``{file name: cells}`` of the matrix files of the dataset layout in
-    ``ds_dir``, by batch number, then RNA, ADT, ATAC. The count is the number
-    of barcodes, as the resolver read it; ``None`` for a file it cannot read."""
+    """``{file name: cells}`` of the layout's matrix files in ``ds_dir``, in layout
+    order; ``None`` for a file that cannot be read."""
     from .engine.ingest import _layout_order
     names = sorted((q.name for q in ds_dir.iterdir() if q.suffix == ".h5" and q.is_file()
                     and _resolve._LAYOUT_FILE_RE.match(q.name)), key=_layout_order)
@@ -1829,8 +1532,8 @@ _CELLS_SHOWN = 8
 
 
 def _cells_line(cells: dict) -> str:
-    """``Cells per file: rna.h5 1,718, adt.h5 1,718.``; a file that cannot be
-    read shows ``?``, and files after the first 8 are counted."""
+    """``Cells per file: rna.h5 1,718, adt.h5 1,718.``; files after the first 8
+    are only counted."""
     shown = [f"{name} {'?' if n is None else format(n, ',')}"
              for name, n in list(cells.items())[:_CELLS_SHOWN]]
     more = len(cells) - len(shown)
@@ -1840,27 +1543,8 @@ def _cells_line(cells: dict) -> str:
 
 def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
                 verbose: bool = True, nested: bool = True) -> "pd.DataFrame":
-    """The frame of ``scan(per_method=True)`` from :func:`_scan`'s two frames.
-
-    One row per method of ``df``: ``method``, ``runnable`` (some row of the
-    method is runnable, which is when ``run_all`` tries the method) and
-    ``reason`` (empty when runnable). Otherwise ``reason`` is that of one
-    row: a row whose input files are all in the folder first
-    (:func:`_inputs_on_disk`), then a row that reads the families the folder
-    holds (a folder of RNA and ATAC is not told that ADT files are missing),
-    then the row that lacks the fewest files, then the first one. Runnable
-    methods first, then by name. ``attrs`` are those of ``df`` and ``cells``
-    (:func:`_cells_per_file`).
-
-    With ``verbose`` it prints, each line after ``[scan]``: the counts with
-    what the folder holds, the cells of each matrix file, the reason of each
-    method that cannot run without the platform sentence and in full (the
-    frame's column is clipped when printed), and the folder note of each row
-    that would run (:func:`_would_run`; ``nested`` leaves out the rows a
-    sweep without ``modalities=`` does not run, :func:`_nested_rows`). The
-    notes on a method itself, the same for every folder, are left to
-    ``run_all``.
-    """
+    """The frame of ``scan(per_method=True)`` from :func:`_scan`'s two frames; with
+    ``verbose`` it prints the per-method lines (``nested``: leave out nested rows)."""
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
     rows, reasons, n_files = [], [], 0
     held = set(df.attrs["held"])
@@ -1923,7 +1607,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
 
 # ------------------------------------------------------------------- label order
 def _read_cty(path):
-    """Read a label CSV with the package's single reader (``eval.io.read_labels``)."""
+    """Read a label CSV (``eval.io.read_labels``)."""
     return _eio.read_labels(path)
 
 
@@ -1933,16 +1617,8 @@ _NOT_ARMED = object()
 
 
 def _arm_deadline(seconds):
-    """Start a SIGALRM deadline covering an entire per-method step.
-
-    The step includes reading the output back and computing the metrics, which
-    can take far longer than the method itself; an alarm around the dispatch
-    call alone would leave them unbounded.
-
-    Returns the previous handler, or ``_NOT_ARMED`` when no deadline was asked
-    for. ``None`` is not usable as that sentinel: ``signal.signal`` returns
-    None when the previous handler was not installed from Python.
-    """
+    """Start a SIGALRM deadline over a whole per-method step (run and scoring);
+    return the previous handler, or ``_NOT_ARMED``."""
     if not seconds:
         return _NOT_ARMED
     import math
@@ -1981,14 +1657,8 @@ def _label_files(dataset, data_path=None) -> list:
 
 
 def _label_inputs(inputs: dict, variant, label_files: dict) -> tuple:
-    """The dataset's label files among the inputs a scan row resolved, by name.
-
-    ``label_files`` maps the resolved path of each label file of the dataset
-    to its name. A variant that is fed the folder (scBridge) names its files
-    as constants; the label files among them count as well. The answer is
-    read from what the variant is given, not from ``needs_labels``: a method
-    may read a label file that it does not demand.
-    """
+    """The names of the dataset's label files among a scan row's inputs (also the
+    constant file names of a folder-fed variant), whatever ``needs_labels`` says."""
     paths = [Path(p) for role, p in inputs.items() if role != "data_dir"]
     if "data_dir" in inputs:
         paths += [Path(inputs["data_dir"]) / str(a.const) for a in variant.args
@@ -1998,7 +1668,8 @@ def _label_inputs(inputs: dict, variant, label_files: dict) -> tuple:
 
 
 def _label_candidates(dataset, n, data_path=None):
-    """Every label ordering whose length matches ``n`` (length alone cannot pick one)."""
+    """``[(file names, labels, batch per cell)]``: every label ordering of ``n``
+    cells; length alone cannot pick one. The batch is each cell's label file."""
     by_file = {}
     for p in _label_files(dataset, data_path):
         try:
@@ -2045,15 +1716,8 @@ _CHANCE_ARI = 0.05
 
 
 def _order_confidence(cands) -> float | None:
-    """How clearly the winning label order beat the alternatives, on a 0-1 scale.
-
-    ``(best - max(runner_up, 0)) / best``. A ratio, not a difference: the
-    runner-up sits near chance (ARI ~ 0), so a difference is bounded above by the
-    ARI itself and a method scoring 0.3 could never look clearly separated.
-    Dividing by the winner makes an unambiguous order read ~1.0 whether the
-    method scored 0.9 or 0.2. ARI can fall slightly below 0, so the runner-up
-    is clipped at 0 to keep the value within 0-1.
-    """
+    """``(best - max(runner_up, 0)) / best`` over the ARI of the ranked label orders;
+    a ratio, as the runner-up sits near ARI 0 and a difference is capped by the winner."""
     if len(cands) < 2:
         return None
     best, second = cands[0]["ARI"], cands[1]["ARI"]
@@ -2092,9 +1756,8 @@ def _names_batch_metric(metrics) -> bool:
 
 
 def _without_classification(metrics, multi_batch: bool):
-    """``metrics=`` for an output that is not an embedding (the UMAP a graph
-    method writes): the same selection without the classification family,
-    which needs an embedding. ``None`` when nothing else is left."""
+    """``metrics=`` without the classification family, for the UMAP a graph method
+    writes; ``None`` when nothing else is left."""
     from .plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
     if metrics is None or metrics == "all":
         if multi_batch:
@@ -2111,22 +1774,8 @@ def _without_classification(metrics, multi_batch: bool):
 
 def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False,
                          batch_given=True, on_rank=None, embedding=True):
-    """Score each candidate label order, keep the best, return the full spread.
-
-    ``batch`` (optional, one entry per cell in embedding order) replaces the
-    file-of-origin batch vector carried by each candidate - ``run_all(batch=)``
-    / ``BatchResult.rescore(batch=)``. ``user_batch`` says that the
-    candidates already carry such a vector. ``metrics`` (a family token or a
-    list of metric codes, ``evaluate(metrics=)``) restricts the set the
-    winner is scored on; ``None`` = the family the batch structure implies
-    (screening still needs ARI only). A file-of-origin batch, or a user batch
-    with ``batch_given=False`` (the one ``run_all`` saved, reused by
-    ``rescore``), goes to ``evaluate`` only when ``metrics`` can use it, so
-    that ``evaluate`` does not warn about a batch the caller never gave.
-    ``on_rank(orders, cells)`` is called before several orders are ranked.
-    ``embedding=False`` (the UMAP of a graph method) leaves out the
-    classification family, which needs a method's own embedding.
-    """
+    """Score each candidate label order and keep the best: ``(names, scores, spread)``.
+    ``user_batch``: the candidates carry the caller's batch (``batch_given``: passed now)."""
     # a file-of-origin batch, or the saved one rescore reuses, goes to evaluate only
     # for a metric that uses it: evaluate would warn about a batch never given
     use_batch = (user_batch and batch_given) or _names_batch_metric(metrics)
@@ -2209,8 +1858,8 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
 
 # ------------------------------------------------------------------------ results
 def _with_label_order_note(summary: "pd.DataFrame") -> "pd.DataFrame":
-    """Attach ``label_order_note``, which says why ``label_order_confidence`` is
-    blank (used by ``BatchResult.summary`` and ``save()``)."""
+    """Add ``label_order_note``: why ``label_order_confidence`` is blank. A column of
+    its own, since a sentinel string in the numeric one would break ``> 0.5``."""
     scored = summary["status"].astype(str).str.startswith("CHAIN_OK")
     blank = scored & summary["label_order_confidence"].isna()
     ari = pd.to_numeric(summary.get("ARI"), errors="coerce")
@@ -2227,9 +1876,8 @@ _UNKNOWN_PROVENANCE = {"scripts_commit": None, "env_flavor": "unknown", "hostnam
 
 
 def _earlier_provenance(folder: Path) -> dict:
-    """``{method: {scripts_commit, env_flavor, hostname}}`` from the records
-    saved in ``d/batch_result.json``; ``{}`` when there are none. A field an
-    earlier record lacks gets its :data:`_UNKNOWN_PROVENANCE` value."""
+    """``{method: {scripts_commit, env_flavor, hostname}}`` of the runs saved in
+    ``folder`` (checked by :func:`_check_save_target` first); ``{}`` when none."""
     path = Path(folder) / "batch_result.json"
     if not path.exists():
         return {}
@@ -2240,8 +1888,8 @@ def _earlier_provenance(folder: Path) -> dict:
 
 
 def _check_save_target(folder: Path, dataset: str, category: str) -> None:
-    """Raise ``ValueError`` when ``d`` holds a saved result of another
-    dataset or category: merging those records would mix two sweeps."""
+    """Raise ``ValueError`` when ``folder`` holds a saved result of another dataset
+    or category: merging the records would mix two sweeps."""
     path = Path(folder) / "batch_result.json"
     if not path.exists():
         return
@@ -2309,23 +1957,13 @@ class BatchResult:
     Attributes
     ----------
     records : list[dict]
-        The raw per-method records (the same list ``results`` returns).
+        The per-method records (the same list ``results`` returns).
     dataset : str
         Dataset folder name.
     category : str
         Integration category.
     out_dir : path | None
         The sweep's output root, or ``None`` for an in-memory result.
-    summary : pandas.DataFrame
-        One row per method with its status, timing and metrics (property).
-    long : pandas.DataFrame
-        Long table ``metric, value, method, dataset, category, ...`` for
-        plotting (property).
-    results : list[dict]
-        The raw records, including every label ordering tried (property).
-    failures : pandas.DataFrame
-        Methods that failed, timed out or could not be scored:
-        ``method, status, error`` (property).
 
     Examples
     --------
@@ -2338,9 +1976,7 @@ class BatchResult:
 
     Notes
     -----
-    **Size and repr.** ``len(res)`` is the number of method records. The
-    repr counts the methods with metrics, those that ran but could not be
-    scored, the skipped ones and the failures.
+    ``len(res)`` is the number of method records.
 
     See Also
     --------
@@ -2414,47 +2050,33 @@ class BatchResult:
         - ``CHAIN_OK`` - ran and scored.
         - ``CHAIN_OK_GRAPH_METHOD`` - a graph method, scored via a secondary
           embedding.
-        - ``RUN_OK_NO_EMBEDDING`` - ran, but the method emits only a graph,
-          so clustering metrics do not apply.
-        - ``RUN_OK_EVAL_FAILED`` - the method ran and produced an embedding,
-          but scoring it failed; see ``error`` in ``failures``.
+        - ``RUN_OK_NO_EMBEDDING`` - ran; the method emits only a graph.
+        - ``RUN_OK_EVAL_FAILED`` - ran, but scoring the embedding failed.
         - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file matches the
           embedding's cell count.
         - ``RUN_OK`` - ran with ``evaluate=False``.
         - ``TIMEOUT`` - exceeded ``run_all(timeout=...)``.
-        - ``FAIL`` - the method itself errored; see ``error`` in ``failures``.
+        - ``FAIL`` - the method itself errored.
         - ``SKIPPED`` - blocked before the run, with the reason in the
-          ``reason`` column; in ``failures`` only when ``methods=`` named the
-          method.
-
-        ``FAIL``, ``TIMEOUT``, ``RUN_OK_EVAL_FAILED`` and
-        ``RUN_OK_NO_LABEL_MATCH`` also appear in ``failures``.
+          ``reason`` column.
 
         **Graph methods.** scMoMaT also writes a UMAP, which is scored:
         ``CHAIN_OK_GRAPH_METHOD``. Seurat_WNN writes only a neighbour graph:
         ``RUN_OK_NO_EMBEDDING``, and its ``emb_shape`` is ``None``. Neither
         has classification metrics, which need the method's own embedding.
 
-        **Batch columns.** ``batch_source`` / ``n_batches`` say which batch
-        vector the batch metrics (ASW_batch, GC, iLISI ...) were computed
-        against, and how many distinct values it has (1 = none):
+        **Batch columns.** The batch vector the batch metrics used, and its
+        number of distinct values (1 = none). ``batch_source`` is
+        ``'file_of_origin'`` (each cell's label file: ``cty1.csv`` -> 1 ...),
+        ``'user'`` (``run_all(batch=)`` / ``rescore(batch=)``) or ``None`` (a
+        single label file: clustering metrics only).
 
-        - ``'file_of_origin'`` - each cell's label file (``cty1.csv`` -> 1,
-          ``cty2.csv`` -> 2 ...), the rule for multi-batch datasets.
-        - ``'user'`` - the vector passed as ``run_all(batch=)`` /
-          ``rescore(batch=)``.
-        - ``None`` - a single label file, so no batch structure and
-          clustering metrics only.
-
-        **Label order.** ``label_order`` is which label file(s), in which
-        order, the metrics were computed against (e.g.
-        ``rna_cty.csv+atac_cty.csv``). For diagonal data the embedding stacks
-        two disjoint cell sets in a method-specific order.
-
-        **Label-order confidence.** ``label_order_confidence`` is
-        ``(best - max(runner_up, 0)) / best`` over the ARI of the candidate
-        label orders, from 0 to 1. Near 1, one order clearly fits. Below about 0.5,
-        two orders scored alike; check that row's label order.
+        **Label-order confidence.** ``label_order`` names the label file(s),
+        in order, the metrics used (``rna_cty.csv+atac_cty.csv``).
+        ``label_order_confidence`` is ``(best - max(runner_up, 0)) / best``
+        over the ARI of the candidate label orders, from 0 to 1. Near 1, one
+        order clearly fits. Below about 0.5, two orders scored alike; check
+        that row's label order.
 
         **Optimistic bias.** When more than one ordering is possible, the
         reported metrics are those of the ordering with the highest ARI. So
@@ -2465,10 +2087,9 @@ class BatchResult:
         So ``> 0.5`` is ``False`` for it and ``.isna()`` finds it. It is blank
         in three cases, named by ``label_order_note``:
 
-        - ``"single ordering"`` - only one ordering was possible (normal for a
-          paired/vertical dataset with a single ``cty.csv``).
-        - ``"winner at chance"`` - the winning ordering itself scored
-          ARI < 0.05, so the ratio would compare two noise values.
+        - ``"single ordering"`` - only one ordering was possible (a vertical
+          dataset with one ``cty.csv``).
+        - ``"winner at chance"`` - the winning ordering scored ARI < 0.05.
         - ``"not scored"`` - the row has no metrics.
 
         See Also
@@ -2575,8 +2196,6 @@ class BatchResult:
     def results(self) -> list:
         """The raw per-method records: status, out_dir, metrics and the orderings tried.
 
-        Each record keeps the method's ``out_dir``, which ``rescore`` reads.
-
         Returns
         -------
         list[dict]
@@ -2612,20 +2231,13 @@ class BatchResult:
         caveat                      that row's caveat, or ""
         data_path, multibench_version, started_at   provenance of the run
         data_root                   data_path as an absolute path
-        scripts_commit, env_flavor, hostname        the scripts, env build and computer
+        scripts_commit, env_flavor, hostname        the scripts, env build and
+                                    computer of the run that made the output
         _long                       internal; read BatchResult.long instead
         ```
 
-        **Reused outputs.** A record with ``reused`` True copies
-        ``scripts_commit``, ``env_flavor`` and ``hostname`` from the method's
-        earlier record in ``out_dir``: the values of the run that made the
-        output. Without an earlier record they are ``None``, ``'unknown'`` and
-        ``''``.
-
-        **Label-order evidence.** ``label_order_candidates`` holds every
-        ordering tried and its ARI. ``summary``'s ``label_order_confidence``
-        is computed from them. It is present only when more than one ordering
-        was possible.
+        ``label_order_candidates`` holds every ordering tried and its ARI.
+        ``summary``'s ``label_order_confidence`` is computed from them.
 
         See Also
         --------
@@ -2785,19 +2397,15 @@ class BatchResult:
 
         Notes
         -----
-        **Arguments.** A ``labels`` array, list or plain CSV follows the
-        embedding rows. Without ``labels=``, a ``batch`` array follows the
-        order of ``mtb.labels_for(dataset)``. With a ``labels`` array in
-        embedding row order, the ``batch`` array follows the embedding rows
-        too. A CSV path is read like a label file. The batch is recorded as
+        **Order.** A ``labels`` array, list or plain CSV follows the embedding
+        rows. Without ``labels=``, a ``batch`` array follows the order of
+        ``mtb.labels_for(dataset)``. With a ``labels`` array it follows the
+        embedding rows too. A Series or one-column
+        DataFrame with a non-default index, or a CSV whose first column holds
+        barcodes, is aligned to the dataset's cells as in ``run_all(batch=)``;
+        aligned labels go into the label-order search, and labels matched by
+        position read ``(user labels)``. The batch is recorded as
         ``batch_source='user'``.
-
-        **Aligned by barcode.** A Series or one-column DataFrame with a
-        non-default index, or a CSV whose first column holds barcodes, is
-        aligned to the dataset's cells as in ``run_all(batch=)``, with the
-        same errors and warnings. Aligned labels go into each record's
-        label-order search, so ``label_order`` names the file order chosen.
-        Labels matched by position read ``(user labels)``.
 
         **Label order.** With ``labels=None`` and several label files,
         ``rescore`` ranks the file orders by ARI, which needs one Leiden sweep.
@@ -2805,35 +2413,24 @@ class BatchResult:
         ARI, NMI or iF1.
 
         **Labels without batch.** Given ``labels`` and no ``batch``, the batch
-        that ``run_all(batch=)`` saved is reused. Without a saved batch, every
-        cell is in one batch (``batch_source`` ``None``, ``n_batches`` 1), so
-        only clustering metrics are computed. Pass ``batch`` as well to get the
-        batch metrics.
+        that ``run_all(batch=)`` saved is reused; without one, every cell is
+        in one batch, so only clustering metrics are computed. Pass ``batch``
+        as well for the batch metrics.
 
-        **Record status.** A method that emits no embedding (graph-only) is
-        marked ``RUN_OK_NO_EMBEDDING`` with a ``note``. ``SKIPPED``, ``FAIL``
-        and ``TIMEOUT`` records are kept as they are. A record whose output
-        file is gone becomes ``RUN_OK_EVAL_FAILED``, with the reason in
-        ``error``. So does a record whose new scoring fails, for example on a
-        ``batch`` of the wrong length (``batch has N entries, embedding has M
-        cells``).
-
-        **Missing labels.** A missing label is not a cell type. A record
-        whose labels have a cell without one (NaN, blank text, or text that
-        a label file reads as missing, such as ``NA``) is not scored: it
-        becomes ``RUN_OK_EVAL_FAILED``, and its ``error`` counts the missing
-        labels and names the files. This holds for the label files of the
-        folder and for ``labels=``. Give every cell a label, then score
-        again.
+        **Record status.** A graph-only method is marked
+        ``RUN_OK_NO_EMBEDDING``. ``SKIPPED``, ``FAIL`` and ``TIMEOUT`` records
+        are kept as they are. A record whose output file is gone, or whose new
+        scoring fails (a ``batch`` of the wrong length), becomes
+        ``RUN_OK_EVAL_FAILED`` with the reason in ``error``. So does a record
+        whose labels, from the folder or ``labels=``, have a cell without one
+        (NaN, blank text, or text such as ``NA``): a missing label is not a
+        cell type.
 
         **Other hosts.** When the dataset folder has moved, pass the folder
         that now holds it as ``mtb.load_batch(data_path=)``. When the dataset
         folder is not found, ``labels=None`` gives ``RUN_OK_NO_LABEL_MATCH``
-        with a ``note``. A Series or CSV is then matched by position, with a warning,
-        and the saved batch is not used.
-
-        **Persisting.** ``mtb.load_batch`` keeps returning the original result
-        until the new one is saved.
+        with a ``note``; a Series or CSV is matched by position, with a
+        warning, and the saved batch is not used.
 
         See Also
         --------
@@ -2965,25 +2562,15 @@ class BatchResult:
         - ``batch_result.json`` - dataset, category and the per-method records.
         - ``batch_<hash>.csv`` - a batch vector the records were scored with.
 
-        Reload it with ``mtb.load_batch``.
-
         **Saving into a folder that has a result.** When the folder already
         holds ``batch_result.json`` for the same dataset and category, the
         records are merged. A method in this result replaces its earlier
         record, unless it is ``SKIPPED`` and the earlier one is not; the other
-        earlier records are kept, and every file in the list above is
-        rewritten from the merged set. This result object is not changed.
-
-        A line ``# Merged with 1 earlier record in <folder> (StabMap).``
-        names the kept methods.
-
-        **Jobs in parallel.** Jobs running at the same time should use one
-        ``out_dir`` each; combine them with
-        ``multibench plot --input dir1 --input dir2``.
-
-        **Blank confidence on disk.** In ``summary.csv`` the
-        ``label_order_note`` column says why ``label_order_confidence`` is
-        empty on a row: "single ordering", "winner at chance" or "not scored".
+        earlier records are kept, every file in the list above is rewritten
+        from the merged set, and a line ``# Merged with 1 earlier record in <folder>
+        (StabMap).`` names them. This result object is not changed. Jobs
+        running at the same time should use one ``out_dir`` each; combine
+        them with ``multibench plot --input dir1 --input dir2``.
 
         See Also
         --------
@@ -3060,9 +2647,8 @@ def _clip_error(text: str) -> str:
 
 
 def _ari_tail(rec) -> str:
-    """The end of a ``run_all`` / ``rescore`` result line: ``ARI 0.629``,
-    rounded to 3 decimals and never ``-0.000``; ``""`` when the record has
-    no ARI (missing, ``None`` or NaN)."""
+    """The end of a ``run_all`` / ``rescore`` result line: ``ARI 0.629`` (never
+    ``-0.000``); ``""`` without an ARI."""
     ari = (rec.get("metrics") or {}).get("ARI")
     try:
         ari = float(ari)
@@ -3074,13 +2660,8 @@ def _ari_tail(rec) -> str:
 
 
 def _error_tail(error, width: int = 200) -> str:
-    """The last line of ``error`` that names a cause, clipped from the left to ``width``.
-
-    ``run_all``'s ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with it, so
-    a job log shows why without opening ``failures.csv``. R's call trace and
-    trailing warning block are skipped, and an R message that continues on
-    the line after ``Error in f() :`` is joined to it.
-    """
+    """The last line of ``error`` that names a cause, clipped from the left to
+    ``width``; R's call trace and warnings are skipped, ``Error in f() :`` joined."""
     lines = [l.strip() for l in str(error or "").splitlines()]
     lines = [l for l in lines if l and l not in _ERROR_TRAILERS]
     cut = next((i for i in range(len(lines) - 1, 0, -1) if _R_WARNINGS.match(lines[i])), None)
@@ -3105,16 +2686,8 @@ def _error_tail(error, width: int = 200) -> str:
 def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
                modalities=None, allow_atac_mismatch: bool = False,
                assume_gpu: bool = False, every: bool = False) -> str:
-    """The ``mtb.scan`` call (``multibench scan`` command under the CLI) that
-    shows the rows a ``run_all`` call with these arguments selected.
-
-    Every argument not at its default is spelled out as the caller gave it
-    (a relative ``data_path`` stays relative), so the hint, run from the same
-    directory, finds the same dataset folder and the same rows. A
-    ``data_path`` that is the default data root is left out, as ``None``.
-    ``every`` is a call with ``modalities="all"``: the hint carries it, since
-    scan without it lists fewer rows.
-    """
+    """The ``mtb.scan`` call (or ``multibench scan`` command) that shows the rows of
+    a ``run_all`` call, with every non-default argument as the caller gave it."""
     py, cli = [repr(dataset), repr(category)], [dataset, "--category", category]
     if data_path is not None and (os.path.realpath(data_path)
                                   != os.path.realpath(config.DEFAULT.data_path)):
@@ -3144,28 +2717,8 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                               allow_atac_mismatch: bool = False,
                               assume_gpu: bool = False, others=None,
                               every: bool = False, note: str = "") -> str:
-    """The ``ValueError`` text for "not one requested variant can start".
-
-    Scoped to what the caller asked for: with ``methods=`` every requested
-    variant is listed with its own reason (one per line); without it the
-    first three blocked variants are shown and the message says how many
-    there are in total. Rows whose input files are in place come first
-    (then by method): an env install unblocks those. Reasons of methods the
-    caller did not request are never listed: they would point at the wrong
-    fix. Off Linux, when an environment blocks a row, the line after the
-    head says where methods run, and the list keeps only the rows that
-    something else also blocks, each with that reason from ``others``
-    (:func:`_other_blocks`). As for ``SKIPPED`` records
-    (:func:`_skipped_rows`), that list counts only the rows whose input
-    files are in the folder, and every row of a named method; one line
-    counts the rows that need files the folder lacks. The last line names
-    the ``scan`` call with the caller's selection (:func:`_scan_hint`,
-    ``every`` for ``modalities="all"``); the list counts methods when each
-    method has one row (:func:`_rows_word`). ``note`` is the sentence on the
-    rows the scan did not list (:func:`_not_listed_note`): without
-    ``methods=`` it is the line before the last, which then says that scan
-    shows the listed rows.
-    """
+    """The ``ValueError`` text when no requested row can start (run_all's Notes);
+    ``others``: each row's blocks besides the platform."""
     def _line(r):
         return f"  {_row_label(r)}: {r['reason']}"
     # rows whose files are in place first: an env install fixes those
@@ -3210,15 +2763,8 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
 
 
 def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
-    """The list of the "No method can run" error under its platform line.
-
-    Only the rows that something besides the platform blocks, each with that
-    reason (``others``, aligned with ``blocked``), under a count line:
-    ``1 of 14 methods is also blocked by something else:``. With
-    ``methods=`` (``requested``) every such row, else the first 3 in the
-    order of ``blocked``. When no row has another block, one line:
-    ``Nothing else blocks these 14 methods.``
-    """
+    """The list under the off-Linux line of the "No method can run" error: the rows
+    something else also blocks, with that reason (all when ``requested``, else 3)."""
     rest = others.reindex(blocked.index).fillna("")
     listed = [(r, rest[i]) for i, r in blocked.iterrows() if rest[i]]
     n, k = len(blocked), len(listed)
@@ -3234,17 +2780,14 @@ def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) 
 
 
 def _row_label(r) -> str:
-    """A scan row as the "No method can run" error lists it: ``Matilda
-    (rna+adt)``, or the method alone for a variant that reads a folder."""
+    """``Matilda (rna+adt)``, or the method alone for a variant that reads a folder."""
     mods = r["modalities"]
     return r["method"] if mods == "(data_dir)" else f"{r['method']} ({mods})"
 
 
 def _platform_line(blocked: pd.DataFrame) -> str:
-    """The platform sentence (with its newline) for the "nothing is runnable"
-    error on a non-Linux host whose rows are blocked by the env check, else
-    ``""``. It comes right after the head: the environments cannot be
-    installed here, so the per-row reasons are not the fix."""
+    """The off-Linux line (with its newline) of the "No method can run" error when
+    an env check blocks a row, else ``""``."""
     linux_only = _runner.linux_only_sentence()
     if not linux_only or blocked["env_ok"].all():
         return ""
@@ -3259,14 +2802,7 @@ def _unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
     """Raise ``KeyError`` when ``params`` names a key no scanned variant of that
-    method accepts - the same check the run loop applies per method, pulled
-    forward into :func:`scan` so a dry run catches the typo before the sweep
-    starts.
-
-    A method in ``params`` that has no row in the plan is left alone (it is
-    simply not run); unknown method names are caught earlier by
-    ``registry.check_method``.
-    """
+    method accepts, so a dry run catches the typo; a method without rows is skipped."""
     for method, overrides in params.items():
         rows = plan_df[plan_df["method"] == method]
         if rows.empty or not overrides:
@@ -3282,12 +2818,8 @@ def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
 
 
 def _load_embedding(mdir: Path, variant):
-    """Read the embedding a finished run left in ``mdir``, or ``None``.
-
-    The primary output when ``output.kind == 'embedding'``; otherwise the first
-    ``extra_outputs`` entry of kind embedding that exists (scMoMaT writes a UMAP
-    next to its KNN graph). Oriented cells x dims (the larger axis is cells).
-    """
+    """The embedding a finished run left in ``mdir`` as cells x dims, or ``None``: the
+    output, or a graph method's extra embedding output (scMoMaT's UMAP)."""
     import h5py
 
     def read(path, key=None):
@@ -3312,8 +2844,7 @@ def _load_embedding(mdir: Path, variant):
 
 def _label_file_sizes(dataset, category=None, method=None, *, modalities=None,
                       data_path=None) -> list:
-    """``[(file name, cells)]`` of ``labels_for(...)``, in its order; ``[]`` when
-    the files cannot be read."""
+    """``[(file name, cells)]`` of ``labels_for(...)``; ``[]`` when unreadable."""
     try:
         files = _resolve.labels_for(dataset, category, method, modalities=modalities,
                                     data_path=data_path, check=False)
@@ -3337,8 +2868,7 @@ def _batch_segments(dataset, data_path, batch) -> dict | None:
 
 def _label_data_files(label: Path) -> list[Path]:
     """The data files whose barcodes are the cells of one label file:
-    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC
-    files; ``atac_cty2.csv`` -> the ATAC files of batch 2."""
+    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC files."""
     stem = label.stem
     digits = stem[len(stem.rstrip("0123456789")):]
     base = stem[:len(stem) - len(digits)]
@@ -3360,9 +2890,8 @@ def _dataset_folder(dataset, data_path) -> Path:
 
 
 def _root_tries(rec: dict, override=None) -> list:
-    """The data roots a saved record's dataset folder is looked up under, in
-    order: ``override``, the recorded ``data_path`` (read from the current
-    directory; ``None`` = config's) and ``data_root``."""
+    """The data roots a saved record's dataset is looked up under: ``override``,
+    the recorded ``data_path`` (``None`` = config's), then ``data_root``."""
     tries = [override] if override is not None else []
     tries.append(rec.get("data_path"))
     if rec.get("data_root"):
@@ -3371,12 +2900,8 @@ def _root_tries(rec: dict, override=None) -> list:
 
 
 def _dataset_root(rec: dict, dataset: str, override=None) -> tuple:
-    """``(root, found)``: the data root a saved record is scored from.
-
-    The first root of :func:`_root_tries` whose ``<root>/<dataset>`` is a
-    folder, as an absolute path (``None`` stays ``None``: config's). When
-    none is, the recorded ``data_path`` and ``False``.
-    """
+    """``(root, found)``: the first root of :func:`_root_tries` that holds the
+    dataset, absolute (``None`` = config's); else the recorded ``data_path``, ``False``."""
     for root in _root_tries(rec, override):
         if _dataset_folder(dataset, root).is_dir():
             return (None if root is None else str(Path(root).resolve())), True
@@ -3405,9 +2930,7 @@ def _or(values) -> str:
 
 
 def _folder_missing(dataset: str, roots) -> str:
-    """Why a saved result's cell ids cannot be read, as a clause: the dataset
-    folder is under none of the data ``roots`` (``None`` = config's), each
-    named as an absolute path."""
+    """The clause that the dataset folder is under none of ``roots``, each absolute."""
     where = dict.fromkeys(os.path.abspath(config.DEFAULT.data_path if r is None else r)
                           for r in roots)
     return f"the dataset folder {dataset} is not found in {_or(where)}"
@@ -3424,9 +2947,8 @@ def _unplaced_batch_note(dataset: str, data_path, tried, n_ids: int) -> str:
 
 
 def _batch_csv(vec, dataset, data_path) -> tuple[str, str]:
-    """``(file name, CSV text)`` of a batch vector that ``run_all`` or
-    ``rescore`` scored with: one row per cell, the dataset's cell ids first
-    when it has as many. The name holds the text's sha1."""
+    """``(batch_<sha1>.csv, CSV text)`` of a batch vector, with the dataset's cell
+    ids when it has as many."""
     import hashlib
     frame = pd.DataFrame({"batch": np.asarray(vec)})
     if _dataset_folder(dataset, data_path).is_dir():
@@ -3445,9 +2967,8 @@ def _read_batch_text(text: str) -> np.ndarray:
 
 
 def _dataset_cell_ids(dataset, data_path) -> list | None:
-    """The dataset's cell ids in the order of ``labels_for(dataset)``: for
-    each label file, the barcodes of a data file with as many cells. ``None``
-    when a label file has no such data file, or ids repeat."""
+    """The dataset's cell ids in ``labels_for(dataset)`` order (each label file's
+    data-file barcodes); ``None`` when some are missing or ids repeat."""
     ids: list = []
     try:
         files = _resolve.labels_for(dataset, data_path=data_path, check=False)
@@ -3470,27 +2991,8 @@ _ROWS = "the embedding rows"
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
                  stacklevel: int = 5, moved: bool = False,
                  tried=None, as_written: bool = False) -> tuple[np.ndarray, bool]:
-    """``x`` as one value per cell, and whether it was aligned by cell id.
-
-    Aligned (``True``): a Series or one-column DataFrame whose index is not
-    a ``RangeIndex``, or a CSV whose first column holds cell ids, is put in
-    the order of ``labels_for(dataset)`` by the barcodes of the dataset's
-    files, as ``evaluate`` aligns to an AnnData. Ids that are not cells of
-    the dataset, repeated ids and cells without a value raise
-    ``ValueError``. Without usable barcodes (missing or repeated) the match
-    is by position, with a ``UserWarning``. Arrays, lists and other CSVs are
-    returned as given (``False``): positional, in ``order`` (default: the
-    order of ``labels_for(dataset)``). ``stacklevel`` is that of the CSV
-    warning, which is raised one call deeper than the Series warning.
-    A dataset folder that is not found is named with the data roots
-    ``tried`` (default: ``data_path``); ``moved`` (rescore) adds the fix for
-    a saved result read from another directory. A string that can only be
-    the name of an obs column (``multibench.eval.io._names_no_file``) raises
-    ``FileNotFoundError`` (:func:`_column_name_error`). ``as_written`` keeps
-    the word a file holds where the reader reads a missing value (``'NA'``,
-    not NaN), for the message of a caller that refuses such a vector; a
-    file without them reads the same.
-    """
+    """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
+    ``labels_for`` order. ``stacklevel`` is the CSV warning's; the Series one is 1 less."""
     from .eval.pipeline import _carries_ids, _pick
     if not config._CLI and _eio._names_no_file(x):
         # the name of a column: the command line says so before it reads --batch
@@ -3559,8 +3061,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
 
 
 def _column_name_error(what: str, x: str) -> str:
-    """The error of ``run_all`` / ``rescore`` for ``batch=`` or ``labels=``
-    given the name of an obs column: a folder holds no such column."""
+    """The error for ``batch=`` / ``labels=`` given the name of an obs column."""
     col = x[4:] if x.startswith("obs:") else x
     return config.hint(
         f"{what}={x!r} is not a file. Pass the column itself, as "
@@ -3570,15 +3071,12 @@ def _column_name_error(what: str, x: str) -> str:
 
 
 def _has_gap(values) -> bool:
-    """Whether some per-cell value is missing (``multibench.eval.io.missing_mask``),
-    answered from the distinct values."""
+    """Whether some per-cell value is missing (checked on the distinct values)."""
     return bool(_eio.missing_mask(pd.unique(np.asarray(values, dtype=object))).any())
 
 
 def _check_batch(vec, dataset: str) -> None:
-    """``ValueError`` when the batch vector of ``run_all`` or ``rescore`` has
-    a cell without a batch. ``vec`` is :func:`_cell_vector`'s, read
-    ``as_written``, so the message names the word a file holds."""
+    """``ValueError`` when the batch vector has a cell without a batch."""
     if not _has_gap(vec):
         return
     miss = _eio.missing_mask(vec)
@@ -3589,9 +3087,7 @@ def _check_batch(vec, dataset: str) -> None:
 
 
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
-    """``batch`` as one id per cell, in the order of ``labels_for(dataset)``
-    when it carries cell ids (:func:`_cell_vector`); arrays as given. A cell
-    without a batch raises (:func:`_check_batch`)."""
+    """``batch`` as one id per cell (:func:`_cell_vector`), checked for gaps."""
     vec = _cell_vector(batch, dataset, data_path, what="batch", stacklevel=5,
                        as_written=True)[0]
     _check_batch(vec, dataset)
@@ -3599,9 +3095,8 @@ def _batch_vector(batch, dataset, data_path) -> np.ndarray:
 
 
 def _label_gaps(dataset, data_path) -> dict:
-    """``{file name: (missing, labels, the labels as the file writes them)}``
-    for each label file of the dataset that has a cell without a label. A
-    file that cannot be read is left to the scoring, which skips it too."""
+    """``{file name: (missing, total, labels as written)}`` of the label files
+    with a cell without a label; an unreadable file is left to the scoring."""
     gaps = {}
     for p in _label_files(dataset, data_path):
         try:
@@ -3617,9 +3112,7 @@ def _label_gaps(dataset, data_path) -> dict:
 
 
 def _label_readers(rows: "pd.DataFrame", private: "pd.DataFrame", gaps: dict) -> dict:
-    """``{method: the label files with a gap that it reads as inputs}`` for
-    the scan rows ``rows`` (``_label_inputs`` of :func:`_scan`); a method
-    that reads none is left out."""
+    """``{method: the label files with a gap it reads as inputs}`` for ``rows``."""
     readers: dict = {}
     for i, m in rows["method"].items():
         read = [n for n in private.at[i, "_label_inputs"] if n in gaps]
@@ -3630,19 +3123,8 @@ def _label_readers(rows: "pd.DataFrame", private: "pd.DataFrame", gaps: dict) ->
 
 def _missing_labels_problem(dataset: str, gaps: dict, readers: dict, *,
                             evaluate: bool) -> str:
-    """Why ``run_all`` does not start on a folder whose label files have cells
-    without a label, or ``""``.
-
-    ``gaps`` is :func:`_label_gaps` and ``readers`` the methods that would
-    run and read such a file as an input (:func:`_label_readers`). With
-    ``evaluate`` every gap stops the run: the scores would count a missing
-    label as a cell type. For ``readers``, ``evaluate=False`` changes nothing:
-    they would train on the missing label as one more class. Without
-    ``evaluate`` only they stop the run: the files counted are the ones they
-    read, and the first of them is named. The message names the first file
-    with its count, counts the other files, and gives one action. ``dry_run``
-    is not worded.
-    """
+    """Why ``run_all`` does not start on label files with a missing label, or "".
+    Without ``evaluate`` only the methods that read such a file as an input stop it."""
     if not gaps or not (evaluate or readers):
         return ""
     if not evaluate:
@@ -3662,13 +3144,8 @@ def _missing_labels_problem(dataset: str, gaps: dict, readers: dict, *,
 
 
 def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
-    """The ``error`` of a record whose labels have a gap, or ``None``.
-
-    ``cands`` are the label orders about to be ranked. The first one with a
-    missing label decides: its count, and its files (``user``: the labels
-    the caller passed). Checked before the ranking, which would catch the
-    error of each order and rank on.
-    """
+    """The ``error`` of a record whose candidate labels have a gap, or ``None``;
+    ``user``: the labels came from the caller."""
     for names, lab, _ in cands:
         if not _has_gap(lab):
             continue
@@ -3685,8 +3162,8 @@ def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
 
 
 def _inputs_on_disk(row, dataset, data_path) -> bool:
-    """Whether every input file of a scan row is in the folder; its file
-    checks may still fail (a missing method script, a label count)."""
+    """Whether every input file of a scan row is in the folder (its other file
+    checks may still fail)."""
     if row["files_ok"]:
         return True
     try:
@@ -3702,13 +3179,8 @@ def _inputs_on_disk(row, dataset, data_path) -> bool:
 
 
 def _skipped_rows(blocked, attempted, methods, dataset, data_path) -> tuple[list, int]:
-    """The blocked rows a real run reports, and how many others it only counts.
-
-    Reported: a row whose input files are in the folder (blocked by its env,
-    the GPU, the method script or an ATAC check), and every row of a method
-    ``methods=`` names that has no runnable row. The rest need files the
-    folder does not have.
-    """
+    """``([(row, files on disk)], others)``: the blocked rows a real run reports
+    (files on disk, or a named method not attempted) and how many it only counts."""
     named = set(methods or ())
     shown, others = [], 0
     for _, r in blocked.iterrows():
@@ -3722,8 +3194,8 @@ def _skipped_rows(blocked, attempted, methods, dataset, data_path) -> tuple[list
 
 def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
                      version, data_root=None) -> list[dict]:
-    """One ``SKIPPED`` record per method with no attempted row: its first
-    reported row, a row with its files on disk first."""
+    """One ``SKIPPED`` record per method not attempted, from its first reported row
+    (one with its files on disk first)."""
     named = set(methods or ())
     first: dict = {}
     for r, on_disk in sorted(shown, key=lambda t: not t[1]):
@@ -3743,15 +3215,8 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
 
 
 def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
-    """The rows of ``plan`` that a sweep without ``modalities=`` leaves out,
-    and one sentence per method that says so.
-
-    A method with several rows whose modalities are nested (scMoMaT on a
-    folder with RNA, ADT and ATAC: ``rna+adt``, ``rna+atac``,
-    ``rna+adt+atac``) runs the row with the most modalities, the variant
-    ``inputs_for`` picks for the folder (``_resolve._drop_nested``). Rows
-    that are not nested all stay. ``plan`` holds the rows that can run.
-    """
+    """``(indices, notes)``: the rows a sweep without ``modalities=`` leaves out
+    because another row of the method holds their modalities, and why."""
     drop, notes = [], []
     for method, rows in plan.groupby("method", sort=False):
         sets = {i: set(str(mods).split("+")) for i, mods in rows["modalities"].items()}
@@ -3770,7 +3235,7 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
 
 def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
     """A dry run's note when ``batch`` fits neither the dataset's label files nor
-    the cells of some row the sweep would run; "" when it fits."""
+    some row the sweep would run; "" when it fits."""
     total = sum(n for _, n in _label_file_sizes(dataset, data_path=data_path))
     if not total or len(batch) == total:
         return ""
@@ -3798,7 +3263,7 @@ _SCORE_KEYS = ("metrics", "labels_used", "label_order_candidates", "batch_source
 
 
 def _drop_scores(rec: dict) -> dict:
-    """Remove the fields of an earlier scoring from ``rec``."""
+    """Remove the fields of an earlier scoring."""
     for k in _SCORE_KEYS:
         rec.pop(k, None)
     return rec
@@ -3808,42 +3273,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
                   batch=None, labels=None, metrics=None, labels_by_cell=False,
                   batch_by_cell=False, keep_order=None, on_rank=None,
                   batch_given=True, tried=None):
-    """Fill ``rec`` with metrics for ``emb`` (shared by run_all and rescore).
-
-    Sets ``status`` (``CHAIN_OK`` / ``CHAIN_OK_GRAPH_METHOD`` /
-    ``RUN_OK_NO_LABEL_MATCH`` / ``RUN_OK_EVAL_FAILED``), ``metrics``,
-    ``labels_used``, ``label_order_candidates``, ``batch_source``,
-    ``n_batches``, ``emb_shape`` and the tidy ``_long`` frame. ``metrics``
-    restricts the metric set (``evaluate(metrics=)``). The fields of an
-    earlier scoring are removed first, so a record that is not scored has
-    none of them.
-
-    ``keep_order`` (a stored ``labels_used``) is scored directly, with no
-    ranking, when it is one of the candidate orders; the stored
-    ``label_order_candidates`` are then kept. ``on_rank`` is handed to
-    :func:`_evaluate_best_order`.
-
-    ``labels`` (one per cell) replaces the label files. In embedding row
-    order it bypasses the label-order search; with ``labels_by_cell`` it is
-    in the order of ``labels_for(dataset)`` and is put into each candidate
-    order of the search, as the file labels are. Either way the cells form
-    one batch unless ``batch`` is given.
-
-    ``batch`` (one per cell) replaces the file-of-origin batch. It is in the
-    order of ``labels_for(dataset)`` and goes into each candidate order,
-    except that a vector without ``batch_by_cell`` follows labels given in
-    embedding row order. A batch in the dataset's order that meets such
-    labels is put in the stored ``labels_used`` order when its files hold
-    the embedding's cells, else in the variant's own label-file order. A
-    positional vector as long as the embedding is used as given when no
-    order fits. A ``batch_by_cell`` batch that fits no order (the dataset
-    folder is not found, or its label files changed) is not used: the record
-    gets a ``note`` and no batch metric. ``batch_given=False`` marks a batch
-    the caller did not pass (the saved one ``rescore`` reuses): it is
-    recorded as ``'user'`` but reaches ``evaluate`` only for a batch metric.
-    ``tried`` are the data roots searched for the dataset folder, named in
-    the note when it is not found (default: ``data_path``).
-    """
+    """Fill ``rec`` with the status and scores of ``emb``. ``labels`` / ``batch`` in
+    ``labels_for`` order (``*_by_cell``) go into each label order, else follow the rows."""
     stored = rec.get("label_order_candidates")
     stored_used = rec.get("labels_used")
     _drop_scores(rec)
@@ -4029,15 +3460,18 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     FileNotFoundError
         ``batch`` is the name of an obs column, such as ``"donor"``.
     ValueError
-        Unknown ``category``, no matching variant, nothing runnable, a
-        mismatched ``out_dir``, or conflicting arguments (Notes).
+        Unknown ``category``; a named method or a selection with no variant,
+        before anything runs, dry run included; nothing runnable (Notes); an
+        ``out_dir`` that holds a saved result of another dataset or category;
+        ``skip_existing=True`` with ``params``, or ``assume_gpu=True``, in a
+        real run.
     ValueError
         A ``batch`` Series or CSV holds ids that are not cells of the dataset.
     ValueError
         A cell has no batch in ``batch``.
     ValueError
         A real run on a folder whose label files have a cell without a label
-        (**Missing labels.**).
+        (Notes).
     KeyError
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
@@ -4064,76 +3498,61 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     Notes
     -----
-    **Dry run.** ``dry_run=True`` runs nothing and returns the
-    ``mtb.scan`` frame for the same selection: blocked rows are kept with
-    their ``reason``, and ``command`` is rendered for ``out_dir`` (or the
-    literal ``'<out_dir>'`` placeholder). ``plan[plan.runnable]`` lists what
-    will run. ``len(plan)`` also counts blocked rows.
-    ``multibench run-all --dry-run --format csv`` writes the same frame.
-    Like ``mtb.scan``, it lists the combinations whose modalities the folder
-    holds, and every combination with ``modalities="all"``. The methods a
-    real run tries are the same either way.
+    **Dry run.** ``dry_run=True`` runs nothing and returns the ``mtb.scan``
+    frame for the same selection: blocked rows are kept with their
+    ``reason``, and ``command`` is rendered for ``out_dir`` (or the literal
+    ``'<out_dir>'`` placeholder). ``plan[plan.runnable]`` lists what will
+    run. Like ``mtb.scan``, it lists the combinations whose modalities the
+    folder holds, and every combination with ``modalities="all"``; the
+    methods a real run tries are the same either way.
 
-    **Several rows of one method.** Without ``modalities``, a method whose
-    runnable rows are nested runs once, on the row with the most modalities:
-    on a folder with ``rna.h5``, ``adt.h5`` and ``atac.h5``, scMoMaT runs
-    ``rna+adt+atac``, not ``rna+adt`` or ``rna+atac``. The log names the rows
-    left out, and so does a dry run, whose frame keeps them. Pass
-    ``modalities=`` to run a smaller combination.
+    **What runs.** Only the rows ``mtb.scan`` marks runnable: input files,
+    conda env, and a GPU where the script needs one. Without
+    ``modalities``, a method whose runnable rows are nested runs once, on
+    the row with the most modalities: on a folder with ``rna.h5``,
+    ``adt.h5`` and ``atac.h5``, scMoMaT runs ``rna+adt+atac``. Pass
+    ``modalities=`` to run a smaller combination; it selects as in
+    ``mtb.scan``. A blocked row whose input files are in the folder, or a
+    named method with no runnable row, is logged and recorded as
+    ``SKIPPED`` with its reason; other blocked rows are only counted.
+    ``run_all`` skips a method given the other representation, also when
+    ``methods=`` names it. With ``allow_atac_mismatch=True`` the method runs
+    without an error and gives a wrong embedding.
 
-    **Before the sweep.** Every attempted row passed both ``mtb.scan`` checks
-    (input files and conda env, plus a GPU where the script needs one), so a
-    missing env is reported before any method starts (``multibench env
-    doctor``). Methods take minutes to hours each.
+    **Failures.** A method that raises is recorded as ``FAIL`` (with its
+    ``error``), one that exceeds ``timeout`` as ``TIMEOUT``, and the sweep
+    moves on; a ``params`` key the variant does not accept is a ``FAIL``
+    too. Check ``res.failures``. Without a timeout, one method that hangs
+    stops the sweep: size it from the ``runtime_tier`` /
+    ``observed_worst_sec`` columns of ``mtb.scan``; the slowest methods take
+    more than 4 h. The timeout covers the run and its scoring; off the main
+    thread it is unavailable, with a warning.
 
-    **Skipped rows.** A blocked row whose input files are in the folder,
-    or a named method with no runnable row, is logged and recorded as
-    ``SKIPPED`` with its reason. Other blocked rows are only counted.
+    Nothing runnable: ``ValueError``. Its first line is ``No method can run
+    on D11 (vertical).`` With ``methods=``, it starts ``None of the
+    requested methods (Matilda, totalVI) can run on D11 (vertical).`` and
+    lists every requested variant. Without ``methods``, it gives the first 3
+    of N. It never lists the reasons of methods you did not ask for. On
+    macOS or Windows, its second line says that methods run only on Linux,
+    and it lists only the rows something else also blocks. Its last line
+    names the ``mtb.scan`` call that shows the rows.
 
-    **Failures are recorded.** In a real run a method that raises is
-    recorded as ``FAIL`` (with its ``error``), one that exceeds ``timeout``
-    as ``TIMEOUT``, and the sweep moves on; a ``params`` key the variant does
-    not accept is a ``FAIL`` too. Check ``res.failures``.
-
-    **Timeout.** Without a cap, one method that hangs stops the whole
-    sweep. Size it from the
-    ``runtime_tier`` / ``observed_worst_sec`` columns of ``mtb.scan`` (or
-    ``method_info(m)['runtime']``); the slowest methods take more than 4 h.
-    The cap covers the run and its scoring; off the main thread it is
-    unavailable, with a warning.
-
-    **Saved files.** The result is saved automatically under ``out_dir``
-    (``summary.csv``, ``failures.csv``, ``batch_result.json``, ``long.csv``
-    when some method produced metrics); reload it with ``mtb.load_batch``.
-    With ``batch=``, the vector is saved as ``batch_<hash>.csv``.
-
-    **Several jobs, one folder.** A later run into the same ``out_dir`` is
-    merged with the records already there: methods it re-ran are replaced,
-    the others kept. An ``out_dir`` that holds another dataset or category
-    raises ``ValueError`` before any method runs. Jobs running at the same
-    time should use one ``out_dir`` each; combine them with
-    ``multibench plot --input dir1 --input dir2``.
+    **Saved files.** The result is saved under ``out_dir`` as
+    ``BatchResult.save`` writes it; reload it with ``mtb.load_batch``. With
+    ``batch=``, the vector is saved as ``batch_<hash>.csv``. A
+    later run into the same ``out_dir`` is merged with the records already
+    there: methods it re-ran are replaced, the others kept. Jobs running at
+    the same time should use one ``out_dir`` each.
 
     **Resuming.** ``skip_existing=True`` reuses each method's existing
-    output. Reuse only checks that the output file exists, not
-    that it is complete: a method killed mid-write leaves a truncated file
-    that would be reused as if it had succeeded. After a hard kill, delete
-    that method's sub-directory before resuming.
-
-    A reused output's record copies ``scripts_commit``, ``env_flavor`` and
-    ``hostname`` from the method's earlier record in ``out_dir``. Without an
-    earlier record they are ``None``, ``'unknown'`` and ``''``.
-
-    **Tuning.** ``skip_existing=True`` together with ``params=...`` raises
-    ``ValueError`` on a real run: reuse is keyed on the output file, not on
-    ``params``, so it would return results computed with the old parameters.
-    Give each setting a fresh ``out_dir`` (or leave ``skip_existing`` False),
-    as ``mtb.sweep`` does:
-
-    ```python
-    mtb.run_all("D11", "vertical", out_dir="out/lr", methods=["Multigrate"],
-                params={"Multigrate": {"lr": 1e-3}})
-    ```
+    output. Reuse only checks that the output file exists, not that it is
+    complete: after a hard kill, delete that method's sub-directory before
+    resuming. A reused output's record copies ``scripts_commit``,
+    ``env_flavor`` and ``hostname`` from the method's earlier record in
+    ``out_dir``; without one they are ``None``, ``'unknown'`` and ``''``.
+    Reuse is keyed on the output file, not on ``params``, so the two
+    together raise ``ValueError``: give each setting a fresh ``out_dir``, as
+    ``mtb.sweep`` does.
 
     **Missing labels.** A missing label is not a cell type. A real run
     stops with ``ValueError`` before its first method when a label file of
@@ -4141,89 +3560,32 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     label file reads as missing, such as ``NA`` or ``None``. Write the
     folder again with a label for every cell. ``evaluate=False`` runs the
     methods without scores, unless one of them reads the label file as an
-    input (Matilda does): that method would train on the missing label, so
-    the run stops as well. A dry run prints the same fact and raises
-    nothing. ``mtb.evaluate(missing_labels="drop")`` scores one embedding
-    on its labelled cells only; ``run_all`` and ``rescore`` have no such
-    option.
+    input (Matilda does). A dry run prints the same fact and raises nothing.
+    ``mtb.evaluate(missing_labels="drop")`` scores one embedding on its
+    labelled cells only.
 
     **Batch vector.** By default the batch metrics use the label file each
     cell came from (``cty1.csv`` -> 1 ...); ``batch=`` replaces that rule and
     is recorded as ``batch_source='user'``. With two or more batches outside
-    ``vertical``, the classification metrics are scored too, as
-    ``mtb.evaluate`` scores them by default.
+    ``vertical``, the classification metrics are scored too. ``run_all``
+    puts the vector in each method's cell order, as it does the labels, and
+    keeps only the cells of the batches a method reads. A vector as long as
+    one method's output is used as given; any other length marks that
+    method ``RUN_OK_EVAL_FAILED``, which the dry run says first.
+
+    A Series or one-column DataFrame indexed by cell id is aligned to the
+    barcodes of the dataset's files. So is a CSV whose first column holds
+    them, as ``obs[["sample"]].to_csv(path)`` writes it. Without usable
+    barcodes, or with a first column of text that holds none of them, the
+    match is by position, with a ``UserWarning``; R's row numbers there give
+    no warning.
 
     ``"obs:<column>"`` and ``"<column>"`` name a column of the object you
     pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and
     ``rescore`` are given a folder, not the object, so they take the column
     itself, for example ``batch=adata.obs["donor"]``. A cell without a batch
-    (NaN, blank text, or text such as ``NA``) raises ``ValueError``, in a
-    dry run too.
-
-    Give ``batch`` in the cell order of ``mtb.labels_for(dataset)``.
-    ``run_all`` puts it in each method's cell order, as it does the labels,
-    and keeps only the cells of the batches a method reads. A vector as long
-    as one method's output is used as given.
-
-    A Series or one-column DataFrame indexed by cell id is aligned to the
-    barcodes of the dataset's files. So is a CSV whose first column holds
-    them, as ``obs[["sample"]].to_csv(path)`` writes it. Ids that are not
-    cells of the dataset raise ``ValueError`` before any method runs.
-
-    Files without usable barcodes give a match by position, with a
-    ``UserWarning``. So does a CSV whose first column holds text but none of
-    the barcodes. R's row numbers in that column give no warning.
-
-    Any other length marks that method ``RUN_OK_EVAL_FAILED`` (``batch has N
-    entries, embedding has M cells``); the dry run says so first. Re-score a
-    finished sweep with ``BatchResult.rescore``.
-
-    **ATAC files.** Vertical reads ``atac.h5``; ``method_info(m)["atac"]``
-    says whether it must hold peaks or gene activity. Diagonal reads
-    ``atac_peak.h5`` (peaks) and ``atac_gas.h5`` (gene activity). Mosaic
-    reads ``atac<i>.h5`` (peaks). ``peak.h5``, and ``atac.h5`` for gene
-    activity, are accepted as older names.
-
-    ``run_all`` skips a method given the other representation, also when
-    ``methods=`` names it. With ``allow_atac_mismatch=True`` the method runs
-    without an error and gives a wrong embedding.
-
-    **Modality tokens.** ``modalities`` follows the rule of ``mtb.scan``.
-    Base tokens keep a row whose modalities are exactly that combination;
-    ``atac`` matches every ATAC role. Representation tokens select by what
-    the method reads: ``atac_peak`` / ``atac_gas`` keep the methods that
-    need that representation. moETM, scMM and iPOLNG read
-    peaks through a role named ``atac_gas``, so ``atac_peak`` selects them
-    and ``atac_gas`` does not, unless ``methods=`` names them.
-
-    **Errors raised.**
-
-    - An unknown ``category``: ``ValueError`` listing the four.
-    - An unknown id in ``methods`` or ``params``: ``KeyError`` with a
-      did-you-mean hint, before anything runs.
-    - A named method or a selection with no variant: ``ValueError`` before
-      anything runs, dry run included, such as "Matilda does not run on
-      cross data."
-    - A dry run with a ``params`` key no planned variant of that method
-      accepts: ``KeyError`` naming the accepted keys.
-    - Nothing runnable: ``ValueError``. Its first line is
-      ``No method can run on D11 (vertical).`` With ``methods=``, it starts
-      ``None of the requested methods (Matilda, totalVI) can run on D11 (vertical).``
-      and lists every requested variant. Without ``methods``, it gives the
-      first 3 of N. It never lists the reasons of methods you did not ask
-      for. On macOS or Windows, its second line says that methods run only
-      on Linux, and it lists only the rows something else also blocks. Its
-      last line names the ``mtb.scan`` call that shows the rows. When
-      combinations are not listed because the folder does not hold their
-      modalities, the line before says so.
-    - An ``out_dir`` that holds a saved result of another dataset or
-      category: ``ValueError``, before any method runs.
-    - ``skip_existing=True`` with ``params``, or ``assume_gpu=True`` in a
-      real run: ``ValueError``; a real run checks this host's GPU.
-
-    **Dataset spelling.** A ``dataset`` that differs from the folder only in
-    case (``'d52'``) is replaced by the on-disk spelling, with a
-    ``UserWarning``, before anything is named after it.
+    (NaN, blank text, or text such as ``NA``) raises ``ValueError``, in a dry
+    run too.
 
     See Also
     --------
@@ -4528,35 +3890,23 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
     Notes
     -----
-    **Folder names.** Each setting's folder is ``<param>_<value>`` with
-    ``.`` -> ``p`` and ``-`` -> ``m`` (``lr=0.001`` runs under
-    ``<out_dir>/lr_0p001/``).
+    Each setting's folder is ``<param>_<value>`` with ``.`` -> ``p`` and
+    ``-`` -> ``m`` (``lr=0.001`` runs under ``<out_dir>/lr_0p001/``).
 
-    **The long table.** ``df.attrs["long"]`` makes each setting a separate
-    series (``"Multigrate (lr=0.001)"``), so it can go straight into
-    ``mtb.plot.bubble``; ``.long`` keys rows by method, so without it every
-    setting would collapse onto one row. ``DataFrame.attrs`` does not
-    survive ``to_csv``, so the frame is also written to
-    ``<out_dir>/sweep_long.csv`` (path in ``df.attrs["long_path"]``) when any
-    setting produced metrics.
+    ``df.attrs["long"]`` names each setting as its own series
+    (``"Multigrate (lr=0.001)"``), so ``mtb.plot.bubble`` draws one row per
+    setting. It is also written to ``<out_dir>/sweep_long.csv`` (path in
+    ``df.attrs["long_path"]``) when any setting produced metrics, since
+    ``DataFrame.attrs`` does not survive ``to_csv``.
 
-    **Failed settings.** A setting that fails is not fatal: ``run_all``
-    records it, so that value's row appears with ``status`` ``FAIL`` (or
-    ``TIMEOUT``) and empty metrics rather than aborting the sweep. Check the
-    ``status`` column before reading the curve.
-
-    **Untunable methods.** Check ``mtb.params_for`` first: a method whose
-    ``tunable`` is empty hardcodes its hyperparameters upstream and cannot be
-    swept. ``sweep`` does not reject it up front; every setting is recorded
-    as ``FAIL``.
-
-    **Errors.** An unknown ``method`` raises ``KeyError`` with a did-you-mean
-    hint; the ``KeyError`` for an unknown ``param`` lists the keys the
-    variant accepts. The ``param`` check needs one variant: with
-    ``modalities=None`` and several variants in ``category`` (Matilda under
-    ``vertical``), an unknown ``param`` is recorded as ``FAIL`` for every
-    setting instead - pass ``modalities`` to get the ``KeyError``. Errors of
-    ``mtb.run_all`` (e.g. no method can run) propagate.
+    A setting that fails is recorded by ``run_all``: its row has ``status``
+    ``FAIL`` or ``TIMEOUT`` and empty metrics. Check the ``status`` column
+    before reading the curve. A method whose ``tunable`` is empty cannot be
+    swept; every setting is then a ``FAIL``. The ``param`` check needs one
+    variant: with ``modalities=None`` and several variants in ``category``
+    (Matilda under ``vertical``), an unknown ``param`` is a ``FAIL`` for
+    every setting; pass ``modalities`` to get the ``KeyError``. Errors of
+    ``mtb.run_all`` (no method can run) propagate.
 
     See Also
     --------
@@ -4597,7 +3947,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
 
 def _params_for_method(method, category, modalities):
-    """The method's tunable set, or None if it cannot be determined."""
+    """The variant's tunable keys, or ``None`` when ``params_for`` raises (several variants)."""
     try:
         from .discover import params_for
         return params_for(method, category,
