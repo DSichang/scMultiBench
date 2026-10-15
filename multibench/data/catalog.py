@@ -184,7 +184,7 @@ def known_metrics() -> list[str]:
     See Also
     --------
     mtb.catalog.canonical_metric : maps any spelling to these codes; ``strict=True`` accepts only them.
-    mtb.catalog.metrics : the description of each scIB metric.
+    mtb.catalog.metrics : the description of each metric.
     """
     seen: list[str] = []
     for v in _METRIC_CANON.values():
@@ -586,7 +586,7 @@ def datasets(files_dir: Path | str | None = None, *,
 
 
 def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """Table describing the scIB metrics: one row per metric code.
+    """Table describing the metrics: one row per metric code.
 
     Parameters
     ----------
@@ -596,7 +596,7 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        One row per scIB metric, with the CSV's columns (``metric`` and
+        One row per metric, with the CSV's columns (``metric`` and
         ``description`` in the shipped file).
 
     Examples
@@ -608,7 +608,8 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     Notes
     -----
     **Rows.** The ten scIB metrics ``ARI, NMI, ASW, iASW, iF1, cLISI,
-    ASW_batch, GC, iLISI, kBET``; header whitespace is stripped. The
+    ASW_batch, GC, iLISI, kBET``, then the five classification metrics
+    ``OCA, ACA, Spec, Sens, F1``; header whitespace is stripped. The
     canonical code vocabulary, including ``PCR`` from the published tables,
     is ``mtb.catalog.known_metrics``.
 
@@ -616,6 +617,7 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     --------
     mtb.catalog.known_metrics : the canonical metric codes.
     mtb.evaluate : computes these metrics for an embedding.
+    mtb.classification_metrics : the classification metrics of ``mtb.classify``'s predictions.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path

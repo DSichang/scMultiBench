@@ -310,7 +310,7 @@ def test_signatures_render_without_internal_names():
     with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
         mtb.list_methods(bogus=1)
     assert mtb.catalog.metrics.__doc__.splitlines()[0] == \
-        "Table describing the scIB metrics: one row per metric code."
+        "Table describing the metrics: one row per metric code."
 
 
 def test_module_help_is_written_for_users():

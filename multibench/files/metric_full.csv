@@ -9,3 +9,8 @@ ASW_batch,"Batch silhouette: 1 minus the absolute batch silhouette within each c
 GC,"Graph connectivity: for each cell type, the share of its cells in the largest connected part of its neighbour graph, averaged over cell types; 0-1; higher = better."
 iLISI,"Integration LISI: how many batches appear among each cell's neighbours on the embedding; the median over cells, scaled to 0-1; higher = better."
 kBET,"k-nearest-neighbour batch effect test: 1 minus the rate at which a test rejects that each neighbourhood has the overall batch mix, averaged over cell types; 0-1; higher = better."
+OCA,"Overall classification accuracy: the fraction of query cells predicted correctly; 0-1; higher = better."
+ACA,"Average classification accuracy: the fraction of each cell type predicted correctly, averaged over cell types; 0-1; higher = better."
+Spec,"Specificity, averaged over cell types; 0-1; higher = better."
+Sens,"Sensitivity, averaged over cell types; 0-1; higher = better."
+F1,"F1-score, averaged over cell types; 0-1; higher = better."

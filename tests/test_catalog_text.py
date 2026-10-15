@@ -27,11 +27,23 @@ def test_isolated_label_metrics_describe_every_cell_type():
 def test_every_metric_states_direction_and_the_clustering_used():
     d = _desc()
     assert set(d.index) == {"ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-                            "ASW_batch", "GC", "iLISI", "kBET"}
+                            "ASW_batch", "GC", "iLISI", "kBET",
+                            "OCA", "ACA", "Spec", "Sens", "F1"}
     assert all(text.endswith("higher = better.") for text in d), d.to_dict()
     for code in ("ARI", "NMI"):
         assert "Leiden clusters from the optimal-resolution sweep" in d[code]
         assert "Louvain" not in d[code]
+
+
+def test_the_classification_rows_follow_the_family_order():
+    # the rows are the codes of known_metrics, in its order, PCR aside
+    rows = list(mtb.catalog.metrics()["metric"])
+    assert rows == [c for c in catalog.known_metrics() if c != "PCR"]
+    d = _desc()
+    assert d["OCA"].startswith("Overall classification accuracy: the fraction of query cells")
+    assert d["ACA"].startswith("Average classification accuracy: the fraction of each cell type")
+    for code in ("Spec", "Sens", "F1"):
+        assert "averaged over cell types" in d[code], code
 
 
 def test_datasets_drops_the_always_empty_columns():
