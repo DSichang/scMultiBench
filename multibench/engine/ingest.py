@@ -1,7 +1,6 @@
 """Adapt arbitrary input formats to the canonical scMultiBench .h5.
 
 Canonical layout: matrix/data (features x cells), matrix/features, matrix/barcodes.
-Method scripts are never modified.
 
 Entry points (exposed as ``mtb.io``):
 
@@ -38,14 +37,10 @@ def __dir__() -> list[str]:
     underscore names, not the imports this module merely uses (PEP 562)."""
     return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
 
-# ATAC peak ids come in chr_start_end / chr-start-end / chr:start-end flavours.
-# Signac CreateChromatinAssay(sep=c(":","-")) (Seurat_v3 etc.) needs chr:start-end.
+# peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
 
-# Modality roles a canonical file can be written for, the user-facing aliases,
-# and the on-disk filename each role gets when ``out`` is a directory. The
-# names follow engine/resolve._ROLE_FILE_CANDIDATES and the shipped datasets
-# (D11: rna.h5/adt.h5; D28: rna.h5/atac_peak.h5/atac_gas.h5).
+# the file names are the ones resolve._ROLE_FILE_CANDIDATES looks up
 _MODALITIES = ("rna", "adt", "atac", "atac_peak", "atac_gas")
 _ALIASES = {"protein": "adt", "peak": "atac_peak", "gas": "atac_gas",
             "gene_activity": "atac_gas"}
@@ -62,7 +57,7 @@ _CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
 _COUNT_ROLES = ("rna", "adt", "atac_peak")
 #: Stored non-zero values sampled by the raw-count check.
 _COUNT_SAMPLE = 5000
-# '<selector>[<var column>=<value>]': keep the features whose var column equals value
+# '<selector>[<var column>=<value>]'
 _VAR_FILTER_RE = re.compile(r"^(?P<base>.*?)\[(?P<col>[^\[\]=]+)=(?P<val>[^\[\]]*)\]$")
 
 
@@ -87,7 +82,7 @@ def _matrix_has_fraction(X) -> bool | None:
     import scipy.sparse as sp
     try:
         if sp.issparse(X):
-            return _has_fraction(X.data if getattr(X, "format", None) in ("csr", "csc", "coo")
+            return _has_fraction(X.data if X.format in ("csr", "csc", "coo")
                                  else X.tocsr().data)
         arr = np.asarray(X)
         if arr.ndim != 2 or arr.size == 0:
@@ -112,16 +107,8 @@ def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int,
 
 
 def _counts_of_object_advice(what: str, spec) -> str | None:
-    """The last sentence of the raw-count warning for a modality that came as
-    its own object, or ``None`` for a selector string.
-
-    A selector reads the object passed as ``data``, so ``adt='layer:counts'``
-    after ``adt=<AnnData>`` would write a layer of the first object as
-    ``adt.h5``. The command line gives ``--atac-from`` an object and takes
-    the selector for it in ``--atac``, so its hint stays.
-
-    The layer ``counts`` is named only for an object that has a layer of
-    that name: the line fails on any other object."""
+    """The last sentence of the raw-count warning for a modality passed as its
+    own object; ``None`` for a selector, which reads ``data`` instead."""
     if isinstance(spec, str) or config._CLI:
         return None
     if _is_anndata(spec) and "counts" in getattr(spec, "layers", {}):
@@ -132,35 +119,25 @@ def _counts_of_object_advice(what: str, spec) -> str | None:
 
 
 def _raw_count_hint(arg: str, spec, *, to_canonical: bool = False):
-    """``(hint, how)`` of :func:`_warn_not_counts` for the matrix that the
-    selector ``spec`` reads: the selector of the raw counts of that matrix,
-    or a sentence when no selector can be named. ``arg`` is the argument the
-    caller wrote (``rna``, ``adt``, ``atac``); with ``to_canonical`` the
-    selector is the ``obsm=`` key or ``None``, and ``arg`` the modality.
-
-    ``'layer:counts'`` is a layer of the matrix the selector reads (``X``),
-    so it is named only for a selector of ``X`` or of a layer, with the
-    modality and the feature filter of that selector. A matrix in ``obsm``
-    has no layer: its raw counts are in an ``obsm`` entry too. For the ADT
-    that entry is usually ``protein_counts``; for another modality, and for
-    an ADT selector that already reads ``protein_counts``, the message names
-    the entry that was read."""
+    """``(hint, how)`` of :func:`_warn_not_counts`: the selector of the raw
+    counts of the matrix ``spec`` reads, else a sentence. With
+    ``to_canonical``, ``spec`` is the ``obsm=`` key and ``arg`` the modality.
+    A matrix in ``obsm`` has no layer, so its counts are named as an
+    ``obsm`` entry (``protein_counts`` for the ADT)."""
     if to_canonical:
-        key, pre, flt = spec, "", None
+        key, pre, var_filter = spec, "", None
         shown = lambda k: config.hint(f"obsm='{k}'", f"--obsm {k}")     # noqa: E731
         layer = config.hint("layer='counts'", "--layer counts")
     else:
-        base, flt = _split_var_filter(spec if isinstance(spec, str) else "")
-        mod = None
-        if base.startswith("mod:"):
-            mod, _, base = base[4:].partition(".")
+        mod, base, var_filter = _parse_selector(spec if isinstance(spec, str) else "")
         pre = f"mod:{mod}." if mod else ""
         key = base[5:] if base.startswith("obsm:") else None
         shown = lambda k: config.hint(f"{arg}='{pre}obsm:{k}'",          # noqa: E731
                                       f"--{arg} {pre}obsm:{k}")
-        counts = f"{pre}layer:counts" + (f"[{flt[0]}={flt[1]}]" if flt else "")
+        counts = f"{pre}layer:counts" + (f"[{var_filter[0]}={var_filter[1]}]"
+                                         if var_filter else "")
         layer = config.hint(f"{arg}='{counts}'",
-                            f"--{arg} \"{counts}\"" if flt else f"--{arg} {counts}")
+                            f"--{arg} \"{counts}\"" if var_filter else f"--{arg} {counts}")
     if key is None:
         return layer, None
     if arg == "adt" and key != "protein_counts":
@@ -169,27 +146,20 @@ def _raw_count_hint(arg: str, spec, *, to_canonical: bool = False):
 
 
 def _matrix_key(data, spec):
-    """What tells whether two modality arguments of :func:`export_dataset`
-    read one matrix: the parts of a selector string (the object, the place,
-    the feature filter), or the object itself. ``data`` passed again as an
-    object is its ``X``."""
+    """A key equal for two modality arguments that read one matrix; ``data``
+    passed again as an object is its ``X``."""
     if isinstance(spec, str):
-        base, flt = _split_var_filter(spec)
-        mod = None
-        if base.startswith("mod:"):
-            mod, _, base = base[4:].partition(".")
-        return "selector", mod, base or "X", flt
+        mod, base, var_filter = _parse_selector(spec)
+        return "selector", mod, base or "X", var_filter
     if spec is data:
         return "selector", None, "X", None
     return "object", id(spec)
 
 
 def _check_one_matrix_each(data, specs, given) -> None:
-    """``ValueError`` when two modalities are read from the same matrix of the
-    same object (``rna='X', adt='X'``): the second file would be a copy of
-    the first under the name of another modality. ``specs`` are the
-    arguments as they are resolved and ``given`` as they were written. Two
-    feature filters on one ``X`` are two matrices."""
+    """``ValueError`` when two modalities read the same matrix
+    (``rna='X', adt='X'``). ``specs`` are the arguments as resolved, ``given``
+    as written."""
     seen = {}
     for what, spec in specs.items():
         if spec is None:
@@ -230,14 +200,10 @@ _BARCODE_SUFFIX_RE = re.compile(r"-\d+$")
 
 
 def _cell_order(names, ref):
-    """How barcodes ``names`` relate to ``ref``.
-
-    Returns ``("same", None)`` (same cells, same order), ``("order", idx)``
-    (same cells; ``names[idx]`` is in ``ref`` order), ``("other", None)``
-    (different cells) or ``("unknown", None)`` (non-unique barcodes). Names
-    that differ only in a trailing ``-<n>`` suffix count as the same cell when
-    the suffix-free names stay unique on both sides.
-    """
+    """``("same", None)``, ``("order", idx)`` (``names[idx]`` is in ``ref``
+    order), ``("other", None)`` or ``("unknown", None)`` (non-unique
+    barcodes). A trailing ``-<n>`` does not count when the names stay unique
+    without it."""
     names, ref = [str(x) for x in names], [str(x) for x in ref]
     judged = False
     for key in (None, _BARCODE_SUFFIX_RE):
@@ -255,13 +221,9 @@ def _cell_order(names, ref):
 
 
 def _follow_peak_order(out: Path, X, bars):
-    """``(X, bars)`` of a gene-activity matrix put in the cell order of the
-    ``atac_peak.h5`` next to ``out``, which ``atac_cty.csv`` follows.
-
-    Same cells in another order: rows reordered, one note on stderr.
-    Different cells: ``UserWarning``. No peak file, or the same order:
-    unchanged.
-    """
+    """``(X, bars)`` of a gene-activity matrix in the cell order of the
+    ``atac_peak.h5`` next to ``out``, which ``atac_cty.csv`` follows; other
+    cells warn."""
     import sys
 
     import scipy.sparse as sp
@@ -299,9 +261,19 @@ def _split_var_filter(spec: str):
     return m.group("base"), (m.group("col").strip(), m.group("val").strip())
 
 
-def _filter_var(adata, flt, *, what, spec):
+def _parse_selector(spec: str):
+    """``'mod:rna.layer:c[col=v]'`` -> ``('rna', 'layer:c', ('col', 'v'))``;
+    the modality is ``None`` without ``mod:``."""
+    base, var_filter = _split_var_filter(spec)
+    mod = None
+    if base.startswith("mod:"):
+        mod, _, base = base[4:].partition(".")
+    return mod, base, var_filter
+
+
+def _filter_var(adata, var_filter, *, what, spec):
     """The features of ``adata`` whose ``var[col]`` equals ``value`` (a view)."""
-    col, val = flt
+    col, val = var_filter
     if col not in adata.var.columns:
         raise KeyError(f"{what}={spec!r}: var column {col!r} not found; available: "
                        f"{list(adata.var.columns)}")
@@ -324,25 +296,15 @@ def _check_category(category):
 
 
 def _atac_filename(modality: str, category: str | None) -> str:
-    """On-disk name of an ATAC-family canonical file.
-
-    ``atac.h5`` is the one name every vertical (paired multiome) variant
-    resolves, whatever representation the method wants
-    (``method_info(m)['atac']``): it is the ``atac`` role's file and the
-    ``atac_gas`` role's fallback, and no vertical variant reads
-    ``atac_peak.h5``. So ``category='vertical'`` maps every ATAC modality to
-    ``atac.h5``; any other category (or None) keeps the representation-named
-    file.
-    """
+    """On-disk name of a modality file: every vertical variant reads its ATAC,
+    of either representation, from ``atac.h5``."""
     if category == "vertical" and modality in ("atac", "atac_peak", "atac_gas"):
         return "atac.h5"
     return _MOD_FILE[modality]
 
 
 def _is_canonical_h5(path: Path) -> bool:
-    """``matrix/data`` is there as a 2-D dataset. A 10x Genomics ``.h5`` also
-    has a ``matrix/data``: the 1-D values of a sparse matrix, next to
-    ``matrix/indptr``."""
+    """``matrix/data`` is a 2-D dataset; a 10x Genomics ``.h5`` has a 1-D one."""
     try:
         with h5py.File(path, "r") as f:
             d = f.get("matrix/data")
@@ -352,8 +314,7 @@ def _is_canonical_h5(path: Path) -> bool:
 
 
 def _is_tenx_h5(path: Path) -> bool:
-    """A 10x Genomics feature-barcode ``.h5``: a sparse matrix, which has
-    ``matrix/indptr``."""
+    """A 10x Genomics ``.h5``: a sparse matrix with ``matrix/indptr``."""
     try:
         with h5py.File(path, "r") as f:
             return "matrix/indptr" in f
@@ -362,41 +323,35 @@ def _is_tenx_h5(path: Path) -> bool:
 
 
 def _tenx_message(path) -> str:
-    """What to do with a 10x Genomics ``.h5`` instead of passing it as a
-    dataset file."""
     return f'{path} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
 
 
 def _is_mudata(obj) -> bool:
-    # Duck-typed so ``mudata`` stays an optional import.
+    # duck-typed: mudata is an optional import
     return hasattr(obj, "mod") and isinstance(getattr(obj, "mod", None), dict) \
         and type(obj).__name__ == "MuData"
 
 
 def _to_anndata(src):
-    """Load ``src`` into an AnnData (or MuData for ``.h5mu``); in-memory objects
-    are returned as-is."""
+    """Load ``src`` into an AnnData (a MuData for ``.h5mu``); an in-memory
+    object is returned as is."""
     import anndata as ad
     import pandas as pd
 
-    if hasattr(src, "X") and hasattr(src, "obs"):     # already AnnData / MuData
+    if hasattr(src, "X") and hasattr(src, "obs"):
         return src
     p = Path(src)
     if not p.exists():
-        # h5py's own error ("Unable to synchronously open file ... errno = 2")
-        # does not read like a missing file, nor name the cwd a relative path
-        # was tried against.
+        # h5py's own error neither reads like a missing file nor names the cwd
         raise FileNotFoundError(
             f"input file does not exist: {p} (cwd {os.getcwd()})")
-    suf = p.suffix.lower()
-    if suf == ".h5":
-        # exists but is not canonical (to_canonical passes canonical files
-        # through before reaching here): say what is inside
+    suffix = p.suffix.lower()
+    if suffix == ".h5":
+        # a canonical .h5 never gets here: say what this one holds
         try:
             with h5py.File(p, "r") as f:
                 keys = sorted(f.keys())
                 d = f.get("matrix/data")
-                # there, but not as the 2-D dataset of a canonical file
                 flat = d is not None and not (isinstance(d, h5py.Dataset) and d.ndim == 2)
         except OSError as exc:
             raise ValueError(f"{p} is not a readable HDF5 file: {exc}") from exc
@@ -409,9 +364,9 @@ def _to_anndata(src):
             + (" (a top-level 'data' dataset is a method output such as "
                "out/<method>/embedding.h5, which mtb.evaluate reads)" if "data" in keys else "")
             + "; pass an AnnData / .h5ad / .csv to convert instead")
-    if suf == ".h5ad":
+    if suffix == ".h5ad":
         return ad.read_h5ad(p)
-    if suf == ".h5mu":
+    if suffix == ".h5mu":
         try:
             import mudata
         except ModuleNotFoundError as exc:
@@ -421,18 +376,17 @@ def _to_anndata(src):
                 ".h5ad / AnnData directly."
             ) from exc
         return mudata.read_h5mu(p)
-    if suf in (".csv", ".tsv"):
-        sep = "," if suf == ".csv" else "\t"
+    if suffix in (".csv", ".tsv"):
+        sep = "," if suffix == ".csv" else "\t"
         df = pd.read_csv(p, sep=sep)
-        # A leading non-numeric column is row labels (cell barcodes): use it as
-        # the index (obs_names) instead of feeding it to the numeric matrix.
+        # a leading non-numeric column holds the cell barcodes
         if df.shape[1] > 1 and not pd.api.types.is_numeric_dtype(df.iloc[:, 0]):
             df = df.set_index(df.columns[0])
         a = ad.AnnData(df.to_numpy(dtype=float))
         a.obs_names = [str(x) for x in df.index]
         a.var_names = [str(c) for c in df.columns]
         return a
-    if suf == ".loom":
+    if suffix == ".loom":
         try:
             import loompy  # noqa: F401  (anndata.read_loom needs it)
         except ModuleNotFoundError as exc:
@@ -442,8 +396,6 @@ def _to_anndata(src):
                 "alternatively convert the input to .h5ad/.csv first."
             ) from exc
         return ad.read_loom(p)
-    if not p.exists():
-        raise FileNotFoundError(f"input file does not exist: {p}")
     raise ValueError(f"unsupported input format: {p.name}")
 
 
@@ -479,25 +431,10 @@ _TENX_TYPE = {"rna": "Gene Expression", "adt": "Antibody Capture", "atac": "Peak
 
 
 def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
-    """``ValueError`` when the matrix of ``adata`` holds features of more than
-    one type (``var['feature_types']``, as in a 10x Genomics file read with
-    ``gex_only=False``): written as it is, genes and peaks would be one file.
-
-    The values that occur are counted, not the categories of the column, so
-    a filtered view passes. ``arg`` is the keyword the user wrote (``'rna'``)
-    and ``spec`` the selector, ``None`` for an object; ``to_canonical`` has
-    neither and gives the modality as ``role``. They only word the message.
-
-    The message names the two types, or the number of types and the most
-    frequent one, and one action. When one of the type names is a 10x
-    Genomics name (``Gene Expression``, ``Antibody Capture``, ``Peaks``) the
-    features are of several modalities, and the action keeps a file to one
-    type: without the column, genes and peaks would be written into one
-    file. When none is, as with ``protein_coding`` and ``lncRNA``, the
-    action is to delete the column, for a reader whose features are all of
-    one modality. The object is named only where the modality came as its
-    own object.
-    """
+    """``ValueError`` when ``var['feature_types']`` of ``adata`` holds more
+    than one value: one file holds one modality. ``arg``, ``spec`` and
+    ``role`` only word the message. Without a 10x type name (``protein_coding``
+    and ``lncRNA``) the advice is to delete the column instead."""
     var = getattr(adata, "var", None)
     if var is None or "feature_types" not in var.columns:
         return
@@ -547,21 +484,10 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
 
 def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
                  names_arg=None, arg=None, spec=None, role=None):
-    """Return ``(X, feature_names)`` for the requested slot of ``adata``.
-
-    ``obsm`` matrices carry no var axis in AnnData, so feature names come from
-    ``feature_names`` when given, else the columns of a DataFrame-valued obsm,
-    else ``adata.uns[f"{obsm}_names"]`` (when its length matches), else
-    ``feature_0..`` - with a ``UserWarning`` naming the fallback, because a
-    protein panel written as ``feature_0..feature_29`` loses its marker names
-    in every downstream readout. ``what`` labels the warning (``'adt'``);
-    ``names_arg`` is the caller's keyword that takes the names
-    (``'adt_names'``, ``'feature_names'``), offered first in Python.
-
-    ``X`` and a layer follow the var axis, which must hold one feature type
-    (:func:`_check_one_feature_type`; ``arg``, ``spec`` and ``role`` word its
-    message, and ``role`` is ``what`` unless given).
-    """
+    """``(X, feature_names)`` of ``X``, a layer or an ``obsm`` entry of ``adata``.
+    An ``obsm`` matrix has no var: its names come from ``feature_names``, a
+    DataFrame's columns or ``uns['<key>_names']``, else ``feature_0..`` with a
+    warning. ``names_arg`` is the caller's keyword for the names."""
     if layer is not None and obsm is not None:
         raise ValueError("pass at most one of layer= / obsm=")
     if obsm is not None:
@@ -613,34 +539,20 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
 
 def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
                              mudata=False) -> str | None:
-    """The warning of :func:`export_dataset` for feature names that occur
-    more than once in one matrix, or ``None`` when every name is unique.
-
-    The names are written as they are. The message gives the number of
-    repeated names, one of them, and how to make them unique for the way
-    the matrix was passed: ``arg`` is the keyword (``'rna'``),
-    ``spec`` what the user gave it (a selector string or an object),
-    ``role`` the modality written and ``obsm`` the key when the matrix is an
-    ``obsm`` entry. ``var_names_make_unique()`` is named for the object that
-    holds these features alone: on an object with features of several types
-    it also renames a feature of another type that has the same name, so a
-    feature filter gets the recipe that splits the object first. A peak name
-    is a region and is not renamed.
-
-    A selector reads the object passed as ``data``, whose variable name is
-    not known here: the message calls it the object you export. A modality
-    passed as its own object is named by its keyword (``rna=rna``).
-    """
+    """The warning for feature names repeated in one matrix, else ``None``.
+    ``var_names_make_unique()`` is advised only for an object that holds
+    these features alone: on a mixed object it would also rename features of
+    another type."""
     import pandas as pd
 
     names = pd.Index([str(f) for f in feats])
     dup = names[names.duplicated()].unique()
     if not len(dup):
         return None
-    sel = spec if isinstance(spec, str) else getattr(spec, "_selector", None)
+    selector = spec if isinstance(spec, str) else getattr(spec, "_selector", None)
     where = config.hint(
         f"{arg}={spec!r}" if isinstance(spec, str) else f"{arg}={type(spec).__name__}",
-        f"--{arg} {sel or 'X'}")
+        f"--{arg} {selector or 'X'}")
     kind = "peak" if role == "atac_peak" else "feature"
     head = (f"{where} has {len(dup):,} repeated {kind} {'name' if len(dup) == 1 else 'names'}"
             f", for example {dup[0]}.")
@@ -648,11 +560,11 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
     if role == "atac_peak":
         # a peak name is a region: no advice that renames one
         return f"{head} Keep one column for each peak."
-    base, flt = _split_var_filter(sel) if isinstance(sel, str) else (None, None)
+    mod, base, var_filter = (_parse_selector(selector) if isinstance(selector, str)
+                             else (None, None, None))
     obj = "the object"
-    if base is not None and base.startswith("mod:"):
-        name, _, base = base[4:].partition(".")
-        obj, base = f"mod[{name!r}] of the object", base or "X"
+    if mod is not None:
+        obj, base = f"mod[{mod!r}] of the object", base or "X"
     elif mudata and base is not None:
         mod, _, rest = base.partition(".")
         obj, base = f"mod[{mod!r}] of the object", rest or "X"
@@ -661,7 +573,7 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
         return f"{head} Give each column its own name."
     if not isinstance(spec, str) and not config._CLI:
         return f"{head} Run {arg}.var_names_make_unique() {when}."
-    if flt is None:
+    if var_filter is None:
         return f"{head} Run var_names_make_unique() on {obj} " + config.hint(
             "you export.", "in Python and save the file again.")
     # on the whole object the call also renames a feature of another type
@@ -685,12 +597,8 @@ def _layout_family(name: str) -> str | None:
 
 
 def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
-    """Warn when the dense ``matrix/data`` will exceed :data:`DENSE_WARN_BYTES`.
-
-    The canonical layout stores the matrix dense (features x cells x
-    itemsize); gzip shrinks a sparse matrix on disk but every reader
-    densifies it, and a 100k-cell x 200k-peak multiome is 160 GB.
-    """
+    """Warn when the dense ``matrix/data`` exceeds :data:`DENSE_WARN_BYTES`:
+    every reader densifies it, however well gzip shrinks the file."""
     itemsize = int(np.dtype(dtype).itemsize)
     size = int(n_feat) * int(n_cell) * itemsize
     if size > DENSE_WARN_BYTES:
@@ -710,15 +618,9 @@ def _peak_fraction(feats) -> float:
 
 
 def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
-    """Warn when the feature names contradict the declared ATAC role.
-
-    Names declared as peaks that do not look like peaks get the rename advice.
-    Gene activity is suggested only when the names support it: when
-    ``rna_feats`` (the RNA feature names of the same export) is given, only
-    if most ATAC names are among them; without it, as the second option.
-    ``kind_arg`` spells the fix as ``export_dataset``'s ``atac_kind=``
-    instead of ``to_canonical``'s ``modality=``.
-    """
+    """Warn when the feature names contradict the ATAC role. Gene activity is
+    suggested only when most names are among ``rna_feats``, or when there
+    is none to compare with. ``kind_arg`` words the fix as ``atac_kind=``."""
     if modality not in ("atac_gas", "atac_peak"):
         return
     frac = _peak_fraction(feats)
@@ -742,7 +644,7 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
         gas = f" If the matrix holds gene activity, pass {as_gas}."
         genes = set(rna_feats or ())
         share = sum(1 for x in feats if x in genes) / len(feats) if len(feats) else 0.0
-        if rna_feats is None:                   # nothing to compare with: both options
+        if rna_feats is None:
             text = head + rename + gas
         elif share > 0.5:
             text = head + f", and {share:.0%} are RNA gene names." + gas
@@ -752,9 +654,8 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
 
 
 def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
-    """Stream ``X`` (cells x features, dense or sparse) to ``out`` as
-    features x cells. Sparse input is converted to CSC so that each block of
-    features is a contiguous column slice that densifies cheaply."""
+    """Stream ``X`` (cells x features) to ``out`` as features x cells, one
+    block of features at a time; CSC makes each block a cheap column slice."""
     import scipy.sparse as sp
 
     if sp.issparse(X):
@@ -867,18 +768,9 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
 
     Notes
     -----
-    **Output location.**
-
-    - ``out`` a file path: written there; ``category`` does not rename it;
-    - ``out`` a directory and ``modality`` given: the modality's canonical
-      filename is appended (``rna.h5``, ``adt.h5``, ...);
-    - ``out=None`` and ``modality`` given: that filename in the current
-      directory; ``out=None`` without ``modality`` raises ``ValueError``.
-
     **Modality aliases and checks.** ``'protein'`` -> ``'adt'``,
     ``'peak'`` -> ``'atac_peak'``, ``'gas'`` / ``'gene_activity'`` ->
-    ``'atac_gas'``. The ADT check is the ``obsm=`` rule under *ADT
-    matrices*. ``'atac_peak'`` warns when fewer than half of the feature
+    ``'atac_gas'``. ``'atac_peak'`` warns when fewer than half of the feature
     names look like peaks (``chr1:100-200``, ``chr1_100_200``,
     ``chr1-100-200``), ``'atac_gas'`` when more than half do; plain
     ``'atac'`` is not checked.
@@ -887,8 +779,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     ``obsm`` keys, ``obsm=`` or ``layer=`` must say where the protein matrix
     is; otherwise ``adata.X`` (usually the RNA) would be written as
     ``adt.h5``, so it raises. Keys that start with ``X_`` (``X_pca``,
-    ``X_umap``) hold embeddings and do not count. ``layer`` and ``obsm`` are
-    mutually exclusive.
+    ``X_umap``) hold embeddings and do not count.
     The feature names of an ``obsm`` matrix come from the first of:
 
     1. ``feature_names``;
@@ -897,22 +788,13 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     4. ``feature_0..``, with a ``UserWarning``: pass ``feature_names`` to
        keep the protein names.
 
-    **ATAC filenames.** Vertical methods read ``atac.h5``;
-    ``method_info(m)['atac']`` says whether it must hold peaks or gene
-    activity. Diagonal methods read ``atac_peak.h5`` (peaks) and
-    ``atac_gas.h5`` (gene activity). Mosaic methods read ``atac<i>.h5``
-    (peaks). ``peak.h5``, and ``atac.h5`` for gene activity, are accepted as
-    older names.
-
-    With ``out`` a directory, ``category='vertical'`` writes ``atac.h5`` for
-    either representation. Any other ``category``, or none, names the file
-    after the representation: ``atac_peak.h5``, ``atac_gas.h5``, or
-    ``atac.h5`` for the plain ``'atac'`` role. For a mosaic batch, pass the
-    numbered file as ``out`` (``'data/MYMOSAIC/atac2.h5'``).
-
-    **Check the ATAC kind.** Without ``category='vertical'``,
-    ``to_canonical(atac, d, modality='peak')`` writes ``atac_peak.h5``, and
-    ``mtb.scan(d, 'vertical')`` finds no ATAC method runnable. The
+    **ATAC filenames.** With ``out`` a directory, ``category='vertical'``
+    writes ``atac.h5`` for either representation, the file vertical methods
+    read. Any other ``category``, or none, names the file after the
+    representation: ``atac_peak.h5``, ``atac_gas.h5``, or ``atac.h5`` for
+    the plain ``'atac'`` role, and ``mtb.scan(d, 'vertical')`` then finds no
+    ATAC method runnable. A file path given as ``out`` is not renamed; for a
+    mosaic batch, pass the numbered file (``'data/MYMOSAIC/atac2.h5'``). The
     representation is not recorded on disk: ``method_info(m)['atac']`` says
     which kind a method expects.
 
@@ -937,18 +819,14 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     of one type, or use ``mtb.io.export_dataset``, whose selectors take a
     filter.
 
-    **Streaming.** Sparse matrices (CSR/CSC, in memory or inside an
-    ``.h5ad``/``.h5mu``) are converted to CSC and written ``block`` features
-    at a time, without densifying the whole matrix. The defaults (gzip,
-    ``'float64'``) match the shipped benchmark files; any compression
-    enables chunking. A ``.csv`` / ``.tsv`` is read as cells x features, and
+    **Storage.** Sparse matrices (in memory or inside an ``.h5ad`` /
+    ``.h5mu``) are written ``block`` features at a time, without densifying
+    the whole matrix. ``matrix/data`` is stored dense (features x cells x
+    itemsize): gzip shrinks the file, but every reader densifies it.
+    ``dtype='float32'`` halves it, and h5py, rhdf5 and hdf5r read it (as
+    double in R). The defaults (gzip, ``'float64'``) match the shipped
+    benchmark files. A ``.csv`` / ``.tsv`` is read as cells x features, and
     a non-numeric first column is used as the cell barcodes.
-
-    **Size on disk.** ``matrix/data`` is stored dense (features x cells x
-    itemsize): gzip shrinks the file, but every reader densifies it. A
-    ``UserWarning`` states the size when it exceeds 1 GB and suggests
-    filtering features or ``dtype='float32'``, which h5py / rhdf5 / hdf5r
-    read (as double in R).
 
     **Errors.** ``ValueError`` is raised for:
 
@@ -976,14 +854,11 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     mtb.io.read_canonical : the inverse, canonical ``.h5`` -> AnnData.
     mtb.describe_layout : the folder layout and the role -> filename mapping.
     """
-    # A canonical .h5 is returned as is, even when run() passes convert=True
-    # and an out path: there is nothing to convert.
     if isinstance(src, (str, Path)) and _is_canonical_h5(Path(src)):
         return Path(src)
     if isinstance(src, (str, Path)) and Path(src).suffix.lower() == ".h5" \
             and _is_tenx_h5(Path(src)):
-        # its matrix/data made 0.3.4 pass the file through. Said before the
-        # checks of the other arguments, which would ask for an out path
+        # before the checks of the other arguments, which would ask for an out path
         raise ValueError(_tenx_message(Path(src)))
     if convert is False:
         raise ValueError(
@@ -1018,8 +893,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
             "pass obsm='<key>' (or layer=) to select the protein matrix, otherwise "
             "adata.X (usually the RNA) would be written as adt.h5")
 
-    # without modality=, the file name says which features the matrix should
-    # hold (mtb.run converts an input to inputs/<role>.h5)
+    # without modality=, the file name (mtb.run writes inputs/<role>.h5) names it
     X, feats = _pick_matrix(adata, layer=layer, obsm=obsm,
                             feature_names=feature_names, what=modality,
                             names_arg="feature_names",
@@ -1078,21 +952,17 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
 
     Notes
     -----
-    **Where the demo data is.** ``mtb.data.fetch("D11")`` downloads a demo
-    dataset into ``mtb.config.DEFAULT.data_path``, not into the current
-    directory.
+    ``mtb.data.fetch("D11")`` downloads a demo dataset into
+    ``mtb.config.DEFAULT.data_path``, not into the current directory.
 
-    **Memory.** The whole matrix is read densely and transposed before the
-    sparsity decision, so memory peaks at the dense size (features x cells
-    x 8 bytes) even when the result is CSR. It is meant for the shipped
-    benchmark inputs and for what ``to_canonical`` writes, not for a
-    100k-cell peak matrix.
+    The whole matrix is read densely, so memory peaks at the dense size
+    (features x cells x 8 bytes) even when the result is CSR: it is meant
+    for the shipped benchmark inputs and for what ``to_canonical`` writes,
+    not for a 100k-cell peak matrix.
 
-    **Other files.** A 10x Genomics ``.h5`` file (a sparse matrix, with
-    ``matrix/indptr``) raises ``ValueError``: read it with scanpy. Nothing
-    else is checked. A file without ``matrix/data`` raises h5py's
-    ``KeyError``. ``matrix/features`` and ``matrix/barcodes`` are optional;
-    without them AnnData's default names (``'0'``, ``'1'``, ...) are kept.
+    A file without ``matrix/data`` raises h5py's ``KeyError``.
+    ``matrix/features`` and ``matrix/barcodes`` are optional; without them
+    AnnData's default names (``'0'``, ``'1'``, ...) are kept.
 
     See Also
     --------
@@ -1108,7 +978,7 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
         # its 1-D matrix/data would fail below with a line about unpacking
         raise ValueError(_tenx_message(path))
     with h5py.File(path, "r") as f:
-        data = np.array(f["matrix/data"]).T  # features x cells -> cells x features
+        data = np.array(f["matrix/data"]).T
         X = np.asarray(data, dtype=float)
         if sparse is None:
             sparse = X.size > 0 and np.count_nonzero(X) / X.size < 0.5
@@ -1148,16 +1018,11 @@ def normalize_peak_names(src, dst):
 
     Notes
     -----
-    **Recognised peaks.** Peak ids come as ``chr_start_end``,
-    ``chr-start-end`` or ``chr:start-end``. A feature counts as a peak when
-    it reads ``<chr><sep><start><sep><end>`` with two integers, the first
-    separator one of ``_``, ``-``, ``:`` and the second ``_`` or ``-``; it
-    is rewritten as ``<chr>:<start>-<end>``.
-
-    **Everything else is kept.** Other features (gene symbols, ids without
-    two numbers) pass through unchanged. ``matrix/data`` and
-    ``matrix/barcodes`` are copied as they are; only ``matrix/features`` is
-    replaced.
+    **Recognised peaks.** A feature reading ``<chr><sep><start><sep><end>``
+    with two integers, the first separator one of ``_``, ``-``, ``:`` and the
+    second ``_`` or ``-``, is rewritten as ``<chr>:<start>-<end>``. Other
+    features (gene symbols) pass through unchanged, and only
+    ``matrix/features`` is replaced.
 
     **Inside ``mtb.run``.** ``mtb.run`` applies this itself for GLUE and
     Seurat_v3, writing a per-run ``<role>_normpeaks.h5`` copy next to the
@@ -1173,11 +1038,11 @@ def normalize_peak_names(src, dst):
     shutil.copyfile(src, dst)
     with h5py.File(dst, "r+") as f:
         feats = f["matrix/features"][:]
-        def _norm(b):
+        def _colon_form(b):
             x = b.decode() if isinstance(b, bytes) else str(b)
             m = _PEAK_RE.match(x)
             return f"{m.group(1)}:{m.group(2)}-{m.group(3)}" if m else x
-        new = np.array([_norm(v) for v in feats], dtype="S")
+        new = np.array([_colon_form(v) for v in feats], dtype="S")
         del f["matrix/features"]
         f.create_dataset("matrix/features", data=new)
     return dst
@@ -1188,26 +1053,8 @@ def normalize_peak_names(src, dst):
 # --------------------------------------------------------------------------
 
 def _write_labels(labels, path: Path | str) -> Path:
-    """Write cell-type labels as the single-column CSV the benchmark reads
-    (header ``x``, one label per line) and return the path.
-
-    This is the shipped ``cty.csv`` format: ``eval.io.read_labels``, the
-    reader behind ``evaluate`` and ``workflow._read_cty``, returns the column
-    named ``x``.
-
-    Parameters
-    ----------
-    labels : sequence
-        Any 1-D sequence (list, ndarray, pandas Series / Categorical); values
-        are written as strings.
-    path : path-like
-        Destination ``.csv`` path (parent directories are created).
-
-    Returns
-    -------
-    pathlib.Path
-        ``path``.
-    """
+    """Write 1-D ``labels`` as the benchmark's label CSV (header ``x``, one
+    label per line, as strings) and return ``path``."""
     from ..eval import io as eio
 
     path = Path(path)
@@ -1215,10 +1062,9 @@ def _write_labels(labels, path: Path | str) -> Path:
     vals = np.asarray(labels)
     if vals.ndim != 1:
         raise ValueError(f"labels must be 1-D, got shape {vals.shape}")
-    # The rows DataFrame.to_csv writes, written here: its csv writer follows
-    # the Python version, and up to 3.10 it leaves a lone carriage return
-    # bare, which the reader takes for the end of a row. An empty label is
-    # written "", because the reader skips an empty line.
+    # not DataFrame.to_csv: up to Python 3.10 its writer leaves a lone carriage
+    # return bare, which the reader takes for a row end. "" because the reader
+    # skips an empty line.
     rows = [eio._csv_field(str(v)) or '""' for v in vals]
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(os.linesep.join(["x", *rows]) + os.linesep)
@@ -1226,17 +1072,13 @@ def _write_labels(labels, path: Path | str) -> Path:
 
 
 def _select(data, spec, *, what):
-    """Parse a matrix selector into ``(adata, to_canonical kwargs)``.
-
-    Selectors: ``'X'`` | ``'obsm:<key>'`` | ``'layer:<key>'`` |
-    ``'mod:<name>'`` (MuData; ``adata.X`` of that modality) |
-    ``'mod:<name>.obsm:<key>'`` / ``'mod:<name>.layer:<key>'``, each
-    optionally followed by a feature filter ``[<var column>=<value>]``.
-    """
+    """``(adata, to_canonical kwargs)`` of a selector: ``'X'``,
+    ``'obsm:<key>'``, ``'layer:<key>'``, each after an optional
+    ``'mod:<name>.'``, then an optional ``[<var column>=<value>]``."""
     if not isinstance(spec, str) or not spec:
         raise ValueError(f"{what}= must be a selector string like 'X', 'obsm:<key>', "
                          f"'layer:<key>' or 'mod:<name>', got {spec!r}")
-    rest, flt = _split_var_filter(spec)
+    rest, var_filter = _split_var_filter(spec)
     adata = data
     if rest.startswith("mod:"):
         if not _is_mudata(data):
@@ -1260,11 +1102,11 @@ def _select(data, spec, *, what):
         raise ValueError(f"{what}={spec!r}: unknown selector; use 'X', 'obsm:<key>', "
                          f"'layer:<key>' or 'mod:<name>[.obsm:<key>|.layer:<key>]', "
                          f"optionally followed by [<var column>=<value>]")
-    if flt is not None:
+    if var_filter is not None:
         if "obsm" in kw:
             raise ValueError(f"{what}={spec!r}: a [<column>=<value>] filter selects "
                              f"features by adata.var; an obsm matrix has no var")
-        adata = _filter_var(adata, flt, what=what, spec=spec)
+        adata = _filter_var(adata, var_filter, what=what, spec=spec)
     return adata, kw
 
 
@@ -1273,9 +1115,9 @@ def _mudata_selector(mdata, spec):
     MuData -> the full ``'mod:<name>...'`` selector; anything else unchanged."""
     if not isinstance(spec, str):
         return spec
-    base, flt = _split_var_filter(spec)
+    base, var_filter = _split_var_filter(spec)
     if base in mdata.mod:
-        return f"mod:{base}" + (spec[len(base):] if flt else "")
+        return f"mod:{base}" + (spec[len(base):] if var_filter else "")
     return spec
 
 
@@ -1287,14 +1129,9 @@ def _obs_column(obs, col, *, what, spec, where):
 
 
 def _select_obs(data, spec, *, what):
-    """Parse an obs-column selector into a pandas Series.
-
-    ``'obs:<col>'`` reads ``data.obs`` (a MuData's global ``.obs``);
-    ``'mod:<name>.obs:<col>'`` reads ``mdata[name].obs``; for a MuData,
-    ``'<name>:<col>'`` reads ``mdata[name].obs``, then muon's prefixed copy
-    ``mdata.obs['<name>:<col>']``. A name without a prefix is a column of
-    ``data.obs``, as ``'obs:<col>'`` is.
-    """
+    """The Series an obs selector names: ``'obs:<col>'`` or ``'<col>'``
+    (``data.obs``), ``'mod:<name>.obs:<col>'``, or for a MuData
+    ``'<name>:<col>'`` (``mdata[name].obs``, then ``mdata.obs['<name>:<col>']``)."""
     if not isinstance(spec, str) or not spec:
         raise ValueError(f"{what}= must be 'obs:<col>' or 'mod:<name>.obs:<col>', got {spec!r}")
     mu = _is_mudata(data)
@@ -1311,7 +1148,7 @@ def _select_obs(data, spec, *, what):
     if spec.startswith("obs:"):
         col = spec[4:]
         if mu and col not in data.obs.columns:
-            # muon keeps a modality's labels in mdata[mod].obs: name that spelling
+            # muon keeps a modality's labels in mdata[mod].obs
             has = [n for n in data.mod if col in data.mod[n].obs.columns]
             if has:
                 raise KeyError(
@@ -1355,7 +1192,6 @@ def _is_file_name(spec: str) -> bool:
 
 
 def _file_name_message(spec: str, what: str) -> str:
-    """``labels`` / ``batch`` take a column of the data: what to do with a file."""
     return config.hint(
         f'{what}={spec!r} is a file name. Add the column first, as in the recipe '
         f'"Labels in a CSV file" in the docs.' if what == "labels" else
@@ -1378,13 +1214,8 @@ def _is_anndata(obj) -> bool:
 
 
 def _as_modality(data, spec, *, what, master, feature_names=None):
-    """Turn a modality argument of :func:`export_dataset` into ``(adata, kw)``.
-
-    ``spec`` is a selector string (resolved against ``data``), an AnnData, a
-    DataFrame (index = cell barcodes, columns = features) or a 2-D array /
-    sparse matrix in ``master`` order (no barcodes to check - pass a DataFrame
-    or AnnData when the order is not known to be right).
-    """
+    """``(adata, kw)`` of a modality argument: a selector against ``data``, an
+    AnnData, a DataFrame (cells x features) or a 2-D array in ``master`` order."""
     import anndata as ad
     import scipy.sparse as sp
 
@@ -1433,14 +1264,8 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
 
 
 def _align_cells(a, *, master, master_name, role):
-    """Return ``a`` re-indexed to the master cell order.
-
-    Same barcodes in another order -> reordered, so two modality files are
-    never written mis-paired. A barcode set that differs raises ``ValueError``
-    naming the strays. Non-unique barcodes on either side cannot be matched by
-    name: the cells are paired positionally and a ``UserWarning`` says so (a
-    different cell count still raises).
-    """
+    """``a`` in the master cell order. Other barcodes raise; non-unique ones
+    are paired by position, with a warning."""
     names = [str(x) for x in a.obs_names]
     master = [str(x) for x in master]
     if names == master:
@@ -1483,12 +1308,8 @@ def _align_cells(a, *, master, master_name, role):
 
 
 def _as_obs_vector(data, spec, *, what, master):
-    """Labels / batch as a 1-D array in master order.
-
-    ``spec``: an ``'obs:<col>'`` selector against ``data``, a pandas Series
-    (aligned by index to the master barcodes; a plain RangeIndex of the right
-    length is taken positionally) or any 1-D sequence of the right length.
-    """
+    """Labels or batch as a 1-D array in master order, from an obs selector, a
+    Series aligned by index (a RangeIndex by position) or a sequence."""
     import pandas as pd
 
     if isinstance(spec, str):
@@ -1514,12 +1335,11 @@ def _as_obs_vector(data, spec, *, what, master):
             return np.asarray(spec)[[pos[x] for x in m]]
         if isinstance(spec.index, pd.RangeIndex) and len(spec) == len(m):
             if what == "batch":
-                # the cells have barcodes (m is not 0..n-1 here) and the Series
-                # has none: a filtered or sorted column would go to other cells
+                # a filtered or sorted column would go to other cells
                 from ..eval import io as eio
                 warnings.warn(eio._by_position(what, len(m), "the cells of the data"),
                               UserWarning, stacklevel=3)
-            return np.asarray(spec)             # unlabeled: positional
+            return np.asarray(spec)
         lack = [x for x in m if x not in set(idx)]
         raise ValueError(
             f"{what}= Series index does not match the cell barcodes: {len(lack)} of "
@@ -1639,9 +1459,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     - a DataFrame (index = cell barcodes, columns = features);
     - a 2-D array or sparse matrix already in the master cell order.
 
-    An ``obsm`` selector takes its feature names from ``adt_names`` (ADT
-    only), else the columns of a DataFrame-valued entry, else
-    ``adata.uns['<key>_names']`` (order in ``mtb.io.to_canonical``).
+    An ``obsm`` matrix takes its feature names as ``mtb.io.to_canonical``
+    does, with ``adt_names`` for ``feature_names``.
 
     All matrices are cells x features and are written transposed. With
     ``data=None`` the default ``rna='X'`` means "no RNA": pass
@@ -1664,13 +1483,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                           labels="obs:celltype", category="vertical")
     ```
 
-    Without a filter on such data, ``export_dataset`` raises ``ValueError``.
-
-    **Raw counts.** Methods normalise the data themselves; give raw counts. A
-    ``UserWarning`` says when sampled RNA, ADT or peak values are not whole
-    numbers (log-normalised data). ``rna='layer:counts'`` usually selects the
-    counts. A selector reads ``data``: for a modality passed as its own
-    object, put the counts into its ``X`` first
+    **Raw counts.** Methods normalise the data themselves. RNA, ADT and peak
+    values that are not whole numbers warn; ``rna='layer:counts'`` usually
+    selects the counts. A selector reads ``data``: for a modality passed as
+    its own object, put the counts into its ``X`` first
     (``adt.X = adt.layers["counts"]``). Gene-activity scores are not checked.
 
     **MuData.** A bare modality name selects ``mdata.mod[name].X``
@@ -1693,20 +1509,15 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     Series. An index of numbers that names no cell of the folder is taken
     as row numbers: the values are written row by row, as a list is.
 
-    - the same barcodes in another order are reordered;
-    - a barcode set that differs raises ``ValueError`` naming the strays;
-    - non-unique barcodes cannot be matched by name, so the cells are paired
-      positionally with a ``UserWarning`` (a different cell count still
-      raises).
+    The same barcodes in another order are reordered. Non-unique barcodes
+    cannot be matched by name, so the cells are paired by position. A bare
+    array has no barcodes, so the order cannot be checked: pass a DataFrame
+    or AnnData when you are not sure of the order.
 
-    A bare array has no barcodes, so the order cannot be checked. Pass a
-    DataFrame or AnnData when you are not sure of the order.
-
-    **Labels.** ``cty.csv`` is the single-column CSV the benchmark reads
-    (header ``x``, one label per line); ``mtb.labels_for`` finds these files
-    again. A ``labels`` / ``batch`` Series is aligned by index to the master
-    barcodes; a plain ``RangeIndex`` of the right length is taken
-    positionally.
+    **Labels.** ``cty.csv`` holds a header ``x`` and one label per line;
+    ``mtb.labels_for`` finds these files again. A ``labels`` / ``batch``
+    Series is aligned by index to the master barcodes; a plain
+    ``RangeIndex`` of the right length is taken positionally.
 
     **Diagonal.** ``category='diagonal'`` pairs no barcodes: RNA and ATAC may
     come from different cells. ``rna`` is written as ``rna.h5`` and ``atac``
@@ -1755,12 +1566,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     batches: a file of batch 4 in the folder is then refused (*Existing
     files*).
 
-    **ATAC filenames.** Vertical methods read ``atac.h5``;
-    ``method_info(m)['atac']`` says whether it must hold peaks or gene
-    activity. Diagonal methods read ``atac_peak.h5`` (peaks) and
-    ``atac_gas.h5`` (gene activity). Mosaic methods read ``atac<i>.h5``
-    (peaks). ``peak.h5``, and ``atac.h5`` for gene activity, are accepted as
-    older names. By ``category``:
+    **ATAC filenames.** By ``category`` (``mtb.describe_layout`` lists what
+    each category reads):
 
     - ``'vertical'``: ``atac.h5`` for both kinds;
     - ``'diagonal'``: ``atac_peak.h5`` or ``atac_gas.h5``;
@@ -1769,7 +1576,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
       copy when the file system refuses links), or ``atac_gas.h5`` only.
       Editing a hard-linked file edits both.
 
-    The representation is not recorded on disk. Check that
+    The representation is not recorded on disk: check that
     ``method_info(m)['atac']`` is the kind exported. ``mtb.scan`` and
     ``run_all`` skip a method whose file holds the other representation,
     unless ``allow_atac_mismatch=True``. ``mtb.run`` only warns, and the
@@ -1895,9 +1702,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     # --- the modality matrices, each re-indexed to its side's cell order.
     # Paired categories have one side; diagonal keeps the ATAC cells apart.
     sides = {"rna": [], "atac": []}     # side -> [(role, adata, kw, what, source)]
-    first = _first_master(data, [("rna", rna), ("adt", adt)]
-                          + ([] if diagonal else [("atac", atac)]), diagonal=diagonal)
-    master, master_name = first
+    master, master_name = _first_master(data, [("rna", rna), ("adt", adt)]
+                                        + ([] if diagonal else [("atac", atac)]),
+                                        diagonal=diagonal)
     for what, spec in (("rna", rna), ("adt", adt)):
         if spec is not None:
             a, kw = _as_modality(data, spec, what=what, master=master,
@@ -1918,12 +1725,12 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         if not mats:
             continue
         if side == "rna" and master is not None:
-            m, mname = master, master_name
+            order, order_name = master, master_name
         else:
-            m, mname = [str(x) for x in mats[0][1].obs_names], mats[0][3]
-        masters[side] = m
-        sides[side] = [(role, _align_cells(a, master=m, master_name=mname, role=what), kw, what, src)
-                       for role, a, kw, what, src in mats]
+            order, order_name = [str(x) for x in mats[0][1].obs_names], mats[0][3]
+        masters[side] = order
+        sides[side] = [(role, _align_cells(a, master=order, master_name=order_name, role=what),
+                        kw, what, src) for role, a, kw, what, src in mats]
     if not masters:                     # labels only
         if master is None:
             # no object names the cells: a Series indexed by barcode does
@@ -1935,10 +1742,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise ValueError(_NO_CELLS)
 
     # --- labels: one vector per side (diagonal) or one for the paired cells
-    lab = {}
+    labels_by_side = {}
     if labels is not None:
         if diagonal:
-            lab = _diagonal_labels(data, labels, sides)
+            labels_by_side = _diagonal_labels(data, labels, sides)
         else:
             m = masters.get("rna")
             vec = _as_obs_vector(data, labels, what="labels", master=m)
@@ -1950,17 +1757,17 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 vec, spec=labels, where=f"the cells ({_labels_where(data, labels)})",
                 advice="give every cell a label, or subset the data to the labelled cells "
                        "first")
-            lab["rna"] = vec
+            labels_by_side["rna"] = vec
 
     # --- batches
     if batch is not None:
         m = masters.get("rna")
-        bvals = _as_obs_vector(data, batch, what="batch", master=m)
-        if m is not None and len(bvals) != len(m):
-            raise ValueError(f"batch has {len(bvals)} entries for {len(m)} cells")
-        _check_batch_complete(bvals, spec=batch)
-        keys = sorted(set(bvals.tolist()), key=lambda v: str(v))
-        groups = [(str(i + 1), np.flatnonzero(bvals == k)) for i, k in enumerate(keys)]
+        batch_values = _as_obs_vector(data, batch, what="batch", master=m)
+        if m is not None and len(batch_values) != len(m):
+            raise ValueError(f"batch has {len(batch_values)} entries for {len(m)} cells")
+        _check_batch_complete(batch_values, spec=batch)
+        keys = sorted(set(batch_values.tolist()), key=lambda v: str(v))
+        groups = [(str(i + 1), np.flatnonzero(batch_values == k)) for i, k in enumerate(keys)]
     elif batch_index is not None:
         groups = [(str(int(batch_index)), None)]
     else:
@@ -1995,44 +1802,42 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
             if role in _COUNT_ROLES:
-                # the hint follows the selector the matrix was read with; the
-                # command line's --atac-from hands over an object and its selector
-                sel = {"rna": rna, "adt": adt, "atac": atac}[what]     # as resolved
-                if not isinstance(sel, str) and config._CLI:
-                    sel = getattr(sel, "_selector", None)
-                hint, how = _raw_count_hint(what, sel)
+                # the command line's --atac-from hands over an object and its selector
+                selector = {"rna": rna, "adt": adt, "atac": atac}[what]
+                if not isinstance(selector, str) and config._CLI:
+                    selector = getattr(selector, "_selector", None)
+                hint, how = _raw_count_hint(what, selector)
                 _warn_not_counts(X, what, hint, stacklevel=2,
                                  how=_counts_of_object_advice(what, given[what]) or how)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
-    # --- the files this call writes, each with its unit: the side and the
-    # batch number ('' without one) whose cells it holds
+    # --- the files this call writes, each with its unit: (side, batch number or '')
     plan = []                           # (path, kind, payload, unit)
     units = {}                          # unit -> (barcodes or None, number of cells)
-    for suf, mask in groups:
+    for number, mask in groups:
         for side, role, X, feats, bars, what in prepared:
             sub = X if mask is None else X[mask]
             if np.ndim(sub) != 2:
-                # a sparse X left on disk (backed): _write_canonical refuses
-                # it, but only after the folder is made
+                # a backed sparse X: _write_canonical refuses it only after mkdir
                 raise ValueError(f"matrix must be 2-D (cells x features), got shape "
                                  f"{np.asarray(sub).shape}")
             sub_bars = bars if mask is None else [bars[i] for i in mask]
-            path = out / _export_filename(role, suf, category)
-            plan.append((path, "matrix", (sub, feats, sub_bars), (side, suf)))
+            path = out / _export_filename(role, number, category)
+            plan.append((path, "matrix", (sub, feats, sub_bars), (side, number)))
             if role == "atac_peak" and category is None:
-                plan.append((out / f"atac{suf}.h5", "link", path, (side, suf)))
-        for side, vec in lab.items():
-            name = (f"{side}_cty{suf}.csv" if diagonal else f"cty{suf}.csv")
+                plan.append((out / f"atac{number}.h5", "link", path, (side, number)))
+        for side, vec in labels_by_side.items():
+            name = (f"{side}_cty{number}.csv" if diagonal else f"cty{number}.csv")
             plan.append((out / name, "labels", vec if mask is None else np.asarray(vec)[mask],
-                         (side, suf)))
-        for side in dict.fromkeys(list(masters) + list(lab)):
+                         (side, number)))
+        for side in dict.fromkeys(list(masters) + list(labels_by_side)):
             m = masters.get(side)
             if m is None:               # labels alone, without barcodes
-                units[(side, suf)] = (None, len(lab[side]) if mask is None else len(mask))
+                units[(side, number)] = (None, len(labels_by_side[side]) if mask is None
+                                         else len(mask))
             else:
-                units[(side, suf)] = (m if mask is None else [m[i] for i in mask],
-                                      len(m) if mask is None else len(mask))
+                units[(side, number)] = (m if mask is None else [m[i] for i in mask],
+                                         len(m) if mask is None else len(mask))
     existing = [pth.name for pth, _, _, _ in plan if pth.exists() or pth.is_symlink()]
     found = _leftovers(out, {pth.name for pth, _, _, _ in plan}, units, diagonal=diagonal,
                        by_column=batch is not None, batch_index=batch_index,
@@ -2041,10 +1846,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         held = []
         if not prepared and category is None and batch_index is None:
             # labels alone, for a folder that may be written with a category
-            held = _matrices_of(out, masters.get("rna"), len(lab["rna"]),
+            held = _matrices_of(out, masters.get("rna"), len(labels_by_side["rna"]),
                                 skip={name for names in found for name in names})
         raise FileExistsError(_leftover_message(
-            out, found, written=[int(suf) for suf, _ in groups if suf],
+            out, found, written=[int(number) for number, _ in groups if number],
             n_batches=n_batches, replace=bool(existing) and not overwrite, held=held))
     if existing and not overwrite:
         from .resolve import _and_list
@@ -2058,9 +1863,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
              else payload, unit) for pth, kind, payload, unit in plan]
     for pth, kind, payload, _ in plan:
         if kind == "matrix":
-            sub, feats, sub_bars = payload
-            if getattr(sub, "ndim", 0) == 2:
-                _warn_dense_size(pth, sub.shape[1], sub.shape[0], dtype)
+            _warn_dense_size(pth, payload[0].shape[1], payload[0].shape[0], dtype)
 
     out.mkdir(parents=True, exist_ok=True)
     for pth, kind, payload, _ in plan:
@@ -2089,35 +1892,22 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
 
 def _has_feature_types(adata, spec) -> bool:
-    """The features of ``X`` or of a layer were selected by type: the object
-    has a var column ``feature_types``, or the selector ``spec`` filters on
-    it. A matrix in ``obsm`` has no var, so the caller leaves it out."""
-    flt = _split_var_filter(spec)[1] if isinstance(spec, str) else None
+    """The features were selected by type: ``adata`` has a var column
+    ``feature_types``, or the selector ``spec`` filters on it."""
+    var_filter = _split_var_filter(spec)[1] if isinstance(spec, str) else None
     return "feature_types" in getattr(getattr(adata, "var", None), "columns", ()) \
-        or bool(flt and flt[0] == "feature_types")
+        or bool(var_filter and var_filter[0] == "feature_types")
 
 
-#: Z1: nothing to write
 _NO_CELLS = ("The data holds 0 cells, so there is nothing to write. Check the filter that "
              "selects the cells.")
 
 
 def _no_features_message(n_cells: int, what: str | None = None, *,
                          typed: bool = False) -> str:
-    """Z2: a selected matrix without a feature, which would be written as a
-    file of barcodes alone. ``what`` is the modality argument (``'atac'``);
-    ``to_canonical`` has none.
-
-    ``typed`` says that the object has a var column ``feature_types``: its
-    features were selected by type, and no feature has the type that was
-    written. The action is then to check that name against the object
-    before the split: the column of the object that came here has no row
-    left, and the command line reads a file that was saved after the split.
-    A 10x Genomics file read without ``gex_only=False`` gives such a matrix
-    too, and the type names then show genes alone: the two cases cannot be
-    told apart here, and the names are the first thing to look at in both.
-    Without the column nothing says how the features were selected, and the
-    text keeps the advice for a 10x file."""
+    """The error for a selected matrix with 0 features. ``typed``: the features
+    were selected by type (:func:`_has_feature_types`), so the type name is
+    the first thing to check."""
     return (f"The {what + ' ' if what else ''}matrix holds 0 features for {n_cells:,} cells. "
             + ("Check the feature type you selected: var['feature_types'] of the whole "
                "object lists the names." if typed
@@ -2125,9 +1915,8 @@ def _no_features_message(n_cells: int, what: str | None = None, *,
 
 
 def _check_batch_complete(vals, *, spec) -> None:
-    """Refuse a batch vector with missing values (``eval.io.missing_mask``, the
-    definition the labels follow): such cells would be left out, or the text
-    ``'nan'`` would become a batch of its own."""
+    """Refuse missing batch values (``eval.io.missing_mask``): ``'nan'`` would
+    become a batch of its own."""
     from ..eval import io as eio
 
     miss = eio.missing_mask(vals)
@@ -2139,10 +1928,8 @@ def _check_batch_complete(vals, *, spec) -> None:
 
 
 def _adt_in_x_message(spec, keys, own: bool = False) -> str:
-    """A1: ``adt`` takes ``X`` of an object that also holds ``obsm`` matrices
-    (:func:`_adt_obsm_keys`), one of which may be the protein matrix. ``own``
-    says that the ADT came as an object of its own, which no selector reads:
-    its ``X`` is then the protein matrix, and the entries are in the way."""
+    """The error for ``adt`` reading ``X`` of an object whose ``obsm`` may hold
+    the protein matrix. ``own``: the ADT came as its own object."""
     one = len(keys) == 1
     head = (config.hint(f"adt={_shown(spec)}", f"--adt {spec}") + " takes X, and the object "
             + (f"also holds obsm[{keys[0]!r}]." if one else
@@ -2162,26 +1949,20 @@ _LAYOUT_STEMS = ("rna", "adt", "atac", "atac_peak", "atac_gas", "cty", "rna_cty"
 
 
 def _layout_unit(name: str, diagonal: bool):
-    """``(side, batch number, is a matrix)`` of a file of the dataset layout,
-    else ``None``.
-
-    The files of one unit - a side and a batch number - hold the same cells.
-    The batch number is the digits of the name, ``''`` without any. Paired
-    data has one side, ``'rna'``. A diagonal call has two: ``rna*``, ``adt*``
-    and ``rna_cty*`` are the RNA side, ``atac*`` and ``atac_cty*`` the ATAC
-    side, and a plain ``cty*.csv`` has none (``None``).
-    """
+    """``(side, batch number or '', is a matrix)`` of a layout file, else
+    ``None``; the files of one unit hold the same cells. Paired data has the
+    one side ``'rna'``; in a diagonal folder a plain ``cty*.csv`` has none."""
     from .resolve import _LAYOUT_FILE_RE
     m = _LAYOUT_FILE_RE.match(name)
     if not m:
         return None
     matrix = m.group(1) is not None
-    suf = m.group(1) if matrix else m.group(2)
+    number = m.group(1) if matrix else m.group(2)
     if not diagonal:
-        return "rna", suf, matrix
+        return "rna", number, matrix
     if matrix or "_cty" in name:
-        return ("atac" if name.startswith("atac") else "rna"), suf, matrix
-    return None, suf, matrix
+        return ("atac" if name.startswith("atac") else "rna"), number, matrix
+    return None, number, matrix
 
 
 def _layout_order(name: str):
@@ -2193,12 +1974,8 @@ def _layout_order(name: str):
 
 
 def _holds_other_cells(names, mine) -> bool:
-    """True when barcodes ``names`` hold a cell that is not among ``mine``.
-
-    Compared as :func:`_cell_order` compares: a trailing ``-<n>`` suffix does
-    not count when the suffix-free names stay unique on both sides.
-    Non-unique barcodes cannot be judged and give ``False``.
-    """
+    """True when ``names`` hold a cell not among ``mine``, compared as
+    :func:`_cell_order` compares; ``False`` for non-unique barcodes."""
     names, mine = [str(x) for x in names], [str(x) for x in mine]
     judged = False
     for key in (None, _BARCODE_SUFFIX_RE):
@@ -2213,13 +1990,8 @@ def _holds_other_cells(names, mine) -> bool:
 
 
 def _folder_readers():
-    """The resolver's readers of a matrix file's barcodes and of a label
-    file's row count, with nothing remembered.
-
-    The resolver keeps what it read by path and modification time, and a
-    file written twice within one tick of the file system's clock keeps its
-    time. The rules of :func:`export_dataset` judge the folder as it is now.
-    """
+    """The resolver's barcode and label-row readers with their caches cleared:
+    a file rewritten within one tick of the file system clock keeps its mtime."""
     from . import resolve
     resolve._sniff_barcode_list.cache_clear()
     resolve._count_label_rows.cache_clear()
@@ -2228,37 +2000,11 @@ def _folder_readers():
 
 
 def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n_batches):
-    """The layout files of ``out`` that hold other data than this call writes,
-    as three lists of names: ``(other batches, other cells, other label counts)``.
-
-    ``planned`` are the names the call writes and ``units`` the cells of each
-    unit it writes (:func:`_layout_unit`). A method reads every file of the
-    layout as part of the dataset, so a file the call does not write is a
-    leftover when one of these holds:
-
-    (a) it has a batch number, its unit is not written, and the call splits
-        by a batch column (``by_column``: the column gives the whole set of
-        batches), or it is a ``batch_index`` call with ``n_batches`` and the
-        number is above ``n_batches``;
-    (b) it is a matrix of a unit the call writes, with other cells. A unit
-        of the call without barcodes, or with barcodes that are not unique,
-        has no names to compare: another number of cells is other cells;
-    (c) it is a label file of a unit the call writes, with another number of
-        rows than the unit has cells;
-    (d) it is a matrix of another unit, the call is not a ``batch_index``
-        call, and it holds a cell the call does not write on that side;
-    (e) it is a label file without a batch number, the call splits by a batch
-        column, and its rows are not as many as the cells of the call.
-
-    Not judged: a matrix without barcodes or with barcodes that are not
-    unique; in a diagonal call the files of the side it does not write and a
-    plain ``cty*.csv``; in a ``batch_index`` call the files without a batch
-    number and those of other batch numbers (up to ``n_batches``); a
-    numbered label file when the call writes no numbered file; a label file
-    that cannot be read. ``n_batches`` counts the batches of the data, so a
-    batch number above it is a leftover under (a) on either side of a
-    diagonal call.
-    """
+    """The layout files of ``out`` the call does not write that hold other
+    data: ``(other batches, other cells, other label counts)``. A method
+    reads every layout file, so such a file would join the dataset.
+    ``units`` maps each unit the call writes to its barcodes and cell count.
+    Files without unique barcodes, or unreadable label files, are not judged."""
     other_batch, other_cells, other_count = [], [], []
     if not out.is_dir():
         return other_batch, other_cells, other_count
@@ -2272,9 +2018,9 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
         unit = _layout_unit(p.name, diagonal)
         if unit is None or unit[0] is None or p.name in planned or not p.is_file():
             continue
-        side, suf, matrix = unit
-        if (side, suf) in units:                        # (b), (c)
-            bars, n = units[(side, suf)]
+        side, number, matrix = unit
+        if (side, number) in units:     # a unit the call writes: other cells or rows
+            bars, n = units[(side, number)]
             if matrix:
                 old = barcodes_of(p)
                 if old is None:
@@ -2284,17 +2030,17 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
                     other_cells.append(p.name)
             elif n_rows(p) not in (None, n):
                 other_count.append(p.name)
-        elif suf and by_column:                         # (a)
+        elif number and by_column:      # a batch column gives every batch
             other_batch.append(p.name)
-        elif batch_index is not None:                   # (a), or a file of the build
-            if suf and n_batches is not None and int(suf) > n_batches:
+        elif batch_index is not None:   # other batches are the build, up to n_batches
+            if number and n_batches is not None and int(number) > n_batches:
                 other_batch.append(p.name)
-        elif matrix:                                    # (d)
+        elif matrix:                    # another unit with a cell the call does not write
             old = barcodes_of(p)
             if old is not None and side in side_cells \
                     and _holds_other_cells(old, side_cells[side]):
                 other_cells.append(p.name)
-        elif not suf and by_column and side in side_n:  # (e)
+        elif not number and by_column and side in side_n:   # unnumbered labels, batch split
             if n_rows(p) not in (None, side_n[side]):
                 other_count.append(p.name)
     return other_batch, other_cells, other_count
@@ -2320,15 +2066,9 @@ def _matrices_of(out: Path, cells, n: int, *, skip) -> list:
 
 def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
                       held=()) -> str:
-    """L1: the leftovers of :func:`_leftovers`, the first file by name and the
-    rest counted, with why they are leftovers when they are of one kind, and
-    what to do. ``written`` and ``replace`` are not worded.
-
-    ``held`` are the matrix files that hold the cells of a call which writes
-    labels only, without a category (:func:`_matrices_of`). The leftovers are
-    then the other side of a diagonal folder or the other batches of a mosaic
-    one, unless the folder was used for two datasets: deleting them is not
-    the first advice."""
+    """The error for the leftovers ``found`` by :func:`_leftovers`. With
+    ``held`` (:func:`_matrices_of`) the leftovers are likely the rest of the
+    same dataset, so the advice is to rerun the export with labels."""
     from .resolve import _span
 
     def names(files):
@@ -2351,7 +2091,6 @@ def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
     else:
         what = f"{names(other_count)} with another number of labels"
     if held:
-        # the files are the other side or the other batches of the same dataset
         how = config.hint(
             "To add labels, run the export call that wrote the folder again with labels= "
             "and overwrite=True.",
@@ -2363,18 +2102,10 @@ def _leftover_message(out: Path, found, *, written, n_batches, replace: bool,
 
 
 def _row_order(out: Path, units, *, diagonal) -> dict:
-    """``{unit: (index, reference file names)}`` for the units of this call
-    whose cells the folder holds in another row order.
-
-    The reference of a unit is a matrix file of that unit in ``out`` with
-    unique barcodes that are the cells of the unit; a file the call replaces
-    counts too. ``index`` puts the rows of the call in the reference's order
-    (:func:`_cell_order`). A label file has no barcodes, so rows written in
-    the order of the object would label other cells than the same rows of
-    the matrix next to it, and nothing could tell afterwards.
-
-    ``ValueError`` when two references of a unit disagree about the order.
-    """
+    """``{unit: (index, reference file names)}`` for the units whose cells the
+    folder holds in another row order; ``index`` puts the call's rows in that
+    order, as a label file has no barcodes to pair it by. ``ValueError``
+    when two files of a unit disagree."""
     follow = {}
     if not out.is_dir():
         return follow
@@ -2414,7 +2145,7 @@ def _in_order(kind: str, payload, idx):
         return sub, feats, [sub_bars[i] for i in idx]
     if kind == "labels":
         return np.asarray(payload)[idx]
-    return payload                      # a link follows the file it links to
+    return payload                      # a link
 
 
 def _check_batch_args(batch, batch_index, category, *, adt, atac, n_batches=None) -> None:
@@ -2473,14 +2204,9 @@ def _names_of(spec):
 
 
 def _series_cells(*specs):
-    """Cell barcodes of a call that writes labels only and is given no object:
-    the index of the first ``labels`` / ``batch`` Series that has one, else
-    ``None``.
-
-    A plain ``RangeIndex`` numbers the rows and names no cell, and an index
-    that is not unique cannot be matched by name: with either, the call is
-    taken row by row, as a list is, and judged by its number of cells.
-    """
+    """The cells of a labels-only call given no object: the index of the
+    first ``labels`` / ``batch`` Series, unless it is a ``RangeIndex`` or not
+    unique (then ``None``: the call is taken row by row)."""
     import pandas as pd
 
     named = [[str(x) for x in s.index] for s in specs
@@ -2495,17 +2221,9 @@ _NUMBER_INDEX = ("integer", "floating", "mixed-integer-float")
 
 
 def _rows_numbered(out: Path, spec):
-    """``labels`` / ``batch`` as a call that is given no object takes it: a
-    Series whose index is numbers that name no cell of ``out`` gets a plain
-    ``RangeIndex``; anything else is returned as it is.
-
-    A column of a filtered table keeps the row numbers of the table as its
-    index. They are no barcodes, so the values are taken row by row, as
-    those of a list are, and the matrix of ``out`` is not held to be a file
-    of other cells. Numbers that a matrix of ``out`` has a cell for (an
-    object without barcodes names its cells ``'0'``, ``'1'``, ...) are the
-    names of cells and stay.
-    """
+    """``spec`` with a ``RangeIndex`` when it is a Series indexed by numbers
+    that name no cell of ``out``: a filtered table's row numbers, not
+    barcodes. An object without barcodes names its cells ``'0'``, ``'1'``."""
     import pandas as pd
 
     if isinstance(spec, pd.Series) and not isinstance(spec.index, pd.RangeIndex) \
@@ -2516,9 +2234,8 @@ def _rows_numbered(out: Path, spec):
 
 
 def _holds_a_cell(out: Path, names) -> bool:
-    """True when a matrix file of the layout in ``out`` holds a cell that one
-    of ``names`` names, with or without the trailing ``-<n>`` of its
-    barcode."""
+    """True when a layout matrix in ``out`` holds a cell of ``names``, with or
+    without the trailing ``-<n>`` of its barcode."""
     if not out.is_dir():
         return False
     barcodes_of, _ = _folder_readers()
@@ -2551,18 +2268,15 @@ def _source_name(data, spec, what) -> str:
     """How an error names the object a modality came from."""
     if isinstance(spec, str):
         if spec.startswith("mod:"):
-            name = _split_var_filter(spec)[0][4:].partition(".")[0]
-            return f"mdata[{name!r}]"
+            return f"mdata[{_parse_selector(spec)[0]!r}]"
         return "data"
     return what
 
 
 def _diagonal_labels(data, spec, sides) -> dict:
-    """``{side: labels}`` for a diagonal export: each side's labels from its
-    own cells. ``'obs:<col>'`` reads each object's own ``.obs`` (a MuData's
-    global ``.obs`` when a modality lacks the column), and so does a bare
-    ``'<col>'``; for a MuData, ``'<mod>:<col>'`` and a bare ``'<col>'`` read
-    ``<col>`` from each modality's own ``.obs``."""
+    """``{side: labels}`` of a diagonal export, each side from its own cells:
+    a column name is read from each object's own ``.obs`` (a MuData's global
+    ``.obs`` when a modality lacks it)."""
     import pandas as pd
 
     present = [side for side in ("rna", "atac") if sides[side]]
@@ -2634,15 +2348,8 @@ def _diagonal_labels(data, spec, sides) -> dict:
 
 
 def _other_column_advice(data, col: str, side: str, sides) -> str:
-    """The way that keeps the labels when the object of ``side`` lacks the
-    column ``col`` of a diagonal export and has other obs columns: its cell
-    types may be there under another name. A sentence, or ``""`` (no other
-    column; a ``.h5mu`` file on the command line,
-    whose two commands would need its modality names).
-
-    In Python the object gets a column of the same name. The command line
-    cannot add a column, so each side is converted with its own command and
-    its own ``--labels``, into the same folder."""
+    """Advice for a side whose object lacks the label column ``col`` but has
+    others, where its cell types may be; ``""`` when there is no way out."""
     role, a, _kw, _what, src = sides[side][0]
     if not len(a.obs.columns) or (config._CLI and _is_mudata(data)):
         return ""
@@ -2654,18 +2361,14 @@ def _other_column_advice(data, col: str, side: str, sides) -> str:
 
 
 def _no_cell_types_advice(side: str) -> str:
-    """C6: the way out for the side of a diagonal export that has no cell
-    types, whether its object lacks the column or the column is empty."""
+    """Advice for a diagonal side without cell types."""
     return (f"Without cell types for the {side.upper()} cells, leave "
             + config.hint("labels= out.", "--labels out."))
 
 
 def _mod_prefix_message(spec: str, col: str | None) -> str:
-    """``labels='<mod>:<col>'`` for a diagonal export of data that is not a
-    MuData and so has no modalities: AnnData objects, DataFrames, a ``.csv``.
-    The message says what the data is not, which holds for each of them.
-    ``col`` is the part after the colon when it is a column of every object,
-    so that ``'obs:<col>'`` is read, else ``None``."""
+    """The error for ``labels='<mod>:<col>'`` on data that is not a MuData;
+    ``col`` when it is a column of every object, else ``None``."""
     return config.hint(
         f"labels={spec!r} names a modality of a MuData, and this data is not one. "
         + (f"Write labels='obs:{col}'." if col else "Write labels='obs:<col>'."),
@@ -2686,28 +2389,17 @@ def _diagonal_label_advice(data, spec, sides) -> str:
             "object's own obs")
 
 
-def _n_missing_labels(vals) -> int:
-    """How many entries of a label vector are missing: NaN, None, an empty
-    string, or text that a label file reads as missing (``eval.io.missing_mask``)."""
-    from ..eval import io as eio
-
-    return int(eio.missing_mask(vals).sum())
-
-
 def _check_labels_complete(vals, *, spec, where: str, advice: str,
                            when_none: str = "") -> None:
-    """Refuse a label vector with missing values: mtb.evaluate does not score
-    a missing label, and the label file would hold one for every such cell.
-    ``when_none`` is a sentence that closes the message when no cell has a
-    label."""
+    """Refuse missing labels (``eval.io.missing_mask``): ``mtb.evaluate`` does
+    not score them. ``when_none`` closes the message when no cell has one."""
     from ..eval import io as eio
 
-    n = _n_missing_labels(vals)
+    n = int(eio.missing_mask(vals).sum())
     if n:
         words = eio.missing_words(vals)
         forms = f"NaN, None, '' or text such as {words[0]!r}" if words else "NaN, None or ''"
         if when_none and n == len(vals):
-            # the sentence brings its own full stop, and closes the message
             advice = f"{advice}. {when_none}"
         raise ValueError(
             f"labels={_shown(spec)}: {n} of the {len(vals)} labels for {where} are missing "
@@ -2729,16 +2421,16 @@ def _labels_where(data, spec) -> str:
     return "data.obs"
 
 
-def _export_filename(role: str, suf: str, category: str | None) -> str:
+def _export_filename(role: str, number: str, category: str | None) -> str:
     """On-disk name of one modality file of :func:`export_dataset`."""
     if role.startswith("atac") and category in ("vertical", "mosaic"):
-        return f"atac{suf}.h5"
-    return f"{role}{suf}.h5"
+        return f"atac{number}.h5"
+    return f"{role}{number}.h5"
 
 
 def _select_object(obj, spec: str, *, what: str):
-    """An AnnData holding the matrix ``spec`` selects from ``obj`` (with its
-    ``.obs``): what the CLI's ``--atac-from`` passes on as ``atac=``."""
+    """An AnnData of the matrix ``spec`` selects from ``obj``, with its
+    ``.obs``: the ``atac=`` of the command line's ``--atac-from``."""
     import anndata as ad
 
     user_spec = spec
@@ -2746,8 +2438,7 @@ def _select_object(obj, spec: str, *, what: str):
         spec = _mudata_selector(obj, spec)
     a, kw = _select(obj, spec, what=what)
     if "obsm" not in kw:
-        # 'X' never reaches _pick_matrix, and the selector the user wrote is
-        # known only here
+        # 'X' never reaches _pick_matrix, and only here is the selector as written
         _check_one_feature_type(a, arg=what, spec=user_spec)
     if kw:
         X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"), what=what)
