@@ -1,10 +1,8 @@
-"""Goal 2, rigorous version: identify the kind of ATAC file each method ACTUALLY receives.
+"""Report the kind of ATAC file each method receives: peaks or gene activity.
 
-Take 1 judged by role name and produced 5 false positives: it assumed `atac` and
-`atac_gas` mean gene activity because describe_layout says so, but D12/D13's
-atac.h5 holds PEAKS (`chrX_143482906_143483206`). Role names and file contents
-disagree, so the only sound test is to resolve the real input path per method and
-look at the feature names in it.
+Role names do not tell (D12/D13's atac.h5 holds peaks such as
+`chrX_143482906_143483206`), so this resolves each method's real input path and
+reads the feature names in it.
 """
 import re
 from collections import defaultdict

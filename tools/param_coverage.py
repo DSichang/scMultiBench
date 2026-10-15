@@ -1,12 +1,9 @@
-"""Goal 2b: which upstream hyperparameters can a user actually tune through our API?
+"""Which upstream hyperparameters can a user tune through the package?
 
-The upstream audit recorded, per method, the knobs a benchmark user would
-realistically want to change. This checks them against what params_for() exposes.
-
-An upstream knob is only tunable here if the METHOD SCRIPT accepts it on the
-command line - hard rule #1 forbids editing tools_scripts/ - so a low number is
-often an upstream limitation rather than a wrapper gap. The point is to say
-which, per method, instead of leaving it vague.
+Checks the knobs the upstream audit recorded per method against the parameters
+the registry exposes. A knob is tunable only if the method script accepts it on
+the command line, and tools_scripts/ is never edited, so a low number is often an
+upstream limitation rather than a wrapper gap.
 """
 import json
 import re
@@ -32,8 +29,7 @@ for m in sorted(mtb.list_methods()):
     spec = registry.get(m)
     ours = set()
     for v in spec.variants:
-        ours |= set(getattr(v, "tunable", {}) or {})
-        ours |= set(getattr(v, "params", {}) or {})
+        ours |= set(v.tunable or {}) | set(v.params or {})
     up = UP.get(m, [])
     up_n = {norm(x): x for x in up if x}
     ours_n = {norm(x) for x in ours}
