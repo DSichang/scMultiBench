@@ -71,11 +71,15 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     Raises
     ------
     ValueError
-        ``long_df`` is empty or lacks ``method`` / ``metric`` / ``value``.
+        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or is empty
+        (``mtb.load_results`` may have returned nothing; see its warning).
     ValueError
-        Unknown ``metrics`` code, or an invalid ``group`` / ``overall``.
+        Unknown ``metrics`` code (with a did-you-mean hint), or an invalid
+        ``group`` / ``overall``.
     ValueError
-        ``group`` names a family with no metric in the frame.
+        ``group`` names a family with no metric in the frame: batch metrics
+        need a multi-batch dataset, and the stored tables have no
+        classification scores.
 
     Warns
     -----
@@ -125,14 +129,6 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     ``mtb.plot.bubble`` and the warnings are those of
     ``mtb.plot.build_table`` with ``aggregate="summary"``; its Notes give
     them.
-
-    **Errors.** An unknown ``metrics`` code gets a did-you-mean hint and the
-    list of metrics present. Batch metrics need a multi-batch dataset: a
-    single-batch design has none to compute, which is what the
-    ``group="batch"`` error says. The stored tables have no classification
-    scores, which is what the ``group="classification"`` error says. An
-    empty frame's error points at ``mtb.load_results``, which may have
-    returned nothing (see its ``UserWarning``).
 
     See Also
     --------

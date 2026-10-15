@@ -69,8 +69,9 @@ class BubbleTable:
         Row order: best first, or the ``order`` methods first;
         ``methods.index(name) + 1`` is the row's position (1 = top).
     blocks : list of FamilyBlock
-        One block per metric family present, in paper order, each with its
-        own ``raw``, ``norm``, ``ranks`` and ``overall``.
+        One block per metric family present, in paper order (Notes of
+        ``build_table``), each with its own ``raw``, ``norm``, ``ranks`` and
+        ``overall``.
     matrix : pandas.DataFrame
         Per-column min-max values (method x metric) of all families, in
         figure order; the same object as ``norm``.
@@ -111,22 +112,16 @@ class BubbleTable:
     **Ranks.** ``ranks`` and ``FamilyBlock.ranks`` hold per-column
     max-ranks: ``n`` = best, ties share the higher number (R's
     ``ties.method="max"``). A method with no value in a column is NaN there,
-    and the column's ``n`` counts only the scored methods. The figure's
-    *Rank* legend counts 1 = best instead.
+    and the column's ``n`` counts only the scored methods.
 
     **Ties.** Values that agree to 9 decimal places count as equal in
     ``ranks``, ``norm`` and the Overall scores. An iLISI of ``2.2e-16``
     therefore ties with ``0.0``.
 
-    **Scaled values.** ``matrix`` and ``norm`` are per-column min-max values
-    in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
-    The figure draws a column whose rows all hold one value in grey, not at
-    the ``High`` end of the Score legend. Every column of a one-method
-    figure is grey.
-
-    **Blocks.** Paper order: DR and clustering (blues), batch correction
-    (greens), classification (pinks), then "Other" (purples) for any metric
-    outside the three.
+    **Scaled values.** In ``matrix`` and ``norm``, a constant (or all-NaN)
+    column is all ones, as in the R code. The figure draws a column whose
+    rows all hold one value in grey, not at the ``High`` end of the Score
+    legend.
 
     See Also
     --------
@@ -329,8 +324,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     order. Ranks and scores always come from the whole filtered frame;
     ``order`` only moves rows.
 
-    **Input columns.** Only ``method``, ``metric`` and ``value`` are
-    required.
+    **Input columns.**
 
     - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
       dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
@@ -1112,9 +1106,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
 
     Notes
     -----
-    ``bubble`` draws the table that ``mtb.plot.build_table`` computes. The
-    Notes of ``build_table`` give the Overall formulas, missing cells, row
-    order, input columns, name matching, errors and warnings.
+    The Notes of ``build_table`` give the Overall formulas, missing cells,
+    row order, input columns and name matching.
 
     **Reading the figure.** What each mark encodes:
 
@@ -1130,7 +1123,6 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     - Family *Overall* bar: length = the family score min-max scaled across
       the rows; fill = the score itself (the two differ only under
       ``overall="mean_overall"``).
-    - Rows: best mean Overall first; ``order`` moves rows only.
     - *Rank* legend: 1 = best, whereas ``BubbleTable.ranks`` /
       ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
     - Grey fill: every row of that column holds the same value, or the
