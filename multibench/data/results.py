@@ -1129,11 +1129,6 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
             f"{' or '.join(missing)}, so this ranking does not describe {data} data.")
 
 
-def _runtime(method_id: str, method_info) -> dict:
-    """``method_info(m)["runtime"]`` (``{"tier", "worst_sec", "observed"}``)."""
-    return dict(method_info(method_id)["runtime"])
-
-
 def _legacy_recommend_kwargs(kw: dict) -> dict:
     """0.2.x keywords of :func:`recommend`: ``task=`` / ``family=`` become
     ``metrics=<token>`` with a ``DeprecationWarning`` (``family`` wins; an
@@ -1467,9 +1462,10 @@ def recommend(
             needs = any(v.needs_labels for v in in_category) if in_category \
                 else bool(spec.needs_labels)
             okind = kinds[0] if kinds else None
+            runtime = method_info(spec.id)["runtime"]
+            tier, worst = runtime.get("tier"), runtime.get("worst_sec")
         else:
-            env, needs, okind = None, None, None
-        rt = _runtime(catalog.canonical_id(m), method_info) if spec is not None else {}
+            env, needs, okind, tier, worst = None, None, None, None, None
         rows.append({
             "method": m,
             "grand_score": float(grand.loc[m]) if scored else float("nan"),
@@ -1477,8 +1473,8 @@ def recommend(
             "n_datasets_total": int(n_total),
             "coverage": float(n_ds.loc[m]) / n_total if scored else 0.0,
             "needs_labels": needs,
-            "runtime_tier": rt.get("tier") if spec is not None else None,
-            "worst_sec": rt.get("worst_sec") if spec is not None else None,
+            "runtime_tier": tier,
+            "worst_sec": worst,
             "env": env,
             "output_kind": okind,
             "datasets": ", ".join(sorted((str(d) for d in per_ds.columns
