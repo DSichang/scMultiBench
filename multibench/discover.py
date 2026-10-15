@@ -9,7 +9,8 @@ from urllib.parse import quote as _quote
 
 from .engine import registry, upstream, envs
 from .engine import resolve as _resolve
-from .engine.schema import AmbiguousVariantError, base_modality, is_label_role
+from .engine.schema import AmbiguousVariantError, is_label_role
+from .engine.schema import base_modality as _base_modality
 
 #: representation role tokens -> the ``atac=`` value they stand for
 _REPRESENTATION_TOKENS = {"atac_peak": "peak", "atac_gas": "gene_activity"}
@@ -42,7 +43,7 @@ def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
                 f"modalities={list(modalities)} selects methods that read "
                 f"{reps[0].replace('_', ' ')} but atac={atac!r}; pass one of the two")
         atac = reps[0]
-    return {base_modality(t) for t in toks}, atac
+    return {_base_modality(t) for t in toks}, atac
 
 
 def _reads_both_files(modalities) -> bool:

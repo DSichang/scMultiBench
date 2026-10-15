@@ -644,14 +644,14 @@ def _cmd_info(args) -> int:
         labels = f"  labels: {', '.join(v['labels'])}" if v["labels"] else ""
         print(f"    {v['category']:9} {mods}{labels}")
     rt = info["runtime"]
-    observed = sorted(rt.get("observed") or [], key=lambda o: -(o.get("sec") or 0))
+    observed = sorted(rt["observed"], key=lambda o: -o["sec"])
     pad = " " * 16
-    print(f"  runtime:      {rt.get('tier') or '?'}"
+    print(f"  runtime:      {rt['tier']}"
           + ("" if observed else " (never measured)"))
     for o in observed:
-        cells = o.get("cells")
+        cells = o["cells"]
         size = f"{cells:,} cells" if isinstance(cells, int) else "cells not recorded"
-        print(f"{pad}{o.get('sec')} s on {o.get('dataset')} ({size})")
+        print(f"{pad}{o['sec']} s on {o['dataset']} ({size})")
     if observed:
         print(textwrap.fill(rt["note"], width=88, initial_indent=pad, subsequent_indent=pad))
     hint = (info["setup_hint"] or "").strip()
@@ -698,11 +698,10 @@ def _cmd_params(args) -> int:
         return _EXIT_OK
     frames = []
     for p in rows:
-        tun = p["tunable"] or {}
-        eff = p["effective"] or {}
+        tun, eff = p["tunable"], p["effective"]
         tbl = pd.DataFrame([{"variant": p["variant"], "key": k,
-                             "type": (t or {}).get("type"),
-                             "default": (t or {}).get("default"),
+                             "type": t.get("type"),
+                             "default": t.get("default"),
                              "effective": eff.get(k)}
                             for k, t in sorted(tun.items())],
                            columns=["variant", "key", "type", "default", "effective"])
@@ -716,16 +715,16 @@ def _cmd_params(args) -> int:
         else:
             print("  (none: the upstream script exposes no hyperparameter on its "
                   "command line)")
-        fixed = p.get("fixed_in_script") or []
+        fixed = p["fixed_in_script"]
         if fixed:
             print("# fixed in the script (not tunable through the wrapper):")
             for f in fixed:
                 print(f"  {f.get('name')} = {f.get('value')}   ({f.get('source')})")
-        knobs = p.get("upstream_knobs") or []
+        knobs = p["upstream_knobs"]
         if knobs:
             print("# upstream library knobs the script does not expose: "
                   + ", ".join(str(k.get("name")) for k in knobs)
-                  + (f"  (see {p['upstream_url']})" if p.get("upstream_url") else ""))
+                  + (f"  (see {p['upstream_url']})" if p["upstream_url"] else ""))
     if frames:
         _print_frame(pd.concat(frames, ignore_index=True), fmt=fmt)
     return _EXIT_OK
@@ -736,7 +735,8 @@ def _cmd_cite(args) -> int:
     from . import discover
     if args.all and args.methods:
         _usage_error(args, "--all and explicit method ids are mutually exclusive")
-    ids =[m for tok in (args.methods or []) for m in _csv_list(tok)]
+    # cite A,B as well: every other multi-id flag of the CLI is comma-separated
+    ids = [m for tok in (args.methods or []) for m in _csv_list(tok)]
     methods = "all" if args.all else (ids or None)
     text = discover.cite(methods, fmt=args.format)
     if args.out:
