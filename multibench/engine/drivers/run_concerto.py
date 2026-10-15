@@ -1,17 +1,14 @@
 """multibench driver for Concerto (cross: several RNA+ADT batches).
 
-Concerto writes one shard per batch, ``tf_<k>.tfrecord`` under
-``./tfrecord/RNA_tf/`` (``tf_<k>`` = the k-th ``--path1``/``--path2`` file),
-and both trains on and embeds the shards in the order ``os.listdir`` returns
-them (main_Concerto.py:60, concerto_function5_3.py:1961), so that listing
-fixes the order of the embedding's rows. It is the filesystem's order: for
-the same three shards APFS lists tf_1, tf_0, tf_2, HFS+ tf_0, tf_1, tf_2, and
-the benchmark host listed tf_2, tf_0, tf_1 (cty3, cty1, cty2 on D52).
+Concerto writes one shard per batch (``tf_<k>.tfrecord``, the k-th
+``--path1``/``--path2`` file) and trains on and embeds the shards in the
+order ``os.listdir`` returns them (main_Concerto.py:60,
+concerto_function5_3.py:1961). That order depends on the filesystem, so it
+would fix the embedding's rows differently per host.
 
 This driver runs the unmodified main_Concerto.py with ``os.listdir`` giving
-the shards in batch order, so the rows follow the argument order on every
-filesystem - the order ``mtb.labels_for`` returns. Nothing else changes: any
-other listing comes back as the filesystem gave it.
+the shards in batch order, so the rows follow the argument order, the order
+``mtb.labels_for`` returns. Any other listing is left as the filesystem gives it.
 
 Args: ``--script_dir <dir of main_Concerto.py>``, then main_Concerto.py's own.
 Kept to Python 3.8 syntax (the scmb_concerto env).
@@ -21,8 +18,7 @@ import re
 import runpy
 import sys
 
-# create_tfrecord's shard names: tf_<k>.tfrecord (the variant main_Concerto.py
-# writes), tf_<k>_no_zero[_no_norm].tfrecord (its zero_filter variants)
+# create_tfrecord's shard names, its zero_filter variants included
 _SHARD = re.compile(r"tf_(\d+)(?:_no_zero(?:_no_norm)?)?\.tfrecord")
 
 
@@ -53,7 +49,7 @@ def main():
 
     # both files call os.listdir through the module, so this reaches every call
     os.listdir = listdir_in_batch_order
-    # as `python main_Concerto.py`: its bgi/ and concerto_function5_3 import from there
+    # as `python main_Concerto.py`: it imports bgi/ and concerto_function5_3 from there
     sys.path[0] = script_dir
     sys.argv = [script] + argv
     runpy.run_path(script, run_name="__main__")
