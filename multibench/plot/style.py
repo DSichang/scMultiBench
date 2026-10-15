@@ -149,7 +149,7 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
     how to merge them."""
     n = len(parts)
     per_method = coverage(parts)
-    if not (n > 1 and len(per_method) and (per_method <= 1).all()):
+    if not (n > 1 and (per_method <= 1).all()):
         return None
     names = [str(ds) for ds in parts]
     stored = [ds for ds in names if ds in set(map(str, stored))]
