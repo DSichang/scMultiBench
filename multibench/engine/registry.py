@@ -1,10 +1,6 @@
-"""Load methods.yaml into MethodSpec objects; selection helpers; token validators.
-
-This module is the chokepoint every entry point goes through (discover, resolve,
-runner, envs, workflow, cli), so the validators for user-facing tokens live here:
-:func:`check_method`, :func:`check_category`, :func:`check_task`,
-:func:`check_atac`, :func:`normalize_modalities`. A typo raises with the valid
-vocabulary instead of silently matching nothing.
+"""Load methods.yaml into MethodSpec objects; the validators of user-facing
+tokens (method, category, task, atac, modalities): a typo raises with the
+valid vocabulary instead of matching nothing.
 """
 from __future__ import annotations
 
@@ -19,19 +15,15 @@ from .schema import (AmbiguousVariantError, ArgSpec, MethodSpec, OutputSpec,  # 
                      Variant, base_modality, is_label_role)
 
 _YAML = Path(__file__).resolve().parent / "methods.yaml"
-# doc-only tunable hyperparams, auto-generated from upstream argparse
+# the tunable hyperparams, generated from the upstream argparse
 _PARAMS_YAML = Path(__file__).resolve().parent / "params.yaml"
-# curated provenance: repo_url / version / summary / reference per method,
-# plus the benchmark's own citation under `_benchmark`
+# per-method provenance, and the benchmark's own citation under `_benchmark`
 _REFERENCES = Path(__file__).resolve().parent / "references.yaml"
 
-# What `atac:` may say in methods.yaml (the representation the upstream method
-# expects). find_methods(atac=) / check_atac accept exactly these.
+# what `atac:` may say in methods.yaml
 ATAC_VALUES = ("peak", "gene_activity")
 
-# Caller-friendly modality spellings -> registry tokens. `protein` is what
-# CITE-seq users say for ADT; the rest are the representation words used in
-# describe_layout / the `atac:` key.
+# caller spellings -> registry tokens
 MODALITY_ALIASES = {
     "protein": "adt",
     "peak": "atac_peak", "peaks": "atac_peak",
@@ -43,10 +35,7 @@ _BASE_MODALITIES = ("rna", "adt", "atac")
 @functools.lru_cache(maxsize=1)
 def _tunable_map() -> dict:
     """{method_id: {"category:mods": {param: {default,type}}}} from params.yaml."""
-    if not _PARAMS_YAML.exists():
-        return {}
-    with open(_PARAMS_YAML) as fh:
-        return yaml.safe_load(fh) or {}
+    return yaml.safe_load(_PARAMS_YAML.read_text()) or {}
 
 
 def _variant_key(when: dict) -> str:
@@ -75,8 +64,7 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         downloads=list(d.get("downloads", []) or []),
         size_hint=d.get("size_hint", "") or "",
     )
-    # labels_for orders label files by this; a declaration the variant cannot
-    # honour must fail here, not hand evaluate() a wrong order later
+    # labels_for orders label files by this: a bad declaration fails at load
     try:
         v.stacked_roles()
     except ValueError as e:
@@ -86,24 +74,16 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
 
 def _parse_method(d: dict) -> MethodSpec:
     if "needs_labels" in d:
-        # Derived from the variants' roles (MethodSpec.needs_labels); a hand
-        # key could disagree with them, so refuse it.
         raise ValueError(
             f"methods.yaml: {d.get('id')!r} declares needs_labels, but needs_labels "
             f"is derived from the variants' label roles (cty/label) - remove the key")
     if "categories" in d:
-        # Likewise derived (MethodSpec.wired_categories): a hand key naming a
-        # category with no variant makes list_methods(category=) and
-        # `env ... --category` disagree with scan/find_methods/run_all.
         raise ValueError(
             f"methods.yaml: {d.get('id')!r} declares categories, but categories is "
             f"derived from the variants' when.category - remove the key")
     variants = [_parse_variant(v, d["id"]) for v in d.get("variants", [])]
-    # params.yaml is keyed per variant and has no entry for cross variants that
-    # run the same script as their vertical variants (e.g. scMDC, scMM) - one
-    # argparse, one vocabulary. A variant with no entry inherits the
-    # tunables of a sibling that runs the same entrypoint, so run_all's
-    # params check (tunable | params) accepts the same keys for both.
+    # params.yaml has no entry for a variant that runs the same script as
+    # another (scMDC, scMM cross): it takes that variant's tunables
     for v in variants:
         if not v.tunable:
             for other in variants:
@@ -117,19 +97,13 @@ def _parse_method(d: dict) -> MethodSpec:
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
         variants=variants,
         env_spec=d.get("env_spec", {}) or {},
-        # GPU/CPU contract (schema.validate_gpu_fields runs in __post_init__:
-        # an absent key reads as none; any present value, dict or not, is
-        # handed over so a wrong shape is refused there, not coerced here)
+        # any present value is handed over, so validate_gpu_fields refuses a wrong shape
         cpu_params=d["cpu_params"] if d.get("cpu_params") is not None else {},
         requires_gpu=d.get("requires_gpu", False),
         gpu_evidence=d.get("gpu_evidence", "") or "",
         gpu_use=d.get("gpu_use", "") or "",
     )
-    # A cpu_params flag the script does not accept would be emitted anyway
-    # (the runner merges it below the params check) and argparse would then
-    # refuse the whole run - so demand it is a param every variant accepts:
-    # the upstream argparse vocabulary (`tunable`, from params.yaml) or a
-    # default the variant already emits (`params`).
+    # a cpu_params flag the script does not accept would make argparse refuse the run
     for v in spec.variants:
         accepted = set(v.tunable) | set(v.params)
         bad = [k for k in spec.cpu_params if k not in accepted]
@@ -139,9 +113,6 @@ def _parse_method(d: dict) -> MethodSpec:
                 f"{_variant_key(v.when)} variant does not accept (its params: "
                 f"{sorted(accepted)}); cpu_params must be command-line params the "
                 f"upstream script declares")
-    # `atac:` is an explicit key (see MethodSpec.atac), so its absence is an
-    # error rather than a silent None that find_methods(atac=...) and
-    # describe_layout would omit.
     if spec.atac is not None and spec.atac not in ATAC_VALUES:
         raise ValueError(
             f"methods.yaml: {spec.id!r} has atac={spec.atac!r}; valid: {list(ATAC_VALUES)}")
@@ -162,8 +133,7 @@ _ENV_SPECS = Path(__file__).resolve().parent / "env_specs.yaml"
 
 @functools.lru_cache(maxsize=1)
 def _references() -> dict:
-    """Parsed engine/references.yaml. A missing file raises instead of returning
-    {}: a wheel shipped without it would return None for every repo_url/DOI."""
+    """Parsed engine/references.yaml; a missing file raises."""
     if not _REFERENCES.is_file():
         raise FileNotFoundError(
             f"{_REFERENCES} is missing - the package data is incomplete "
@@ -172,9 +142,7 @@ def _references() -> dict:
 
 
 def benchmark_reference() -> dict:
-    """The benchmark's own citation: ``{doi, title, authors, journal, year, ...}``
-    (from engine/references.yaml ``_benchmark``, mirroring scMultiBench's
-    CITATION.cff)."""
+    """The benchmark's own citation: ``{doi, title, authors, journal, year, ...}``."""
     return dict(_references().get("_benchmark") or {})
 
 
@@ -182,14 +150,10 @@ def benchmark_reference() -> dict:
 def load() -> list[MethodSpec]:
     data = yaml.safe_load(_YAML.read_text())
     specs = [_parse_method(m) for m in data["methods"]]
-    # Per-method environment recipes live in a separate file so methods.yaml
-    # stays focused on the run contract; attach them here.
-    if _ENV_SPECS.exists():
-        env_specs = yaml.safe_load(_ENV_SPECS.read_text()) or {}
-        for s in specs:
-            if not s.env_spec and s.id in env_specs:
-                s.env_spec = env_specs[s.id] or {}
-    # Provenance (repo_url / version / summary / paper reference) likewise.
+    env_specs = yaml.safe_load(_ENV_SPECS.read_text()) or {}
+    for s in specs:
+        if not s.env_spec and s.id in env_specs:
+            s.env_spec = env_specs[s.id] or {}
     refs = _references()
     for s in specs:
         s.reference = dict(refs.get(s.id) or {})
@@ -198,12 +162,8 @@ def load() -> list[MethodSpec]:
 
 # --------------------------------------------------------------- validators
 def check_method(method_id: str) -> str:
-    """Return ``method_id`` if it is a registry id; else raise ``KeyError``.
-
-    The message names the closest known id and the call that lists them all:
-    ``"Unknown method stabmap. Did you mean StabMap? mtb.list_methods() shows
-    all methods."``
-    """
+    """Return ``method_id`` if it is a registry id; else raise ``KeyError``
+    with :func:`unknown_method_message`."""
     ids = [s.id for s in load()]
     if method_id in ids:
         return method_id
@@ -211,11 +171,8 @@ def check_method(method_id: str) -> str:
 
 
 def unknown_method_message(method_id, hint: str | None = None) -> str:
-    """``"Unknown method X. Did you mean Y? ... shows all methods."`` (internal).
-
-    ``hint`` defaults to :func:`closest_method`; the last sentence names
-    ``multibench list`` on the command line.
-    """
+    """``"Unknown method X. Did you mean Y? ... shows all methods."``; ``hint``
+    defaults to :func:`closest_method`."""
     hint = closest_method(method_id) if hint is None else hint
     return (f"Unknown method {method_id}."
             + (f" Did you mean {hint}?" if hint else "")
@@ -229,16 +186,12 @@ def closest_method(method_id: str) -> str | None:
     hint = difflib.get_close_matches(str(method_id), ids, n=1, cutoff=0.6)
     if hint:
         return hint[0]
-    # case-insensitive exact match is a better hint than fuzzy distance
     return {i.lower(): i for i in ids}.get(str(method_id).lower())
 
 
 def check_id_list(value, name: str):
-    """Return ``value``; raise ``TypeError`` if it is a bare string.
-
-    ``methods='StabMap'`` would be iterated character by character and fail
-    with ``KeyError: Unknown method S.``; the ``TypeError`` says what was meant.
-    """
+    """Return ``value``; raise ``TypeError`` if it is a bare string, which
+    would be iterated character by character."""
     if isinstance(value, str):
         raise TypeError(
             f"{name} must be a list of ids, got the string {value!r} - did you "
@@ -246,52 +199,12 @@ def check_id_list(value, name: str):
     return value
 
 
-def resolve_method_id(name: str) -> str:
-    """Return the registry id for ``name``, accepting any letter case.
-
-    Parameters
-    ----------
-    name : a method id as the user typed it (``'scipenn'``, ``'MOFA2'``,
-        ``'totalvi'``).
-
-    Returns
-    -------
-    str
-        The canonical registry id (``'sciPENN'``) - an exact id is returned as
-        is; otherwise the unique id that matches case-insensitively.
-
-    Raises
-    ------
-    KeyError
-        Nothing matches, with the same message as :func:`check_method`
-        (``"Unknown method Matlida. Did you mean Matilda? mtb.list_methods()
-        shows all methods."``).
-
-    Notes
-    -----
-    ``check_method`` stays strict on purpose (it validates ids at the entry
-    points); use this where a spelling from a file or a table is normalized.
-    """
-    ids = [s.id for s in load()]
-    key = str(name).strip()
-    if key in ids:
-        return key
-    lower = [i for i in ids if i.lower() == key.lower()]
-    if len(lower) == 1:
-        return lower[0]
-    return check_method(key)            # raises KeyError with a did-you-mean
-
-
 def check_category(category: str | None) -> str | None:
-    """Validate a category token (``vertical``/``diagonal``/``mosaic``/``cross``).
-
-    ``None`` passes through. Otherwise raises ``ValueError`` "unknown category
-    ...; valid: [...]" - the same validator (and message) scan/run_all/load_results
-    use via ``config.category_folder``.
-    """
+    """Validate a category token; ``None`` passes through. Raises the
+    ``ValueError`` of ``config.category_folder``."""
     if category is None:
         return None
-    config.category_folder(category)   # raises ValueError with the valid list
+    config.category_folder(category)
     return category
 
 
@@ -306,11 +219,8 @@ def check_task(task: str | None) -> str | None:
 
 
 def check_atac(atac: str | None) -> str | None:
-    """Validate an ``atac=`` filter value (``peak`` / ``gene_activity``).
-
-    Accepts the describe_layout spellings ``peaks``/``gas``/``gene-activity`` as
-    aliases and returns the canonical token; ``None`` passes through.
-    """
+    """The canonical ``atac=`` token (``peak`` / ``gene_activity``) for a value
+    or its aliases ``peaks`` / ``gas`` / ``gene-activity``; ``None`` passes through."""
     if atac is None:
         return None
     canon = {"peak": "peak", "peaks": "peak",
@@ -323,25 +233,15 @@ def check_atac(atac: str | None) -> str | None:
 
 @functools.lru_cache(maxsize=1)
 def known_modalities() -> set[str]:
-    """Every modality token a variant declares (``rna``, ``adt``, ``atac``,
-    ``atac_gas``, ``atac_peak``, ``rna1``..., ``adt2``..., ``atac3``...) plus
-    the three base types."""
+    """Every modality token a variant declares, plus the three base types."""
     toks = {m for s in load() for v in s.variants for m in v.when.get("modalities", [])}
     return toks | set(_BASE_MODALITIES)
 
 
 def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
-    """Map caller modality spellings to registry tokens, validating each.
-
-    * spellings: ``protein`` -> ``adt``; the representation tokens
-      ``peak``/``peaks`` -> ``atac_peak`` and ``gas``/``gene_activity`` ->
-      ``atac_gas``
-    * ``base=True`` further reduces every token to its base type
-      (``atac_gas`` -> ``atac``, ``rna1`` -> ``rna``) - what ``find_methods``
-      compares against.
-
-    Order is kept, duplicates dropped. Unknown tokens raise ``ValueError`` naming
-    the accepted vocabulary. ``None`` -> ``None``.
+    """Map caller modality spellings (:data:`MODALITY_ALIASES`) to registry
+    tokens, in order, without duplicates; ``base=True`` reduces each to its
+    base type. An unknown token raises ``ValueError``; ``None`` -> ``None``.
     """
     if modalities is None:
         return None
@@ -367,10 +267,7 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
 # ---------------------------------------------------------------- lookups
 def get(method_id: str) -> MethodSpec:
     check_method(method_id)
-    for s in load():
-        if s.id == method_id:
-            return s
-    raise KeyError(unknown_method_message(method_id))  # unreachable
+    return next(s for s in load() if s.id == method_id)
 
 
 def list_tasks() -> list[str]:
@@ -396,29 +293,9 @@ def list_tasks() -> list[str]:
 
 def list_methods(category: str | None = None, task: str | None = None,
                  runnable: bool | None = None) -> list[str]:
-    """Registry method ids, optionally filtered (engine-internal form).
-
-    The public ``mtb.list_methods`` takes ``category`` only; ``task`` /
-    ``runnable`` are ``find_methods`` filters there. This engine function
-    keeps them for the package's own callers.
-
-    Parameters
-    ----------
-    category : ``vertical`` / ``diagonal`` / ``mosaic`` / ``cross`` or None.
-        Keeps the methods that have a variant wired for that category - the
-        same set ``scan`` / ``run_all`` / ``find_methods(category=)`` dispatch
-        (``MethodSpec.categories`` is derived from the variants, never
-        declared). Validated: ``ValueError`` listing the valid tokens on a typo.
-    task : one of :func:`list_tasks` or None; validated the same way.
-    runnable : ``True`` keeps only methods with at least one declared variant
-        (usable by ``inputs_for``/``run``); ``False`` keeps only the
-        declared-but-unwired stubs; ``None`` (default) returns all.
-
-    Returns
-    -------
-    list[str]
-        Method ids in registry order.
-    """
+    """Registry method ids in registry order, filtered by a validated
+    ``category`` and ``task``; ``runnable=True`` keeps the methods with a
+    variant, ``False`` those without."""
     check_category(category)
     check_task(task)
     out = []

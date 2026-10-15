@@ -1,5 +1,5 @@
 """categories derived from the variants (P09); scBridge's modalities from its
-const filenames (P03); resolve_method_id (Rin)."""
+const filenames (P03); method ids are case-sensitive."""
 import pytest
 import yaml
 
@@ -61,15 +61,7 @@ def test_empty_when_modalities_only_for_data_dir_variants():
             assert (not v.when.get("modalities")) == v.takes_data_dir, (spec.id, v.when)
 
 
-def test_resolve_method_id_case_folds_with_did_you_mean():
-    assert registry.resolve_method_id("scipenn") == "sciPENN"
-    assert registry.resolve_method_id("totalvi") == "totalVI"
-    assert registry.resolve_method_id("MOFA2") == "MOFA2"
-    assert registry.resolve_method_id(" Matilda ") == "Matilda"
-    with pytest.raises(KeyError) as e:
-        registry.resolve_method_id("Matlida")
-    assert "Did you mean Matilda" in str(e.value) and "mtb.list_methods()" in str(e.value)
-    # strict validator is unchanged
+def test_check_method_is_case_sensitive():
     with pytest.raises(KeyError):
         registry.check_method("scipenn")
 
