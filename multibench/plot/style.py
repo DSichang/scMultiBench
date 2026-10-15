@@ -53,9 +53,7 @@ def compute_overall(mat: pd.DataFrame) -> pd.Series:
     return pd.Series(minmax(mean_rank.to_numpy()), index=mat.index)
 
 
-# --------------------------------------------------------------------------
-# cross-dataset summary math (shared by bubble and bar)
-# --------------------------------------------------------------------------
+# cross-dataset summary math, shared by bubble and bar
 
 #: the two ways an across-dataset "Overall" can be formed; the formulas are
 #: in overall_by_basis
@@ -90,7 +88,7 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     out = {}
     for ds, group in rows.groupby("dataset", sort=True):
         mat = group.pivot_table(index="method", columns="metric", values="value",
-                            aggfunc="mean")
+                                aggfunc="mean")
         mat = mat.dropna(axis=1, how="all")
         if mat.empty:
             continue
@@ -168,8 +166,8 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
 
 
 def _and(names) -> str:
-    """``'A'``, ``'A and B'``, ``'A, B and C'``: the distinct names, in first-seen order."""
-    names = list(dict.fromkeys(map(str, names)))
+    """``'A'``, ``'A and B'``, ``'A, B and C'``."""
+    names = [str(n) for n in names]
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 

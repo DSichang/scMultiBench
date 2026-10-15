@@ -74,8 +74,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         ``long_df`` lacks ``method`` / ``metric`` / ``value``, or is empty
         (``mtb.load_results`` may have returned nothing; see its warning).
     ValueError
-        Unknown ``metrics`` code (with a did-you-mean hint), or an invalid
-        ``group`` / ``overall``.
+        Unknown ``metrics`` code (the error suggests a close match and lists
+        the metrics present), or an invalid ``group`` / ``overall``.
     ValueError
         ``group`` names a family with no metric in the frame: batch metrics
         need a multi-batch dataset, and the stored tables have no

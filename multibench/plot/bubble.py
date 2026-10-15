@@ -69,9 +69,10 @@ class BubbleTable:
         Row order: best first, or the ``order`` methods first;
         ``methods.index(name) + 1`` is the row's position (1 = top).
     blocks : list of FamilyBlock
-        One block per metric family present, in paper order (Notes of
-        ``build_table``), each with its own ``raw``, ``norm``, ``ranks`` and
-        ``overall``.
+        One block per metric family present, in paper order: DR and
+        clustering (blues), batch correction (greens), classification
+        (pinks), then "Other" (purples) for metrics outside the three. Each
+        has its own ``raw``, ``norm``, ``ranks`` and ``overall``.
     matrix : pandas.DataFrame
         Per-column min-max values (method x metric) of all families, in
         figure order; the same object as ``norm``.
@@ -118,10 +119,10 @@ class BubbleTable:
     ``ranks``, ``norm`` and the Overall scores. An iLISI of ``2.2e-16``
     therefore ties with ``0.0``.
 
-    **Scaled values.** In ``matrix`` and ``norm``, a constant (or all-NaN)
-    column is all ones, as in the R code. The figure draws a column whose
-    rows all hold one value in grey, not at the ``High`` end of the Score
-    legend.
+    **Scaled values.** ``matrix`` and ``norm`` are per-column min-max values
+    in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
+    The figure draws a column whose rows all hold one value in grey, not at
+    the ``High`` end of the Score legend.
 
     See Also
     --------
@@ -151,6 +152,11 @@ class BubbleTable:
         return pd.concat([b.ranks for b in self.blocks], axis=1)
 
 
+def _and_distinct(values) -> str:
+    """:func:`_and` of the distinct ``str`` forms of ``values``, in first-seen order."""
+    return _and(dict.fromkeys(map(str, values)))
+
+
 def _unknown_names(unknown, available, kind: str) -> str:
     """The error for ``unknown`` names of ``kind``: a did-you-mean from the
     table (for a method also from the registry), then the names the table has."""
@@ -163,11 +169,11 @@ def _unknown_names(unknown, available, kind: str) -> str:
             from ..engine import registry
             h = [c for c in (registry.closest_method(str(u)),) if c]
         hints += h
-    text = f"Unknown {kind if len(unknown) == 1 else kind + 's'} {_and(unknown)}."
+    text = f"Unknown {kind if len(unknown) == 1 else kind + 's'} {_and_distinct(unknown)}."
     if hints:
-        text += f" Did you mean {_and(hints)}?"
+        text += f" Did you mean {_and_distinct(hints)}?"
     have = sorted(set(pool))
-    return text + (f" The table has {_and(have)}." if have else " The table is empty.")
+    return text + (f" The table has {_and_distinct(have)}." if have else " The table is empty.")
 
 
 def _resolve(requested, available, kind: str, canon) -> list:
@@ -324,7 +330,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     order. Ranks and scores always come from the whole filtered frame;
     ``order`` only moves rows.
 
-    **Input columns.**
+    **Input columns.** Only ``method``, ``metric`` and ``value`` are
+    required.
 
     - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
       dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
@@ -421,8 +428,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                 warnings.warn(
                     _config.hint("require_complete=True", "--require-complete")
                     + f" dropped {n_dropped} method{'' if n_dropped == 1 else 's'}: "
-                    + " ".join(f"{_and(ms)} lack{'s' if len(ms) == 1 else ''} "
-                               f"{_and(ds)}." for ds, ms in groups.items())
+                    + " ".join(f"{_and_distinct(ms)} lack{'s' if len(ms) == 1 else ''} "
+                               f"{_and_distinct(ds)}." for ds, ms in groups.items())
                     + " " + _config.hint("Pass require_complete=False",
                                          "Leave out --require-complete")
                     + " to keep them.",
@@ -481,7 +488,6 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         if not cols:
             continue
         blocks.append(_block(label, cmap, raw_all[cols]))
-    # anything not in a known family still gets shown, neutrally coloured
     if metrics is not None:
         leftover = [c for c in metrics if c not in known and c in raw_all.columns]
     else:
@@ -691,9 +697,10 @@ def _duplicate_rows_message(dup, keys) -> str:
         lambda s: s.any() and not s.all())
     mixed = mixed[mixed].index.to_frame(index=False)
     if len(mixed):
-        where = f" on {_and(mixed['dataset'])}" if "dataset" in keys else ""
+        where = f" on {_and_distinct(mixed['dataset'])}" if "dataset" in keys else ""
         first = str(mixed["method"].iloc[0])
-        return (f"Your rows and the stored table both have {_and(mixed['method'])}{where}. "
+        return (f"Your rows and the stored table both have "
+                f"{_and_distinct(mixed['method'])}{where}. "
                 f"Give your rows another name, such as {first}_rerun, "
                 + _config.hint("with to_long(method=...).", "with evaluate --name."))
     what = ", ".join(keys[:-1]) + " and " + keys[-1]
@@ -779,7 +786,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     n_rows = len(methods)
     ROW_H, R_MAX = 1.0, 0.5          # row height; circle max radius = row/2
 
-    # ---- x layout: per family [overall][metrics...] with a family gap -----
+    # x layout: per family [overall][metrics...], with a gap between families
     x_next, layout = 0.0, []
     for fi, b in enumerate(tbl.blocks):
         if fi:
@@ -791,8 +798,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
             x_next += 1.1
     total_w = x_next
 
-    # ---- legend geometry: the legends under a table of few metrics are wider
-    # than the table, so the axes end at the right edge of the widest one ----
+    # the legends under a table of few metrics are wider than the table, so the
+    # axes end at the right edge of the widest one
     RAMP_X0, RAMP_STEP, RAMP_W = 1.2, 4.6, 40 * 0.07   # Score ramp per family
     # room for the "High" label after a ramp: about 0.5 units in a tall
     # figure, up to 0.7 in a one-row figure with a title
@@ -816,13 +823,12 @@ def _draw(tbl, cmap, title, show_language, gaps):
                    cmap if (fi == 0 and cmap) else b.cmap))
                for fi, b in enumerate(tbl.blocks)}
 
-    # ---- alternating row stripes (#DDDDDD, like the Shiny output) ---------
+    # alternating row stripes, like the Shiny output
     for i in range(n_rows):
         if i % 2 == 0:
             ax.add_patch(Rectangle((-1.3, n_rows - i - 1), total_w + 1.8, ROW_H,
                                    facecolor="#DDDDDD", edgecolor="none", zorder=0))
 
-    # ---- language chips ----------------------------------------------------
     if show_language:
         for i, m in enumerate(methods):
             lang = _method_language(m)
@@ -845,7 +851,6 @@ def _draw(tbl, cmap, title, show_language, gaps):
         radii = 0.85 * np.sqrt(r)
         return pd.Series(np.maximum(radii, 0.12), index=colvals.index)
 
-    # ---- markers -----------------------------------------------------------
     # a column whose rows all hold one value gets the neutral fill
     constant = style.constant_columns(pd.concat([b.raw for b in tbl.blocks], axis=1))
     flat_overall = {fi for fi, b in enumerate(tbl.blocks)
@@ -897,7 +902,6 @@ def _draw(tbl, cmap, title, show_language, gaps):
                                                     name in constant),
                                     edgecolor="#333333", linewidth=0.4, zorder=3))
 
-    # ---- column titles: slanted 30deg above the table, with tick marks -----
     for x, fi, kind, name in layout:
         tick_x = x + (0.7 if kind == "overall" else 0.55)
         ax.plot([tick_x, tick_x], [n_rows + 0.05, n_rows + 0.22], color="#333333",
@@ -905,7 +909,6 @@ def _draw(tbl, cmap, title, show_language, gaps):
         ax.text(tick_x - 0.05, n_rows + 0.30, name, rotation=30, ha="left",
                 va="bottom", fontsize=8, rotation_mode="anchor")
 
-    # ---- family bands above the slanted titles ----------------------------
     band_y = n_rows + 2.05
     for fi, b in enumerate(tbl.blocks):
         family_xs = [x for x, f, k, _ in layout if f == fi]
@@ -919,7 +922,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
         ax.text((x0 + x1 - 0.3) / 2, band_y + 0.3, b.label, ha="center",
                 va="center", fontsize=8.6, color="#1a1a1a", zorder=3, gid="family")
 
-    # ---- legends: Score ramps + Rank size, under the table (scIB layout) ---
+    # Score ramps and Rank sizes under the table, as in the scIB layout
     # gid="legend" marks every artist of the Score and Rank legends
     score_y = -1.1
     ax.text(-0.9, score_y, "Score", fontsize=8, fontweight="bold", va="center",
@@ -954,7 +957,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     # room under the legends: the Rank labels, or the Score legend's note
     y_bottom = -3.4 if tbl.aggregate != "summary" else -2.0
 
-    # ---- row labels: add a dataset cue when one figure mixes datasets -----
+    # a figure that mixes datasets gets a dataset cue in each row label
     labels = list(methods)
     if tbl.aggregate == "dataset" and len(tbl.datasets) > 1:
         datasets_of = tbl.method_datasets
