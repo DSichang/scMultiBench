@@ -29,7 +29,7 @@ import pandas as pd
 
 from . import config
 from .config import _and_list
-from .discover import _runtimes
+from .discover import _REPRESENTATION_TOKENS, _runtimes
 from .engine import envs, registry, resolve as _resolve
 from .engine import runner as _runner
 from .engine.schema import base_modality as _schema_base
@@ -845,7 +845,7 @@ def _modality_matcher(modalities, named=None):
     for given in modalities:
         token = registry.MODALITY_ALIASES.get(str(given).lower(), str(given))
         family = modality_family(token)
-        tokens.append((family, _REP_OF_TOKEN.get(token.rstrip("0123456789")),
+        tokens.append((family, _REPRESENTATION_TOKENS.get(token.rstrip("0123456789")),
                        family in ("rna", "adt", "atac")))
     reps = _token_reps(modalities)
 
@@ -870,10 +870,8 @@ def _modality_matcher(modalities, named=None):
     return match
 
 
-#: representation token stem -> ``method_info(m)['atac']``, and back
-_REP_OF_TOKEN = {"atac_peak": "peak", "atac_gas": "gene_activity"}
-_TOKEN_OF_REP = {v: k for k, v in _REP_OF_TOKEN.items()}
-_REP_WORDS = {"peak": "peaks", "gene_activity": "gene activity"}
+#: ``method_info(m)['atac']`` -> representation token stem
+_TOKEN_OF_REP = {v: k for k, v in _REPRESENTATION_TOKENS.items()}
 
 
 def _token_reps(modalities) -> set:
@@ -881,7 +879,7 @@ def _token_reps(modalities) -> set:
     out = set()
     for given in modalities or ():
         token = registry.MODALITY_ALIASES.get(str(given).lower(), str(given))
-        rep = _REP_OF_TOKEN.get(token.rstrip("0123456789"))
+        rep = _REPRESENTATION_TOKENS.get(token.rstrip("0123456789"))
         if rep:
             out.add(rep)
     return out
@@ -896,7 +894,7 @@ def _representation_note(category, methods, modalities) -> str:
               for t in modalities]
 
     def rep(token):
-        return _REP_OF_TOKEN.get(token.rstrip("0123456789"))
+        return _REPRESENTATION_TOKENS.get(token.rstrip("0123456789"))
     reps = {rep(t) for t in tokens if rep(t)}
     if len(reps) != 1:
         return ""
@@ -911,7 +909,7 @@ def _representation_note(category, methods, modalities) -> str:
         via = f" through its {other} input" if other else ""
         fixed = [_TOKEN_OF_REP[spec.atac] if rep(t) else t for t in tokens]
         base = ["atac" if rep(t) else t for t in tokens]
-        notes.append(f"{spec.id} reads {_REP_WORDS[spec.atac]}{via}. Pass " + config.hint(
+        notes.append(f"{spec.id} reads {_resolve._READS[spec.atac]}{via}. Pass " + config.hint(
             f"modalities={fixed!r} or {base!r}.",
             f"--modalities {','.join(fixed)} or {','.join(base)}."))
     return " ".join(notes)

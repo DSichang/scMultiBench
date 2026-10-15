@@ -12,9 +12,7 @@ from . import io
 from .. import _compat, config
 from ..config import _and_list
 from ..data import catalog
-
-#: the seven columns of the long table, the same as multibench.data.results.COLUMNS
-LONG_COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
+from ..data.results import COLUMNS as LONG_COLUMNS
 
 #: the ``attrs`` keys evaluate() sets and to_long() joins into ``scored_with``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
