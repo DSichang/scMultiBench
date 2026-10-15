@@ -338,8 +338,8 @@ def test_glue_d28_caveat_names_the_rename_call(tmp_path):
 
 def test_caveat_clauses_join_as_sentences():
     # R6-10: the caveat parts are sentences, joined with a space
-    assert W._join_clauses(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
-    assert W._join_clauses(["Only one."]) == "Only one."
+    assert W._join_sentences(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
+    assert W._join_sentences(["Only one."]) == "Only one."
 
 
 # ====================================================================== M13

@@ -225,9 +225,6 @@ def test_check_data_dir_names_the_missing_files(tmp_path):
     gone = tmp_path / "nope"
     assert resolve._check_data_dir(v, gone, "scBridge") == (
         False, f"scBridge needs the folder {gone}, which does not exist.")
-    # the workflow alias delegates here
-    from multibench import workflow as W
-    assert W._data_dir_usable(v, d) == (True, "")
 
 
 def test_labels_for_docstring_says_how_to_hand_to_evaluate():
