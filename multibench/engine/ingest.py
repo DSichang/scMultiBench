@@ -328,8 +328,7 @@ def _tenx_message(path) -> str:
 
 def _is_mudata(obj) -> bool:
     # duck-typed: mudata is an optional import
-    return hasattr(obj, "mod") and isinstance(getattr(obj, "mod", None), dict) \
-        and type(obj).__name__ == "MuData"
+    return isinstance(getattr(obj, "mod", None), dict) and type(obj).__name__ == "MuData"
 
 
 def _to_anndata(src):
@@ -347,7 +346,7 @@ def _to_anndata(src):
             f"input file does not exist: {p} (cwd {os.getcwd()})")
     suffix = p.suffix.lower()
     if suffix == ".h5":
-        # a canonical .h5 never gets here: say what this one holds
+        # to_canonical returns a canonical .h5 before this: say what the file holds
         try:
             with h5py.File(p, "r") as f:
                 keys = sorted(f.keys())
@@ -435,7 +434,7 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
     than one value: one file holds one modality. ``arg``, ``spec`` and
     ``role`` only word the message. Without a 10x type name (``protein_coding``
     and ``lncRNA``) the advice is to delete the column instead."""
-    var = getattr(adata, "var", None)
+    var = adata.var                     # None from runner for an unreadable .h5ad
     if var is None or "feature_types" not in var.columns:
         return
     counts = var["feature_types"].astype(str).value_counts()
@@ -505,7 +504,7 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
                 raise ValueError(f"{len(names)} feature names for {n_feat} features "
                                  f"in obsm[{obsm!r}]")
             return X, names
-        uns_names = adata.uns.get(f"{obsm}_names") if hasattr(adata, "uns") else None
+        uns_names = adata.uns.get(f"{obsm}_names")
         if names is None and uns_names is not None and n_feat is not None \
                 and len(uns_names) == n_feat:
             names = [str(v) for v in uns_names]
@@ -583,6 +582,7 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
 def _adt_obsm_keys(adata) -> list:
     """The ``obsm`` keys that can hold a protein matrix: the ones that do not
     start with ``X_``, where scanpy keeps embeddings (``X_pca``, ``X_umap``)."""
+    # export_dataset may pass data=None
     return [k for k in getattr(adata, "obsm", {}) if not str(k).startswith("X_")]
 
 
@@ -792,11 +792,13 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     writes ``atac.h5`` for either representation, the file vertical methods
     read. Any other ``category``, or none, names the file after the
     representation: ``atac_peak.h5``, ``atac_gas.h5``, or ``atac.h5`` for
-    the plain ``'atac'`` role, and ``mtb.scan(d, 'vertical')`` then finds no
-    ATAC method runnable. A file path given as ``out`` is not renamed; for a
-    mosaic batch, pass the numbered file (``'data/MYMOSAIC/atac2.h5'``). The
-    representation is not recorded on disk: ``method_info(m)['atac']`` says
-    which kind a method expects.
+    the plain ``'atac'`` role. So ``to_canonical(atac, d, modality='peak')``
+    without ``category='vertical'`` writes ``atac_peak.h5``, and
+    ``mtb.scan(d, 'vertical')`` then finds no ATAC method runnable. A file
+    path given as ``out`` is not renamed; for a mosaic batch, pass the
+    numbered file (``'data/MYMOSAIC/atac2.h5'``).
+    The representation is not recorded on disk: ``method_info(m)['atac']``
+    says which kind a method expects.
 
     **Gene activity next to peaks.** With ``modality='gas'`` (no
     ``category``, or ``'diagonal'``) and an ``atac_peak.h5`` in the output
@@ -908,7 +910,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         _warn_not_counts(X, modality, hint, stacklevel=2, how=how)
     if modality == "atac_gas" and category in (None, "diagonal"):
         X, bars = _follow_peak_order(out, X, bars)
-    if getattr(X, "ndim", 0) == 2:
+    if getattr(X, "ndim", 0) == 2:      # X=None: _write_canonical raises
         _warn_dense_size(out, X.shape[1], X.shape[0], dtype)
     return _write_canonical(out, X, feats, bars, dtype=dtype,
                             compression=compression, block=block)
@@ -1460,7 +1462,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     - a 2-D array or sparse matrix already in the master cell order.
 
     An ``obsm`` matrix takes its feature names as ``mtb.io.to_canonical``
-    does, with ``adt_names`` for ``feature_names``.
+    does; for the ADT, ``adt_names`` comes first (it applies to no other
+    modality).
 
     All matrices are cells x features and are written transposed. With
     ``data=None`` the default ``rna='X'`` means "no RNA": pass
@@ -1510,7 +1513,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     as row numbers: the values are written row by row, as a list is.
 
     The same barcodes in another order are reordered. Non-unique barcodes
-    cannot be matched by name, so the cells are paired by position. A bare
+    cannot be matched by name, so the cells are paired by position (a
+    different cell count still raises). A bare
     array has no barcodes, so the order cannot be checked: pass a DataFrame
     or AnnData when you are not sure of the order.
 
@@ -1893,7 +1897,7 @@ def _has_feature_types(adata, spec) -> bool:
     """The features were selected by type: ``adata`` has a var column
     ``feature_types``, or the selector ``spec`` filters on it."""
     var_filter = _split_var_filter(spec)[1] if isinstance(spec, str) else None
-    return "feature_types" in getattr(getattr(adata, "var", None), "columns", ()) \
+    return "feature_types" in adata.var.columns \
         or bool(var_filter and var_filter[0] == "feature_types")
 
 

@@ -370,7 +370,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
     TypeError
         ``category`` and ``method`` were passed in swapped order.
     KeyError
-        Unknown method, or no variant matches ``category`` and ``modalities``.
+        Unknown method (the message names the closest method id), or no
+        variant matches ``category`` and ``modalities``.
     ValueError
         Unknown category or modality token, or several variants fit
         (``mtb.AmbiguousVariantError``).
