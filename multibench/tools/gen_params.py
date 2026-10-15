@@ -1,7 +1,7 @@
 """Generate engine/params.yaml: doc-only tunable hyperparams per method variant,
 extracted from the ``add_argument`` calls of each upstream script. The recorded
 defaults are never put on a command line; multibench.params_for() surfaces them."""
-import warnings, os, re, json; warnings.filterwarnings("ignore")
+import warnings, os, re; warnings.filterwarnings("ignore")
 from multibench.engine import registry
 
 ROOTS = ["/media/disk2/Sichang/scmbench_pkg/scMultiBench_ref",

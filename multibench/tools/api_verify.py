@@ -4,7 +4,7 @@ Public entry points are called with real inputs (the paths below); env
 installation runs as a dry run. Ends with the four-scenario plotting chain.
 Prints a PASS/FAIL table and writes ``api_verify.json``.
 """
-import warnings, json, inspect, tempfile, os, traceback
+import warnings, json, os, traceback
 warnings.filterwarnings("ignore")
 import numpy as np, pandas as pd
 import matplotlib; matplotlib.use("Agg")
@@ -227,7 +227,7 @@ def _():
     e, lab = _emb_and_labels()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        v = mtb.evaluate(e, category="vertical", task="clustering", labels=lab)
+        mtb.evaluate(e, category="vertical", task="clustering", labels=lab)
     msgs = [str(x.message) for x in w if issubclass(x.category, DeprecationWarning)]
     assert any("metrics='clustering'" in m for m in msgs), msgs
     return f"warned: {msgs[0][:60]}"
