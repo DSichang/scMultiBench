@@ -3,42 +3,40 @@ from __future__ import annotations
 
 from .schema import Variant
 
-_INTERP = {"python": "python", "R": "Rscript"}
+_INTERPRETER = {"python": "python", "R": "Rscript"}
 
 
 def build_command(variant: Variant, values: dict, out_dir: str,
                   params: dict | None = None) -> list[str]:
     """Return argv: [interpreter, entrypoint, *args, *params]."""
-    cmd: list[str] = [_INTERP[variant.language], variant.entrypoint]
-    vals = dict(values)
-    vals["out_dir"] = out_dir
+    cmd: list[str] = [_INTERPRETER[variant.language], variant.entrypoint]
+    by_role = dict(values)
+    by_role["out_dir"] = out_dir
 
-    for a in variant.args:
-        if a.const is not None:
-            items = [a.const]
-        elif a.roles:
-            # An entry written "=VALUE" is a literal, not an input role. Upstream
-            # scripts that take one slot per batch need a placeholder for batches
-            # lacking that modality (scMoMaT documents `None`); without it a
-            # mosaic layout cannot be expressed.
-            missing = [r for r in a.roles
-                       if not str(r).startswith("=") and r not in vals]
+    for arg in variant.args:
+        if arg.const is not None:
+            items = [arg.const]
+        elif arg.roles:
+            # "=VALUE" is a literal: a placeholder for a batch that lacks the
+            # modality (scMoMaT takes `None` there)
+            missing = [r for r in arg.roles
+                       if not str(r).startswith("=") and r not in by_role]
             if missing:
                 raise KeyError(f"missing input roles {missing} for {variant.entrypoint}")
-            items = [str(r)[1:] if str(r).startswith("=") else vals[r]
-                     for r in a.roles]
+            items = [str(r)[1:] if str(r).startswith("=") else by_role[r]
+                     for r in arg.roles]
         else:
-            if a.role not in vals:
-                raise KeyError(f"missing input role {a.role!r} for {variant.entrypoint}")
-            val = vals[a.role]
-            items = val if (a.repeat and isinstance(val, (list, tuple))) else [val]
+            if arg.role not in by_role:
+                raise KeyError(f"missing input role {arg.role!r} for {variant.entrypoint}")
+            val = by_role[arg.role]
+            items = val if (arg.repeat and isinstance(val, (list, tuple))) else [val]
         items = [str(x) for x in items]
-        if a.is_positional:
+        if arg.is_positional:
             cmd.extend(items)
-        elif a.eq:
-            cmd.extend([f"{a.flag}={x}" for x in items])
+        elif arg.eq:
+            cmd.extend([f"{arg.flag}={x}" for x in items])
         else:
-            cmd.append(a.flag)
+            cmd.append(arg.flag)
             cmd.extend(items)
 
     merged = {**variant.params, **(params or {})}
