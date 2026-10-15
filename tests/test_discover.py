@@ -35,11 +35,10 @@ def test_top_level_find_methods():
 
 def test_modality_types_mapping():
     from multibench.engine import registry
-    from multibench.discover import _modality_types
-    assert _modality_types(registry.get("SCALEX")) == {"rna", "atac"}
-    assert _modality_types(registry.get("Cobolt")) == {"rna", "atac"}
-    assert _modality_types(registry.get("totalVI")) == {"rna", "adt"}
-    assert _modality_types(registry.get("UINMF")) == {"rna", "adt", "atac"}
+    assert registry.get("SCALEX").modality_types == {"rna", "atac"}
+    assert registry.get("Cobolt").modality_types == {"rna", "atac"}
+    assert registry.get("totalVI").modality_types == {"rna", "adt"}
+    assert registry.get("UINMF").modality_types == {"rna", "adt", "atac"}
 
 
 def test_find_methods_modalities_rna_adt():
@@ -58,13 +57,12 @@ def test_find_methods_modalities_rna_atac():
 
 def test_find_methods_modalities_and_combined_with_category():
     from multibench.engine import registry
-    from multibench.discover import _modality_types
     ids = discover.find_methods(category="diagonal", modalities=["rna", "atac"])
     assert "SCALEX" in ids
     for m in ids:
         s = registry.get(m)
         assert "diagonal" in s.categories
-        assert {"rna", "atac"} <= _modality_types(s)
+        assert {"rna", "atac"} <= s.modality_types
 
 
 def test_find_methods_modalities_rna_ubiquitous():
