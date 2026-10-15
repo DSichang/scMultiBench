@@ -246,10 +246,6 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
     return out
 
 
-#: family tokens the ``metrics=`` knob accepts (besides None and a list of codes)
-_METRIC_TOKENS = ("all", "clustering", "batch", "classification")
-
-
 class MetricSelection:
     """What a ``metrics=`` argument resolved to: ``family`` (the token, or for
     a list the family holding every code, else ``"all"``), ``codes`` (``None``

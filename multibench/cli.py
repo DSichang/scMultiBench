@@ -72,7 +72,6 @@ from .workflow import (_batch_length_problem, _batch_vector, _column_name_error,
 
 _EXIT_OK = 0
 _EXIT_ERROR = 1
-_EXIT_USAGE = 2
 #: ``run-all`` finished and saved, but ``failures`` is not empty
 _EXIT_METHOD_FAILED = 3
 
