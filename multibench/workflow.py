@@ -352,7 +352,6 @@ def _atac_lines(category: str) -> list[str]:
                                   if {"atac_peak", "atac_gas"} <= set(mods)))
         if both:
             out.append(f"  need both files:       {', '.join(both)}")
-        # each method on one line only
         peak = [m for m in peak if m not in both]
         gas = [m for m in gas if m not in both]
     elif gas:
@@ -1249,8 +1248,9 @@ def scan(dataset: str, category: str | None = None, *,
     when ``run_all`` tries the method. Otherwise ``reason`` is that of one
     variant: one whose input files are all in the folder, else one that
     reads the modalities the folder holds, else the one that lacks the
-    fewest files. The printout adds the cells of each matrix file and the
-    full reason of each method that cannot run.
+    fewest files. Runnable methods come first, then by name. The printout
+    adds the cells of each matrix file and the full reason of each method
+    that cannot run.
 
     **The two checks.** ``files_ok``: the method's script is present, the
     input files resolve on disk and are oriented features x cells, no
@@ -1259,8 +1259,10 @@ def scan(dataset: str, category: str | None = None, *,
     the modality it labels, and a ``data_dir`` method (scBridge) finds the
     files it names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must hold
     the same cells; a diagonal ``atac_gas.h5`` must list the cells of
-    ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists
-    (on macOS and Windows ``env_reason`` says it runs only on Linux) and,
+    ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists;
+    ``env_reason`` names it and the one-method install command (``multibench
+    env install --methods X --packed --run``), or on macOS and Windows says
+    it runs only on Linux; ``multibench env doctor`` checks every env. And,
     for a method with ``requires_gpu``, the host has an NVIDIA GPU. Without
     one, ``env_reason`` is the sentence ``run`` would raise: ``"<method>
     needs an NVIDIA GPU, and this computer has none. See ..."``. With
@@ -1274,7 +1276,8 @@ def scan(dataset: str, category: str | None = None, *,
     whose only label file is ``cty.csv``; a method that reads fewer
     numbered batches than the folder holds; a step to do first (the first
     sentence of ``method_info(m)['setup_hint']``); method scripts not on
-    this machine yet (``multibench fetch --scripts`` fetches them); a
+    this machine yet (the first real run clones them with ``git``; on a host
+    without network, fetch them first with ``multibench fetch --scripts``); a
     command that reads a file ``mtb.run`` writes first, so start that
     method with ``mtb.run``.
 
@@ -1290,7 +1293,8 @@ def scan(dataset: str, category: str | None = None, *,
     writing under ``<out_dir>/<method>_<dataset>/`` as ``run_all`` does, with
     absolute paths, ``params`` merged and, on a host without a GPU, each
     method's ``cpu_params``. A row blocked only by ``env_ok`` still shows its
-    command.
+    command. ``multibench scan`` prints compact columns; ``--columns all``
+    adds ``command`` and the rest.
 
     **Modality tokens.** A list of ``modalities`` names one combination, in
     any order. Base tokens keep a row whose modalities are exactly that
@@ -1303,11 +1307,12 @@ def scan(dataset: str, category: str | None = None, *,
     Seurat_v3, which read both files; ``atac_peak`` together with
     ``atac_gas`` keeps only those two. moETM, scMM and iPOLNG read peaks
     through a role named ``atac_gas``, so ``atac_peak`` selects them and
-    ``atac_gas`` does not, unless ``methods=`` names them. A numbered token (``rna1``) matches that
-    role only. ``modalities=[]`` selects the variants that read a folder.
-    Other lists drop them, with a ``UserWarning`` unless the tokens already
-    exclude their ATAC representation. ``mtb.find_methods`` keeps every method that reads at least the named
-    modalities, so the two can list different methods.
+    ``atac_gas`` does not, unless ``methods=`` names them. A numbered token
+    (``rna1``) matches that role only. ``modalities=[]`` selects the
+    variants that read a folder. Other lists drop them, with a
+    ``UserWarning`` unless the tokens already exclude their ATAC
+    representation. ``mtb.find_methods`` keeps every method that reads at
+    least the named modalities, so the two can list different methods.
 
     See Also
     --------
@@ -1412,7 +1417,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                 or _short_reason(full, spec.id, dataset, cat))
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
-        # check 2, env and GPU
         env_hint = gpu_hint = ""
         if rec["env"] and rec["env"] not in installed:
             rec["env_ok"] = False
@@ -1775,7 +1779,7 @@ def _without_classification(metrics, multi_batch: bool):
 def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False,
                          batch_given=True, on_rank=None, embedding=True):
     """Score each candidate label order and keep the best: ``(names, scores, spread)``.
-    ``user_batch``: the candidates carry the caller's batch (``batch_given``: passed now)."""
+    ``user_batch``: the candidates carry the caller's batch; ``batch_given``: passed now."""
     # a file-of-origin batch, or the saved one rescore reuses, goes to evaluate only
     # for a metric that uses it: evaluate would warn about a batch never given
     use_batch = (user_batch and batch_given) or _names_batch_metric(metrics)
@@ -1877,14 +1881,17 @@ _UNKNOWN_PROVENANCE = {"scripts_commit": None, "env_flavor": "unknown", "hostnam
 
 def _earlier_provenance(folder: Path) -> dict:
     """``{method: {scripts_commit, env_flavor, hostname}}`` of the runs saved in
-    ``folder`` (checked by :func:`_check_save_target` first); ``{}`` when none."""
+    ``folder``; records without a method are skipped, an unreadable file gives ``{}``."""
     path = Path(folder) / "batch_result.json"
-    if not path.exists():
+    try:
+        with open(path) as fh:
+            records = json.load(fh).get("records") or []
+    except (OSError, ValueError, AttributeError):
         return {}
-    with open(path) as fh:
-        records = json.load(fh)["records"]
+    # a saved file may hold any records BatchResult was given
     return {r["method"]: {k: r.get(k, v) for k, v in _UNKNOWN_PROVENANCE.items()}
-            for r in records if r.get("status") != "SKIPPED"}
+            for r in records if isinstance(r, dict) and r.get("method")
+            and r.get("status") != "SKIPPED"}
 
 
 def _check_save_target(folder: Path, dataset: str, category: str) -> None:
@@ -2127,7 +2134,7 @@ class BatchResult:
         table["label_order_confidence"] = pd.to_numeric(
             table["label_order_confidence"], errors="coerce").astype("float64")
         table = _with_label_order_note(table)
-        for col in ("caveat", "reason"):         # new columns go last
+        for col in ("caveat", "reason"):
             table[col] = table.pop(col)
         # whole numbers stay whole next to the blanks of SKIPPED and FAIL rows
         for col in ("n_batches", "n_tunable"):
@@ -2399,11 +2406,12 @@ class BatchResult:
         -----
         **Order.** A ``labels`` array, list or plain CSV follows the embedding
         rows. Without ``labels=``, a ``batch`` array follows the order of
-        ``mtb.labels_for(dataset)``. With a ``labels`` array it follows the
-        embedding rows too. A Series or one-column
-        DataFrame with a non-default index, or a CSV whose first column holds
-        barcodes, is aligned to the dataset's cells as in ``run_all(batch=)``;
-        aligned labels go into the label-order search, and labels matched by
+        ``mtb.labels_for(dataset)``. With a ``labels`` array, the ``batch``
+        array follows the embedding rows too. A CSV path is read like a label
+        file. A Series or one-column DataFrame with a non-default index, or a
+        CSV whose first column holds barcodes, is aligned to the dataset's
+        cells as in ``run_all(batch=)``, with the same errors and warnings.
+        Aligned labels go into the label-order search; labels matched by
         position read ``(user labels)``. The batch is recorded as
         ``batch_source='user'``.
 
@@ -2654,7 +2662,7 @@ def _ari_tail(rec) -> str:
         ari = float(ari)
     except (TypeError, ValueError):
         return ""
-    if ari != ari:          # NaN
+    if np.isnan(ari):
         return ""
     return f"ARI {round(ari, 3) + 0.0:.3f}"
 
@@ -3330,9 +3338,10 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         # a vector as long as the embedding is kept as given
         own = None
         if rows and segments is not None:
-            used = list(stored_used or ())
-            own = (used if used and all(k in segments for k in used)
-                   and sum(len(segments[k]) for k in used) == n else
+            stored_order = list(stored_used or ())
+            fits = (stored_order and all(k in segments for k in stored_order)
+                    and sum(len(segments[k]) for k in stored_order) == n)
+            own = (stored_order if fits else
                    [k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
                                                     modalities=rec.get("modalities") or None,
                                                     data_path=data_path)])
@@ -3377,8 +3386,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     elif len(spread) > 1:
         rec["label_order_candidates"] = spread
     # the batch vector the batch metrics saw
-    used = next(b for order, _, b in cands if order == names)
-    n_batches = int(len(set(np.asarray(used).tolist())))
+    winning_batch = next(b for order, _, b in cands if order == names)
+    n_batches = int(len(set(np.asarray(winning_batch).tolist())))
     if batch is not None:
         rec["batch_source"] = "user"
     else:
@@ -3504,7 +3513,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     ``'<out_dir>'`` placeholder). ``plan[plan.runnable]`` lists what will
     run. Like ``mtb.scan``, it lists the combinations whose modalities the
     folder holds, and every combination with ``modalities="all"``; the
-    methods a real run tries are the same either way.
+    methods a real run tries are the same either way. ``multibench run-all
+    --dry-run --format csv`` writes the same frame.
 
     **What runs.** Only the rows ``mtb.scan`` marks runnable: input files,
     conda env, and a GPU where the script needs one. Without
@@ -3514,7 +3524,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     ``modalities=`` to run a smaller combination; it selects as in
     ``mtb.scan``. A blocked row whose input files are in the folder, or a
     named method with no runnable row, is logged and recorded as
-    ``SKIPPED`` with its reason; other blocked rows are only counted.
+    ``SKIPPED`` with its reason; other blocked rows are only counted. Each
+    method reads one ATAC representation (``mtb.describe_layout``), and
     ``run_all`` skips a method given the other representation, also when
     ``methods=`` names it. With ``allow_atac_mismatch=True`` the method runs
     without an error and gives a wrong embedding.
@@ -3535,14 +3546,16 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     of N. It never lists the reasons of methods you did not ask for. On
     macOS or Windows, its second line says that methods run only on Linux,
     and it lists only the rows something else also blocks. Its last line
-    names the ``mtb.scan`` call that shows the rows.
+    names the ``mtb.scan`` call that shows the rows. When combinations are
+    not listed because the folder does not hold their modalities, the line
+    before says so.
 
     **Saved files.** The result is saved under ``out_dir`` as
     ``BatchResult.save`` writes it; reload it with ``mtb.load_batch``. With
-    ``batch=``, the vector is saved as ``batch_<hash>.csv``. A
-    later run into the same ``out_dir`` is merged with the records already
-    there: methods it re-ran are replaced, the others kept. Jobs running at
-    the same time should use one ``out_dir`` each.
+    ``batch=``, the vector is saved as ``batch_<hash>.csv``. A later run
+    into the same ``out_dir`` is merged with the records already there:
+    methods it re-ran are replaced, the others kept. Jobs running at the
+    same time should use one ``out_dir`` each.
 
     **Resuming.** ``skip_existing=True`` reuses each method's existing
     output. Reuse only checks that the output file exists, not that it is
@@ -3947,7 +3960,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
 
 def _params_for_method(method, category, modalities):
-    """The variant's tunable keys, or ``None`` when ``params_for`` raises (several variants)."""
+    """The variant's tunable keys, or ``None`` on any exception (several variants)."""
     try:
         from .discover import params_for
         return params_for(method, category,
