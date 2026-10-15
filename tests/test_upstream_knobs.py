@@ -12,7 +12,7 @@ import pytest
 import multibench as mtb
 from multibench.engine import upstream
 
-AUDITED = upstream.audited_methods()
+AUDITED = sorted(upstream._table())
 
 
 def test_the_audit_is_present_and_covers_the_zero_tunable_methods():
