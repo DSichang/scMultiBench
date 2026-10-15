@@ -1506,6 +1506,12 @@ def recommend(
     if sel.codes is not None:
         df = df[df["metric"].isin(sel.codes)]
         if df.empty:
+            from ..plot.bar import CLASSIFICATION_METRICS
+            if long_df_was_none and result_path is None \
+                    and set(sel.codes) <= set(CLASSIFICATION_METRICS):
+                raise ValueError(
+                    "The stored tables have no classification scores. Score your runs "
+                    "with mtb.evaluate and pass them as long_df=.")
             raise ValueError(
                 f"no {metrics!r} metrics ({sel.codes}) in the frame; metrics present: "
                 f"{sorted(long_df['metric'].unique())}")
