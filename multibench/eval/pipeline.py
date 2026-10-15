@@ -388,7 +388,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
             UserWarning, stacklevel=4)
     if what == "batch" and io._numbers_rows(x, ids):
-        warnings.warn(io._by_position(what, len(x), "the rows of the output"),
+        warnings.warn(io._by_position(what),
                       UserWarning, stacklevel=4)
     return io.as_vector(x, what=what, column=column, as_written=as_written)
 
@@ -534,7 +534,7 @@ def _label_files(given) -> list:
     return []
 
 
-def _src(given) -> str:
+def _named_files(given) -> str:
     """`` (cty1.csv, cty2.csv)``: the files an argument named; ``""`` for values
     in memory."""
     files = _label_files(given)
@@ -591,7 +591,7 @@ def _no_label_error(shown, miss, given) -> str:
     n, n_cells = int(miss.sum()), len(miss)
     dataset = _CLI_LABELS_FROM.get()
     head = config.hint("labels", f"the label files of {dataset}" if dataset
-                       else "--labels") + _src(given)
+                       else "--labels") + _named_files(given)
     example = io._missing_example(shown)
     if n == n_cells:
         return (f"{head}: none of the {n_cells:,} cells has a label{example}. Pass the "
@@ -604,7 +604,7 @@ def _no_label_error(shown, miss, given) -> str:
 def _no_batch_error(shown, miss, given) -> str:
     """evaluate()'s error for a batch missing where ``miss`` is true. ``shown``
     is the batch as written."""
-    head = config.hint("batch", "--batch") + _src(given)
+    head = config.hint("batch", "--batch") + _named_files(given)
     return (f"{head}: {int(miss.sum()):,} of the {len(miss):,} cells have no batch"
             f"{io._missing_example(shown)}. Give every cell a batch.")
 
@@ -670,7 +670,7 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
     labels" recipe.
     """
     from . import scib as escib
-    files, names = _label_files(given), _src(given)
+    files, names = _label_files(given), _named_files(given)
     dataset = _CLI_LABELS_FROM.get() if what == "labels" else None
     side = _diagonal_side(files) if what == "labels" and n < n_cells else None
     if dataset:

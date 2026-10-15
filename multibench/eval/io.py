@@ -693,7 +693,7 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
     return np.asarray(x.reindex(ids).to_numpy())
 
 
-def _by_position(what: str, n: int, order: str) -> str:
+def _by_position(what: str) -> str:
     """The warning for a ``batch`` Series with a plain ``RangeIndex`` matched by
     position to cells that have barcodes."""
     return (f"{what} is a Series without barcodes and is matched to the cells by position. "

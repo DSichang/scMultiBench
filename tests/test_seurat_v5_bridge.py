@@ -62,7 +62,7 @@ def test_scan_flags_unpaired_bridge_files(tmp_path):
 def test_the_check_is_only_for_methods_that_need_paired_files(tmp_path):
     _folder(tmp_path, "UNP", [f"c{i}" for i in range(50)], [f"a{i}" for i in range(45)])
     got = resolve.inputs_for("UNP", "diagonal", "GLUE", data_path=tmp_path, check=True)
-    assert resolve._check_same_cells("GLUE", "UNP", "diagonal", got) is None
+    assert resolve._check_same_cells("GLUE", "UNP", got) is None
     assert resolve._preflight_caveats(got, atac="peak") == []
 
 

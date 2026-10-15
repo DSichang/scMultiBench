@@ -23,6 +23,7 @@ from .. import config
 from ..config import _and_list
 from .. import _compat
 from . import catalog
+from ..engine.registry import _BASE_MODALITIES
 
 __all__ = ["load_results", "available_datasets", "fetchable", "results_coverage",
            "recommend", "COLUMNS", "SOURCES", "DegenerateRerunWarning"]
@@ -109,6 +110,12 @@ def _version_attr(versions: set[str]):
     if len(versions) == 1:
         return next(iter(versions))
     return tuple(sorted(versions))
+
+
+def _versions_in(frame) -> tuple:
+    """The versions in ``frame.attrs["rerun_version"]`` (:func:`_version_attr`)."""
+    v = frame.attrs.get("rerun_version")
+    return v if isinstance(v, tuple) else ((v,) if v else ())
 
 
 def _read_metric_csv(path: Path) -> pd.DataFrame:
@@ -318,8 +325,7 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
         if sel.empty:
             continue
         frames.append(sel)
-        v = df.attrs.get("rerun_version")
-        versions.update(v if isinstance(v, tuple) else ([v] if v else []))
+        versions.update(_versions_in(df))
     if not frames:
         allf = pd.concat([df for _, df in files], ignore_index=True)
         if category is not None:
@@ -754,8 +760,7 @@ def load_results(
             if source in ("rerun", "both"):
                 try:
                     rr = _load_rerun(cat, datasets, base)
-                    v = rr.attrs.get("rerun_version")
-                    rerun_versions.update(v if isinstance(v, tuple) else ([v] if v else []))
+                    rerun_versions.update(_versions_in(rr))
                     frames.append(rr)
                     got_any = True
                 except FileNotFoundError as e:
@@ -1084,8 +1089,7 @@ def results_coverage(
             if source in ("rerun", "both"):
                 try:
                     rr = load_results(cat, result_path=result_path, source="rerun")
-                    v = rr.attrs.get("rerun_version")
-                    versions.update(v if isinstance(v, tuple) else ([v] if v else []))
+                    versions.update(_versions_in(rr))
                     frames.append(rr[cols])
                 except FileNotFoundError:
                     pass
@@ -1106,7 +1110,6 @@ _STORED_DATASET_MODALITIES = {
     "D45": ("rna", "atac"), "D45s": ("rna", "atac"),
     "D52": ("rna", "adt"), "D52s": ("rna", "adt"),
 }
-_MODALITY_ORDER = ("rna", "adt", "atac")
 
 
 def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) -> str:
@@ -1116,14 +1119,14 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
     if not datasets or any(d not in _STORED_DATASET_MODALITIES for d in datasets):
         return ""
     measured = set().union(*(_STORED_DATASET_MODALITIES[d] for d in datasets))
-    missing = [m for m in _MODALITY_ORDER if m in wanted and m not in measured]
+    missing = [m for m in _BASE_MODALITIES if m in wanted and m not in measured]
     if not missing:
         return ""
     groups: dict[tuple, list[str]] = {}
     for d in sorted(datasets, key=catalog._dataset_sort_key):
         groups.setdefault(_STORED_DATASET_MODALITIES[d], []).append(d)
     where = "; ".join(f"{', '.join(ds)} ({'+'.join(mods)})" for mods, ds in groups.items())
-    data = "+".join(m.upper() for m in _MODALITY_ORDER if m in wanted)
+    data = "+".join(m.upper() for m in _BASE_MODALITIES if m in wanted)
     head = f"Stored {category} scores" if stored else f"The {category} scores in long_df"
     return (f"{head} come from {where}. None of these datasets measured "
             f"{' or '.join(missing)}, so this ranking does not describe {data} data.")

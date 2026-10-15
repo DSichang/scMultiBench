@@ -214,7 +214,7 @@ def _check_input_cells(method: str, category: str, inputs: dict) -> None:
     if not paths:
         return
     dataset = Path(next(iter(paths.values()))).parent.name or "inputs"
-    resolve._check_same_cells(method, dataset, category, paths)
+    resolve._check_same_cells(method, dataset, paths)
     if category == "diagonal":
         resolve._check_atac_gas_cells(method, dataset, paths)
 

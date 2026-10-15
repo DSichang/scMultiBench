@@ -28,6 +28,7 @@ import h5py
 import numpy as np
 
 from .. import config
+from .registry import ATAC_VALUES as _ATAC_KINDS
 
 __all__ = ["export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"]
 
@@ -46,7 +47,6 @@ _ALIASES = {"protein": "adt", "peak": "atac_peak", "gas": "atac_gas",
             "gene_activity": "atac_gas"}
 _MOD_FILE = {"rna": "rna.h5", "adt": "adt.h5", "atac": "atac.h5",
              "atac_peak": "atac_peak.h5", "atac_gas": "atac_gas.h5"}
-_ATAC_KINDS = ("peak", "gene_activity")
 #: :func:`to_canonical` warns when ``matrix/data`` (stored dense, features x
 #: cells) would exceed this many bytes uncompressed on disk.
 DENSE_WARN_BYTES = 10 ** 9
@@ -1339,7 +1339,7 @@ def _as_obs_vector(data, spec, *, what, master):
             if what == "batch":
                 # a filtered or sorted column would go to other cells
                 from ..eval import io as eio
-                warnings.warn(eio._by_position(what, len(m), "the cells of the data"),
+                warnings.warn(eio._by_position(what),
                               UserWarning, stacklevel=3)
             return np.asarray(spec)
         lack = [x for x in m if x not in set(idx)]
@@ -1713,7 +1713,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         if spec is not None:
             a, kw = _as_modality(data, spec, what=what, master=master,
                                  feature_names=adt_names if what == "adt" else None)
-            sides["rna"].append((what, a, kw, what, _source_name(data, spec, what)))
+            sides["rna"].append((what, a, kw, what, _source_name(spec, what)))
     if atac is not None:
         atac_master = master
         if diagonal:
@@ -1723,7 +1723,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         a, kw = _as_modality(data, atac, what="atac", master=atac_master)
         role = "atac_peak" if atac_kind == "peak" else "atac_gas"
         sides["atac" if diagonal else "rna"].append(
-            (role, a, kw, "atac", _source_name(data, atac, "atac")))
+            (role, a, kw, "atac", _source_name(atac, "atac")))
     masters = {}
     for side, mats in sides.items():
         if not mats:
@@ -2264,7 +2264,7 @@ def _first_master(data, specs, *, diagonal):
     return None, None
 
 
-def _source_name(data, spec, what) -> str:
+def _source_name(spec, what) -> str:
     """How an error names the object a modality came from."""
     if isinstance(spec, str):
         if spec.startswith("mod:"):

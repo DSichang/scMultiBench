@@ -35,7 +35,7 @@ from .engine import runner as _runner
 from .engine.schema import base_modality as _schema_base
 from .engine.runner import run as _run
 from .eval import io as _eio, scib as _escib
-from .eval.pipeline import evaluate as _evaluate, to_long as _to_long
+from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, evaluate as _evaluate, to_long as _to_long
 
 __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout",
            "load_batch", "sweep"]
@@ -616,7 +616,7 @@ def _atac_kind_of(path: Path) -> str:
     return "ATAC"
 
 
-def _missing_files_reason(spec, variant, category: str, mods: list, dataset: str,
+def _missing_files_reason(spec, category: str, mods: list, dataset: str,
                           data_path) -> str:
     """The ``reason`` for input files that are not on disk, or ``""``: ``SCALEX needs
     gene-activity ATAC (atac_gas.h5), and the folder has peaks (atac_peak.h5).``"""
@@ -702,7 +702,7 @@ def _dropped_dirs_message(modalities, dropped: list) -> str:
             f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
 
 
-def _short_reason(text: str, method: str, dataset: str, category: str | None) -> str:
+def _short_reason(text: str, method: str, dataset: str) -> str:
     """A ``files_reason`` part as the ``reason`` column shows it: without the
     exception class, directories, or the ``<method> reads <file> of <dataset>`` opening."""
     if not text:
@@ -915,7 +915,7 @@ def _representation_note(category, methods, modalities) -> str:
     return " ".join(notes)
 
 
-def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
+def _no_variant_error(category, methods, modalities) -> ValueError:
     """The ``ValueError`` for named methods without a row, or a selection that
     matches no variant: what does not run, then why."""
     from .engine.schema import no_category_message
@@ -960,8 +960,6 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
 #: what :func:`_scan` keeps of each row besides the shown columns (its second frame)
 _PRIVATE_COLUMNS = ["_other", "_label_inputs", "_folder_caveat"]
 
-#: the modality families a dataset folder holds, in the order they are named
-_FAMILIES = ("rna", "adt", "atac")
 _FAMILY_WORDS = {"rna": "RNA", "adt": "ADT", "atac": "ATAC"}
 
 
@@ -986,7 +984,7 @@ def _family(role) -> str:
 def _row_families(modalities) -> set:
     """The families a scan row reads; none for a row that reads a folder."""
     roles = _row_modalities(modalities)
-    return {_family(r) for r in roles} & set(_FAMILIES)
+    return {_family(r) for r in roles} & set(registry._BASE_MODALITIES)
 
 
 def _role_files(ds_dir: Path, category: str | None) -> dict:
@@ -997,7 +995,7 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
     for spec, v, *_ in _variant_rows(category):
         for role, path in _resolve._resolve_variant_inputs(v, ds_dir, spec.id).items():
             fam, p = _family(role), Path(path)
-            if fam not in _FAMILIES or is_label_role(role):
+            if fam not in registry._BASE_MODALITIES or is_label_role(role):
                 continue
             if p.name not in files and p.exists():
                 files[p.name] = fam
@@ -1013,7 +1011,7 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
 def _held_families(ds_dir: Path, category: str | None) -> list:
     """The families the folder holds a file of (:func:`_role_files`)."""
     held = set(_role_files(ds_dir, category).values())
-    return [f for f in _FAMILIES if f in held]
+    return [f for f in registry._BASE_MODALITIES if f in held]
 
 
 def _listed(df: "pd.DataFrame", need, held, methods) -> list:
@@ -1034,7 +1032,7 @@ def _tenx_files(ds_dir: Path, files: dict) -> list:
 
     def order(name):
         stem = name.rsplit(".", 1)[0]
-        return int(stem[len(stem.rstrip("0123456789")):] or 0), _FAMILIES.index(files[name])
+        return int(stem[len(stem.rstrip("0123456789")):] or 0), registry._BASE_MODALITIES.index(files[name])
     return sorted((n for n in files if not _is_canonical_h5(ds_dir / n)
                    and _is_tenx_h5(ds_dir / n)), key=order)
 
@@ -1393,7 +1391,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         why_script = _missing_script(v, method=spec.id)
         if why_script:
             file_problems.append(why_script)
-            short_problems.append(_short_reason(why_script, spec.id, dataset, cat))
+            short_problems.append(_short_reason(why_script, spec.id, dataset))
         got, wrong_atac = None, ""
         rec["_label_inputs"], rec["_folder_caveat"] = (), ""
         try:
@@ -1411,8 +1409,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
             short_problems.append(
-                _missing_files_reason(spec, v, cat, mods, dataset, data_path)
-                or _short_reason(full, spec.id, dataset, cat))
+                _missing_files_reason(spec, cat, mods, dataset, data_path)
+                or _short_reason(full, spec.id, dataset))
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         env_hint = gpu_hint = ""
@@ -1459,7 +1457,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         # a named method with no row is a request problem, also next to others
         missing = [m for m in dict.fromkeys(methods) if m not in set(df["method"])]
         if missing or df.empty:
-            raise _no_variant_error(category, dataset, missing or methods, modalities)
+            raise _no_variant_error(category, missing or methods, modalities)
     if params:
         _check_param_keys(df, params)
     if dropped_dirs and modalities:
@@ -1470,13 +1468,13 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     need = [_row_families(m) for m in df["modalities"]]
     keep = ([True] * len(df) if every or modalities is not None
             else _listed(df, need, held, methods))
-    left_out = [(m, [f for f in _FAMILIES if f in n and f not in held])
+    left_out = [(m, [f for f in registry._BASE_MODALITIES if f in n and f not in held])
                 for m, n, k in zip(df["method"], need, keep) if not k]
     if left_out:
         df = df[keep].reset_index(drop=True)
         private = private[keep].reset_index(drop=True)
     df.attrs.update(held=held, not_listed=len(left_out),
-                    not_held=[f for f in _FAMILIES
+                    not_held=[f for f in registry._BASE_MODALITIES
                               if any(f in lack for _, lack in left_out)])
     private.attrs.update(dataset=dataset, folder=ds_dir, unlisted=left_out,
                          category=category)
@@ -1581,7 +1579,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             gone.setdefault(m, set()).update(lack)
     if gone:
         one = len(gone) == 1
-        lack = _lacking([f for f in _FAMILIES if any(f in v for v in gone.values())])
+        lack = _lacking([f for f in registry._BASE_MODALITIES if any(f in v for v in gone.values())])
         line += (f" {len(gone)} {'method that needs' if one else 'methods that need'} "
                  f"{lack} {'is' if one else 'are'} not listed. {_all_spelling()} lists "
                  f"{'it' if one else 'them'}.")
@@ -2171,7 +2169,6 @@ class BatchResult:
 
         mtb.to_long : the wide -> long conversion used for the metrics dict.
         """
-        cols = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
         frames = []
         for r in self.records:
             if r.get("_long") is not None:
@@ -2189,7 +2186,7 @@ class BatchResult:
                         category=r.get("category", self.category)
                     ).drop(columns="scored_with"))
         if not frames:
-            return pd.DataFrame(columns=cols)
+            return pd.DataFrame(columns=_LONG_COLUMNS)
         return pd.concat(frames, ignore_index=True)
 
     @property
@@ -3016,7 +3013,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     if not _carries_ids(x):
         if what == "batch" and isinstance(x, pd.Series) \
                 and _eio._numbers_rows(x, _dataset_cell_ids(dataset, data_path)):
-            warnings.warn(_eio._by_position(what, len(x), order), UserWarning,
+            warnings.warn(_eio._by_position(what), UserWarning,
                           stacklevel=stacklevel - 1)
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
@@ -3634,7 +3631,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
                   if plan_df.attrs["not_listed"] else "")
     if plan_df.empty:
         # a modalities= selection that matches nothing, without methods=
-        raise _no_variant_error(category, dataset, methods, modalities)
+        raise _no_variant_error(category, methods, modalities)
     if dry_run:
         batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
         if verbose:

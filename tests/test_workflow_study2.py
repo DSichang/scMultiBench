@@ -35,16 +35,16 @@ def test_short_reason_strips_exception_prefix_cell_check_opening_and_absolute_pa
     raw = ("ValueError: SCALEX reads atac_gas.h5 of LUNG, which holds other cells than "
            "atac_peak.h5. The files hold 20 and 20 cells and share 0. Both files need "
            "the same ATAC cells.")
-    got = W._short_reason(raw, "SCALEX", "LUNG", "diagonal")
+    got = W._short_reason(raw, "SCALEX", "LUNG")
     assert got == ("atac_gas.h5 holds other cells than atac_peak.h5. The files hold 20 "
                    "and 20 cells and share 0. Both files need the same ATAC cells.")
     raw = ("FileNotFoundError: UnitedNet (vertical) needs atac_gas.h5 in "
            "/home/wen/data/D11. The folder holds adt.h5, cty.csv and rna.h5.")
-    got = W._short_reason(raw, "UnitedNet", "D11", "vertical")
+    got = W._short_reason(raw, "UnitedNet", "D11")
     assert got == ("UnitedNet (vertical) needs atac_gas.h5 in D11. The folder holds "
                    "adt.h5, cty.csv and rna.h5.")
     assert "/home" not in got and "FileNotFoundError" not in got
-    assert W._short_reason("", "M", "D", "c") == ""
+    assert W._short_reason("", "M", "D") == ""
 
 
 def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):

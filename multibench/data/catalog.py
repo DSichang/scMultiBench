@@ -526,7 +526,7 @@ def datasets(files_dir: Path | str | None = None, *,
     # from the result tree at each call, so no dataset load_results serves is missing
     from . import results
     cat_of: dict[str, list[str]] = {}
-    for cat in ("cross", "diagonal", "mosaic", "vertical"):
+    for cat in results._CATEGORIES:
         try:
             for ds in results.available_datasets(cat, source="both"):
                 cat_of.setdefault(ds, []).append(cat)

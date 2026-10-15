@@ -526,11 +526,11 @@ def inputs_for(dataset: str, category: str, method: str, *,
             raise FileNotFoundError(_missing_inputs_text(method, category, ds_dir,
                                                          missing, near))
         _check_matrix_files(method, dataset, out)
-        _check_orientation(method, dataset, category, out)
-        _check_same_cells(method, dataset, category, out)
+        _check_orientation(method, dataset, out)
+        _check_same_cells(method, dataset, out)
         if category == "diagonal":
             _check_atac_gas_cells(method, dataset, out)
-        _check_label_lengths(method, dataset, category, out)
+        _check_label_lengths(category, out)
         if "data_dir" in out:
             ok, why = _check_data_dir(variant, out["data_dir"], method)
             if not ok:
@@ -539,7 +539,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
             _check_matrix_files(method, dataset, named)
             if category == "diagonal":
                 _check_atac_gas_cells(method, dataset, named)
-                _check_diagonal_label_files(method, dataset, named)
+                _check_diagonal_label_files(named)
     elif check is None and missing:
         warnings.warn(
             _missing_inputs_text(method, category, ds_dir, missing, near)
@@ -662,7 +662,7 @@ def _check_matrix_files(method, dataset, resolved):
                 f"with {again}.")
 
 
-def _check_orientation(method, dataset, category, resolved):
+def _check_orientation(method, dataset, resolved):
     """Reject a ``matrix/data`` stored cells x features before the run, which
     would otherwise fail late inside the method. A square matrix is left alone."""
     for path in resolved.values():
@@ -776,7 +776,7 @@ def _check_label_count(labels: Path, data: Path, category, *, batch=None) -> Non
                                            category, batch=batch))
 
 
-def _check_label_lengths(method, dataset, category, resolved):
+def _check_label_lengths(category, resolved):
     """Reject a label file whose row count differs from the cells it labels,
     which ``evaluate`` would refuse only after the run: the label roles
     (:func:`_label_partners`), and the numbered label files of each batch
@@ -786,14 +786,14 @@ def _check_label_lengths(method, dataset, category, resolved):
         if pair is not None and pair[1].stem not in resolved:   # else a role, below
             _check_label_count(pair[1], Path(path), category, batch=pair[0])
     if category == "diagonal":
-        _check_diagonal_label_files(method, dataset, resolved)
+        _check_diagonal_label_files(resolved)
     for role, path in resolved.items():
         if is_label_role(role) and Path(path).suffix == ".csv":
             for partner in _label_partners(role, resolved):
                 _check_label_count(Path(path), Path(resolved[partner]), category)
 
 
-def _check_diagonal_label_files(method, dataset, resolved):
+def _check_diagonal_label_files(resolved):
     """Diagonal: ``rna_cty.csv`` / ``atac_cty.csv`` need one row per cell of
     ``rna.h5`` / the ATAC file, also when the variant does not read them.
     Numbered roles are left to :func:`_check_label_lengths`."""
@@ -1020,7 +1020,7 @@ def _barcodes_of(path) -> tuple | None:
     return _sniff_barcode_list(str(p), p.stat().st_mtime_ns)
 
 
-def _check_same_cells(method, dataset, category, resolved) -> None:
+def _check_same_cells(method, dataset, resolved) -> None:
     """``ValueError`` when ``method`` needs two roles to hold the same cells
     (:data:`_SAME_CELL_ROLES`) and their barcode sets differ."""
     roles = _SAME_CELL_ROLES.get(method or "")
@@ -1205,9 +1205,9 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
         if _h5_has_fraction(str(p), p.stat().st_mtime_ns):
             out.append(NOT_COUNTS_CAVEAT.format(method=who, file=p.name))
     if category == "diagonal" and resolved:
-        ds_dir = next((Path(v) if k == "data_dir" else Path(v).parent
-                       for k, v in resolved.items()), None)
-        if ds_dir is not None and (ds_dir / "cty.csv").is_file() \
+        ds_dir = next(Path(v) if k == "data_dir" else Path(v).parent
+                      for k, v in resolved.items())
+        if (ds_dir / "cty.csv").is_file() \
                 and not (ds_dir / "rna_cty.csv").is_file() \
                 and not (ds_dir / "atac_cty.csv").is_file():
             out.append(DIAGONAL_CTY_CAVEAT.format(method=who))

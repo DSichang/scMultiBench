@@ -84,14 +84,14 @@ def test_reason_column_starts_with_the_file_of_a_cell_check(tmp_path):
 def test_reason_column_of_the_other_cells_and_orientation_checks():
     other = ("ValueError: SCALEX reads atac_gas.h5 of LUNG, which holds other cells than "
              "atac_peak.h5. The files hold 18 and 20 cells and share 0.")
-    assert W._short_reason(other, "SCALEX", "LUNG", "diagonal").startswith(
+    assert W._short_reason(other, "SCALEX", "LUNG").startswith(
         "atac_gas.h5 holds other cells than atac_peak.h5.")
     turned = ("ValueError: totalVI reads rna.h5 of TRANS, which stores matrix/data as "
               "cells x features, shape (20, 60).")
-    assert W._short_reason(turned, "totalVI", "TRANS", "vertical") == (
+    assert W._short_reason(turned, "totalVI", "TRANS") == (
         "rna.h5 stores matrix/data as cells x features, shape (20, 60).")
     # another method or dataset is left alone
-    assert W._short_reason(other, "GLUE", "LUNG", "diagonal").startswith("SCALEX reads")
+    assert W._short_reason(other, "GLUE", "LUNG").startswith("SCALEX reads")
 
 
 # ================================================================ batch file
