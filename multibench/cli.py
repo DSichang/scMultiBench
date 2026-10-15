@@ -43,10 +43,31 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import shlex
+import shutil
 import sys
+import tempfile
+import textwrap
 import warnings
 from pathlib import Path
+
+import h5py
+import numpy as np
+import pandas as pd
+
+import multibench
+from . import __version__, config, discover, workflow
+from . import plot as plot_ns
+from .data.results import _unpublished_msg
+from .engine import envs, ingest, registry, schema
+from .engine.runner import _prepared_at
+from .eval import io as eio
+from .eval import pipeline
+from .plot.bubble import _and, _unknown_names
+from .workflow import (_batch_length_problem, _batch_vector, _column_name_error,
+                       _dry_run_notes, _is_wrong_atac, _is_wrong_ref, _rows_word, _scan_note,
+                       _scripts_ref_note)
 
 _EXIT_OK = 0
 _EXIT_ERROR = 1
@@ -216,7 +237,6 @@ def _parse_params(pairs, args=None, default_method: str | None = None) -> dict:
     """Repeated ``--param [METHOD:]KEY=VALUE`` as ``{METHOD: {KEY: value}}``.
 
     ``METHOD:`` may be left out only for ``run`` (``default_method`` = ``--method``)."""
-    from .engine import registry
     out: dict = {}
     for p in pairs or []:
         if "=" not in p:
@@ -251,7 +271,6 @@ def _usage_error(args, message: str) -> None:
 def _platform_note() -> str | None:
     """Print ``warning: ...`` on stderr when this host cannot build the method envs
     (they are linux-64); return the problem, or ``None``."""
-    from .engine import envs
     problem = envs.host_platform_problem()
     if problem:
         print(f"warning: {envs.linux_only_text(problem)} multibench env install "
@@ -264,7 +283,6 @@ def _platform_note() -> str | None:
 # ----------------------------------------------------------------- commands
 def _cmd_list(args) -> int:
     """``multibench list``: method ids, one per line (``find_methods`` filters)."""
-    from . import discover
     for m in discover.find_methods(category=args.category, task=args.task,
                                    runnable=args.runnable or None):
         print(m)
@@ -273,7 +291,6 @@ def _cmd_list(args) -> int:
 
 def _cmd_find(args) -> int:
     """``multibench find``: :func:`multibench.find_methods` with the same filters."""
-    from . import discover
     for m in discover.find_methods(category=args.category, task=args.task,
                                    needs_labels=_tri_state(args.needs_labels),
                                    atac=args.atac,
@@ -287,8 +304,6 @@ def _cmd_find(args) -> int:
 def _cmd_scan(args) -> int:
     """``multibench scan``: print :func:`multibench.scan` for one dataset; a note on
     the rows not listed goes to stderr after the table and the ``--strict`` error."""
-    import multibench
-    from .engine import registry
     methods = _csv_list(args.methods)
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
@@ -300,7 +315,6 @@ def _cmd_scan(args) -> int:
     shown = _strict_table(df) if args.strict else df
     _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
                  compact=_compact_plan_columns(df))
-    from .workflow import _scan_note
     note = _scan_note(df, args.dataset, args.data_path, args.category)
     code = _EXIT_OK
     if args.strict:
@@ -320,7 +334,6 @@ _SCRIPTS_REASON = "The method scripts are not fetched. Run multibench fetch --sc
 def _strict_table(df):
     """The ``scan --strict`` table: while the scripts are not fetched, a runnable row
     shows ``runnable`` False and :data:`_SCRIPTS_REASON`, as the error under it says."""
-    from . import config
     if config.scripts_present() or "runnable" not in df:
         return df
     df = df.copy()
@@ -334,7 +347,6 @@ def _strict_table(df):
 def _strict_problem(df, methods) -> str | None:
     """Why ``scan --strict`` fails, or ``None``: no runnable row, or a ``--methods``
     method without one. Unfetched scripts block every row (a node may lack network)."""
-    from . import config
     fetched = config.scripts_present()
     ok = df["runnable"].astype(bool) & fetched
     runnable = df[ok]
@@ -351,11 +363,10 @@ def _strict_problem(df, methods) -> str | None:
     if "files_ok" in rest and (~rest["files_ok"].astype(bool)).any():
         counts.append(f"Rows with missing input files: "
                       f"{int((~rest['files_ok'].astype(bool)).sum())}")
-    from .workflow import PEAK_NAMES_REASON, _is_wrong_atac, _is_wrong_ref
     if "reason" in rest:
         wrong = _is_wrong_atac(rest["reason"])
-        names = wrong & rest["reason"].astype(str).str.contains(PEAK_NAMES_REASON,
-                                                                regex=False)
+        names = wrong & rest["reason"].astype(str).str.contains(
+            workflow.PEAK_NAMES_REASON, regex=False)
         if (wrong & ~names).any():
             counts.append(f"Rows with the wrong ATAC kind: {int((wrong & ~names).sum())}")
         if names.any():
@@ -406,7 +417,6 @@ def _strict_problem(df, methods) -> str | None:
 def _env_and_gpu_counts(rest) -> tuple[int, int, int]:
     """Rows of ``rest`` blocked by a missing env, by this host's GPU test, and by
     the GPU test alone (the ones ``--assume-gpu`` makes runnable)."""
-    from .engine import registry
     if "env_ok" not in rest:
         return 0, 0, 0
     n_env = n_gpu = gpu_only = 0
@@ -424,7 +434,6 @@ def _env_and_gpu_counts(rest) -> tuple[int, int, int]:
 
 def _cmd_layout(args) -> int:
     """``multibench layout``: print :func:`multibench.describe_layout`."""
-    import multibench
     print(multibench.describe_layout(args.category))
     return _EXIT_OK
 
@@ -451,10 +460,6 @@ One file per batch (mosaic or cross): write each file as its batch number.
 def _rewrite_canonical(src, out, dtype: str) -> bool:
     """Copy the canonical ``.h5`` ``src`` to ``out`` with ``matrix/data`` as ``dtype``:
     a byte copy (returns ``False``) when it already is, else a re-encoding (``True``)."""
-    import shutil
-
-    import h5py
-    import numpy as np
     src, out = Path(src), Path(out)
     with h5py.File(src, "r") as f:
         same = f["matrix/data"].dtype == np.dtype(dtype)
@@ -489,7 +494,6 @@ def _folder_state(folder) -> dict:
 def _cmd_convert(args) -> int:
     """``multibench convert``: one canonical ``.h5`` (``to_canonical``), or with any
     :data:`_EXPORT_FLAGS` flag a dataset folder (``export_dataset``)."""
-    from .engine import ingest
     export_mode = any(getattr(args, f) is not None for f in _EXPORT_FLAGS)
     category = args.category
     if export_mode:
@@ -575,7 +579,6 @@ def _cmd_convert(args) -> int:
 def _cmd_fetch(args) -> int:
     """``multibench fetch``: :func:`multibench.data.fetch` (or ``fetch_outputs``) per
     dataset named, and with ``--scripts`` the method scripts (``config.ensure_repo``)."""
-    from . import config
     from .data.fetch import AVAILABLE, fetch, fetch_outputs
     ids = [d for tok in (args.datasets or []) for d in _csv_list(tok)]
     if not ids and not args.scripts:
@@ -605,7 +608,6 @@ def _cmd_fetch(args) -> int:
 def _cmd_config(args) -> int:
     """``multibench config``: each setting of ``mtb.config.DEFAULT`` and where it came
     from; ``--get NAME`` prints the bare value."""
-    from . import config
     rows = config._sources()
     if args.get:
         print(next(r["value"] for r in rows if r["name"] == args.get))
@@ -627,9 +629,6 @@ def _yes_no(value) -> str:
 def _cmd_info(args) -> int:
     """``multibench info METHOD``: the :func:`multibench.method_info` facts to check
     before a run; ``--format json`` prints the whole dict."""
-    import textwrap
-
-    from . import discover
     info = discover.method_info(args.method)          # KeyError (did-you-mean)
     if args.format == "json":
         print(json.dumps(info, indent=1, default=str))
@@ -666,8 +665,6 @@ def _cmd_info(args) -> int:
 def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
     """The :func:`multibench.params_for` dict of every variant of ``method`` that
     matches ``category`` / ``modalities``; a selector left out matches all."""
-    from . import discover
-    from .engine import registry
     spec = registry.get(method)                       # KeyError (did-you-mean)
     registry.check_category(category)
     want = registry.normalize_modalities(modalities) if modalities else None
@@ -676,8 +673,7 @@ def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
               and (want is None or set(v.when.get("modalities", [])) == set(want))]
     if not picked:
         if category is not None and category not in spec.wired_categories:
-            from .engine.schema import no_category_message
-            raise ValueError(no_category_message(method, spec.wired_categories, category))
+            raise ValueError(schema.no_category_message(method, spec.wired_categories, category))
         avail = [f"{v.when.get('category')}:{'+'.join(v.when.get('modalities', [])) or '(data_dir)'}"
                  for v in spec.variants]
         raise ValueError(f"{method}: no variant for category={category!r} "
@@ -690,7 +686,6 @@ def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
 def _cmd_params(args) -> int:
     """``multibench params METHOD``: the :func:`multibench.params_for` tables, one
     block per matching variant (``--format json``: the dicts)."""
-    import pandas as pd
     rows = _params_rows(args.method, args.category, _csv_list(args.modalities))
     fmt = args.format
     if fmt == "json":
@@ -732,7 +727,6 @@ def _cmd_params(args) -> int:
 
 def _cmd_cite(args) -> int:
     """``multibench cite``: :func:`multibench.cite` for the benchmark + methods."""
-    from . import discover
     if args.all and args.methods:
         _usage_error(args, "--all and explicit method ids are mutually exclusive")
     # cite A,B as well: every other multi-id flag of the CLI is comma-separated
@@ -747,10 +741,9 @@ def _cmd_cite(args) -> int:
     return _EXIT_OK
 
 
-def _load_long_input(path) -> "pd.DataFrame":  # noqa: F821 - pandas imported lazily
+def _load_long_input(path) -> pd.DataFrame:
     """A long results frame from a CSV with ``metric,value,method`` columns or a
     ``run_all`` output directory."""
-    import pandas as pd
     p = Path(path)
     if p.is_dir():
         from .workflow import load_batch
@@ -780,7 +773,6 @@ _API_TO_FLAGS = (
 
 def _cli_spelling(message: str) -> str:
     """A ``load_results`` message with its keywords spelled as ``plot`` flags."""
-    import re
     for pattern, flag in _API_TO_FLAGS:
         message = re.sub(pattern, flag, message)
     return message
@@ -806,7 +798,6 @@ def _filter_own_rows(frames: list, args) -> list:
     frames of ``plot``: dropping every row is an error, some rows a warning."""
     if not frames:
         return frames
-    import pandas as pd
     whole = pd.concat(frames, ignore_index=True, sort=False)
     n = len(whole)
     datasets = _csv_list(args.dataset)
@@ -822,7 +813,6 @@ def _filter_own_rows(frames: list, args) -> list:
                 f"Your {n} rows are for dataset {_names(whole['dataset'])}, and "
                 f"--dataset {args.dataset} removed all of them. {fix}")
     if methods:
-        from .plot.bubble import _and
         by_method = whole["method"].astype(str).isin(methods)
         if (keep & ~by_method).any() and not (keep & by_method).any():
             own = list(dict.fromkeys(whole.loc[keep, "method"].astype(str)))
@@ -851,8 +841,6 @@ def _filter_own_rows(frames: list, args) -> list:
 def _cmd_plot(args) -> int:
     """``multibench plot {bubble,bar}``: draw the ``--input`` rows, the stored table
     of ``--category`` (:func:`multibench.load_results`), or both concatenated."""
-    import pandas as pd
-    from . import plot as plot_ns
     inputs = _csv_list(args.input) or []
     if not inputs and args.category is None:
         _usage_error(args, "need --category (stored results) or --input LONG_CSV")
@@ -866,7 +854,6 @@ def _cmd_plot(args) -> int:
         try:
             frames.append(load_results(**kw))
         except FileNotFoundError as e:
-            from .data.results import _unpublished_msg
             if str(e) == _unpublished_msg(args.category):
                 raise FileNotFoundError(_unpublished_plot_msg(args.category, inputs)) from e
             raise FileNotFoundError(_cli_spelling(str(e))) from e
@@ -891,7 +878,6 @@ def _cmd_plot(args) -> int:
         present = sorted(df["method"].astype(str).unique())
         unknown = [m for m in methods if m not in present]
         if unknown:
-            from .plot.bubble import _unknown_names
             raise ValueError(_unknown_names(unknown, present, "method"))
         df = df[df["method"].isin(methods)]
     if len(df) == 0:
@@ -938,7 +924,6 @@ def _parse_inputs(pairs, args) -> dict:
 
 def _cmd_run(args) -> int:
     """``multibench run``: :func:`multibench.run` one method on explicit inputs."""
-    import multibench
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
     if args.dry_run:
@@ -968,7 +953,6 @@ def _cmd_run_all(args) -> int:
 
 def _run_all_command(args, stack) -> int:
     """The body of :func:`_cmd_run_all`; ``stack`` removes the ``--batch-column`` copy."""
-    import multibench
     if args.out is None and not args.dry_run:
         # the text argparse prints for a missing required option
         _usage_error(args, "the following arguments are required: --out-dir/--out")
@@ -977,22 +961,17 @@ def _run_all_command(args, stack) -> int:
     if args.assume_gpu and not args.dry_run:
         _usage_error(args, "--assume-gpu applies to --dry-run only; a real run checks "
                            "this host's GPU")
-    from .eval import io as eio
     if eio._names_no_file(args.batch):
         # the name of an obs column: a dataset folder holds none
-        from .workflow import _column_name_error
         raise FileNotFoundError(_column_name_error("batch", args.batch))
     batch = _batch_arg(args, stack)
     batch_vec = None
     if batch is not None:
         eio._require_file(batch, "--batch file")   # exit 1 before any method runs
         if args.dry_run:
-            from .workflow import _batch_vector
             # a file it cannot read, or ids that are not cells of the dataset, fail
             batch_vec = _batch_vector(batch, args.dataset, args.data_path)
     if args.dry_run:
-        from .workflow import (_batch_length_problem, _dry_run_notes, _scan_note,
-                               _scripts_ref_note)
         modalities = _modalities_arg(args.modalities)
         with _quiet_stdout():
             df = multibench.run_all(args.dataset, args.category, out_dir=args.out,
@@ -1003,7 +982,6 @@ def _run_all_command(args, stack) -> int:
                                     assume_gpu=args.assume_gpu,
                                     allow_atac_mismatch=args.allow_atac_mismatch)
         k, n = int(df["runnable"].sum()), len(df)
-        from .workflow import _rows_word
         print(f"# Dry run. Nothing was executed. {k} of {n} {_rows_word(df, n)} "
               f"can run on {args.dataset} ({args.category}). The commands below are what "
               f"multibench run would execute. A {_rows_word(df, 1)} whose input files "
@@ -1029,7 +1007,6 @@ def _run_all_command(args, stack) -> int:
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
             print()
-            from .engine.runner import _prepared_at
             print(f"# Commands of the {len(have)} {_rows_word(df, len(have))} "
                   f"whose input files are in place. [env missing] marks a "
                   f"{_rows_word(df, 1)} whose environment is not installed. "
@@ -1083,7 +1060,6 @@ def _failed_word(status) -> str:
 
 def _saved_methods(where, status=None) -> set | None:
     """The methods of a saved CSV (with ``status`` when given); ``None`` when unreadable."""
-    import pandas as pd
     try:
         df = pd.read_csv(where)
     except Exception:  # noqa: BLE001 - no saved file to compare with
@@ -1138,7 +1114,6 @@ def _not_run_line(res, where) -> str | None:
 @contextlib.contextmanager
 def _leiden_flavor(flavor):
     """Set ``mtb.config.DEFAULT.leiden_flavor`` for one command (``None`` = unchanged)."""
-    from . import config
     if flavor is None:
         yield
         return
@@ -1153,14 +1128,11 @@ def _leiden_flavor(flavor):
 def _evaluate_labels(args, stack):
     """The ``labels=`` value of ``multibench evaluate``: the ``--labels`` file(s), or
     the dataset's label files in the method's cell order (``mtb.labels_for``)."""
-    import multibench
     files = list(args.labels or [])
     if not files:
         if args.dataset is None or args.method is None or args.category is None:
             _usage_error(args, "need --labels CSV (repeatable), or --dataset, --method "
                          "and --category to read the dataset's label files")
-        from .engine import registry
-        from .engine.schema import no_category_message
         try:
             spec = registry.get(args.method)
         except KeyError:
@@ -1168,8 +1140,8 @@ def _evaluate_labels(args, stack):
             # method passes its label files instead
             raise KeyError(_unknown_method_message(args.method)) from None
         if args.category not in spec.wired_categories:
-            raise KeyError(no_category_message(args.method, spec.wired_categories,
-                                               args.category)
+            raise KeyError(schema.no_category_message(args.method, spec.wired_categories,
+                                                      args.category)
                            + " For your own embedding, pass the label files with --labels.")
         labels = multibench.labels_for(args.dataset, args.category, args.method,
                                        data_path=args.data_path)
@@ -1193,10 +1165,6 @@ def _evaluate_labels(args, stack):
         # one column out of each file, written as column x after the file's
         # first column, which may hold the cell ids evaluate aligns by; several
         # files still count as batches
-        import tempfile
-
-        import pandas as pd
-        from .eval import io as eio
         tmp = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         picked = []
         for i, f in enumerate(files, 1):
@@ -1220,17 +1188,12 @@ def _batch_arg(args, stack):
         return batch
     if batch is None:
         _usage_error(args, "--batch-column needs --batch")
-    from .eval import pipeline
     return pipeline._one_column_file(batch, column, stack)
 
 
 def _label_order_problem(files, method, dataset, category) -> str | None:
     """Why the ``--labels`` files contradict ``--method``'s cell order, or ``None``;
     checked only for two or more of the dataset's label files of a package method."""
-    import tempfile
-
-    import multibench
-    from .engine import registry
     names = [Path(f).name for f in files]
     if (None in (method, dataset, category) or len(names) < 2
             or len(set(names)) != len(names)):
@@ -1287,7 +1250,6 @@ def _own_method_flags(name, files) -> str:
 
 def _unknown_method_message(method, name=None, files=()) -> str:
     """The error of ``multibench evaluate`` for a ``--method`` the package does not know."""
-    from .engine import registry
     msg = f"{method} is not a package method."
     ids = [s.id for s in registry.load()]
     base = max((i for i in ids if len(str(method)) > len(i)
@@ -1309,7 +1271,6 @@ def _unknown_method_message(method, name=None, files=()) -> str:
 def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file; with
     ``--method`` or ``--name``, ``--dataset`` and ``--category`` the long table (``to_long``)."""
-    import multibench
     name = args.name
     long_mode = args.method is not None or args.dataset is not None or name is not None
     if long_mode:
@@ -1323,7 +1284,6 @@ def _cmd_evaluate(args) -> int:
             _usage_error(args, "Without --method, pass the label files with --labels, "
                          "once per file, in your embedding's cell order.")
     if name is not None and args.method is not None:
-        from .engine import registry
         try:
             registry.check_method(args.method)
         except KeyError:
@@ -1345,7 +1305,6 @@ def _cmd_evaluate(args) -> int:
                           DeprecationWarning, stacklevel=2)
         if metrics is None:
             metrics = args.task
-    from .eval import pipeline
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
         labels = _evaluate_labels(args, stack)
@@ -1382,7 +1341,6 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
                      layers: dict | None = None) -> str:
     """The ``# total`` lines (stderr) for ``rows``: download and on-disk sums, a line
     naming the builds when ``flavor`` is given, the envs without a size, the shared layers."""
-    from .engine import envs
     dl = disk = 0
     n = n_dl = n_disk = 0
     n_cpu = n_gpu = n_single = 0
@@ -1509,7 +1467,6 @@ def _flavor_token(flavor, env: str | None = None) -> str:
     if flavor not in ("cpu", "gpu"):
         return ""
     if env is not None:
-        from .engine import envs
         if envs._single_build(env):
             return ""
     return f" flavor={flavor}"
@@ -1517,7 +1474,6 @@ def _flavor_token(flavor, env: str | None = None) -> str:
 
 def _cmd_env(args) -> int:
     """``multibench env ...``: environment recipes, preflight and installation."""
-    from .engine import envs, registry
     cmd = args.env_cmd
     refusing = cmd == "install" and args.run and not args.force
     if cmd in ("status", "plan", "doctor", "install") and not refusing:
@@ -1692,11 +1648,8 @@ class _HelpFormatter(argparse.HelpFormatter):
 
 def _status_epilog() -> str:
     """The ``env status`` help epilog: one difficulty tag per line."""
-    import textwrap
-
-    from .engine.envs import DIFFICULTY, MARK_LEGEND, VERIFIED_STAR
-    rows = [(tag, text) for tag, text in DIFFICULTY.items()]
-    star, _, star_text = VERIFIED_STAR.partition(" = ")
+    rows = [(tag, text) for tag, text in envs.DIFFICULTY.items()]
+    star, _, star_text = envs.VERIFIED_STAR.partition(" = ")
     field, _, what = star_text.partition(": ")
     rows.append((star, f"after a tag: {what} ({field})"))
     width = max(len(tag) for tag, _ in rows) + 2
@@ -1705,7 +1658,7 @@ def _status_epilog() -> str:
         lines += textwrap.wrap(text, width=78, initial_indent=f"  {tag:<{width}}",
                                subsequent_indent=" " * (width + 2),
                                break_on_hyphens=False)
-    lines += [""] + textwrap.wrap("marks: " + MARK_LEGEND, width=78,
+    lines += [""] + textwrap.wrap("marks: " + envs.MARK_LEGEND, width=78,
                                   subsequent_indent="  ", break_on_hyphens=False)
     lines.append("The same legend is printed on stderr.")
     return "\n".join(lines)
@@ -1718,7 +1671,6 @@ _CATEGORY_HELP = ("integration category: vertical (several modalities measured i
 _TASK_HELP = ("task within the category: clustering, batch or dimension_reduction. "
               "mtb.list_tasks() lists them.")
 _METHODS_HELP = "comma-separated method ids, as printed by multibench list"
-_FLAVORS = ("auto", "cpu", "gpu")        # mtb.env.FLAVORS (module imported lazily)
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
                 "(the same env without the CUDA libraries, 3-4x smaller) where "
                 "published, else the '<env>' archive with a warning, 'gpu' = the "
@@ -1741,7 +1693,6 @@ _BATCH_COLUMN_HELP = "the column to read in the --batch CSV when it has several 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the ``multibench`` argument parser (every command and flag has help text)."""
-    from . import __version__
     p = argparse.ArgumentParser(
         prog="multibench",
         description="Run, evaluate and plot single-cell multimodal integration "
@@ -2332,7 +2283,7 @@ def build_parser() -> argparse.ArgumentParser:
                                    "measured. A '# total' line on stderr sums them.")
     ep.add_argument("--category", help=_CATEGORY_HELP)
     ep.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
-    ep.add_argument("--flavor", choices=_FLAVORS, default="auto", help=_FLAVOR_HELP)
+    ep.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
     ep.set_defaults(func=_cmd_env, _parser=ep)
     eg = ev.add_parser("create-group", help="create one shared group env (dry run unless --run)",
                        description="Create the shared conda env GROUP; without --run only "
@@ -2373,7 +2324,7 @@ def build_parser() -> argparse.ArgumentParser:
     ei.add_argument("--packed", action="store_true",
                     help="use prebuilt archives when published (the URLs recorded "
                          "for this release); fall back to the lockfile build")
-    ei.add_argument("--flavor", choices=_FLAVORS, default="auto", help=_FLAVOR_HELP)
+    ei.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
     ei.add_argument("--run", action="store_true",
                     help="actually create the envs; without it the command is a dry run")
     ei.add_argument("--force", action="store_true", help=_FORCE_HELP)
@@ -2396,7 +2347,6 @@ def main(argv=None) -> int:
     ``warning: <message>``. While it runs, ``config.hint`` names shell commands.
     """
     args = build_parser().parse_args(argv)
-    from . import config
     prev_show, prev_cli = warnings.showwarning, config._CLI
     config._CLI = True
 

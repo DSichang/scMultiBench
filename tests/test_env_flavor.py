@@ -67,7 +67,11 @@ def cpu_host(monkeypatch):
 
 # ---------------------------------------------------------------- the flavour vocabulary
 def test_flavors_and_check():
-    assert envs.FLAVORS == ("auto", "cpu", "gpu") and cli._FLAVORS == envs.FLAVORS
+    assert envs.FLAVORS == ("auto", "cpu", "gpu")
+    env = next(a for a in cli.build_parser()._actions if a.dest == "command").choices["env"]
+    sub = next(a for a in env._actions if a.dest == "env_cmd").choices
+    assert sub["plan"]._option_string_actions["--flavor"].choices is envs.FLAVORS
+    assert sub["install"]._option_string_actions["--flavor"].choices is envs.FLAVORS
     for f in envs.FLAVORS:
         assert envs.check_flavor(f) == f
     with pytest.raises(ValueError) as e:
