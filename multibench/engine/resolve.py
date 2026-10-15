@@ -685,10 +685,9 @@ def _check_orientation(method, dataset, category, resolved):
             )
 
 
-@functools.lru_cache(maxsize=512)
-def _sniff_features(path: str, mtime_ns: int, n: int = 50) -> tuple:
-    """First ``n`` feature names of a canonical .h5 (cached by mtime), or
-    ``()``, also for the ``matrix/features`` group of a 10x Genomics file."""
+def _read_features(path: str, n: int | None = None) -> tuple:
+    """The first ``n`` (``None``: all) feature names of a canonical .h5, or ``()``,
+    also for the ``matrix/features`` group of a 10x Genomics file."""
     import h5py
 
     try:
@@ -700,6 +699,12 @@ def _sniff_features(path: str, mtime_ns: int, n: int = 50) -> tuple:
     except OSError:
         return ()
     return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
+
+
+@functools.lru_cache(maxsize=512)
+def _sniff_features(path: str, mtime_ns: int, n: int = 50) -> tuple:
+    """:func:`_read_features` of the first ``n``, cached by mtime."""
+    return _read_features(path, n)
 
 
 @functools.lru_cache(maxsize=512)
@@ -917,18 +922,8 @@ def _peak_fraction_of(path: Path) -> float | None:
 
 @functools.lru_cache(maxsize=64)
 def _all_features(path: str, mtime_ns: int) -> tuple:
-    """Every feature name of a canonical .h5 (cached by mtime), or ``()``."""
-    import h5py
-
-    try:
-        with h5py.File(path, "r") as f:
-            feats = f.get("matrix/features")
-            if not isinstance(feats, h5py.Dataset):
-                return ()
-            raw = feats[:]
-    except OSError:
-        return ()
-    return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
+    """:func:`_read_features` of every feature, cached by mtime."""
+    return _read_features(path)
 
 
 #: Ensembl gene ids (``ENSG00000141510``, ``ENSMUSG...``)
