@@ -24,7 +24,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
 
     One batch is the reference: a small neural network learns the cell
     types from the embedding of its cells, then predicts the cells of all the
-    other batches, the query. This is the benchmark's classification step.
+    other batches, the query.
 
     Parameters
     ----------
@@ -41,7 +41,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         ``labels`` lists two or more files.
     reference : str, optional
         The batch to learn from. ``None`` = every batch in turn, as in the
-        benchmark.
+        article.
     obsm : str
         ``.obsm`` key of an AnnData or ``.h5ad`` ``output``; ``'X'`` means
         ``.X``.
@@ -50,7 +50,8 @@ def classify(output, labels=None, *, batch=None, reference=None,
         ``mtb.evaluate``; ``None`` works for an unchanged ``mtb.labels_for``
         dict.
     seed : int
-        Seed of the network; the same seed gives the same predictions.
+        Seed of the network; the same seed and the same input, with the
+        cells in the same order, give the same predictions.
 
     Returns
     -------
@@ -148,8 +149,8 @@ def classify(output, labels=None, *, batch=None, reference=None,
     n_cells = emb.shape[0]
     if len(ct) != n_cells:
         raise ValueError(_count_error("labels", len(ct), n_cells, labels))
-    if emb.shape[1] == n_cells:
-        raise ValueError(_NOT_EMBEDDING.format(what="output"))     # cells x cells
+    if emb.shape[1] == n_cells or _is_neighbour_index(emb):
+        raise ValueError(_graph_error("output"))     # cells x cells, or a kNN index
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table, cells=cells)
         if len(ba) != n_cells:
@@ -214,34 +215,96 @@ _NOT_EMBEDDING = ("classify needs an embedding; {what} is not one. "
                   "Pass the method's embedding file.")
 
 
+def _graph_text(who: str) -> str:
+    """What is wrong with the output of a graph method: ``who`` is the method,
+    or ``"output"`` when the method is not known."""
+    if who == "output":
+        return "output is a graph, not an embedding, so it has no classification scores."
+    return f"{who} writes a graph, not an embedding, so it has no classification scores."
+
+
 def _check_embedding(output) -> None:
     """``ValueError`` for an output that is a graph or labels, not an embedding:
     a file a method writes as its graph or label output, or a list of labels."""
+    who = _graph_writer(output)
+    if who is not None:
+        raise ValueError(_graph_error(who))
     what = _not_embedding(output)
     if what is not None:
         raise ValueError(_NOT_EMBEDDING.format(what=what))
 
 
+def _graph_error(who: str) -> str:
+    return _graph_text(who) + " Score it with mtb.evaluate(metrics='clustering')."
+
+
 def _not_embedding(output) -> str | None:
-    """The name of an output that is a graph or labels, not an embedding
-    (``"output"`` for a list, the file name for a graph or label file);
-    ``None`` for anything else."""
+    """The name of an output that is labels, not an embedding (``"output"``
+    for a list, the file name for a label file); ``None`` for anything else."""
     if isinstance(output, (list, tuple)):
         return "output"
-    if isinstance(output, (str, Path)) and Path(output).name in _other_outputs():
+    if isinstance(output, (str, Path)) and Path(output).name in _label_outputs():
         return Path(output).name
     return None
 
 
-def _other_outputs() -> set:
-    """File names the registry gives to graph and label outputs, and to no embedding."""
+def _graph_writer(output) -> str | None:
+    """The method that writes ``output`` when it is the path of a file only
+    graph methods write (their graph, or the UMAP scMoMaT writes beside it);
+    ``"output"`` when several do; ``None`` for anything else."""
+    if not isinstance(output, (str, Path)):
+        return None
+    methods = _graph_files().get(Path(output).name)
+    if not methods:
+        return None
+    return methods[0] if len(methods) == 1 else "output"
+
+
+def _registry_files() -> dict:
+    """``{file name: [(output kind, variant output kind, method), ...]}`` over
+    every output and extra output of the registry."""
     from ..engine import registry
-    kinds: dict = {}
+    files: dict = {}
     for spec in registry.load():
         for v in spec.variants:
             for o in [v.output, *v.extra_outputs]:
-                kinds.setdefault(o.file, set()).add(o.kind)
-    return {f for f, k in kinds.items() if "embedding" not in k and k & {"graph", "labels"}}
+                files.setdefault(o.file, []).append((o.kind, v.output.kind, spec.id))
+    return files
+
+
+def _label_outputs() -> set:
+    """File names the registry gives to label outputs, and to no embedding."""
+    return {f for f, uses in _registry_files().items()
+            if {k for k, _, _ in uses} == {"labels"}}
+
+
+def _graph_files() -> dict:
+    """``{file name: [method, ...]}`` for the files that only variants whose
+    output is a graph write; a name an embedding variant also writes is not
+    in it."""
+    return {f: sorted({m for _, _, m in uses}) for f, uses in _registry_files().items()
+            if all(vk == "graph" for _, vk, _ in uses)}
+
+
+def _is_neighbour_index(emb) -> bool:
+    """Whether ``emb`` (cells x columns) is a nearest-neighbour index matrix,
+    the graph a method such as scMoMaT writes, and not an embedding: two or
+    more columns but fewer than cells, every value a whole number from 0 to
+    the number of cells (row numbers counted from 0 or from 1), and no value
+    twice in a row. An embedding holds values that are not whole numbers, so
+    it never matches."""
+    a = np.asarray(emb)
+    if a.ndim != 2 or not 2 <= a.shape[1] < a.shape[0]:
+        return False
+    if a.dtype.kind == "f":
+        if not (np.isfinite(a).all() and (a == np.round(a)).all()):
+            return False
+    elif a.dtype.kind not in "iu":
+        return False
+    if a.min() < 0 or a.max() > a.shape[0]:
+        return False
+    s = np.sort(a, axis=1)
+    return bool((s[:, 1:] != s[:, :-1]).all())
 
 
 def _mlp(x, y, seed: int):
@@ -312,8 +375,7 @@ def classification_metrics(predictions) -> pd.DataFrame:
     and ``Sens`` average over the types that are true, ``Spec`` and ``F1``
     over all of them, so ``Spec`` is NaN when a query has one true type; the
     ``mean`` row is then NaN too. A row with a missing ``label`` or
-    ``predicted`` is left out. The numbers are those of the benchmark's R
-    code.
+    ``predicted`` is left out.
     """
     if not isinstance(predictions, pd.DataFrame):
         raise TypeError("classification_metrics needs a DataFrame. "
@@ -334,8 +396,9 @@ def classification_metrics(predictions) -> pd.DataFrame:
 
 
 def _metrics(frame: pd.DataFrame) -> list:
-    """The five metrics of one query, as the benchmark's R code
-    computes them from ``table(truth, predicted)``."""
+    """The five metrics of one query, from the confusion table of the
+    true and the predicted cell types (rows and columns: every type true or
+    predicted)."""
     keep = ~(io.missing_mask(frame["label"].to_numpy(dtype=object))
              | io.missing_mask(frame["predicted"].to_numpy(dtype=object)))
     truth = frame["label"].to_numpy(dtype=object)[keep]

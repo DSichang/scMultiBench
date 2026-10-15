@@ -128,13 +128,47 @@ def test_a_graph_or_label_output_is_an_error(three, tmp_path):
         f["data"] = np.tile(np.arange(20), (90, 1))
     with pytest.raises(ValueError) as e:
         mtb.classify(graph, labels=list(paths.values()))
-    assert str(e.value) == ("classify needs an embedding; knn_indices.h5 is not one. "
+    assert str(e.value) == ("scMoMaT writes a graph, not an embedding, so it has no "
+                            "classification scores. Score it with "
+                            "mtb.evaluate(metrics='clustering').")
+    with pytest.raises(ValueError) as e:
+        mtb.classify(labels, labels=list(paths.values()))          # predicted labels
+    assert str(e.value) == ("classify needs an embedding; output is not one. "
                             "Pass the method's embedding file.")
-    for output in (labels, np.eye(90)):           # predicted labels; cells x cells
+    # cells x cells, and a kNN index matrix as mtb.run returns it for scMoMaT
+    knn = np.stack([np.roll(np.arange(90), -i)[:20] for i in range(90)])
+    for output in (np.eye(90), knn, knn.astype(float), knn + 1, knn.T):
         with pytest.raises(ValueError) as e:
             mtb.classify(output, labels=list(paths.values()))
-        assert str(e.value) == ("classify needs an embedding; output is not one. "
-                                "Pass the method's embedding file.")
+        assert str(e.value) == ("output is a graph, not an embedding, so it has no "
+                                "classification scores. Score it with "
+                                "mtb.evaluate(metrics='clustering').")
+
+
+def test_the_umap_of_a_graph_method_is_a_graph_output(three, tmp_path):
+    """scMoMaT's umap_embedding.h5 is written only by a graph variant."""
+    emb, labels, paths = three
+    umap = tmp_path / "umap_embedding.h5"
+    with h5py.File(umap, "w") as f:
+        f["data"] = emb[:, :2]
+    with pytest.raises(ValueError) as e:
+        mtb.classify(umap, labels=list(paths.values()))
+    assert str(e.value).startswith("scMoMaT writes a graph, not an embedding")
+
+
+def test_the_neighbour_index_rule():
+    from multibench.eval.classify import _is_neighbour_index
+    rng = np.random.default_rng(0)
+    knn = np.stack([rng.permutation(200)[:15] for _ in range(200)])
+    assert _is_neighbour_index(knn) and _is_neighbour_index(knn + 1)
+    assert _is_neighbour_index(knn.astype(np.float32))
+    emb = rng.normal(size=(200, 15))
+    assert not _is_neighbour_index(emb)
+    assert not _is_neighbour_index(np.round(emb, 3))
+    assert not _is_neighbour_index(np.zeros((200, 15)))     # a value twice in a row
+    assert not _is_neighbour_index(knn[:, :1])              # one column
+    assert not _is_neighbour_index(knn + 2)                 # beyond the cells
+    assert not _is_neighbour_index(knn[:10])                # more columns than cells
 
 
 def test_unknown_reference_is_an_error(three):

@@ -921,9 +921,14 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
 def _classification_error(metrics, why: str, what: str = "output") -> str:
     """evaluate()'s error when the classification codes ``metrics`` names
     cannot be computed: ``why`` is ``"no batch"`` (no batch vector),
-    ``"one batch"``, ``"not embedding"`` (``what`` is a graph or labels) or
-    ``"none scored"`` (no batch could serve as the reference)."""
+    ``"one batch"``, ``"graph"`` (``what`` is the graph method, or
+    ``"output"``), ``"not embedding"`` (``what`` is labels) or ``"none
+    scored"`` (no batch could serve as the reference)."""
     head = _metrics_spelling(metrics)
+    if why == "graph":
+        from .classify import _graph_text
+        return _graph_text(what) + " " + config.hint("Pass metrics='clustering'.",
+                                                     "Pass --metrics clustering.")
     if why == "not embedding":
         return f"{head} needs an embedding; {what} is not one. Pass the method's embedding file."
     if why == "none scored":
@@ -940,6 +945,11 @@ def _classification_warning(why: str, what: str = "output") -> str:
     """evaluate()'s one warning when the classification scores it was not
     explicitly asked for cannot be computed; they are NaN."""
     head = "OCA, ACA, Spec, Sens and F1 are NaN"
+    if why == "graph":
+        who = "output is a graph" if what == "output" else f"{what} writes a graph"
+        return (f"{who}, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
+                + config.hint("Pass metrics='clustering' to leave them out.",
+                              "Pass --metrics clustering to leave them out."))
     if why == "not embedding":
         return f"{head}: {what} is not an embedding. Pass the method's embedding file."
     if why == "none scored":
@@ -949,15 +959,17 @@ def _classification_warning(why: str, what: str = "output") -> str:
         "Pass batch= with two or more batches.", "Pass --batch with two or more batches.")
 
 
-def _classification_scores(request, emb, ct, cb, *, category, not_embedding, metrics):
+def _classification_scores(request, emb, ct, cb, *, category, not_embedding, graph,
+                            metrics):
     """The classification rows of evaluate(): ``{code: value}`` for the codes
     of ``request`` (``(how, codes)`` from :func:`_plan_metrics`), or ``{}``
     when they are left out.
 
     ``cb`` is the batch of each scored cell (``None``: one batch);
-    ``not_embedding`` names an output that is a graph or labels. Under
+    ``not_embedding`` names an output that is labels, ``graph`` the method
+    that wrote an output that is a graph (``"output"`` when not known). Under
     ``metrics=None`` the family is scored only for two or more batches and
-    a category other than ``"vertical"``, as in the benchmark. When it cannot
+    a category other than ``"vertical"``. When it cannot
     be computed, an explicit request raises ``ValueError`` and any other
     gives NaN and one ``UserWarning``. The values are the ``mean`` row of
     ``classification_metrics(classify(...))`` with seed 0.
@@ -966,9 +978,9 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, met
     n_batches = 0 if cb is None else _n_batches(cb)
     if how == "default" and (n_batches < 2 or category == "vertical"):
         return {}
-    if emb.ndim == 2 and emb.shape[0] == emb.shape[1]:
-        not_embedding = not_embedding or "output"          # cells x cells: a graph
-    why = ("not embedding" if not_embedding else "one batch" if n_batches < 2 else None)
+    why = ("graph" if graph else "not embedding" if not_embedding
+           else "one batch" if n_batches < 2 else None)
+    what = graph or not_embedding or "output"
     mean = None
     if why is None:
         from .classify import classification_metrics, classify
@@ -981,13 +993,20 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, met
             mean = table.loc["mean"]
             for w in caught:      # a skipped reference batch: said once, as classify says it
                 warnings.warn(w.message, w.category, stacklevel=4)
+            one_type = [str(r) for r in table.index[:-1] if np.isnan(table.loc[r, "Spec"])]
+            if "Spec" in codes and one_type:
+                # specificity needs cells of a second true cell type
+                warnings.warn(
+                    f"Spec is NaN: when batch {_and_list(one_type, 'or')} is the reference, "
+                    f"the cells it predicts are all of one cell type. Compare methods on "
+                    f"the other metrics.", UserWarning, stacklevel=4)
         else:
             why = "none scored"
     if why is not None:
         if how == "explicit":
-            raise ValueError(_classification_error(metrics, why, not_embedding or "output"))
+            raise ValueError(_classification_error(metrics, why, what))
         # evaluate <- its keyword wrapper <- the caller
-        warnings.warn(_classification_warning(why, not_embedding or "output"),
+        warnings.warn(_classification_warning(why, what),
                       UserWarning, stacklevel=4)
         return {c: float("nan") for c in codes}
     return {c: float(mean[c]) for c in codes}
@@ -1226,9 +1245,9 @@ def evaluate(
     NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, GC, iLISI`` when a batch
     vector is available (``batch=`` or a list of label files), plus the
     classification family (``OCA, ACA, Spec, Sens, F1``) when the cells are
-    in two or more batches and ``category`` is not ``"vertical"``, as in the
-    benchmark. kBET is never included by default: it shells out to R and
-    takes hours on large datasets.
+    in two or more batches and ``category`` is not ``"vertical"``. kBET is
+    never included by default: it shells out to R and takes hours on large
+    datasets.
 
     - ``"clustering"`` / ``"batch"`` / ``"classification"`` - that family;
       ``"all"`` - all three (``"batch"``, ``"classification"`` and ``"all"``
@@ -1315,9 +1334,12 @@ def evaluate(
     **Classification.** The five values are the ``mean`` row of
     ``mtb.classification_metrics(mtb.classify(...))`` with seed 0: each batch
     in turn is the reference. They need an embedding and two or more
-    batches. When they cannot be computed, ``"classification"`` or a list
-    of their codes raises ``ValueError``; ``"all"``, and ``None`` with two
-    or more batches, give NaN and one ``UserWarning``.
+    batches: the output of a graph method (its neighbour index, or the UMAP
+    scMoMaT writes) has none. When they cannot be computed,
+    ``"classification"`` or a list of their codes raises ``ValueError``;
+    ``"all"``, and ``None`` with two or more batches, give NaN and one
+    ``UserWarning``. ``Spec`` is NaN, with a ``UserWarning``, when the cells
+    a reference batch predicts are all of one cell type.
 
     **Cell order.** Arrays, lists and label files without a cell-id column
     are matched by position to the rows of ``output``. A ``Series`` /
@@ -1437,8 +1459,9 @@ def evaluate(
         metrics, has_batch=batch is not None or batch_from_files,
         batch_given=batch is not None)
     if want_cls:
-        from .classify import _not_embedding
-        not_embedding = _not_embedding(output)     # a graph or labels file
+        from .classify import _graph_writer, _not_embedding
+        not_embedding = _not_embedding(output)     # a label file or a list
+        graph = _graph_writer(output)              # a file only graph methods write
 
     # the caller holds an object whose obs_names are the cell ids: named in
     # the error for a Series that lacks some cells
@@ -1474,6 +1497,10 @@ def evaluate(
         warnings.warn(
             f"output was (dims x cells) {emb.shape}; transposed to (cells x dims)")
         emb = emb.T
+    if want_cls and not (graph or not_embedding):
+        from .classify import _is_neighbour_index
+        if emb.ndim == 2 and (emb.shape[0] == emb.shape[1] or _is_neighbour_index(emb)):
+            graph = "output"                       # cells x cells, or a kNN index
     if clustering is None:
         cl = None
     elif isinstance(clustering, (str, Path)) \
@@ -1556,7 +1583,8 @@ def evaluate(
                             verbose=None if verbose else False)
     if want_cls:
         rows = _classification_scores(want_cls, emb, ct, cb, category=category,
-                                      not_embedding=not_embedding, metrics=metrics)
+                                      not_embedding=not_embedding, graph=graph,
+                                      metrics=metrics)
         if rows:
             attrs = out.attrs
             out = pd.concat([out, pd.DataFrame({"Value": rows})]) if len(out) \
