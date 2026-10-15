@@ -2215,10 +2215,15 @@ def _evaluate_best_order(emb, category, cands, *, batch=None, metrics=None,
         # real batch structure, so ask for both metric families; else clustering.
         if batch is not None:
             bat = np.asarray(batch)
-        multi = use_batch and len(set(np.asarray(bat).tolist())) > 1
+        several = len(set(np.asarray(bat).tolist())) > 1
+        multi = use_batch and several
         # metrics=None is evaluate's own default, with the batches when there
         # are several
         chosen = metrics if embedding else _without_classification(metrics, multi)
+        if not embedding:
+            # the batches go only with a selection that still uses them
+            multi = several and ((user_batch and batch_given)
+                                 or _names_batch_metric(chosen))
         return _evaluate(emb, category=category, labels=lab,
                          verbose=False, batch=(bat if multi else None),
                          clustering=clustering, metrics=chosen)
@@ -3962,8 +3967,10 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     rec["emb_shape"] = list(emb.shape)
     embedding = variant.output.kind == "embedding"
     if not embedding and _without_classification(metrics, True) is None:
-        raise ValueError(f"{rec.get('method')} writes a graph, not an embedding, so it "
-                         f"has no classification scores. Pass other metrics=.")
+        from .eval.classify import _graph_text
+        raise ValueError(_graph_text(rec.get("method")) + " "
+                         + config.hint("Pass metrics='clustering'.",
+                                       "Pass --metrics clustering."))
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
