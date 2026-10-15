@@ -96,8 +96,10 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     ------
     ValueError
         ``value_df`` is already long (pass it to the plot / ``load_results``
-        consumers directly), lacks ``Value`` or string metric names, has
-        only blank names, or names one metric twice (``ari`` and ``ARI``).
+        consumers directly), lacks ``Value`` (for a wide one-row frame the
+        message gives the ``df.T.set_axis(['Value'], axis=1)`` fix) or string
+        metric names, has only blank names, or names one metric twice
+        (``ari`` and ``ARI``).
 
     Warns
     -----
@@ -474,8 +476,8 @@ def _labels_from_dict(d: dict, label_order) -> list:
         if keys == sorted(keys, key=_label_sort_key):
             return [d[k] for k in keys]
         # name the method's cell order only for a reordered labels_for dict that had one
-        own = list(getattr(d, "stacking_order", ()))
-        if isinstance(d, LabelFiles) and own != sorted(own, key=_label_sort_key):
+        if isinstance(d, LabelFiles) and \
+                list(d.stacking_order) != sorted(d.stacking_order, key=_label_sort_key):
             where = "are in neither the method's cell order nor the default order"
         else:
             where = "are not in the default order"
@@ -1199,8 +1201,9 @@ def evaluate(
     a ``Series`` / ``DataFrame`` with a non-default index is aligned by id,
     and so is a CSV whose first column holds cell ids (as
     ``obs[["batch"]].to_csv(path)`` writes it), or a list of such files. A
-    missing or extra id raises ``ValueError`` naming the first ones, and so
-    does a first column where only some values are cell ids.
+    missing or extra id raises ``ValueError`` naming the first ones (for a
+    ``.csv`` / ``.tsv`` output, their number and one of them), and so does a
+    first column where only some values are cell ids.
 
     A file, or a Series against a ``.csv`` / ``.tsv`` output, whose ids name
     none of the cells is matched by position with a ``UserWarning``; such a
@@ -1386,6 +1389,10 @@ def evaluate(
     out.attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
     out.attrs["multibench_version"] = __version__
     out.attrs["scib_version"] = _scib_version()
+    if out.empty:
+        # unreachable while every family code is one compute() scores; loud if not
+        raise ValueError(
+            f"evaluate(metrics={metrics!r}) selected no metric - nothing to return")
     if dropped:
         out.attrs.update(zip(DROP_ATTRS, dropped[:2]))
         # evaluate <- its keyword wrapper <- the caller
