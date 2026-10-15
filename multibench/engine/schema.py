@@ -27,8 +27,10 @@ class AmbiguousVariantError(ValueError, KeyError):
     Notes
     -----
     ``mtb.inputs_for`` (without ``modalities=``) and
-    ``mtb.params_for(dataset=)`` first let the dataset folder decide, and
-    raise only when it settles nothing. ``mtb.labels_for`` never raises it.
+    ``mtb.params_for(dataset=)`` (without ``category=`` or ``modalities=``)
+    first let the dataset folder decide, and raise only when it settles
+    nothing. ``mtb.labels_for`` never raises it; it falls back to the default
+    label order.
 
     It is a ``ValueError`` and also a ``KeyError``, so ``except KeyError``
     catches it too. ``str(exc)`` is the plain message, without ``KeyError``

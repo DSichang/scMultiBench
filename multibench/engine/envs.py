@@ -319,7 +319,8 @@ def installed_flavor(env: str, conda: str | None = None) -> str | None:
     str or None
         ``'cpu'``, ``'gpu'`` or ``'single'`` from :data:`FLAVOR_FILE` (an env
         with a single build reads ``'single'``); ``None`` when the env is not
-        installed or has no record.
+        installed or has no record, or the record is unreadable or holds
+        anything else.
     """
     prefix = env_prefix(env, conda)
     if prefix is None:
@@ -395,7 +396,7 @@ def recipe(method: str) -> dict:
 
     mtb.env.status : ``has_recipe`` and ``difficulty`` per method.
     """
-    return registry.get(method).env_spec or {}
+    return registry.get(method).env_spec
 
 
 def own_env_name(method: str) -> str:
@@ -523,7 +524,7 @@ def groups() -> dict:
     for s in registry.load():
         if s.id not in covered:
             out[own_env_name(s.id)] = {
-                **(s.env_spec or {}), "members": [s.id], "shared": False,
+                **s.env_spec, "members": [s.id], "shared": False,
             }
     return out
 
@@ -1117,7 +1118,7 @@ def status(conda: str | None = None, *, as_frame: bool = False):
     have = set(installed_envs(conda))
     out = []
     for s in registry.load():
-        env_spec = s.env_spec or {}
+        env_spec = s.env_spec
         env_name = group_for(s.id)
         own = own_env_name(s.id)
         exists = env_name in have or own in have

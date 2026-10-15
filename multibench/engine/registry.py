@@ -11,8 +11,8 @@ from pathlib import Path
 import yaml
 
 from .. import config
-from .schema import (AmbiguousVariantError, ArgSpec, MethodSpec, OutputSpec,  # noqa: F401
-                     Variant, base_modality, is_label_role)
+from .schema import (ArgSpec, MethodSpec, OutputSpec, Variant, base_modality,
+                     is_label_role)
 
 _YAML = Path(__file__).resolve().parent / "methods.yaml"
 # the tunable hyperparams, generated from the upstream argparse

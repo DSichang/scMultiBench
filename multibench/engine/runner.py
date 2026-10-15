@@ -667,6 +667,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         An input the run cannot convert, such as an ``.h5mu`` file or a MuData.
     ValueError
         Input files that must hold the same cells, in one order, do not.
+    ValueError
+        ``MULTIBENCH_RUN_MODE`` is set to anything but ``conda`` or ``prefix``.
     OSError
         The method needs a GPU this host lacks, or its env is not installed.
     RuntimeError
@@ -714,6 +716,11 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     A MuData raises ``ValueError``: pass one modality per role
     (``mdata.mod["rna"]``) or write the folder with ``mtb.io.export_dataset``.
     With ``convert=False`` every modality input must be a file path.
+    Before anything runs, canonical ``.h5`` inputs get the cell checks of
+    ``mtb.inputs_for(check=True)``: Seurat_v5's ``rna`` and ``atac_peak`` must
+    hold the same cells, and a diagonal ``atac_gas`` file must list the cells
+    of its ``atac_peak`` file (the one given, else the one next to it) in the
+    same order.
     Relative paths are made absolute, because the method runs in ``out_dir``
     or in its script's folder.
 
@@ -734,8 +741,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     some env is found at all); a ``{cmd}`` template skips this check. The
     method gets ``PYTHONNOUSERSITE=1``, and ``MPLBACKEND=Agg`` unless it sets
     its own backend; environment variables the method needs are set over yours.
+    A variable made of absolute paths, such as ``LD_PRELOAD``, keeps only the
+    paths that exist on this machine; when none does, it is left as you set
+    it, or unset.
 
-    **Launcher templates.** A Slurm job step:
+    **Launcher templates.** A ``{cmd}`` template must enter an env itself,
+    for example ``"conda run -n myenv {cmd}"``. A Slurm job step:
 
     ```python
     mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
