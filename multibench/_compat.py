@@ -1,15 +1,9 @@
-"""Deprecation shims shared by every namespace of the package.
-
-0.3.0 renamed a handful of entry points. Each old spelling is kept for one
-release as a thin alias that warns and forwards, so a 0.2 script keeps
-working and says what to change.
-"""
+"""Deprecation shims: the 0.2 spellings warn and forward for one release."""
 from __future__ import annotations
 
 import functools
 import warnings
 
-#: the release in which the aliases were introduced (and the one they warn about)
 DEPRECATED_SINCE = "0.3.0"
 
 
@@ -20,25 +14,7 @@ def warn(old: str, new: str, *, stacklevel: int = 3) -> None:
 
 
 def deprecated_alias(old: str, new: str, fn):
-    """Wrap ``fn`` as the deprecated spelling ``old`` of the public name ``new``.
-
-    Parameters
-    ----------
-    old : str
-        The spelling being retired, e.g. ``"plan"``.
-    new : str
-        What callers should write instead, e.g. ``"scan"`` or
-        ``"method_info(m)['runtime']"``; quoted verbatim in the warning.
-    fn : callable
-        The function the alias forwards to; it receives the arguments
-        unchanged and its return value is returned as is.
-
-    Returns
-    -------
-    callable
-        A function named ``old`` that emits ``DeprecationWarning`` (pointing
-        at the caller) and then calls ``fn(*args, **kwargs)``.
-    """
+    """``fn`` under the retired name ``old``, warning that callers should write ``new``."""
     @functools.wraps(fn)
     def alias(*args, **kwargs):
         warn(old, new)
@@ -49,12 +25,8 @@ def deprecated_alias(old: str, new: str, fn):
 
 
 def legacy_kwargs(translate):
-    """Decorator: pass the call's ``**kwargs`` through ``translate`` first.
-
-    ``translate(kwargs) -> kwargs`` maps deprecated keywords onto the new
-    spelling (calling :func:`warn` with ``stacklevel=4`` so the warning points
-    at the caller) and raises ``TypeError`` for removed ones.
-    """
+    """Decorator: pass the call's ``**kwargs`` through ``translate``, which maps the
+    deprecated keywords (warning with ``stacklevel=4``, the caller)."""
     def deco(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
