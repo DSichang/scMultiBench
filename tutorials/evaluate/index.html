@@ -705,6 +705,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#classification-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classification metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2137,6 +2148,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#classification-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classification metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2213,7 +2235,8 @@
 
 <h1 id="evaluate-a-run">Evaluate a run<a class="headerlink" href="#evaluate-a-run" title="Anchor link to this section">&para;</a></h1>
 <p><code>mtb.evaluate</code> scores an embedding against cell-type labels and returns the
-scIB metrics. An embedding is a table with one row per cell, like
+scIB metrics, and the classification metrics for data in several batches.
+An embedding is a table with one row per cell, like
 <code>adata.obsm["X_pca"]</code>.</p>
 <div class="admonition tip">
 <p class="admonition-title">Summary</p>
@@ -2230,7 +2253,7 @@ scIB metrics. An embedding is a table with one row per cell, like
 <hr />
 <h2 id="choose-the-metrics">Choose the metrics<a class="headerlink" href="#choose-the-metrics" title="Anchor link to this section">&para;</a></h2>
 <p><code>metrics=</code> takes a <a href="../../api/#the-metrics-vocabulary">family</a> (<code>"clustering"</code>,
-<code>"batch"</code>, <code>"all"</code>) or a list of metric codes. The default computes every
+<code>"batch"</code>, <code>"classification"</code>, <code>"all"</code>) or a list of metric codes. The default computes every
 metric your inputs allow except kBET.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">)[</span><span class="s2">"cty"</span><span class="p">]</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
@@ -2310,14 +2333,37 @@ vector. No method is re-run:</p>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">rescored</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">rescore</span><span class="p">(</span><span class="n">batch</span><span class="o">=</span><span class="n">my_batch_vector</span><span class="p">)</span>
 </span></code></pre></div>
 </details>
+<h3 id="classification-metrics">Classification metrics<a class="headerlink" href="#classification-metrics" title="Anchor link to this section">&para;</a></h3>
+<p>With two or more batches, <code>evaluate</code> also predicts each cell's type from
+another batch and scores the predictions: OCA, ACA, Spec, Sens and F1. The
+default adds them unless <code>category="vertical"</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D52"</span><span class="p">,</span> <span class="s2">"cross"</span><span class="p">,</span> <span class="s2">"StabMap"</span><span class="p">),</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">metrics</span><span class="o">=</span><span class="s2">"classification"</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p>Each batch in turn is the reference that a small neural network learns
+from, as in the article. The scores are the mean over the references,
+the <code>mean</code> row of <code>mtb.classification_metrics(mtb.classify(...))</code>.</p>
+<p>They need the method's embedding. A graph method has none, and
+<code>run_all</code> leaves them out for it. Where they cannot be computed,
+<code>metrics="classification"</code> raises. <code>"all"</code> gives <code>NaN</code> with a warning,
+and so does the default, except on data in one batch, where it leaves
+them out.</p>
+<p>For vertical data in several batches, ask for them with
+<code>metrics="classification"</code>.</p>
+</details>
 <hr />
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Anchor link to this section">&para;</a></h2>
 <p><code>evaluate</code> returns a DataFrame indexed by metric name, with one <code>Value</code>
 column. A metric that cannot run on your machine is <code>NaN</code>, with a warning.
 Save the scores with <code>mtb.to_long</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"MyMethod"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>                   <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mine</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s2">"mine.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">to_long</span><span class="p">(</span><span class="n">metrics</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"MyMethod"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>                   <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">mine</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s2">"mine.csv"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
@@ -2391,6 +2437,31 @@ ARI can be slightly below 0, which means a random clustering.</p>
 <td>batch</td>
 <td>How often a neighbourhood holds the overall batch mix</td>
 </tr>
+<tr>
+<td>OCA</td>
+<td>classification</td>
+<td>The fraction of query cells predicted correctly</td>
+</tr>
+<tr>
+<td>ACA</td>
+<td>classification</td>
+<td>The fraction of each cell type predicted correctly, averaged over cell types</td>
+</tr>
+<tr>
+<td>Spec</td>
+<td>classification</td>
+<td>Specificity, averaged over cell types</td>
+</tr>
+<tr>
+<td>Sens</td>
+<td>classification</td>
+<td>Sensitivity, averaged over cell types</td>
+</tr>
+<tr>
+<td>F1</td>
+<td>classification</td>
+<td>F1-score, averaged over cell types</td>
+</tr>
 </tbody>
 </table>
 <p><a href="../../reference/catalog/#multibench.data.catalog.metrics"><code>mtb.catalog.metrics()</code></a>
@@ -2409,8 +2480,8 @@ the build command.</p>
 <h2 id="are-my-numbers-comparable">Are my numbers comparable?<a class="headerlink" href="#are-my-numbers-comparable" title="Anchor link to this section">&para;</a></h2>
 <p>To compare with the stored tables, published or re-run, use the Leiden
 backend they were scored with and the dataset's own labels:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">leiden_flavor</span> <span class="o">=</span> <span class="s2">"leidenalg"</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">))</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">leiden_flavor</span> <span class="o">=</span> <span class="s2">"leidenalg"</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">metrics</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">))</span>
 </span></code></pre></div>
 <p>The default <code>igraph</code> backend is faster but can move ARI by up to about
 0.1. Most methods' scores vary slightly between runs. Compare ranks.</p>

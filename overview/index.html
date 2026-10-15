@@ -2131,7 +2131,7 @@ measured. Each scenario is a <code>category</code> value in the API:</p>
 <details class="note">
 <summary>Details</summary>
 <p>The benchmark evaluates dimension reduction, batch correction,
-clustering and feature selection.</p>
+clustering, classification and feature selection.</p>
 <p>Its datasets are real and simulated, and cover <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
 </details>
 <h2 id="how-it-evaluates">How it evaluates<a class="headerlink" href="#how-it-evaluates" title="Anchor link to this section">&para;</a></h2>
@@ -2144,11 +2144,12 @@ rank scores. For the full ranking per scenario, see the paper's decision tree
 <ul>
 <li>Dimension reduction, batch correction and clustering: scIB metrics
   such as kBET, iLISI, ASW, graph connectivity, PCR, ARI and NMI.</li>
+<li>Classification: OCA, ACA, Spec, Sens and F1.</li>
 <li>Feature selection: marker overlap and correlation.</li>
 <li>Every task: runtime and peak memory.</li>
 </ul>
-<p>In the package, <code>mtb.evaluate</code> computes the scIB metrics for an
-embedding.</p>
+<p>In the package, <code>mtb.evaluate</code> computes the scIB metrics and the
+classification metrics for an embedding.</p>
 </details>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Anchor link to this section">&para;</a></h2>
 <ul>

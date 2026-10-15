@@ -2313,7 +2313,8 @@ dataset of the category.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p><code>None</code> / <code>"all"</code> = every metric; or <code>"clustering"</code>,
-<code>"batch"</code>, or a list of codes such as <code>["ARI", "NMI"]</code>.</p>
+<code>"batch"</code>, <code>"classification"</code>, or a list of codes such as
+<code>["ARI", "NMI"]</code>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2545,6 +2546,10 @@ a <code>category</code>, an id that differs from a stored one only in case
 <li><code>"clustering"</code> - <code>mtb.plot.CLUSTERING_METRICS</code> (ARI, NMI, ASW,
   iASW, iF1, cLISI);</li>
 <li><code>"batch"</code> - <code>mtb.plot.BATCH_METRICS</code> (ASW_batch, GC, iLISI, kBET);</li>
+<li><code>"classification"</code> - <code>mtb.plot.CLASSIFICATION_METRICS</code> (OCA, ACA,
+  Spec, Sens, F1). The stored tables have none, so the frame is empty,
+  as for <code>"batch"</code> on a single-batch dataset; a long CSV of your own
+  (<code>result_path=</code>) can hold them;</li>
 <li>a list - exactly those codes (alias tolerant, <code>["ari"]</code> -&gt; ARI).</li>
 </ul>
 <p>Every code must be one of <code>mtb.catalog.known_metrics()</code> or present in
@@ -3070,7 +3075,8 @@ themselves; <code>None</code> = every method.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p><code>None</code> = the <code>"clustering"</code> family (the benchmark's main
-ranking); or <code>"batch"</code>, <code>"all"</code>, or a list of codes.</p>
+ranking); or <code>"batch"</code>, <code>"classification"</code>, <code>"all"</code>, or a
+list of codes.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">

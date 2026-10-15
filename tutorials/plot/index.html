@@ -2467,8 +2467,9 @@ fill is the lowest value in that column. Each metric family starts with
 an Overall bar, and rows are ordered by the mean of those bars.</p>
 <details class="note">
 <summary>Details</summary>
-<p>Blue columns are the dimension-reduction and clustering metrics, and
-green columns the batch-correction metrics.</p>
+<p>Blue columns are the dimension-reduction and clustering metrics, green
+columns the batch-correction metrics, and pink columns the
+classification metrics.</p>
 <p>A grey column holds the same value in every row. In a summary panel
 it holds the same mean rank. A figure with one method is grey in every
 column. A warning names the grey columns.</p>
@@ -2518,7 +2519,8 @@ numbers behind the figure as a
 </span></code></pre></div>
 <h3 id="summary-bars">Summary bars<a class="headerlink" href="#summary-bars" title="Anchor link to this section">&para;</a></h3>
 <p><code>mtb.plot.bar</code> draws one bar per method with its Overall score across
-datasets, for one metric family.</p>
+datasets, for one metric family: <code>group="clustering"</code>, <code>"batch"</code> or
+<code>"classification"</code>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"clustering"</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">"bar.pdf"</span><span class="p">)</span>
 </span></code></pre></div>
 <details class="note">

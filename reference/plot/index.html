@@ -2385,8 +2385,8 @@ paper's panel c).</p>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Matplotlib colormap for the first family; <code>None</code> = blues, greens
-and purples per family.</p>
+                <p>Matplotlib colormap for the first family; <code>None</code> = blues, greens,
+pinks and purples per family.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2732,13 +2732,13 @@ optional <code>dataset</code> (absent = one dataset), e.g. from
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Score one metric family only (the benchmark's two summary panels);
+                <p>Score one metric family only (the benchmark's summary panels);
 <code>None</code> = the <code>metrics</code> selection.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
                     <b>type</b>
-                      <code>(None, &#39;clustering&#39;, &#39;batch&#39;)</code>
+                      <code>(None, &#39;clustering&#39;, &#39;batch&#39;, &#39;classification&#39;)</code>
                   </span>
                   <span class="doc-param-default">
                     <b>default</b>
@@ -2796,7 +2796,8 @@ optional <code>dataset</code> (absent = one dataset), e.g. from
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Matplotlib colormap for the bars; <code>group="batch"</code> always uses
-<code>"Greens"</code> (the paper's family colour).</p>
+greens and <code>group="classification"</code> pinks (the paper's family
+colours).</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -3004,7 +3005,8 @@ of their dataset.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">)</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"clustering"</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">"clustering.png"</span><span class="p">)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"batch"</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">overall</span><span class="o">=</span><span class="s2">"rank"</span><span class="p">)</span>       <span class="c1"># bubble's default formula</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">long</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="s2">"classification"</span><span class="p">)</span>   <span class="c1"># res: mtb.run_all</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">overall</span><span class="o">=</span><span class="s2">"rank"</span><span class="p">)</span>       <span class="c1"># bubble's default formula</span>
 </span></code></pre></div>
 
 
@@ -3037,9 +3039,10 @@ them.</p>
 <p><strong>Errors.</strong> An unknown <code>metrics</code> code gets a did-you-mean hint and the
 list of metrics present. Batch metrics need a multi-batch dataset: a
 single-batch design has none to compute, which is what the
-<code>group="batch"</code> error says. An empty frame's error points at
-<code>mtb.load_results</code>, which may have returned nothing (see its
-<code>UserWarning</code>).</p>
+<code>group="batch"</code> error says. The stored tables have no classification
+scores, which is what the <code>group="classification"</code> error says. An
+empty frame's error points at <code>mtb.load_results</code>, which may have
+returned nothing (see its <code>UserWarning</code>).</p>
 </details>
 
 <details class="see-also">
@@ -3492,8 +3495,8 @@ with <code>res</code> from <code>mtb.run_all</code>.</p>
 <p><strong>Name matching.</strong> <code>metrics</code>, <code>methods</code> and <code>order</code> match the
 frame exactly, by canonical form (<code>"ari"</code> -&gt; <code>"ARI"</code>) or
 case-insensitively; the frame's own spelling is kept. The family blocks
-always stay in paper order; metrics outside the two paper families form
-a neutral purple "Other" block.</p>
+always stay in paper order; metrics outside the three families form a
+neutral purple "Other" block.</p>
 </details>
 
 <details class="see-also">
@@ -3744,7 +3747,8 @@ The figure draws a column whose rows all hold one value in grey, not at
 the <code>High</code> end of the Score legend. Every column of a one-method
 figure is grey.</p>
 <p><strong>Blocks.</strong> Paper order: DR and clustering (blues), batch correction
-(greens), then "Other" (purples) for any metric outside the two.</p>
+(greens), classification (pinks), then "Other" (purples) for any metric
+outside the three.</p>
 </details>
 
 <details class="see-also">

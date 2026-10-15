@@ -2676,7 +2676,7 @@ run before you start.</p>
 </table>
 </div>
 <h3 id="step-4-score">Step 4: Score<a class="headerlink" href="#step-4-score" title="Anchor link to this section">&para;</a></h3>
-<p>Compute scIB metrics for a run output.</p>
+<p>Compute the benchmark's metrics for a run output.</p>
 <div class="api-table">
 <table>
 <thead>
@@ -2688,11 +2688,19 @@ run before you start.</p>
 <tbody>
 <tr>
 <td><a href="../reference/score/#multibench.eval.pipeline.evaluate"><code>mtb.evaluate</code></a></td>
-<td>scIB metrics of a run output, scored against cell-type labels and, when given, batch labels.</td>
+<td>scIB and classification metrics of a run output, scored against cell-type labels and, when given, batch labels.</td>
 </tr>
 <tr>
 <td><a href="../reference/score/#multibench.eval.pipeline.to_long"><code>mtb.to_long</code></a></td>
 <td>Reshape <code>evaluate</code>'s result into the long results table.</td>
+</tr>
+<tr>
+<td><a href="../reference/score/#multibench.eval.classify.classify"><code>mtb.classify</code></a></td>
+<td>Predict the cell type of each query cell from a reference batch.</td>
+</tr>
+<tr>
+<td><a href="../reference/score/#multibench.eval.classify.classification_metrics"><code>mtb.classification_metrics</code></a></td>
+<td>Score the predicted cell types of <code>mtb.classify</code> with the benchmark's metrics.</td>
 </tr>
 </tbody>
 </table>
@@ -2907,19 +2915,24 @@ without an error. You can filter it by class.</p>
 <a href="../reference/compare/#multibench.data.results.load_results"><code>load_results</code></a>,
 <a href="../reference/compare/#multibench.data.results.recommend"><code>recommend</code></a> and
 <code>BatchResult.rescore</code> take the same selector: <code>"clustering"</code>, <code>"batch"</code>,
-<code>"all"</code>, or a list of metric codes such as <code>["ARI", "NMI"]</code>.</p>
+<code>"classification"</code>, <code>"all"</code>, or a list of metric codes such as
+<code>["ARI", "NMI"]</code>.</p>
 <details class="note">
 <summary>Details</summary>
-<p>The three family names select these codes:</p>
+<p>The family names select these codes:</p>
 <ul>
 <li><code>"clustering"</code>: ARI, NMI, ASW, iASW, iF1, cLISI (<code>mtb.plot.CLUSTERING_METRICS</code>).</li>
 <li><code>"batch"</code>: ASW_batch, GC, iLISI, kBET (<code>mtb.plot.BATCH_METRICS</code>).</li>
-<li><code>"all"</code>: both families. <code>evaluate</code> then needs batch labels.</li>
+<li><code>"classification"</code>: OCA, ACA, Spec, Sens, F1 (<code>mtb.plot.CLASSIFICATION_METRICS</code>).
+  The stored tables have none.</li>
+<li><code>"all"</code>: the three families. <code>evaluate</code> then needs batch labels.</li>
 </ul>
 <p>With the default <code>None</code>, <code>evaluate</code> computes the clustering family, plus
-ASW_batch, GC and iLISI when batch labels are available. <code>load_results</code>
-keeps every metric, and <code>recommend</code> ranks on the clustering family.
-<code>evaluate</code> computes kBET only when a list names it.</p>
+ASW_batch, GC and iLISI when batch labels are available, plus the
+classification family when the cells are in two or more batches and the
+category is not vertical. <code>load_results</code> keeps every metric, and
+<code>recommend</code> ranks on the clustering family. <code>evaluate</code> computes kBET only
+when a list names it.</p>
 <p>A single code still goes in a list: <code>metrics=["ARI"]</code>. A task name or an
 unknown code raises <code>ValueError</code> listing the valid values.</p>
 </details>

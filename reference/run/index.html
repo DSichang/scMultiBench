@@ -4181,7 +4181,9 @@ on its labelled cells only; <code>run_all</code> and <code>rescore</code> have n
 option.</p>
 <p><strong>Batch vector.</strong> By default the batch metrics use the label file each
 cell came from (<code>cty1.csv</code> -&gt; 1 ...); <code>batch=</code> replaces that rule and
-is recorded as <code>batch_source='user'</code>.</p>
+is recorded as <code>batch_source='user'</code>. With two or more batches outside
+<code>vertical</code>, the classification metrics are scored too, as
+<code>mtb.evaluate</code> scores them by default.</p>
 <p><code>"obs:&lt;column&gt;"</code> and <code>"&lt;column&gt;"</code> name a column of the object you
 pass. <code>export_dataset</code> and <code>evaluate</code> take both. <code>run_all</code> and
 <code>rescore</code> are given a folder, not the object, so they take the column
@@ -5160,7 +5162,8 @@ columns below except the metrics:</p>
 <code>RUN_OK_NO_LABEL_MATCH</code> also appear in <code>failures</code>.</p>
 <p><strong>Graph methods.</strong> scMoMaT also writes a <abbr title="Uniform Manifold Approximation and Projection">UMAP</abbr>, which is scored:
 <code>CHAIN_OK_GRAPH_METHOD</code>. Seurat_WNN writes only a neighbour graph:
-<code>RUN_OK_NO_EMBEDDING</code>, and its <code>emb_shape</code> is <code>None</code>.</p>
+<code>RUN_OK_NO_EMBEDDING</code>, and its <code>emb_shape</code> is <code>None</code>. Neither
+has classification metrics, which need the method's own embedding.</p>
 <p><strong>Batch columns.</strong> <code>batch_source</code> / <code>n_batches</code> say which batch
 vector the batch metrics (ASW_batch, GC, iLISI ...) were computed
 against, and how many distinct values it has (1 = none):</p>
@@ -5659,8 +5662,9 @@ again.</p>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Metric family (<code>"clustering"</code>, <code>"batch"</code>, <code>"all"</code>) or metric
-codes; <code>None</code> = every metric the batch structure allows.</p>
+                <p>Metric family (<code>"clustering"</code>, <code>"batch"</code>, <code>"classification"</code>,
+<code>"all"</code>) or metric codes; <code>None</code> = every metric the batch
+structure allows, as in <code>mtb.evaluate</code>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">

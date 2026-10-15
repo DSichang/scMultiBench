@@ -1982,6 +1982,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-038" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.8
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-037" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2328,6 +2339,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-038" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.8
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-037" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2665,6 +2687,22 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-038">New in 0.3.8<a class="headerlink" href="#new-in-038" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>Classification is added. <code>mtb.classify</code> predicts the cell type of each
+  query cell. Each batch in turn is the reference, as in the article: a
+  small neural network learns the cell types of its cells and predicts the
+  cells of the other batches.</li>
+<li><code>mtb.classification_metrics</code> scores the predictions: OCA, ACA, Spec, Sens
+  and F1.</li>
+<li>On data in two or more batches, <code>evaluate</code> and <code>run_all</code> add these five
+  scores. Vertical data do not get them by default.</li>
+<li><code>metrics="classification"</code> selects these five scores.</li>
+<li><code>mtb.catalog.metrics()</code> describes the five scores.</li>
+<li>The bubble figure has a pink Classification block.</li>
+<li>The stored result tables have no classification scores.</li>
+<li>The install cell of the tutorials asks for <code>multibench-sc&gt;=0.3.8</code>.</li>
+</ul>
 <h2 id="new-in-037">New in 0.3.7<a class="headerlink" href="#new-in-037" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>The method environments are smaller to download. All 24 environments

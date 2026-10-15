@@ -2211,7 +2211,7 @@ or metric code into the canonical one.</p>
 </tr>
 <tr>
 <td><a href="#multibench.data.catalog.metrics"><code>mtb.catalog.metrics</code></a></td>
-<td>Table describing the scIB metrics: one row per metric code.</td>
+<td>Table describing the metrics: one row per metric code.</td>
 </tr>
 <tr>
 <td><a href="#multibench.data.catalog.canonical_id"><code>mtb.catalog.canonical_id</code></a></td>
@@ -2527,7 +2527,7 @@ mtb.load_results : the stored metric tables themselves.</p>
 
     <div class="doc doc-contents first">
 
-        <p>Table describing the scIB metrics: one row per metric code.</p>
+        <p>Table describing the metrics: one row per metric code.</p>
 
 
 <table>
@@ -2578,7 +2578,7 @@ mtb.load_results : the stored metric tables themselves.</p>
             </td>
             <td class="doc-returns-details">
               <div class="doc-md-description">
-                <p>One row per scIB metric, with the CSV's columns (<code>metric</code> and
+                <p>One row per metric, with the CSV's columns (<code>metric</code> and
 <code>description</code> in the shipped file).</p>
               </div>
             </td>
@@ -2597,7 +2597,8 @@ mtb.load_results : the stored metric tables themselves.</p>
 <details class="note">
   <summary>Notes</summary>
   <p><strong>Rows.</strong> The ten scIB metrics <code>ARI, NMI, ASW, iASW, iF1, cLISI,
-ASW_batch, GC, iLISI, kBET</code>; header whitespace is stripped. The
+ASW_batch, GC, iLISI, kBET</code>, then the five classification metrics
+<code>OCA, ACA, Spec, Sens, F1</code>; header whitespace is stripped. The
 canonical code vocabulary, including <code>PCR</code> from the published tables,
 is <code>mtb.catalog.known_metrics</code>.</p>
 </details>
@@ -2605,7 +2606,8 @@ is <code>mtb.catalog.known_metrics</code>.</p>
 <details class="see-also">
   <summary>See Also</summary>
   <p>mtb.catalog.known_metrics : the canonical metric codes.
-mtb.evaluate : computes these metrics for an embedding.</p>
+mtb.evaluate : computes these metrics for an embedding.
+mtb.classification_metrics : the classification metrics of <code>mtb.classify</code>'s predictions.</p>
 </details>
 
     </div>
@@ -2949,7 +2951,8 @@ mtb.catalog.canonical_id : the same normalisation for method names.</p>
             <td class="doc-returns-details">
               <div class="doc-md-description">
                 <p>The clustering / bio-conservation codes (<code>mtb.plot.CLUSTERING_METRICS</code>),
-the batch-correction codes (<code>mtb.plot.BATCH_METRICS</code>), then <code>PCR</code>
+the batch-correction codes (<code>mtb.plot.BATCH_METRICS</code>), the
+classification codes (<code>mtb.plot.CLASSIFICATION_METRICS</code>), then <code>PCR</code>
 (principal-component regression, in some published tables).</p>
               </div>
             </td>
@@ -2962,14 +2965,14 @@ the batch-correction codes (<code>mtb.plot.BATCH_METRICS</code>), then <code>PCR
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">known_metrics</span><span class="p">()</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI',</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go"> 'kBET', 'PCR']</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go"> 'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1', 'PCR']</span>
 </span></code></pre></div>
 
 
 <details class="see-also">
   <summary>See Also</summary>
   <p>mtb.catalog.canonical_metric : maps any spelling to these codes; <code>strict=True</code> accepts only them.
-mtb.catalog.metrics : the description of each scIB metric.</p>
+mtb.catalog.metrics : the description of each metric.</p>
 </details>
 
     </div>
