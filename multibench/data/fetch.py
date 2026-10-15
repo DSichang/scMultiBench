@@ -7,17 +7,15 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .. import config
+
 
 def safe_extract(tar: tarfile.TarFile, dest) -> None:
-    """extractall with a path-traversal guard (absolute paths, .., links out).
+    """``extractall`` that refuses an entry or link writing outside ``dest``.
 
-    A crafted archive could otherwise write outside ``dest``; every tarball
-    the package opens (datasets, packed envs) goes through here. Where
-    ``tarfile`` has the extraction filters (PEP 706: 3.12+ and the security
-    releases of the older series) the ``'data'`` filter is passed as well:
-    the archives are plain data, and the bare call raises
-    ``DeprecationWarning`` on 3.12/3.13 and changes behaviour on 3.14.
-    Interpreters without the filters keep the bare call behind the guard.
+    Every tarball the package opens goes through here. Where ``tarfile`` has
+    the extraction filters (PEP 706) the ``'data'`` filter is passed too: the
+    bare call warns on 3.12/3.13 and changes behaviour on 3.14.
     """
     import os
     dest = Path(dest).resolve()
@@ -34,11 +32,10 @@ def safe_extract(tar: tarfile.TarFile, dest) -> None:
     else:                                 # pragma: no cover - pre-filter Pythons
         tar.extractall(dest)
 
-from .. import config
 
 RELEASE_URL = "https://github.com/DSichang/scMultiBench/releases/download/data-v1"
 
-# datasets published as release assets, with approximate download sizes
+#: datasets published as release assets, with approximate download sizes
 AVAILABLE = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB",
              "D46": "97 MB", "D52": "179 MB",
              # one small dataset per integration task (tools/make_tutorial_data.py)
@@ -53,29 +50,21 @@ OUTPUT_MANIFEST = Path(__file__).resolve().parent.parent / "engine" / "output_ur
 
 
 def _download(url: str) -> Path:
-    """Fetch ``url`` to a temporary file and return its path.
-
-    The single network seam of this module: tests monkeypatch it to serve a
-    local tarball, so the extraction / idempotence / filter logic runs
-    without touching the network.
-    """
+    """Fetch ``url`` to a temporary file; the module's one network call."""
     tgz, _ = urllib.request.urlretrieve(url)
     return Path(tgz)
 
 
 def _download_or_explain(url: str, what: str, by_hand: str) -> Path:
-    """:func:`_download`, with a failure raised as ``OSError`` naming ``url``.
-
-    ``what`` names the download in the message ("D46", "the stored outputs
-    of D11"); ``by_hand`` is the sentence that says how to get it by hand.
-    """
+    """:func:`_download`, a failure raised as ``OSError`` naming ``what``,
+    ``url`` and ``by_hand``, the sentence that says how to get it by hand."""
     try:
         return _download(url)
     except urllib.error.HTTPError as e:
         why = f"HTTP {e.code}"
         err = e
     except (OSError, http.client.HTTPException) as e:
-        # URLError keeps the cause in .reason (a refused connection, a dead proxy)
+        # URLError keeps the cause in .reason
         why = str(getattr(e, "reason", None) or e) or type(e).__name__
         err = e
     raise OSError(
@@ -84,7 +73,7 @@ def _download_or_explain(url: str, what: str, by_hand: str) -> Path:
 
 
 def _output_urls() -> dict:
-    """The ``{dataset: url}`` manifest, read from :data:`OUTPUT_MANIFEST`."""
+    """The ``{dataset: url}`` manifest :data:`OUTPUT_MANIFEST`."""
     import json
     return dict(json.loads(OUTPUT_MANIFEST.read_text()))
 
@@ -154,7 +143,7 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
         d = root / ds
         if d.is_dir() and any(d.iterdir()):
             continue
-        if d.is_dir():                       # empty leftover from a failed run
+        if d.is_dir():                       # empty leftover of a failed run
             d.rmdir()
         if ds not in AVAILABLE:
             raise ValueError(
@@ -167,9 +156,7 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
             url, ds, f"download the file by hand and unpack it into {root}, as shown "
                      "under 'Get the data' in the installation guide.")
         root.mkdir(parents=True, exist_ok=True)
-        # extract to a scratch dir first and move into place atomically, so an
-        # interrupted download/extract can never masquerade as a complete
-        # dataset on the next run
+        # into place in one move: an interrupted extract never looks complete
         tmp = Path(_tempfile.mkdtemp(dir=root, prefix=f".{ds}-"))
         try:
             with tarfile.open(tgz) as t:
@@ -289,8 +276,7 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
         try:
             with tarfile.open(tgz) as t:
                 safe_extract(t, tmp)
-            # the archive may be rooted at the tree itself or at one folder
-            # (``outputs-D11/``, ``D11/``) - accept either, nothing deeper
+            # rooted at the tree or at one folder (``outputs-D11/``), nothing deeper
             found = next((c for c in [tmp, *sorted(x for x in tmp.iterdir() if x.is_dir())]
                           if (c / "batch_result.json").is_file()), None)
             if found is None:
