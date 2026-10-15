@@ -435,7 +435,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     s = registry.get(method)
     if not s.variants:
         raise KeyError(f"{method}: no variants (declared stub)")
-    ref = s.reference or {}
+    ref = s.reference
     info = {
         "id": s.id, "language": s.language, "categories": s.categories,
         "tasks": s.tasks, "env": envs.group_for(s.id), "atac": s.atac,
@@ -813,11 +813,11 @@ def cite(*methods, fmt: str = "text") -> str:
     parts = [_format_entry("scMultiBench", registry.benchmark_reference(), fmt)]
     for m in ids:
         s = registry.get(m)
-        ref = (s.reference or {}).get("reference")
+        ref = s.reference.get("reference")
         if ref:
             parts.append(_format_entry(m, ref, fmt))
         else:
-            url = (s.reference or {}).get("repo_url") or "(no repo_url)"
+            url = s.reference.get("repo_url") or "(no repo_url)"
             note = f"{m}: no verified reference; see {url}"
             parts.append(("% " + note) if fmt == "bibtex" else note)
     return "\n\n".join(parts) if fmt == "bibtex" else "\n".join(parts)
