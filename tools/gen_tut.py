@@ -1112,6 +1112,18 @@ def _install(md, code):
 #: what run_all scores besides the scIB metrics on data in several batches
 SCORED_TOO = " and the classification scores (OCA, ACA, Spec, Sens, F1)"
 
+
+def no_classification_sentence(key, methods):
+    """The sentence after ``SCORED_TOO`` for a tutorial that runs a method
+    whose output is a graph: run_all scores no classification for it."""
+    graphs = sorted({m for m, v in task_variants(key)
+                     if m in methods and v.output.kind == "graph"})
+    if not graphs:
+        return ""
+    one = len(graphs) == 1
+    return (f" {and_list(graphs)} write{'s' if one else ''} a graph, so "
+            f"{'it gets' if one else 'they get'} no classification scores.")
+
 PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size shows the rank "
              "within a column, and bigger is better. The fill compares a value with the "
              "other rows in the same column.")
@@ -1193,7 +1205,7 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
     ]
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run_all` runs each method on `{ds}` and scores its output with the scIB metrics{SCORED_TOO if cat != "vertical" else ""}. `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
+`run_all` runs each method on `{ds}` and scores its output with the scIB metrics{SCORED_TOO + "." + no_classification_sentence(key, methods) if cat != "vertical" else "."} `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
 
 """ + details(*run_notes))
     code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
