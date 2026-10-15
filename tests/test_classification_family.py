@@ -156,19 +156,68 @@ def test_a_graph_output(three, tmp_path):
         f["data"] = np.tile(np.arange(20), (90, 1)).T
     with pytest.raises(ValueError) as e:
         mtb.evaluate(graph, labels=paths, metrics="classification")
-    assert str(e.value) == ("metrics='classification' needs an embedding; knn_indices.h5 "
-                            "is not one. Pass the method's embedding file.")
+    assert str(e.value) == ("scMoMaT writes a graph, not an embedding, so it has no "
+                            "classification scores. Pass metrics='clustering'.")
     df, said = _caught(mtb.evaluate, graph, labels=paths, metrics="all", verbose=False)
     assert df.loc[CODES, "Value"].isna().all()
     assert [m for m in said if "OCA" in m] == [
-        "OCA, ACA, Spec, Sens and F1 are NaN: knn_indices.h5 is not an embedding. "
-        "Pass the method's embedding file."]
+        "scMoMaT writes a graph, not an embedding, so OCA, ACA, Spec, Sens and F1 are "
+        "NaN. Pass metrics='clustering' to leave them out."]
     # cells x cells, by default
     df, said = _caught(mtb.evaluate, np.eye(90), labels=paths, verbose=False)
     assert df.loc[CODES, "Value"].isna().all()
     assert [m for m in said if "OCA" in m] == [
-        "OCA, ACA, Spec, Sens and F1 are NaN: output is not an embedding. "
-        "Pass the method's embedding file."]
+        "output is a graph, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
+        "Pass metrics='clustering' to leave them out."]
+
+
+def _knn(n=90, k=20, seed=0):
+    rng = np.random.default_rng(seed)
+    return np.stack([rng.permutation(n)[:k] for _ in range(n)])
+
+
+def test_every_form_of_a_graph_output_is_treated_alike(three, tmp_path):
+    """The kNN index matrix mtb.run returns for scMoMaT, the same matrix in
+    its file and scMoMaT's UMAP file: NaN and one warning by default, an
+    error when classification is asked for."""
+    emb, paths = three
+    umap = tmp_path / "umap_embedding.h5"
+    with h5py.File(umap, "w") as f:
+        f["data"] = emb[:, :2].T
+    knn = _knn()
+    for output, who in ((knn, "output is a graph"), (knn + 1.0, "output is a graph"),
+                        (umap, "scMoMaT writes a graph")):
+        df, said = _caught(mtb.evaluate, output, labels=paths, verbose=False)
+        assert df.loc[CODES, "Value"].isna().all()
+        assert [m for m in said if "OCA" in m] == [
+            f"{who}, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
+            f"Pass metrics='clustering' to leave them out."]
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(output, labels=paths, metrics=["OCA", "ARI"])
+        assert str(e.value) == (f"{who}, not an embedding, so it has no classification "
+                                f"scores. Pass metrics='clustering'.")
+    # the scIB rows of the array are what 0.3.7 gave
+    scib = _quiet(mtb.evaluate, knn, labels=paths, metrics="clustering", verbose=False)
+    assert list(scib.index) == SCIB[:6]
+
+
+def test_an_embedding_is_never_taken_for_a_graph(three):
+    emb, paths = three
+    df, said = _caught(mtb.evaluate, emb, labels=paths, verbose=False)
+    assert not df.loc[CODES, "Value"].isna().any()
+    assert not [m for m in said if "graph" in m]
+
+
+def test_spec_nan_for_a_query_of_one_cell_type_is_said(tmp_path):
+    # with cty1 as the reference only A is shared; with cty2, only A too
+    emb, paths = _write(tmp_path, {"cty1": ("AB", 40), "cty2": ("AC", 40)})
+    df, said = _caught(mtb.evaluate, emb, labels=paths, verbose=False)
+    assert np.isnan(df.loc["Spec", "Value"]) and df.loc["OCA", "Value"] == 1.0
+    assert [m for m in said if "Spec" in m] == [
+        "Spec is NaN: when batch cty1 or cty2 is the reference, the cells it predicts "
+        "are all of one cell type. Compare methods on the other metrics."]
+    _, said = _caught(mtb.evaluate, emb, labels=paths, metrics=["OCA"], verbose=False)
+    assert not [m for m in said if "Spec" in m]
 
 
 def test_no_batch_to_learn_from(tmp_path):
@@ -239,7 +288,14 @@ def test_score_record_carries_the_codes(three, tmp_path):
         W._score_record(dict(rec), emb, "MB", "cross", tmp_path, graph,
                         metrics="classification")
     assert str(e.value) == ("StabMap writes a graph, not an embedding, so it has no "
-                            "classification scores. Pass other metrics=.")
+                            "classification scores. Pass metrics='clustering'.")
+    # classification and another code: the graph row is scored on the other
+    # code, and nothing is said of a batch the caller never passed
+    h = dict(rec)
+    _, said = _caught(W._score_record, h, emb, "MB", "cross", tmp_path, graph,
+                      metrics=["OCA", "ARI"])
+    assert list(h["metrics"]) == ["ARI"]
+    assert not [m for m in said if "batch" in m]
 
 
 def test_rescore_carries_the_codes(three, tmp_path):
@@ -294,6 +350,33 @@ def test_bar_scores_the_family_in_pink():
         "no 'classification' metrics present. Found ['ARI', 'ASW', 'ASW_batch', 'GC', "
         "'NMI', 'cLISI', 'iASW', 'iF1', 'iLISI']. The stored tables have none. "
         "mtb.evaluate computes them on multi-batch data.")
+
+
+def test_cli_bar_names_the_command(tmp_path, capsys):
+    long = tmp_path / "long.csv"
+    _long(SCIB).assign(category="cross").to_csv(long, index=False)
+    code = cli.main(["plot", "bar", "--input", str(long), "--group", "classification",
+                     "--out", str(tmp_path / "x.png")])
+    err = capsys.readouterr().err
+    assert code == 1 and "multibench evaluate computes them" in err
+    assert "mtb." not in err
+
+
+def test_bubble_grey_columns_with_a_method_without_values():
+    lg = pd.concat([_long(SCIB + CODES, methods=("M1",)), _long(SCIB, methods=("M2",))])
+    lg.loc[lg.method == "M2", "value"] += 0.01
+    _, said = _caught(mtb.plot.build_table, lg)
+    grey = [m for m in said if "grey" in m]
+    assert len(grey) == 1 and grey[0].endswith(
+        "for every method with a value. Those columns are grey.")
+    assert "for every method." not in grey[0]
+
+
+def test_recommend_without_classification_scores():
+    with pytest.raises(ValueError) as e:
+        _quiet(mtb.recommend, "cross", metrics="classification")
+    assert str(e.value) == ("The stored tables have no classification scores. Score "
+                            "your runs with mtb.evaluate and pass them as long_df=.")
 
 
 def test_stored_tables_have_no_classification():
