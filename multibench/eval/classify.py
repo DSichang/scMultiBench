@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 
 from . import io
-from .pipeline import (_Table, _and_list, _as_written, _cell_ids, _count_error,
+from ..config import _and_list
+from .pipeline import (_Table, _as_written, _cell_ids, _count_error,
                        _is_label_path_list, _labels_from_dict, _n_values,
                        _no_batch_error, _no_label_error, _obs_or_vector,
                        _stack_label_files)

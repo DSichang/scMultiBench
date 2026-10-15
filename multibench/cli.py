@@ -59,12 +59,13 @@ import pandas as pd
 import multibench
 from . import __version__, config, discover, workflow
 from . import plot as plot_ns
+from .config import _and_list
 from .data.results import _unpublished_msg
 from .engine import envs, ingest, registry, schema
 from .engine.runner import _prepared_at
 from .eval import io as eio
 from .eval import pipeline
-from .plot.bubble import _and, _unknown_names
+from .plot.bubble import _unknown_names
 from .workflow import (_batch_length_problem, _batch_vector, _column_name_error,
                        _dry_run_notes, _is_wrong_atac, _is_wrong_ref, _rows_word, _scan_note,
                        _scripts_ref_note)
@@ -818,8 +819,8 @@ def _filter_own_rows(frames: list, args) -> list:
             own = list(dict.fromkeys(whole.loc[keep, "method"].astype(str)))
             noun = "method" if len(own) == 1 else "methods"
             raise ValueError(
-                f"Your rows are for {noun} {_and(own)}, and --methods {args.methods} "
-                f"removed all of them. Add {_and(own)} to --methods.")
+                f"Your rows are for {noun} {_and_list(own)}, and --methods {args.methods} "
+                f"removed all of them. Add {_and_list(own)} to --methods.")
         keep &= by_method
     dropped = whole[~keep]
     if len(dropped):
@@ -1420,7 +1421,7 @@ def _named(env_names) -> str:
     names = list(dict.fromkeys(env_names))
     if len(names) > 3:
         return f"{len(names)} envs"
-    return " and ".join([", ".join(names[:-1]), names[-1]]) if len(names) > 1 else names[0]
+    return _and_list(names)
 
 
 _SINGLE_BUILD = "a single build (the same archive for CPU and GPU hosts)"

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from urllib.parse import quote as _quote
 
+from .config import _and_list
 from .engine import registry, upstream, envs
 from .engine import resolve as _resolve
 from .engine.schema import AmbiguousVariantError, is_label_role
@@ -646,7 +647,7 @@ def params_for(method: str, category: str | None = None,
         if len(s.variants) > 1:
             v = _by_folder(s.variants)
             if v is None:
-                keys = _resolve._and_list(_variant_key(x) for x in s.variants)
+                keys = _and_list(_variant_key(x) for x in s.variants)
                 raise AmbiguousVariantError(
                     f"{method} has {len(s.variants)} variants, {keys}. Pass the "
                     f"category and modalities of one, for example "
@@ -662,7 +663,7 @@ def params_for(method: str, category: str | None = None,
         if len(cands) > 1:
             v = _by_folder(cands)
             if v is None:
-                mods = _resolve._and_list("+".join(x.when.get("modalities", []))
+                mods = _and_list("+".join(x.when.get("modalities", []))
                                           for x in cands)
                 raise AmbiguousVariantError(
                     f"{method} has {len(cands)} {category} variants, {mods}. Pass the "
@@ -678,16 +679,16 @@ def params_for(method: str, category: str | None = None,
             cands = [x for x in s.variants
                      if {modality_family(m) for m in x.when.get("modalities", [])} == want]
         if not cands:
-            keys = _resolve._and_list(_variant_key(x) for x in s.variants)
+            keys = _and_list(_variant_key(x) for x in s.variants)
             raise KeyError(
                 f"No variant of {method} takes the modalities "
-                f"{_resolve._and_list(sorted(modalities))}. Its variants: {keys}.")
+                f"{_and_list(sorted(modalities))}. Its variants: {keys}.")
         if len(cands) > 1:
             v = _by_folder(cands)
             if v is None:
-                keys = _resolve._and_list(_variant_key(x) for x in cands)
+                keys = _and_list(_variant_key(x) for x in cands)
                 raise AmbiguousVariantError(
-                    f"The modalities {_resolve._and_list(sorted(modalities))} match "
+                    f"The modalities {_and_list(sorted(modalities))} match "
                     f"{len(cands)} variants of {method}, {keys}. Pass the category "
                     f"too, for example {_example(cands[0])}.")
         else:

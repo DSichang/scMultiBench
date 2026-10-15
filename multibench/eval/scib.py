@@ -470,9 +470,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             needs = [m for m in ("ARI", "NMI")
                      if cluster is None and (only is None or m in only)] \
                 + (["iF1"] if needs_isof1 else [])
-            names = (needs[0] if len(needs) == 1
-                     else ", ".join(needs[:-1]) + " and " + needs[-1])
             from .. import config
+            names = config._and_list(needs)
             # clustering= spares the sweep only when iF1 does not need it
             skip = (config.hint(f"metrics= without {names}",
                                 f"--metrics without {names}")

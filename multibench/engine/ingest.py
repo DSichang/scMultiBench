@@ -408,7 +408,7 @@ def _norm_modality(modality):
         valid = [m + (f" (or {', '.join(alias[m])})" if alias[m] else "")
                  for m in _MODALITIES]
         raise ValueError(f"Unknown modality {modality}. The modalities are "
-                         f"{', '.join(valid[:-1])} and {valid[-1]}.")
+                         f"{config._and_list(valid)}.")
     return m
 
 
@@ -1854,9 +1854,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                 skip={name for names in found for name in names})
         raise FileExistsError(_leftover_message(out, found, n_batches=n_batches, held=held))
     if existing and not overwrite:
-        from .resolve import _and_list
         raise FileExistsError(
-            f"{out} already holds {_and_list(existing)}. Pass "
+            f"{out} already holds {config._and_list(existing)}. Pass "
             f"{config.hint('overwrite=True', '--overwrite')} to replace "
             f"{'it' if len(existing) == 1 else 'them'}.")
     # --- cells that the folder already holds keep the row order of its files

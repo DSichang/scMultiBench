@@ -473,4 +473,4 @@ def test_shipped_tree_is_consistent_across_the_api(result_dir):
             continue
         with pytest.raises(FileNotFoundError, match="result_path=") as e:
             results.load_results(c, dataset="D999", result_path=result_dir)
-        assert f"The published tables of {c} hold {results._and(ds)}, not D999." in str(e.value)
+        assert f"The published tables of {c} hold {results._and_list(ds)}, not D999." in str(e.value)

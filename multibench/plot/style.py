@@ -12,6 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from ..config import _and_list
+
 #: values that agree to this many decimal places are ties: floating-point
 #: noise (an iLISI of 2.2e-16 next to 0.0) must not decide a rank or a fill
 TIE_DECIMALS = 9
@@ -160,15 +162,9 @@ def _no_overlap_message(parts: dict, stored=()) -> str | None:
     same_cells = ("" if stored else
                   " If these datasets hold the same cells, give their rows one "
                   "dataset name first.")
-    return (f"The rows come from {n} datasets, {_and(names)}, that share no method. "
+    return (f"The rows come from {n} datasets, {_and_list(names)}, that share no method. "
             f"The figure ranks unrelated rows against each other. "
             f"Plot each dataset on its own, or {remedy}.{same_cells}")
-
-
-def _and(names) -> str:
-    """``'A'``, ``'A and B'``, ``'A, B and C'``."""
-    names = [str(n) for n in names]
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _lone_method_messages(parts: dict, consequence: str) -> list:
@@ -204,7 +200,7 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
         for m, c in partial.items():
             by_count.setdefault(int(c), []).append(str(m))
         seen = " ".join(
-            f"{_and(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
+            f"{_and_list(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
             for c, ms in by_count.items())
         out.append(
             f"The summary ranks {n} datasets. {seen} With "
@@ -236,7 +232,7 @@ def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
     none_shared = _no_overlap_message(parts, stored)
     if none_shared:
         return [none_shared] + lone
-    msg = (f"This figure averages each method over {n} datasets, {_and(parts)}. "
+    msg = (f"This figure averages each method over {n} datasets, {_and_list(parts)}. "
            "Its rows mix datasets. ")
     if (coverage(parts) >= 2).all() and not lone:
         msg += config.hint(

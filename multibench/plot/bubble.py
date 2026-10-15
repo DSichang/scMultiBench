@@ -17,9 +17,9 @@ import numpy as np
 import pandas as pd
 
 from . import style
-from .style import _and
 from .. import _compat
 from .. import config as _config
+from ..config import _and_list
 
 # column order within each family, as in the paper's panels
 FAMILIES = [
@@ -153,8 +153,8 @@ class BubbleTable:
 
 
 def _and_distinct(values) -> str:
-    """:func:`_and` of the distinct ``str`` forms of ``values``, in first-seen order."""
-    return _and(dict.fromkeys(map(str, values)))
+    """``_and_list`` of the distinct ``str`` forms of ``values``, in first-seen order."""
+    return _and_list(dict.fromkeys(map(str, values)))
 
 
 def _unknown_names(unknown, available, kind: str) -> str:
@@ -555,14 +555,14 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
         groups = {}
         for c, v in constant.items():
             groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
-        same = " ".join(f"Every method has mean rank {v} in {_and(cs)}."
+        same = " ".join(f"Every method has mean rank {v} in {_and_list(cs)}."
                         for v, cs in groups.items())
         return f"{same} {which} grey."
     sentences = []
     for cols, who in (([c for c in constant if c not in partial], "every method"),
                       ([c for c in constant if c in partial], "every method with a value")):
         if cols:
-            sentences.append(_and([f"{c} is {constant[c]:.3f}" for c in cols])
+            sentences.append(_and_list([f"{c} is {constant[c]:.3f}" for c in cols])
                              + f" for {who}.")
     return f"{' '.join(sentences)} {which} grey."
 
@@ -626,12 +626,6 @@ def _na_missing(blocks, parts, aggregate: str) -> list:
     return out
 
 
-def _either(codes) -> str:
-    """``'ASW, iASW or ASW_batch'``."""
-    codes = [str(c) for c in codes]
-    return codes[0] if len(codes) == 1 else ", ".join(codes[:-1]) + " or " + codes[-1]
-
-
 #: most rows the ``n/a`` warning names before it counts the rest
 NA_ROWS_SHOWN = 3
 
@@ -661,10 +655,10 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
             by_codes: dict = {}
             for ds, codes in per_ds:
                 by_codes.setdefault(tuple(codes), []).append(str(ds))
-            what = ", and no ".join(f"{_either(codes)} on {_and(dss)}"
+            what = ", and no ".join(f"{_and_list(codes, 'or')} on {_and_list(dss)}"
                                     for codes, dss in by_codes.items())
         else:
-            what = _either(dict.fromkeys(c for _, codes in per_ds for c in codes))
+            what = _and_list(dict.fromkeys(c for _, codes in per_ds for c in codes), "or")
         text = f"{name} has no {what}."
         if whole:
             text += f" It has no {' or '.join(whole)} Overall."
@@ -703,7 +697,7 @@ def _duplicate_rows_message(dup, keys) -> str:
                 f"{_and_distinct(mixed['method'])}{where}. "
                 f"Give your rows another name, such as {first}_rerun, "
                 + _config.hint("with to_long(method=...).", "with evaluate --name."))
-    what = ", ".join(keys[:-1]) + " and " + keys[-1]
+    what = _and_list(keys)
     example = ", ".join(str(dup[k].iloc[0]) for k in keys)
     return (f"{len(dup)} rows repeat the same {what}, for example {example}. The figure "
             "does not average them. Remove the repeats, or give each version its own "

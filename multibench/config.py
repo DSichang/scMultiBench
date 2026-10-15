@@ -64,6 +64,12 @@ def hint(py: str, cli: str) -> str:
     return cli if _CLI else py
 
 
+def _and_list(items, last: str = "and") -> str:
+    """``'A'``, ``'A and B'``, ``'A, B and C'`` (``last='or'``: ``'A, B or C'``); repeats stay."""
+    items = [str(i) for i in items]
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {last} {items[-1]}"
+
+
 def _from_env(var: str) -> Path | None:
     """The path in environment variable ``var`` (``~`` expanded), or ``None`` if unset or empty."""
     value = _os.environ.get(var)

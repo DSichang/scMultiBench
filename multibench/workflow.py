@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 
 from . import config
+from .config import _and_list
 from .discover import _runtimes
 from .engine import envs, registry, resolve as _resolve
 from .engine import runner as _runner
@@ -689,7 +690,7 @@ _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
 def _dropped_dirs_message(modalities, dropped: list) -> str:
     """The warning of ``scan(modalities=...)`` for the methods that read a folder."""
     one = len(dropped) == 1
-    mods = _resolve._and_list([str(m) for m in modalities])
+    mods = _and_list([str(m) for m in modalities])
     head = (f"The modality {mods} leaves" if len(modalities) == 1
             else f"The modalities {mods} leave")
     fix = config.hint(
@@ -697,7 +698,7 @@ def _dropped_dirs_message(modalities, dropped: list) -> str:
         f"modalities= to see every variant.",
         f'Pass --modalities "" to select {"it" if one else "them"}, or leave out '
         f"--modalities to see every variant.")
-    return (f"{head} out {_resolve._and_list(dropped)}, which "
+    return (f"{head} out {_and_list(dropped)}, which "
             f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
 
 
@@ -920,7 +921,6 @@ def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
     """The ``ValueError`` for named methods without a row, or a selection that
     matches no variant: what does not run, then why."""
     from .engine.schema import no_category_message
-    from .plot.bubble import _and
     where = f"{category} data" if category else "any category"
     methods = list(methods or ())
     cats = {m: dict.fromkeys(c for s, _v, c, _m in _variant_rows() if s.id == m and c)
@@ -932,7 +932,7 @@ def _no_variant_error(category, dataset, methods, modalities) -> ValueError:
     parts = [no_category_message(m, cats[m], category) for m in off]
     if modalities is not None and (dropped or not methods):
         mods = "+".join(map(str, modalities or ())) or "a data folder"
-        parts.append(f"{_and(dropped)} {'does' if len(dropped) == 1 else 'do'} not read "
+        parts.append(f"{_and_list(dropped)} {'does' if len(dropped) == 1 else 'do'} not read "
                      f"{mods} in {where}." if dropped else
                      f"No method reads {mods} in {where}.")
         one = dropped[0] if len(dropped) == 1 else None
@@ -1053,7 +1053,7 @@ def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = Non
     tenx = _tenx_files(ds_dir, files)
     is_tenx = ""
     if tenx:
-        is_tenx = f" {_resolve._and_list(tenx)} " + (
+        is_tenx = f" {_and_list(tenx)} " + (
             "is a 10x Genomics file under the name of a dataset file." if len(tenx) == 1
             else "are 10x Genomics files under the names of dataset files.")
         held = [f for f in held
@@ -1063,7 +1063,7 @@ def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = Non
     nums = sorted(_resolve._folder_batches(ds_dir))
     where = (f", in {'batch' if len(nums) == 1 else 'batches'} {_resolve._span(nums)}"
              if nums else "")
-    return (f"{dataset} holds {_resolve._and_list(_FAMILY_WORDS[f] for f in held)}{where}."
+    return (f"{dataset} holds {_and_list(_FAMILY_WORDS[f] for f in held)}{where}."
             + is_tenx)
 
 
@@ -1074,7 +1074,7 @@ def _all_spelling() -> str:
 
 def _lacking(families) -> str:
     """``ATAC``, ``ADT or ATAC``: the families as words."""
-    return _or([_FAMILY_WORDS[f] for f in families])
+    return _and_list([_FAMILY_WORDS[f] for f in families], "or")
 
 
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
@@ -2931,17 +2931,11 @@ _MOVED_FIX = ("Pass data_path= to mtb.load_batch, or run rescore from the folder
               "where run_all ran.")
 
 
-def _or(values) -> str:
-    """``'A'``, ``'A or B'``, ``'A, B or C'``."""
-    v = list(values)
-    return v[0] if len(v) == 1 else ", ".join(v[:-1]) + " or " + v[-1]
-
-
 def _folder_missing(dataset: str, roots) -> str:
     """The clause that the dataset folder is under none of ``roots``, each absolute."""
     where = dict.fromkeys(os.path.abspath(config.DEFAULT.data_path if r is None else r)
                           for r in roots)
-    return f"the dataset folder {dataset} is not found in {_or(where)}"
+    return f"the dataset folder {dataset} is not found in {_and_list(where, 'or')}"
 
 
 def _unplaced_batch_note(dataset: str, data_path, tried, n_ids: int) -> str:
@@ -3160,7 +3154,7 @@ def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
         miss, shown, files = _eio.missing_mask(lab), lab, "the labels you passed"
         if not user:
             folder = _dataset_folder(dataset, data_path)
-            files = _resolve._and_list(names)
+            files = _and_list(names)
             shown = np.concatenate([np.asarray(_eio.read_labels(folder / k, as_written=True),
                                                dtype=object) for k in names])
         return (f"ValueError: {int(miss.sum()):,} of the {len(miss):,} labels in {files} "
@@ -3234,8 +3228,8 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
         drop += inside
         kept = [rows.at[i, "modalities"] for i in sets if i not in inside]
         left = [rows.at[i, "modalities"] for i in inside]
-        notes.append(f"{method} runs on {_resolve._and_list(kept)}, not on "
-                     f"{_resolve._and_list(left)}, whose files are part of it. Pass "
+        notes.append(f"{method} runs on {_and_list(kept)}, not on "
+                     f"{_and_list(left)}, whose files are part of it. Pass "
                      + config.hint("modalities=", "--modalities")
                      + " to run a smaller combination.")
     return drop, notes

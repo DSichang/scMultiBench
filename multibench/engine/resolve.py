@@ -8,6 +8,7 @@ import warnings
 from pathlib import Path
 
 from .. import config
+from ..config import _and_list
 from . import registry
 from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
                      base_modality, is_label_role)
@@ -67,12 +68,6 @@ def _batch_column_advice() -> str:
                        'run_all(batch=adata.obs["donor"])',
                        "convert without --batch and pass a CSV file of barcode and batch "
                        "to run-all --batch")
-
-
-def _and_list(names) -> str:
-    """``['a', 'b', 'c']`` -> ``'a, b and c'``."""
-    names = [str(n) for n in names]
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f" and {names[-1]}"
 
 
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
@@ -837,8 +832,7 @@ def _check_data_dir(variant, data_dir, method: str = "The method") -> tuple[bool
     if len(missing) == 1:
         return False, f"{method} needs {missing[0]}, and {d} has no such file."
     if missing:
-        names = ", ".join(missing[:-1]) + f" and {missing[-1]}"
-        return False, f"{method} needs {names}, and {d} has none of them."
+        return False, f"{method} needs {_and_list(missing)}, and {d} has none of them."
     return True, ""
 
 

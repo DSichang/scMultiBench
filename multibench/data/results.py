@@ -20,6 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 from .. import config
+from ..config import _and_list
 from .. import _compat
 from . import catalog
 
@@ -142,8 +143,8 @@ def _no_dataset_msg(source: str, category, missing, have) -> str:
     """The error for datasets without a stored table: the datasets the tables
     hold, and the ``result_path=`` sentence."""
     of = f" of {category}" if category else ""
-    held = (f"hold {_and(have)}" if have else "hold no dataset") + (
-        f", not {_and(missing)}." if missing else ".")
+    held = (f"hold {_and_list(have)}" if have else "hold no dataset") + (
+        f", not {_and_list(missing)}." if missing else ".")
     return f"The {_SOURCE_WORD.get(source, source)} tables{of} {held} {_RESULT_PATH_HINT}"
 
 
@@ -272,7 +273,7 @@ def _load_published(category: str, datasets: list | None, clustering: str,
                      and next(_iter_published(root, datasets, c), None) is not None]
         raise FileNotFoundError(
             f"The published tables of {category} have no {clustering} variant."
-            + (f" They have {_and(other)} only." if other else ""))
+            + (f" They have {_and_list(other)} only." if other else ""))
     return pd.concat(rows, ignore_index=True)[COLUMNS]
 
 
@@ -843,7 +844,7 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
     other = "rerun" if source == "published" else "published"
     where = category or "/".join(cats)
     if datasets:          # no dataset filter: the selection is the category
-        where += f"/{_and(datasets)}"
+        where += f"/{_and_list(datasets)}"
     names = {"published": "published", "rerun": "re-run"}
     fix = config.hint(f'Pass source="{other}" or "both".', f"Pass --source {other}.")
     warnings.warn(
@@ -1126,12 +1127,6 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
     head = f"Stored {category} scores" if stored else f"The {category} scores in long_df"
     return (f"{head} come from {where}. None of these datasets measured "
             f"{' or '.join(missing)}, so this ranking does not describe {data} data.")
-
-
-def _and(names) -> str:
-    """``'A'``, ``'A and B'``, ``'A, B and C'``."""
-    names = [str(n) for n in names]
-    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _runtime(method_id: str, method_info) -> dict:
@@ -1509,7 +1504,7 @@ def recommend(
     if degenerate:
         one = len(degenerate) == 1
         notes.append(
-            f"{'Dataset' if one else 'Datasets'} {_and(degenerate)} "
+            f"{'Dataset' if one else 'Datasets'} {_and_list(degenerate)} "
             f"{'has' if one else 'have'} fewer than {min_methods} methods and "
             f"{'is' if one else 'are'} left out of the ranking. A min-max score "
             f"over one method is always 1.0.")
@@ -1517,7 +1512,7 @@ def recommend(
         one = len(foreign) == 1
         it, they = ("it", "it is") if one else ("them", "they are")
         notes.append(
-            f"{_and(foreign)} {'has' if one else 'have'} scores in the "
+            f"{_and_list(foreign)} {'has' if one else 'have'} scores in the "
             f"{table_noun}, but this package does not run {it} for {category}, "
             f"so {they} left out of the ranking. "
             f"mtb.list_methods(category={category!r}) does not list {it}.")
@@ -1533,7 +1528,7 @@ def recommend(
     if only_dropped:
         one = len(only_dropped) == 1
         notes.append(
-            f"{_and(only_dropped)} {'has' if one else 'have'} scores only on "
+            f"{_and_list(only_dropped)} {'has' if one else 'have'} scores only on "
             f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
             f"listed last.")
     if no_rows:

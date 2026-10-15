@@ -10,6 +10,7 @@ import pandas as pd
 
 from . import io
 from .. import _compat, config
+from ..config import _and_list
 from ..data import catalog
 
 #: the seven columns of the long table, the same as multibench.data.results.COLUMNS
@@ -438,7 +439,7 @@ def _stack_label_files(files, ids, as_written=False, table=None):
     unique = ids is not None and pd.Index(ids).is_unique
     order = "the rows of the output"
     if all(first is not None for _, first in read):
-        name = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        name = _and_list(names)
         keys = pd.concat([first for _, first in read], ignore_index=True)
         if table is not None and unique and _file_carries_ids(keys, ids) \
                 and _same_cells(keys, ids, what="labels", table=table, **(
@@ -878,12 +879,6 @@ def _metrics_spelling(metrics) -> str:
         codes = [str(m) for m in metrics]
         return config.hint(f"metrics={codes!r}", f"--metrics {','.join(codes)}")
     return config.hint(f"metrics={metrics!r}", f"--metrics {metrics}")
-
-
-def _and_list(items, last: str = "and") -> str:
-    """``['a', 'b', 'c']`` -> ``'a, b and c'``."""
-    items = [str(i) for i in items]
-    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {last} {items[-1]}"
 
 
 def _legacy_evaluate_kwargs(kw: dict) -> dict:
