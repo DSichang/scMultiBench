@@ -66,16 +66,12 @@ def _runtime_of(method: str) -> dict:
     return method_info(method)["runtime"]
 
 
-# Deprecated 0.2 spellings, kept for one release: each warns (DeprecationWarning)
-# and forwards. They stay reachable as attributes but are not in __all__ and
-# do not show in dir(mtb).
+# deprecated 0.2 spellings: reachable, not in __all__ or dir(mtb)
 plan = _deprecated_alias("plan", "scan", scan)
 plan_commands = _deprecated_alias("plan_commands", "scan", scan)
 runtime_hint = _deprecated_alias("runtime_hint", "method_info(m)['runtime']", _runtime_of)
 
 
 def __dir__() -> list[str]:
-    """``dir(mtb)`` lists the public surface (``__all__``) and the dunders only
-    (PEP 562): imported submodules and the deprecated aliases are reachable
-    but not advertised."""
+    """``dir(mtb)`` lists ``__all__`` and the dunders only (PEP 562)."""
     return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})

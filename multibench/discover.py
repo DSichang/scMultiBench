@@ -9,54 +9,25 @@ from urllib.parse import quote as _quote
 
 from .engine import registry, upstream, envs
 from .engine import resolve as _resolve
-from .engine.runner import _AUX_ROLES  # noqa: F401  (re-exported for back-compat)
 from .engine.schema import AmbiguousVariantError, is_label_role
-from .engine.schema import base_modality as _base_modality  # noqa: F401  (tests import it from here)
-
-
-def _modality_types(spec) -> set[str]:
-    """Union of base modality types consumed across all of a method's variants.
-
-    Auxiliary roles (data_dir, source/target data & cty, out_dir) and label roles
-    are excluded. Methods with no variants (declared stubs) yield an empty set.
-    (Thin alias of ``MethodSpec.modality_types``, kept for callers/tests.)
-    """
-    return spec.modality_types
-
+from .engine.schema import base_modality as _base_modality
 
 #: representation role tokens -> the ``atac=`` value they stand for
 _REPRESENTATION_TOKENS = {"atac_peak": "peak", "atac_gas": "gene_activity"}
 
 
 def _representations(toks) -> set[str]:
-    """The ATAC representations (``peak``, ``gene_activity``) that normalised
-    modality tokens name."""
+    """The ATAC representations (``peak``, ``gene_activity``) the normalised tokens name."""
     return {_REPRESENTATION_TOKENS[t] for t in toks if t in _REPRESENTATION_TOKENS}
 
 
-#: the two ATAC representation roles; naming both selects the variants that
-#: read both files (MultiMAP and Seurat_v3 read atac_peak.h5 and atac_gas.h5)
+#: naming both ATAC roles selects the variants that read both files (MultiMAP, Seurat_v3)
 _BOTH_FILES = frozenset(_REPRESENTATION_TOKENS)
 
 
 def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
-    """The one modality rule of ``find_methods`` and ``recommend``.
-
-    Returns ``(base types every matching variant must consume, atac)``. A base
-    token (``rna``, ``adt``/``protein``, ``atac``, or a numbered role such as
-    ``rna1``) matches every role of that type. A representation token
-    (``atac_peak``/``peak``/``peaks``, ``atac_gas``/``gas``/``gene_activity``)
-    means base ``atac`` plus the representation the method reads
-    (``method_info(m)['atac']``), the same as ``atac='peak'`` /
-    ``atac='gene_activity'``: the role name alone does not say what the script
-    reads (moETM takes ``atac_gas`` and reads peaks). Both representation
-    tokens together select the variants that read both files
-    (:func:`_reads_both_files`); ``atac`` is then left as given.
-
-    Raises ``TypeError`` for a bare string, ``ValueError`` for an unknown
-    token or ``atac`` value, or for a representation that contradicts
-    ``atac=``.
-    """
+    """``(base types every matching variant must consume, atac)``: the modality rule
+    of ``find_methods`` and ``recommend`` (see the ``find_methods`` Notes)."""
     if isinstance(modalities, str):
         raise TypeError(
             f"modalities must be a list of modality tokens, got the string "
@@ -76,21 +47,15 @@ def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
 
 
 def _reads_both_files(modalities) -> bool:
-    """Whether ``modalities`` names both ATAC representations (``atac_peak``
-    and ``atac_gas``, in any spelling): then only a variant with both roles
-    matches."""
+    """Whether ``modalities`` names both ATAC representations, in any spelling."""
     if modalities is None or isinstance(modalities, str):
         return False
     return _BOTH_FILES <= set(registry.normalize_modalities(modalities))
 
 
 def _variant_matches(v, category, want, needs_labels, atac) -> bool:
-    """Whether one variant satisfies every per-variant filter at once.
-
-    ``v`` may be ``None`` for a declared-but-unwired stub (no variants): it
-    satisfies only the filters that ask for nothing a variant could supply
-    (``needs_labels`` None/False, no ``modalities``, no ``atac``).
-    """
+    """Whether variant ``v`` satisfies every per-variant filter; ``v=None`` (a stub)
+    satisfies only filters that ask nothing of a variant."""
     if v is None:
         return want is None and atac is None and not needs_labels
     if category and v.when.get("category") != category:
@@ -203,8 +168,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     ``peak`` / ``peaks`` and ``gene_activity`` / ``gene-activity`` / ``gas``,
     in any case.
 
-    **Labels.** ``needs_labels`` here is per variant.
-    ``method_info(m)['needs_labels']`` is the method-level flag (any variant
+    **Labels.** ``method_info(m)['needs_labels']`` is the method-level flag (any variant
     needs labels); the per-variant answer is
     ``method_info(m)['supports'][i]['needs_labels']``.
 
@@ -234,12 +198,9 @@ def find_methods(category: str | None = None, *, task: str | None = None,
             continue
         if runnable is not None and bool(s.variants) != runnable:
             continue
-        if tunable is not None:
-            has = any(v.tunable for v in s.variants)
-            if has != tunable:
-                continue
-        # `atac` is declared once per method but only variants that take an
-        # ATAC input can honour it; fold that into the per-variant test.
+        if tunable is not None and any(v.tunable for v in s.variants) != tunable:
+            continue
+        # atac is declared per method, but only a variant with an ATAC input honours it
         if atac and s.atac != atac:
             continue
         cands = s.variants or [None]
@@ -255,9 +216,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
 
 def _find_methods_filters_raise(fn):
-    """Keyword guard of ``list_methods``: a ``find_methods`` filter passed to
-    it raises a ``TypeError`` that names ``find_methods``; any other unknown
-    keyword gets Python's own message. The signature stays ``(category)``."""
+    """Keyword guard of ``list_methods``: a ``find_methods`` filter raises a
+    ``TypeError`` naming ``find_methods``; another keyword gets Python's message."""
     @functools.wraps(fn)
     def guard(*args, **kwargs):
         extra = [k for k in kwargs if k != "category"]
@@ -295,7 +255,8 @@ def list_methods(category: str | None = None) -> list[str]:
     ValueError
         Unknown ``category``; the message lists the valid ones.
     TypeError
-        A keyword other than ``category``; see **Other keywords** in Notes.
+        A keyword other than ``category``. For a ``find_methods`` filter such as
+        ``task=`` the message names the call to use: ``find_methods(category, task=...)``.
 
     Examples
     --------
@@ -305,14 +266,9 @@ def list_methods(category: str | None = None) -> list[str]:
 
     Notes
     -----
-    **Category membership.** A method is listed under a category when it has
-    a variant for that category - the same set ``scan``, ``run_all``
-    and ``find_methods(category=)`` dispatch.
-
-    **Other keywords.** A ``find_methods`` filter such as ``task=`` or
-    ``runnable=`` raises a ``TypeError`` that names the call to use
-    instead: ``find_methods(category, task=...)``. Any other keyword raises
-    Python's own ``unexpected keyword argument`` message.
+    A method is listed under a category when it has a variant for that
+    category - the same set ``scan``, ``run_all`` and
+    ``find_methods(category=)`` dispatch.
 
     See Also
     --------
@@ -324,13 +280,8 @@ def list_methods(category: str | None = None) -> list[str]:
 
 
 def _effective(v) -> dict:
-    """Upstream argparse defaults overlaid with what the wrapper actually emits.
-
-    ``tunable[k]['default']`` stays the upstream default (documented contract);
-    ``defaults`` is what the package passes on the command line; ``effective`` is
-    the merge - the value the script will really run with when the caller
-    passes no ``params``.
-    """
+    """The value each knob runs with when the caller passes no ``params``: upstream
+    argparse defaults overlaid with what the package passes."""
     eff = {k: (t or {}).get("default") for k, t in v.tunable.items()}
     eff.update(dict(v.params))
     return eff
@@ -338,8 +289,7 @@ def _effective(v) -> dict:
 
 def _reference_batch(variant):
     """Batch ``N`` of a variant's ``reference`` const ``data<N>``, else ``None``."""
-    ref = next((a.const for a in variant.args
-                if getattr(a, "role", None) == "reference" and a.const), None)
+    ref = next((a.const for a in variant.args if a.role == "reference" and a.const), None)
     ref = str(ref) if ref is not None else ""
     return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
 
@@ -482,37 +432,23 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     mtb.env.recipe : the hand-written environment recipe of a method.
     """
     s = registry.get(method)
-    # scripts_url, variants and params all come from the variants
     if not s.variants:
         raise KeyError(f"{method}: no variants (declared stub)")
     ref = s.reference or {}
     info = {
         "id": s.id, "language": s.language, "categories": s.categories,
-        # `env` is the conda env run() actually executes in: the shared group
-        # env, or the method's own scmb_<method> env (see engine.envs.group_for).
         "tasks": s.tasks, "env": envs.group_for(s.id), "atac": s.atac,
         "needs_labels": s.needs_labels, "status": s.status,
         "setup_hint": s.setup_hint,
-        # distinct entrypoints, in declaration order (several variants may share
-        # one script)
         "variants": list(dict.fromkeys(v.entrypoint for v in s.variants)),
-        # package-relative wrapper the runner executes instead of the entrypoint
-        # (it source()s/imports the unmodified upstream script); None = the
-        # upstream script itself is run
         "driver": next((v.driver for v in s.variants if v.driver), None),
-        # folder of this method's unmodified upstream scripts in the
-        # scMultiBench repository, percent-encoded ('online iNMF' has a space)
+        # percent-encoded: 'online iNMF' has a space
         "scripts_url": ("https://github.com/PYangLab/scMultiBench/tree/main/"
                         + _quote("/".join(s.variants[0].entrypoint.split("/")[:2]),
                                  safe="/")),
-        # provenance (engine/references.yaml): the upstream repository / docs, the
-        # version the benchmark ran, and the paper to cite (see mtb.cite)
         "repo_url": ref.get("repo_url") or upstream.knobs_for(s.id)["upstream_url"],
         "version": ref.get("version"),
         "reference": dict(ref["reference"]) if ref.get("reference") else None,
-        # What this method can actually be dispatched for. Methods like Multigrate
-        # support several integration categories, each with its own modality
-        # combination - this is the list to pass to run()/inputs_for().
         "supports": [{"category": v.when.get("category"),
                       "modalities": list(v.when.get("modalities", [])),
                       "output_kind": v.output.kind,
@@ -521,26 +457,17 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
                       "labels": [r for r in v.roles() if is_label_role(r)],
                       "reference_batch": _reference_batch(v)}
                      for v in s.variants],
-        # what the caller may pass to run(params=...): see params_for()
         "params": {_variant_key(v): {"defaults": dict(v.params),
                                      "tunable": dict(v.tunable),
                                      "effective": _effective(v)}
                    for v in s.variants},
     }
-    # An empty `tunable` means the script exposes nothing on its command line,
-    # not that the method has no hyperparameters: also report what the script
-    # pins and what its library documents.
     up = upstream.knobs_for(s.id)
     info["fixed_in_script"] = up["fixed_in_script"]
     info["upstream_knobs"] = up["upstream_knobs"]
     info["upstream_url"] = up["upstream_url"]
-    # `notes` is the curated one-line summary; verbose=True adds the long
-    # audit notes as notes_long.
     info["notes"] = ref.get("summary") or None
-    # observed cost (engine/runtimes.yaml); the tier scan() reports per row
     info["runtime"] = _runtime_hint(s.id)
-    # the GPU/CPU contract of the upstream script (methods.yaml, read from
-    # its source): what run() merges on a GPU-less host, and what it refuses
     info["gpu"] = s.gpu
     info["cpu_params"] = dict(s.cpu_params)
     info["requires_gpu"] = bool(s.requires_gpu)
@@ -556,27 +483,18 @@ _RUNTIMES_YAML = Path(__file__).resolve().parent / "engine" / "runtimes.yaml"
 
 @functools.lru_cache(maxsize=1)
 def _runtimes() -> dict:
-    """Observed per-method runtimes (reference data; see engine/runtimes.yaml)."""
-    if not _RUNTIMES_YAML.exists():
-        return {}
+    """Observed per-method runtimes (engine/runtimes.yaml)."""
     import yaml
     with open(_RUNTIMES_YAML) as fh:
         return yaml.safe_load(fh) or {}
 
 
 def _runtime_hint(method: str) -> dict:
-    """``method_info(method)["runtime"]``: ``{"tier", "worst_sec", "observed", "host", "note"}``.
-
-    ``method`` must be a registry id: a typo raises ``KeyError`` with a
-    did-you-mean hint. A known but never-measured method (e.g. a declared
-    stub) returns tier ``"unknown"`` with ``worst_sec=None`` and an empty
-    ``observed`` list. See :func:`method_info` for the meaning of the fields.
-    """
+    """``method_info(method)["runtime"]`` (see its Notes); a typo raises ``KeyError``."""
     registry.check_method(method)
     rt = dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
                                        "observed": []}))
-    # every observation in runtimes.yaml was taken on the GPU benchmark host;
-    # the CPU slowdown applies only to a method that may use that GPU
+    # every observation was taken on the GPU benchmark host
     rt["host"] = "gpu"
     rt["note"] = "times observed on the benchmark host (NVIDIA RTX 4090)"
     if registry.get(method).gpu != "not used":
@@ -586,9 +504,8 @@ def _runtime_hint(method: str) -> dict:
 
 
 def _variant_key(v) -> str:
-    """Stable human-readable key for a variant: 'category:mod1+mod2'."""
-    mods = "+".join(v.when.get("modalities", [])) or "-"
-    return f"{v.when.get('category')}:{mods}"
+    """``'category:mod1+mod2'`` (``-`` for no modalities)."""
+    return registry._variant_key(v.when)
 
 
 def params_for(method: str, category: str | None = None,
@@ -717,9 +634,8 @@ def params_for(method: str, category: str | None = None,
         ds_dir = Path(os.path.abspath(os.fspath(root))) / dataset
 
     def _by_folder(cands):
-        """The single candidate the dataset folder satisfies, else None. Of
-        nested ones it is the one with the most modalities, as in
-        ``inputs_for`` (``_resolve._drop_nested``)."""
+        """The one candidate the dataset folder satisfies (of nested ones the largest,
+        as in ``inputs_for``), else None."""
         if ds_dir is None or not ds_dir.is_dir():
             return None
         ok = _resolve._drop_nested(
@@ -738,9 +654,7 @@ def params_for(method: str, category: str | None = None,
         else:
             v = s.variants[0]
     elif modalities is None:
-        # category alone is enough whenever it selects exactly one variant. This is
-        # the only way to reach a data_dir variant (scBridge),
-        # which has no modalities to pass.
+        # the only way to reach a data_dir variant (scBridge), which has no modalities
         cands = [x for x in s.variants if x.when.get("category") == category]
         if not cands:
             from .engine.schema import no_category_message
