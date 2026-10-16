@@ -15,5 +15,6 @@ def test_scan_sees_an_env_installed_after_the_first_scan(tmp_path, monkeypatch):
     before = mtb.scan("D11", "vertical", methods=["sciPENN"])
     assert not before.env_ok.any()
     (tmp_path / "envs" / "env_sciPENN" / "bin").mkdir(parents=True)   # what install_packed leaves
+    (tmp_path / "envs" / "env_sciPENN" / envs.FLAVOR_FILE).write_text("cpu\n")
     after = mtb.scan("D11", "vertical", methods=["sciPENN"])
     assert after.env_ok.all()

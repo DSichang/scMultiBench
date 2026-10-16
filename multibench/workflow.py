@@ -502,6 +502,14 @@ def _installed_envs() -> frozenset:
         return frozenset()
 
 
+def _other_env(env: str):
+    """:func:`envs.other_env_prefix`, ``None`` when the probe fails."""
+    try:
+        return envs.other_env_prefix(env)
+    except Exception:      # an env probe must not break discovery
+        return None
+
+
 def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script or a helper module it imports is missing from
     the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
@@ -570,11 +578,15 @@ SCAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tun
 OUT_DIR_PLACEHOLDER = "<out_dir>"
 
 
-def _env_hint(env: str, method: str, category: str | None) -> str:
+def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
     """The ``env_reason`` text: the install command first, so a clipped reason
-    still holds it; off Linux only the platform sentence."""
+    still holds it; off Linux only the platform sentence; ``other`` = the
+    prefix of a same-named env multibench did not install."""
     if _runner.linux_only_sentence():
         return f"Environment {env} runs only on Linux, not on this computer."
+    if other is not None:
+        return (f"{envs.other_env_text(env, other)} Rename or remove it, then run "
+                f"multibench env install --methods {method} --packed --run.")
     alt = (f" Use --category {category} to install the environments of every "
            f"{category} method." if category else "")
     return (f"Environment {env} is not installed. Run "
@@ -1254,10 +1266,12 @@ def scan(dataset: str, category: str | None = None, *,
     the modality it labels, and a ``data_dir`` method (scBridge) finds the
     files it names. Seurat_v5's ``rna.h5`` and ``atac_peak.h5`` must hold
     the same cells; a diagonal ``atac_gas.h5`` must list the cells of
-    ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists;
-    ``env_reason`` names it and the one-method install command (``multibench
-    env install --methods X --packed --run``), or on macOS and Windows says
-    it runs only on Linux (``multibench env doctor`` checks every env). For
+    ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists
+    and multibench installed it, on Linux; ``env_reason`` names the env and
+    the one-method install command (``multibench env install --methods X
+    --packed --run``), names an env of the same name that multibench did not
+    install (it is not used), or on macOS and Windows says it runs only on
+    Linux (``multibench env doctor`` checks every env). For
     a method with ``requires_gpu``, the host also needs an NVIDIA GPU. Without
     one, ``env_reason`` is the sentence ``run`` would raise: ``"<method>
     needs an NVIDIA GPU, and this computer has none. See ..."``. With
@@ -1362,6 +1376,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     rows = []
     dropped_dirs: list[str] = []
     off_linux = bool(_runner.linux_only_sentence())
+    others: dict = {}          # env -> a same-named env multibench did not install
     reps = _token_reps(modalities) if modalities is not None else set()
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
@@ -1413,9 +1428,11 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         env_hint = gpu_hint = ""
-        if rec["env"] and rec["env"] not in installed:
+        if rec["env"] and (off_linux or rec["env"] not in installed):
             rec["env_ok"] = False
-            env_hint = _env_hint(rec["env"], spec.id, cat)
+            if not off_linux and rec["env"] not in others:
+                others[rec["env"]] = _other_env(rec["env"])
+            env_hint = _env_hint(rec["env"], spec.id, cat, others.get(rec["env"]))
         # a script that calls CUDA unconditionally: run() raises this sentence
         if spec.requires_gpu and not envs.host_has_gpu():
             if assume_gpu:

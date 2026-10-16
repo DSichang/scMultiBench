@@ -23,11 +23,14 @@ from multibench.engine import envs
 @pytest.fixture
 def fake_conda(tmp_path, monkeypatch):
     """An executable ``conda`` stub whose ``env list --json`` reports Matilda's
-    env; ``envs_dir`` is empty, so only the stub can make that env exist."""
+    env (installed by multibench); ``envs_dir`` is empty, so only the stub can
+    make that env exist."""
     env = envs.group_for("Matilda")
     exe = tmp_path / "bin" / "conda"
     exe.parent.mkdir()
     listing = json.dumps({"envs": [str(tmp_path / "prefixes" / env)]})
+    (tmp_path / "prefixes" / env).mkdir(parents=True)
+    (tmp_path / "prefixes" / env / envs.FLAVOR_FILE).write_text("gpu\n")  # a packed install
     exe.write_text(f"#!/bin/sh\necho '{listing}'\n")
     exe.chmod(exe.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     empty = tmp_path / "envs"

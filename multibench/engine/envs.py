@@ -706,6 +706,109 @@ def _prefixes_on_disk(envs_dir: Path) -> dict[str, Path]:
         return {}
 
 
+#: What :data:`FLAVOR_FILE` holds in an env built from a lockfile or a recipe
+#: (a packed install writes its flavour there instead).
+BUILT_FROM = {"lockfile": "build", "recipe": "recipe"}
+
+
+def _creation_command(prefix: Path) -> str:
+    """The first ``# cmd:`` line of ``<prefix>/conda-meta/history`` (the command
+    that created the env), or ``""``."""
+    try:
+        with open(prefix / "conda-meta" / "history", encoding="utf-8",
+                  errors="replace") as fh:
+            for line in fh:
+                if line.startswith("# cmd:"):
+                    return line[len("# cmd:"):].strip()
+    except OSError:
+        pass
+    return ""
+
+
+def _lockfile_build_record(prefix: Path, env: str) -> bool:
+    """Was ``prefix`` created by a lockfile build of an earlier multibench?
+
+    Those builds ran ``<conda> env create -n <env> -f <file>`` with ``<file>``
+    one of ``.../multibench_envbuild/<env>/conda.yml`` (installed package),
+    ``.../env_locks/.build/<env>/conda.yml`` (source checkout), or, before
+    0.2, ``.../env_locks/<env>.yml``; conda keeps that command as the first
+    ``# cmd:`` line of ``conda-meta/history``.
+    """
+    cmd = _creation_command(prefix)
+    if not cmd:
+        return False
+    e = re.escape(env)
+    if not re.search(r"(?:^|\s)env\s+create\s", cmd):
+        return False
+    if not re.search(rf"\s(?:-n|--name)(?:\s+|=){e}(?:\s|$)", cmd):
+        return False
+    return re.search(rf"\s(?:-f|--file)(?:\s+|=).*/(?:multibench_envbuild/{e}/conda\.yml|"
+                     rf"env_locks/\.build/{e}/conda\.yml|env_locks/{e}\.yml)\s*$",
+                     cmd) is not None
+
+
+def made_by_multibench(prefix: Path | str, env: str | None = None) -> bool:
+    """Did multibench install the env at ``prefix``?
+
+    ``True`` when the prefix holds :data:`FLAVOR_FILE` (every install path
+    writes it), or when conda's history shows a lockfile build of an earlier
+    multibench (:func:`_lockfile_build_record`). An env someone made by hand
+    under the same name is not a method env.
+    """
+    prefix = Path(prefix)
+    return (prefix / FLAVOR_FILE).is_file() or _lockfile_build_record(prefix, env or prefix.name)
+
+
+def _same_named(env: str, conda: str | None = None):
+    """Every prefix named ``env``, lazily: ``<envs_dir>/<env>`` when it has
+    ``bin/`` (no conda asked), then those ``conda env list`` reports."""
+    candidate = Path(config.DEFAULT.envs_dir) / env
+    if (candidate / "bin").is_dir():
+        yield candidate
+    conda_exe = conda or _find_conda()
+    if conda_exe is not None:
+        for p in _conda_prefixes(conda_exe):
+            if os.path.basename(p.rstrip("/")) == env and Path(p) != candidate:
+                yield Path(p)
+
+
+def other_env_prefix(env: str, conda: str | None = None) -> Path | None:
+    """A prefix named ``env`` that multibench did not install, or ``None``.
+
+    Such an env is never used for a method; :func:`other_env_text` says what to do.
+    """
+    for p in _same_named(env, conda):
+        if p.is_dir() and not made_by_multibench(p, env):
+            return p
+    return None
+
+
+def other_env_text(env: str, prefix) -> str:
+    """``"Environment matilda at /x/envs/matilda was not installed by multibench,
+    so it is not used."``"""
+    return (f"Environment {env} at {prefix} was not installed by multibench, so it "
+            f"is not used.")
+
+
+def _refuse_other_env(env: str, conda: str | None = None) -> None:
+    """``RuntimeError`` before an install when an env of that name exists that
+    multibench did not install."""
+    other = other_env_prefix(env, conda)
+    if other is not None:
+        raise RuntimeError(f"{other_env_text(env, other)} Rename or remove it, "
+                           f"then install again.")
+
+
+def _mark_built(env: str, conda: str | None, how: str, before: set) -> None:
+    """Write :data:`FLAVOR_FILE` (``BUILT_FROM[how]``) into the env a lockfile
+    or recipe build just created under the name ``env``: a prefix of that
+    name that was not there ``before`` the build."""
+    _conda_prefixes.cache_clear()
+    for p in _same_named(env, conda):
+        if p not in before and p.is_dir():
+            (p / FLAVOR_FILE).write_text(BUILT_FROM[how] + "\n")
+
+
 def env_prefix(env: str, conda: str | None = None) -> Path | None:
     """The on-disk prefix of a method environment, or ``None``.
 
@@ -731,18 +834,15 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
     -----
     ``<mtb.config.DEFAULT.envs_dir>/<env>`` when it contains ``bin/`` (no
     conda needed); else the prefix ``conda env list`` reports for that name.
-    This is what "installed" means everywhere, and the prefix ``mtb.run``
-    activates.
+    Only an env multibench installed counts: every install writes the file
+    ``.multibench_flavor`` into it, and an env built from a lockfile by an
+    earlier version is known by the build command conda recorded. An env
+    you made yourself under the same name is never used. This is what
+    "installed" means everywhere, and the prefix ``mtb.run`` activates.
     """
-    candidate = Path(config.DEFAULT.envs_dir) / env
-    if (candidate / "bin").is_dir():
-        return candidate
-    conda_exe = conda or _find_conda()
-    if conda_exe is None:
-        return None
-    for p in _conda_prefixes(conda_exe):
-        if os.path.basename(p.rstrip("/")) == env:
-            return Path(p)
+    for p in _same_named(env, conda):
+        if made_by_multibench(p, env):
+            return p
     return None
 
 
@@ -929,7 +1029,10 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         envs_root = Path(config.DEFAULT.envs_dir)
     dest = envs_root / env
     if dest.exists():
-        return True
+        if made_by_multibench(dest, env):
+            return True
+        raise RuntimeError(f"{other_env_text(env, dest)} Rename or remove it, "
+                           f"then install again.")
     manifest, sizes = packed_manifest(), packed_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
     if resolve_flavor(flavor) == "cpu" and installed == "gpu":
@@ -995,17 +1098,31 @@ def _conda_unpack(prefix: Path) -> None:
     subprocess.run(argv, check=True, capture_output=True, env=env)
 
 
-def installed_envs(conda: str | None = None) -> list[str]:
-    """Names of the envs :func:`env_prefix` would find: the prefixes under
+def _all_env_names(conda: str | None = None) -> list[str]:
+    """Names of every env here, whoever made it: the prefixes under
     ``envs_dir`` first, then those ``conda`` lists, without duplicates."""
-    names = list(_prefixes_on_disk(Path(config.DEFAULT.envs_dir)))
+    return list(dict.fromkeys(name for name, _ in _all_prefixes(conda)))
+
+
+def _all_prefixes(conda: str | None = None) -> list[tuple[str, Path]]:
+    """``(name, prefix)`` of every env under ``envs_dir``, then of those
+    ``conda`` lists."""
+    out = list(_prefixes_on_disk(Path(config.DEFAULT.envs_dir)).items())
     conda_exe = conda or _find_conda()
     if conda_exe is not None:
         for p in _conda_prefixes(conda_exe):
             name = os.path.basename(str(p).rstrip("/"))
-            if name and name not in names:
-                names.append(name)
-    return names
+            if name:
+                out.append((name, Path(p)))
+    return out
+
+
+def installed_envs(conda: str | None = None) -> list[str]:
+    """Names of the envs :func:`env_prefix` would find: those multibench
+    installed (:func:`made_by_multibench`), under ``envs_dir`` first, then
+    those ``conda`` lists, without duplicates."""
+    return list(dict.fromkeys(name for name, p in _all_prefixes(conda)
+                              if made_by_multibench(p, name)))
 
 
 def _check_conda(conda) -> None:
@@ -1242,8 +1359,17 @@ def create_env(env_name: str, conda: str | None = None,
         cmds.append([conda, "run", "-n", env_name, "bash", str(post)])
     if not dry_run:
         _require_linux(force)
-        _run_all(cmds)
+        _build(env_name, cmds, conda, "lockfile")
     return cmds
+
+
+def _build(env_name: str, cmds: list[list[str]], conda: str | None, how: str) -> None:
+    """Run the build ``cmds`` of ``env_name`` and mark the new env as made by
+    multibench; refused first when another env already has that name."""
+    _refuse_other_env(env_name, conda)
+    before = set(_same_named(env_name, conda))
+    _run_all(cmds)
+    _mark_built(env_name, conda, how, before)
 
 
 def create_all(category: str | None = None, methods: list[str] | None = None,
@@ -1290,7 +1416,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
         if not exists and lock is not None:
             cmds = create_env(env, conda=conda, dry_run=True)
             if not dry_run:
-                _run_all(cmds)
+                _build(env, cmds, conda, "lockfile")
         out.append({"env": env, "methods": sorted(ms), "exists": exists,
                     "has_lock": lock is not None, "cmds": cmds})
     return out
@@ -1401,6 +1527,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     **State values on a dry run.**
 
     - ``'have'`` - already installed.
+    - ``'name taken'`` - an env of this name exists that multibench did not
+      install; it is not used. Rename or remove it, then install.
     - ``'packed archive published'`` - an archive would be downloaded; the
       sizes and URL are filled in.
     - ``'no archive - lockfile build'`` / ``'no archive - NO-LOCK'`` -
@@ -1435,7 +1563,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     to the lockfile build. Archives unpack into ``mtb.config.Config.envs_dir``
     (or, when ``conda`` is given, that tool's envs dir) and need no conda.
     Without conda, a missing env that needs a lockfile build raises
-    ``RuntimeError`` before any download.
+    ``RuntimeError`` before any download, and so does an env of the same
+    name that multibench did not install.
 
     **Command line.** ``multibench env install --methods X --packed --run``
     takes the packed path; ``multibench env install --run`` builds from
@@ -1458,6 +1587,10 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         _require_linux(force)             # before conda is even asked anything
         missing = [r for r in doctor(category=category, methods=methods, conda=conda)
                    if not r["exists"]]
+        for r in missing:          # before any download or build
+            if r.get("other_env"):
+                raise RuntimeError(f"{other_env_text(r['env'], r['other_env'])} Rename "
+                                   f"or remove it, then install again.")
         if (conda or _find_conda()) is None:
             # only the packed path works: refuse before any download
             for r in missing:
@@ -1489,6 +1622,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
             state = "PACKED"
         elif r["exists"]:
             state = "have"
+        elif dry_run and other_env_prefix(env, conda) is not None:
+            state = "name taken"
         elif not dry_run:
             state = "BUILD" if r["has_lock"] else "NO-LOCK"
         elif packed:
@@ -1510,7 +1645,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                     "archive_bytes": size.get("archive_bytes"),
                     "unpacked_bytes": size.get("unpacked_bytes"),
                     "flavor": installed if (r["exists"] or env in unpacked) else would_install})
-    if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu" for r in out):
+    if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu"
+                                  and r["state"] != "name taken" for r in out):
         note = auto_flavor_note(flavor)
         if note:
             print(note, file=sys.stderr, flush=True)
@@ -1573,6 +1709,9 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
       recipe (``mtb.env.recipe``).
     - ``flavor`` - ``'cpu'`` / ``'gpu'`` / ``'single'`` when the installed
       env came from a packed archive, else ``None``.
+    - ``other_env`` - the path of an env of the same name that multibench
+      did not install, else ``None``. It is not used; rename or remove it,
+      then install.
 
     **Next step.** ``mtb.env.install(methods, dry_run=False)`` installs the
     missing envs, packed archives first; on the command line that is
@@ -1596,9 +1735,15 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
         by_env.setdefault(group_for(m), []).append(m)
     rows = [{"env": env, "methods": sorted(ms), "exists": env in have,
              "has_lock": lockfile(env) is not None,
-             "flavor": installed_flavor(env, conda) if env in have else None}
+             "flavor": installed_flavor(env, conda) if env in have else None,
+             "other_env": (None if env in have
+                           else _str_or_none(other_env_prefix(env, conda)))}
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
     return _as_frame(rows, as_frame)
+
+
+def _str_or_none(path) -> str | None:
+    return None if path is None else str(path)
 
 
 _LOCAL_PIP_RE = re.compile(r"@\s*file://|feedstock_root")
@@ -1698,7 +1843,7 @@ def freeze(env_name: str, conda: str | None = None,
     conda = conda or _conda_bin("conda")
     # an export of a name that does not exist succeeds, empty: it would
     # overwrite a lockfile with a stub
-    if env_name not in installed_envs(conda):
+    if env_name not in _all_env_names(conda):
         raise FileNotFoundError(
             f"no conda env named {env_name!r} on this machine "
             f"(conda env list shows them); freeze captures existing envs only")
@@ -1765,7 +1910,7 @@ def create(method: str, env_name: str | None = None, conda: str | None = None,
     cmds = create_commands(method, env_name=env_name, conda=conda)
     if not dry_run:
         _require_linux(force)
-        _run_all(cmds)
+        _build(env_name or default_env_name(method), cmds, conda, "recipe")
     return cmds
 
 
@@ -1786,7 +1931,7 @@ def create_group(group: str, env_name: str | None = None, conda: str | None = No
     cmds = group_create_commands(group, env_name=env_name, conda=conda)
     if not dry_run:
         _require_linux(force)
-        _run_all(cmds)
+        _build(env_name or group, cmds, conda, "recipe")
     return cmds
 
 

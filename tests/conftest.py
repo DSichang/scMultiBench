@@ -164,3 +164,17 @@ def layout_tree(tmp_path):
 # tests/_serve.py (archive download fakes) is imported by several test files
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+# ---- host-agnostic conda envs -----------------------------------------------
+# An env multibench did not install is reported by name and path ("Environment
+# matilda at ... was not installed by multibench"). A developer's own conda can
+# hold such an env (a `matilda` env made by hand), which would change the
+# messages the tests assert. Pin "no such env" everywhere except in the tests of
+# env identity, which build their own conda root.
+@_pytest.fixture(autouse=True)
+def _no_stray_envs(request, monkeypatch):
+    if request.node.fspath.basename in ("test_env_identity.py",):
+        return
+    from multibench.engine import envs
+    monkeypatch.setattr(envs, "other_env_prefix", lambda env, conda=None: None)

@@ -1578,6 +1578,9 @@ def _cmd_env(args) -> int:
             mark = envs.env_mark(r["exists"], r["has_lock"])
             print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}"
                   f"{_flavor_token(r.get('flavor'), r['env'])}")
+            if r.get("other_env"):
+                print(f"#   {envs.other_env_text(r['env'], r['other_env'])} Rename or "
+                      f"remove it, then install.")
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"

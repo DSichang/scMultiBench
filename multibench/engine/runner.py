@@ -670,7 +670,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     ValueError
         ``MULTIBENCH_RUN_MODE`` is set to anything but ``conda`` or ``prefix``.
     OSError
-        The method needs a GPU this host lacks, or its env is not installed.
+        The method needs a GPU this host lacks, its env is not installed, or
+        this host is not Linux.
     RuntimeError
         The method exited with a non-zero status, or its scripts could not be fetched.
 
@@ -736,9 +737,11 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     ``mtb.method_info(method)['env']`` names: through its prefix when
     ``mtb.env.env_prefix(env)`` finds it (no conda needed), else with
     ``conda run -n <env>``. ``MULTIBENCH_RUN_MODE=conda|prefix`` forces one.
-    Method environments are Linux-only. Before anything is written, a missing
-    env raises ``OSError`` naming the install command (on Linux only when
-    some env is found at all); a ``{cmd}`` template skips this check. The
+    Method environments are Linux-only: off Linux the run raises ``OSError``.
+    Before anything is written, a missing env raises ``OSError`` naming the
+    install command (when some env is found at all), and so does an env of
+    the same name that multibench did not install, which is never used; a
+    ``{cmd}`` template skips these checks. The
     method gets ``PYTHONNOUSERSITE=1``, and ``MPLBACKEND=Agg`` unless it sets
     its own backend; environment variables the method needs are set over yours.
     A variable made of absolute paths, such as ``LD_PRELOAD``, keeps only the
@@ -800,23 +803,29 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         print(f"[run] no GPU on this host: applying {method} cpu_params {applied}",
               file=sys.stderr, flush=True)
 
-    # the env check of scan, before anything is written; on Linux only when
-    # the probe finds some env (else the subprocess reports the failure)
+    # the env check of scan, before anything is written: off Linux always; on
+    # Linux when the probe finds some env (else the subprocess reports the
+    # failure) or an env of that name multibench did not install
     if cmd_template is None or ENV_CMD in cmd_template:
         env_name = envs.group_for(method)
         linux_only = linux_only_sentence()
+        if linux_only:
+            this = config.hint("this call", "this command")
+            preview_with = config.hint("dry_run=True", "--dry-run")
+            raise EnvironmentError(
+                f"{linux_only} Run {this} on a Linux machine. {preview_with} "
+                f"previews the method's command here.")
         have = envs.installed_envs()
-        if (have or linux_only) and env_name not in have:
+        if env_name not in have:
             # conda's env list is cached per process: probe once more
             envs._conda_prefixes.cache_clear()
             have = envs.installed_envs()
-        if (have or linux_only) and env_name not in have:
-            if linux_only:
-                this = config.hint("this call", "this command")
-                preview_with = config.hint("dry_run=True", "--dry-run")
-                raise EnvironmentError(
-                    f"{linux_only} Run {this} on a Linux machine. {preview_with} "
-                    f"previews the method's command here.")
+        other = envs.other_env_prefix(env_name) if env_name not in have else None
+        if other is not None:
+            raise EnvironmentError(
+                f"{envs.other_env_text(env_name, other)} Rename or remove it, then "
+                f"run multibench env install --methods {method} --packed --run.")
+        if have and env_name not in have:
             py = f" In Python, call mtb.env.install([{method!r}], dry_run=False)."
             raise EnvironmentError(
                 f"Environment {env_name} of {method} is not installed. Run "

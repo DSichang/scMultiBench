@@ -55,6 +55,7 @@ def make_prefix(envs_dir: Path, env: str) -> Path:
     (prefix / "etc" / "conda" / "activate.d" / "x.sh").write_text(
         '[ -n "$CONDA_PREFIX" ] || exit 99\n'          # they assume it is set
         f'export {MARKER}="set-from-$CONDA_DEFAULT_ENV"\n')
+    (prefix / envs.FLAVOR_FILE).write_text("build\n")    # made by multibench, no archive flavour
     return prefix
 
 
@@ -151,17 +152,20 @@ def test_env_prefix_and_installed_envs_without_conda(envs_dir):
     assert envs.env_prefix("scmb_torch") is None
 
 
-def test_env_prefix_asks_conda_when_not_under_envs_dir(envs_dir, monkeypatch):
+def test_env_prefix_asks_conda_when_not_under_envs_dir(envs_dir, monkeypatch, tmp_path):
+    base = tmp_path / "opt" / "conda"
+    make_prefix(base / "envs", "scmb_r")
+    (base / "conda-meta").mkdir(parents=True)              # the base env: not ours
     monkeypatch.setattr(envs, "_find_conda", lambda: "/fake/conda")
     monkeypatch.setattr(envs, "_conda_prefixes",
-                        lambda conda: ("/opt/conda/envs/scmb_r", "/opt/conda"))
-    assert envs.env_prefix("scmb_r") == Path("/opt/conda/envs/scmb_r")
-    assert envs.env_prefix("conda") == Path("/opt/conda")
+                        lambda conda: (str(base / "envs" / "scmb_r"), str(base)))
+    assert envs.env_prefix("scmb_r") == base / "envs" / "scmb_r"
+    assert envs.env_prefix("conda") is None
     assert envs.env_prefix("matilda") is None
-    assert envs.installed_envs() == ["scmb_r", "conda"]
+    assert envs.installed_envs() == ["scmb_r"]
     make_prefix(envs_dir, "matilda")                     # on disk wins, no conda call
     assert envs.env_prefix("matilda") == envs_dir / "matilda"
-    assert envs.installed_envs() == ["matilda", "scmb_r", "conda"]
+    assert envs.installed_envs() == ["matilda", "scmb_r"]
 
 
 def test_doctor_and_status_count_the_prefix(envs_dir):
