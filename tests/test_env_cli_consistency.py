@@ -180,7 +180,8 @@ def test_missing_helper_module_blocks_the_script_gate(tmp_path, monkeypatch):
     (script.parent / "logger.py").write_text("")
     assert workflow._missing_script(v, method="MIRA") == ""
     # a variant without helpers (every other method) is untouched
-    assert workflow._missing_script(SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py")) == ""
+    assert workflow._missing_script(SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py",
+                                                    helpers=[])) == ""
 
 
 def test_scan_reports_the_mira_helper_when_the_checkout_lacks_it(tmp_path, monkeypatch):

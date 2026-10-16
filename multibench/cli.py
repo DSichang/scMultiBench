@@ -1125,7 +1125,7 @@ def _not_run_line(res, where) -> str | None:
     """``# Not run: MIRA, moETM (SKIPPED). ...``, or ``None``: the stderr line naming
     the ``SKIPPED`` methods ``--methods`` did not name (they do not set exit 3)."""
     skipped = list(dict.fromkeys(str(r.get("method"))
-                                 for r in getattr(res, "records", None) or []
+                                 for r in res.records
                                  if r.get("status") == "SKIPPED"
                                  and not r.get("requested")))
     if not skipped:

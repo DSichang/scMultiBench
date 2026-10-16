@@ -506,16 +506,15 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script or a helper module it imports is missing from
     the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
     entry = Path(variant.entrypoint)
-    helpers = getattr(variant, "helpers", None) or []     # test stubs lack the field
     for root in (Path(config.DEFAULT.repo_path), Path(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
             # a script the package ships is copied in before the run
-            shipped = (method and entry.name in helpers
+            shipped = (method and entry.name in variant.helpers
                        and _runner.shipped_helper(method, entry.name))
             if not (root / entry).exists() and not shipped:
                 return (f"method script {entry} is missing from the reference checkout at "
                         f"{root}: " + _runner.missing_script_fix(root))
-            gone = [h for h in helpers
+            gone = [h for h in variant.helpers
                     if not (root / entry).parent.joinpath(h).exists()
                     and not (method and _runner.shipped_helper(method, h))]
             if gone:

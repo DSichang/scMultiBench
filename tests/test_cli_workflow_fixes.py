@@ -508,6 +508,7 @@ def test_run_all_progress_goes_to_stderr(monkeypatch, tmp_path, capsys):
     class FakeRes:
         summary = pd.DataFrame({"method": ["M"], "status": ["CHAIN_OK"]})
         failures = pd.DataFrame(columns=["method", "status", "error"])
+        records = []
 
     def fake_run_all(*a, **k):
         print("[run_all] M (vertical/D11) ...")          # library progress on stdout

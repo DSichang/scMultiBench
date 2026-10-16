@@ -11,7 +11,7 @@ from multibench import workflow
 
 
 def _variant(entrypoint):
-    return SimpleNamespace(entrypoint=entrypoint)
+    return SimpleNamespace(entrypoint=entrypoint, helpers=[])
 
 
 def test_relative_entrypoint_missing_from_a_present_checkout(tmp_path, monkeypatch):
