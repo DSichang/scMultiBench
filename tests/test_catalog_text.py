@@ -36,9 +36,9 @@ def test_every_metric_states_direction_and_the_clustering_used():
 
 
 def test_the_classification_rows_follow_the_family_order():
-    # the rows are the codes of known_metrics, in its order, PCR aside
+    # the rows are the codes of known_metrics, in its order (PCR left it in 0.4)
     rows = list(mtb.catalog.metrics()["metric"])
-    assert rows == [c for c in catalog.known_metrics() if c != "PCR"]
+    assert rows == catalog.known_metrics()
     d = _desc()
     assert d["OCA"].startswith("Overall classification accuracy: the fraction of query cells")
     assert d["ACA"].startswith("Average classification accuracy: the fraction of each cell type")

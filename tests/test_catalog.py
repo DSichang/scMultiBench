@@ -122,7 +122,7 @@ def test_canonical_metric_strict_and_known_metrics():
     assert catalog.canonical_metric("ari", strict=True) == "ARI"
     km = catalog.known_metrics()
     assert km[:10] == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-                       "ASW_batch", "GC", "iLISI", "kBET"] and "PCR" in km
+                       "ASW_batch", "GC", "iLISI", "kBET"] and "PCR" not in km   # 0.4
     # the docstring no longer promises None for an UNKNOWN code
     assert "``None`` for ``None``, an empty string" in catalog.canonical_metric.__doc__
 

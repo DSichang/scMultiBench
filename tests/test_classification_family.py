@@ -74,7 +74,7 @@ def test_the_family_and_its_codes():
     assert "CLASSIFICATION_METRICS" in mtb.plot.__all__
     assert mtb.catalog.known_metrics() == [
         "ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "GC", "iLISI",
-        "kBET", "OCA", "ACA", "Spec", "Sens", "F1", "PCR"]
+        "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]         # no PCR since 0.4
     assert [catalog.canonical_metric(c) for c in ("oca", "Aca", "SPEC", "sens", "f1",
                                                   "if1")] == CODES + ["iF1"]
 

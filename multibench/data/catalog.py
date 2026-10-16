@@ -137,7 +137,6 @@ _METRIC_CANON = {
     "ilisi": "iLISI",
     "gc": "GC",
     "asw_batch": "ASW_batch",
-    "pcr": "PCR",
     "oca": "OCA",
     "aca": "ACA",
     "spec": "Spec",
@@ -159,16 +158,16 @@ def known_metrics() -> list[str]:
     -------
     list of str
         The clustering / bio-conservation codes (``mtb.plot.CLUSTERING_METRICS``),
-        the batch-correction codes (``mtb.plot.BATCH_METRICS``), the
-        classification codes (``mtb.plot.CLASSIFICATION_METRICS``), then ``PCR``
-        (principal-component regression, in some published tables).
+        the batch-correction codes (``mtb.plot.BATCH_METRICS``), then the
+        classification codes (``mtb.plot.CLASSIFICATION_METRICS``): the
+        metrics ``mtb.evaluate`` computes, the rows of ``mtb.catalog.metrics()``.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> mtb.catalog.known_metrics()
     ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI',
-     'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1', 'PCR']
+     'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1']
 
     See Also
     --------
@@ -577,9 +576,8 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     -----
     **Rows.** The ten scIB metrics ``ARI, NMI, ASW, iASW, iF1, cLISI,
     ASW_batch, GC, iLISI, kBET``, then the five classification metrics
-    ``OCA, ACA, Spec, Sens, F1``; header whitespace is stripped. The
-    canonical code vocabulary, including ``PCR`` from the published tables,
-    is ``mtb.catalog.known_metrics``.
+    ``OCA, ACA, Spec, Sens, F1``; header whitespace is stripped. The same
+    codes, in this order, are ``mtb.catalog.known_metrics()``.
 
     See Also
     --------

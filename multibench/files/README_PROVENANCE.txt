@@ -39,7 +39,6 @@ metric_full.csv - one row per metric of the clustering, batch and
   (multibench/eval/scib.py), Leiden clusters from the optimal-resolution
   sweep for ARI/NMI/iF1, every cell type counted as an isolated label for
   iASW/iF1; for OCA, ACA, Spec, Sens and F1 (multibench/eval/classify.py),
-  the mean over the reference batches. PCR, which catalog.known_metrics()
-  also lists, has no row.
+  the mean over the reference batches.
 
 An official scMultiBench file with the same columns can replace any of these.
