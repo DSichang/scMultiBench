@@ -575,6 +575,11 @@ def _cmd_convert(args) -> int:
             role = {"rna": "rna", "adt": "adt", "atac": atac_role}[matrices[0]]
         _refuse_canonical(args, args.src, f"--{reads[0]}" if reads else "the dataset mode",
                           role, category)
+        if args.rna is None and args.adt is None and args.atac is None \
+                and args.atac_from is None and not any(Path(args.out).glob("*.h5")):
+            # a folder of labels alone; adding them to a folder with matrices is fine
+            _usage_error(args, "--labels alone writes only the label file. Add --rna X "
+                         "to export the matrix too.")
         data = ingest._to_anndata(args.src)
         before = _folder_state(args.out)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
