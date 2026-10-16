@@ -2055,7 +2055,8 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--methods", help=_METHODS_HELP + "; only those rows (unknown name "
                                                       "-> error)")
     pp.add_argument("--metrics", help="comma-separated metric codes to draw, in this "
-                                      "order (e.g. ARI,NMI,ASW; default: all present)")
+                                      "order (e.g. ARI,NMI,ASW), or a family: clustering, "
+                                      "batch, classification, all (default: all present)")
     pp.add_argument("--aggregate", choices=["dataset", "summary"], default="dataset",
                     help="bubble only: dataset = one dataset's raw values (default); "
                          "summary = across-dataset rank panel")

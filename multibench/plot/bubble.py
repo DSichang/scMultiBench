@@ -206,6 +206,40 @@ def _resolve(requested, available, kind: str, canon) -> list:
     return out
 
 
+def _expand_families(metrics, available) -> list:
+    """``metrics`` with each family word (``"clustering"``, ``"batch"``,
+    ``"classification"``, ``"all"``, as ``mtb.evaluate`` takes them) replaced by
+    the frame's codes of that family, in the figure's column order; other
+    names are kept for ``_resolve``. A family the frame has no code of
+    raises ``ValueError``."""
+    from .bar import FAMILY_METRICS
+    from ..data import catalog
+    paper = [c for _, codes, _ in FAMILIES for c in codes]
+
+    def in_figure_order(names):
+        return sorted(names, key=lambda a: (
+            paper.index(catalog.canonical_metric(a))
+            if catalog.canonical_metric(a) in paper else len(paper), str(a)))
+
+    requested = [metrics] if isinstance(metrics, str) else list(metrics)
+    available = [a for a in available if a is not None]
+    out = []
+    for r in requested:
+        word = str(r).strip().lower()
+        if word == "all":
+            out += in_figure_order(available)
+        elif word in FAMILY_METRICS:
+            codes = FAMILY_METRICS[word]
+            got = [a for a in available if catalog.canonical_metric(a) in codes]
+            if not got:
+                raise ValueError(f"The table has no {word} metrics. It has "
+                                 f"{_and_distinct(sorted(map(str, available)))}.")
+            out += in_figure_order(got)
+        else:
+            out.append(r)
+    return list(dict.fromkeys(out))
+
+
 #: accepted values of ``build_table(na=)`` / ``bubble(na=)``
 NA_POLICIES = ("skip", "warn", "raise")
 
@@ -222,9 +256,10 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     long_df : pandas.DataFrame
         Long table with ``method``, ``metric``, ``value`` columns; optional
         ``dataset`` column (Notes).
-    metrics : list of str | None
-        Metric codes to keep, in this order within each family; ``None`` =
-        every metric in the frame.
+    metrics : str, list of str | None
+        Metric codes to keep, in this order within each family, or a family
+        (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``, as
+        ``mtb.evaluate`` takes them); ``None`` = every metric in the frame.
     methods : list of str | None
         Methods (rows) to keep; ``None`` = every method in the frame.
     order : list of str | None
@@ -385,6 +420,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                            catalog.canonical_id)
         df = df[df["method"].isin(methods)]
     if metrics is not None:
+        metrics = _expand_families(metrics, df["metric"].unique().tolist())
         metrics = _resolve(metrics, df["metric"].unique().tolist(), "metric",
                            catalog.canonical_metric)
         df = df[df["metric"].isin(metrics)]
@@ -1044,9 +1080,10 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         Long table with ``method``, ``metric``, ``value`` and optional
         ``dataset`` columns, as from ``mtb.load_results``, ``mtb.to_long`` or
         the ``BatchResult.long`` property (more in Notes).
-    metrics : list of str | None
-        Metric codes to show, in this order within each family; ``None`` =
-        every metric in the frame.
+    metrics : str, list of str | None
+        Metric codes to show, in this order within each family, or a family
+        (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``);
+        ``None`` = every metric in the frame.
     methods : list of str | None
         Methods (rows) to show; ``None`` = every method in the frame.
     order : list of str | None

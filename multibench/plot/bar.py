@@ -37,9 +37,10 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         Long table with ``method``, ``metric``, ``value`` columns and an
         optional ``dataset`` (absent = one dataset), e.g. from
         ``mtb.load_results``.
-    metrics : list of str | None
-        Metric codes to score; ``None`` = every metric. Ignored when
-        ``group`` is given.
+    metrics : str, list of str | None
+        Metric codes to score, or a family (``"clustering"``, ``"batch"``,
+        ``"classification"``, ``"all"``); ``None`` = every metric. Ignored
+        when ``group`` is given.
     group : {None, "clustering", "batch", "classification"}
         Score one metric family only (the benchmark's summary panels);
         ``None`` = the ``metrics`` selection.
@@ -151,6 +152,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
             "Its UserWarning says why, for example a method with no rows under "
             "source='published'. Then try source='rerun'.")
     if metrics is not None and not group:
+        from .bubble import _expand_families
+        metrics = _expand_families(metrics, long_df["metric"].dropna().unique().tolist())
         metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
                            "metric", catalog.canonical_metric)
     if group:
