@@ -492,18 +492,22 @@ def _folder_state(folder) -> dict:
 
 
 def _refuse_canonical(args, path, flag, role, category) -> None:
-    """Dataset mode reads an .h5ad or .h5mu: for a canonical ``.h5`` at ``path``,
-    raise with the file-mode command that copies it into the folder as ``role``."""
+    """Dataset mode reads an .h5ad or .h5mu: raise for a canonical ``.h5`` at
+    ``path``. With a ``role`` (the caller found the copy is the whole export)
+    and an empty ``OUT``, the message gives the command that copies the file
+    there under the name the export would write; else it asks for the source."""
     p = Path(path)
     if not (p.suffix.lower() == ".h5" and p.is_file() and ingest._is_canonical_h5(p)):
         return
-    if role is None:
-        action = "Pass the .h5ad or .h5mu it came from."
-    else:
-        name = ingest._export_filename(role, str(args.batch_index or ""), category)
-        action = (f"Copy it into the folder with: multibench convert {path} "
-                  f"{Path(args.out) / name}"
-                  + (f" --dtype {args.dtype}" if args.dtype != "float64" else ""))
+    out = Path(args.out)
+    action = "Pass the .h5ad or .h5mu it came from."
+    # a folder with files: the export would order the rows by them, a copy does not
+    if role is not None and not (out.is_dir() and any(out.iterdir())):
+        name = ingest._export_filename(role, str(args.batch_index or ""),
+                                       ingest._check_category(category))
+        action = "Copy it into the folder with: " + shlex.join(
+            ["multibench", "convert", str(path), str(out / name)]
+            + (["--dtype", args.dtype] if args.dtype != "float64" else []))
     raise ValueError(f"{path} is already a canonical .h5 file, and {flag} reads an .h5ad "
                      f"or .h5mu. {action}")
 
@@ -543,21 +547,33 @@ def _cmd_convert(args) -> int:
         if args.n_batches is not None:
             extra["n_batches"] = args.n_batches
         atac = args.atac
-        atac_role = {"peak": "atac_peak", "gene_activity": "atac_gas"}.get(args.atac_kind,
-                                                                           "atac")
+        # a canonical .h5 given here: the copy command only when the copy is the
+        # whole export (one matrix as it is, no labels or batch split) and its
+        # file name is certain (peak without a category writes two files)
+        atac_role = {"peak": "atac_peak", "gene_activity": "atac_gas"}.get(args.atac_kind)
+        if args.atac_kind == "peak" and category is None:
+            atac_role = None
+        alone = args.labels is None and args.batch is None
         if args.atac_from is not None:
             if category != "diagonal":
                 _usage_error(args, "--atac-from is for --category diagonal (RNA and "
                              "ATAC from different cells)")
-            _refuse_canonical(args, args.atac_from, "--atac-from", atac_role, category)
+            whole = alone and args.rna is None and args.adt is None \
+                and args.atac in (None, "X")
+            _refuse_canonical(args, args.atac_from, "--atac-from",
+                              atac_role if whole else None, category)
             atac = ingest._select_object(ingest._to_anndata(args.atac_from),
                                          args.atac or "X", what="atac")
-        flag, role = next(
-            ((f"--{f.replace('_', '-')}", r) for f, r in (
-                ("rna", "rna"), ("adt", "adt"), ("atac", atac_role), ("labels", None),
-                ("batch", None), ("batch_index", None)) if getattr(args, f) is not None),
-            ("dataset mode", None))
-        _refuse_canonical(args, args.src, flag, role, category)
+        reads = [f for f in ("rna", "adt", "atac", "labels", "batch")
+                 if getattr(args, f) is not None
+                 and not (f == "atac" and args.atac_from is not None)]
+        matrices = [f for f in reads if f in ("rna", "adt", "atac")]
+        role = None
+        if alone and args.atac_from is None and len(matrices) == 1 \
+                and getattr(args, matrices[0]) == "X":
+            role = {"rna": "rna", "adt": "adt", "atac": atac_role}[matrices[0]]
+        _refuse_canonical(args, args.src, f"--{reads[0]}" if reads else "the dataset mode",
+                          role, category)
         data = ingest._to_anndata(args.src)
         before = _folder_state(args.out)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
