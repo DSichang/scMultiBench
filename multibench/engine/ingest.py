@@ -1325,8 +1325,8 @@ def _as_obs_vector(data, spec, *, what, master):
                 # by position every row would go to another cell
                 raise ValueError(
                     f"The cell names of {_labels_where(data, spec)} are not unique, so its "
-                    f"{what} cannot be matched to the cells. Give every cell a unique name "
-                    f"first.")
+                    f"{what} cannot be matched to the cells. Give each cell a unique name, "
+                    f"the same in every modality, first.")
             if set(src_names) == set(master):
                 ser = ser.reindex([str(x) for x in master]) if ser.index.dtype == object \
                     else ser.iloc[[src_names.index(str(x)) for x in master]]

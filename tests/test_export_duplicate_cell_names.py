@@ -50,7 +50,8 @@ def test_repeated_names_in_another_order_are_an_error(tmp_path, what, category):
                               category=category, **{what: "mod:atac.obs:ct"})
     assert str(e.value) == (
         f"The cell names of mdata['atac'].obs are not unique, so its {what} cannot be "
-        f"matched to the cells. Give every cell a unique name first.")
+        f"matched to the cells. Give each cell a unique name, the same in every "
+        f"modality, first.")
     assert not (out / "rna.h5").exists() and not (out / "cty.csv").exists()
 
 
@@ -67,3 +68,29 @@ def test_unique_names_in_another_order_are_matched_by_name(tmp_path):
     out = ingest.export_dataset(_mdata(UNIQUE, True), tmp_path / "OUT", rna="mod:rna",
                                 labels="mod:atac.obs:ct", category="vertical")
     assert _labels(out) == [f"a{i}" for i in range(6)]
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_the_advice_works(tmp_path):
+    """One unique name per cell, the same in every modality: the labels match."""
+    m = _mdata(NAMES, True)
+    for mod in ("rna", "atac"):                     # ct a<i> tells which cell a row is
+        m.mod[mod].obs_names = [f"cell{x[1:]}" for x in m.mod[mod].obs["ct"]]
+    m.update()
+    out = ingest.export_dataset(m, tmp_path / "OUT", rna="mod:rna",
+                                labels="mod:atac.obs:ct", category="vertical")
+    assert _labels(out) == [f"a{i}" for i in range(6)]
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_the_command_line_says_the_same(tmp_path, capsys):
+    from multibench import cli
+    _mdata(NAMES, True).write(tmp_path / "m.h5mu")
+    rc = cli.main(["convert", str(tmp_path / "m.h5mu"), str(tmp_path / "OUT"), "--rna",
+                   "mod:rna", "--labels", "atac:ct", "--category", "vertical"])
+    assert rc == 1
+    assert capsys.readouterr().err.splitlines()[0] == (
+        "error: The cell names of mdata['atac'].obs are not unique, so its labels cannot be "
+        "matched to the cells. Give each cell a unique name, the same in every modality, "
+        "first.")
+    assert not (tmp_path / "OUT").exists()
