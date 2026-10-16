@@ -589,6 +589,22 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     return wrap_command(cmd, outer) if outer is not None else cmd
 
 
+def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
+    """The error for ``params`` keys a variant does not accept (``run``,
+    ``run_all`` and ``sweep`` say the same)."""
+    return KeyError(f"{method} does not accept {unknown}; it accepts {sorted(allowed)}. "
+                    "An empty set means it hardcodes its hyperparameters upstream.")
+
+
+def check_params(method: str, variant, params: dict | None) -> None:
+    """Raise :func:`unknown_params_error` for a ``params`` key the variant does
+    not accept, before anything runs."""
+    allowed = set(variant.tunable) | set(variant.params)
+    unknown = [k for k in (params or {}) if k not in allowed]
+    if unknown:
+        raise unknown_params_error(method, unknown, allowed)
+
+
 def cpu_params_for(spec, params: dict | None, *,
                    gpu: bool | None = None) -> tuple[dict | None, dict]:
     """``(params, applied)`` after the CPU switch.
@@ -636,8 +652,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     out_dir : str
         Folder the method writes into; created if missing.
     params : dict | None
-        Hyperparameter overrides merged over the variant's defaults;
-        ``None`` = the defaults.
+        Hyperparameter overrides merged over the variant's defaults, keyed
+        by parameter name (``mtb.params_for``); ``None`` = the defaults.
     task : str | None
         Accepted for forward compatibility; currently ignored.
     convert : bool
@@ -662,7 +678,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     Raises
     ------
     KeyError
-        Unknown method, or no variant fits ``category`` and the input roles.
+        Unknown method, no variant fits ``category`` and the input roles, or
+        a ``params`` key the variant does not accept (also on a dry run).
     ValueError
         An input the run cannot convert, such as an ``.h5mu`` file or a MuData.
     ValueError
@@ -780,6 +797,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     _check_template(cmd_template)
     method = registry.check_method(method)
     inputs = _rename_old_roles(method, inputs)
+    check_params(method, registry.get(method).select(category, _modality_roles(inputs)),
+                 params)
     _check_input_cells(method, category, inputs)
     from ..workflow import _atac_mismatch_caveats     # workflow imports this module
     mismatch = _atac_mismatch_caveats(method, category, inputs)

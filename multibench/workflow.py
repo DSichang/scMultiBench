@@ -2819,9 +2819,7 @@ def _platform_line(blocked: pd.DataFrame) -> str:
             f"plot. Run the methods on a Linux machine.\n")
 
 
-def _unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
-    return KeyError(f"{method} does not accept {unknown}; it accepts {sorted(allowed)}. "
-                    "An empty set means it hardcodes its hyperparameters upstream.")
+_unknown_params_error = _runner.unknown_params_error
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
