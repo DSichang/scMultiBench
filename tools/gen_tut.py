@@ -49,6 +49,7 @@ import hashlib
 import json
 import os
 import re
+import warnings
 
 import nbformat as nbf
 
@@ -370,7 +371,9 @@ def check_task(key):
     if ran != sorted(run_variants(key).items()):
         raise SystemExit(f"{key}: run_all on {t['ds']} would run {ran}, not one row per "
                          f"method of the task: change the dataset or name the modalities")
-    n = len(mtb.labels_for(t["ds"]))
+    with warnings.catch_warnings():          # a count of the files: no order needed
+        warnings.simplefilter("ignore", UserWarning)
+        n = len(mtb.labels_for(t["ds"]))
     for m in everyone:
         if len(mtb.labels_for(t["ds"], t["cat"], m)) < n:
             raise SystemExit(f"{m} reads only some batches of {t['ds']}: reword the notebooks")
