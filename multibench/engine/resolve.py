@@ -392,7 +392,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
     >>> mtb.inputs_for("D11", "vertical", "Matilda")
     {'rna': '/abs/data/D11/rna.h5', 'adt': '/abs/data/D11/adt.h5',
      'cty': '/abs/data/D11/cty.csv'}
-    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
+    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda",
+    ...                      modalities=["rna", "adt"])
     >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11")
     >>> mtb.inputs_for("D28", "diagonal", "scBridge")
     {'data_dir': '/abs/data/D28/'}
