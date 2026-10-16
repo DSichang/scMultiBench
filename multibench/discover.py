@@ -605,7 +605,10 @@ def params_for(method: str, category: str | None = None,
     nothing changes nothing, and the ambiguity error is raised as usual.
 
     **Modality spellings.** ``protein`` is accepted for ``adt``, and ``atac``
-    for either ATAC representation role (``atac_gas`` / ``atac_peak``).
+    for either ATAC representation role (``atac_gas`` / ``atac_peak``). The
+    tokens ``find_methods`` takes work too: ``["rna", "atac"]`` selects the
+    variant that reads RNA and ATAC whatever its batch numbers (Multigrate's
+    cross ``rna1+rna2+rna3+atac1+atac2+atac3``).
 
     **Ambiguity error.** ``mtb.AmbiguousVariantError`` derives from both
     ``ValueError`` and ``KeyError``. Its message spells out the selecting
@@ -681,6 +684,8 @@ def params_for(method: str, category: str | None = None,
             cands = [x for x in s.variants
                      if {modality_family(m) for m in x.when.get("modalities", [])} == want]
         if not cands:
+            cands = _same_types(s.variants, modalities)
+        if not cands:
             keys = _and_list(_variant_key(x) for x in s.variants)
             raise KeyError(
                 f"No variant of {method} takes the modalities "
@@ -696,7 +701,26 @@ def params_for(method: str, category: str | None = None,
         else:
             v = cands[0]
     else:
-        v = s.select(category, set(modalities), loose=True)
+        try:
+            v = s.select(category, set(modalities), loose=True)
+        except AmbiguousVariantError:
+            raise
+        except KeyError:
+            # base tokens, as find_methods takes them: rna + atac for rna1..3 + atac1..3
+            cands = _same_types([x for x in s.variants
+                                 if x.when.get("category") == category], modalities)
+            if len(cands) > 1:
+                v = _by_folder(cands)
+                if v is None:
+                    keys = _and_list("+".join(x.when.get("modalities", [])) for x in cands)
+                    raise AmbiguousVariantError(
+                        f"{method} has {len(cands)} {category} variants of "
+                        f"{_and_list(sorted(modalities))}, {keys}. Pass the modalities "
+                        f"of one, for example {_example(cands[0])}.") from None
+            elif cands:
+                v = cands[0]
+            else:
+                raise
     up = upstream.knobs_for(s.id)
     return {"method": s.id, "variant": _variant_key(v),
             "defaults": dict(v.params), "tunable": dict(v.tunable),
@@ -704,6 +728,13 @@ def params_for(method: str, category: str | None = None,
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],
             "upstream_url": up["upstream_url"]}
+
+
+def _same_types(variants, modalities) -> list:
+    """The variants whose inputs are exactly the base types ``modalities`` name
+    (``rna``, ``adt``, ``atac``; numbers and ATAC forms dropped)."""
+    want = {_base_modality(m) for m in modalities}
+    return [v for v in variants if v.modality_types == want]
 
 
 # ------------------------------------------------------------------ citations
