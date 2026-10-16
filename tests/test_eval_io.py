@@ -417,11 +417,12 @@ def test_read_labels_reads_benchmark_style_files(tmp_path):
         io.read_labels(f)
 
 
-def test_align_vector_docstring_names_what_evaluate_calls():
-    """evaluate() calls the private _align_vector, not align_vector."""
-    import inspect
+def test_align_vector_matches_as_evaluate_does():
+    """The docstring says evaluate() matches the same way: a Series by its ids."""
     from multibench.eval import pipeline
-    src = inspect.getsource(pipeline)
-    assert "io._align_vector(" in src and "io.align_vector(" not in src
-    doc = io.align_vector.__doc__
-    assert "calls this" not in doc and "``_align_vector``" in doc
+    ids = pd.Index([f"c{i}" for i in range(6)])
+    x = pd.Series([f"t{i}" for i in range(6)], index=ids).iloc[[3, 0, 5, 1, 4, 2]]
+    mine = io.align_vector(x, ids)
+    assert list(mine) == [f"t{i}" for i in range(6)]
+    assert list(pipeline._obs_or_vector(x, None, what="labels", ids=ids)) == list(mine)
+    assert "calls this" not in io.align_vector.__doc__
