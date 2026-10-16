@@ -491,6 +491,23 @@ def _folder_state(folder) -> dict:
             for q in d.iterdir() if q.is_file() for st in (q.stat(),)}
 
 
+def _refuse_canonical(args, path, flag, role, category) -> None:
+    """Dataset mode reads an .h5ad or .h5mu: for a canonical ``.h5`` at ``path``,
+    raise with the file-mode command that copies it into the folder as ``role``."""
+    p = Path(path)
+    if not (p.suffix.lower() == ".h5" and p.is_file() and ingest._is_canonical_h5(p)):
+        return
+    if role is None:
+        action = "Pass the .h5ad or .h5mu it came from."
+    else:
+        name = ingest._export_filename(role, str(args.batch_index or ""), category)
+        action = (f"Copy it into the folder with: multibench convert {path} "
+                  f"{Path(args.out) / name}"
+                  + (f" --dtype {args.dtype}" if args.dtype != "float64" else ""))
+    raise ValueError(f"{path} is already a canonical .h5 file, and {flag} reads an .h5ad "
+                     f"or .h5mu. {action}")
+
+
 def _cmd_convert(args) -> int:
     """``multibench convert``: one canonical ``.h5`` (``to_canonical``), or with any
     :data:`_EXPORT_FLAGS` flag a dataset folder (``export_dataset``)."""
@@ -526,12 +543,21 @@ def _cmd_convert(args) -> int:
         if args.n_batches is not None:
             extra["n_batches"] = args.n_batches
         atac = args.atac
+        atac_role = {"peak": "atac_peak", "gene_activity": "atac_gas"}.get(args.atac_kind,
+                                                                           "atac")
         if args.atac_from is not None:
             if category != "diagonal":
                 _usage_error(args, "--atac-from is for --category diagonal (RNA and "
                              "ATAC from different cells)")
+            _refuse_canonical(args, args.atac_from, "--atac-from", atac_role, category)
             atac = ingest._select_object(ingest._to_anndata(args.atac_from),
                                          args.atac or "X", what="atac")
+        flag, role = next(
+            ((f"--{f.replace('_', '-')}", r) for f, r in (
+                ("rna", "rna"), ("adt", "adt"), ("atac", atac_role), ("labels", None),
+                ("batch", None), ("batch_index", None)) if getattr(args, f) is not None),
+            ("dataset mode", None))
+        _refuse_canonical(args, args.src, flag, role, category)
         data = ingest._to_anndata(args.src)
         before = _folder_state(args.out)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
