@@ -2,7 +2,7 @@
 
 Before the fix ``recommend('vertical', modalities=['rna', 'atac'])`` ranked
 moETM, scMM and scMoMaT at coverage 1.0 on D11 alone, a CITE-seq (RNA+ADT)
-dataset, and nothing said so.
+dataset, and nothing said so. 0.3.x warned; since 0.4 it raises.
 """
 import warnings
 
@@ -20,14 +20,16 @@ def _quiet(fn, *a, **kw):
     return out, [str(x.message) for x in w]
 
 
-def test_warns_when_no_ranked_dataset_measured_the_modality():
-    with pytest.warns(UserWarning, match=(
-            r"Stored vertical scores come from D11, D11s \(rna\+adt\)\. None of these "
-            r"datasets measured atac, so this ranking does not describe RNA\+ATAC "
-            r"data\.")):
+def test_raises_when_no_ranked_dataset_measured_the_modality():
+    # a warning until 0.3.9; the ranking was returned all the same
+    with pytest.raises(ValueError) as e:
         mtb.recommend("vertical", modalities=["rna", "atac"], source="rerun")
+    assert str(e.value) == (
+        "Stored vertical scores come from D11, D11s (rna+adt). None of these datasets "
+        "measured atac, so they cannot rank methods for RNA+ATAC data. Pass scores on "
+        "such data as long_df=.")
     # atac= names the modality as well
-    with pytest.warns(UserWarning, match=r"come from D11 \(rna\+adt\)\. None of these "
+    with pytest.raises(ValueError, match=r"come from D11 \(rna\+adt\)\. None of these "
                                          r"datasets measured atac"):
         mtb.recommend("vertical", atac="peak")
 

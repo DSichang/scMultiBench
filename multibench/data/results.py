@@ -1102,7 +1102,7 @@ def results_coverage(
     return out
 
 
-#: the modalities each shipped stored dataset measured, for recommend's warning
+#: the modalities each shipped stored dataset measured, for recommend's error
 _STORED_DATASET_MODALITIES = {
     "D11": ("rna", "adt"), "D11s": ("rna", "adt"),
     "D24": ("rna", "atac"), "D25": ("rna", "atac"),
@@ -1113,7 +1113,7 @@ _STORED_DATASET_MODALITIES = {
 
 
 def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) -> str:
-    """The recommend() warning line when no ranked dataset measured a requested
+    """The recommend() error when no ranked dataset measured a requested
     modality; ``""`` otherwise, or for a dataset that is not shipped."""
     datasets = [str(d) for d in datasets]
     if not datasets or any(d not in _STORED_DATASET_MODALITIES for d in datasets):
@@ -1129,7 +1129,8 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
     data = "+".join(m.upper() for m in _BASE_MODALITIES if m in wanted)
     head = f"Stored {category} scores" if stored else f"The {category} scores in long_df"
     return (f"{head} come from {where}. None of these datasets measured "
-            f"{' or '.join(missing)}, so this ranking does not describe {data} data.")
+            f"{' or '.join(missing)}, so they cannot rank methods for {data} data. "
+            f"Pass scores on such data as long_df=.")
 
 
 def _legacy_recommend_kwargs(kw: dict) -> dict:
@@ -1213,7 +1214,8 @@ def recommend(
         method the package does not run for the category, or ``methods=``,
         ``modalities=`` or ``atac=`` leaves no scored method. Also an
         unknown ``metrics`` value, modality token or ``atac`` value, or a
-        representation token that contradicts ``atac``.
+        representation token that contradicts ``atac``. Also ``modalities``
+        or ``atac`` naming a modality none of the ranked datasets measured.
     KeyError
         Unknown method name in ``methods``; the message suggests a close match,
         if any.
@@ -1280,8 +1282,8 @@ def recommend(
     methods; they do not change the datasets the scores come from. The
     shipped tables measured rna+adt (D11, D11s, D52, D52s) or rna+atac (D24,
     D25, D28, D28s, D45, D45s). When ``modalities`` or ``atac`` names a
-    modality that none of the ranked datasets measured, a ``UserWarning``
-    says so.
+    modality that none of the ranked datasets measured, ``recommend`` raises
+    ``ValueError`` instead of ranking.
 
     The stored Seurat_v5 diagonal scores come from runs with a separate paired
     bridge dataset; ``mtb.scan`` marks Seurat_v5 runnable only when your RNA and
@@ -1499,7 +1501,7 @@ def recommend(
         unmeasured = _unmeasured_note(category, list(per_ds.columns), want_mods,
                                       long_df_was_none)
         if unmeasured:
-            notes.append(unmeasured)
+            raise ValueError(unmeasured)
     if degenerate:
         one = len(degenerate) == 1
         notes.append(
