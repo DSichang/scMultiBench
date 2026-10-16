@@ -220,6 +220,16 @@ def test_python_overlay_with_a_stored_name_names_to_long():
                             "to_long(method=...).")
 
 
+def test_a_user_source_that_starts_like_a_stored_one_is_not_stored():
+    """Stored rows are those whose source is exactly one of STORED_SOURCES, as
+    everywhere else; "rerun_mine" is a user's source."""
+    df = pd.concat([mtb.load_results("diagonal", dataset="D28"),
+                    _user_rows().assign(source="rerun_mine")], ignore_index=True)
+    with pytest.raises(ValueError) as e:
+        mtb.plot.build_table(df)
+    assert str(e.value).startswith("Your rows and the stored table both have uniPort on D28.")
+
+
 def test_repeated_user_rows_give_the_plain_repeat_text():
     rows = pd.concat([_user_rows("Mine"), _user_rows("Mine")], ignore_index=True)
     with pytest.raises(ValueError) as e:

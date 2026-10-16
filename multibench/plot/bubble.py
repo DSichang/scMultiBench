@@ -685,7 +685,7 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
 def _duplicate_rows_message(dup, keys) -> str:
     """The error for rows that repeat ``keys``: the fix when your rows collide
     with stored ones, else one example repeat."""
-    stored = (dup["source"].astype("string").str.match(r"^(published|rerun)").fillna(False)
+    stored = (dup["source"].isin(style.STORED_SOURCES)
               if "source" in dup.columns else pd.Series(False, index=dup.index))
     mixed = dup.assign(_st=stored.to_numpy()).groupby(keys)["_st"].agg(
         lambda s: s.any() and not s.all())
