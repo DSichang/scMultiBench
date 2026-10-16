@@ -251,10 +251,11 @@ def _parse_params(pairs, args=None, default_method: str | None = None) -> dict:
         if not method or not key:
             _usage_error(args, f"--param needs METHOD:KEY=VALUE with non-empty parts, got {p!r}"
                          + ("" if default_method else " (METHOD: is required for run-all)"))
-        if default_method is not None and method != default_method:
+        if default_method is not None and registry.check_method(method) \
+                != registry.check_method(default_method):
             _usage_error(args, f"--param names method {method!r} but --method is "
                                f"{default_method!r}; drop the METHOD: prefix or make them agree")
-        registry.check_method(method)
+        method = registry.check_method(method)
         out.setdefault(method, {})[key] = _parse_scalar(value)
     return out
 
@@ -966,6 +967,7 @@ def _parse_inputs(pairs, args) -> dict:
 
 def _cmd_run(args) -> int:
     """``multibench run``: :func:`multibench.run` one method on explicit inputs."""
+    args.method = registry.check_method(args.method)     # any case, or a display name
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
     if args.dry_run:

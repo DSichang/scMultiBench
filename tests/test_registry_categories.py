@@ -61,9 +61,11 @@ def test_empty_when_modalities_only_for_data_dir_variants():
             assert (not v.when.get("modalities")) == v.takes_data_dir, (spec.id, v.when)
 
 
-def test_check_method_is_case_sensitive():
+def test_check_method_returns_the_id_in_any_case():
+    # since 0.4 a method id in another letter case names that method
+    assert registry.check_method("scipenn") == "sciPENN"
     with pytest.raises(KeyError):
-        registry.check_method("scipenn")
+        registry.check_method("scipen")
 
 
 def test_loose_select_and_family_helper():

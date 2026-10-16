@@ -433,6 +433,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     mtb.env.recipe : the hand-written environment recipe of a method.
     """
     s = registry.get(method)
+    method = s.id
     if not s.variants:
         raise KeyError(f"{method}: no variants (declared stub)")
     ref = s.reference
@@ -492,7 +493,7 @@ def _runtimes() -> dict:
 
 def _runtime_hint(method: str) -> dict:
     """``method_info(method)["runtime"]`` (see its Notes); a typo raises ``KeyError``."""
-    registry.check_method(method)
+    method = registry.check_method(method)
     rt = dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
                                        "observed": []}))
     # every observation was taken on the GPU benchmark host
@@ -619,6 +620,7 @@ def params_for(method: str, category: str | None = None,
     mtb.AmbiguousVariantError : raised when several variants fit the selection.
     """
     s = registry.get(method)
+    method = s.id
     registry.check_category(category)
     modalities = registry.normalize_modalities(modalities)
     if not s.variants:

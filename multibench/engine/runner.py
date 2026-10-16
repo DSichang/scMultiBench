@@ -778,6 +778,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     mtb.evaluate : scores ``RunResult.output``.
     """
     _check_template(cmd_template)
+    method = registry.check_method(method)
     inputs = _rename_old_roles(method, inputs)
     _check_input_cells(method, category, inputs)
     from ..workflow import _atac_mismatch_caveats     # workflow imports this module
@@ -902,6 +903,7 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     then the prepared-files note. ``gpu`` goes to :func:`cpu_params_for`.
     """
     spec = registry.get(method)
+    method = spec.id
     variant = spec.select(category, _modality_roles(inputs))
     params, _ = cpu_params_for(spec, params, gpu=gpu)
     values, out_str = normalize_paths(inputs, out_dir)

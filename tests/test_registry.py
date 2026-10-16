@@ -168,7 +168,7 @@ def test_parse_method_rejects_missing_or_stray_atac():
 def test_get_unknown_method_has_did_you_mean():
     import pytest
     with pytest.raises(KeyError) as e:
-        registry.get("Stabmap")
+        registry.get("StabMapp")
     msg = str(e.value)
     assert "Did you mean StabMap" in msg and "mtb.list_methods()" in msg
     with pytest.raises(KeyError, match="Unknown method zzz"):

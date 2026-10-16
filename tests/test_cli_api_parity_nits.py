@@ -40,7 +40,7 @@ def test_labels_for_old_order_is_a_typeerror():
 
 def test_inputs_for_plain_typos_keep_their_messages():
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.inputs_for("D52", "cross", "Stabmap")
+        mtb.inputs_for("D52", "cross", "StabMapp")
     with pytest.raises(ValueError, match="unknown category 'cros'; valid"):
         mtb.inputs_for("D52", "cros", "StabMap")
     # a method id in BOTH slots is a bad category, not a swap

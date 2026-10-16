@@ -119,7 +119,7 @@ def test_inputs_for_protein_alias_and_bad_category(tmp_path):
         resolve.inputs_for("D11", "vertical", "totalVI", modalities=["rna", "proteinx"],
                            data_path=tmp_path)
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        resolve.inputs_for("D11", "cross", "Stabmap", data_path=tmp_path)
+        resolve.inputs_for("D11", "cross", "StabMapp", data_path=tmp_path)
 
 
 # --- P01 follow-up: content preflight in inputs_for(check=True) ---------------

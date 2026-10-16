@@ -408,8 +408,7 @@ def own_env_name(method: str) -> str:
 def default_env_name(method: str) -> str:
     """The conda env name every entry point uses for ``method``:
     :func:`group_for` after validating the id."""
-    registry.check_method(method)
-    return group_for(method)
+    return group_for(registry.check_method(method))
 
 
 def _conda_bin(prefer: str = "mamba") -> str:
@@ -552,11 +551,11 @@ def group_create_commands(group: str, env_name: str | None = None,
 
 
 def _check_methods(methods):
-    """Raise ``KeyError`` for an unknown id in ``methods`` (else a typo gets a
-    made-up ``scmb_<typo>`` env) and ``TypeError`` for a bare string."""
+    """``methods`` as registry ids (any letter case or a display name is
+    accepted); ``KeyError`` for an unknown id (else a typo gets a made-up
+    ``scmb_<typo>`` env) and ``TypeError`` for a bare string."""
     registry.check_id_list(methods, "methods")
-    for m in methods or []:
-        registry.check_method(m)
+    return None if methods is None else [registry.check_method(m) for m in methods]
 
 
 def plan(category: str | None = None, methods: list[str] | None = None, *,
@@ -619,7 +618,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
 
     mtb.env.doctor : whether each of these envs exists here.
     """
-    _check_methods(methods)
+    methods = _check_methods(methods)
     if methods is None:
         methods = registry.list_methods(category=category)
     shared = _merged_groups()
@@ -1399,7 +1398,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
         One entry per env, largest first: ``{env, methods, exists, has_lock,
         cmds}`` (``cmds`` = the commands run, or that would run).
     """
-    _check_methods(methods)
+    methods = _check_methods(methods)
     if not dry_run:
         _require_linux(force)             # before conda is even asked anything
     have = set(installed_envs(conda))
@@ -1579,7 +1578,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     mtb.env.status : install status per method.
     """
     check_flavor(flavor)
-    _check_methods(methods)
+    methods = _check_methods(methods)
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
     unpacked: set[str] = set()
@@ -1726,7 +1725,7 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
 
     mtb.scan : its ``env_ok`` column uses the same installed-env check.
     """
-    _check_methods(methods)
+    methods = _check_methods(methods)
     have = set(installed_envs(conda))
     if methods is None:
         methods = registry.list_methods(category=category)
@@ -1904,6 +1903,7 @@ def create(method: str, env_name: str | None = None, conda: str | None = None,
     list of list of str
         The argv commands.
     """
+    method = registry.check_method(method)
     target = env_name or group_for(method)
     if lockfile(target) is not None:
         return create_env(target, conda=conda, dry_run=dry_run, force=force)

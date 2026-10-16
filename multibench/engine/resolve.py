@@ -508,6 +508,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
     spec = registry.get(method)
+    method = spec.id
     registry.check_category(category)
     dataset = canonical_dataset(base, dataset)
     ds_dir = base / dataset
@@ -1508,7 +1509,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     if category is not None:
         registry.check_category(category)
     if method is not None:
-        registry.check_method(method)
+        method = registry.check_method(method)
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
     dataset = canonical_dataset(base, dataset)

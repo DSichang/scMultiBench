@@ -145,7 +145,7 @@ def test_scan_methods_filter_and_unknown_raises():
     with pytest.raises(KeyError, match="Unknown method Nope"):
         mtb.scan("D11", "vertical", methods=["Nope"])
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.scan("D11", "cross", methods=["Stabmap"])
+        mtb.scan("D11", "cross", methods=["StabMapp"])
 
 
 def test_scan_modalities_filter_accepts_protein_alias():
@@ -248,7 +248,7 @@ def test_run_all_dry_run_unknown_method_still_keyerror():
         mtb.run_all("D28", "diagonal", out_dir="/tmp/unused", methods=["NotAMethod"],
                     dry_run=True, verbose=False)
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.run_all("D11", "cross", out_dir="/tmp/unused", methods=["Stabmap"],
+        mtb.run_all("D11", "cross", out_dir="/tmp/unused", methods=["StabMapp"],
                     dry_run=True, verbose=False)
 
 

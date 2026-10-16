@@ -41,6 +41,14 @@ __all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout
            "load_batch", "sweep"]
 
 
+def _registry_id_or(name):
+    """The registry id of ``name``, else ``name`` unchanged."""
+    try:
+        return registry.check_method(name)
+    except KeyError:
+        return name
+
+
 def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     """Reload a saved ``run_all`` result.
 
@@ -102,7 +110,10 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
         blob = json.load(fh)
     records = blob["records"]
     if methods is not None:
+        registry.check_id_list(methods, "methods")
         have = [r.get("method") for r in records]
+        # a method id in any letter case, or a display name, names its record
+        methods = [m if m in have else _registry_id_or(m) for m in methods]
         unknown = [m for m in methods if m not in have]
         if unknown:
             raise KeyError(f"no record for {unknown} in {folder}; methods in the "
@@ -1359,9 +1370,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     registry.check_id_list(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]
-    params = params or {}
-    for method in params:                   # did-you-mean KeyError before any I/O
-        registry.check_method(method)
+    # did-you-mean KeyError before any I/O; ids in any case or display names
+    params = {registry.check_method(m): v for m, v in (params or {}).items()}
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     dataset = _resolve.canonical_dataset(base, dataset, stacklevel=stacklevel + 1)
@@ -3619,9 +3629,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     registry.check_id_list(methods, "methods")
     every, modalities = _every_combination(modalities)
     registry.check_id_list(modalities, "modalities")
-    params = params or {}
-    for method in params:
-        registry.check_method(method)
+    if methods is not None:
+        methods = [registry.check_method(m) for m in methods]
+    params = {registry.check_method(m): v for m, v in (params or {}).items()}
     if assume_gpu and not dry_run:
         raise ValueError(
             "assume_gpu=True applies to a dry run only; a real run checks this "
@@ -3929,7 +3939,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
     mtb.run_all : what each setting runs through.
     """
-    registry.check_method(method)
+    method = registry.check_method(method)
     tune = _params_for_method(method, category, modalities)
     if tune and param not in tune:
         raise KeyError(

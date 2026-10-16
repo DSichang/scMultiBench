@@ -70,12 +70,12 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
 
 # ------------------------------------------------------------------ J6: did-you-mean before any I/O
 @pytest.mark.parametrize("call", [
-    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["Stabmap"]),
+    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"]),
     lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
-                        methods=["Stabmap"], verbose=False),
+                        methods=["StabMapp"], verbose=False),
     lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
-                        params={"Stabmap": {"k": 1}}, verbose=False),
-    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["Stabmap"],
+                        params={"StabMapp": {"k": 1}}, verbose=False),
+    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"],
                      out_dir="runs"),
 ])
 def test_unknown_method_raises_did_you_mean_before_filesystem(call):

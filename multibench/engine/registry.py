@@ -162,11 +162,18 @@ def load() -> list[MethodSpec]:
 
 # --------------------------------------------------------------- validators
 def check_method(method_id: str) -> str:
-    """Return ``method_id`` if it is a registry id; else raise ``KeyError``
-    with :func:`unknown_method_message`."""
+    """The registry id of a method name: an id in any letter case
+    (``"totalvi"``) or a display name (``"MOFA+"``, ``"Seurat(WNN)"``, as
+    ``mtb.catalog.canonical_id`` reads them). Anything else raises
+    ``KeyError`` with :func:`unknown_method_message`."""
     ids = [s.id for s in load()]
     if method_id in ids:
         return method_id
+    if isinstance(method_id, str):
+        from ..data import catalog          # lazy: catalog imports registry lazily
+        canon = catalog.canonical_id(method_id)
+        if canon in ids:
+            return canon
     raise KeyError(unknown_method_message(method_id))
 
 
@@ -266,7 +273,7 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
 
 # ---------------------------------------------------------------- lookups
 def get(method_id: str) -> MethodSpec:
-    check_method(method_id)
+    method_id = check_method(method_id)
     return next(s for s in load() if s.id == method_id)
 
 

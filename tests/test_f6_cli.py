@@ -101,8 +101,8 @@ def test_unknown_method_without_labels_names_the_rename(diag, capsys):
 
 def test_check_method_is_short_sentences():
     with pytest.raises(KeyError) as e:
-        registry.check_method("stabmap")
-    assert e.value.args[0] == ("Unknown method stabmap. Did you mean StabMap? "
+        registry.check_method("stabmapp")
+    assert e.value.args[0] == ("Unknown method stabmapp. Did you mean StabMap? "
                                "mtb.list_methods() shows all methods.")
     with pytest.raises(KeyError) as e:
         registry.check_method("zzz")
@@ -129,8 +129,8 @@ def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_
                                                                             capsys):
     rna, adt = str(_DATA / "D11" / "rna.h5"), str(_DATA / "D11" / "adt.h5")
     msgs = _messages_of([
-        lambda: registry.check_method("stabmap"),
-        lambda: mtb.method_info("stabmap"),
+        lambda: registry.check_method("stabmapp"),
+        lambda: mtb.method_info("stabmapp"),
         lambda: mtb.catalog.canonical_id("Matlida", strict=True),
         lambda: mtb.load_results("vertical", methods=["Matlida"]),
         lambda: mtb.labels_for("D11", "vertical", "SCALEX", data_path=_DATA),
@@ -140,7 +140,7 @@ def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_
         lambda: mtb.params_for("SCALEX", "vertical"),
     ])
     np.save(tmp_path / "emb.npy", np.zeros((10, 3)))
-    for argv in (["info", "stabmap"], ["params", "Matilda", "--category", "cross"],
+    for argv in (["info", "stabmapp"], ["params", "Matilda", "--category", "cross"],
                  ["evaluate", "--output", str(tmp_path / "emb.npy"), "--method", "SCALEX",
                   "--name", "ADT_PCA", "--dataset", "D11", "--category", "vertical",
                   "--data-path", str(_DATA)],
@@ -154,7 +154,7 @@ def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_
         assert "?;" not in m and "variant" not in m, m
     assert ("error: SCALEX does not run on vertical data. Its categories: diagonal. For "
             "your own embedding, pass the label files with --labels.") in msgs[10]
-    assert "error: Unknown method stabmap. Did you mean StabMap? multibench list shows " \
+    assert "error: Unknown method stabmapp. Did you mean StabMap? multibench list shows " \
            "all methods." in msgs[8]
 
 
