@@ -1320,10 +1320,16 @@ def _as_obs_vector(data, spec, *, what, master):
                              f"Series/array instead")
         ser = _select_obs(data, spec, what=what)
         src_names = [str(x) for x in ser.index]
-        if master is not None and src_names != [str(x) for x in master] \
-                and set(src_names) == set(master) and len(set(src_names)) == len(src_names):
-            ser = ser.reindex([str(x) for x in master]) if ser.index.dtype == object \
-                else ser.iloc[[src_names.index(str(x)) for x in master]]
+        if master is not None and src_names != [str(x) for x in master]:
+            if len(set(src_names)) != len(src_names):
+                # by position every row would go to another cell
+                raise ValueError(
+                    f"The cell names of {_labels_where(data, spec)} are not unique, so its "
+                    f"{what} cannot be matched to the cells. Give every cell a unique name "
+                    f"first.")
+            if set(src_names) == set(master):
+                ser = ser.reindex([str(x) for x in master]) if ser.index.dtype == object \
+                    else ser.iloc[[src_names.index(str(x)) for x in master]]
         return np.asarray(ser)
     if isinstance(spec, pd.Series):
         if master is None:
@@ -1521,7 +1527,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     **Labels.** ``cty.csv`` holds a header ``x`` and one label per line;
     ``mtb.labels_for`` finds these files again. A ``labels`` / ``batch``
     Series is aligned by index to the master barcodes; a plain
-    ``RangeIndex`` of the right length is taken positionally.
+    ``RangeIndex`` of the right length is taken positionally. A column of an
+    ``obs`` whose cell names repeat is taken positionally only when its
+    cells are in the master order; in another order it raises.
 
     **Diagonal.** ``category='diagonal'`` pairs no barcodes: RNA and ATAC may
     come from different cells. ``rna`` is written as ``rna.h5`` and ``atac``
