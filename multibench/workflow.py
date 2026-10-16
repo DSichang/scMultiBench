@@ -3875,7 +3875,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
 def sweep(dataset: str, category: str, method: str, param: str, values, *,
           out_dir, modalities=None, data_path=None, timeout=None,
-          verbose: bool = True) -> pd.DataFrame:
+          verbose: bool = True, dry_run: bool = False) -> pd.DataFrame:
     """Run one method once per value of one hyperparameter, each in its own out_dir.
 
     Parameters
@@ -3904,18 +3904,23 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         ``None`` = no cap.
     verbose : bool
         Print ``run_all``'s progress lines.
+    dry_run : bool
+        ``True`` = run nothing: return the planned settings, each
+        setting's ``mtb.scan`` rows with its command line.
 
     Returns
     -------
     pandas.DataFrame
         The settings' ``BatchResult.summary`` rows stacked, the swept value
         first (column named ``param``). A long table for plotting is in
-        ``df.attrs["long"]``.
+        ``df.attrs["long"]``. With ``dry_run=True``, the settings' scan rows
+        stacked, the swept value first.
 
     Raises
     ------
     KeyError
-        Unknown ``method``, or ``param`` not among the tunable keys of a single variant.
+        Unknown ``method``, or ``param`` that no variant of the method on
+        this dataset accepts (``run_all``'s message), before anything runs.
 
     Examples
     --------
@@ -3940,12 +3945,11 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
     A setting that fails is recorded by ``run_all``: its row has ``status``
     ``FAIL`` or ``TIMEOUT`` and empty metrics. Check the ``status`` column
-    before reading the curve. A method whose ``tunable`` is empty cannot be
-    swept; every setting is then a ``FAIL``. The ``param`` check needs one
-    variant: with ``modalities=None`` and several variants in ``category``
-    (Matilda under ``vertical``), an unknown ``param`` is a ``FAIL`` for
-    every setting; pass ``modalities`` to get the ``KeyError``. Errors of
-    ``mtb.run_all`` (no method can run) propagate.
+    before reading the curve. ``param`` is checked before anything runs,
+    against every variant the run would use; with ``modalities=None`` and
+    several variants in ``category`` (Matilda under ``vertical``), a
+    ``param`` that only one of them accepts is a ``FAIL`` for the others.
+    Errors of ``mtb.run_all`` (no method can run) propagate.
 
     See Also
     --------
@@ -3954,10 +3958,23 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     mtb.run_all : what each setting runs through.
     """
     method = registry.check_method(method)
-    tune = _params_for_method(method, category, modalities)
-    if tune and param not in tune:
-        raise KeyError(
-            f"{method} does not expose {param!r}; it accepts {sorted(tune)}.")
+    values = list(values)
+
+    def plan(v):
+        tag = str(v).replace(".", "p").replace("-", "m")
+        df = run_all(dataset, category, out_dir=Path(out_dir) / f"{param}_{tag}",
+                     methods=[method], modalities=modalities, data_path=data_path,
+                     params={method: {param: v}}, dry_run=True, verbose=False)
+        df.insert(0, param, v)
+        return df
+
+    # the key check of run_all's dry run, before any setting runs
+    planned = [plan(v) for v in (values if dry_run else values[:1])]
+    if dry_run:
+        if verbose:
+            print(f"[sweep] Dry run: {len(values)} settings of {param} for {method} on "
+                  f"{dataset} ({category}). Nothing was run.", flush=True)
+        return pd.concat(planned, ignore_index=True) if planned else pd.DataFrame()
     frames, longs = [], []
     for v in values:
         tag = str(v).replace(".", "p").replace("-", "m")
@@ -3982,13 +3999,3 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         long_table.to_csv(long_path, index=False)
         out.attrs["long_path"] = str(long_path)
     return out
-
-
-def _params_for_method(method, category, modalities):
-    """The variant's tunable keys, or ``None`` when ``params_for`` raises."""
-    try:
-        from .discover import params_for
-        return params_for(method, category,
-                          list(modalities) if modalities else None)["tunable"]
-    except Exception:
-        return None
