@@ -83,6 +83,18 @@ class RunResult:
     env_flavor: str = "unknown"
     hostname: str = ""
 
+    def __repr__(self) -> str:
+        """One line: the method, the folder, the output's shape and the extra
+        files; not the data, stdout or the cell names."""
+        def shape(x):
+            sh = getattr(x, "shape", None)
+            return (f"{type(x).__name__} {tuple(sh)}" if sh is not None
+                    else type(x).__name__)
+        cells = "None" if self.obs_names is None else f"{len(self.obs_names):,} cells"
+        return (f"RunResult(method={self.method!r}, out_dir={str(self.out_dir)!r}, "
+                f"output={shape(self.output)}, extra={sorted(map(str, self.extra or {}))}, "
+                f"obs_names={cells})")
+
 
 def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
     """Wrap argv with a cmd_template like 'conda run -n env {cmd}'."""

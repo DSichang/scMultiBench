@@ -41,6 +41,13 @@ from .workflow import (scan, run_all, BatchResult, list_categories,
                        describe_layout, load_batch, sweep)
 from ._compat import deprecated_alias as _deprecated_alias
 
+# `import multibench.io` / `from multibench.env import plan` work as for a real
+# submodule: the three namespaces live elsewhere in the package
+import sys as _sys
+for _name, _module in (("io", io), ("catalog", catalog), ("env", env)):
+    _sys.modules.setdefault(f"{__name__}.{_name}", _module)
+del _sys, _name, _module
+
 __version__ = "0.3.9"
 
 __all__ = [

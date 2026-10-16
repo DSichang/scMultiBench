@@ -54,7 +54,8 @@ def test_io_all_is_exactly_the_contract():
 
 def test_env_all_is_exactly_the_contract():
     assert set(mtb.env.__all__) == ENV_ALL and mtb.env is envs
-    assert _leaks(mtb.env) == set()
+    # the two helpers the reference documents are in dir() too (0.4)
+    assert _leaks(mtb.env) == {"env_prefix", "host_has_gpu"}
     # the rest of engine/envs.py stays importable for the CLI and the tests
     for name in ("group_for", "create_all", "install_packed", "installed_envs",
                  "default_env_name", "packed_sizes", "packed_manifest"):

@@ -31,10 +31,15 @@ from . import registry
 
 __all__ = ["status", "plan", "install", "doctor", "recipe"]
 
+#: helpers the API reference documents and the help texts name, outside __all__
+_DOCUMENTED = ("env_prefix", "host_has_gpu")
+
 
 def __dir__() -> list[str]:
-    """``dir(mtb.env)`` lists :data:`__all__` and the dunders (PEP 562)."""
-    return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
+    """``dir(mtb.env)`` lists :data:`__all__`, the two documented helpers
+    (``env_prefix``, ``host_has_gpu``) and the dunders (PEP 562)."""
+    return sorted(n for n in globals()
+                  if n in __all__ or n in _DOCUMENTED or n.startswith("__"))
 
 
 # --- host platform --------------------------------------------------------

@@ -1002,7 +1002,9 @@ def fetchable() -> list[str]:
     --------
     >>> import multibench as mtb
     >>> mtb.data.fetchable()
-    ['D11', 'D28', 'D45', 'D46', 'D52']
+    ['D11', 'D22mini', 'D27mini', 'D27mini_vertical', 'D28', 'D37mini', 'D38mini',
+     'D45', 'D45mini', 'D46', 'D46mini', 'D49mini', 'D52', 'D52mini', 'D56mini',
+     'D58mini', 'D59mini']
 
     Notes
     -----

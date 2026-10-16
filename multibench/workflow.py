@@ -2375,7 +2375,7 @@ class BatchResult:
         return _plot.bubble(lng, **kw)
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
-                verbose: bool = False) -> "BatchResult":
+                verbose: bool = True) -> "BatchResult":
         """Score the saved outputs again with new labels, batch or metrics.
 
         No method is re-run. Each record's embedding is read back from its

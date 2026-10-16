@@ -150,9 +150,11 @@ def test_host_has_gpu_true_from_the_driver_record(probe):
     assert envs.host_has_gpu() is True
 
 
-def test_host_has_gpu_importable_but_not_advertised():
+def test_host_has_gpu_is_in_dir_but_not_in_all():
+    # documented and named in env plan --help: in dir(mtb.env) since 0.4
     assert callable(envs.host_has_gpu) and callable(mtb.env.host_has_gpu)
-    assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" not in dir(mtb.env)
+    assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" in dir(mtb.env)
+    assert "env_prefix" in dir(mtb.env)
     assert set(mtb.env.__all__) == {"status", "plan", "install", "doctor", "recipe"}
 
 
