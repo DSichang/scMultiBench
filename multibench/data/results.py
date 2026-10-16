@@ -653,8 +653,9 @@ def load_results(
     token raises too (``"dimension_reduction"`` is a ``list_tasks`` token,
     not a family).
 
-    **Empty results.** A known method or metric with no rows gives an empty
-    frame and a ``UserWarning``, not an error. Under ``source="published"``
+    **Empty results.** A known method or metric, or a family
+    (``metrics="classification"``), with no rows gives an empty frame and a
+    ``UserWarning``, not an error. Under ``source="published"``
     the warning also says whether the re-run sweeps hold that method
     (``"The re-run tables hold 1 dataset (D11). Pass source='rerun' or
     'both'."``).
@@ -801,11 +802,19 @@ def load_results(
     if sel is None:
         sel = catalog.metric_selection(metrics, extra=have_metrics)
     if sel.codes is not None:
+        before = len(out)
         out = out[out["metric"].isin(sel.codes)]
         if out.empty and sel.explicit:
             warnings.warn(
                 f"metric(s) {sel.codes} not present in {where} (source={source!r}; "
                 f"available: {have_metrics})", UserWarning, stacklevel=3)
+        elif out.empty and before:
+            tables = " ".join(x for x in (source, category, "tables") if x)
+            of = f" of {', '.join(map(str, datasets))}" if datasets else ""
+            warnings.warn(
+                f"The {tables}{of} have no {sel.family} scores, so no rows are left. "
+                f"Leave out metrics= to get the scores they have "
+                f"({', '.join(have_metrics)}).", UserWarning, stacklevel=3)
     out = out[COLUMNS + [c for c in _KEPT_FILE_COLUMNS if c in out.columns]]
     out = out.reset_index(drop=True)
     out.attrs["rerun_version"] = _version_attr(rerun_versions)
