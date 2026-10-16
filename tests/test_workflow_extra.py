@@ -120,6 +120,8 @@ def test_sweep_rejects_a_param_the_method_does_not_expose():
                   out_dir="/tmp/unused", modalities=["rna", "adt"])
     assert "does not expose" in str(e.value)
     assert "lr" in str(e.value)          # tells you what it DOES accept
+    # raised only when the set is not empty: no clause about an empty set
+    assert str(e.value.args[0]).endswith("].") and "empty" not in str(e.value)
 
 
 def test_runresult_is_documented():

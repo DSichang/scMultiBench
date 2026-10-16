@@ -3915,8 +3915,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     tune = _params_for_method(method, category, modalities)
     if tune and param not in tune:
         raise KeyError(
-            f"{method} does not expose {param!r}; it accepts {sorted(tune)}. "
-            f"(An empty set means it hardcodes its hyperparameters upstream.)")
+            f"{method} does not expose {param!r}; it accepts {sorted(tune)}.")
     frames, longs = [], []
     for v in values:
         tag = str(v).replace(".", "p").replace("-", "m")
