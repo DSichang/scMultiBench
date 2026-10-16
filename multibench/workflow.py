@@ -1370,6 +1370,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     registry.check_id_list(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]
+    _check_params_shape(params, methods, "scan")
     # did-you-mean KeyError before any I/O; ids in any case or display names
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
@@ -2822,6 +2823,19 @@ def _platform_line(blocked: pd.DataFrame) -> str:
 _unknown_params_error = _runner.unknown_params_error
 
 
+def _check_params_shape(params, methods, fn: str) -> None:
+    """``TypeError`` for a ``params`` dict that is not keyed by method (a value
+    that is not a dict), showing the nested form."""
+    if not params or not isinstance(params, dict):
+        return
+    if all(isinstance(v, dict) for v in params.values()):
+        return
+    method = methods[0] if methods else "Matilda"
+    flat = {k: v for k, v in params.items() if not isinstance(v, dict)}
+    raise TypeError(f"{fn}(params=) takes one dict per method, such as "
+                    f"params={{{method!r}: {flat!r}}}.")
+
+
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
     """Raise ``KeyError`` when ``params`` names a key no scanned variant of that
     method accepts, so a dry run catches the typo; a method without rows is skipped."""
@@ -3495,7 +3509,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         Unknown id in ``methods`` or ``params``; on a dry run, a rejected ``params`` key.
     TypeError
         A real run without ``out_dir``; ``methods`` given as a bare string, or
-        ``modalities`` as a string other than ``"all"``.
+        ``modalities`` as a string other than ``"all"``; ``params`` not keyed
+        by method (``{"epochs": 3}`` for ``{"Matilda": {"epochs": 3}}``).
 
     Warns
     -----
@@ -3629,6 +3644,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     registry.check_id_list(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]
+    _check_params_shape(params, methods, "run_all")
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
     if assume_gpu and not dry_run:
         raise ValueError(
