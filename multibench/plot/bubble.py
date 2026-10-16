@@ -1127,7 +1127,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     Warns
     -----
     UserWarning
-        As ``mtb.plot.build_table``.
+        As ``mtb.plot.build_table``; also when the figure compares two
+        methods ("With 2 methods each column only shows which is higher.").
 
     Examples
     --------
@@ -1160,7 +1161,9 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     - *Rank* legend: 1 = best, whereas ``BubbleTable.ranks`` /
       ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
     - Grey fill: every row of that column holds the same value, or the
-      figure has one method, so there is nothing to compare.
+      figure has one method, so there is nothing to compare. With two
+      methods each column holds the higher and the lower one; a
+      ``UserWarning`` says so.
 
     **Chips** (``show_language``). ``Py`` / ``R`` = language; ``?`` = a name
     the package does not know, such as your own or a renamed re-run.
@@ -1175,6 +1178,9 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,
                       overall=overall, na=na)
+    if len(tbl.methods) == 2:
+        import warnings
+        warnings.warn(style.TWO_METHODS, UserWarning, stacklevel=2)
     fig = render(tbl, cmap=cmap, title=title, show_language=show_language)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")

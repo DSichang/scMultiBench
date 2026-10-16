@@ -91,6 +91,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     UserWarning
         Rows scored with the igraph Leiden backend are shown with stored rows
         of their dataset.
+    UserWarning
+        Two methods: "With 2 methods each column only shows which is higher."
 
     Examples
     --------
@@ -186,6 +188,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     backend = style.backend_warning(shown)
     if backend:
         warnings.warn(backend, UserWarning, stacklevel=2)
+    if len({m for mat in parts.values() for m in mat.index}) == 2:
+        warnings.warn(style.TWO_METHODS, UserWarning, stacklevel=2)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed
     # so the best method is drawn on top

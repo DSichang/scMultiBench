@@ -262,6 +262,11 @@ def constant_columns(mat: pd.DataFrame) -> dict:
     return out
 
 
+#: the warning of a figure that compares two methods: each column is min-max
+#: scaled, so it holds 1 and 0
+TWO_METHODS = "With 2 methods each column only shows which is higher."
+
+
 def backend_warning(df: pd.DataFrame) -> str | None:
     """The message for igraph-scored rows plotted next to stored rows, else ``None``.
 

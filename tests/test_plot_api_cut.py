@@ -39,6 +39,7 @@ def test_plot_all_and_dir_are_the_contract():
 def test_plot_bubble_is_a_deprecated_alias_of_bubble(tmp_path):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        warnings.filterwarnings("ignore", message="With 2 methods")   # the toy has two
         new = mtb.plot.bubble(_toy_long(), metrics=["ARI", "NMI"])
     with pytest.warns(DeprecationWarning, match=r"mtb.plot.plot_bubble is deprecated since 0.3.0.*use mtb.plot.bubble"):
         old = mtb.plot.plot_bubble(_toy_long(), metrics=["ARI", "NMI"])
