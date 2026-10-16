@@ -280,6 +280,27 @@ def _obs_column_name(x, adata) -> str | None:
     return None
 
 
+def _mod_obs_column(x, adata):
+    """The values of a MuData's ``"<mod>:<col>"`` (``mdata[mod].obs[col]``, as
+    ``export_dataset`` reads it) in the MuData's cell order, or ``None``."""
+    mods = getattr(adata, "mod", None)
+    if not isinstance(mods, dict) or ":" not in x:
+        return None
+    mod, col = x.split(":", 1)
+    if mod not in mods or col not in mods[mod].obs.columns:
+        return None
+    return pd.Series(mods[mod].obs[col]).reindex(adata.obs_names).to_numpy()
+
+
+def _obs_choices(adata) -> list[str]:
+    """The obs column names an argument can give: the object's own, then a
+    MuData's ``<mod>:<col>``."""
+    names = list(map(str, adata.obs.columns))
+    for mod, a in (getattr(adata, "mod", None) or {}).items():
+        names += [f"{mod}:{c}" for c in map(str, a.obs.columns)]
+    return names
+
+
 def _column_without_obs(x, adata) -> bool:
     """``x`` can only be an obs column name, and the output has no obs. The
     command line takes files only and keeps its file errors."""
@@ -350,11 +371,14 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         col = _obs_column_name(x, adata)
         if col is not None:
             return np.asarray(pd.Series(adata.obs[col]).to_numpy())
+        in_mod = _mod_obs_column(x, adata)
+        if in_mod is not None:
+            return np.asarray(in_mod)
         if not Path(x).is_file():
             raise ValueError(
-                f"{what}={x!r} is neither an obs column of the AnnData (obs "
-                f"columns: {list(map(str, adata.obs.columns))}) nor an existing "
-                f"file")
+                f"{what}={x!r} is neither an obs column of the "
+                f"{type(adata).__name__} (obs columns: {_obs_choices(adata)}) nor an "
+                f"existing file")
     if _column_without_obs(x, adata):
         raise FileNotFoundError(_no_column_error(what, x))
     if isinstance(x, (str, Path)) and column is None:
@@ -1047,7 +1071,9 @@ def evaluate(
       single-column DataFrame;
     - when ``output`` is an AnnData or MuData, the name of an ``.obs``
       column, with or without the ``obs:`` prefix (``"celltype"`` or
-      ``"obs:celltype"``).
+      ``"obs:celltype"``); for a MuData also ``"<mod>:<column>"``, a column
+      of one modality (``"rna:celltype"`` = ``mdata["rna"].obs["celltype"]``),
+      as ``export_dataset`` reads it.
 
     ``"obs:<column>"`` and ``"<column>"`` name a column of the object you
     pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and
