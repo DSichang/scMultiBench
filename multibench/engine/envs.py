@@ -558,7 +558,18 @@ def _check_methods(methods):
     return None if methods is None else [registry.check_method(m) for m in methods]
 
 
-def plan(category: str | None = None, methods: list[str] | None = None, *,
+def _category_or_methods(category, methods, fn: str):
+    """``(category, methods)``, with a list or tuple of method ids passed as the
+    first argument (``plan(["Matilda"])``) moved to ``methods``."""
+    if isinstance(category, (list, tuple)):
+        if methods is not None:
+            raise TypeError(f"{fn}() got methods twice: pass the list once, as "
+                            f"methods=[...]")
+        return None, list(category)
+    return category, methods
+
+
+def plan(category: str | list[str] | None = None, methods: list[str] | None = None, *,
          as_frame: bool = False):
     """List the conda envs a set of methods needs, one row per env.
 
@@ -566,9 +577,10 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
 
     Parameters
     ----------
-    category : str | None
+    category : str | list[str] | None
         Integration category (``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``) whose methods to cover; ``None`` = every method.
+        ``cross``) whose methods to cover; ``None`` = every method. A list
+        of method ids here is read as ``methods``.
     methods : list[str] | None
         Method ids to cover instead of ``category``.
     as_frame : bool
@@ -594,7 +606,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
     --------
     >>> import multibench as mtb
     >>> mtb.env.plan("vertical", as_frame=True)[["env", "methods"]]
-    >>> mtb.env.plan(methods=["Matilda", "totalVI", "scMoMaT"])
+    >>> mtb.env.plan(["Matilda", "totalVI", "scMoMaT"])
 
     Notes
     -----
@@ -618,6 +630,7 @@ def plan(category: str | None = None, methods: list[str] | None = None, *,
 
     mtb.env.doctor : whether each of these envs exists here.
     """
+    category, methods = _category_or_methods(category, methods, "plan")
     methods = _check_methods(methods)
     if methods is None:
         methods = registry.list_methods(category=category)
@@ -1652,7 +1665,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     return out
 
 
-def doctor(category: str | None = None, methods: list[str] | None = None,
+def doctor(category: str | list[str] | None = None, methods: list[str] | None = None,
            conda: str | None = None, *, as_frame: bool = False):
     """Report, per needed env, whether it is installed and has a lockfile.
 
@@ -1661,9 +1674,10 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
 
     Parameters
     ----------
-    category : str | None
+    category : str | list[str] | None
         Integration category (``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``) whose methods to check; ``None`` = every method.
+        ``cross``) whose methods to check; ``None`` = every method. A list
+        of method ids here is read as ``methods``.
     methods : list[str] | None
         Method ids to check instead of ``category``.
     conda : str | None
@@ -1725,6 +1739,7 @@ def doctor(category: str | None = None, methods: list[str] | None = None,
 
     mtb.scan : its ``env_ok`` column uses the same installed-env check.
     """
+    category, methods = _category_or_methods(category, methods, "doctor")
     methods = _check_methods(methods)
     have = set(installed_envs(conda))
     if methods is None:
