@@ -415,3 +415,13 @@ def test_read_labels_reads_benchmark_style_files(tmp_path):
         if "scjoint" in f.name.lower():
             continue
         io.read_labels(f)
+
+
+def test_align_vector_docstring_names_what_evaluate_calls():
+    """evaluate() calls the private _align_vector, not align_vector."""
+    import inspect
+    from multibench.eval import pipeline
+    src = inspect.getsource(pipeline)
+    assert "io._align_vector(" in src and "io.align_vector(" not in src
+    doc = io.align_vector.__doc__
+    assert "calls this" not in doc and "``_align_vector``" in doc

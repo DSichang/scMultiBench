@@ -603,9 +603,10 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
     """Align an indexed ``Series``/``DataFrame`` to the output's cell ids.
 
     A Series indexed by cell barcode is matched by barcode, not by position
-    (the pandas convention). ``evaluate()`` calls this when ``output`` carries
-    ids (an AnnData's ``obs_names``, or a DataFrame with a non-default index)
-    and ``x`` carries a non-default index.
+    (the pandas convention). ``evaluate()`` matches the same way, through the
+    private ``_align_vector``, when ``output`` carries ids (an AnnData's
+    ``obs_names``, or a DataFrame with a non-default index) and ``x`` carries
+    a non-default index.
 
     Parameters
     ----------
