@@ -382,7 +382,11 @@ def test_recommend_without_classification_scores():
 def test_stored_tables_have_no_classification():
     df, said = _caught(mtb.load_results, "vertical", dataset="D11",
                        metrics="classification")
-    assert df.empty and not said             # as metrics="batch" on a single-batch dataset
+    # one line says so since 0.4, as for metrics="batch" on a single-batch dataset
+    assert df.empty and said == [
+        "The published vertical tables of D11 have no classification scores, so no rows "
+        "are left. Leave out metrics= to get the scores they have (ARI, ASW, NMI, cLISI, "
+        "iASW, iF1)."]
 
 
 # ---------------------------------------------------------------- command line
