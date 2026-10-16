@@ -2979,7 +2979,9 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     data-file barcodes); ``None`` when some are missing or ids repeat."""
     ids: list = []
     try:
-        files = _resolve.labels_for(dataset, data_path=data_path, check=False)
+        with warnings.catch_warnings():       # the default order is meant here
+            warnings.simplefilter("ignore", UserWarning)
+            files = _resolve.labels_for(dataset, data_path=data_path, check=False)
         for p in map(Path, files.values()):
             n = len(_eio.read_labels(p))
             bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(p))

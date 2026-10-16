@@ -1272,6 +1272,52 @@ def _agreed_label_order(spec, category: str, stems: list[str]) -> list[str] | No
     return list(orders.pop()) if len(orders) == 1 else None
 
 
+def _reordering_methods(stems: list[str], category: str | None,
+                        ds_dir: Path) -> list[tuple[str, str]]:
+    """``(method, category)`` of the methods that can run on ``ds_dir`` and
+    put the cells of the label files ``stems`` in another order than the
+    default one (the order of ``stems``); one pair per method, of
+    ``category`` when given."""
+    batches = {int(m.group(1)) for st in stems if (m := _NUMBERED_LABEL_RE.fullmatch(st))}
+    out = []
+    for spec in registry.load():
+        for v in spec.variants:
+            cat = v.when.get("category")
+            if category is not None and cat != category:
+                continue
+            roles = {r for a in v.args for r in (a.roles or [a.role]) if r}
+            used = _variant_batches(roles)
+            if batches and used and used != batches:
+                continue
+            rank = _variant_label_rank(stems, v)
+            # every file pairs with an input of the variant: it reads this folder
+            if rank is None or any(rank[st][0] != 0 for st in stems):
+                continue
+            if sorted(stems, key=lambda st: rank[st]) != list(stems) \
+                    and _variant_satisfiable(v, ds_dir, spec.id):
+                out.append((spec.id, cat))
+                break
+    return out
+
+
+def _default_order_warning(dataset: str, category, stems: list[str],
+                           ds_dir: Path) -> str | None:
+    """The warning of ``labels_for`` without a method when some method puts
+    these files' cells in another order, else ``None``."""
+    if len(stems) < 2:
+        return None
+    others = _reordering_methods(stems, category, ds_dir)
+    if not others:
+        return None
+    names = [m for m, _ in others]
+    shown = _and_list(names[:3] + ([f"{len(names) - 3} more"] if len(names) > 3 else []))
+    method, cat = others[0]
+    return (f"labels_for({dataset!r}) has no method: the files are in the default order "
+            f"{', '.join(stems)}, and {shown} {'puts its' if len(names) == 1 else 'put their'} "
+            f"cells in another order. For a method's output, pass "
+            f"labels_for({dataset!r}, {cat!r}, {method!r}).")
+
+
 class LabelFiles(dict):
     """The ``{stem: path}`` dict :func:`labels_for` returns: a ``dict`` that
     remembers its key order (``stacking_order``), so ``evaluate`` takes it as
@@ -1342,6 +1388,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         ``dataset`` matches a folder only up to letter case.
     UserWarning
         ``check=None`` and a per-batch folder for a vertical or diagonal ``category``.
+    UserWarning
+        No ``method``, and a method that can run on the folder puts these
+        cells in another order (StabMap on ``D52``); the warning names it.
 
     Examples
     --------
@@ -1386,6 +1435,11 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
        atac_cty2``. The diagonal methods other than uniPort and Seurat_v5
        emit the RNA cells first;
     4. any other ``*cty*`` file, alphabetically, last.
+
+    When a method that can run on the folder (of ``category``, when given)
+    puts the cells in another order, the call without ``method`` warns and
+    names it: an embedding of that method scored against the default order
+    gets wrong scores without an error.
 
     **Per-method order.** With ``category`` and ``method``, each file goes
     where the cells it labels sit in that variant's output: the order of its
@@ -1470,6 +1524,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     files = {p.stem: str(p) for p in ds_dir.glob("*cty*.csv")
              if "scjoint" not in p.name.lower()}
     stems = sorted(files, key=_label_sort_key)
+    if method is None:
+        note = _default_order_warning(dataset, category, stems, ds_dir)
+        if note:
+            warnings.warn(note, UserWarning, stacklevel=2)
     if method is not None and category is not None:
         spec = registry.get(method)
         mods = registry.normalize_modalities(modalities)
