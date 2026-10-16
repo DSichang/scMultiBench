@@ -1804,6 +1804,13 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
 
     def _full(lab, batch, clustering=None):
         several = len(set(np.asarray(batch).tolist())) > 1
+        if user_batch and batch_given and not several and metrics is not None \
+                and _names_batch_metric(metrics):
+            # evaluate would ask for the batch that was passed
+            raise ValueError(
+                f"The batch has one value among the {len(batch):,} cells this method "
+                f"embedded, so the batch metrics cannot be computed. Pass a batch "
+                f"that splits these cells.")
         multi = use_batch and several
         chosen = metrics if embedding else _without_classification(metrics, multi)
         if not embedding:
@@ -2762,13 +2769,21 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
             blocked = blocked.loc[[r.name for r, _ in shown]]
             lacking = (f"\n{n_lacking} {'row needs' if n_lacking == 1 else 'rows need'} "
                        f"files that {dataset} does not have.")
+    if methods and not every and not (platform and others is not None):
+        # the rows whose files the folder holds; the others are only counted
+        held = [i for i, r in blocked.iterrows() if _inputs_on_disk(r, dataset, data_path)]
+        if held and len(held) < len(blocked):
+            n = len(blocked) - len(held)
+            blocked = blocked.loc[held]
+            lacking = (f"\n{n} other {'row needs' if n == 1 else 'rows need'} files that "
+                       f"{dataset} does not have.")
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
         listing = (_other_blocks(blocked, others, requested=True) + lacking
                    if platform and others is not None else
                    f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
-                   + "\n".join(_line(r) for _, r in blocked.iterrows()))
+                   + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
         return (f"{head}.\n{platform}{listing}"
                 f"\n{where} shows these rows. Its files_ok and env_ok columns say "
                 f"which check failed. {doctor} checks the environments.")

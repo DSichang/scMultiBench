@@ -161,17 +161,30 @@ def _unknown_names(unknown, available, kind: str) -> str:
     """The error for ``unknown`` names of ``kind``: a did-you-mean from the
     table (for a method also from the registry), then the names the table has."""
     import difflib
+    from ..engine import registry
     pool = [str(a) for a in available]
-    hints = []
+    absent, hints = [], []          # absent: package methods this table lacks
     for u in unknown:
+        if kind == "method":
+            try:
+                registry.check_method(str(u))
+                absent.append(u)
+                continue
+            except KeyError:
+                pass
         h = difflib.get_close_matches(str(u), pool, n=1, cutoff=0.6)
         if not h and kind == "method":
-            from ..engine import registry
             h = [c for c in (registry.closest_method(str(u)),) if c]
-        hints += h
-    text = f"Unknown {kind if len(unknown) == 1 else kind + 's'} {_and_distinct(unknown)}."
-    if hints:
-        text += f" Did you mean {_and_distinct(hints)}?"
+        hints += [x for x in h if x != str(u)]
+    rest = [u for u in unknown if u not in absent]
+    parts = []
+    if rest:
+        parts.append(f"Unknown {kind if len(rest) == 1 else kind + 's'} {_and_distinct(rest)}."
+                     + (f" Did you mean {_and_distinct(hints)}?" if hints else ""))
+    if absent:
+        parts.append(f"{_and_distinct(absent)} {'is' if len(absent) == 1 else 'are'} "
+                     f"not in this table.")
+    text = " ".join(parts)
     have = sorted(set(pool))
     return text + (f" The table has {_and_distinct(have)}." if have else " The table is empty.")
 
