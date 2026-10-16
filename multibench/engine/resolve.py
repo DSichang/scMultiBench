@@ -329,11 +329,13 @@ def _old_order_error(fn: str, dataset, category, method) -> None:
 def inputs_for(dataset: str, category: str, method: str, *,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
-               check: bool | None = False) -> dict:
+               check: bool | None = True) -> dict:
     """Return the input files a method reads from a dataset folder, by role.
 
-    Paths are absolute, ready for ``mtb.run(inputs=...)``. Pass
-    ``check=True`` to verify the files before a long run.
+    Paths are absolute, ready for ``mtb.run(inputs=...)``. The files are
+    checked before they are returned, so a long run does not start on a
+    missing or malformed file; ``check=False`` only builds the paths (for
+    another host).
 
     Parameters
     ----------
@@ -351,8 +353,8 @@ def inputs_for(dataset: str, category: str, method: str, *,
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
     check : bool | None
-        ``False`` = no checks; ``True`` = raise on a missing or malformed
-        input; ``None`` = warn about missing files.
+        ``True`` (default) = raise on a missing or malformed input;
+        ``False`` = no checks; ``None`` = warn about missing files.
 
     Returns
     -------
@@ -390,8 +392,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     >>> mtb.inputs_for("D11", "vertical", "Matilda")
     {'rna': '/abs/data/D11/rna.h5', 'adt': '/abs/data/D11/adt.h5',
      'cty': '/abs/data/D11/cty.csv'}
-    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda",
-    ...                      modalities=["rna", "adt"], check=True)
+    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
     >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11")
     >>> mtb.inputs_for("D28", "diagonal", "scBridge")
     {'data_dir': '/abs/data/D28/'}

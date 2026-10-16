@@ -86,8 +86,8 @@ def test_seurat_v5_unpaired_folder_fails_the_file_check(tmp_path, envs_installed
     with pytest.raises(ValueError, match="Seurat_v5 needs RNA and ATAC from the same cells"):
         mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
     # check=False keeps returning the paths
-    assert set(mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path)) == \
-        {"rna", "atac_peak"}
+    assert set(mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path,
+                              check=False)) == {"rna", "atac_peak"}
 
 
 def test_seurat_v5_paired_folder_passes(tmp_path, envs_installed):
@@ -307,7 +307,8 @@ def test_unitednet_still_reads_an_older_rna_cty_file(tmp_path):
 
 def test_rna_cty_next_to_atac_cty_is_not_paired_labels(root, tmp_path):
     """In a diagonal folder rna_cty.csv labels the RNA cells only."""
-    got = mtb.inputs_for("D28", "vertical", "UnitedNet", data_path=root / "data")
+    got = mtb.inputs_for("D28", "vertical", "UnitedNet", data_path=root / "data",
+                         check=False)
     assert got["cty"].endswith("/D28/cty.csv")
     row = _row("D28", "vertical", "UnitedNet", root / "data")
     assert not row["files_ok"] and "cty.csv is missing." in row["reason"]

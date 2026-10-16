@@ -32,7 +32,7 @@ def test_inputs_for_gene_activity_alias(tmp_path):
 def test_inputs_for_falls_back_to_canonical_name(tmp_path):
     # when no candidate file exists, fall back to <role>.h5 (best effort)
     data = _make_diag(tmp_path, ["rna.h5"])
-    inputs = resolve.inputs_for("D27", "diagonal", "SCALEX", data_path=data)
+    inputs = resolve.inputs_for("D27", "diagonal", "SCALEX", data_path=data, check=False)
     assert inputs["atac_gas"].endswith("/D27/atac_gas.h5")
 
 
@@ -189,8 +189,8 @@ def test_inputs_for_check_true_rejects_data_dir_without_the_named_files(tmp_path
                                                 r"rna_cty\.csv and atac_cty\.csv, and "
                                                 r".*D27 has none of them\."):
         resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path, check=True)
-    # default (warn-only) still hands back the directory
-    got = resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path)
+    # check=False still hands back the directory
+    got = resolve.inputs_for("D27", "diagonal", "scBridge", data_path=tmp_path, check=False)
     assert got["data_dir"].rstrip("/").endswith("D27")
 
 

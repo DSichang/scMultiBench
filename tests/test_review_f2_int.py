@@ -173,7 +173,7 @@ def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
 
 # ====================================================== cell checks in run()
 def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
-    inp = mtb.inputs_for("D28", "diagonal", "Seurat_v5")
+    inp = mtb.inputs_for("D28", "diagonal", "Seurat_v5", check=False)
     want = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, "
             "rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
     for dry in (True, False):

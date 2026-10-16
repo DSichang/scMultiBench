@@ -58,7 +58,7 @@ def test_inputs_for_check_none_warns_on_missing(tmp_path):
     assert "Pass check=True to raise this as an error" in msg
 
 
-def test_inputs_for_check_false_is_silent_and_is_the_default(tmp_path):
+def test_inputs_for_check_false_is_silent_and_check_is_the_default(tmp_path):
     import warnings
     d = tmp_path / "D27"; d.mkdir()
     (d / "rna.h5").write_text("")
@@ -66,8 +66,10 @@ def test_inputs_for_check_false_is_silent_and_is_the_default(tmp_path):
         warnings.simplefilter("error")
         got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path,
                                  check=False)
-        assert resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path) == got
     assert "atac_peak" in got
+    # since 0.4 the default checks the files (it was check=False)
+    with pytest.raises(FileNotFoundError, match="needs atac_peak.h5"):
+        resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path)
 
 
 def test_inputs_for_default_no_warning_when_present(tmp_path):

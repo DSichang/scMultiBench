@@ -103,13 +103,16 @@ def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods,
 def test_inputs_for_keeps_a_variants_own_roles_and_matching_tokens(data):
     # moETM's role is named atac_gas although it reads peaks: its own roles work
     assert "atac_gas" in mtb.inputs_for("D11", "vertical", "moETM",
-                                        modalities=["rna", "atac_gas"], data_path=data)
+                                        modalities=["rna", "atac_gas"], data_path=data,
+                                        check=False)
     assert "atac_gas" in mtb.inputs_for("D11", "vertical", "moETM",
-                                        modalities=["rna", "peak"], data_path=data)
+                                        modalities=["rna", "peak"], data_path=data,
+                                        check=False)
     assert "atac" in mtb.inputs_for("D11", "vertical", "Matilda",
-                                    modalities=["rna", "peak"], data_path=data)
+                                    modalities=["rna", "peak"], data_path=data, check=False)
     assert "atac_gas" in mtb.inputs_for("D28", "diagonal", "SCALEX",
-                                        modalities=["rna", "atac"], data_path=data)
+                                        modalities=["rna", "atac"], data_path=data,
+                                        check=False)
 
 
 def test_the_vocabulary_message_calls_peak_and_gas_representation_tokens():
